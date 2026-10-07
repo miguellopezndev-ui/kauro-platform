@@ -14,7 +14,7 @@
 import { readFileSync } from "node:fs";
 import { isApplicationOrigin } from "@kauro/application";
 import type { Environment } from "@kauro/domain";
-import { ENVIRONMENTS } from "@kauro/domain";
+import { ENVIRONMENTS, PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
 import { DEFAULT_MIGRATOR_CONNECT_TIMEOUT_MS, DEFAULT_MIGRATOR_LOCK_TIMEOUT_MS, DEFAULT_MIGRATOR_STATEMENT_TIMEOUT_MS } from "@kauro/persistence";
 
 export interface DatabaseConnectionConfig {
@@ -148,6 +148,21 @@ export const MIGRATOR_PASSWORD_VARIABLE = "KAURO_DB_MIGRATOR_PASSWORD";
 /** The migrator's password as a file (a mounted secret): the one-shot job, or LOCAL migrations on start (N7). */
 export const MIGRATOR_PASSWORD_FILE_VARIABLE = "KAURO_DB_MIGRATOR_PASSWORD_FILE";
 
+/**
+ * The unit of work's statement_timeout (D10-GAP-6a, ADV-14): never above PROVIDER_CALL_TIMEOUT_MS. The bound of a call made inside a unit of
+ * work ends the wait and the unit abandons its backend; statement_timeout is what still ends that backend if the explicit end failed, so a
+ * larger value would let an abandoned CMD043 backend hold its locks (the agency row included) for the difference. Refused outside LOCAL.
+ */
+export function statementTimeoutOf(env: Env, environment: Environment): number {
+  const ms = integer(env, "KAURO_DB_STATEMENT_TIMEOUT_MS", PROVIDER_CALL_TIMEOUT_MS, 100, 120_000);
+  // LOCAL only keeps the wider range: the lock-race tests of the harness (operability, R35) hold a lock for 10+ s and need the waiting command
+  // to outlive the observation; no deployment (SANDBOX, LIVE) can run above the bound
+  if (ms > PROVIDER_CALL_TIMEOUT_MS && environment !== "LOCAL") {
+    throw new ConfigError("KAURO_DB_STATEMENT_TIMEOUT_MS", `must not exceed the provider call bound (${PROVIDER_CALL_TIMEOUT_MS} ms): an abandoned unit's backend would hold its locks beyond the bound (D10-GAP-6a)`);
+  }
+  return ms;
+}
+
 export class ConfigError extends Error {
   constructor(variable: string, problem: string) {
     super(`${variable}: ${problem}`);
@@ -276,7 +291,7 @@ export function loadConfig(env: Env = process.env): ApiConfig {
       user: runtimeUser,
       ...(runtimePassword === undefined ? {} : { password: runtimePassword }),
       poolMax: integer(env, "KAURO_DB_POOL_MAX", undefined, 1, API_POOL_CEILING),
-      statementTimeoutMs: integer(env, "KAURO_DB_STATEMENT_TIMEOUT_MS", 10_000, 100, 120_000),
+      statementTimeoutMs: statementTimeoutOf(env, environment),
     },
     migrateOnStart,
     bearerTokensFile,

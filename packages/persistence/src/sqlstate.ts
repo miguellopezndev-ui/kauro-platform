@@ -168,6 +168,10 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   "40P01": { code: "CAPACITY_UNAVAILABLE", retryable: true },
   "55P03": { code: "CAPACITY_UNAVAILABLE", retryable: true },
   "57014": { code: "CAPACITY_UNAVAILABLE", retryable: true },
+  // the database ended the session itself: transaction_timeout (the limit of a bounded unit, D10-GAP-6a) or an administrator's termination.
+  // The unit never committed, so the caller's retry with the same key is safe: the same retriable refusal as a statement timeout
+  "25P04": { code: "CAPACITY_UNAVAILABLE", retryable: true },
+  "57P01": { code: "CAPACITY_UNAVAILABLE", retryable: true },
 });
 
 /**

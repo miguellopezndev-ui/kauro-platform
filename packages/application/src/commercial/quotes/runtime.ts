@@ -9,7 +9,8 @@ import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { AgencyId, ProjectId, QuoteId, RecurrenceRepository, UnitOfWork } from "@kauro/domain";
 import type { CommerceRequestCollaborators } from "../../commerce/request/runtime.js";
 import type { PurchaseRebinder } from "../../commerce/ports.js";
-import type { BuyerTypeReader } from "../ports.js";
+import type { LateFailureSink } from "../call-bound.js";
+import type { BuyerTypeReader, ProviderCallTimer } from "../ports.js";
 
 /** The reads CMD027 relies on beyond B06's and B09's repositories (@kauro/persistence quoteReadsOf). */
 export interface QuoteReads {
@@ -47,6 +48,10 @@ export interface QuoteCollaborators {
   readonly reads: (uow: UnitOfWork) => QuoteReads;
   /** B09's re-binding of a paid capture to the replacement quote (D-QUOTE-B6); null: not bound (a replacement answers PROVIDER_SERVICES_UNAVAILABLE). */
   readonly rebinder: PurchaseRebinder | null;
+  /** The bound of the re-binding's call (PROVIDER_CALL_TIMEOUT_MS): realProviderCallTimer when absent; a fault cell binds a clock-driven one. */
+  readonly providerTimer?: ProviderCallTimer;
+  /** Where the failure of a re-binding after its bound elapsed goes (stderr when absent). */
+  readonly onLateFailure?: LateFailureSink;
   /** Test-only hold of the replacement protocol. */
   readonly hold?: (point: QuoteHoldPoint) => Promise<void>;
 }

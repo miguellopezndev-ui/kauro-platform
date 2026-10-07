@@ -12,6 +12,8 @@ import { after, before, test } from "node:test";
 import { MigratorRoleError, PrivilegedRoleError, listMigrations } from "@kauro/persistence";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "@kauro/persistence/testing";
 import { BearerTokenFileError, ConfigError, authenticatorOf, bootstrap, loadConfig, parseBearerTokenFile } from "../src/index.js";
+import { statementTimeoutOf } from "../src/config.js";
+import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
 
 let pg: TemporaryPostgres;
 let dir: string;
@@ -90,6 +92,16 @@ test("configuration: every variable is validated and a missing or malformed one 
   for (const bad of ["0", "5", "24", "25", "ten", "-1", "2.5"]) assert.throws(() => loadConfig(envOf({ KAURO_DB_POOL_MAX: bad })), configError("KAURO_DB_POOL_MAX"), bad);
   assert.throws(() => loadConfig(envOf({ KAURO_DB_PORT: "70000" })), configError("KAURO_DB_PORT"));
   assert.throws(() => loadConfig(envOf({ KAURO_DB_STATEMENT_TIMEOUT_MS: "5" })), configError("KAURO_DB_STATEMENT_TIMEOUT_MS"));
+  // D10-GAP-6a (ADV-14): outside LOCAL the statement timeout never exceeds the provider call bound; equal to it is accepted, and so is any smaller value
+  const timeoutOf = (value: string | undefined, environment: "LOCAL" | "SANDBOX" | "LIVE"): number => statementTimeoutOf(value === undefined ? {} : { KAURO_DB_STATEMENT_TIMEOUT_MS: value }, environment);
+  for (const environment of ["SANDBOX", "LIVE"] as const) {
+    assert.throws(() => timeoutOf(String(PROVIDER_CALL_TIMEOUT_MS + 1), environment), configError("KAURO_DB_STATEMENT_TIMEOUT_MS"), environment);
+    assert.throws(() => timeoutOf("60000", environment), (e: unknown) => configError("KAURO_DB_STATEMENT_TIMEOUT_MS")(e) && (e as Error).message.includes("provider call bound"), environment);
+    assert.equal(timeoutOf(String(PROVIDER_CALL_TIMEOUT_MS), environment), PROVIDER_CALL_TIMEOUT_MS, "equal to the bound is accepted");
+    assert.equal(timeoutOf("5000", environment), 5_000);
+    assert.equal(timeoutOf(undefined, environment), PROVIDER_CALL_TIMEOUT_MS, "the default is the bound");
+  }
+  assert.equal(loadConfig(envOf({ KAURO_DB_STATEMENT_TIMEOUT_MS: "30000" })).database.statementTimeoutMs, 30_000, "LOCAL keeps the wide range: the harness's lock races need it");
   assert.throws(() => loadConfig(envOf({ KAURO_DB_MIGRATE_ON_START: "yes" })), configError("KAURO_DB_MIGRATE_ON_START"));
   // migration roles are separate from runtime: migrating on start names its own role, never the runtime login
   assert.throws(() => loadConfig(envOf({ KAURO_DB_MIGRATE_ON_START: "true" })), configError("KAURO_DB_MIGRATOR_USER"));
