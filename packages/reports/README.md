@@ -9,11 +9,14 @@ HTML and PDF are rendered in the worker over the model this package builds.
 
 - `package` — `readMigrationPackage(files)`: reads one Migration Core 3.0.0 package (format 2.1.0) and refuses it unless its
   closed inventory, every length, SHA-256 and record count, and the reconciliation's equations agree with the bytes; the
-  reconciliation is cross-checked against the import files, the crosswalk and the lineage (CMD039).
+  reconciliation is cross-checked against the import files, the crosswalk, the lineage and the relationship table; every
+  string it returns is from the core's closed vocabularies except the agency's file names (`UntrustedText`) (CMD039, S069).
 - `model` — `buildReportModel(pkg, facts)`: every figure carries the package file and locator it came from; the billable
   source units come from the frozen quote and stand beside the physical rows and the output rows (R2-065); the import
-  guide names only `01_IMPORT` machine files (R2-069); the issuer comes from the terms snapshot, never from branding (R2-070);
-  the registry `ReportSnapshot` with the canonical model hash.
+  guide names only `01_IMPORT` machine files (R2-069); the issuer comes from the terms facts, never from branding (R2-070);
+  the model is bound to the platform's record of the package (`expectedManifestSha256`), says whether its counts are bound
+  (`countsBinding`), is a deep-frozen copy, and carries the registry `ReportSnapshot` with
+  `structuredDigest(DOMAINS.REPORT_MODEL, 1, model)`.
 - `problems` — the closed refusal vocabulary; a refusal never quotes a value from inside a file.
 - `csv` — strict UTF-8, RFC 4180 record reading.
 

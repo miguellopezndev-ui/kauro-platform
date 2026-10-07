@@ -8,26 +8,21 @@
  * units, comes from the frozen quote the platform hands in, and is shown beside — never instead of — the physical source rows and
  * the output rows (R2-065).
  *
- * The issuer of the service (legal identity) comes only from the terms snapshot; branding carries a display name and a logo
- * reference and nothing that could stand in for the issuer (R2-070).
+ * The model is bound to the platform's record of the package (`expectedManifestSha256`), states whether its counts were bound to
+ * the platform's own RowCounts (`countsBinding`), and is a frozen deep copy, so nothing a caller does after hashing changes it.
+ * Every string in it is from a closed vocabulary or fenced text, except the agency's file names, typed `UntrustedText` (S069).
  */
-import { createHash } from "node:crypto";
-import { canonicalBytes, isSha256Hex } from "@kauro/contracts";
+import { DOMAINS, isSha256Hex, structuredDigest } from "@kauro/contracts";
 import type { ReportSnapshot, RowCounts } from "@kauro/contracts";
-import { LINEAGE_PATH, MANIFEST_PATH, OBJECT_ORDER, RECONCILIATION_PATH } from "./package.js";
-import type { ArtifactKind, CoreObject, PackageArtifact, VerifiedPackage } from "./package.js";
+import { isVerifiedPackage, LINEAGE_PATH, OBJECT_ORDER, RECONCILIATION_PATH } from "./package.js";
+import type { ArtifactKind, CoreObject, PackageArtifact, UntrustedText, VerifiedPackage } from "./package.js";
 import { Problems } from "./problems.js";
 
 /** Version of this model's shape; a change to any field below changes it. */
-export const REPORT_MODEL_VERSION = "1.0.0";
-/**
- * Domain of the model hash (the canonical wrapper of `@kauro/contracts` digest: {domain, version, payload}). Provisional here
- * until `DOMAINS` in `@kauro/contracts` carries it (requested of B in the PR); the bytes are identical either way.
- */
-export const REPORT_MODEL_DOMAIN = "KAURO_REPORT_MODEL_V1";
+export const REPORT_MODEL_VERSION = "2.0.0";
 
 export interface FigureSource {
-  /** The package file the value was read from (`input:quote` for the one platform fact). */
+  /** The package file or area the value was read from (`input:quote` for the one platform fact). */
   readonly artifact: string;
   /** Where in it: a JSON pointer, or the selection of CSV records that were counted. */
   readonly locator: string;
@@ -57,19 +52,26 @@ export interface LegalIssuer {
 export interface PlatformFacts {
   readonly reportId: string;
   readonly packageId: string;
+  /** The manifest SHA-256 the platform recorded for `packageId` when the package was accepted; the package must match it. */
+  readonly expectedManifestSha256: string;
   readonly privacyClass: PrivacyClass;
   /** From the frozen quote the order captured; never derived from the package. */
   readonly billableSourceUnits: number;
   readonly quoteId: string;
   readonly branding: Branding;
   readonly termsVersion: string;
+  /** SHA-256 of the terms document the issuer is read from (the model records it; it cannot read the terms itself). */
+  readonly termsSha256: string;
   readonly issuer: LegalIssuer;
   readonly findingIds: readonly string[];
   readonly materialDecisionIds: readonly string[];
   readonly rendererVersion: string;
-  /** The platform's PackageManifest counts, when its assembler recorded them: they must equal what the bytes prove. */
+  /** The platform's RowCounts for this package (sealed-revision populations and the validation receipt), or null while none exist. */
   readonly declaredCounts: RowCounts | null;
 }
+
+/** BOUND: every count equals the platform's own RowCounts. UNBOUND: the platform supplied none, and the report must say so. */
+export type CountsBinding = "BOUND" | "UNBOUND";
 
 export type ArtifactUse = "IMPORT" | "EXCEPTION" | "TRACEABILITY" | "HUMAN_VIEW" | "DOCUMENT";
 
@@ -88,7 +90,7 @@ export interface ImportStep {
   readonly sha256: string;
   /** The destination object of a record file, or the two ends of an association file. */
   readonly object: CoreObject | null;
-  readonly association: { readonly from: string; readonly to: string } | null;
+  readonly association: { readonly from: CoreObject; readonly to: CoreObject } | null;
   /** 1-based part number when the core cut the table into numbered parts, else null. */
   readonly part: number | null;
   readonly records: Figure;
@@ -96,8 +98,8 @@ export interface ImportStep {
 
 export interface ReportInput {
   readonly fileId: string;
-  /** Present only in SECURE_DETAIL and INTERNAL_EVIDENCE reports: the agency's own file name, untrusted text. */
-  readonly fileName: string | null;
+  /** Present only in SECURE_DETAIL and INTERNAL_EVIDENCE reports. */
+  readonly fileName: UntrustedText | null;
   readonly sha256: string;
   readonly byteLength: number;
   readonly dataRows: Figure;
@@ -108,6 +110,7 @@ export interface ReportModel {
   readonly reportId: string;
   readonly packageId: string;
   readonly privacyClass: PrivacyClass;
+  readonly countsBinding: CountsBinding;
   readonly package: {
     readonly packageDigest: string;
     readonly manifestSha256: string;
@@ -122,11 +125,11 @@ export interface ReportModel {
   readonly artifacts: readonly ReportArtifact[];
   readonly importGuide: readonly ImportStep[];
   readonly exceptions: readonly ReportArtifact[];
-  readonly reasonCodes: readonly { readonly code: string; readonly occurrences: Figure }[];
   readonly lineage: { readonly artifact: string; readonly sha256: string; readonly rows: Figure; readonly inputs: readonly ReportInput[] };
   readonly issuer: LegalIssuer;
   readonly branding: Branding;
   readonly termsVersion: string;
+  readonly termsSha256: string;
   readonly quoteId: string;
   readonly findingIds: readonly string[];
   readonly materialDecisionIds: readonly string[];
@@ -135,19 +138,25 @@ export interface ReportModel {
 
 export interface VerifiedReport {
   readonly model: ReportModel;
-  /** SHA-256 of the canonical {domain, version, payload: model} wrapper: the renderer's exact input. */
+  /** `structuredDigest(DOMAINS.REPORT_MODEL, 1, model)`: the renderer's exact input. */
   readonly modelHash: string;
+  /** The registry ReportSnapshot (closed contract). Whether its counts are bound is in the model, under `modelHash`. */
   readonly snapshot: ReportSnapshot;
+  readonly countsBinding: CountsBinding;
 }
 
 const fig = (value: number, artifact: string, locator: string): Figure => ({ value, source: { artifact, locator } });
 const recon = (value: number, pointer: string): Figure => fig(value, RECONCILIATION_PATH, pointer);
 
-/** C0/C1 controls, bidirectional overrides and isolates, and markup characters: refused in branding and issuer text (S069). */
-const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f؜‎‏‪-‮⁦-⁩<>]/u;
+/**
+ * Refused in brand and issuer text (S069): controls (Cc), format characters (Cf: bidirectional controls, zero-width
+ * characters, U+FEFF), line and paragraph separators (Zl, Zp), and the characters that change meaning in HTML text or an
+ * attribute (`<`, `>`, `"`, `'`, `&`, `` ` ``). The renderer escapes everything anyway; this is the earlier of two fences.
+ */
+const UNSAFE_TEXT = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}<>"'&`]/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const PRIVACY_CLASSES: readonly PrivacyClass[] = ["AGENCY_SUMMARY", "SECURE_DETAIL", "INTERNAL_EVIDENCE"];
-const FACT_KEYS = ["reportId", "packageId", "privacyClass", "billableSourceUnits", "quoteId", "branding", "termsVersion", "issuer", "findingIds", "materialDecisionIds", "rendererVersion", "declaredCounts"];
+const FACT_KEYS = ["reportId", "packageId", "expectedManifestSha256", "privacyClass", "billableSourceUnits", "quoteId", "branding", "termsVersion", "termsSha256", "issuer", "findingIds", "materialDecisionIds", "rendererVersion", "declaredCounts"];
 const ROW_COUNT_KEYS: readonly (keyof RowCounts)[] = [
   "physicalSourceRows",
   "logicalSourceRecords",
@@ -172,6 +181,7 @@ function checkFacts(facts: unknown, problems: Problems): facts is PlatformFacts 
   }
   const f = facts;
   for (const key of ["reportId", "packageId", "quoteId", "termsVersion", "rendererVersion"] as const) if (typeof f[key] !== "string" || !ID.test(f[key])) problems.add("FACTS_MALFORMED", key, "not an identifier");
+  for (const key of ["expectedManifestSha256", "termsSha256"] as const) if (!isSha256Hex(f[key])) problems.add("FACTS_MALFORMED", key, "not a SHA-256");
   if (!PRIVACY_CLASSES.includes(f["privacyClass"] as PrivacyClass)) problems.add("FACTS_MALFORMED", "privacyClass", "unknown privacy class");
   const units = f["billableSourceUnits"];
   if (typeof units !== "number" || !Number.isSafeInteger(units) || units < 0) problems.add("FACTS_MALFORMED", "billableSourceUnits", "not a non-negative integer");
@@ -183,7 +193,7 @@ function checkFacts(facts: unknown, problems: Problems): facts is PlatformFacts 
   if (!isObject(branding) || !exactKeys(branding, ["version", "displayName", "logo"])) problems.add("FACTS_MALFORMED", "branding", "branding is not the closed Branding object");
   else {
     if (typeof branding["version"] !== "string" || !ID.test(branding["version"])) problems.add("FACTS_MALFORMED", "branding.version", "not an identifier");
-    if (!safeText(branding["displayName"], 120)) problems.add("BRANDING_UNSAFE", "branding.displayName", "empty, too long, not NFC, or holds a control, bidirectional or markup character");
+    if (!safeText(branding["displayName"], 120)) problems.add("BRANDING_UNSAFE", "branding.displayName", "empty, too long, not NFC, or holds a control, format, separator or markup-significant character");
     const logo = branding["logo"];
     if (logo !== null && (!isObject(logo) || !exactKeys(logo, ["sha256", "mediaType"]) || !isSha256Hex(logo["sha256"]) || (logo["mediaType"] !== "image/png" && logo["mediaType"] !== "image/jpeg")))
       problems.add("BRANDING_UNSAFE", "branding.logo", "a logo is a stored PNG or JPEG named by its SHA-256, never a URL or SVG");
@@ -213,7 +223,6 @@ function useOf(artifact: PackageArtifact): ArtifactUse {
 }
 
 const NUMBERED_PART = /-([0-9]{3})\.csv$/;
-const ASSOCIATION_FILE = /\/associations\/([a-z]+)_to_([a-z]+)\.csv$/;
 
 function importGuide(pkg: VerifiedPackage): ImportStep[] {
   const imports = pkg.artifacts.filter((a) => a.kind === "MACHINE_IMPORT_CSV");
@@ -221,35 +230,54 @@ function importGuide(pkg: VerifiedPackage): ImportStep[] {
     const m = NUMBERED_PART.exec(path);
     return m === null ? null : Number(m[1]);
   };
+  const objectOf = (path: string): CoreObject | null => pkg.importFiles.get(path)?.object ?? null;
   const records = imports
-    .filter((a) => pkg.importObjects.has(a.path))
+    .filter((a) => objectOf(a.path) !== null)
     .sort((a, b) => {
-      const byObject = OBJECT_ORDER.indexOf(pkg.importObjects.get(a.path) as CoreObject) - OBJECT_ORDER.indexOf(pkg.importObjects.get(b.path) as CoreObject);
+      const byObject = OBJECT_ORDER.indexOf(objectOf(a.path) as CoreObject) - OBJECT_ORDER.indexOf(objectOf(b.path) as CoreObject);
       return byObject !== 0 ? byObject : (partOf(a.path) ?? 0) - (partOf(b.path) ?? 0) || (a.path < b.path ? -1 : 1);
     });
-  const edges = imports.filter((a) => !pkg.importObjects.has(a.path)).sort((a, b) => (a.path < b.path ? -1 : 1));
-  return [...records, ...edges].map((a, index) => {
-    const edge = ASSOCIATION_FILE.exec(a.path);
-    return {
-      order: index + 1,
-      path: a.path,
-      sha256: a.sha256,
-      object: pkg.importObjects.get(a.path) ?? null,
-      association: edge === null ? null : { from: (edge[1] as string).toUpperCase(), to: (edge[2] as string).toUpperCase() },
-      part: partOf(a.path),
-      records: fig(a.rowCount ?? 0, a.path, "records excluding the header"),
-    };
-  });
+  const edges = imports.filter((a) => objectOf(a.path) === null).sort((a, b) => (a.path < b.path ? -1 : 1));
+  return [...records, ...edges].map((a, index) => ({
+    order: index + 1,
+    path: a.path,
+    sha256: a.sha256,
+    object: objectOf(a.path),
+    association: pkg.importFiles.get(a.path)?.association ?? null,
+    part: partOf(a.path),
+    records: fig(a.rowCount ?? 0, a.path, "records excluding the header"),
+  }));
+}
+
+function deepFreeze<T>(value: T): T {
+  if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
+    for (const v of Object.values(value)) deepFreeze(v);
+    Object.freeze(value);
+  }
+  return value;
 }
 
 /**
- * Builds the model, or refuses with every problem found. `facts` is taken as `unknown` because it crosses a trust boundary
- * (it is assembled from database rows and a stored branding version) and is checked as a closed object here.
+ * Builds the model, or refuses with every problem found. `pkg` must come from `readMigrationPackage` (a look-alike object is
+ * refused); `facts` is taken as `unknown` because it crosses a trust boundary (database rows and a stored branding version) and
+ * is checked as a closed object here.
  */
 export function buildReportModel(pkg: VerifiedPackage, facts: unknown): VerifiedReport {
   const problems = new Problems();
-  if (!checkFacts(facts, problems)) problems.throwIfAny();
-  const f = facts as PlatformFacts;
+  if (!isVerifiedPackage(pkg)) {
+    problems.add("PACKAGE_UNVERIFIED", "pkg", "the package was not produced by readMigrationPackage");
+    problems.throwIfAny();
+  }
+  // Checked on a private copy, so what is checked is what is used (a getter or a later mutation cannot change it).
+  let copy: unknown;
+  try {
+    copy = structuredClone(facts);
+  } catch {
+    copy = undefined;
+  }
+  if (!checkFacts(copy, problems)) problems.throwIfAny();
+  const f = copy as PlatformFacts;
+  if (f.expectedManifestSha256 !== pkg.manifestSha256) problems.add("PACKAGE_BINDING_MISMATCH", "expectedManifestSha256", "the package is not the one the platform recorded for this packageId");
   const rec = pkg.reconciliation;
   const rows = rec.sourceRows.byDisposition;
   const edges = rec.associations.byDisposition;
@@ -257,6 +285,7 @@ export function buildReportModel(pkg: VerifiedPackage, facts: unknown): Verified
 
   // RowCounts, each named denominator from one place (design §3). The counters are over physical source rows except
   // logicalSourceRecords (lineage RECORD rows), associationEdges (source edges) and emittedArtifactRows (import file records).
+  // Every reconciliation figure below was cross-checked against the evidence tables by readMigrationPackage.
   const counts: ReportModel["counts"] = {
     physicalSourceRows: recon(rec.sourceRows.total, "/sourceRows/total"),
     logicalSourceRecords: fig(pkg.lineage.recordRows, LINEAGE_PATH, "records with contribution_kind=RECORD"),
@@ -267,12 +296,13 @@ export function buildReportModel(pkg: VerifiedPackage, facts: unknown): Verified
     rejected: recon(rows.REJECTED_INPUT, "/sourceRows/byDisposition/REJECTED_INPUT"),
     withheld: recon(rows.ISOLATED + rows.LEFTOVER, "/sourceRows/byDisposition/ISOLATED + /sourceRows/byDisposition/LEFTOVER"),
     unresolved: recon(rec.sourceRows.withoutDisposition + rec.associations.withoutDisposition, "/sourceRows/withoutDisposition + /associations/withoutDisposition"),
-    emittedArtifactRows: fig(importRows, MANIFEST_PATH, "records of every MACHINE_IMPORT_CSV, counted from its bytes"),
+    emittedArtifactRows: fig(importRows, "01_IMPORT", "records of every MACHINE_IMPORT_CSV under 01_IMPORT, counted from its bytes"),
   };
   // "unresolved: Nonterminal decisions; positive value blocks final acceptance" — a report is not built over them.
   if (counts.unresolved.value > 0) problems.add("UNRESOLVED_DECISIONS", RECONCILIATION_PATH, "source rows or relationships have no disposition");
+  const countsBinding: CountsBinding = f.declaredCounts === null ? "UNBOUND" : "BOUND";
   if (f.declaredCounts !== null)
-    for (const key of ROW_COUNT_KEYS) if (f.declaredCounts[key] !== counts[key].value) problems.add("DECLARED_COUNTS_MISMATCH", `declaredCounts.${key}`, "the platform manifest's count differs from what the package bytes prove");
+    for (const key of ROW_COUNT_KEYS) if (f.declaredCounts[key] !== counts[key].value) problems.add("DECLARED_COUNTS_MISMATCH", `declaredCounts.${key}`, "the platform's count differs from what the package bytes prove");
   problems.throwIfAny();
 
   const artifacts: ReportArtifact[] = pkg.artifacts.map((a) => ({
@@ -287,43 +317,44 @@ export function buildReportModel(pkg: VerifiedPackage, facts: unknown): Verified
   const showNames = f.privacyClass !== "AGENCY_SUMMARY";
   const lineageArtifact = pkg.artifacts.find((a) => a.path === LINEAGE_PATH) as PackageArtifact;
 
-  const model: ReportModel = {
-    modelVersion: REPORT_MODEL_VERSION,
-    reportId: f.reportId,
-    packageId: f.packageId,
-    privacyClass: f.privacyClass,
-    package: { packageDigest: pkg.packageDigest, manifestSha256: pkg.manifestSha256, coreVersion: pkg.coreVersion, packageFormat: pkg.packageFormat, runId: pkg.runId, target: pkg.target },
-    counts,
-    deliveredByObject,
-    relationships: {
-      sourceEdges: counts.associationEdges,
-      delivered: recon(edges.OUTPUT, "/associations/byDisposition/OUTPUT"),
-      leftover: recon(edges.LEFTOVER, "/associations/byDisposition/LEFTOVER"),
-      unresolved: recon(edges.UNRESOLVED, "/associations/byDisposition/UNRESOLVED"),
-      deduplicated: recon(edges.DEDUPLICATED, "/associations/byDisposition/DEDUPLICATED"),
-    },
-    artifacts,
-    importGuide: importGuide(pkg),
-    exceptions: artifacts.filter((a) => a.path.startsWith("02_EXCEPTIONS/")),
-    reasonCodes: Object.keys(rec.reasonCodeTally)
-      .sort()
-      .map((code) => ({ code, occurrences: recon(rec.reasonCodeTally[code] as number, `/reasonCodeTally/${code}`) })),
-    lineage: {
-      artifact: LINEAGE_PATH,
-      sha256: lineageArtifact.sha256,
-      rows: fig(pkg.lineage.rows, LINEAGE_PATH, "records excluding the header"),
-      inputs: pkg.inputs.map((i) => ({ fileId: i.fileId, fileName: showNames ? i.path : null, sha256: i.sha256, byteLength: i.byteLength, dataRows: fig(i.dataRowCount, MANIFEST_PATH, `/inputs[fileId=${i.fileId}]/sheets/*/dataRowCount`) })),
-    },
-    issuer: f.issuer,
-    branding: f.branding,
-    termsVersion: f.termsVersion,
-    quoteId: f.quoteId,
-    findingIds: [...f.findingIds],
-    materialDecisionIds: [...f.materialDecisionIds],
-    rendererVersion: f.rendererVersion,
-  };
-  const modelHash = createHash("sha256").update(canonicalBytes({ domain: REPORT_MODEL_DOMAIN, version: 1, payload: model })).digest("hex");
-  const snapshot: ReportSnapshot = {
+  const model: ReportModel = deepFreeze(
+    structuredClone({
+      modelVersion: REPORT_MODEL_VERSION,
+      reportId: f.reportId,
+      packageId: f.packageId,
+      privacyClass: f.privacyClass,
+      countsBinding,
+      package: { packageDigest: pkg.packageDigest, manifestSha256: pkg.manifestSha256, coreVersion: pkg.coreVersion, packageFormat: pkg.packageFormat, runId: pkg.runId, target: pkg.target },
+      counts,
+      deliveredByObject,
+      relationships: {
+        sourceEdges: counts.associationEdges,
+        delivered: recon(edges.OUTPUT, "/associations/byDisposition/OUTPUT"),
+        leftover: recon(edges.LEFTOVER, "/associations/byDisposition/LEFTOVER"),
+        unresolved: recon(edges.UNRESOLVED, "/associations/byDisposition/UNRESOLVED"),
+        deduplicated: recon(edges.DEDUPLICATED, "/associations/byDisposition/DEDUPLICATED"),
+      },
+      artifacts,
+      importGuide: importGuide(pkg),
+      exceptions: artifacts.filter((a) => a.path.startsWith("02_EXCEPTIONS/")),
+      lineage: {
+        artifact: LINEAGE_PATH,
+        sha256: lineageArtifact.sha256,
+        rows: fig(pkg.lineage.rows, LINEAGE_PATH, "records excluding the header"),
+        inputs: pkg.inputs.map((i) => ({ fileId: i.fileId, fileName: showNames ? i.fileName : null, sha256: i.sha256, byteLength: i.byteLength, dataRows: fig(i.dataRowCount, "manifest.json", `/inputs[fileId=${i.fileId}]/sheets/*/dataRowCount`) })),
+      },
+      issuer: f.issuer,
+      branding: f.branding,
+      termsVersion: f.termsVersion,
+      termsSha256: f.termsSha256,
+      quoteId: f.quoteId,
+      findingIds: f.findingIds,
+      materialDecisionIds: f.materialDecisionIds,
+      rendererVersion: f.rendererVersion,
+    }),
+  );
+  const modelHash = structuredDigest(DOMAINS.REPORT_MODEL, 1, model);
+  const snapshot: ReportSnapshot = deepFreeze({
     reportId: f.reportId,
     packageId: f.packageId,
     counts: Object.fromEntries(ROW_COUNT_KEYS.map((k) => [k, counts[k].value])) as Record<keyof RowCounts, number>,
@@ -334,7 +365,6 @@ export function buildReportModel(pkg: VerifiedPackage, facts: unknown): Verified
     modelHash,
     rendererVersion: f.rendererVersion,
     privacyClass: f.privacyClass,
-  };
-  return { model, modelHash, snapshot };
+  });
+  return Object.freeze({ model, modelHash, snapshot, countsBinding });
 }
-

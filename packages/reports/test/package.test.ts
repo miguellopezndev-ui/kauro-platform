@@ -1,32 +1,39 @@
 // readMigrationPackage over the real Migration Core 3.0.0 acceptance packages (EXECUTED_LOCAL: the core's own bytes, read here)
-// and over forged copies of them (CMD039-OK, CMD039-DENY; design B13-report-model.md §2, §5).
+// and over forged copies of them (CMD039-OK, CMD039-DENY; design B13-report-model.md §2). Every forgery re-declares the altered
+// file's length, hash and count in the manifest, so only the cross-checks against the other evidence can catch it.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readMigrationPackage, ReportModelError } from "../src/index.js";
 import type { ProblemCode } from "../src/index.js";
 import { parseCsv } from "../src/csv.js";
-import { CASES, fileText, forge, loadPackage, manifestOf, writeManifest } from "./support/fixtures.js";
-import type { CaseName } from "./support/fixtures.js";
+import { CASES, fileText, forge, loadPackage, manifestOf, ORACLE, writeManifest } from "./support/fixtures.js";
 
-// Independent oracles. manifestSha256: the core's own acceptance.json. packageDigest: a separate Python implementation of the
-// core's `kauro-package-digest/1` definition run over the fixture directories. Rows: the core's acceptance/README.md table.
-const ORACLE: Record<CaseName, { manifestSha256: string; packageDigest: string; files: number; sourceRows: number; delivered: number; merged: number; isolated: number; edgesDelivered: number; leftover: number }> = {
-  "A-clean-multi-object": { manifestSha256: "69a35b99f6e033d1375ccc0f268adf8d92e09d4c54daf57d2a91a6804bdd985e", packageDigest: "37f98cce23e43a71ad24922ade889f877465e40000bcb00b54d875bbc7ff950a", files: 30, sourceRows: 19, delivered: 15, merged: 0, isolated: 0, edgesDelivered: 12, leftover: 0 },
-  "B-dirty-multinational": { manifestSha256: "20d35be70a587da2ae0cd5e7f65b1ab390eb4da1a794407139153155ba1142c4", packageDigest: "543b767d068a58b856f90968e308f943008b0fbbaa1fcb4e9dd12ee2f2f454e7", files: 23, sourceRows: 8, delivered: 8, merged: 0, isolated: 0, edgesDelivered: 0, leftover: 0 },
-  "C-identity-adversarial": { manifestSha256: "daca27c3d715ad187612d04321cb87d84cda1fbbae3f34aad128d8f4185754aa", packageDigest: "bb1b68fd4d1b47167fea9e5a9ee4ab0c2ac75f5d7d186b02aa231f783129efb9", files: 22, sourceRows: 10, delivered: 3, merged: 2, isolated: 5, edgesDelivered: 0, leftover: 0 },
-  "D-hubspot": { manifestSha256: "6177cda1ce9bacc728b25bb38a7250321a3615cd6dc6818b2cea623b4be82241", packageDigest: "ceab42f60701016c4a67aa6cce82555e36d90a03b767e5f064418d91a0590dd4", files: 28, sourceRows: 16, delivered: 12, merged: 0, isolated: 0, edgesDelivered: 12, leftover: 0 },
-  "D-salesforce": { manifestSha256: "46d9e077930d8dbbf73f934e43d5d6d788423f6683e07307e17adbf7bafb43c4", packageDigest: "232f775956d7d61c2c5e38639a2465c4484b58b8a84f7bb23b7461389c1471ce", files: 30, sourceRows: 19, delivered: 15, merged: 0, isolated: 0, edgesDelivered: 8, leftover: 4 },
-};
+const R = "03_TRACEABILITY/reconciliation.json";
+const X = "03_TRACEABILITY/import-crosswalk.csv";
+const L = "03_TRACEABILITY/source-lineage.csv";
 
-function refusal(files: Map<string, Uint8Array>): ProblemCode[] {
+function refusal(files: Map<string, Uint8Array>): { codes: ProblemCode[]; text: string } {
   try {
     readMigrationPackage(files);
   } catch (error) {
     assert.ok(error instanceof ReportModelError, `expected ReportModelError, got ${String(error)}`);
-    return error.problems.map((p) => p.code);
+    return { codes: error.problems.map((p) => p.code), text: `${error.message} ${JSON.stringify(error.problems)}` };
   }
   assert.fail("the package was accepted");
 }
+const codes = (files: Map<string, Uint8Array>): ProblemCode[] => refusal(files).codes;
+const editJson = (files: Map<string, Uint8Array>, path: string, edit: (json: any) => void): void => {
+  const json = JSON.parse(fileText(files, path));
+  edit(json);
+  forge(files, path, JSON.stringify(json));
+};
+const renameArtifact = (files: Map<string, Uint8Array>, from: string, to: string): void => {
+  const manifest = manifestOf(files);
+  (manifest.artifacts.find((a) => a["path"] === from) as Record<string, unknown>)["path"] = to;
+  files.set(to, files.get(from) as Uint8Array);
+  files.delete(from);
+  writeManifest(files, manifest);
+};
 
 describe("CMD039-OK: every Migration Core 3.0.0 acceptance package verifies and its figures match the core's own record", () => {
   for (const name of CASES) {
@@ -44,6 +51,7 @@ describe("CMD039-OK: every Migration Core 3.0.0 acceptance package verifies and 
       assert.equal(pkg.reconciliation.associations.byDisposition.OUTPUT, oracle.edgesDelivered);
       assert.equal(pkg.reconciliation.sourceRows.byDisposition.LEFTOVER, oracle.leftover);
       assert.equal(pkg.lineage.rows, oracle.sourceRows);
+      assert.ok(Object.isFrozen(pkg) && Object.isFrozen(pkg.reconciliation.sourceRows.byDisposition) && Object.isFrozen(pkg.inputs[0]));
     });
   }
 });
@@ -54,7 +62,7 @@ describe("CMD039-DENY: a package whose bytes, inventory or sums do not hold is r
     const bytes = new Uint8Array(files.get("01_IMPORT/hubspot/contacts.csv") as Uint8Array);
     bytes[bytes.length - 2] = (bytes[bytes.length - 2] as number) ^ 1;
     files.set("01_IMPORT/hubspot/contacts.csv", bytes);
-    assert.deepEqual(refusal(files), ["ARTIFACT_BYTES_MISMATCH"]);
+    assert.deepEqual(codes(files), ["ARTIFACT_BYTES_MISMATCH"]);
   });
 
   it("matching manifest sums with wrong data: a dropped import record, re-declared in the manifest, still fails", () => {
@@ -63,30 +71,25 @@ describe("CMD039-DENY: a package whose bytes, inventory or sums do not hold is r
     const lines = fileText(files, path).split("\n");
     lines.splice(1, 1);
     forge(files, path, lines.join("\n"));
-    const codes = refusal(files);
-    assert.ok(codes.includes("RECONCILIATION_MISMATCH"), codes.join(","));
+    assert.ok(codes(files).includes("RECONCILIATION_MISMATCH"));
   });
 
-  it("a reconciliation rewritten to move a delivered row to leftover, with conserving sums and a re-declared hash, still fails", () => {
+  it("a reconciliation rewritten to move a delivered row to leftover, with conserving sums, still fails", () => {
     const files = loadPackage("A-clean-multi-object");
-    const path = "03_TRACEABILITY/reconciliation.json";
-    const rec = JSON.parse(fileText(files, path));
-    rec.sourceRows.byDisposition.OUTPUT -= 1;
-    rec.sourceRows.byDisposition.LEFTOVER += 1;
-    forge(files, path, JSON.stringify(rec));
-    const codes = refusal(files);
-    assert.ok(codes.includes("RECONCILIATION_MISMATCH"), codes.join(","));
+    editJson(files, R, (r) => {
+      r.sourceRows.byDisposition.OUTPUT -= 1;
+      r.sourceRows.byDisposition.LEFTOVER += 1;
+    });
+    assert.ok(codes(files).includes("RECONCILIATION_MISMATCH"));
   });
 
   it("dispositions that do not sum to the total fail even though the core's own equationHolds flag says true", () => {
     const files = loadPackage("B-dirty-multinational");
-    const path = "03_TRACEABILITY/reconciliation.json";
-    const rec = JSON.parse(fileText(files, path));
-    rec.sourceRows.total += 1;
-    assert.equal(rec.sourceRows.equationHolds, true);
-    forge(files, path, JSON.stringify(rec));
-    const codes = refusal(files);
-    assert.ok(codes.includes("RECONCILIATION_MISMATCH"), codes.join(","));
+    editJson(files, R, (r) => {
+      assert.equal(r.sourceRows.equationHolds, true);
+      r.sourceRows.total += 1;
+    });
+    assert.ok(codes(files).includes("RECONCILIATION_MISMATCH"));
   });
 
   it("an input whose declared data rows differ from the reconciled source rows fails", () => {
@@ -95,49 +98,24 @@ describe("CMD039-DENY: a package whose bytes, inventory or sums do not hold is r
     const inputs = manifest["inputs"] as { sheets: { dataRowCount: number }[] }[];
     (inputs[0]?.sheets[0] as { dataRowCount: number }).dataRowCount += 1;
     writeManifest(files, manifest);
-    assert.deepEqual(refusal(files), ["RECONCILIATION_MISMATCH"]);
+    assert.deepEqual(codes(files), ["RECONCILIATION_MISMATCH"]);
   });
 
   it("a declared record count that differs from the records in the bytes fails", () => {
     const files = loadPackage("C-identity-adversarial");
     const manifest = manifestOf(files);
-    const entry = manifest.artifacts.find((a) => a["path"] === "02_EXCEPTIONS/isolated.csv") as Record<string, unknown>;
-    entry["rowCount"] = 4;
+    (manifest.artifacts.find((a) => a["path"] === "02_EXCEPTIONS/isolated.csv") as Record<string, unknown>)["rowCount"] = 4;
     writeManifest(files, manifest);
-    assert.deepEqual(refusal(files), ["ARTIFACT_ROWS_MISMATCH"]);
+    assert.deepEqual(codes(files), ["ARTIFACT_ROWS_MISMATCH"]);
   });
 
   it("a file the manifest does not name is refused, and so is a name without its file", () => {
     const extra = loadPackage("D-salesforce");
     extra.set("01_IMPORT/salesforce/Extra.csv", new TextEncoder().encode("Name\nx\n"));
-    assert.deepEqual(refusal(extra), ["ARTIFACT_UNDECLARED"]);
+    assert.deepEqual(codes(extra), ["ARTIFACT_UNDECLARED"]);
     const missing = loadPackage("D-salesforce");
     missing.delete("02_EXCEPTIONS/leftovers.csv");
-    assert.ok(refusal(missing).includes("ARTIFACT_MISSING"));
-  });
-
-  for (const unsafe of ["01_IMPORT/../manifest.csv", "/01_IMPORT/x.csv", "01_IMPORT\\x.csv", "01_IMPORT//x.csv", "01_IMPORT/x\u202e.csv", "C:/x.csv"]) {
-    it(`an unsafe artifact path is refused: ${JSON.stringify(unsafe)}`, () => {
-      const files = loadPackage("B-dirty-multinational");
-      const manifest = manifestOf(files);
-      (manifest.artifacts[0] as Record<string, unknown>)["path"] = unsafe;
-      writeManifest(files, manifest);
-      assert.ok(refusal(files).includes("UNSAFE_PATH"));
-    });
-  }
-
-  it("R2-069: evidence relabelled as an import file, or an import kind outside 01_IMPORT, is refused", () => {
-    for (const [path, kind] of [
-      ["03_TRACEABILITY/changes.csv", "MACHINE_IMPORT_CSV"],
-      ["04_DOCUMENTATION/data-view/clean-only/contacts.csv", "MACHINE_IMPORT_CSV"],
-      ["01_IMPORT/clean-only/contacts.csv", "HUMAN_VIEW_CSV"],
-    ] as const) {
-      const files = loadPackage("A-clean-multi-object");
-      const manifest = manifestOf(files);
-      (manifest.artifacts.find((a) => a["path"] === path) as Record<string, unknown>)["kind"] = kind;
-      writeManifest(files, manifest);
-      assert.deepEqual(refusal(files), ["AREA_KIND_MISMATCH"], `${path} as ${kind}`);
-    }
+    assert.ok(codes(missing).includes("ARTIFACT_MISSING"));
   });
 
   it("another core version or package format is refused, not read as if it were 3.0.0", () => {
@@ -146,7 +124,7 @@ describe("CMD039-DENY: a package whose bytes, inventory or sums do not hold is r
       const manifest = manifestOf(files);
       manifest[key] = value;
       writeManifest(files, manifest);
-      assert.deepEqual(refusal(files), ["UNSUPPORTED_FORMAT"]);
+      assert.deepEqual(codes(files), ["UNSUPPORTED_FORMAT"]);
     }
   });
 
@@ -155,21 +133,157 @@ describe("CMD039-DENY: a package whose bytes, inventory or sums do not hold is r
     const manifest = manifestOf(files);
     manifest["verified"] = true;
     writeManifest(files, manifest);
-    assert.deepEqual(refusal(files), ["MANIFEST_MALFORMED"]);
+    assert.deepEqual(codes(files), ["MANIFEST_MALFORMED"]);
   });
 
-  it("a refusal never quotes a value from inside a file", () => {
+  it("a refusal for an unreadable file never quotes a value from inside it", () => {
     const files = loadPackage("D-hubspot");
     const path = "01_IMPORT/hubspot/contacts.csv";
-    const content = fileText(files, path);
-    forge(files, path, content.replace(/\n$/, "\n\"=HYPERLINK(\"\"http://x\"\")\",SECRET-CELL\n"));
-    try {
-      readMigrationPackage(files);
-      assert.fail("accepted");
-    } catch (error) {
-      assert.ok(error instanceof ReportModelError);
-      assert.ok(!error.message.includes("SECRET-CELL") && !JSON.stringify(error.problems).includes("SECRET-CELL"));
+    forge(files, path, fileText(files, path).replace(/\n$/, '\n"=HYPERLINK(""http://x"")",SECRET-CELL\n'));
+    const { codes: found, text } = refusal(files);
+    assert.deepEqual(found, ["ARTIFACT_UNREADABLE"]);
+    assert.ok(!text.includes("SECRET-CELL") && !text.includes("HYPERLINK"));
+  });
+});
+
+describe("ADV-1: every figure the model shows is bound to the evidence tables", () => {
+  it("R1: relationships relabelled LEFTOVER -> DEDUPLICATED fail against associations.csv", () => {
+    const files = loadPackage("D-salesforce");
+    editJson(files, R, (r) => {
+      r.associations.byDisposition.LEFTOVER = 0;
+      r.associations.byDisposition.DEDUPLICATED = 4;
+    });
+    assert.deepEqual(codes(files), ["RECONCILIATION_MISMATCH", "RECONCILIATION_MISMATCH", "RECONCILIATION_MISMATCH"]);
+  });
+
+  it("R1b: relationships relabelled LEFTOVER -> without disposition fail against associations.csv", () => {
+    const files = loadPackage("D-salesforce");
+    editJson(files, R, (r) => {
+      r.associations.byDisposition.LEFTOVER = 0;
+      r.associations.withoutDisposition = 4;
+      r.associations.accountedFor = 8;
+    });
+    assert.ok(codes(files).includes("RECONCILIATION_MISMATCH"));
+  });
+
+  it("an unresolved-associations table that drops a row fails against LEFTOVER + UNRESOLVED", () => {
+    const files = loadPackage("D-salesforce");
+    const path = "02_EXCEPTIONS/unresolved-associations.csv";
+    const lines = fileText(files, path).split("\n");
+    lines.splice(1, 1);
+    forge(files, path, lines.join("\n"));
+    assert.deepEqual(codes(files), ["RECONCILIATION_MISMATCH"]);
+  });
+
+  it("R3: crosswalk objects swapped COMPANY <-> CONTACT, with byObject swapped too, fail against the lineage and the migration keys", () => {
+    const files = loadPackage("D-salesforce");
+    forge(files, X, fileText(files, X).replace(/,COMPANY,/g, ",@@,").replace(/,CONTACT,/g, ",COMPANY,").replace(/,@@,/g, ",CONTACT,"));
+    editJson(files, R, (r) => {
+      [r.records.byObject.COMPANY, r.records.byObject.CONTACT] = [r.records.byObject.CONTACT, r.records.byObject.COMPANY];
+    });
+    assert.ok(codes(files).includes("RECONCILIATION_MISMATCH"));
+  });
+
+  it("crosswalk and lineage objects swapped together still fail against the migration keys", () => {
+    const files = loadPackage("D-hubspot");
+    const swap = (text: string): string => text.replace(/,COMPANY,/g, ",@@,").replace(/,CONTACT,/g, ",COMPANY,").replace(/,@@,/g, ",CONTACT,");
+    forge(files, X, swap(fileText(files, X)));
+    forge(files, L, swap(fileText(files, L)));
+    editJson(files, R, (r) => {
+      [r.records.byObject.COMPANY, r.records.byObject.CONTACT] = [r.records.byObject.CONTACT, r.records.byObject.COMPANY];
+    });
+    const found = refusal(files);
+    assert.ok(found.codes.includes("RECONCILIATION_MISMATCH"));
+    assert.match(found.text, /disagrees with its migration key/);
+  });
+
+  it("a crosswalk association key that differs from the import file's own row fails", () => {
+    const files = loadPackage("D-hubspot");
+    const text = fileText(files, X);
+    const first = text.split("\n")[1] as string;
+    const key = first.split(",")[2] as string;
+    forge(files, X, text.replace(`,${key},`, `,${"0".repeat(key.length)},`));
+    const found = refusal(files);
+    assert.deepEqual(found.codes, ["RECONCILIATION_MISMATCH"]);
+    assert.match(found.text, /association key differs from the import file/);
+  });
+
+  it("lineage rows without a disposition must match sourceRows.withoutDisposition", () => {
+    const files = loadPackage("A-clean-multi-object");
+    forge(files, L, fileText(files, L).replace(/,ASSOCIATION,OUTPUT,/, ",ASSOCIATION,,"));
+    assert.match(refusal(files).text, /lineage rows without a disposition differ from sourceRows.withoutDisposition/);
+  });
+});
+
+describe("ADV-2, ADV-6: strings from the package are from the core's closed vocabularies; paths are portable", () => {
+  it("R4: markup in runId or target.mode is refused", () => {
+    for (const edit of [(m: Record<string, any>) => (m["runId"] = "<script>x</script>"), (m: Record<string, any>) => (m["target"].mode = "<b>SF</b>"), (m: Record<string, any>) => (m["target"].importMode = "MERGE"), (m: Record<string, any>) => (m["bundleId"] = 'B"x')]) {
+      const files = loadPackage("D-salesforce");
+      const manifest = manifestOf(files);
+      edit(manifest);
+      writeManifest(files, manifest);
+      assert.ok(codes(files).includes("MANIFEST_MALFORMED"));
     }
+  });
+
+  it("R5: an artifact path with markup is refused, and the refusal does not quote it", () => {
+    const files = loadPackage("D-salesforce");
+    renameArtifact(files, "02_EXCEPTIONS/formula-risk.csv", "02_EXCEPTIONS/<svg onload=alert(1)>.csv");
+    const found = refusal(files);
+    assert.ok(found.codes.includes("UNSAFE_PATH"));
+    assert.ok(!found.text.includes("<svg"));
+  });
+
+  for (const unsafe of ["01_IMPORT/../manifest.csv", "/01_IMPORT/x.csv", "01_IMPORT\\x.csv", "01_IMPORT//x.csv", "01_IMPORT/x\u202e.csv", "C:/x.csv", "01_IMPORT/x y.csv", "01_IMPORT/a&b.csv", "01_IMPORT/x/CON.csv", "01_IMPORT/x/nul", "01_IMPORT/x./a.csv", "01_IMPORT/caf\u00e9.csv"]) {
+    it(`an unsafe artifact path is refused: ${JSON.stringify(unsafe)}`, () => {
+      const files = loadPackage("B-dirty-multinational");
+      const manifest = manifestOf(files);
+      (manifest.artifacts[0] as Record<string, unknown>)["path"] = unsafe;
+      writeManifest(files, manifest);
+      assert.ok(codes(files).includes("UNSAFE_PATH"));
+    });
+  }
+
+  it("R6: two paths that differ only in case are refused", () => {
+    const files = loadPackage("D-salesforce");
+    const manifest = manifestOf(files);
+    const entry = manifest.artifacts.find((a) => a["path"] === "02_EXCEPTIONS/formula-risk.csv") as Record<string, unknown>;
+    manifest.artifacts.push({ ...entry, path: "02_EXCEPTIONS/Formula-Risk.csv" });
+    files.set("02_EXCEPTIONS/Formula-Risk.csv", files.get("02_EXCEPTIONS/formula-risk.csv") as Uint8Array);
+    writeManifest(files, manifest);
+    assert.ok(codes(files).includes("DUPLICATE_PATH"));
+  });
+
+  it("an association file over an object the core does not have is refused", () => {
+    const files = loadPackage("D-salesforce");
+    renameArtifact(files, "01_IMPORT/salesforce/associations/contact_to_deal.csv", "01_IMPORT/salesforce/associations/contact_to_widget.csv");
+    assert.deepEqual(codes(files), ["IMPORT_OBJECT_UNKNOWN"]);
+  });
+});
+
+describe("R2-069: the kind of every artifact is derived from its path, as the core's verifier does", () => {
+  for (const [path, kind] of [
+    ["03_TRACEABILITY/changes.csv", "MACHINE_IMPORT_CSV"],
+    ["04_DOCUMENTATION/data-view/clean-only/contacts.csv", "MACHINE_IMPORT_CSV"],
+    ["01_IMPORT/clean-only/contacts.csv", "HUMAN_VIEW_CSV"],
+    ["02_EXCEPTIONS/leftovers.csv", "HUMAN_VIEW_CSV"],
+    ["02_EXCEPTIONS/formula-risk.csv", "MACHINE_EXCEPTION_CSV"],
+  ] as const) {
+    it(`${path} declared ${kind} is refused`, () => {
+      const files = loadPackage("A-clean-multi-object");
+      const manifest = manifestOf(files);
+      (manifest.artifacts.find((a) => a["path"] === path) as Record<string, unknown>)["kind"] = kind;
+      writeManifest(files, manifest);
+      assert.deepEqual(codes(files), ["AREA_KIND_MISMATCH"]);
+    });
+  }
+  it("a file at a path the format does not place, and a data view of no import file, are refused", () => {
+    const unknown = loadPackage("A-clean-multi-object");
+    renameArtifact(unknown, "02_EXCEPTIONS/leftovers.csv", "02_EXCEPTIONS/notes.csv");
+    assert.ok(codes(unknown).includes("AREA_KIND_MISMATCH"));
+    const orphan = loadPackage("A-clean-multi-object");
+    renameArtifact(orphan, "04_DOCUMENTATION/data-view/clean-only/contacts.csv", "04_DOCUMENTATION/data-view/clean-only/people.csv");
+    assert.deepEqual(codes(orphan), ["AREA_KIND_MISMATCH"]);
   });
 });
 
