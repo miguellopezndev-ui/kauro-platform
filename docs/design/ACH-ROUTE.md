@@ -1,5 +1,9 @@
 # ACH bank-transfer route — owner amendment A8
 
+Design revision **r11** (2026-10-07): r10 plus the fixes of Codex design r10 (ACH-R10-01, ACH-R7-03, ACH-R10-02; family
+`evidence`): one normative text for destination normalization and offers (superseded r9/r10 sentences deleted, quoted in §13),
+offers committed before classification, §7.22c rewritten, coverage table §7.22d, §13 (r10 → r11). The r10 paragraph below is history.
+
 Design revision **r10** (2026-10-07): r9 plus the fixes of Codex design r9 (ACH-R8-01, ACH-R7-03 partial): DV1-11 (canonical
 fingerprint encoding and named normalization; durable append-only execution offers), §7.22c cells and §12 (r9 → r10 list).
 Everything else in r9 is unchanged. The r9 paragraph below is history.
@@ -138,8 +142,7 @@ both source scopes (CAPTURE refund, BANK_CREDIT treasury refund).
 - **Execution attempts.** Every V1 outbound movement of route money is one `outbound_execution_attempts` row (scope union as
   D-ACH-19): kind RETURN (a refund or treasury refund) or RESEND (re-send of a bounced return). Machine: DECLARED → UNCERTAIN;
   DECLARED or UNCERTAIN → RECORDED or NOT_EXECUTED. Frozen at declaration: kind, source, refund or parent bounce, amount, currency,
-  `declaredAt` (DB clock), declared destination (`accountDigest`, `accountLast4`, `routingDigest`, computed from the approved destination
-  evidence) [SUPERSEDED r9: the keyed destination fingerprint `DF` and key version captured at F2, DV1-10] and reference `kauro-refund-<refundId>-<n>` (n = attempt number of that refund; 1 for its RETURN).
+  `declaredAt` (DB clock), the destination fingerprint `DF` with its key id, key version and normalizer version (captured at F2; DV1-10, DV1-11) and reference `kauro-refund-<refundId>-<n>` (n = attempt number of that refund; 1 for its RETURN).
 - **Declare.** **X1** (RETURN): Refund APPROVED → SUBMITTING `manual_execution_declared` and attempt DECLARED; no PaymentAttempt.
   **X4** (RESEND): only after G3 recorded a bounce of the same source (evidence that the previous execution's money came back), with
   amount ≤ that bounce's open REFUND_PAYABLE `O` less other open attempts; the Refund stays COMPLETED (D-ACH-18); attempt DECLARED.
@@ -157,9 +160,9 @@ both source scopes (CAPTURE refund, BANK_CREDIT treasury refund).
   `manual_return_recorded`, then `refund.completed` drives revenue/cash (P3), seller commission (B10 consumers) and the credit note
   (D-FISC-B2); RESEND: REFUND_PAYABLE settled) only if each predicate holds (rule 12, one control each): **E-ID** `bankExecutionId`
   present and unused across both scopes; **E-AMT** amount and currency equal the attempt; **E-TIME** `executedAt` present and
-  `≥ declaredAt` (strict, no tolerance); **E-DEST** destination proven (`accountDigest` equal, or `accountLast4` and `routingDigest`
-  both equal) and **no E-DEST-CONFLICT** (no present destination field differs); [SUPERSEDED r9: E-DEST is DP-FULL or DP-RECIPIENT and any differing partial field is a conflict, DV1-10] **no E-REF-CONFLICT** (a present reference equals the
-  attempt's). A failing predicate refuses with its own code, changes nothing and opens a REVIEW case. [r10: it commits only the durable offer row and the case; no money, attempt or refund state changes, DV1-11.] If real artifacts never carry a
+  `≥ declaredAt` (strict, no tolerance); **E-DEST** and **no E-DEST-CONFLICT** as defined in DV1-10; **no E-REF-CONFLICT** (a present reference equals the
+  attempt's). A failing predicate refuses with its own code: the outcome step commits only its outcome row and a REVIEW case, with no money,
+  attempt or refund state change; the execution offer was already committed before classification (DV1-11). If real artifacts never carry a
   destination field, G2 cannot complete and the attempt stays frozen for X3 with stronger evidence (K-8, K-10): nothing completes on
   weaker evidence.
 - **Window (X2).** DECLARED with `effectNow ≥ declaredAt + manualExecutionWindow` (route data) → UNCERTAIN, UNCERTAIN_EFFECT case;
@@ -167,12 +170,10 @@ both source scopes (CAPTURE refund, BANK_CREDIT treasury refund).
 - **Owner resolution (X3, D-24 A).** EXECUTED: the G2/G4 predicates on the supplied evidence → RECORDED. NOT_EXECUTED → attempt
   NOT_EXECUTED (RETURN: Refund → FAILED `owner_attested_no_effect`, share released; RESEND: payable stays open) only if **NX-LAG**
   `effectNow ≥ declaredAt + manualExecutionWindow + coverageLag`, **NX-COVERAGE** SI2 coverage of the account's outbound stream is
-  contiguous over `[declaredAt, effectNow − coverageLag]`, and **NX-NO-POTENTIAL** no potentially matching debit lies in it. A debit
-  is **excluded** only if it is linked to another RECORDED attempt, has another currency, or has E-DEST-CONFLICT against this attempt;
-  every other debit — including one with null reference and null destination — is potentially matching and keeps the attempt
-  UNCERTAIN (`POTENTIAL_MATCH_UNRESOLVED`). [SUPERSEDED r9: the exclusion rule above is replaced by DV1-10 — correlation overrides every exclusion; only debits explained by another RECORDED attempt or a recorded settlement are excluded.]
+  contiguous over `[declaredAt, effectNow − coverageLag]`, and **NX-NO-POTENTIAL** as defined in DV1-10 (no correlated and no unexplained debit lies in it) and no execution offer exists for
+  the attempt (DV1-11).
 - **Undeclared debits (ACH-R7-01).** SI2 links a debit only to a RECORDED attempt by `bankExecutionId`. An unlinked debit that is
-  potentially matching (definition above) for a refund of the account that is APPROVED, has an open attempt, or reached a terminal
+  unexplained or correlated (DV1-10) for a refund of the account that is APPROVED, has an open attempt, or reached a terminal
   state within the covered interval, and that was executed before any declaration of it, opens UNDECLARED_OUTBOUND naming them and
   sets `execution_frozen` on every open refund of that source: X1/X4 refuse `EXECUTION_FROZEN`, B09's `authorization_lapsed` skips
   frozen refunds, the share stays reserved, the period is never BALANCED. Resolving UNDECLARED_OUTBOUND is LATER 2026-11-30 with G5/P4
@@ -195,14 +196,14 @@ self-tests are "simulator self-test, not V1 rail evidence"); their live remainde
 bank route's own equivalents are C6/P1 (capture), C5/C6 (no webhook), X1/G2/NR (refund execution) and SI2/C6 (reconciliation).
 This is stated in the acceptance ledger and in every Codex prompt.
 
-**DV1-10 — Destination proof and negative evidence (r9: ACH-R8-01, ACH-R7-03).** Supersedes in DV1-08 the destination fields
-of the attempt, the E-DEST and E-DEST-CONFLICT definitions and the NX-NO-POTENTIAL exclusion rule. All other DV1-08 text stands.
+**DV1-10 — Destination proof and negative evidence (r9: ACH-R8-01, ACH-R7-03).** Defines the use of the destination
+fingerprint, E-DEST, E-DEST-CONFLICT and NX-NO-POTENTIAL that DV1-08 references.
 - **Approved destination, captured once.** At approval (F2) the owner enters the destination's **full routing number, full account
   number and account holder name** from the restricted destination evidence (D-ACH-13). Kauro stores only the encrypted evidence
-  artifact and a **keyed destination fingerprint** `DF = HMAC(destinationKey_v, routing ‖ account ‖ normalizedHolderName)` [SUPERSEDED r10: canonical length-prefixed encoding, DV1-11] with its key
-  version `v` (key in the platform secret store, never in an adapter, log or event). Name normalization (versioned): Unicode NFKC,
-  case fold, punctuation removed, whitespace collapsed. The full numbers are never displayed again: the owner queue and every
-  response show only the masked account (last four) and the holder name. X1 and X4 freeze `DF` and `v` into the attempt and refuse
+  artifact and the **keyed destination fingerprint** `DF` with its key id,
+  key version and normalizer version, computed only as DV1-11 defines (normalization `destination-norm-v1`, canonical encoding; the key
+  stays in the platform secret store, never in an adapter, log or event). The full numbers are never displayed again: the owner queue and every
+  response show only the masked account (last four) and the holder name. X1 and X4 freeze `DF` and its versions into the attempt and refuse
   `DESTINATION_NOT_CAPTURED` without it. Send details (amount, reference, masked destination) are shown only after that COMMIT.
 - **What proves "sent to the approved destination" (E-DEST, replaces r8).** One of:
   - **DP-FULL** — the classified execution evidence carries the full recipient routing number, account number and holder name
@@ -219,24 +220,22 @@ of the attempt, the E-DEST and E-DEST-CONFLICT definitions and the NX-NO-POTENTI
     routing digest, holder name) is **E-DEST-CONFLICT**: refused, REVIEW, attempt frozen. **No partial match proves or releases
     anything.**
 - **Correlation overrides every exclusion (ACH-R7-03).** A debit is **correlated** with an attempt if any of: its reference equals
-  the attempt's (CORR-REF); its `recipientRef` equals the bound one (CORR-RECIPIENT); its `bankExecutionId` was offered for this attempt
-  in a refused G2/G4/X3 (CORR-OFFERED); [r10: read from the durable `execution_offers` rows, and any offer row blocks NOT_EXECUTED, DV1-11] its `DF` equals the attempt's (CORR-DF). A correlated debit always blocks NOT_EXECUTED and keeps
+  the attempt's (CORR-REF); its `recipientRef` equals the bound one (CORR-RECIPIENT); an `execution_offers` row exists for this
+  attempt (CORR-OFFERED, DV1-11); its `DF` equals the attempt's (CORR-DF). A correlated debit always blocks NOT_EXECUTED and keeps
   the attempt UNCERTAIN (`CONTRADICTORY_EVIDENCE`), whatever its currency, destination or links.
 - **Negative evidence (NX-NO-POTENTIAL, replaces r8).** In `[declaredAt, effectNow − coverageLag]` every debit of the account must be
   **explained** and none correlated: explained = linked by bank transaction id to another RECORDED attempt or to a recorded settlement
   (ST2), or a fee line of such a linked record. Any unexplained debit — another currency, a conflicting destination, a different
   amount, all fields null — blocks NOT_EXECUTED (`UNEXPLAINED_DEBIT`). The V1 route account is therefore dedicated to Kauro (K-12):
-  any other outgoing payment from it blocks owner NOT_EXECUTED resolutions until explained. The r8 "potentially matching" test of
-  undeclared debits (DV1-08) reads "unexplained or correlated" with these definitions.
+  any other outgoing payment from it blocks owner NOT_EXECUTED resolutions until explained.
 - **Locks.** Unchanged (§7.28): DP checks run inside G2/G4/X3 under L1 → L2 → L3 → L4; recipient-record artifacts are read outside any
   transaction like every evidence read and re-verified by hash under the locks.
 - **Qualification.** ACH-REFUND-LIVE-01's send evidence must satisfy DP-FULL or DP-RECIPIENT. If the real Wise artifacts give
   neither (K-8), the refund stays UNCERTAIN and GENERAL is not enabled: an owner-visible blocker, never a weaker proof.
 Cells: §7.22b.
 
-**DV1-11 — Canonical fingerprint encoding and durable execution offers (r10: ACH-R8-01, ACH-R7-03).** Supersedes in DV1-10 the
-`DF` formula and the CORR-OFFERED definition, and in DV1-08 the sentence "a failing predicate … changes nothing". Everything else
-in DV1-08 and DV1-10 stands.
+**DV1-11 — Canonical fingerprint encoding and durable execution offers (r10: ACH-R8-01, ACH-R7-03).** The only normative text for the
+normalization, the canonical encoding of `DF` and the durable execution offers that DV1-08 and DV1-10 reference.
 - **Normalization (`destination-norm-v1`, versioned).** Routing: remove ASCII spaces and hyphens; the result must be exactly 9 ASCII
   digits passing the ABA check-digit rule, else `DESTINATION_INVALID`. Account: remove ASCII spaces and hyphens; the result must be
   1–17 ASCII digits (leading zeros are significant and kept), else `DESTINATION_INVALID`. Holder name: Unicode NFC; Unicode default
@@ -252,24 +251,30 @@ in DV1-08 and DV1-10 stands.
 - **Recipient binding (DP-RECIPIENT).** X1/X4 refuse `RECIPIENT_ALIAS` when the bound recipient-record artifact's full details do
   not give exactly the attempt's `DF` under the canonical encoding (closes the r9 reproduction: account 12341234 / holder "1234M"
   versus account 123412341234 / holder "M" at routing 021000021).
-- **Execution offers are durable (CORR-OFFERED).** Every G2, G4 or X3-EXECUTED request that passes the actor's authority guards and
-  reaches its effect transaction inserts one append-only `execution_offers` row: attempt, `bankExecutionId` (null when the evidence
-  was REJECTED by the classifier), evidence hash and ref, command, actor, `offeredAt` (DB clock), outcome code. The row is written
-  **in the same transaction, under L1 → L2 → L3**, and that transaction **commits in both outcomes**: on success with the RECORDED
-  footprint, on a failed predicate with only the offer row and the REVIEW case (no money, attempt or refund state change). A refusal because the
-  attempt is already NOT_EXECUTED also commits its row, opens REFUND_TERMINAL_CONTRADICTED and sets `execution_frozen` on the open
-  refunds of the source. Rows are
-  unique by `(attemptId, evidenceHash, command)`; never updated or deleted. Unauthorized requests write nothing here (they take the
-  separate DENY-fact path).
-- **Effect on NOT_EXECUTED.** X3 NOT_EXECUTED reads `execution_offers` for the attempt under L1 and is refused
-  `CONTRADICTORY_EVIDENCE` if any row exists, whatever its outcome or later use of the same execution id elsewhere (an execution id
-  offered for A and later RECORDED for B still blocks A: the owner claimed A was executed). Such an attempt stays UNCERTAIN until it
-  is RECORDED with proof; clearing a contradictory offer is LATER 2026-11-30 with UNDECLARED_OUTBOUND (fail closed).
-- **Failure columns of the offer write.** CRASH-BEFORE (before the effect COMMIT): no offer, no case; the client has no answer and the
-  replay inserts the one row. CRASH-AFTER and TIMEOUT: the replay with the same key returns the committed outcome and finds the one row.
-  RETRY: same key replays; the same evidence under another key hits the unique row (no second row) and gets the same outcome. RACE:
-  X3 and the offering command serialize on L1 (cells both orders). PARTIAL: a failure at the case insert rolls back the offer row too.
-Cells: §7.22c.
+- **Execution offers are durable and come first (CORR-OFFERED; r11).** Every G2, G4 or X3-EXECUTED request runs in this order:
+  1. **`Koffer`** — one transaction under L1 → L2 → L3: re-check the actor's authority guards (grant, verified identity, session,
+     step-up) at the effect; if they fail, write nothing (the separate DENY-fact path records it). Otherwise insert one append-only
+     `execution_offers` row — attempt, command, idempotency key, requested evidence ref and expected evidence hash, actor,
+     `offeredAt` (DB clock) — and **COMMIT**. If the attempt is already NOT_EXECUTED, the same COMMIT opens REFUND_TERMINAL_CONTRADICTED
+     and sets `execution_frozen` on the open refunds of the source. Unique by `(attemptId, command, idempotencyKey)`; never updated or
+     deleted.
+  2. **G1** — outside any transaction: store read, hash verification and pure classification (§6). Every outcome follows step 1:
+     CLASSIFIED, REJECTED (UNKNOWN_EVIDENCE, MALFORMED_EVIDENCE, HASH_MISMATCH, UNAUTHENTICATED_EVIDENCE), store refusal or timeout.
+     No gate outcome can skip the offer.
+  3. **Outcome** — one transaction under L1 → L2 → L3 → L4 inserting one append-only `execution_offer_outcomes` row (offer, gate
+     outcome, `bankExecutionId` when CLASSIFIED, outcome code) together with either the RECORDED footprint (every predicate holds) or
+     the REVIEW case (a predicate failed or the gate rejected); no money, attempt or refund state changes on refusal.
+- **Effect on NOT_EXECUTED.** X3 NOT_EXECUTED reads `execution_offers` for the attempt under L1 and is refused `CONTRADICTORY_EVIDENCE`
+  if **any offer row** exists — with or without an outcome row, whatever the gate outcome, and whatever later use of the same execution
+  id elsewhere (an execution id offered for A and later RECORDED for B still blocks A: the owner claimed A was executed). The attempt
+  stays UNCERTAIN until RECORDED with proof; clearing a contradictory offer is LATER 2026-11-30 with UNDECLARED_OUTBOUND (fail closed).
+- **Failure columns.** CRASH-BEFORE `Koffer` COMMIT: nothing; the replay inserts the one row. Crash or store timeout between step 1 and
+  step 3: the offer row stands (blocks NOT_EXECUTED), no outcome row; the replay with the same key finds the offer, reruns G1 and
+  writes one outcome. CRASH-AFTER or TIMEOUT of step 3: the replay returns the committed outcome. RETRY: same key replays; another key
+  with the same evidence adds its own offer row (each offer is a separate owner claim). RACE: X3 and step 1 or step 3 serialize on L1
+  (both orders). PARTIAL: a failure at a later write of step 1 rolls back the offer; of step 3, the outcome row and its footprint.
+Cells: §7.22c (r10) and §7.22d (r11).
+
 
 **V1 vs LATER (ACH-17).** V1 (22 rows, 176 cells): R1 (owner-supplied details evidence, no API fetch), R2, I1, I2 (+DV1-07), I3,
 C4, C5, C6, S3 (actor SI2), M1, M2, P1 (+DV1-06), P2, E1, F1, F2, G1, G2, G3, G4, G6, P3. **LATER 2026-11-30, provider API** (8 rows,
@@ -784,7 +789,8 @@ Only `CLASSIFIED` with all required fields permits comparison and subsequent eff
 the verified artifact ref/hash. Missing evidence or invalid provenance yields `UNAUTHENTICATED_EVIDENCE`, unknown format/version
 or status yields `UNKNOWN_EVIDENCE`, truncated/malformed bytes or missing required fields yields `MALFORMED_EVIDENCE`, and digest
 mismatch yields `HASH_MISMATCH`. Each is a fail-closed `REJECTED` result: no confirmation, capture, outbound record, money/authority
-state change or cursor advance; only the separate safe denial/coverage-gap path may record the reason. Store timeout/refusal
+state change or cursor advance; only the separate safe denial/coverage-gap path may record the reason. For G2, G4 and X3-EXECUTED the durable execution offer
+(DV1-11 `Koffer`) is committed before this read; it is not a money or authority state change. Store timeout/refusal
 likewise grants nothing. After a crash, reread the same ref, reverify bytes and classify again before an uncommitted effect;
 committed commands still replay by their journal/transfer identity. Revalidate mutable authority after the read under effect locks.
 C4 and G1 map this read/verify/classify boundary, including CRASH-AFTER, RETRY and PARTIAL.
@@ -1071,7 +1077,6 @@ G2Δ and G4Δ are deltas on the r6 rows G2/G4 (their r6 cells stay; these add th
 - "DENY RFG-P-NX-LAG (one ms before declaredAt + window + coverageLag): Resolve uncertain execution"
 - "DENY RFG-P-NX-COVERAGE (a one-day gap in imported coverage): Resolve uncertain execution"
 - "DENY RFG-P-NX-POTENTIAL (one unlinked debit with null reference and null destination in the interval): Resolve uncertain execution"
-- "OK RFG-P-NX-EXCLUDED (only debits linked elsewhere, in another currency or with a conflicting destination): Resolve uncertain execution" **[SUPERSEDED r9: not written; see §7.22b RFG-P-NX-EXPLAINED]**
 
 ### 7.22b Destination proof and negative evidence (DV1-10) — r9, V1 (tier 1)
 `packages/persistence/test/refund-generic-cells.test.ts`; each cell runs both source scopes and both attempt kinds. Predicate
@@ -1101,32 +1106,85 @@ Interleavings with the statement import (rule 1; both orders, held at L1):
 - "RACE RFG-M-DEST-RECIPIENT (both orders): a recipient-record artifact with a new version imported against G2 recording through DP-RECIPIENT — G2 first records only on the declared version carried by the execution evidence; artifact first changes no bound version and G2 still requires the declared version"
 - "RACE RFG-M-NX-SI2-CORR (both orders): X3 NOT_EXECUTED against a statement import of a correlated debit with a conflicting destination — import first: NOT_EXECUTED refused CONTRADICTORY_EVIDENCE; X3 first: NOT_EXECUTED commits, the import opens REFUND_TERMINAL_CONTRADICTED and freezes every open refund of the source (no further share is released)"
 
-`RFG-P-NX-EXCLUDED` (r8) is **[SUPERSEDED r9]** by `RFG-P-NX-EXPLAINED` and the denial controls above; the r8 title is not written.
 
-### 7.22c Canonical fingerprint and durable execution offers (DV1-11) — r10, V1 (tier 1)
-`packages/persistence/test/refund-generic-cells.test.ts` unless named; offers are exercised through the real refusal and recovery
-paths, never a seeded association.
+### 7.22c Canonical fingerprint and durable execution offers (DV1-10, DV1-11) — r11, V1 (tier 1)
+`packages/persistence/test/refund-generic-cells.test.ts` unless named. Offers are exercised through the real `Koffer` → G1 →
+outcome path, never a seeded row. The scopes, kinds and commands each title must run are fixed by the coverage table §7.22d.
 
-Fingerprint (rule 12 controls):
+Fingerprint and normalization (rule 12: one control per atomic predicate):
 - "DENY RFG-P-DF-CONCAT-COLLISION (routing 021000021, account 12341234, holder 1234M versus account 123412341234, holder M): distinct destinations give distinct fingerprints"
+- "DENY RFG-P-DF-HYPHEN (holder A-B captured at F2 versus AB in DP-FULL evidence and in a recipient artifact): one outcome — distinct fingerprints, DP-FULL E-DEST-CONFLICT, X1 and X4 RECIPIENT_ALIAS"
+- "DENY RFG-P-DF-FULLWIDTH (holder in full-width letters versus ASCII letters): one outcome — distinct fingerprints under NFC, DP-FULL E-DEST-CONFLICT, X1 and X4 RECIPIENT_ALIAS"
+- "OK RFG-P-DF-NORMALIZATION (spaces and hyphens in routing and account, NFC-equivalent and case variants of the holder give one fingerprint; leading zeros stay significant)"
+- "OK RFG-P-DF-BOUNDS (routing of 9 digits with a valid ABA check digit, account of 1 and of 17 digits, holder of 1 and of 140 code points after normalization): Capture approved destination"
+- "DENY RFG-P-DF-ROUTING-LENGTH (routing of 8 and of 10 digits): Capture approved destination"
+- "DENY RFG-P-DF-ROUTING-ABA (9 digits with a wrong ABA check digit): Capture approved destination"
+- "DENY RFG-P-DF-ACCOUNT-EMPTY (account empty after removing spaces and hyphens): Capture approved destination"
+- "DENY RFG-P-DF-ACCOUNT-18 (account of 18 digits): Capture approved destination"
+- "DENY RFG-P-DF-ACCOUNT-NONDIGIT (account with a letter): Capture approved destination"
+- "DENY RFG-P-DF-HOLDER-EMPTY (holder empty after normalization): Capture approved destination"
+- "DENY RFG-P-DF-HOLDER-141 (holder of 141 code points after normalization): Capture approved destination"
+- "DENY RFG-P-DF-INVALID-EVIDENCE (DP-FULL evidence or a recipient artifact whose holder normalizes to 141 code points or whose routing fails the ABA check): Record a declared execution — DESTINATION_UNPROVEN"
 - "DENY RFG-P-DEST-RECIPIENT-ALIAS (a recipient record whose full details give another fingerprint, including the concatenation-collision pair): Declare manual refund execution"
-- "OK RFG-P-DF-NORMALIZATION (spaces and hyphens in routing and account, NFC and case variants of the holder give one fingerprint; leading zeros stay significant)"
-- "DENY RFG-P-DF-INVALID (routing not 9 digits or failing the ABA check digit, account empty, over 17 digits or with a letter, empty holder): Capture approved destination"
+- "DENY RFG-P-DEST-RECIPIENT-ALIAS-RESEND (the same alias cases): Declare a resend execution"
 - "DENY RFG-P-DF-KEY-VERSION (a fingerprint under another key id, key version or normalizer version never compares equal): Record a declared execution"
-- `packages/domain/test/destination-fingerprint.test.ts` :: "OK destination-norm-v1 vectors: fixed inputs give fixed canonical bytes M and fixed fingerprints under a test key"
+- `packages/domain/test/destination-fingerprint.test.ts` :: "OK destination-norm-v1 vectors: fixed inputs give fixed canonical bytes M and fixed fingerprints under a test key, including holders of 140 and 141 code points and the concatenation-collision pair"
 
-Execution offers (failure columns of the offer write; both orders at L1):
-- "RACE RFG-M-OFFER-RACE (both orders): a refused offer of execution id X for attempt A against X3 NOT_EXECUTED of A — offer first: NOT_EXECUTED refused CONTRADICTORY_EVIDENCE; X3 first: NOT_EXECUTED commits, then the offer is recorded and opens REFUND_TERMINAL_CONTRADICTED, freezing open refunds of the source"
-- "RACE RFG-M-OFFER-TIMEOUT (lock or COMMIT timeout): Record a declared execution — nothing or the committed outcome; the same key finds one offer row"
-- "RACE RFG-M-OFFER-CRASH-BEFORE (crash before the effect COMMIT of a refusal): Record a declared execution — no offer row, no case; the replay writes exactly one"
-- "RACE RFG-M-OFFER-CRASH-AFTER (lost refusal answer): Record a declared execution — the replay returns the same refusal and the one offer row"
-- "RACE RFG-M-OFFER-RETRY (same key, same evidence under another key, other evidence): Record a declared execution — one row per evidence and command; other evidence adds its own row"
-- "RACE RFG-M-OFFER-PARTIAL (case insert fails after the offer row): Record a declared execution — both rolled back"
-- "DENY RFG-M-OFFER-UNAUTHORIZED (an offer by a non-owner or without step-up): Record a declared execution — no offer row; DENY fact only"
+Execution offers — one title per gate outcome (each runs G2 and G4 in both scopes and X3-EXECUTED for both kinds, then asserts
+X3 NOT_EXECUTED is refused CONTRADICTORY_EVIDENCE):
+- "DENY RFG-P-OFFER-GATE-RECORDED (classified, every predicate holds): an authorized offer is committed before classification"
+- "DENY RFG-P-OFFER-GATE-PREDICATE (classified, a recording predicate fails): an authorized offer is committed before classification and blocks NOT_EXECUTED"
+- "DENY RFG-P-OFFER-GATE-UNKNOWN (UNKNOWN_EVIDENCE): an authorized offer is committed before classification and blocks NOT_EXECUTED"
+- "DENY RFG-P-OFFER-GATE-MALFORMED (MALFORMED_EVIDENCE): an authorized offer is committed before classification and blocks NOT_EXECUTED"
+- "DENY RFG-P-OFFER-GATE-HASH (HASH_MISMATCH): an authorized offer is committed before classification and blocks NOT_EXECUTED"
+- "DENY RFG-P-OFFER-GATE-UNAUTHENTICATED (UNAUTHENTICATED_EVIDENCE): an authorized offer is committed before classification and blocks NOT_EXECUTED"
+- "DENY RFG-P-OFFER-GATE-STORE (evidence store refusal and store timeout): an authorized offer is committed before classification and blocks NOT_EXECUTED"
 - "DENY RFG-P-NX-CORR-OFFERED-REPRO (X offered for A and refused on destination proof, X then recorded for B, its debit imported without reference or recipient): Resolve uncertain execution — NOT_EXECUTED of A refused CONTRADICTORY_EVIDENCE"
-- "DENY RFG-P-NX-OFFER-REJECTED-EVIDENCE (an authorized offer whose evidence the classifier rejected): Resolve uncertain execution — NOT_EXECUTED refused"
 
-The r9 control "DENY RFG-P-NX-CORR-OFFERED" is kept and now reads the durable `execution_offers` row (no seeding).
+Failure columns of the offer path (both orders at L1 where two actors):
+- "RACE RFG-M-OFFER-RACE (both orders): Koffer for attempt A against X3 NOT_EXECUTED of A — Koffer first: NOT_EXECUTED refused CONTRADICTORY_EVIDENCE; X3 first: NOT_EXECUTED commits, then Koffer commits its row, opens REFUND_TERMINAL_CONTRADICTED and freezes the open refunds of the source"
+- "RACE RFG-M-OFFER-OUTCOME-RACE (both orders): the outcome transaction of A against X3 NOT_EXECUTED of A — NOT_EXECUTED refused in both orders because the offer row exists"
+- "RACE RFG-M-OFFER-TIMEOUT (Koffer lock or COMMIT timeout): Record a declared execution — no row or the one committed row; the same key finds it"
+- "RACE RFG-M-OFFER-CRASH-BEFORE (crash before the Koffer COMMIT): Record a declared execution — no offer row; the replay writes exactly one"
+- "RACE RFG-M-OFFER-CRASH-BETWEEN (crash after the Koffer COMMIT, before the outcome COMMIT): Record a declared execution — the offer row stands and blocks NOT_EXECUTED; the replay reruns G1 and writes one outcome"
+- "RACE RFG-M-OFFER-CRASH-AFTER (lost outcome answer): Record a declared execution — the replay returns the committed outcome"
+- "RACE RFG-M-OFFER-RETRY (same key replay, same evidence under another key): Record a declared execution — one offer row per key; the replay adds none"
+- "RACE RFG-M-OFFER-PARTIAL (a later write of Koffer fails; a later write of the outcome step fails): Record a declared execution — Koffer rolls back whole; the outcome step rolls back whole and leaves the offer"
+- "DENY RFG-M-OFFER-UNAUTHORIZED (non-owner, no step-up, revoked grant at the Koffer lock): Record a declared execution — no offer row; DENY fact only"
+
+### 7.22d Coverage table: every guard and entry point of DV1-08, DV1-10, DV1-11 → titles (r11)
+Columns: what must run inside each listed title. "Both scopes" = CAPTURE refund and BANK_CREDIT treasury refund; "both kinds" =
+RETURN and RESEND attempts. Titles abbreviated by code; each code is exactly one title in §7.21, §7.22, §7.22b, §7.22c, §7.23 or §7.28
+(file `refund-generic-cells.test.ts` unless named). A row with no title is not allowed.
+
+| Guard / entry point | Commands that must be exercised | Scopes / kinds | Titles |
+|---|---|---|---|
+| Destination capture, normalization, bounds (routing 9 + ABA, account 1–17, holder 1–140; 0/141 refused) | F2 (Capture approved destination) | both scopes | RFG-P-DF-BOUNDS, RFG-P-DF-ROUTING-LENGTH, RFG-P-DF-ROUTING-ABA, RFG-P-DF-ACCOUNT-EMPTY, RFG-P-DF-ACCOUNT-18, RFG-P-DF-ACCOUNT-NONDIGIT, RFG-P-DF-HOLDER-EMPTY, RFG-P-DF-HOLDER-141, RFG-P-DF-NORMALIZATION; norm-v1 vectors |
+| Same normalization in evidence (DP-FULL, recipient artifact) | G2, G4, X3-EXECUTED; X1, X4 (artifact) | both scopes, both kinds | RFG-P-DF-INVALID-EVIDENCE, RFG-P-DF-HYPHEN, RFG-P-DF-FULLWIDTH |
+| Canonical encoding injective; key/normalizer version | G2, G4, X3-EXECUTED | both scopes, both kinds | RFG-P-DF-CONCAT-COLLISION, RFG-P-DF-KEY-VERSION; norm-v1 vectors |
+| DESTINATION_NOT_CAPTURED | X1, X4 | both scopes | RFG-P-DEST-NOT-CAPTURED |
+| RECIPIENT_ALIAS | X1 | both scopes | RFG-P-DEST-RECIPIENT-ALIAS, RFG-P-DF-HYPHEN, RFG-P-DF-FULLWIDTH |
+| RECIPIENT_ALIAS | X4 | both scopes | RFG-P-DEST-RECIPIENT-ALIAS-RESEND, RFG-P-DF-HYPHEN, RFG-P-DF-FULLWIDTH |
+| DP-FULL / DP-RECIPIENT proof | G2, G4, X3-EXECUTED | both scopes, both kinds | RFG-P-DEST-FULL, RFG-P-DEST-RECIPIENT |
+| DESTINATION_UNPROVEN (partial only, absent, unversioned, changed version) | G2, G4, X3-EXECUTED | both scopes, both kinds | RFG-P-E-DEST-UNPROVEN, RFG-P-DEST-PARTIAL-ONLY, RFG-P-DEST-ABSENT, RFG-P-DEST-RECIPIENT-UNVERSIONED, RFG-P-DEST-RECIPIENT-CHANGED, RFG-P-X3-EXECUTED-PARTIAL |
+| E-DEST-CONFLICT (last four, routing, name) | G2, G4, X3-EXECUTED | both scopes, both kinds | RFG-P-DEST-SAME-LAST4, RFG-P-DEST-ROUTING, RFG-P-DEST-NAME, RFG-P-E-DEST-CONFLICT |
+| E-ID, E-AMT, E-TIME, E-REF-CONFLICT | G2, G4, X3-EXECUTED | both scopes, both kinds | RFG-P-E-ID, RFG-P-E-AMT, RFG-P-E-TIME, RFG-P-E-REF-CONFLICT, RFG-P-E-ALL |
+| Offer committed before G1, per gate outcome | G2, G4 (both scopes); X3-EXECUTED (both kinds) | both scopes, both kinds | RFG-P-OFFER-GATE-RECORDED, RFG-P-OFFER-GATE-PREDICATE, RFG-P-OFFER-GATE-UNKNOWN, RFG-P-OFFER-GATE-MALFORMED, RFG-P-OFFER-GATE-HASH, RFG-P-OFFER-GATE-UNAUTHENTICATED, RFG-P-OFFER-GATE-STORE |
+| Offer failure columns | G2, G4, X3-EXECUTED | both scopes, both kinds | RFG-M-OFFER-RACE, RFG-M-OFFER-OUTCOME-RACE, RFG-M-OFFER-TIMEOUT, RFG-M-OFFER-CRASH-BEFORE, RFG-M-OFFER-CRASH-BETWEEN, RFG-M-OFFER-CRASH-AFTER, RFG-M-OFFER-RETRY, RFG-M-OFFER-PARTIAL, RFG-M-OFFER-UNAUTHORIZED |
+| NOT_EXECUTED: NX-LAG, NX-COVERAGE | X3-NOT_EXECUTED | both scopes, both kinds | RFG-P-NX-LAG, RFG-P-NX-COVERAGE, RFG-M-X3-EXPIRY |
+| NOT_EXECUTED: correlation (REF, RECIPIENT, OFFERED, DF) | X3-NOT_EXECUTED | both scopes, both kinds | RFG-P-NX-CORR-REF, RFG-P-NX-CORR-RECIPIENT, RFG-P-NX-CORR-OFFERED, RFG-P-NX-CORR-OFFERED-REPRO, RFG-P-NX-CORR-DF, RFG-P-NX-CORR-LINKED |
+| NOT_EXECUTED: unexplained debits / explained | X3-NOT_EXECUTED | both scopes, both kinds | RFG-P-NX-POTENTIAL, RFG-P-NX-OTHER-CURRENCY, RFG-P-NX-UNEXPLAINED, RFG-P-NX-EXPLAINED |
+| NOT_EXECUTED vs statement import and offers (L1) | X3, SI2, Koffer, outcome step | both scopes, both kinds | RFG-M-X3-RACE, RFG-M-NX-SI2-CORR, RFG-M-OFFER-RACE, RFG-M-OFFER-OUTCOME-RACE |
+| Recording vs statement import (L1) | G2, G4, SI2 | both scopes, both kinds | RFG-M-DEST-SI2, RFG-M-DEST-SI2-FULL, RFG-M-DEST-RECIPIENT, RFG-M-G2D-RACE |
+| One open attempt, NO_RECORDED_BOUNCE, RESEND_EXCEEDS_PAYABLE | X1, X4 | both scopes | RFG-M-X1-RETRY, RFG-M-X4-RETRY |
+| EXECUTION_FROZEN, undeclared debits, lapse skip | SI2, X1, X4, `authorization_lapsed` | both scopes | ACH-M-SI2-UNDECLARED (`ach-inbound-cells.test.ts`), RFG-M-X1-RACE, RFG-M-X4-RACE |
+| E-TIME before declaration (no retrospective declaration) | G2, G4 | both scopes, both kinds | RFG-M-G2D-CRASH-BEFORE, RFG-P-E-TIME |
+| Window lapse | X2 | both scopes, both kinds | RFG-M-X2-* (8) |
+| NEVER-RESEND closure (X1/X4 keys, CMD033, F2 second approval, queue, consumers) | X1, X4, CMD033, F2, owner queue, `refund.*` consumers | both scopes, both kinds | RFG-M-NR-RACE; `apps/api/test/refund-generic-v1.test.ts` :: "DENY CMD033 on a manual-rail refund: 409 MANUAL_RAIL_NO_AUTOMATED_OUTBOUND, nothing written" |
+| Secrecy of full destination numbers | F2, X1, X4, G2, G4, X3, owner queue, events, logs | both scopes | RFG-P-FINGERPRINT-SECRECY |
+| Lock order L1 → Lc → L2 → L3 → L4 | SI2, G6, X1, X2, `authorization_lapsed` | both scopes | RFG-M-LOCK-L1, RFG-M-LOCK-L3 |
+
+New titles in r11 for rows that had none: "DENY RFG-P-NX-CORR-RECIPIENT (a debit carrying the bound recipient id with no reference and no destination fields): Resolve uncertain execution" and "DENY RFG-P-NX-CORR-DF (a debit whose full destination gives the attempt's fingerprint, other amount, no reference): Resolve uncertain execution".
 
 ### 7.23 Owner statement import (DV1-02; replaces API sweeps; realises S3) — r7, V1
 File `packages/persistence/test/ach-inbound-cells.test.ts`. SI2 locks the account/environment statement stream, then the
@@ -1330,6 +1388,31 @@ Delta only; everything else in r9 is unchanged.
 |---|---|---|---|
 | 1 | ACH-R8-01 | DV1-11: named normalization `destination-norm-v1` (routing 9 digits + ABA check, account 1–17 digits with leading zeros, holder NFC + default case folding + whitespace rule); canonical length-prefixed encoding with domain tag, normalizer version, key id and key version, injective over the tuple; X1/X4 refuse `RECIPIENT_ALIAS` | RFG-P-DF-CONCAT-COLLISION, RFG-P-DEST-RECIPIENT-ALIAS, RFG-P-DF-NORMALIZATION, RFG-P-DF-INVALID, RFG-P-DF-KEY-VERSION, destination-norm-v1 vectors |
 | 2 | ACH-R7-03 | DV1-11: append-only `execution_offers` written in the recording transaction under L1 → L2 → L3, committed on success and on a failed predicate; any offer row blocks X3 NOT_EXECUTED; failure columns defined | RFG-M-OFFER-RACE, -TIMEOUT, -CRASH-BEFORE, -CRASH-AFTER, -RETRY, -PARTIAL, -UNAUTHORIZED; RFG-P-NX-CORR-OFFERED-REPRO, RFG-P-NX-OFFER-REJECTED-EVIDENCE |
+
+## 13. r10 → r11 change list (Codex design r10, `tools/review/out/ach-design-r10-6c0e5d74a2ab`; family `evidence`)
+
+| # | Finding | Change (by construction) | Cells |
+|---|---|---|---|
+| 1 | ACH-R10-01 | One normative rule: the r9 NFKC/punctuation-removal normalization and every supersession clause in DV1-08/10/11 are deleted from the normative text (quoted below as history); DV1-11 is the only definition | RFG-P-DF-HYPHEN, RFG-P-DF-FULLWIDTH |
+| 2 | ACH-R7-03 | `Koffer` commits the offer under L1 → L2 → L3 before G1; every gate outcome (classified, predicate failure, four REJECTED codes, store refusal/timeout) follows it; outcome rows are separate and append-only; any offer blocks NOT_EXECUTED | RFG-P-OFFER-GATE-* (7), RFG-M-OFFER-* (9), RFG-P-NX-CORR-OFFERED-REPRO |
+| 3 | ACH-R10-02 | Coverage table §7.22d maps every guard and entry point (F2 bounds incl. holders 140/141, X4 RECIPIENT_ALIAS, X3-EXECUTED offers, both scopes, both kinds) to titles; split bounds controls; two titles added for unmapped correlations | §7.22d; RFG-P-DF-BOUNDS, -ROUTING-*, -ACCOUNT-*, -HOLDER-*, -INVALID-EVIDENCE, -DEST-RECIPIENT-ALIAS-RESEND, -NX-CORR-RECIPIENT, -NX-CORR-DF |
+
+**History (removed from the normative text in r11; not in force):**
+- DV1-08 attempt destination: "declared destination (`accountDigest`, `accountLast4`, `routingDigest`, computed from the approved destination evidence) [SUPERSEDED r9: the keyed destination fingerprint `DF` and key version captured at F2, DV1-10]"
+- DV1-08 E-DEST: "**E-DEST** destination proven (`accountDigest` equal, or `accountLast4` and `routingDigest` both equal) and **no E-DEST-CONFLICT** (no present destination field differs); [SUPERSEDED r9: E-DEST is DP-FULL or DP-RECIPIENT and any differing partial field is a conflict, DV1-10]"
+- DV1-08 failing predicate: "A failing predicate refuses with its own code, changes nothing and opens a REVIEW case. [r10: it commits only the durable offer row and the case; no money, attempt or refund state changes, DV1-11.]"
+- DV1-08 NX exclusion: "and **NX-NO-POTENTIAL** no potentially matching debit lies in it. A debit is **excluded** only if it is linked to another RECORDED attempt, has another currency, or has E-DEST-CONFLICT against this attempt; every other debit — including one with null reference and null destination — is potentially matching and keeps the attempt UNCERTAIN (`POTENTIAL_MATCH_UNRESOLVED`). [SUPERSEDED r9: the exclusion rule above is replaced by DV1-10 — correlation overrides every exclusion; only debits explained by another RECORDED attempt or a recorded settlement are excluded.]"
+- DV1-08 undeclared definition: "potentially matching (definition above)"
+- DV1-10 supersession clause: "Supersedes in DV1-08 the destination fields of the attempt, the E-DEST and E-DEST-CONFLICT definitions and the NX-NO-POTENTIAL exclusion rule. All other DV1-08 text stands."
+- DV1-10 DF formula and NFKC normalization: "and a **keyed destination fingerprint** `DF = HMAC(destinationKey_v, routing ‖ account ‖ normalizedHolderName)` [SUPERSEDED r10: canonical length-prefixed encoding, DV1-11] with its key version `v` (key in the platform secret store, never in an adapter, log or event). Name normalization (versioned): Unicode NFKC, case fold, punctuation removed, whitespace collapsed."
+- DV1-10 freeze: "X1 and X4 freeze `DF` and `v` into the attempt"
+- DV1-10 CORR-OFFERED: "its `bankExecutionId` was offered for this attempt in a refused G2/G4/X3 (CORR-OFFERED); [r10: read from the durable `execution_offers` rows, and any offer row blocks NOT_EXECUTED, DV1-11]"
+- DV1-10 r8 reading note: "The r8 "potentially matching" test of undeclared debits (DV1-08) reads "unexplained or correlated" with these definitions."
+- DV1-11 supersession clause: "Supersedes in DV1-10 the `DF` formula and the CORR-OFFERED definition, and in DV1-08 the sentence "a failing predicate … changes nothing". Everything else in DV1-08 and DV1-10 stands."
+- DV1-11 r10 offer write (single transaction, after classification): "- **Execution offers are durable (CORR-OFFERED).** Every G2, G4 or X3-EXECUTED request that passes the actor's authority guards and reaches its effect transaction inserts one append-only `execution_offers` row: attempt, `bankExecutionId` (null when the evidence was REJECTED by the classifier), evidence hash and ref, command, actor, `offeredAt` (DB clock), outcome code. The row is written **in the same transaction, under L1 → L2 → L3**, and that transaction **commits in both outcomes**: on success with the RECORDED footprint, on a failed predicate with only the offer row and the REVIEW case (no money, attempt or refund state change). A refusal because the attempt is already NOT_EXECUTED also commits its row, opens REFUND_TERMINAL_CONTRADICTED and sets `execution_frozen` on the open refunds of the source. Rows are unique by `(attemptId, evidenceHash, command)`; never updated or deleted. Unauthorized requests write nothing here (they take the separate DENY-fact path). - **Effect on NOT_EXECUTED.** X3 NOT_EXECUTED reads `execution_offers` for the attempt under L1 and is refused `CONTRADICTORY_EVIDENCE` if any row exists, whatever its outcome or later use of the same execution id elsewhere (an execution id offered for A and later RECORDED for B still blocks A: the owner claimed A was executed). Such an attempt stays UNCERTAIN until it is RECORDED with proof; clearing a contradictory offer is LATER 2026-11-30 with UNDECLARED_OUTBOUND (fail closed). - **Failure columns of the offer write.** CRASH-BEFORE (before the effect COMMIT): no offer, no case; the client has no answer and the replay inserts the one row. CRASH-AFTER and TIMEOUT: the replay with the same key returns the committed outcome and finds the one row. RETRY: same key replays; the same evidence under another key hits the unique row (no second row) and gets the same outcome. RACE: X3 and the offering command serialize on L1 (cells both orders). PARTIAL: a failure at the case insert rolls back the offer row too. Cells: §7.22c."
+- §7.22 r8 title RFG-P-NX-EXCLUDED: "- "OK RFG-P-NX-EXCLUDED (only debits linked elsewhere, in another currency or with a conflicting destination): Resolve uncertain execution" **[SUPERSEDED r9: not written; see §7.22b RFG-P-NX-EXPLAINED]**"
+- §7.22b note on RFG-P-NX-EXCLUDED: "`RFG-P-NX-EXCLUDED` (r8) is **[SUPERSEDED r9]** by `RFG-P-NX-EXPLAINED` and the denial controls above; the r8 title is not written."
+- §7.22c r10 (whole subsection: single-transaction offer cells, compound RFG-P-DF-INVALID): "see r10 commit 6c0e5d7"
 
 ## Appendix A. Phase 2 (post-launch): automated Wise outbound — not designed here
 
