@@ -146,6 +146,14 @@ Every divergence is asserted per binding in `contract.test.ts` (row titles start
   transport, credentials, clock })`, with `credentials.read(ref)` reading the Secrets Manager file the deployment writes (AWS-DELTA §2.6)
   and `merchantId`/`webhookId` from configuration.
 
+- **I-PP-7 `tools/evidence.mjs`** — the evidence run must list every workspace package with a test script
+  (`tools/test/evidence.test.mjs` "the suites the tool runs are the packages' own test scripts, …" fails without it):
+  ```diff
+     { name: "data-plane", cwd: "packages/data-plane", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
+  +  // package B15: the PayPal provider adapters on the recorded wire
+  +  { name: "adapters-paypal", cwd: "packages/adapters-paypal", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
+  ```
+
 ### 2.6 Reversal proofs (rule 4)
 
 Each guard reverted alone, the suite rebuilt and run; the failing titles and assertion text are pasted in the PR brief.
