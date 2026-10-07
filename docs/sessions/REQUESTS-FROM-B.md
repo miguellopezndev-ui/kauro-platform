@@ -56,3 +56,10 @@ Read this file at the start of each block (`git fetch origin docs/b-requests`). 
   renew-and-repeat on READS (GET). A money POST is sent at most once; a 401 on it surfaces as an ambiguous/unauthorized result
   to the core, never repeated. Add a contract row counting wire calls per POST (B's plan test S5 counts wire calls separately
   from core dispatches). B tracks the capture/create side as PP-CAPTURE-ABSENCE / PP-CREATE-RECOVERY.
+- **R-B7 (owner rule 2026-10-07, binding).** For an uncertain refund nothing ever re-sends the refund POST (not even with the
+  same PayPal-Request-Id); recovery only READS (GET order view, GET /v2/payments/refunds/{id}). Provider facts come only from
+  official PayPal documentation with exact URL (OpenAPI at github.com/paypal/paypal-rest-api-specifications); answers from an
+  AI assistant are not evidence. Officially documented today: the refund POST's PayPal-Request-Id has NO stated retention
+  (UNKNOWN); "6 h (72 h)" is for Orders create only; refund status enum CANCELLED/FAILED/PENDING/COMPLETED has no stated money
+  meaning (CANCELLED/FAILED stay unrecognized-for-money). The adapter must expose no API that can re-POST a refund for an
+  existing attempt; B adds the test `NEVER-RESEND` over every entry point.
