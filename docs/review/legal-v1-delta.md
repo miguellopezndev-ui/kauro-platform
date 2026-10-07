@@ -30,3 +30,18 @@ Ambiguities: DV1-06 text is not in the repo; row 3 uses the mandate's summary on
 | 17 | TERMS 8.1 (amends row 1) | "la Plataforma ofrece ... cuando esté habilitada" -> "el único medio previsto es ...; Kauro no cobra ni acepta pagos por esta vía hasta que la ruta esté habilitada; solo se muestra cuando esté habilitada" | Owner Addendum: no implication of collecting before ENABLED |
 | 18 | CHECKLIST A-20 | added "Deadline: during the real-account qualification, before the deletion texts (ToS 13.4, DPA 13.2) are published" | F-02 |
 Note: 3.1 "cobra el precio acordado" describes the service flow and was left; flag if Codex wants it conditional.
+
+## Round 3 (Codex r2 REJECT F-01 MAJOR, F-02 MINOR; owner language rule 2026-10-07)
+| # | File : section | Before -> after | Reason |
+|---|---|---|---|
+| 19 | TERMS 8.2(4) | "sigan siendo válidos ..." -> English: the accepted Quote and its source or files, target, legal and fiscal treatment and delivery scope must remain **unchanged**; a scope amendment or source replacement under 6.5 after acceptance does not qualify; plus no other open or paid purchase | Codex F-01 (6.5 replacement must not slip through) |
+| 20 | TERMS 10.5 | same "unchanged" requirement for price honoured after expiry/deletion | consistency with 19 |
+| 21 | CHECKLIST A-20 | adds "Decision date 2026-10-07; the measurement must be completed by 2026-10-10 (Codex wording), during the real-account qualification and before the deletion texts (ToS 13.4, DPA 13.2) are published"; quote translated to "may persist for a few days after deletion" | Codex F-02 |
+| 22 | Language: ToS, DATA_PROCESSING_POLICY (POL), PRIVACY_NOTICE, INTERNAL_DATA_MANUAL, PIA_BEDROCK | Spanish -> English master, meaning preserved (every clause, number, term and auth/law trace kept; Colombian statute names kept in Spanish with English text). Placeholders now English: [NIT], [registered address], [notice email], [effective date], [phone]. ToS 24.4: English master prevails, Spanish translation only where Colombian law requires it. AVISO abbreviation -> NOTICE | Owner rule: customers are US companies, no Spanish by default |
+| 23 | DPA.md + DPA_EN.md | merged into one English master `DPA.md` (the former DPA_EN content, which already carried the Payments V1 and D-19 edits); Spanish DPA deleted; DPA_EN.md removed | Owner rule |
+| 24 | CHECKLIST (header, S-16), LAWYER_LATER (L-11 reopened as r5, L-13, F-01..F-05) | language statements and file references updated; AVISO -> NOTICE; Spanish placeholders renamed | consequence of 22-23 |
+| 25 | docs/legal/es/ (new) | Spanish secondary copies of DATA_PROCESSING_POLICY.md, PRIVACY_NOTICE.md, INTERNAL_DATA_MANUAL.md (the pre-conversion Spanish text including rows 8-9, 13, 15's Spanish equivalents), each with a banner: "secondary translation of the English master; reachable only through the language selector; English prevails" | see below |
+
+Spanish copies kept and why: (a) POL = the habeas-data treatment policy that Ley 1581 de 2012 / Decreto 1074 art. 2.2.2.25.3.1 requires data subjects in Colombia to receive (owner named it); (b) MAN = its internal manual (Ley 1581 art. 17 lit. k; owner named it); (c) PRIVACY_NOTICE = the Aviso de Privacidad (Decreto 1074 arts. 2.2.2.25.3.2-3), the notice required at collection of data from Colombian data subjects; kept by the same reasoning, drop if the owner wants only (a)+(b). Not kept: ToS, DPA, PIA, CHECKLIST, LAWYER_LATER.
+Spanish-copy caveat: es/ copies do not carry rows 19-21 (not applicable to POL/NOTICE/MAN); they are as of c364a5b for the Payments V1 hunks.
+Open: ToS section 25 (Ley 1480 consumers, Colombian) and the consumer Quote are now English only; LAWYER_LATER L-11 records whether Colombian consumer law needs Spanish there.

@@ -1,329 +1,326 @@
 <!--
-D-08b · Política de Tratamiento de Información Personal de Kauro (Ley 1581 de 2012; Decreto 1377 de 2013 compilado en el
-Decreto 1074 de 2015, art. 2.2.2.25.3.1). Borrador del constructor sin abogado (decisión D-08b, opción 1).
-Trazabilidad: `auth:` = authority/r2; `law:` = fila de CHECKLIST.md. Marcadores admitidos: [NIT], [domicilio],
-[correo de notificaciones], [fecha de vigencia], [teléfono] (ver LAWYER_LATER F-05).
+D-08b · Kauro Personal Data Processing Policy (Ley 1581 de 2012; Decreto 1377 de 2013 compiled in Decreto 1074 de 2015, art.
+2.2.2.25.3.1). English master (owner rule 2026-10-07); a Spanish secondary translation is kept in es/ because Colombian law
+requires the habeas-data policy in Spanish. Draft by the builder without a lawyer (decision D-08b, option 1).
+Traceability: `auth:` = authority/r2; `law:` = CHECKLIST.md row. Allowed placeholders: [NIT], [registered address],
+[notice email], [effective date], [phone] (see LAWYER_LATER F-05).
 -->
 
-# Política de Tratamiento de Información Personal
+# Personal Data Processing Policy
 
-**Versión:** 1.0 · **Vigente desde:** [fecha de vigencia]
+**Version:** 1.0 · **Effective from:** [effective date]
 
-## 1. Responsable del tratamiento
+## 1. Data controller
 
-| Dato | Valor |
+| Item | Value |
 |---|---|
-| Razón social | Kauro Data S.A.S. |
+| Legal name | Kauro Data S.A.S. |
 | NIT | [NIT] |
-| Domicilio y dirección | [domicilio] |
-| Correo electrónico | [correo de notificaciones] |
-| Teléfono | [teléfono] |
-| Sitio web | kaurodata.com |
-<!-- law: C-03 (Decreto 1074 art. 2.2.2.25.3.1 num. 1: nombre, domicilio, dirección, correo y teléfono) · auth: A8 §1; A4 §Owner acts; 19 §BusinessProfile and legal facts -->
+| Domicile and address | [registered address] |
+| Email | [notice email] |
+| Phone | [phone] |
+| Website | kaurodata.com |
+<!-- law: C-03 (Decreto 1074 art. 2.2.2.25.3.1 num. 1: name, domicile, address, email and phone) · auth: A8 §1; A4 §Owner acts; 19 §BusinessProfile and legal facts -->
 
-## 2. Marco normativo y alcance
+## 2. Legal framework and scope
 
-Esta Política cumple la Ley Estatutaria 1581 de 2012, el Decreto 1377 de 2013 (compilado en el Capítulo 25 del Decreto 1074 de
-2015) y las instrucciones de la Superintendencia de Industria y Comercio (SIC). Aplica a las bases de datos con datos personales
-de las que **Kauro es responsable** y, en lo que corresponda, a los datos que Kauro trata como **encargado** por cuenta de sus
-clientes (sección 12).
+This Policy complies with Statutory Law 1581 of 2012, Decreto 1377 of 2013 (compiled in Chapter 25 of Decreto 1074 of 2015) and
+the instructions of the Superintendencia de Industria y Comercio (SIC). It applies to the databases containing personal data of
+which **Kauro is the controller** and, as applicable, to the data Kauro processes as **processor** on behalf of its customers
+(section 12).
 <!-- law: C-01, C-02 -->
 
-## 3. Definiciones
+## 3. Definitions
 
-Se usan las definiciones del artículo 3 de la Ley 1581 de 2012: autorización, base de datos, dato personal, encargado del
-tratamiento, responsable del tratamiento, titular y tratamiento. Además: **transferencia** es el envío de datos a un receptor que
-es a su vez responsable; **transmisión** es la comunicación de datos a un encargado para que los trate por cuenta del responsable.
+The definitions of article 3 of Ley 1581 de 2012 are used: authorization, database, personal data, processor, controller, data
+subject and processing. In addition: **transfer** is the sending of data to a recipient that is itself a controller;
+**transmission** is the communication of data to a processor so that it processes them on the controller's behalf.
 <!-- law: C-01 (Ley 1581 art. 3); C-20 (Decreto 1074 art. 2.2.2.25.5.1) -->
 
-## 4. Principios
+## 4. Principles
 
-Kauro aplica de manera armónica los principios de legalidad, finalidad, libertad, veracidad o calidad, transparencia, acceso y
-circulación restringida, seguridad y confidencialidad del artículo 4 de la Ley 1581 de 2012, y el principio de responsabilidad
-demostrada. En la práctica: recoge solo los datos necesarios para cada finalidad; no envía a vendedores, analítica, notificaciones,
-registros ni herramientas de desarrollo más datos de los necesarios; y no usa datos de clientes en asistentes de desarrollo,
-repositorios ni servicios de modelos no pagados.
+Kauro applies in a harmonious way the principles of legality, purpose, freedom, truthfulness or quality, transparency, restricted
+access and circulation, security and confidentiality of article 4 of Ley 1581 de 2012, and the principle of demonstrated
+accountability. In practice: it collects only the data necessary for each purpose; it sends to sellers, analytics, notifications,
+logs and development tools no more data than necessary; and it does not use customer data in development assistants,
+repositories or unpaid model services.
 <!-- law: C-01 (art. 4), C-24 (Decreto 1074 art. 2.2.2.25.6.1) · auth: 01 CH-006 -->
 
-## 5. Roles de Kauro
+## 5. Kauro's roles
 
-- **Responsable:** de los datos de sus clientes como empresas y de sus usuarios, de los interesados y prospectos, de sus
-  colaboradores comerciales y proveedores, de quienes ejercen derechos ante Kauro y de los registros de seguridad (sección 6).
-- **Encargado:** de los datos personales contenidos en las exportaciones de CRM y hojas de cálculo que los clientes cargan para
-  su preparación, y de sus derivados. En ese caso el responsable es el cliente o el cliente final del cliente, y el tratamiento se
-  rige por el Acuerdo de Encargo (DPA) firmado con el cliente (sección 12).
-<!-- auth: 19 §Data processing agreement; 01 §Purpose and customer promise (A3 §4.1); producto: brief D-08b -->
+- **Controller:** of the data of its customers as companies and of their users, of leads and prospects, of its commercial
+  collaborators and providers, of those who exercise rights before Kauro and of security records (section 6).
+- **Processor:** of the personal data contained in the CRM exports and spreadsheets that customers upload for preparation, and
+  of their derivatives. In that case the controller is the customer or the customer's end client, and the processing is
+  governed by the Data Processing Agreement (DPA) signed with the customer (section 12).
+<!-- auth: 19 §Data processing agreement; 01 §Purpose and customer promise (A3 §4.1); product: brief D-08b -->
 
-## 6. Bases de datos, datos tratados y finalidades (Kauro como responsable)
+## 6. Databases, data processed and purposes (Kauro as controller)
 
-### 6.1. Clientes y usuarios de la plataforma
+### 6.1. Customers and platform users
 
-- **Titulares:** administradores y usuarios invitados de las agencias y empresas cliente.
-- **Datos:** nombre, correo electrónico de trabajo, empresa, rol y permisos, idioma; información de verificación de correo y de
-  segundo factor (Kauro no conserva contraseñas en texto claro ni muestra códigos de recuperación fuera del flujo seguro); registro
-  de la aceptación de los documentos del contrato; actividad en la plataforma y eventos de seguridad (actor, alcance, acción,
-  resultado y fecha); tipo de comprador declarado (agencia o equipo interno).
-- **Finalidades:** (a) crear y administrar la cuenta, las membresías y los permisos; (b) prestar el servicio contratado y el
-  soporte; (c) autenticar y proteger el acceso; (d) enviar avisos transaccionales del servicio (invitaciones, estado del
-  procesamiento, pagos, entregas, avisos de eliminación, soporte); (e) aplicar descuentos de recurrencia y cupos fundadores; (f)
-  medir de forma agregada el uso por segmento; (g) cumplir obligaciones legales y atender requerimientos de autoridad; (h) solo
-  si el usuario lo autoriza por separado (sección 8.3), enviarle comunicaciones comerciales sobre Kauro por los canales que
-  autorizó; y (i) prevenir el abuso y el fraude.
-<!-- auth: 02 §2; 08 §Authentication and assurance; 08 §Audit events and retention; 11 §Agency onboarding; 16 §Recurrence decision; A3 §3.7 (tipo de comprador); reference/MESSAGING_AND_SENDER_OPERATIONS.md (avisos transaccionales vía Resend) -->
+- **Data subjects:** administrators and invited users of customer agencies and companies.
+- **Data:** name, work email, company, role and permissions, language; email and second-factor verification information (Kauro
+  keeps no clear-text passwords and shows no recovery codes outside the secure flow); record of acceptance of the contract
+  documents; activity on the platform and security events (actor, scope, action, result and date); declared buyer type (agency
+  or in-house team).
+- **Purposes:** (a) create and manage the account, memberships and permissions; (b) provide the contracted service and support;
+  (c) authenticate and protect access; (d) send transactional service notices (invitations, processing status, payments,
+  deliveries, deletion notices, support); (e) apply recurrence discounts and founding slots; (f) measure usage in aggregate by
+  segment; (g) comply with legal obligations and respond to authority requests; (h) only if the user authorizes it separately
+  (section 8.3), send commercial communications about Kauro through the channels it authorized; and (i) prevent abuse and fraud.
+<!-- auth: 02 §2; 08 §Authentication and assurance; 08 §Audit events and retention; 11 §Agency onboarding; 16 §Recurrence decision; A3 §3.7 (buyer type); reference/MESSAGING_AND_SENDER_OPERATIONS.md (transactional notices via Resend) -->
 
-### 6.2. Facturación, pagos y contabilidad
+### 6.2. Billing, payments and accounting
 
-- **Titulares:** representantes y contactos de facturación de los clientes; personas que figuran en pagos y transferencias.
-- **Datos:** razón social, identificación tributaria, dirección de facturación, contacto de facturación, datos del pedido,
-  referencias y estados del pago, nombre y referencia del ordenante en transferencias recibidas, reembolsos y disputas. Kauro no
-  recibe ni guarda números de tarjeta.
-- **Finalidades:** cobrar, conciliar pagos, emitir factura electrónica y notas, gestionar reembolsos y disputas, llevar la
-  contabilidad y cumplir obligaciones tributarias y comerciales.
+- **Data subjects:** representatives and billing contacts of customers; people named in payments and transfers.
+- **Data:** legal name, tax identification, billing address, billing contact, order data, payment references and statuses, the
+  payer's name and reference in received transfers, refunds and disputes. Kauro does not receive or keep card numbers.
+- **Purposes:** collect, reconcile payments, issue electronic invoices and notes, manage refunds and disputes, keep the books and
+  meet tax and commercial obligations.
 <!-- auth: 15 §Money vocabulary; 15 §FiscalProfile ("collects only billing facts necessary"); 15 §Disputes and chargebacks; A8 §1, §3 -->
 
-### 6.3. Interesados y prospectos
+### 6.3. Leads and prospects
 
-- **Titulares:** personas que llenan el formulario de contacto del sitio, y personas de **agencias** que autorizaron a Kauro a
-  contactarlas.
-- **Datos:** del formulario: nombre, correo y empresa, tipo de comprador, destino, banda aproximada de registros y fecha deseada
-  (el formulario no acepta archivos de CRM). De agencias prospecto, **solo datos de la organización**: nombre de la agencia,
-  dominio, país, fuente y fecha de observación, notas comerciales acotadas sin datos de personas, estado de baja y, como canal de
-  contacto, solo un correo o teléfono que cumpla **los tres hechos** de la sección 6.3.1. Cualquier dato de una persona (nombre,
-  cargo, correo, teléfono) se trata **solo después de que esa persona autoriza** el tratamiento, y Kauro guarda la prueba.
-- **6.3.1. Cuándo un canal es de la organización.** Un correo o teléfono es dato de la organización, y no dato personal, solo si
-  se cumplen los tres hechos siguientes, verificados y registrados, nunca deducidos de la forma del correo o del número: (a) la
-  propia organización, que es una persona jurídica, lo publica como su canal de contacto comercial, y Kauro guarda la evidencia
-  (dirección web, fecha y captura); (b) no identifica a una persona natural ni se le puede atribuir: no contiene el nombre de una
-  persona, la agencia no es un comerciante persona natural ni un negocio de una sola persona, y el número no es un celular ni una
-  línea personal; y (c) Kauro vuelve a verificar (a) y (b) cada vez que lo va a usar. Si alguno de los tres falla o no se puede
-  determinar, el canal es **dato personal** y requiere autorización previa. La misma regla se aplica a cada campo importado, a la
-  referencia de la fuente y a las notas.
-- **Finalidades:** responder solicitudes; evaluar si el proyecto encaja con el servicio; contactar a la agencia por sus canales
-  de organización (sección 6.3.1) para presentarle el servicio y, si una persona quiere seguir la conversación, pedirle su autorización; enviar
-  comunicaciones comerciales solo según la sección 17; y registrar las bajas para respetarlas siempre.
-- **Límites:** Kauro solo prospecta agencias. Nunca investiga, registra como prospecto ni contacta para venta a empresas que no
-  son agencias ni a sus equipos internos, ni a los clientes finales de sus agencias clientes. **No recoge de sitios web,
-  directorios ni redes sociales nombres, correos nominativos ni teléfonos directos de personas para prospectarlas.** No usa los
-  datos de los archivos de CRM de sus clientes para fines comerciales.
-<!-- auth: 02 §1 Discover and qualify fit; 12 §Prospect record (persona de contacto "where appropriate": restringida por las decisiones del coordinador de 2026-10-06, CHECKLIST S-22); 18 §Prospect qualification; 18 §Communication compliance ("Publicly available contact details do not automatically authorize every use"); 16 §Offer and buyer fit; A3 §3.7 · law: C-04, C-06, C-19 (Ley 1581 arts. 3 lit. c, 9 y 10; SIC Circular 002 de 2024, instrucción IX; SIC, concepto radicado 23-571469 (datos corporativos de una persona jurídica)) · CHECKLIST A-13 -->
+- **Data subjects:** people who fill in the site's contact form, and people at **agencies** who authorized Kauro to contact
+  them.
+- **Data:** from the form: name, email and company, buyer type, target, approximate record band and desired date (the form
+  accepts no CRM files). From prospect agencies, **organization data only**: agency name, domain, country, source and date of
+  observation, bounded commercial notes without data of individuals, opt-out status and, as a contact channel, only an email or
+  phone that meets **all three facts** of section 6.3.1. Any data of an individual (name, title, email, phone) is processed
+  **only after that person authorizes** the processing, and Kauro keeps the proof.
+- **6.3.1. When a channel is the organization's.** An email or phone is organization data, and not personal data, only if all
+  three of the following facts are met, verified and recorded, never inferred from the shape of the email or number: (a) the
+  organization itself, which is a legal entity, publishes it as its commercial contact channel, and Kauro keeps the evidence
+  (web address, date and capture); (b) it does not identify or cannot be attributed to a natural person: it does not contain a
+  person's name, the agency is not a sole-trader merchant or a one-person business, and the number is not a mobile or personal
+  line; and (c) Kauro re-verifies (a) and (b) each time it is about to use it. If any of the three fails or cannot be determined,
+  the channel is **personal data** and requires prior authorization. The same rule applies to each imported field, to the source
+  reference and to the notes.
+- **Purposes:** answer requests; assess whether the project fits the service; contact the agency through its organization
+  channels (section 6.3.1) to present the service and, if a person wants to continue the conversation, ask for authorization;
+  send commercial communications only under section 17; and record opt-outs to always respect them.
+- **Limits:** Kauro prospects only agencies. It never researches, records as a prospect or contacts for sale companies that are
+  not agencies or their in-house teams, or the end clients of its agency customers. **It does not collect from websites,
+  directories or social networks names, named emails or direct phones of individuals to prospect them.** It does not use the
+  data in its customers' CRM files for commercial purposes.
+<!-- auth: 02 §1 Discover and qualify fit; 12 §Prospect record (contact person "where appropriate": restricted by the coordinator's decisions of 2026-10-06, CHECKLIST S-22); 18 §Prospect qualification; 18 §Communication compliance ("Publicly available contact details do not automatically authorize every use"); 16 §Offer and buyer fit; A3 §3.7 · law: C-04, C-06, C-19 (Ley 1581 arts. 3 lit. c, 9 and 10; SIC Circular 002 de 2024, instruction IX; SIC, concept file 23-571469 (corporate data of a legal entity)) · CHECKLIST A-13 -->
 
-### 6.4. Colaboradores comerciales y proveedores
+### 6.4. Commercial collaborators and providers
 
-- **Titulares:** vendedores independientes, candidatos a serlo, proveedores personas naturales y contactos de proveedores.
-- **Datos:** identificación, contacto, información contractual, documentos tributarios y de seguridad social exigidos,
-  datos bancarios para pagos, liquidaciones de comisiones y su soporte.
-- **Finalidades:** seleccionar y contratar, administrar la relación, calcular y pagar comisiones u honorarios, cumplir
-  obligaciones tributarias y contables, y atender disputas. Los documentos de identidad, bancarios y tributarios se guardan con
-  acceso restringido a finanzas y nunca se incluyen en exportaciones de prospectos ni en paquetes de revisión.
+- **Data subjects:** independent sellers, candidates to be sellers, individual providers and provider contacts.
+- **Data:** identification, contact, contractual information, required tax and social-security documents, bank details for
+  payments, commission settlements and their support.
+- **Purposes:** select and contract, manage the relationship, calculate and pay commissions or fees, meet tax and accounting
+  obligations and handle disputes. Identity, bank and tax documents are kept with access restricted to finance and are never
+  included in prospect exports or review packages.
 <!-- auth: 17 §Currency, fees and tax documentation; 17 §Legal engagement packet; 12 §Seller onboarding and access lifecycle -->
 
-### 6.5. Solicitudes, consultas y reclamos
+### 6.5. Requests, queries and claims
 
-- **Datos:** identificación del solicitante, tipo de solicitud, fechas, verificación aplicada, alcance, respuesta y cierre.
-- **Finalidad:** atender y documentar el ejercicio de derechos y las quejas, conservando la evidencia mínima sin conservar los
-  datos que se suprimieron.
+- **Data:** requester identification, type of request, dates, verification applied, scope, response and closure.
+- **Purpose:** handle and document the exercise of rights and complaints, keeping the minimum evidence without keeping the data
+  that was deleted.
 <!-- auth: 19 §Rights requests and privacy complaints -->
 
-### 6.6. Seguridad y registros técnicos
+### 6.6. Security and technical records
 
-- **Datos:** eventos de seguridad y registros de la aplicación con identificadores de actor, alcance, acción, resultado y fecha.
-  No contienen contenido de CRM, contraseñas ni secretos.
-- **Finalidad:** proteger el servicio, investigar incidentes y demostrar el cumplimiento.
+- **Data:** security events and application logs with actor, scope, action, result and date identifiers. They contain no CRM
+  content, passwords or secrets.
+- **Purpose:** protect the service, investigate incidents and demonstrate compliance.
 <!-- auth: 08 §Audit events and retention; 09 §Retention schedule -->
 
-## 7. Datos sensibles y de niños, niñas y adolescentes
+## 7. Sensitive data and data of children and adolescents
 
-Kauro no solicita datos sensibles en ninguna de las bases de la sección 6 y no trata datos de niños, niñas o adolescentes; el
-servicio es solo para empresas. Si un titular decide entregar un dato sensible, responder es facultativo. Los clientes tienen
-prohibido cargar datos sensibles y datos de menores en los archivos de CRM (Términos de Servicio, sección 5.2).
-<!-- law: C-07 (Ley 1581 arts. 5, 6 y 7; Decreto 1074 art. 2.2.2.25.2.3) · auth: 19 §Data categories and excluded use -->
+Kauro does not request sensitive data in any of the databases in section 6 and does not process data of children or
+adolescents; the service is for companies only. If a data subject decides to provide sensitive data, answering is optional.
+Customers are prohibited from uploading sensitive data and data of minors in CRM files (Terms of Service, section 5.2).
+<!-- law: C-07 (Ley 1581 arts. 5, 6 and 7; Decreto 1074 art. 2.2.2.25.2.3) · auth: 19 §Data categories and excluded use -->
 
-## 8. Autorización
+## 8. Authorization
 
-8.1. Kauro solicita la autorización previa, expresa e informada del titular al momento de la recolección, por un medio que
-permite consultarla después: casilla de aceptación en el registro de la cuenta y en el formulario de contacto, con enlace a esta
-Política y al Aviso de Privacidad; o documento firmado en la contratación de colaboradores. Kauro conserva la prueba de la
-autorización.
+8.1. Kauro requests the data subject's prior, express and informed authorization at the time of collection, by a means that
+allows it to be consulted later: an acceptance checkbox at account registration and on the contact form, with a link to this
+Policy and the Privacy Notice; or a signed document when contracting collaborators. Kauro keeps the proof of authorization.
 
-8.2. No se requiere autorización en los casos del artículo 10 de la Ley 1581 de 2012, entre ellos los datos de naturaleza pública
-y la información requerida por una autoridad en ejercicio de sus funciones. Un dato accesible al público, por ejemplo en un sitio
-web, no es por eso de naturaleza pública; por eso Kauro no trata datos de personas de contacto para prospección sin su
-autorización (sección 6.3). La autorización de una persona de una agencia prospecto se obtiene cuando ella misma llena el
-formulario de contacto, o cuando responde por escrito a un primer mensaje enviado a un canal de la organización que cumple la sección 6.3.1 y que le pide
-esa autorización; Kauro guarda la respuesta como prueba.
-<!-- law: C-04, C-05, C-06, C-19 (Ley 1581 arts. 9 y 10; Decreto 1074 arts. 2.2.2.25.2.2, 2.2.2.25.2.4 y 2.2.2.25.2.5; SIC Circular Externa 002 de 2024, instrucción IX) · CHECKLIST A-13, S-22 -->
+8.2. Authorization is not required in the cases of article 10 of Ley 1581 de 2012, among them data of a public nature and
+information required by an authority in the exercise of its functions. Data accessible to the public, for example on a website,
+is not for that reason of a public nature; therefore Kauro does not process data of contact persons for prospecting without their
+authorization (section 6.3). The authorization of a person at a prospect agency is obtained when that person fills in the contact
+form themselves, or when they respond in writing to a first message sent to an organization channel that meets section 6.3.1
+and that asks for that authorization; Kauro keeps the response as proof.
+<!-- law: C-04, C-05, C-06, C-19 (Ley 1581 arts. 9 and 10; Decreto 1074 arts. 2.2.2.25.2.2, 2.2.2.25.2.4 and 2.2.2.25.2.5; SIC Circular Externa 002 de 2024, instruction IX) · CHECKLIST A-13, S-22 -->
 
-8.3. **Comunicaciones comerciales: autorización separada y opcional.** La autorización para recibir comunicaciones comerciales de
-Kauro se pide aparte de la autorización para prestar el servicio, con una casilla no marcada de antemano; no es condición para
-crear la cuenta, usar la plataforma, comprar ni llenar el formulario. El titular elige los canales que autoriza (correo
-electrónico, llamada, SMS o mensajería) y puede revocarla en cualquier momento. Kauro registra la finalidad, los canales, la fecha
-y la versión del texto aceptado.
-<!-- law: C-51 (Ley 2300 de 2023 arts. 2 y 5, parágrafo 2), C-52 (SIC Circular Externa 001 de 2024, instrucción iii) · CHECKLIST A-14 -->
+8.3. **Commercial communications: separate and optional authorization.** Authorization to receive commercial communications from
+Kauro is requested separately from the authorization to provide the service, with a checkbox not pre-ticked; it is not a
+condition for creating the account, using the platform, buying or filling in the form. The data subject chooses the channels it
+authorizes (email, call, SMS or messaging) and may revoke it at any time. Kauro records the purpose, the channels, the date and
+the version of the text accepted.
+<!-- law: C-51 (Ley 2300 de 2023 arts. 2 and 5, paragraph 2), C-52 (SIC Circular Externa 001 de 2024, instruction iii) · CHECKLIST A-14 -->
 
-## 9. Derechos de los titulares
+## 9. Rights of data subjects
 
-El titular puede: (a) conocer, actualizar y rectificar sus datos frente a Kauro, incluso frente a datos parciales, inexactos,
-incompletos, fraccionados o que induzcan a error, o cuyo tratamiento no haya sido autorizado; (b) solicitar prueba de la
-autorización, salvo cuando no se requiera; (c) ser informado, previa solicitud, del uso que se ha dado a sus datos; (d) presentar
-quejas ante la Superintendencia de Industria y Comercio, después de agotar el trámite de consulta o reclamo ante Kauro; (e)
-solicitar en cualquier momento la supresión de sus datos y/o revocar la autorización mediante reclamo, sin necesidad de alegar
-un incumplimiento, salvo el deber legal o contractual aplicable de permanecer en la base de datos; y (f) acceder gratuitamente a
-sus datos al menos una vez cada mes calendario y cada vez que haya cambios sustanciales de esta Política. Si un deber de
-permanecer impide la supresión total, Kauro deja de usar los datos para las finalidades que no son necesarias para cumplir ese
-deber (por ejemplo, las comunicaciones comerciales).
-<!-- law: C-08 (Ley 1581 arts. 8 y 16), C-09 (Decreto 1074 art. 2.2.2.25.4.2), C-11 (Decreto 1074 art. 2.2.2.25.2.6: revocatoria y supresión en cualquier momento) -->
+The data subject may: (a) know, update and rectify its data before Kauro, including partial, inaccurate, incomplete, fractioned
+or misleading data, or data whose processing was not authorized; (b) request proof of the authorization, except where it is not
+required; (c) be informed, on request, of the use made of its data; (d) file complaints with the Superintendencia de Industria y
+Comercio, after exhausting the query or claim procedure before Kauro; (e) request at any time the deletion of its data and/or
+revoke the authorization by claim, without needing to allege a breach, except for the applicable legal or contractual duty to
+remain in the database; and (f) access its data free of charge at least once per calendar month and each time there are
+substantial changes to this Policy. If a duty to remain prevents total deletion, Kauro stops using the data for the purposes that
+are not necessary to meet that duty (for example, commercial communications).
+<!-- law: C-08 (Ley 1581 arts. 8 and 16), C-09 (Decreto 1074 art. 2.2.2.25.4.2), C-11 (Decreto 1074 art. 2.2.2.25.2.6: revocation and deletion at any time) -->
 
-## 10. Procedimiento para consultas y reclamos
+## 10. Procedure for queries and claims
 
-10.1. **Canal.** Las solicitudes se envían a [correo de notificaciones], o por escrito a [domicilio], o desde la sección de
-privacidad de la cuenta en la plataforma. Kauro verifica la identidad del titular o de su causahabiente o representante antes de
-revelar, corregir o suprimir datos.
+10.1. **Channel.** Requests are sent to [notice email], or in writing to [registered address], or from the privacy section of the
+account on the platform. Kauro verifies the identity of the data subject or its successor or representative before disclosing,
+correcting or deleting data.
 <!-- auth: 11 §Billing, team, settings and help ("privacy requests"); 19 §Rights requests and privacy complaints -->
 
-10.2. **Consultas.** Se atienden en un máximo de diez (10) días hábiles desde su recibo. Si no es posible, Kauro informa antes del
-vencimiento los motivos y la nueva fecha, que no superará cinco (5) días hábiles adicionales.
+10.2. **Queries.** They are answered within a maximum of ten (10) business days from receipt. If that is not possible, Kauro
+informs, before the deadline, the reasons and the new date, which will not exceed five (5) additional business days.
 
-10.3. **Reclamos** (corrección, actualización, supresión o presunto incumplimiento). El reclamo debe incluir la identificación
-del titular, la descripción de los hechos, la dirección y los documentos que se quieran hacer valer. Si está incompleto, Kauro
-pide completarlo dentro de los cinco (5) días siguientes a su recibo; si pasan dos (2) meses sin respuesta, se entiende desistido.
-Si Kauro no es competente para resolverlo, lo traslada a quien corresponda en un máximo de dos (2) días hábiles e informa al
-interesado. Recibido el reclamo completo, Kauro incluye en la base la leyenda "reclamo en trámite" y su motivo en un máximo de dos
-(2) días hábiles, y la mantiene hasta decidir. El término para atenderlo es de quince (15) días hábiles desde el día siguiente a
-su recibo; si no es posible, Kauro informa al interesado, **antes del vencimiento del término inicial**, los motivos y la nueva
-fecha, que no superará ocho (8) días hábiles siguientes al vencimiento del primer término.
+10.3. **Claims** (correction, update, deletion or alleged breach). The claim must include the data subject's identification, the
+description of the facts, the address and the documents it wants to rely on. If it is incomplete, Kauro asks for it to be
+completed within five (5) days of receipt; if two (2) months pass without a response, the claim is deemed withdrawn. If Kauro is
+not competent to resolve it, it forwards it to the one who is within a maximum of two (2) business days and informs the person
+concerned. Once the complete claim is received, Kauro adds to the database the legend "claim in process" and its reason within a
+maximum of two (2) business days, and keeps it until it decides. The term to handle it is fifteen (15) business days from the day
+after receipt; if that is not possible, Kauro informs the person concerned, **before the initial term expires**, of the reasons
+and the new date, which will not exceed eight (8) business days after the expiry of the first term.
 
-10.4. **Supresión y revocatoria.** Pueden pedirse en cualquier momento. No proceden cuando el titular tiene un deber legal o
-contractual de permanecer en la base de datos (por ejemplo, facturas y registros contables que la ley obliga a conservar). En ese
-caso Kauro suprime o deja de usar todo lo demás, explica qué registros residuales conserva y por qué.
-<!-- law: C-10 (Ley 1581 arts. 14 y 15), C-11 (Decreto 1074 art. 2.2.2.25.2.6, revocatoria y supresión) · auth: 19 §Rights requests and privacy complaints (último párrafo) -->
+10.4. **Deletion and revocation.** They may be requested at any time. They do not apply when the data subject has a legal or
+contractual duty to remain in the database (for example, invoices and accounting records the law requires to be kept). In that
+case Kauro deletes or stops using everything else, and explains what residual records it keeps and why.
+<!-- law: C-10 (Ley 1581 arts. 14 and 15), C-11 (Decreto 1074 art. 2.2.2.25.2.6, revocation and deletion) · auth: 19 §Rights requests and privacy complaints (last paragraph) -->
 
-## 11. Área responsable de la protección de datos
+## 11. Area responsible for data protection
 
-La función de protección de datos personales la asume el representante legal de Kauro, quien recibe y tramita las solicitudes de
-los titulares por los canales de la sección 10.1.
-<!-- law: C-09b (Decreto 1074 art. 2.2.2.25.4.4: designar persona o área) · resolución de silencio S-14 -->
+The personal data protection function is assumed by Kauro's legal representative, who receives and handles data subjects'
+requests through the channels in section 10.1.
+<!-- law: C-09b (Decreto 1074 art. 2.2.2.25.4.4: designate a person or area) · silence resolution S-14 -->
 
-## 12. Datos que Kauro trata como encargado (archivos de CRM)
+## 12. Data Kauro processes as processor (CRM files)
 
-12.1. Cuando una agencia o empresa carga exportaciones de CRM, el responsable de esos datos es el cliente o su cliente final.
-Kauro los trata solo para prepararlos según las instrucciones del cliente, no los usa para fines propios, no los vende ni los
-comparte, no los usa para entrenar modelos y los elimina en plazos cortos (entre 24 horas y 30 días según la etapa; el calendario
-completo está en los Términos de Servicio, sección 13).
+12.1. When an agency or company uploads CRM exports, the controller of that data is the customer or its end client. Kauro
+processes it only to prepare it according to the customer's instructions, does not use it for its own purposes, does not sell or
+share it, does not use it to train models and deletes it within short periods (between 24 hours and 30 days depending on the
+stage; the full schedule is in the Terms of Service, section 13).
 
-12.2. Si usted es una persona cuyos datos aparecen en el CRM de un cliente de Kauro, puede dirigir su consulta o reclamo a la
-empresa con la que tiene relación (el responsable) o a Kauro. Si la presenta a Kauro, Kauro, como encargado: verifica su
-identidad; identifica el proyecto y el responsable según la cadena registrada (cuando el cliente de Kauro es una agencia, el
-responsable es el cliente final de esa agencia y la solicitud se le hace llegar por medio de la agencia); dentro de los dos (2)
-días hábiles siguientes al recibo de un reclamo completo, marca los datos afectados con la leyenda "reclamo en trámite" y su
-motivo; traslada al responsable lo que solo él puede decidir y le informa a usted el traslado; y ejecuta y le comunica lo que
-corresponda dentro de los plazos de la sección 10. Kauro también marca la leyenda "información en discusión judicial" cuando una
-autoridad le notifica un proceso judicial sobre la calidad del dato, y no hace circular la información cuyo bloqueo ordene la
-Superintendencia de Industria y Comercio. Kauro solo conserva los datos por el tiempo del proyecto, por lo que es posible que ya
-no los tenga; en ese caso se lo informa.
+12.2. If you are a person whose data appears in the CRM of a Kauro customer, you may direct your query or claim to the company
+you have a relationship with (the controller) or to Kauro. If you file it with Kauro, Kauro, as processor: verifies your
+identity; identifies the project and the controller according to the recorded chain (when Kauro's customer is an agency, the
+controller is that agency's end client and the request is passed to it through the agency); within two (2) business days after
+receiving a complete claim, marks the affected data with the legend "claim in process" and its reason; passes to the controller
+what only it can decide and informs you of the transfer; and carries out and communicates to you what applies within the terms
+of section 10. Kauro also marks the legend "information under judicial dispute" when an authority notifies it of a judicial
+proceeding about the quality of the data, and does not circulate information whose blocking the Superintendencia de Industria y
+Comercio orders. Kauro keeps the data only for the duration of the project, so it may no longer have it; in that case it tells
+you so.
 
-12.3. Para preparar los datos, Kauro puede enviar a un modelo de lenguaje alojado en Amazon Bedrock (Amazon Web Services, en
-Estados Unidos) solo un contexto minimizado: estructura, datos agregados, vocabulario aprobado y ejemplos enmascarados. Nunca
-envía registros crudos, credenciales ni secretos, y el modelo no toma decisiones: las aprueba el cliente.
-<!-- auth: 19 §Data processing agreement; 06 §Privacy classes and minimization; 09 §Retention schedule; 19 §Rights requests and privacy complaints ("The agency/controller chain is identified"); A9 §3 · law: C-13, C-13b, C-17 (Ley 1581 arts. 15 y 18 lit. e, g, h, i) -->
+12.3. To prepare the data, Kauro may send to a language model hosted on Amazon Bedrock (Amazon Web Services, in the United
+States) only minimized context: structure, aggregate data, approved vocabulary and masked examples. It never sends raw records,
+credentials or secrets, and the model makes no decisions: the customer approves them.
+<!-- auth: 19 §Data processing agreement; 06 §Privacy classes and minimization; 09 §Retention schedule; 19 §Rights requests and privacy complaints ("The agency/controller chain is identified"); A9 §3 · law: C-13, C-13b, C-17 (Ley 1581 arts. 15 and 18 lit. e, g, h, i) -->
 
-## 13. Transmisiones y transferencias internacionales
+## 13. International transmissions and transfers
 
-13.1. Kauro usa encargados (proveedores que tratan datos por su cuenta), algunos de ellos ubicados en Estados Unidos:
+13.1. Kauro uses processors (providers that process data on its behalf), some of them located in the United States:
 
-| Encargado | Función | Datos | Ubicación |
+| Processor | Function | Data | Location |
 |---|---|---|---|
-| Amazon Web Services, Inc. | Alojamiento, base de datos, almacenamiento, identidad, registros y modelos de lenguaje (Amazon Bedrock) | Todos los de la sección 6 que la plataforma guarda; archivos de CRM como subencargado | Estados Unidos |
-| Resend | Correo transaccional del servicio (encargado de Kauro para los datos de sus usuarios; no recibe archivos de CRM) | Correo y nombre del usuario y contenido mínimo del aviso, sin registros de CRM | Estados Unidos |
-| Google LLC (Google Workspace) | Correo corporativo de Kauro (soporte, ventas, administración) y registros internos de solicitudes, incidentes y formación | Datos de contacto, contenido de la correspondencia y datos de los registros internos (sin archivos de CRM) | Según la infraestructura de Google |
-| Proveedor de facturación electrónica que Kauro use ante la DIAN | Emisión y validación de facturas y notas | Datos de facturación (sección 6.2) | Colombia |
-<!-- registros internos de Google Workspace: INTERNAL_DATA_MANUAL §8 (resolución de silencio S-20) · auth: A9 §1 y §3; 19 §Subprocessor register; reference/MESSAGING_AND_SENDER_OPERATIONS.md; 15 §Accounting integration decision (Alegra candidato o ruta DIAN) · resolución de silencio S-05 (proveedor fiscal no elegido) -->
+| Amazon Web Services, Inc. | Hosting, database, storage, identity, logs and language models (Amazon Bedrock) | All of those in section 6 that the platform stores; CRM files as sub-processor | United States |
+| Resend | Transactional email for the service (Kauro's processor for its users' data; receives no CRM files) | User's email and name and minimal notice content, without CRM records | United States |
+| Google LLC (Google Workspace) | Kauro's corporate email (support, sales, administration) and internal records of requests, incidents and training | Contact data, content of correspondence and data in internal records (no CRM files) | Per Google's infrastructure |
+| Electronic-invoicing provider Kauro uses before the DIAN | Issuance and validation of invoices and notes | Billing data (section 6.2) | Colombia |
+<!-- Google Workspace internal records: INTERNAL_DATA_MANUAL §8 (silence resolution S-20) · auth: A9 §1 and §3; 19 §Subprocessor register; reference/MESSAGING_AND_SENDER_OPERATIONS.md; 15 §Accounting integration decision (Alegra candidate or DIAN route) · silence resolution S-05 (tax provider not chosen) -->
 
-13.2. Kauro comunica datos de pago a **Wise**, y opera con su banco **Bancolombia**; estas entidades tratan esos
-datos como responsables independientes según sus propias políticas, porque prestan servicios financieros regulados. Kauro también
-entrega a la DIAN la información que la ley tributaria exige.
-<!-- auth: A8 §1; 19 §Subprocessor register (proveedor como responsable independiente); 15 §TaxDocument state machine -->
+13.2. Kauro communicates payment data to **Wise**, and operates with its bank **Bancolombia**; these entities process that data as
+independent controllers under their own policies, because they provide regulated financial services. Kauro also delivers to the
+DIAN the information the tax law requires.
+<!-- auth: A8 §1; 19 §Subprocessor register (provider as independent controller); 15 §TaxDocument state machine -->
 
-13.3. Las comunicaciones de datos a encargados en el exterior son **transmisiones** y se rigen por contratos que obligan al
-encargado a tratar los datos según los principios de la Ley 1581 y esta Política, a proteger la seguridad de las bases y a guardar
-confidencialidad. Estados Unidos figura en la lista de países con nivel adecuado de protección de la SIC. Kauro no transfiere
-datos personales a terceros responsables fuera de Colombia distintos de los indicados en la sección 13.2.
-<!-- law: C-20, C-21, C-22, C-23 · CHECKLIST A-07 (r2: mapeo fechado de cláusulas obligatorias por proveedor antes de entregar datos); ver LAWYER_LATER L-01 (solo vacíos que el mapeo encuentre) -->
+13.3. Communications of data to processors abroad are **transmissions** and are governed by contracts that oblige the processor
+to process the data according to the principles of Ley 1581 and this Policy, to protect the security of the databases and to keep
+confidentiality. The United States appears on the SIC's list of countries with an adequate level of protection. Kauro does not
+transfer personal data to third-party controllers outside Colombia other than those indicated in section 13.2.
+<!-- law: C-20, C-21, C-22, C-23 · CHECKLIST A-07 (r2: dated mapping of mandatory clauses per provider before handing over data); see LAWYER_LATER L-01 (only gaps the mapping finds) -->
 
-## 14. Seguridad
+## 14. Security
 
-Kauro aplica medidas técnicas, humanas y administrativas para impedir la adulteración, pérdida, consulta, uso o acceso no
-autorizado: segundo factor obligatorio, aislamiento por cliente en la base de datos, cifrado en tránsito y en reposo, credenciales
-de corta vida, mínimo privilegio, registros de auditoría sin contenido sensible y eliminación verificada. La descripción completa
-está en el Anexo II del Acuerdo de Encargo.
-<!-- law: C-12 (art. 17 lit. d), C-13 (art. 18 lit. b) · auth: 08 (todas las secciones citadas en DPA Anexo II) -->
+Kauro applies technical, human and administrative measures to prevent adulteration, loss, unauthorized consultation, use or
+access: mandatory second factor, per-customer isolation in the database, encryption in transit and at rest, short-lived
+credentials, least privilege, audit logs without sensitive content and verified deletion. The full description is in Annex II of
+the DPA.
+<!-- law: C-12 (art. 17 lit. d), C-13 (art. 18 lit. b) · auth: 08 (all sections cited in DPA Annex II) -->
 
-## 15. Conservación
+## 15. Retention
 
-| Base | Plazo |
+| Database | Period |
 |---|---|
-| Clientes y usuarios | Mientras la cuenta esté activa y hasta seis (6) meses después de su cierre, salvo los datos que deban conservarse por otra base |
-| Facturación, pagos y contabilidad | Al menos diez (10) años, por la obligación de conservar libros y papeles del comerciante (Código de Comercio, art. 60) |
-| Prospectos | Datos de la organización y de personas que autorizaron el contacto: hasta la baja o la revocatoria, o veinticuatro (24) meses sin interacción, lo que ocurra primero; la baja se conserva para respetarla |
-| Interesados del formulario | Doce (12) meses desde la última interacción si no se convierten en clientes |
-| Colaboradores comerciales | Durante la relación y por los plazos legales tributarios y contables posteriores |
-| Solicitudes y reclamos | Cinco (5) años desde su cierre, con la evidencia mínima |
-| Registros de aplicación | Treinta (30) días |
-| Evidencia de seguridad | Ciento ochenta (180) días, salvo retención por incidente con motivo y fecha de revisión |
-| Archivos de CRM (como encargado) | Según el calendario de los Términos de Servicio, sección 13 |
+| Customers and users | While the account is active and up to six (6) months after its closure, except data that must be kept on another basis |
+| Billing, payments and accounting | At least ten (10) years, because of the merchant's duty to keep books and papers (Código de Comercio, art. 60) |
+| Prospects | Organization data and data of people who authorized contact: until opt-out or revocation, or twenty-four (24) months without interaction, whichever comes first; the opt-out is kept to respect it |
+| Contact-form leads | Twelve (12) months from the last interaction if they do not become customers |
+| Commercial collaborators | During the relationship and for the later statutory tax and accounting periods |
+| Requests and claims | Five (5) years from closure, with the minimum evidence |
+| Application logs | Thirty (30) days |
+| Security evidence | One hundred eighty (180) days, except retention for an incident with reason and review date |
+| CRM files (as processor) | Per the schedule in the Terms of Service, section 13 |
 
-Los plazos son máximos: Kauro elimina cada registro antes de que su plazo venza, y aplica una baja o una revocatoria de inmediato.
-<!-- auth: 09 §Retention schedule (registros 30 días, seguridad 180 días, financieros por plazo legal, CRM); law: C-25 (Decreto 1074 art. 2.2.2.25.2.8 limitación temporal), C-38 (C. Co. art. 60) · resolución de silencio S-13 (plazos de cuentas, prospectos, formulario y solicitudes no fijados por la autoridad) -->
+The periods are maximums: Kauro deletes each record before its period expires, and applies an opt-out or revocation immediately.
+<!-- auth: 09 §Retention schedule (logs 30 days, security 180 days, financial by legal period, CRM); law: C-25 (Decreto 1074 art. 2.2.2.25.2.8 time limitation), C-38 (C. Co. art. 60) · silence resolution S-13 (periods for accounts, prospects, form and requests not set by the authority) -->
 
-## 16. Cookies y tecnologías similares
+## 16. Cookies and similar technologies
 
-La plataforma usa una cookie de sesión estrictamente necesaria para mantener la sesión iniciada y proteger contra falsificación
-de solicitudes. A la fecha de vigencia, Kauro no usa cookies de publicidad ni de seguimiento de terceros. Si eso cambia, Kauro
-actualizará esta Política antes de usarlas.
-<!-- auth: 08 §Authentication and assurance (cookies de sesión Secure, HttpOnly, SameSite); 13 §Privacy in reports and downloads (prohibida la vista previa en analítica de terceros); diseño B11 D-AUTH-1 y D-PRIV-1 (docs/design/B11-agency-app.md) · resolución de silencio S-15 -->
+The platform uses a strictly necessary session cookie to keep the session signed in and to protect against request forgery. As of
+the effective date, Kauro uses no advertising or third-party tracking cookies. If that changes, Kauro will update this Policy
+before using them.
+<!-- auth: 08 §Authentication and assurance (Secure, HttpOnly, SameSite session cookies); 13 §Privacy in reports and downloads (preview in third-party analytics prohibited); design B11 D-AUTH-1 and D-PRIV-1 (docs/design/B11-agency-app.md) · silence resolution S-15 -->
 
-## 17. Comunicaciones comerciales
+## 17. Commercial communications
 
-17.1. **A quién.** Kauro envía comunicaciones comerciales solo (a) a usuarios e interesados que las autorizaron por separado
-(sección 8.3), por los canales que autorizaron; (b) a los canales de una agencia prospecto que cumplen los tres hechos de la
-sección 6.3.1, verificados de nuevo antes del envío; y (c) a personas de una agencia que autorizaron ese contacto. Nunca obliga a
-nadie a aceptar publicidad para obtener el servicio.
+17.1. **To whom.** Kauro sends commercial communications only (a) to users and leads who authorized them separately (section 8.3),
+through the channels they authorized; (b) to the channels of a prospect agency that meet the three facts of section 6.3.1,
+verified again before sending; and (c) to people at an agency who authorized that contact. It never obliges anyone to accept
+advertising to obtain the service.
 
-17.2. **Registro de Números Excluidos.** Antes de cada envío comercial por correo electrónico, llamada, SMS o mensajería a
-destinatarios en Colombia, Kauro consulta el Registro de Números Excluidos (RNE) de la Comisión de Regulación de Comunicaciones
-**el mismo día calendario del envío (hora de Bogotá)** y excluye los canales inscritos. Como una inscripción se hace efectiva el
-día hábil siguiente, un resultado de un día anterior nunca se reutiliza. Una autorización anterior a la inscripción de un canal en
-el RNE se tiene por revocada, salvo que el titular dé una nueva autorización después de inscribirse.
+17.2. **CRC Excluded Numbers Registry.** Before each commercial sending by email, call, SMS or messaging to recipients in
+Colombia, Kauro consults the Excluded Numbers Registry (RNE) of the Communications Regulation Commission (CRC) **on the same
+calendar day as the sending (Bogotá time)** and excludes the registered channels. Because a registration takes effect on the next
+business day, a result from a previous day is never reused. An authorization prior to a channel's registration in the RNE is
+deemed revoked, unless the data subject gives a new authorization after registering.
 
-17.2A. **Frecuencia después de un contacto directo.** Una vez establecido un contacto directo con un destinatario en Colombia, por
-cualquier canal y por cualquier persona que actúe por Kauro (incluidos los vendedores), Kauro no vuelve a contactarlo con fines
-comerciales más de una vez en el mismo día, ni por más de un canal en la misma semana. Kauro lleva un registro de contactos por
-destinatario que cubre todas las campañas, canales y vendedores.
+17.2A. **Frequency after a direct contact.** Once a direct contact with a recipient in Colombia is established, through any
+channel and by any person acting for Kauro (including sellers), Kauro does not contact it again for commercial purposes more
+than once on the same day, nor through more than one channel in the same week. Kauro keeps a contact record per recipient
+covering all campaigns, channels and sellers.
 
-17.3. **Forma y horario.** Cada mensaje identifica de forma veraz al remitente y el asunto, se identifica claramente como
-publicidad cuando lo es, incluye la dirección postal real de Kauro y un mecanismo de baja que no exige iniciar sesión. La baja se
-aplica de inmediato y sobrevive a reasignaciones, reimportaciones de listas y cambios de proveedor. Los avisos transaccionales del
-servicio no incluyen publicidad encubierta. Para destinatarios en Colombia, Kauro envía mensajes comerciales solo de lunes a
-viernes de 7:00 a. m. a 7:00 p. m. y sábados de 8:00 a. m. a 3:00 p. m., nunca domingos ni festivos.
-<!-- auth: 18 §Communication compliance ("required commercial identification"; "Publicly available contact details do not automatically authorize every use"); reference/MESSAGING_AND_SENDER_OPERATIONS.md (baja sin login, supresión inmediata) · law: C-50 (CAN-SPAM, FTC), C-51 (Ley 2300 de 2023 arts. 2, 3 —horario y frecuencia— y 5), C-52 (SIC Circular Externa 001 de 2024, instrucciones iii y iv; Resolución CRC 5050 de 2016, art. 2.1.18.1, modificado por las Resoluciones CRC 7356 de 2024 y 8308 de 2026 (art. 4, vigente desde el 30-jul-2026)) · CHECKLIST A-14 -->
+17.3. **Form and hours.** Each message truthfully identifies the sender and the subject, is clearly identified as advertising
+when it is, includes Kauro's real postal address and an unsubscribe mechanism that does not require signing in. The opt-out
+applies immediately and survives reassignments, list re-imports and provider changes. Transactional service notices include no
+disguised advertising. For recipients in Colombia, Kauro sends commercial messages only Monday to Friday from 7:00 a.m. to
+7:00 p.m. and Saturdays from 8:00 a.m. to 3:00 p.m., never on Sundays or holidays.
+<!-- auth: 18 §Communication compliance ("required commercial identification"; "Publicly available contact details do not automatically authorize every use"); reference/MESSAGING_AND_SENDER_OPERATIONS.md (unsubscribe without login, immediate suppression) · law: C-50 (CAN-SPAM, FTC), C-51 (Ley 2300 de 2023 arts. 2, 3 —hours and frequency— and 5), C-52 (SIC Circular Externa 001 de 2024, instructions iii and iv; CRC Resolución 5050 de 2016, art. 2.1.18.1, as amended by CRC Resolutions 7356 de 2024 and 8308 de 2026 (art. 4, in force since 30-Jul-2026)) · CHECKLIST A-14 -->
 
-## 18. Incidentes de seguridad
+## 18. Security incidents
 
-Kauro gestiona los incidentes con un registro de detección, impacto, contención, comunicación y recuperación; reporta a la SIC
-las violaciones de los códigos de seguridad dentro de los quince (15) días hábiles siguientes a su detección y avisa a los
-titulares y clientes afectados cuando corresponde.
+Kauro manages incidents with a record of detection, impact, containment, communication and recovery; it reports to the SIC
+breaches of security codes within fifteen (15) business days after detection and notifies affected data subjects and customers
+when appropriate.
 <!-- law: C-14, C-15 · auth: 14 §Incident containment; 19 §Incident and breach obligations -->
 
-## 19. Registro Nacional de Bases de Datos
+## 19. National Database Registry (RNBD)
 
-La inscripción en el Registro Nacional de Bases de Datos es obligatoria para las sociedades con activos totales superiores a
-100.000 UVT. Kauro determina sus activos totales con su balance antes de iniciar operaciones y luego con cada cierre anual; mientras
-no superen ese umbral no está obligada a inscribirse, y si lo superan inscribirá sus bases en el plazo que fije la SIC. Sus demás
-deberes de protección de datos no dependen de esa inscripción.
-<!-- law: C-16 (Decreto 1074 art. 2.2.2.26.1.2, modificado por el Decreto 090 de 2018) · CHECKLIST A-16 -->
+Registration in the National Database Registry (Registro Nacional de Bases de Datos) is mandatory for companies with total assets
+above 100,000 UVT. Kauro determines its total assets from its balance sheet before starting operations and then at each annual
+close; while they do not exceed that threshold it is not obliged to register, and if they do it will register its databases
+within the period the SIC sets. Its other data protection duties do not depend on that registration.
+<!-- law: C-16 (Decreto 1074 art. 2.2.2.26.1.2, amended by Decreto 090 de 2018) · CHECKLIST A-16 -->
 
-## 20. Vigencia y cambios
+## 20. Validity and changes
 
-Esta Política rige desde [fecha de vigencia]. Las bases de datos tienen la vigencia de las finalidades de la sección 6 y los
-plazos de la sección 15. Kauro informará los cambios sustanciales a los titulares por la plataforma, por correo o en el sitio
-web antes de aplicarlos y, cuando afecten la finalidad, solicitará una nueva autorización.
-<!-- law: C-03 (Decreto 1074 art. 2.2.2.25.3.1 num. 6 y parágrafo), C-26 (art. 2.2.2.25.2.2 sobre nueva autorización por cambio de finalidad) -->
+This Policy is in force from [effective date]. The databases remain in force for the purposes in section 6 and the periods in
+section 15. Kauro will inform data subjects of substantial changes through the platform, by email or on the website before
+applying them and, when they affect the purpose, will request a new authorization.
+<!-- law: C-03 (Decreto 1074 art. 2.2.2.25.3.1 num. 6 and paragraph), C-26 (art. 2.2.2.25.2.2 on new authorization for change of purpose) -->

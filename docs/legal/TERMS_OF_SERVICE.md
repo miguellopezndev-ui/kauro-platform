@@ -1,692 +1,678 @@
 <!--
-D-08b · Términos de Servicio (agencia/cliente ↔ Kauro). Borrador redactado por el constructor sin abogado (decisión del dueño
-D-08b, opción 1, 2026-10-05). Fuentes legales: CHECKLIST.md. Incertidumbres: LAWYER_LATER.md.
-Convención de trazabilidad: cada afirmación de hecho sobre Kauro lleva un comentario `auth:` con el archivo y el encabezado de
-authority/r2 (o de la enmienda) del que sale. Los comentarios `law:` remiten a la fila del CHECKLIST.
-Únicos marcadores admitidos: [NIT], [domicilio], [correo de notificaciones], [fecha de vigencia]; más [teléfono], añadido por
-exigencia del Decreto 1377 de 2013 art. 13 (ver LAWYER_LATER F-05).
+D-08b · Terms of Service (agency/customer <-> Kauro). English master (owner rule 2026-10-07: customers are US companies; no Spanish text by default). Draft written by the builder without a lawyer (owner decision D-08b, option 1, 2026-10-05). Legal sources: CHECKLIST.md. Uncertainties: LAWYER_LATER.md.
+Traceability convention: each statement of fact about Kauro carries an `auth:` comment with the file and heading of authority/r2 (or of the amendment) it comes from. `law:` comments point to the CHECKLIST row.
+Only placeholders allowed: [NIT], [registered address], [notice email], [effective date]; plus [phone], added because Decreto 1377 de 2013 art. 13 requires it (see LAWYER_LATER F-05).
 -->
 
-# Términos de Servicio de Kauro
+# Kauro Terms of Service
 
-**Versión:** 1.0 · **Vigentes desde:** [fecha de vigencia]
+**Version:** 1.0 · **Effective from:** [effective date]
 
-Estos Términos de Servicio (los "Términos") regulan la relación entre **Kauro Data S.A.S.** ("Kauro") y la persona jurídica que
-crea una cuenta de cliente en la plataforma de Kauro (el "Cliente"). Léalos completos antes de aceptarlos. Junto con los
-documentos enumerados en la sección 1.3 forman el contrato entre las partes.
+These Terms of Service (the "Terms") govern the relationship between **Kauro Data S.A.S.** ("Kauro") and the legal entity that
+creates a customer account on Kauro's platform (the "Customer"). Read them in full before accepting them. Together with the
+documents listed in section 1.3 they form the contract between the parties.
 
-## 1. Partes, documentos del contrato y orden de prevalencia
+## 1. Parties, contract documents and order of precedence
 
-1.1. **Kauro.** Kauro Data S.A.S., sociedad por acciones simplificada constituida en Colombia, NIT [NIT], con domicilio en
-[domicilio], correo de notificaciones [correo de notificaciones], teléfono [teléfono], sitio web kaurodata.com.
-<!-- auth: amendments/A8_PAYMENT_ROUTING.md §1 (Kauro Data S.A.S.); amendments/A4_OPERATING_MODEL.md §Owner acts (dominio kaurodata.com); 19 §BusinessProfile and legal facts (dirección postal real, sin oficina ficticia) -->
+1.1. **Kauro.** Kauro Data S.A.S., a simplified stock company (sociedad por acciones simplificada) incorporated in Colombia, NIT [NIT], domiciled at
+[registered address], notice email [notice email], phone [phone], website kaurodata.com.
+<!-- auth: amendments/A8_PAYMENT_ROUTING.md §1 (Kauro Data S.A.S.); amendments/A4_OPERATING_MODEL.md §Owner acts (domain kaurodata.com); 19 §BusinessProfile and legal facts (real postal address, no fictitious office) -->
 
-1.2. **Cliente.** El Cliente es (a) una agencia que presta servicios de CRM, RevOps o limpieza de datos a sus propios clientes
-(cada uno, un "Cliente Final"), o (b) una empresa cuyo equipo interno de CRM o datos trabaja sobre los datos de su propia
-empresa ("Cliente Interno"). Kauro contrata únicamente con el Cliente, no con su Cliente Final ni con las personas que aparecen en
-los archivos.
-<!-- auth: 01_CHARTER.md §Purpose and customer promise (texto enmendado por A3 §4.1); 02 §Buyer, user and job to be done; A3 §3.7 -->
+1.2. **Customer.** The Customer is (a) an agency that provides CRM, RevOps or data-cleaning services to its own clients
+(each, an "End Client"), or (b) a company whose in-house CRM or data team works on its own company's data ("Internal
+Customer"). Kauro contracts only with the Customer, not with its End Client or with the people who appear in the files.
+<!-- auth: 01_CHARTER.md §Purpose and customer promise (text amended by A3 §4.1); 02 §Buyer, user and job to be done; A3 §3.7 -->
 
-1.3. **Documentos del contrato.** El contrato está formado por: (i) estos Términos; (ii) el Acuerdo de Encargo de Tratamiento de
-Datos Personales ("DPA", archivo DPA.md, y su versión en inglés DPA_EN.md); (iii) la Política de Tratamiento de Información
-Personal de Kauro; (iv) la lista de subencargados y transferencias publicada en el DPA; (v) el calendario de conservación de la
-sección 13; (vi) la política de soporte y remedios de las secciones 11 y 12; y (vii) cada Cotización aceptada (el "Pedido").
+1.3. **Contract documents.** The contract consists of: (i) these Terms; (ii) the Data Processing Agreement for Personal Data
+("DPA", file DPA.md, the English master); (iii) Kauro's Personal Data Processing Policy; (iv) the list of sub-processors and
+transfers published in the DPA; (v) the retention schedule in section 13; (vi) the support and remedies policy in sections 11
+and 12; and (vii) each accepted Quote (the "Order").
 <!-- auth: 19 §Customer instrument hierarchy -->
 
-1.4. **Prevalencia.** En caso de contradicción prevalece, en este orden: el DPA en lo relativo a datos personales tratados por
-cuenta del Cliente; el Pedido en cuanto a modo, unidades, precio, descuento, impuestos y alcance de entrega; y estos Términos en
-todo lo demás. Ningún correo, mensaje de un vendedor, texto publicitario o pantalla amplía las obligaciones de Kauro más allá de
-estos documentos. Una excepción negociada solo obliga si consta en una enmienda escrita al Pedido aceptada por ambas partes.
+1.4. **Precedence.** In case of conflict the following prevails, in this order: the DPA as to personal data processed on the
+Customer's behalf; the Order as to mode, units, price, discount, taxes and delivery scope; and these Terms in everything else.
+No email, seller message, advertising text or screen extends Kauro's obligations beyond these documents. A negotiated exception
+binds only if it appears in a written amendment to the Order accepted by both parties.
 <!-- auth: 19 §Customer instrument hierarchy; 19 §Service terms: required operative content ("The order governs mode, counted units...") -->
 
-## 2. Definiciones
+## 2. Definitions
 
-- **Plataforma:** la aplicación web de Kauro, su API y los paquetes que produce.
-- **Archivos:** las exportaciones de CRM y hojas de cálculo que el Cliente carga.
-- **Revisión de origen:** el conjunto sellado de Archivos y hojas admitidas, con sus huellas (hash) y configuración de lectura.
-  Cualquier cambio posterior crea una nueva Revisión.
-- **Plan:** el plan de transformación acotado que el Cliente revisa y aprueba, ligado a una Revisión, a un Contrato de Destino y a
-  unas decisiones concretas.
-- **Contrato de Destino:** la descripción vigente y aprobada de la instancia de CRM de destino (cuando el modo la requiere).
-- **Perfil soportado:** el perfil de importación aceptado para un destino (importador de HubSpot o Data Loader de Salesforce).
-- **Paquete:** el entregable publicado (archivos, informe, manifiesto legible por máquina e instrucciones de importación).
-- **Finalización del servicio:** el momento en que el primer Paquete del Pedido queda disponible para descarga, o, en una
-  importación por etapas, el momento en que queda disponible la entrega final.
-- **Usuarios autorizados:** las personas que el administrador del Cliente invita y a quienes asigna un rol.
-- **Unidades facturables:** las ocurrencias de objetos admitidos bajo la proyección sellada, antes de la deduplicación aprobada,
-  según la sección 7.
-- **Free data health check:** la revisión gratuita, previa a la compra, del estado de los datos cargados (sección 3.3).
+- **Platform:** Kauro's web application, its API and the packages it produces.
+- **Files:** the CRM exports and spreadsheets the Customer uploads.
+- **Source Revision:** the sealed set of admitted Files and sheets, with their hashes and read configuration. Any later change
+  creates a new Revision.
+- **Plan:** the bounded transformation plan the Customer reviews and approves, tied to a Revision, a Target Contract and specific
+  decisions.
+- **Target Contract:** the current approved description of the target CRM instance (when the mode requires it).
+- **Supported Profile:** the import profile accepted for a target (HubSpot importer or Salesforce Data Loader).
+- **Package:** the published deliverable (files, report, machine-readable manifest and import instructions).
+- **Service Completion:** the moment the first Package of the Order becomes available for download or, for a staged import, the
+  moment the final delivery becomes available.
+- **Authorized Users:** the people the Customer's administrator invites and to whom it assigns a role.
+- **Billable Units:** the occurrences of admitted objects under the sealed projection, before approved deduplication, as
+  provided in section 7.
+- **Free data health check:** the free, pre-purchase review of the state of the uploaded data (section 3.3).
 <!-- auth: 19 §Service terms: required operative content ("define files, source revision, plan, package, target contract, supported profile, service completion and authorized users"); 02 §4 Upload, inspect and seal; 02 §6 Resolve and approve the plan; 16 §Billable unit and fairness; A3 §3.2 -->
 
-## 3. Objeto y alcance del servicio
+## 3. Purpose and scope of the service
 
-3.1. **Qué hace Kauro.** Kauro recibe Archivos autorizados, los inspecciona, perfila los datos, propone un Plan acotado, obtiene
-la aprobación del Cliente, cobra el precio acordado, ejecuta el Plan de forma determinista y entrega un Paquete con evidencia y,
-cuando el modo lo incluye, un procedimiento de importación para el destino. El servicio es de **preparación de archivos**: Kauro
-limpia archivos exportados, no el CRM en vivo.
-<!-- auth: 01 §Purpose and customer promise (segundo párrafo); A3 §3.3 ("we clean exported files, not your live CRM") -->
+3.1. **What Kauro does.** Kauro receives authorized Files, inspects them, profiles the data, proposes a bounded Plan, obtains
+the Customer's approval, collects the agreed price, executes the Plan deterministically and delivers a Package with evidence
+and, where the mode includes it, an import procedure for the target. The service is **file preparation**: Kauro cleans exported
+files, not the live CRM.
+<!-- auth: 01 §Purpose and customer promise (second paragraph); A3 §3.3 ("we clean exported files, not your live CRM") -->
 
-3.2. **Modos.** Cada proyecto tiene un único modo comprado y una única instancia de destino para su revisión pagada:
-- **CLEAN:** tablas limpias, disposición de cada unidad de origen, inventario de incidencias, explicación de las
-  transformaciones aprobadas y verificación por máquina. No afirma que un archivo genérico cumpla el esquema de un CRM desconocido.
-- **HUBSPOT:** archivos de los objetos soportados, asociaciones, configuración del importador, pasos ordenados y evidencia ligada
-  al destino, con un Contrato de Destino vigente y un perfil de importación de HubSpot aceptado.
-- **SALESFORCE:** archivos de los objetos soportados, mapeo y configuración de Data Loader, pasos de dependencia y evidencia
-  ligada al destino, con metadatos vigentes de la organización y un perfil de Data Loader aceptado.
+3.2. **Modes.** Each project has a single purchased mode and a single target instance for its paid revision:
+- **CLEAN:** clean tables, disposition of each source unit, an inventory of issues, an explanation of the approved
+  transformations and machine verification. It does not claim that a generic file meets the schema of an unknown CRM.
+- **HUBSPOT:** files for the supported objects, associations, importer configuration, ordered steps and target-bound evidence,
+  with a current Target Contract and an accepted HubSpot import profile.
+- **SALESFORCE:** files for the supported objects, Data Loader mapping and configuration, dependency steps and target-bound
+  evidence, with current organization metadata and an accepted Data Loader profile.
 
-Solo pueden cotizarse los modos y capacidades que la Plataforma muestre como disponibles en el momento de la Cotización. Kauro
-califica importaciones únicamente para HubSpot y Salesforce. Cambiar de CLEAN a HUBSPOT, o cambiar de organización de
-Salesforce, exige una nueva Cotización y una nueva aprobación.
+Only the modes and capabilities the Platform shows as available at the time of the Quote may be quoted. Kauro qualifies imports
+only for HubSpot and Salesforce. Changing from CLEAN to HUBSPOT, or changing Salesforce organization, requires a new Quote and
+a new approval.
 <!-- auth: 02 §Service modes; 02 §Capability publication contract; A3 §3.3 -->
 
-3.3. **Free data health check.** Antes de comprar, el Cliente puede solicitar un Free data health check sobre los Archivos que
-cargue dentro de los límites publicados. Es gratuito y no crea obligación de compra. Está acotado y protegido contra abuso: una
-revisión activa por Cliente a la vez, un tope de gasto de procesamiento por revisión y una pausa de nuevas revisiones gratuitas
-cuando se agota el presupuesto disponible. No siempre está disponible de inmediato y su duración depende de la capacidad
-observada; Kauro no promete un plazo fijo. Si el presupuesto de procesamiento se agota, la Plataforma entrega el perfil
-determinista y un estado pendiente específico, sin inventar una interpretación completa.
-<!-- auth: A3 §3.2 (nombre público, tope USD 1.50 freeAuditCeilingCents 150, agencyAudits 1, pausa al 90%); A3 §3.5 ("the check is free and creates no obligation to buy"); A3 §3.6 (sin plazo fijo); 02 §5 Receive the audit -->
+3.3. **Free data health check.** Before buying, the Customer may request a Free data health check on the Files it uploads within
+the published limits. It is free and creates no obligation to buy. It is bounded and abuse-protected: one active review per
+Customer at a time, a processing-spend cap per review and a pause on new free reviews when the available budget is exhausted. It
+is not always available immediately and its duration depends on observed capacity; Kauro promises no fixed time. If the
+processing budget is exhausted, the Platform delivers the deterministic profile and a specific pending status, without
+inventing a complete interpretation.
+<!-- auth: A3 §3.2 (public name, cap USD 1.50 freeAuditCeilingCents 150, agencyAudits 1, pause at 90%); A3 §3.5 ("the check is free and creates no obligation to buy"); A3 §3.6 (no fixed time); 02 §5 Receive the audit -->
 
-3.4. **Objetos cubiertos.** El alcance inicial de objetos es contactos, organizaciones/cuentas y negocios/oportunidades, con las
-asociaciones soportadas por destino. No están incluidos, salvo que se publique una capacidad calificada: conversión de leads,
-objetos personalizados arbitrarios, actividades, adjuntos, recreación de historial de interacciones, membresías de campañas,
-aprovisionamiento de propietarios ni despliegue de automatizaciones. Cada forma no soportada recibe una explicación y una ruta de
-acción.
-<!-- auth: 02 §Service modes (último párrafo) -->
+3.4. **Covered objects.** The initial object scope is contacts, organizations/accounts and deals/opportunities, with the
+associations supported per target. Unless a qualified capability is published, the following are not included: lead conversion,
+arbitrary custom objects, activities, attachments, recreation of interaction history, campaign memberships, owner provisioning
+and automation deployment. Each unsupported shape receives an explanation and a path of action.
+<!-- auth: 02 §Service modes (last paragraph) -->
 
-3.5. **Qué no hace Kauro.** Kauro no escribe en el CRM de producción del Cliente ni del Cliente Final, no despliega campos,
-reglas de validación ni automatizaciones, no hace enriquecimiento pagado, no administra el CRM en vivo ni ofrece mantenimiento
-continuo de bases de datos, no presta consultoría ilimitada y no ejecuta código arbitrario ni instrucciones en lenguaje natural
-que eludan el compilador del Plan. Generar un archivo de importación no otorga a Kauro autoridad sobre un CRM.
-<!-- auth: 01 §Purpose and customer promise; 02 §Service modes (columna "Excluded authority"); 02 §6; 16 §What the price includes; 16 §Offer and buyer fit ("not an unlimited consulting retainer") -->
+3.5. **What Kauro does not do.** Kauro does not write to the Customer's or End Client's production CRM, does not deploy fields,
+validation rules or automations, does no paid enrichment, does not manage the live CRM or offer ongoing database maintenance,
+provides no unlimited consulting, and does not run arbitrary code or natural-language instructions that bypass the Plan
+compiler. Generating an import file gives Kauro no authority over a CRM.
+<!-- auth: 01 §Purpose and customer promise; 02 §Service modes ("Excluded authority" column); 02 §6; 16 §What the price includes; 16 §Offer and buyer fit ("not an unlimited consulting retainer") -->
 
-3.6. **Uso de modelos de lenguaje.** Para proponer decisiones acotadas (por ejemplo, el significado de una columna o un posible
-duplicado), la Plataforma puede enviar a un modelo de lenguaje alojado en Amazon Bedrock únicamente un contexto minimizado:
-estructura, datos agregados, vocabulario semántico aprobado y ejemplos enmascarados autorizados. No se envían registros crudos,
-credenciales ni secretos. Las propuestas del modelo nunca se ejecutan por sí solas: el Cliente decide, y solo el motor
-determinista ejecuta operaciones soportadas y validadas.
-<!-- auth: 06 §Privacy classes and minimization (L0–L4); 08 §Model boundary; 01 CH-002; amendments/A9_CLOUD_AWS.md §3 (Bedrock) y §4 -->
+3.6. **Use of language models.** To propose bounded decisions (for example, the meaning of a column or a possible duplicate),
+the Platform may send to a language model hosted on Amazon Bedrock only minimized context: structure, aggregate data, approved
+semantic vocabulary and authorized masked examples. No raw records, credentials or secrets are sent. Model proposals are never
+executed on their own: the Customer decides, and only the deterministic engine executes supported, validated operations.
+<!-- auth: 06 §Privacy classes and minimization (L0–L4); 08 §Model boundary; 01 CH-002; amendments/A9_CLOUD_AWS.md §3 (Bedrock) and §4 -->
 
-3.7. **Lo que decide el Cliente.** Las decisiones semánticas que no se pueden establecer a partir de los hechos de origen y de
-destino (por ejemplo, si dos personas parecidas deben unificarse o si un valor debe borrarse) son del Cliente. Un candidato a
-duplicado no es una unificación confirmada; Kauro unifica duplicados solo con la aprobación del Cliente y nada se elimina sin
-dejar rastro.
+3.7. **What the Customer decides.** Semantic decisions that cannot be established from the source and target facts (for example,
+whether two similar people should be merged or whether a value should be deleted) belong to the Customer. A duplicate candidate
+is not a confirmed merge; Kauro merges duplicates only with the Customer's approval and nothing is deleted without leaving a
+trace.
 <!-- auth: 02 §What remains human; 02 §5; A3 §3.3 -->
 
-3.8. **Estado de disponibilidad.** Kauro opera inicialmente en disponibilidad limitada, dentro de un envoltorio técnico calificado
-y de límites publicados (archivos, tamaño, filas, columnas, expansión de archivos comprimidos y concurrencia). Un límite que la
-Plataforma no publica no está ofrecido.
+3.8. **Availability status.** Kauro initially operates in limited availability, within a qualified technical envelope and
+published limits (files, size, rows, columns, expansion of compressed files and concurrency). A limit the Platform does not
+publish is not offered.
 <!-- auth: 02 §Capability publication contract (AVAILABLE_LIMITED); 02 §Intake and project boundaries; 09 §Initial intake envelope -->
 
-## 4. Cuentas, usuarios y seguridad de acceso
+## 4. Accounts, users and access security
 
-4.1. El Cliente se registra mediante un proceso explícito de membresía. La similitud de nombre o de dominio de correo nunca
-otorga membresía. El primer administrador del Cliente suministra la información de facturación y contractual, acepta las
-versiones vigentes de los documentos del contrato y confirma su autoridad para tratar los datos de su Cliente Final o de su
-propia empresa.
+4.1. The Customer registers through an explicit membership process. Similarity of name or email domain never grants
+membership. The Customer's first administrator provides the billing and contractual information, accepts the current versions of
+the contract documents and confirms its authority to process the data of its End Client or of its own company.
 <!-- auth: 02 §2 Establish agency authority; 11 §Agency onboarding -->
 
-4.2. Para acceder a datos, cada Usuario autorizado debe tener correo verificado y segundo factor de autenticación (MFA)
-activado. Las acciones de alto impacto (transferencia de titularidad, cambio de destino de pagos, concesiones privilegiadas,
-decisiones destructivas) exigen reautenticación reciente.
+4.2. To access data, each Authorized User must have a verified email and multi-factor authentication (MFA) enabled. High-impact
+actions (transfer of ownership, change of payment destination, privileged grants, destructive decisions) require recent
+re-authentication.
 <!-- auth: 08 §Authentication and assurance -->
 
-4.3. El Cliente es responsable de: las personas que invita y los roles que asigna; revocar el acceso de quien deje de trabajar
-con él; mantener la confidencialidad de sus credenciales y factores; y avisar a Kauro sin demora si sospecha un acceso no
-autorizado. Kauro nunca pide contraseñas, códigos de recuperación ni semillas de MFA por correo o chat.
-<!-- auth: 08 §Authentication and assurance (último párrafo); 11 §Billing, team, settings and help -->
+4.3. The Customer is responsible for: the people it invites and the roles it assigns; revoking the access of anyone who stops
+working with it; keeping its credentials and factors confidential; and notifying Kauro without delay if it suspects
+unauthorized access. Kauro never asks for passwords, recovery codes or MFA seeds by email or chat.
+<!-- auth: 08 §Authentication and assurance (last paragraph); 11 §Billing, team, settings and help -->
 
-4.4. Un usuario que pertenece a varios Clientes elige activamente el Cliente con el que trabaja; los datos siguen el contexto
-seleccionado.
+4.4. A user who belongs to several Customers actively chooses the Customer they are working with; data follows the selected
+context.
 <!-- auth: 02 §2; 11 §Agency onboarding -->
 
-## 5. Autoridad sobre los datos, uso aceptable y datos prohibidos
+## 5. Authority over data, acceptable use and prohibited data
 
-5.1. **Declaración de autoridad.** El Cliente declara y garantiza que (a) tiene la autoridad necesaria para cargar y hacer
-tratar los Archivos y para tomar las decisiones semánticas que el servicio requiere; (b) cuando actúa por cuenta de un Cliente
-Final, cuenta con las instrucciones y autorizaciones de ese Cliente Final; y (c) la recolección de los datos y su entrega a Kauro
-cumplen la ley aplicable al Cliente y al Cliente Final, incluidas las autorizaciones de los titulares cuando la ley las exige.
-Esta declaración no exime a Kauro de sus propias obligaciones.
-<!-- auth: 19 §Service terms: required operative content (segundo párrafo); 17 Ley 1581 deberes del responsable (law: C-12) -->
+5.1. **Statement of authority.** The Customer represents and warrants that (a) it has the authority needed to upload and have
+the Files processed and to make the semantic decisions the service requires; (b) when acting on behalf of an End Client, it has
+that End Client's instructions and authorizations; and (c) the collection of the data and its delivery to Kauro comply with the
+law applicable to the Customer and the End Client, including data subjects' authorizations where the law requires them. This
+statement does not relieve Kauro of its own obligations.
+<!-- auth: 19 §Service terms: required operative content (second paragraph); 17 Ley 1581 controller duties (law: C-12) -->
 
-5.2. **Datos prohibidos.** El Cliente no cargará: credenciales o secretos de autenticación; datos completos de tarjetas de pago;
-datos de salud regulados; datos sensibles en el sentido del artículo 5 de la Ley 1581 de 2012 o "sensitive personal information"
-de las leyes estatales de EE. UU.; datos de niños, niñas y adolescentes; ni otras categorías cuyas obligaciones o requisitos de
-seguridad excedan el servicio calificado. Un campo de "notas" puede contener información sensible: el Cliente debe revisarlo o
-excluirlo antes de cargar.
-<!-- auth: 19 §Data categories and excluded use; 02 §1 (no se aceptan adjuntos de CRM en el formulario) -->
+5.2. **Prohibited data.** The Customer will not upload: credentials or authentication secrets; full payment card data;
+regulated health data; sensitive data within the meaning of article 5 of Ley 1581 de 2012 or "sensitive personal information"
+under US state laws; data of children and adolescents; or other categories whose obligations or security requirements exceed the
+qualified service. A "notes" field may contain sensitive information: the Customer must review or exclude it before uploading.
+<!-- auth: 19 §Data categories and excluded use; 02 §1 (no CRM attachments are accepted in the form) -->
 
-5.3. **Hallazgo de datos prohibidos.** Si se detecta material prohibido, Kauro puede poner en cuarentena o pausar el alcance
-afectado, minimizar el acceso, avisar al contacto autorizado del Cliente y aplicar el procedimiento de eliminación o de
-incidente. Kauro no copiará ese material en un ticket de soporte ni en una consulta a un modelo.
-<!-- auth: 19 §Data categories and excluded use (último párrafo) -->
+5.3. **Finding prohibited data.** If prohibited material is detected, Kauro may quarantine or pause the affected scope, minimize
+access, notify the Customer's authorized contact and apply the deletion or incident procedure. Kauro will not copy that
+material into a support ticket or a model query.
+<!-- auth: 19 §Data categories and excluded use (last paragraph) -->
 
-5.4. **Instrucciones fuera de alcance.** Kauro puede pedir evidencia, o suspender el tratamiento afectado, si una instrucción
-parece ilícita o fuera del alcance contratado (por ejemplo, conservar datos indefinidamente o enviar registros crudos a un
-modelo no aprobado).
-<!-- auth: 19 §Service terms: required operative content; 19 §Data processing agreement (tercer párrafo) -->
+5.4. **Out-of-scope instructions.** Kauro may ask for evidence, or suspend the affected processing, if an instruction appears
+unlawful or outside the contracted scope (for example, keeping data indefinitely or sending raw records to an unapproved model).
+<!-- auth: 19 §Service terms: required operative content; 19 §Data processing agreement (third paragraph) -->
 
-5.5. **Datos sujetos a leyes de otras jurisdicciones.** El servicio inicial se ofrece para clientes y datos cuyo tratamiento se
-rige por la ley colombiana y por leyes de Estados Unidos; de las leyes estatales de privacidad, Kauro solo ha verificado las de
-California, Virginia y Colorado, y un proyecto sujeto a otra se acepta solo según la sección 14.1 del DPA. Kauro no ofrece en esta versión los instrumentos de transferencia del
-Reglamento General de Protección de Datos de la Unión Europea ni del Reino Unido. Si los Archivos contienen datos cuyo
-tratamiento esté sujeto a esas normas, el Cliente debe informarlo antes de cargarlos para que Kauro evalúe si puede admitir el
-proyecto; sin esa evaluación, no deben cargarse.
-<!-- auth: 02 §Buyer, user and job to be done ("Expansion to other markets is a capability change with legal and support consequences"); 19 §Data processing agreement (último párrafo, GDPR depende de roles y geografía) · resolución de silencio: ver CHECKLIST §Silencios S-06 -->
+5.5. **Data subject to the laws of other jurisdictions.** The initial service is offered for customers and data whose processing
+is governed by Colombian law and by United States laws; of the US state privacy laws, Kauro has verified only those of
+California, Virginia and Colorado, and a project subject to another is accepted only under section 14.1 of the DPA. Kauro does
+not offer in this version the transfer instruments of the European Union or United Kingdom General Data Protection Regulation.
+If the Files contain data whose processing is subject to those rules, the Customer must say so before uploading them so Kauro
+can assess whether it can accept the project; without that assessment, they must not be uploaded.
+<!-- auth: 02 §Buyer, user and job to be done ("Expansion to other markets is a capability change with legal and support consequences"); 19 §Data processing agreement (last paragraph, GDPR depends on roles and geography) · silence resolution: see CHECKLIST §Silences S-06 -->
 
-5.6. **Uso aceptable.** El Cliente no intentará acceder a datos de otros clientes, eludir límites de carga, de revisión gratuita
-o de seguridad, cargar contenido activo o malicioso, ni usar la Plataforma para actividades ilícitas. Kauro aplica límites de
-tasa y de recursos y puede suspender el abuso conforme a la sección 19.
+5.6. **Acceptable use.** The Customer will not attempt to access other customers' data, bypass upload, free-review or security
+limits, upload active or malicious content, or use the Platform for unlawful activities. Kauro applies rate and resource limits
+and may suspend abuse under section 19.
 <!-- auth: 08 §Abuse controls; 08 §Quarantine and malware boundaries -->
 
-## 6. Cotización, Pedido y aceptación electrónica
+## 6. Quote, Order and electronic acceptance
 
-6.1. **Cotización.** El servidor calcula la Cotización con las Unidades facturables admitidas, el modo, el nivel de recurrencia y
-el descuento válido. La Cotización registra versión de precios, evidencia de cantidad, descuento aplicado, tratamiento
-tributario, emisor, huellas de origen, plan y destino, vencimiento del precio y la fecha hasta la cual los datos estarán
-disponibles. Una Cotización emitida no cambia; una corrección material crea una Cotización sustituta con comparación visible.
+6.1. **Quote.** The server calculates the Quote from the admitted Billable Units, the mode, the recurrence tier and the valid
+discount. The Quote records the price version, quantity evidence, discount applied, tax treatment, issuer, source, plan and
+target fingerprints, price expiry and the date until which the data will be available. An issued Quote does not change; a
+material correction creates a substitute Quote with a visible comparison.
 <!-- auth: 16 §Quote calculation; 02 §7 Quote and purchase -->
 
-6.2. **Vigencia.** El precio de una Cotización vence a los catorce (14) días. La disponibilidad de los datos se muestra por
-separado y puede terminar antes. No se puede pagar ni ejecutar una Cotización sobre datos ya eliminados; en ese caso el Cliente
-vuelve a cargar los Archivos y obtiene una Revisión validada compatible o una nueva Cotización.
+6.2. **Validity.** The price of a Quote expires after fourteen (14) days. Data availability is shown separately and may end
+earlier. A Quote cannot be paid or executed on data that has already been deleted; in that case the Customer re-uploads the
+Files and obtains a compatible validated Revision or a new Quote.
 <!-- auth: 09 §Quotes, reuploads and retention; 02 §7 -->
 
-6.3. **Formación del contrato.** La Cotización publicada en la Plataforma es una oferta mercantil de Kauro. El Pedido se forma
-cuando el Cliente acepta la Cotización en la Plataforma (aprobación del Plan vigente y confirmación de compra) dentro de su
-vigencia. La aceptación se hace por medios electrónicos y tiene plena validez; Kauro conserva un registro durable de la versión
-de cada documento aceptado, de la identidad del Usuario autorizado, de la fecha y de la Cotización. Ningún cambio posterior del
-sitio web modifica un Pedido existente.
+6.3. **Formation of the contract.** The Quote published on the Platform is a commercial offer by Kauro. The Order is formed when
+the Customer accepts the Quote on the Platform (approval of the current Plan and purchase confirmation) within its validity.
+Acceptance is by electronic means and is fully valid; Kauro keeps a durable record of the version of each accepted document, the
+identity of the Authorized User, the date and the Quote. No later change to the website modifies an existing Order.
 <!-- auth: 19 §Customer instrument hierarchy ("durable record"; "A later website edit does not silently amend an existing order") · law: C-30..C-34 (Ley 527 arts. 5, 14, 15; C. Co. arts. 824, 845, 864; Decreto 2364 de 2012) -->
 
-6.4. **Requisitos de compra.** Para comprar se requieren una aprobación vigente del Plan, datos disponibles, capacidad de
-procesamiento financiada, identidad de facturación, la declaración del tipo de comprador de la sección 25.1 y un medio de pago
-utilizable.
+6.4. **Purchase requirements.** To purchase, the following are required: a current Plan approval, available data, funded
+processing capacity, billing identity, the buyer-type declaration in section 25.1 and a usable means of payment.
 <!-- auth: 02 §7 · law: C-37 · CHECKLIST A-05 -->
 
-6.5. **Cambios de alcance.** Un nuevo alcance requiere un nuevo Pedido o una enmienda aceptada. Por defecto se permite un único
-reemplazo de origen antes de la ejecución, previa revalidación, si no ha empezado ninguna ejecución pagada y el nuevo alcance
-queda en la misma banda. Corregir un defecto de Kauro nunca se convierte en una compra nueva no informada.
+6.5. **Scope changes.** A new scope requires a new Order or an accepted amendment. By default a single source replacement is
+allowed before execution, after revalidation, if no paid execution has started and the new scope stays in the same band.
+Correcting a Kauro defect never becomes a new, uninformed purchase.
 <!-- auth: 16 §Scope changes and credits; 19 §Service terms: required operative content -->
 
-## 7. Precios, descuentos e impuestos
+## 7. Prices, discounts and taxes
 
-7.1. **Unidad de precio.** El precio depende del modo y de la banda de Unidades facturables. Se cuentan las ocurrencias de
-objetos admitidos bajo la proyección sellada antes de la deduplicación aprobada; no se cuentan filas físicas de salida ni la
-multiplicación de relaciones. Kauro no puede cambiar la interpretación después del pago para alcanzar una banda superior. Cero
-unidades elegibles no generan una venta de precio mínimo.
+7.1. **Pricing unit.** The price depends on the mode and the band of Billable Units. Occurrences of admitted objects under the
+sealed projection are counted before approved deduplication; physical output rows and the multiplication of relations are not
+counted. Kauro cannot change the interpretation after payment to reach a higher band. Zero eligible units do not generate a
+minimum-price sale.
 <!-- auth: 16 §Billable unit and fairness; 16 §Price schedule -->
 
-7.2. **Tarifa.** Para Clientes que no son consumidores, los precios de referencia vigentes figuran en el Anexo A y en la página de
-precios; toda cifra mostrada antes de la Cotización es una banda indicativa y el precio que obliga es el de la Cotización emitida
-sobre el alcance sellado. Para un Cliente que sea consumidor rige la sección 7.7, que prevalece sobre este párrafo.
+7.2. **Rates.** For Customers that are not consumers, the current reference prices appear in Annex A and on the pricing page;
+any figure shown before the Quote is an indicative band and the binding price is that of the Quote issued on the sealed scope.
+For a Customer that is a consumer, section 7.7 governs and prevails over this paragraph.
 <!-- auth: A3 §3.4; 16 §Price schedule -->
 
-7.3. **Descuentos.** (a) Descuento por recurrencia, calculado al emitir la Cotización sobre los proyectos calificados del Cliente
-en los 365 días anteriores: 5 % con 1 a 9 proyectos previos, 10 % con 10 a 24 y 15 % con 25 o más. (b) Descuento fundador del
-25 % en el primer proyecto elegible de cada uno de los tres primeros clientes fundadores aceptados (agencias o Clientes Internos),
-solo mientras pueda reservarse un cupo; el cupo se reserva al emitir la Cotización con descuento fundador y vence con ella. (c)
-Los descuentos no se acumulan: se aplica el mayor elegible. Un reembolso posterior de un proyecto previo afecta Cotizaciones
-futuras, no un Pedido ya aceptado.
-<!-- auth: 16 §Recurrence decision; 16 §Founding incentive (enmendado por A3 §4.5); A3 §3.4, §3.5 punto 3, §3.7 (cupos fundadores abiertos a Clientes Internos) -->
+7.3. **Discounts.** (a) Recurrence discount, calculated when the Quote is issued on the Customer's qualified projects in the
+previous 365 days: 5% with 1 to 9 prior projects, 10% with 10 to 24 and 15% with 25 or more. (b) Founding discount of 25% on the
+first eligible project of each of the first three accepted founding customers (agencies or Internal Customers), only while a
+slot can be reserved; the slot is reserved when the Quote with the founding discount is issued and expires with it. (c)
+Discounts do not stack: the larger eligible one applies. A later refund of a prior project affects future Quotes, not an
+already accepted Order.
+<!-- auth: 16 §Recurrence decision; 16 §Founding incentive (amended by A3 §4.5); A3 §3.4, §3.5 point 3, §3.7 (founding slots open to Internal Customers) -->
 
-7.4. **Moneda.** Los precios para clientes fuera de Colombia se expresan y cobran en dólares de los Estados Unidos (USD). A los
-clientes extranjeros no se les muestran pesos colombianos. Los clientes colombianos pagan en pesos colombianos por la ruta que
-Kauro indique en su Cotización, separada del cobro internacional en USD. A un consumidor siempre se le informa y se le cobra el
-precio en pesos colombianos (sección 7.7).
-<!-- auth: amendments/A8_PAYMENT_ROUTING.md §2 regla 6; 16 §Price schedule (USD) -->
+7.4. **Currency.** Prices for customers outside Colombia are expressed and charged in United States dollars (USD). Colombian
+pesos are not shown to foreign customers. Colombian customers pay in Colombian pesos by the route Kauro indicates in its Quote,
+separate from the international USD collection. A consumer is always informed of and charged the price in Colombian pesos
+(section 7.7).
+<!-- auth: amendments/A8_PAYMENT_ROUTING.md §2 rule 6; 16 §Price schedule (USD) -->
 
-7.5. **Impuestos.** Los precios de la tarifa del Anexo A, para Clientes que no son consumidores, no incluyen impuestos. La
-Cotización muestra, antes del pago, los impuestos que
-correspondan según el tratamiento tributario validado para esa operación, y el total. Kauro emite la factura electrónica de venta
-conforme a la regulación de la DIAN. Si una retención en la fuente es legalmente exigible al Cliente, este la practica y entrega
-el certificado correspondiente.
+7.5. **Taxes.** The prices in the Annex A schedule, for Customers that are not consumers, do not include taxes. Before payment,
+the Quote shows the taxes that apply under the tax treatment validated for that transaction, and the total. Kauro issues the
+electronic sales invoice in accordance with DIAN regulations. If withholding tax is legally required of the Customer, the
+Customer applies it and delivers the corresponding certificate.
 <!-- auth: 15 §Money vocabulary; 15 §FiscalProfile; 16 §Quote calculation; 01 CH-007 · law: C-40, C-41 -->
 
-7.6. **Lo que incluye el precio.** Las transformaciones deterministas aprobadas, el informe de excepciones dentro del envoltorio
-admitido, la verificación del Paquete, el informe con la marca del Cliente según las opciones soportadas, la guía de destino, la
-continuación por etapas necesaria para la estrategia de relaciones comprada y la corrección de defectos verificados de Kauro.
-Una importación por etapas, con su acción adicional y su ventana de conservación, se informa antes de la compra y no genera un
-segundo cobro por el solo hecho de que los identificadores de destino aparezcan después de una etapa anterior.
+7.6. **What the price includes.** The approved deterministic transformations, the exceptions report within the admitted
+envelope, verification of the Package, the report with the Customer's branding under the supported options, the target guide,
+the staged continuation needed for the purchased relationship strategy and the correction of verified Kauro defects. A staged
+import, with its additional action and its retention window, is disclosed before purchase and does not generate a second charge
+merely because target identifiers appear after an earlier stage.
 <!-- auth: 16 §What the price includes -->
 
-7.7. **Precios para consumidores.** A un Cliente que sea consumidor (sección 25.1), todo precio que Kauro le informe o anuncie
-—en la página de precios, en ejemplos, en la Plataforma y en la Cotización— se le muestra visualmente, junto a la descripción del
-servicio, como **precio total en pesos colombianos que incluye el IVA cuando aplique y todos los demás impuestos y costos
-adicionales** que deba pagar, con el impuesto que calcule el proveedor de facturación electrónica de Kauro para esa operación.
-La página de precios muestra esos totales, o una pestaña para consumidores claramente identificada que los muestra para cada
-banda. Ninguna cifra indicativa sin impuestos o en dólares es el único precio que ve un consumidor, y la Cotización muestra el
-mismo total. El precio informado coincide con el cobrado; si aparecen dos precios, el consumidor paga el menor.
-<!-- law: C-37b (Ley 1480 de 2011 art. 26; SIC Circular Única, Título II, numerales 2.3 y 2.3.1) · CHECKLIST A-18 · ver LAWYER_LATER L-07 (tarifa y exenciones de IVA) -->
+7.7. **Consumer prices.** For a Customer that is a consumer (section 25.1), every price Kauro tells or advertises to it —on the
+pricing page, in examples, on the Platform and in the Quote— is shown visually, next to the description of the service, as the
+**total price in Colombian pesos including VAT where applicable and all other taxes and additional costs** it must pay, with the
+tax calculated by Kauro's electronic-invoicing provider for that transaction. The pricing page shows those totals, or a clearly
+identified consumer tab showing them for each band. No indicative figure without taxes or in dollars is the only price a
+consumer sees, and the Quote shows the same total. The price informed matches the price charged; if two prices appear, the
+consumer pays the lower.
+<!-- law: C-37b (Ley 1480 de 2011 art. 26; SIC Circular Única, Título II, numerals 2.3 and 2.3.1) · CHECKLIST A-18 · see LAWYER_LATER L-07 (VAT rate and exemptions) -->
 
-## 8. Pagos
+## 8. Payments
 
-8.1. **Medios de pago.** Kauro trabaja por proyecto: no hay suscripciones ni cargos recurrentes automáticos. Para clientes de
-Estados Unidos, el único medio de pago previsto es la **transferencia bancaria en EE. UU. (ACH o transferencia doméstica a los
-mismos datos)**, recibida en la cuenta empresarial de Kauro, con una referencia única por Pedido. Kauro no cobra ni acepta
-pagos por esta vía hasta que la ruta esté habilitada; solo se muestra **cuando esté habilitada**, y Kauro puede no ofrecerla.
-La Plataforma no ofrece pago con tarjeta ni otros medios.
+8.1. **Means of payment.** Kauro works per project: there are no subscriptions or automatic recurring charges. For customers in
+the United States, the only means of payment envisaged is a **US bank transfer (ACH, or a domestic wire to the same details)**,
+received in Kauro's business account, with a unique reference per Order. Kauro does not collect or accept payments by this
+route until the route is enabled; it is shown only **when enabled**, and Kauro may not offer it. The Platform does not offer
+card payment or other means.
 
-Un Cliente que paga mediante una plataforma de cuentas por pagar paga a los datos bancarios que Kauro haya indicado para ese
-Pedido. Kauro no está integrado con esas plataformas.
-<!-- auth: amendments/A8_PAYMENT_ROUTING.md §1 y §2 (reglas 2, 3, 4, 5); 15 §Initial payment decision · Payments V1 (decisión del dueño 2026-10-07): PayPal fuera del lanzamiento, no se ofrece tarjeta; una sola ruta condicionada -->
+A Customer that pays through an accounts-payable platform pays to the bank details Kauro has indicated for that Order. Kauro is
+not integrated with those platforms.
+<!-- auth: amendments/A8_PAYMENT_ROUTING.md §1 and §2 (rules 2, 3, 4, 5); 15 §Initial payment decision · Payments V1 (owner decision 2026-10-07): PayPal out of the launch, no card offered; a single conditional route -->
 
-8.2. **Cuándo se considera pagado un Pedido por transferencia bancaria.** Una página de retorno o el aviso de que el Cliente
-inició una transferencia no prueban el pago.
+8.2. **When an Order is considered paid by bank transfer.** A return page or a notice that the Customer initiated a transfer does
+not prove payment.
 
-1. Un Pedido se considera pagado solo cuando Kauro concilia un abono **recibido** en la cuenta de Kauro por el **monto exacto en
-   USD** del Pedido, con la referencia del Pedido y verificado con evidencia bancaria. Iniciar o programar una transferencia no es
-   confirmación de pago.
-2. Las instrucciones de pago muestran una **fecha límite** y una fecha recomendada de envío ("enviar antes de"). Kauro no garantiza
-   cuánto tarda el banco del Cliente ni el sistema bancario en acreditar la transferencia.
-3. Para decidir si el pago llegó a tiempo cuenta la **fecha y hora en que el banco registra el abono**, según el comprobante
-   bancario, con el margen técnico indicado en las instrucciones de pago. No cuenta la fecha en que el Cliente inició la
-   transferencia ni la fecha en que Kauro termina de conciliarla.
-4. Si el abono quedó registrado a tiempo, Kauro respeta el precio aceptado aunque confirme el pago después de la fecha límite,
-   **siempre que**, al momento de confirmarlo, sigan siendo válidos los archivos o la fuente, el destino, el tratamiento legal y
-   fiscal y el alcance de entrega del Pedido, y el proyecto no tenga otra compra abierta o pagada. Esto no depende de si Kauro ya
-   había marcado el Pedido como vencido.
-5. Si el abono quedó registrado después de ese momento, o alguna de esas condiciones ya no se cumple, Kauro **no inicia el
-   trabajo**: registra el dinero recibido y lo **devuelve** conforme a la sección 10; el Cliente puede pedir una nueva Cotización.
-6. Un pago parcial, un pago mayor, un pago con otra referencia o enviado por un pagador distinto al titular de facturación aceptado
-   queda **en revisión**: no habilita el trabajo y se devuelve conforme a la sección 10. Kauro no pide completar la diferencia con
-   un segundo pago.
-7. Kauro no pide un segundo pago mientras un pago enviado no esté conciliado. El Cliente no debe pagar de nuevo mientras su pago
-   esté en camino o en revisión.
+1. An Order is considered paid only when Kauro reconciles a credit **received** in Kauro's account for the **exact USD amount**
+   of the Order, with the Order reference and verified with bank evidence. Initiating or scheduling a transfer is not
+   confirmation of payment.
+2. The payment instructions show a **deadline** and a recommended send date ("send by"). Kauro does not guarantee how long the
+   Customer's bank or the banking system takes to credit the transfer.
+3. To decide whether the payment arrived on time, what counts is the **date and time the bank books the credit**, according to
+   the bank evidence, within the technical tolerance stated in the payment instructions. The date on which the Customer
+   initiated the transfer, and the date on which Kauro finishes reconciling it, do not count.
+4. If the credit was booked on time, Kauro honors the accepted price even if it confirms the payment after the deadline,
+   **provided that**, when it confirms it, the accepted Quote and its source or files, target, legal and fiscal treatment and
+   delivery scope remain **unchanged** (a scope amendment or source replacement under section 6.5 after the Quote was accepted
+   does not qualify), and the project has no other open or paid purchase. This does not depend on whether Kauro had already
+   marked the Order as expired.
+5. If the credit was booked after that moment, or any of those conditions is no longer met, Kauro **does not start the work**:
+   it records the money received and **returns** it under section 10; the Customer may request a new Quote.
+6. A partial payment, an overpayment, a payment with another reference or sent by a payer other than the accepted billing holder
+   is **under review**: it does not enable the work and is returned under section 10. Kauro does not ask for the difference to
+   be completed with a second payment.
+7. Kauro does not request a second payment while a sent payment is unreconciled. The Customer must not pay again while its
+   payment is in transit or under review.
 
-Los cargos que cobre el banco o la plataforma del Cliente por enviar el pago corren por cuenta del Cliente; las comisiones de
-recepción y de procesamiento del lado de Kauro corren por cuenta de Kauro y no se suman al total.
-<!-- auth: 02 §7 ("Payment return pages do not assert payment success"); A8 §3 ("the order paid only on a reconciled credit of the exact amount and currency"); 15 §Money vocabulary ("only explicitly disclosed permitted charges"); 15 §Fee reference and example · resolución de silencio S-09 -->
+Charges made by the Customer's bank or platform for sending the payment are borne by the Customer; receiving and processing fees
+on Kauro's side are borne by Kauro and are not added to the total.
+<!-- auth: 02 §7 ("Payment return pages do not assert payment success"); A8 §3 ("the order paid only on a reconciled credit of the exact amount and currency"); 15 §Money vocabulary ("only explicitly disclosed permitted charges"); 15 §Fee reference and example · silence resolution S-09 -->
 
-8.3. **Sin doble cobro.** Kauro no pide un segundo pago mientras un pago enviado no esté conciliado; los pagos inciertos se
-concilian antes de cualquier reintento.
+8.3. **No double charge.** Kauro does not request a second payment while a sent payment is unreconciled; uncertain payments are
+reconciled before any retry.
 <!-- auth: 01 CH-007; 15 §Webhooks and reconciliation -->
 
-8.4. **Datos bancarios de Kauro.** Kauro solo comunica sus datos bancarios dentro de la Plataforma o desde su dominio
-verificado. Si el Cliente recibe un cambio de datos bancarios por otro medio, debe confirmarlo en la Plataforma antes de pagar.
-<!-- auth: 15 §Settlement and withdrawal (cambio de destino de pago con verificación); 08 §Authentication and assurance -->
+8.4. **Kauro's bank details.** Kauro communicates its bank details only within the Platform or from its verified domain. If the
+Customer receives a change of bank details by any other means, it must confirm it on the Platform before paying.
+<!-- auth: 15 §Settlement and withdrawal (change of payment destination with verification); 08 §Authentication and assurance -->
 
-8.5. **Disputas y contracargos.** Si el Cliente abre una disputa o contracargo, Kauro responde con evidencia veraz y limitada al
-servicio disputado (términos aceptados, Cotización, aprobación, pago, disponibilidad y descarga del Paquete, historial de
-soporte), sin aportar registros del CRM. Una reversión puede revocar la autoridad de nuevas ejecuciones del Pedido afectado.
+8.5. **Disputes and chargebacks.** If the Customer opens a dispute or chargeback, Kauro responds with truthful evidence limited to
+the disputed service (accepted terms, Quote, approval, payment, availability and download of the Package, support history),
+without providing CRM records. A reversal may revoke the authority for new executions of the affected Order.
 <!-- auth: 15 §Disputes and chargebacks -->
 
-## 9. Ejecución, entrega e importación
+## 9. Execution, delivery and import
 
-9.1. El trabajo autorizado usa entradas inmutables. La salida provisional permanece privada hasta que el verificador final, la
-conciliación de linaje, la nueva verificación de autorización y la publicación tienen éxito. Un intento cancelado o reemplazado no
-publica.
+9.1. Authorized work uses immutable inputs. Provisional output stays private until the final verifier, lineage reconciliation,
+re-check of authorization and publication succeed. A cancelled or replaced attempt does not publish.
 <!-- auth: 02 §8 Execute and deliver -->
 
-9.2. El Cliente recibe un Paquete con informe para humanos, manifiesto legible por máquina e instrucciones específicas del
-destino. La Plataforma distingue paquete preparado, descargable, descargado e importación reportada por el Cliente. Kauro nunca
-marca un proyecto como importado solo porque se descargó un archivo.
+9.2. The Customer receives a Package with a human-readable report, a machine-readable manifest and target-specific
+instructions. The Platform distinguishes prepared, downloadable, downloaded and Customer-reported import packages. Kauro never
+marks a project as imported merely because a file was downloaded.
 <!-- auth: 02 §8 -->
 
-9.3. **La importación es del Cliente.** El Cliente ejecuta la importación documentada en su propio entorno de destino autorizado
-y es responsable de ella. En importaciones por etapas, el Cliente entrega en la Plataforma los comprobantes de resultado
-definidos y recibe la siguiente etapa verificada. Un archivo arbitrario de "éxito" no es prueba.
+9.3. **The import is the Customer's.** The Customer runs the documented import in its own authorized target environment and is
+responsible for it. In staged imports, the Customer delivers on the Platform the defined result receipts and receives the next
+verified stage. An arbitrary "success" file is not proof.
 <!-- auth: 02 §9 Verify target import and handle issues; 19 §Service terms ("agency's responsibility for final CRM import") -->
 
-9.4. **Cambios del destino.** Un cambio del destino después del pago pausa la ejecución que depende de él; el Cliente recibe el
-impacto y sus opciones. Un cobro adicional solo procede con un nuevo alcance aceptado.
+9.4. **Target changes.** A change of the target after payment pauses the execution that depends on it; the Customer receives the
+impact and its options. An additional charge applies only with a new accepted scope.
 <!-- auth: 15 §Price and source expiry races -->
 
-9.5. **Marca del Cliente.** El Cliente puede poner su marca en el informe y omitir la publicidad de Kauro, pero no puede editarlo
-para afirmar una certificación, garantía o importación que no ocurrió.
+9.5. **Customer branding.** The Customer may brand the report and omit Kauro's advertising, but may not edit it to claim a
+certification, guarantee or import that did not occur.
 <!-- auth: 13 §Branding and white label -->
 
-## 10. Cancelación y reembolsos
+## 10. Cancellation and refunds
 
-10.1. **Antes del inicio del procesamiento pagado.** El Cliente puede cancelar un Pedido pagado antes de que empiece su
-procesamiento y recibe el reembolso del valor pagado. Las comisiones del proveedor de pagos que no se recuperen son costo de Kauro.
-<!-- auth: 15 §Refund policy and calculation (segundo párrafo) -->
+10.1. **Before paid processing starts.** The Customer may cancel a paid Order before its processing begins and receives a refund
+of the amount paid. Payment-provider fees that are not recovered are Kauro's cost.
+<!-- auth: 15 §Refund policy and calculation (second paragraph) -->
 
-10.2. **Después del inicio del procesamiento.** La cancelación detiene el trabajo futuro y bloquea nuevas publicaciones, pero no
-puede deshacer trabajo ya transmitido ni una importación que el Cliente ya haya hecho. Kauro evalúa de buena fe la solicitud según
-la fase registrada y, cuando proceda, abona el valor a una nueva Revisión o lo reembolsa, y explica por escrito su decisión. Kauro
-no impone penalidades que no estén en estos Términos. Si el Cliente es consumidor, sus derechos legales de la sección 25
-(retracto, entrega y reversión del pago) prevalecen sobre esta evaluación y sobre cualquier abono.
-<!-- auth: 19 §Service terms (párrafo de cancelación); 01 CH-005; 15 §Refund policy and calculation ("does not invent a penalty"); 16 §Scope changes and credits ("Prior payment is credited or refunded through the ledger where appropriate") · resolución de silencio S-08 -->
+10.2. **After processing starts.** Cancellation stops future work and blocks new publications, but cannot undo work already
+transmitted or an import the Customer has already done. Kauro evaluates the request in good faith according to the recorded
+phase and, where appropriate, credits the amount to a new Revision or refunds it, and explains its decision in writing. Kauro
+imposes no penalties that are not in these Terms. If the Customer is a consumer, its statutory rights in section 25 (withdrawal,
+delivery and payment reversal) prevail over this evaluation and over any credit.
+<!-- auth: 19 §Service terms (cancellation paragraph); 01 CH-005; 15 §Refund policy and calculation ("does not invent a penalty"); 16 §Scope changes and credits ("Prior payment is credited or refunded through the ledger where appropriate") · silence resolution S-08 -->
 
-10.3. **Defecto de Kauro.** El remedio por defecto de Kauro se rige por la sección 11.
+10.3. **Kauro defect.** The remedy for a Kauro defect is governed by section 11.
 
-10.4. **Forma del reembolso.** Los reembolsos se pagan por el mismo medio de pago cuando sea posible (los de transferencia
-bancaria, como transferencia saliente aprobada por Kauro, cuando la ejecución real esté comprobada). El total reembolsado nunca excede lo efectivamente capturado menos reembolsos y
-reversiones anteriores. Un reembolso parcial identifica el componente del servicio afectado y ajusta el impuesto de forma
-coherente, con la nota crédito correspondiente.
+10.4. **Form of the refund.** Refunds are paid by the same means of payment where possible (bank-transfer refunds, as an
+outbound transfer approved by Kauro, once actual execution is evidenced). The total refunded never exceeds what was actually
+captured less prior refunds and reversals. A partial refund identifies the affected component of the service and adjusts the tax
+consistently, with the corresponding credit note.
 <!-- auth: 15 §Refund policy and calculation; A8 §3 ("refunds as outbound transfers under owner approval"); 15 §TaxDocument state machine -->
 
-10.5. **Vencimiento de precio y datos.** Si un pago se confirma después del vencimiento de la Cotización o de la eliminación de
-los datos, Kauro respeta el precio solo si el origen, el destino, el tratamiento legal y el alcance siguen siendo válidos; en
-caso contrario reembolsa o emite una nueva Cotización a elección del Cliente.
+10.5. **Price and data expiry.** If a payment is confirmed after the Quote expires or after the data is deleted, Kauro honors the
+price only if the accepted Quote and its source, target, legal treatment and scope remain unchanged; otherwise it refunds or
+issues a new Quote at the Customer's choice.
 <!-- auth: 15 §Price and source expiry races -->
 
-## 11. Defectos y remedios
+## 11. Defects and remedies
 
-11.1. **Qué es un defecto de Kauro.** Un incumplimiento material del Paquete frente al Plan aprobado, al Contrato de Destino o al
-perfil soportado, imputable a Kauro. No son defectos de Kauro, por sí mismos: errores del origen, ediciones del Cliente, cambios
-del destino o configuraciones de herramientas de terceros; Kauro los distingue con evidencia y sin culpar automáticamente al
-Cliente.
-<!-- auth: 19 §Service terms (párrafo del remedio); 02 §9 (clasificación de fallas) -->
+11.1. **What a Kauro defect is.** A material failure of the Package against the approved Plan, the Target Contract or the
+Supported Profile, attributable to Kauro. The following are not Kauro defects in themselves: source errors, Customer edits,
+target changes or third-party tool configurations; Kauro distinguishes them with evidence and without automatically blaming the
+Customer.
+<!-- auth: 19 §Service terms (remedy paragraph); 02 §9 (failure classification) -->
 
-11.2. **Plazo para reclamar.** El Cliente puede reportar un defecto dentro de los **treinta (30) días** siguientes a la
-Finalización del servicio. Como los datos se conservan por menos tiempo (sección 13), un reclamo posterior a la eliminación puede
-exigir volver a cargar exactamente el mismo origen y la evidencia; la Plataforma lo explica. Los proyectos por etapas usan los
-hitos informados antes de la compra.
+11.2. **Time to claim.** The Customer may report a defect within **thirty (30) days** after Service Completion. Because data is
+kept for a shorter time (section 13), a claim after deletion may require re-uploading exactly the same source and the evidence;
+the Platform explains this. Staged projects use the milestones disclosed before purchase.
 <!-- auth: 18 §Support coverage and service targets; registry/policy.json support.defectReportDays = 30; 11 §Billing, team, settings and help -->
 
-11.3. **Remedio.** Para un defecto material verificado de Kauro, el remedio principal es investigar y reparar o regenerar el
-Paquete, con un objetivo inicial de **cinco (5) días hábiles**. Si la reparación no es razonable o no es posible, Kauro reembolsa
-el valor del proyecto afectado en lo que corresponda. Esto no limita los derechos que la ley no permite excluir; para un Cliente
-que sea consumidor, el remedio lo elige él según la sección 25.9.
-<!-- auth: 18 §Support coverage and service targets; registry/policy.json support.defectRepairTargetBusinessDays = 5; 15 §Refund policy and calculation (tercer párrafo); 19 §Service terms ("preserves rights that cannot legally be excluded") -->
+11.3. **Remedy.** For a verified material Kauro defect, the main remedy is to investigate and repair or regenerate the Package,
+with an initial target of **five (5) business days**. If repair is not reasonable or not possible, Kauro refunds the value of the
+affected project to the extent appropriate. This does not limit rights the law does not allow to be excluded; for a Customer
+that is a consumer, the remedy is the consumer's choice under section 25.9.
+<!-- auth: 18 §Support coverage and service targets; registry/policy.json support.defectRepairTargetBusinessDays = 5; 15 §Refund policy and calculation (third paragraph); 19 §Service terms ("preserves rights that cannot legally be excluded") -->
 
-## 12. Soporte
+## 12. Support
 
-12.1. El soporte humano es por escrito, de lunes a viernes de 09:00 a 17:00 hora de Bogotá (America/Bogota), excluidos los
-festivos aplicables. El acuse de recibo es automático y el objetivo de respuesta humana es el siguiente día hábil. Kauro no ofrece
-soporte atendido 24/7.
+12.1. Human support is in writing, Monday to Friday from 09:00 to 17:00 Bogotá time (America/Bogota), excluding applicable
+holidays. Acknowledgment is automatic and the human response target is the next business day. Kauro does not offer 24/7 staffed
+support.
 <!-- auth: 18 §Support coverage and service targets; registry/policy.json support -->
 
-12.2. El Cliente nunca debe enviar su exportación de CRM por correo. Las solicitudes de soporte se refieren a identificadores
-de proyecto y de artefacto. Si Kauro necesita ver registros, lo hace dentro de la Plataforma mediante un acceso de soporte
-específico para el caso: con propósito, proyecto y operaciones definidos, aprobación, duración máxima de treinta (30) minutos,
-lectura por defecto, registro de auditoría y, cuando corresponda, consentimiento del Cliente.
+12.2. The Customer must never send its CRM export by email. Support requests refer to project and artifact identifiers. If
+Kauro needs to see records, it does so within the Platform through case-specific support access: with defined purpose, project
+and operations, approval, a maximum duration of thirty (30) minutes, read-only by default, an audit record and, where
+appropriate, the Customer's consent.
 <!-- auth: 02 §9; 08 §Support access and break-glass; registry/policy.json retention.breakglassSeconds = 1800 -->
 
-12.3. El Cliente puede tener una llamada opcional con un vendedor de habla inglesa, pero no está obligado a ella para comprar.
+12.3. The Customer may have an optional call with an English-speaking seller, but is not required to have one in order to
+purchase.
 <!-- auth: 02 §1 Discover and qualify fit; 11 §Billing, team, settings and help -->
 
-## 13. Conservación, devolución y eliminación de datos
+## 13. Retention, return and deletion of data
 
-13.1. **Calendario.** Kauro conserva los datos del Cliente durante los periodos siguientes ("día" significa periodo de 24 horas):
+13.1. **Schedule.** Kauro keeps the Customer's data for the following periods ("day" means a 24-hour period):
 
-| Clase | Disponibilidad ordinaria | Límite máximo |
+| Class | Ordinary availability | Maximum limit |
 |---|---|---|
-| Carga incompleta y cuarentena | Hasta que termina la inspección o vence la reserva | 24 horas desde el inicio de la carga |
-| Origen y derivados del Free data health check (sin pago) | 7 días después de que el resultado esté listo o de la falla terminal | 14 días desde el sellado |
-| Origen y entrega de un proyecto pagado ordinario | 7 días después de que el primer Paquete esté disponible | 14 días desde la confirmación del pago |
-| Origen y artefactos de una importación por etapas | Hasta el fin de la ventana por etapas y luego hasta 7 días para la entrega final | 21 días desde la primera etapa y nunca más de 30 días desde la confirmación del pago |
-| Comprobantes de importación | 7 días desde que su verificación termina | Dentro del límite del proyecto por etapas cuando se necesitan para continuar |
-| Esquema de destino y configuración reutilizable | Hasta 180 días desde la última confirmación o uso | Vigencia ejecutable máxima de 30 días; se invalida ante un cambio material del destino |
-| Contexto minimizado enviado al modelo | Durante la revisión activa y su breve ventana de evidencia | Se elimina con los datos del proyecto |
-| Registros de aplicación | 30 días | Sin contenido de CRM ni secretos |
-| Evidencia mínima de seguridad | 180 días | Sin contenido de CRM |
-| Registros financieros y legales | El plazo legal aplicable | Separados, sin contenido de CRM |
+| Incomplete upload and quarantine | Until inspection ends or the reservation expires | 24 hours from the start of the upload |
+| Source and derivatives of the Free data health check (unpaid) | 7 days after the result is ready or after terminal failure | 14 days from sealing |
+| Source and delivery of an ordinary paid project | 7 days after the first Package is available | 14 days from payment confirmation |
+| Source and artifacts of a staged import | Until the end of the staged window and then up to 7 days for the final delivery | 21 days from the first stage and never more than 30 days from payment confirmation |
+| Import receipts | 7 days from when their verification ends | Within the staged project's limit when needed to continue |
+| Target schema and reusable configuration | Up to 180 days from the last confirmation or use | Maximum executable validity of 30 days; invalidated on a material change of the target |
+| Minimized context sent to the model | During the active review and its short evidence window | Deleted with the project data |
+| Application logs | 30 days | No CRM content or secrets |
+| Minimal security evidence | 180 days | No CRM content |
+| Financial and legal records | The applicable legal period | Separate, no CRM content |
 <!-- auth: 09 §Retention schedule; registry/policy.json retention -->
 
-13.2. **Extensión.** Se permite una sola extensión de un plazo blando por proyecto, de hasta setenta y dos (72) horas, solicitada
-por un usuario autorizado antes de que venza, con propósito indicado; nunca supera los límites máximos. Abrir un informe,
-contactar soporte o recibir recordatorios no extiende la conservación.
+13.2. **Extension.** A single extension of a soft period per project is allowed, of up to seventy-two (72) hours, requested by an
+authorized user before it expires, with a stated purpose; it never exceeds the maximum limits. Opening a report, contacting
+support or receiving reminders does not extend retention.
 <!-- auth: 09 §Quotes, reuploads and retention; registry/policy.json retention.softExtensionsPerProject = 1, softExtensionMaximumSeconds = 259200, extendHardCap = false -->
 
-13.3. **Devolución o eliminación a elección del responsable.** Al terminar la prestación del servicio, o antes cuando lo pida,
-el Cliente (por su propia cuenta o por instrucción de su Cliente Final) elige si Kauro le **devuelve** o **elimina** todos los
-datos personales de los Datos del Cliente que Kauro todavía conserve: los Archivos de origen aceptados, los Paquetes y los demás
-derivados que contengan datos personales (perfiles, excepciones, linaje, comprobantes de importación). La devolución se hace por
-descarga segura dentro de la Plataforma antes de la eliminación; después, Kauro elimina y entrega el comprobante de la sección
-13.4. Si el Cliente no elige, se aplica el calendario de la sección 13.1, que elimina los datos en plazos cortos; la Plataforma
-avisa la fecha de eliminación para que el Cliente pueda descargar antes. Lo que la ley obligue a conservar se conserva solo para
-ese fin. Cada enlace de descarga firmado vence a los quince (15) minutos.
-<!-- auth: 09 §Notifications and customer action; 09 §Early deletion; 09 §Deletion receipts and restoration; 19 §Data processing agreement ("return/deletion"); registry/policy.json retention.signedDownloadSeconds = 900 · law: C-65 (Va. Code §59.1-579 B.2), C-66 (C.R.S. 6-1-1305(5)(d)(I), texto 2026) · resolución S-11 (r2) · CHECKLIST A-15 -->
+13.3. **Return or deletion at the controller's choice.** When the service ends, or earlier on request, the Customer (on its own
+behalf or on its End Client's instruction) chooses whether Kauro **returns** or **deletes** all the personal data in the
+Customer Data that Kauro still holds: the accepted source Files, the Packages and the other derivatives containing personal data
+(profiles, exceptions, lineage, import receipts). Return is by secure download within the Platform before deletion; afterwards,
+Kauro deletes and delivers the receipt described in section 13.4. If the Customer does not choose, the schedule in section 13.1
+applies, which deletes data within short periods; the Platform gives notice of the deletion date so the Customer can download
+earlier. What the law requires to be kept is kept only for that purpose. Each signed download link expires after fifteen (15)
+minutes.
+<!-- auth: 09 §Notifications and customer action; 09 §Early deletion; 09 §Deletion receipts and restoration; 19 §Data processing agreement ("return/deletion"); registry/policy.json retention.signedDownloadSeconds = 900 · law: C-65 (Va. Code §59.1-579 B.2), C-66 (C.R.S. 6-1-1305(5)(d)(I), 2026 text) · resolution S-11 (r2) · CHECKLIST A-15 -->
 
-13.4. **Eliminación anticipada.** El Cliente puede pedir la eliminación anticipada de un proyecto o de un alcance. Kauro bloquea
-primero nuevas cargas, envíos al modelo, procesamientos, publicaciones y descargas, cancela los intentos activos y elimina todas
-las generaciones registradas (cuarentena, aceptados, derivados, provisionales, entregas, comprobantes y copias de soporte),
-comparándolas con el inventario del proveedor. Kauro entrega un comprobante de eliminación para el alcance que controla; no puede
-eliminar copias ya descargadas por el Cliente ni importaciones hechas en su CRM. Si una operación del proveedor falla, la
-eliminación queda parcial y visible, y se reintenta. Una copia eliminada puede persistir unos días tras el borrado en el
-almacenamiento del proveedor, hasta su expiración automática; Kauro no la usa ni la restaura.
+13.4. **Early deletion.** The Customer may request early deletion of a project or a scope. Kauro first blocks new uploads,
+sends to the model, processing, publications and downloads, cancels active attempts and deletes all recorded generations
+(quarantine, accepted, derived, provisional, deliveries, receipts and support copies), comparing them with the provider's
+inventory. Kauro delivers a deletion receipt for the scope it controls; it cannot delete copies already downloaded by the
+Customer or imports made in its CRM. If a provider operation fails, the deletion remains partial and visible, and is retried. A
+deleted copy may persist for a few days after deletion in the provider's storage, until it expires automatically; Kauro does not
+use or restore it.
 <!-- auth: 09 §Early deletion; 09 §Deletion receipts and restoration -->
 
-13.5. **Copias de respaldo.** Las copias de respaldo de la base de datos contienen metadatos y referencias, no el contenido de
-los Archivos. La recuperación de una copia no reactiva descargas ni datos eliminados.
+13.5. **Backups.** Database backups contain metadata and references, not the content of the Files. Restoring a backup does not
+reactivate downloads or deleted data.
 <!-- auth: 14 §Storage configuration ("Domain backups contain metadata and safe references, not source file payload"); 09 §Deletion receipts and restoration -->
 
-## 14. Protección de datos personales
+## 14. Personal data protection
 
-14.1. Respecto de los datos personales contenidos en los Archivos y en sus derivados, el Cliente (o su Cliente Final, según la
-cadena registrada) es el responsable del tratamiento y Kauro actúa como **encargado** por cuenta del Cliente, conforme al DPA.
-Respecto de los datos de las cuentas, usuarios, facturación y comunicaciones del Cliente con Kauro, Kauro es **responsable** y
-los trata según su Política de Tratamiento de Información Personal.
-<!-- auth: 19 §Data processing agreement (texto enmendado por A3 §4.7); producto: brief D-08b · law: C-01..C-29 -->
+14.1. With respect to the personal data contained in the Files and their derivatives, the Customer (or its End Client, according
+to the recorded chain) is the controller and Kauro acts as **processor** on the Customer's behalf, under the DPA. With respect
+to the data of the Customer's accounts, users, billing and communications with Kauro, Kauro is the **controller** and processes
+it under its Personal Data Processing Policy.
+<!-- auth: 19 §Data processing agreement (text amended by A3 §4.7); product: brief D-08b · law: C-01..C-29 -->
 
-14.2. Kauro no vende ni comparte los datos personales de los Archivos, no los usa para fines propios, no los combina con datos
-de otros clientes y no los usa para entrenar modelos. No existe base vectorial, búsqueda entre clientes ni aprendizaje en línea.
+14.2. Kauro does not sell or share the personal data in the Files, does not use it for its own purposes, does not combine it
+with other customers' data and does not use it to train models. There is no vector database, cross-customer search or online
+learning.
 <!-- auth: 06 §Scoped memory; 01 CH-006; 09 §Derived data and worker scratch · law: C-60..C-66 -->
 
-## 15. Propiedad intelectual
+## 15. Intellectual property
 
-15.1. **Software de Kauro.** Kauro (o quien le haya licenciado) es titular de la Plataforma, su código, sus modelos de
-configuración, sus plantillas genéricas y su documentación. El Cliente recibe un derecho no exclusivo, intransferible y limitado
-a la vigencia del contrato para usar la Plataforma en su propia operación.
+15.1. **Kauro software.** Kauro (or its licensor) owns the Platform, its code, its configuration models, its generic templates
+and its documentation. The Customer receives a non-exclusive, non-transferable right, limited to the term of the contract, to use
+the Platform in its own operation.
 
-15.2. **Datos del Cliente.** Kauro no adquiere la propiedad de los Archivos ni de los registros de clientes. El Cliente concede a
-Kauro solo la licencia necesaria para prestar el servicio, conforme a las instrucciones del DPA.
+15.2. **Customer Data.** Kauro does not acquire ownership of the Files or of customer records. The Customer grants Kauro only the
+license needed to provide the service, under the DPA's instructions.
 
-15.3. **Entregables.** El Cliente puede usar, modificar y entregar a su Cliente Final los Paquetes e informes generados para él.
-La marca, logotipo y colores que el Cliente carga siguen siendo suyos; los usa Kauro solo para generar sus informes. La evidencia
-técnica de Kauro dentro del manifiesto conserva su procedencia.
+15.3. **Deliverables.** The Customer may use, modify and deliver to its End Client the Packages and reports generated for it. The
+brand, logo and colors the Customer uploads remain its own; Kauro uses them only to generate its reports. Kauro's technical
+evidence inside the manifest retains its provenance.
 
-15.4. **Comentarios.** Kauro puede usar las sugerencias generales del Cliente sobre el producto sin obligación de pago, sin
-incluir datos del Cliente. Kauro solo usa el nombre, la identidad o testimonios del Cliente con su aprobación escrita del texto
-exacto.
-<!-- auth: 19 §Service terms (IP distingue software, datos, marca y entregables; "Kauro does not claim ownership of customer records"); 13 §Branding and white label; 18 §Feedback and product improvement -->
+15.4. **Feedback.** Kauro may use the Customer's general suggestions about the product without any payment obligation, without
+including Customer data. Kauro uses the Customer's name, identity or testimonials only with its written approval of the exact
+text.
+<!-- auth: 19 §Service terms (IP distinguishes software, data, brand and deliverables; "Kauro does not claim ownership of customer records"); 13 §Branding and white label; 18 §Feedback and product improvement -->
 
-## 16. Confidencialidad
+## 16. Confidentiality
 
-16.1. Cada parte protegerá la información no pública de la otra que reciba con ocasión del contrato con, al menos, el cuidado que
-aplica a la suya y nunca con un cuidado inferior al razonable; la usará solo para cumplir o ejercer el contrato; y la revelará
-solo a su personal, colaboradores y proveedores que la necesiten y estén obligados a reserva equivalente.
+16.1. Each party will protect the other's non-public information that it receives in connection with the contract with at least
+the care it applies to its own and never less than reasonable care; will use it only to perform or exercise the contract; and
+will disclose it only to its personnel, collaborators and providers who need it and are bound by equivalent confidentiality.
 
-16.2. No es información confidencial la que (a) ya era pública sin culpa de quien la recibe; (b) ya la tenía legítimamente quien
-la recibe; (c) recibe legítimamente de un tercero sin obligación de reserva; o (d) desarrolla de forma independiente. Una parte
-puede revelar información cuando una autoridad competente se lo ordene, avisando antes a la otra si la ley lo permite y limitando
-la revelación a lo ordenado.
+16.2. Information is not confidential if it (a) was already public through no fault of the recipient; (b) was already lawfully
+held by the recipient; (c) is lawfully received from a third party without a duty of confidentiality; or (d) is independently
+developed. A party may disclose information when a competent authority orders it, giving prior notice to the other if the law
+permits and limiting the disclosure to what is ordered.
 
-16.3. Los datos personales de los Archivos se rigen además por el DPA. Esta obligación sobrevive a la terminación mientras la
-información conserve su carácter confidencial.
+16.3. The personal data in the Files is also governed by the DPA. This obligation survives termination as long as the
+information remains confidential.
 <!-- auth: 19 §Service terms ("Confidentiality covers both parties' nonpublic information with defined permitted uses and exceptions") -->
 
-## 17. Declaraciones del Cliente; alcance de las garantías
+## 17. Customer representations; scope of warranties
 
-17.1. El Cliente declara que la información de facturación y de identidad que suministra es veraz, y que sus Usuarios autorizados
-actúan con su autorización.
+17.1. The Customer represents that the billing and identity information it provides is truthful and that its Authorized Users
+act with its authorization.
 
-17.2. Kauro presta el servicio con la diligencia de un profesional del ramo y conforme al Plan aprobado. Kauro no garantiza que
-el CRM de destino aceptará siempre la importación cuando el destino cambie o cuando el Cliente modifique archivos o
-configuraciones; tampoco garantiza un resultado comercial, un ahorro determinado ni que una revisión gratuita encuentre
-problemas. Ninguna disposición de estos Términos excluye derechos irrenunciables del Cliente.
-<!-- auth: A3 §3.5 (no se promete ahorro); 01 CH-012; 19 §Service terms (remedio y derechos irrenunciables) · law: C-36, C-37 -->
+17.2. Kauro provides the service with the diligence of a professional in the field and in accordance with the approved Plan.
+Kauro does not guarantee that the target CRM will always accept the import when the target changes or when the Customer modifies
+files or configurations; nor does it guarantee a commercial result, a particular saving, or that a free review will find
+problems. Nothing in these Terms excludes the Customer's non-waivable rights.
+<!-- auth: A3 §3.5 (no savings promised); 01 CH-012; 19 §Service terms (remedy and non-waivable rights) · law: C-36, C-37 -->
 
-## 18. Limitación de responsabilidad
+## 18. Limitation of liability
 
-18.1. La responsabilidad total de cada parte frente a la otra por todos los reclamos derivados de un Pedido o relacionados con él
-se limita al valor efectivamente pagado por el Cliente a Kauro por los Pedidos de los doce (12) meses anteriores al hecho que
-origina el reclamo.
+18.1. Each party's total liability to the other for all claims arising from or related to an Order is limited to the amount
+actually paid by the Customer to Kauro for the Orders of the twelve (12) months before the event giving rise to the claim.
 
-18.2. Ninguna parte responde frente a la otra por lucro cesante ni por perjuicios que no se previeron ni pudieron preverse al
-celebrar el contrato.
+18.2. Neither party is liable to the other for lost profits or for damages that were not foreseen or foreseeable when the
+contract was made.
 
-18.3. Los límites anteriores **no aplican** a: (a) dolo o culpa grave; (b) la obligación del Cliente de pagar el precio; (c) los
-derechos que la ley no permite limitar; ni (d) la responsabilidad que la ley imponga a cada parte frente a los titulares de los
-datos o frente a la autoridad de protección de datos por su propio rol.
-<!-- auth: 19 §Service terms ("does not insert a sweeping 'no liability under any circumstances' clause"); 15 §Refund policy · law: C-35 (C.C. arts. 63, 1522, 1616) · ver LAWYER_LATER L-04 · resolución de silencio S-03 -->
+18.3. The above limits **do not apply** to: (a) fraud (dolo) or gross negligence (culpa grave); (b) the Customer's obligation to pay the
+price; (c) rights the law does not allow to be limited; or (d) the liability the law imposes on each party toward data subjects
+or the data protection authority for its own role.
+<!-- auth: 19 §Service terms ("does not insert a sweeping 'no liability under any circumstances' clause"); 15 §Refund policy · law: C-35 (C.C. arts. 63, 1522, 1616) · see LAWYER_LATER L-04 · silence resolution S-03 -->
 
-## 19. Suspensión y terminación
+## 19. Suspension and termination
 
-19.1. **Suspensión.** Kauro puede suspender, con aviso al Cliente y por el alcance mínimo necesario: (a) el tratamiento de una
-instrucción aparentemente ilícita o fuera de alcance; (b) el alcance afectado por datos prohibidos; (c) el acceso de un usuario o
-cuenta usado para abuso o con riesgo de seguridad; (d) nuevas ejecuciones de un Pedido con pago revertido; o (e) servicios
-afectados por un incidente, como medida de contención. La suspensión conserva los caminos legítimos de recuperación, reembolso y
-eliminación.
+19.1. **Suspension.** Kauro may suspend, with notice to the Customer and for the minimum scope necessary: (a) the processing of an
+apparently unlawful or out-of-scope instruction; (b) the scope affected by prohibited data; (c) the access of a user or account
+used for abuse or with a security risk; (d) new executions of an Order whose payment was reversed; or (e) services affected by an
+incident, as a containment measure. Suspension preserves the legitimate paths of recovery, refund and deletion.
 <!-- auth: 19 §Service terms; 19 §Data categories and excluded use; 08 §Abuse controls; 14 §Incident containment; 15 §Disputes and chargebacks -->
 
-19.2. **Terminación por el Cliente.** El Cliente puede cerrar su cuenta en cualquier momento. El cierre detiene nuevos Pedidos y
-sigue las obligaciones pendientes de entrega, reembolso, legales y de eliminación. El Cliente puede obtener los registros
-permitidos durante el proceso de cierre.
+19.2. **Termination by the Customer.** The Customer may close its account at any time. Closure stops new Orders and follows
+pending delivery, refund, legal and deletion obligations. The Customer may obtain the permitted records during the closure
+process.
 
-19.3. **Terminación por Kauro.** Kauro puede terminar el contrato con un aviso de treinta (30) días, o de inmediato ante un
-incumplimiento grave del Cliente no subsanado dentro de los diez (10) días hábiles siguientes a un aviso escrito. Los Pedidos
-pagados y en curso al momento del aviso sin causa se terminan de prestar o se reembolsan.
+19.3. **Termination by Kauro.** Kauro may terminate the contract on thirty (30) days' notice, or immediately in case of a serious
+breach by the Customer not cured within ten (10) business days after written notice. Paid Orders in progress at the time of
+notice without cause are completed or refunded.
 
-19.4. **Efectos.** Al terminar, los datos del Cliente se eliminan según la sección 13 y el DPA, y se conservan solo los
-registros financieros, legales y de seguridad mínimos, separados y sin contenido de CRM. "Cuenta eliminada" no significa que
-desaparezcan las facturas que la ley obliga a conservar. Las secciones 13, 15, 16, 18, 22, 23 y 25 sobreviven.
-<!-- auth: 16 §Agency lifecycle ("Closing an agency stops new orders..."); 19 §Rights requests and privacy complaints (último párrafo); 09 §Retention schedule · resolución de silencio S-10 (plazos de aviso de terminación) -->
+19.4. **Effects.** On termination, the Customer's data is deleted under section 13 and the DPA, and only minimal financial,
+legal and security records are kept, separate and without CRM content. "Account deleted" does not mean that invoices the law
+requires to be kept disappear. Sections 13, 15, 16, 18, 22, 23 and 25 survive.
+<!-- auth: 16 §Agency lifecycle ("Closing an agency stops new orders..."); 19 §Rights requests and privacy complaints (last paragraph); 09 §Retention schedule · silence resolution S-10 (termination notice periods) -->
 
-## 20. Vendedores y comunicaciones
+## 20. Sellers and communications
 
-20.1. Kauro puede vender por medio de colaboradores comerciales independientes. Un vendedor no puede prometer funciones, fechas,
-precios, soporte ilimitado, conservación permanente ni escrituras en un CRM en vivo, ni obligar a Kauro fuera de la Cotización
-emitida por la Plataforma. Los vendedores no reciben los informes con registros de CRM.
-<!-- auth: 19 §Customer instrument hierarchy (último párrafo); 02 §1 ("A seller cannot promise a feature or delivery date..."); 13 §Privacy in reports and downloads -->
+20.1. Kauro may sell through independent commercial collaborators. A seller may not promise features, dates, prices, unlimited
+support, permanent retention or writes to a live CRM, or bind Kauro outside the Quote issued by the Platform. Sellers do not
+receive reports containing CRM records.
+<!-- auth: 19 §Customer instrument hierarchy (last paragraph); 02 §1 ("A seller cannot promise a feature or delivery date..."); 13 §Privacy in reports and downloads -->
 
-20.2. Kauro envía al Cliente avisos transaccionales del servicio (cuenta, invitaciones, estado del pago, entrega, avisos de
-eliminación, soporte) a los usuarios registrados. Esos avisos no incluyen registros de CRM ni enlaces de descarga firmados; enlazan
-a la Plataforma. Las comunicaciones comerciales a los Usuarios autorizados se envían solo a quienes las autorizaron por separado
-y por los canales que autorizaron, con las reglas de la sección 17 de la Política de Tratamiento (identificación como
-publicidad, consulta del Registro de Números Excluidos para destinatarios en Colombia, horario legal y baja inmediata). Aceptar
-estos Términos no implica aceptar publicidad.
-<!-- auth: 09 §Notifications and customer action; reference/MESSAGING_AND_SENDER_OPERATIONS.md (Resend, solo transaccional; suppression); 18 §Communication compliance · law: C-50, C-51, C-52 · CHECKLIST A-14 -->
+20.2. Kauro sends the Customer transactional service notices (account, invitations, payment status, delivery, deletion notices,
+support) to registered users. Those notices include no CRM records or signed download links; they link to the Platform.
+Commercial communications to Authorized Users are sent only to those who authorized them separately and through the channels they
+authorized, under the rules in section 17 of the Processing Policy (identification as advertising, consultation of the CRC
+Excluded Numbers Registry for recipients in Colombia, legal hours and immediate unsubscribe). Accepting these Terms does not
+mean accepting advertising.
+<!-- auth: 09 §Notifications and customer action; reference/MESSAGING_AND_SENDER_OPERATIONS.md (Resend, transactional only; suppression); 18 §Communication compliance · law: C-50, C-51, C-52 · CHECKLIST A-14 -->
 
-## 21. Cambios a estos Términos
+## 21. Changes to these Terms
 
-21.1. Cada versión de los documentos del contrato tiene número y fecha de vigencia. Kauro avisará por la Plataforma y por correo
-a los administradores del Cliente, con al menos treinta (30) días de anticipación, cualquier cambio material. El cambio rige para
-Pedidos posteriores a su aceptación; nunca modifica un Pedido ya aceptado. Si el Cliente no acepta la nueva versión, puede cerrar
-su cuenta sin costo antes de que rija.
+21.1. Each version of the contract documents has a number and an effective date. Kauro will give notice on the Platform and by
+email to the Customer's administrators, at least thirty (30) days in advance, of any material change. The change applies to
+Orders after its acceptance; it never modifies an Order already accepted. If the Customer does not accept the new version, it may
+close its account at no cost before it takes effect.
 <!-- auth: 19 §Customer instrument hierarchy ("version and effective date"; "Material changes require notice and acceptance where applicable") -->
 
-## 22. Ley aplicable y solución de controversias
+## 22. Governing law and dispute resolution
 
-22.1. Estos Términos y cada Pedido se rigen por las leyes de la República de Colombia.
+22.1. These Terms and each Order are governed by the laws of the Republic of Colombia.
 
-22.2. Las partes intentarán resolver cualquier controversia mediante negociación directa durante treinta (30) días calendario
-desde el aviso escrito de una de ellas. Esa etapa no impide pedir medidas urgentes ni presentar una acción antes de que caduque o
-prescriba. Si no la resuelven, la controversia se someterá a los jueces competentes conforme a las reglas legales de jurisdicción
-y competencia aplicables.
+22.2. The parties will try to resolve any dispute by direct negotiation for thirty (30) calendar days from the written notice of
+either of them. That stage does not prevent seeking urgent measures or filing an action before it lapses or becomes time-barred.
+If they do not resolve it, the dispute will be submitted to the competent judges under the applicable statutory rules of
+jurisdiction and competence.
 
-22.3. Nada de lo anterior impide a un titular de datos o a una autoridad ejercer los derechos o competencias que la ley les
-otorga, ni al Cliente acudir a la Superintendencia de Industria y Comercio cuando la ley lo permita.
-<!-- auth: 19 §Service terms ("Liability limits, exclusions, governing law, forum, dispute procedure and any indemnity require application to the actual operator..."; "no ... invented foreign jurisdiction") · law: C-42 (Código General del Proceso art. 28 num. 3: la estipulación de domicilio contractual para efectos judiciales se tiene por no escrita) · ver LAWYER_LATER L-05 (arbitraje o reconocimiento en EE. UU.) -->
+22.3. Nothing above prevents a data subject or an authority from exercising the rights or powers the law gives them, or the
+Customer from going to the Superintendencia de Industria y Comercio (SIC) when the law permits.
+<!-- auth: 19 §Service terms ("Liability limits, exclusions, governing law, forum, dispute procedure and any indemnity require application to the actual operator..."; "no ... invented foreign jurisdiction") · law: C-42 (Código General del Proceso art. 28 num. 3: a stipulation of contractual domicile for judicial purposes is deemed unwritten) · see LAWYER_LATER L-05 (arbitration or recognition in the US) -->
 
-## 23. Notificaciones
+## 23. Notices
 
-23.1. Kauro notifica al Cliente por la Plataforma y al correo del administrador registrado. El Cliente notifica a Kauro en
-[correo de notificaciones] o por los canales de la Plataforma. Una notificación por correo se entiende recibida cuando el sistema
-de información del destinatario la recibe, salvo prueba en contrario.
-<!-- law: C-32 (Ley 527 de 1999, art. 24, tiempo de recepción en el sistema de información designado) -->
+23.1. Kauro notifies the Customer through the Platform and at the registered administrator's email. The Customer notifies Kauro
+at [notice email] or through the Platform's channels. An email notice is deemed received when the recipient's information system
+receives it, unless proven otherwise.
+<!-- law: C-32 (Ley 527 de 1999, art. 24, time of receipt in the designated information system) -->
 
-23.2. Las notificaciones judiciales a Kauro se dirigen a [domicilio] y a [correo de notificaciones].
+23.2. Judicial notices to Kauro are addressed to [registered address] and [notice email].
 
-## 24. Disposiciones varias
+## 24. Miscellaneous
 
-24.1. **Fuerza mayor.** Ninguna parte responde por el incumplimiento causado por fuerza mayor o caso fortuito, siempre que avise
-a la otra y mitigue sus efectos; esto no suspende las obligaciones de seguridad ni de eliminación de datos que sigan siendo
-posibles.
+24.1. **Force majeure.** Neither party is liable for non-performance caused by force majeure or fortuitous event (fuerza mayor o
+caso fortuito), provided it notifies the other and mitigates its effects; this does not suspend security or data-deletion
+obligations that remain possible.
 
-24.2. **Cesión.** El Cliente no puede ceder el contrato sin consentimiento escrito de Kauro. Kauro puede cederlo a una sociedad
-sucesora de su negocio, avisando al Cliente, siempre que el cesionario asuma las obligaciones del DPA.
+24.2. **Assignment.** The Customer may not assign the contract without Kauro's written consent. Kauro may assign it to a
+successor company of its business, with notice to the Customer, provided the assignee assumes the DPA obligations.
 
-24.3. **Independencia.** Las partes son contratistas independientes. Nada crea sociedad, agencia comercial ni relación laboral.
+24.3. **Independence.** The parties are independent contractors. Nothing creates a partnership, commercial agency or employment
+relationship.
 
-24.4. **Idioma.** Estos Términos se redactan en español. Kauro puede ofrecer traducciones; en caso de diferencia prevalece la
-versión en español, salvo para el DPA, cuya versión en inglés tiene el mismo valor que la española.
+24.4. **Language.** These Terms are written in English, which is the master version. Kauro may offer translations (including a
+Spanish translation where Colombian law requires one); in case of difference the English version prevails.
 
-24.5. **Integridad y divisibilidad.** Los documentos de la sección 1.3 son el acuerdo completo entre las partes sobre su objeto.
-Si una disposición resulta inválida, las demás conservan su efecto y la inválida se reemplaza por la válida más cercana a su
-propósito.
+24.5. **Entire agreement and severability.** The documents in section 1.3 are the entire agreement between the parties on their
+subject matter. If a provision is invalid, the others keep their effect and the invalid one is replaced by the valid one closest
+to its purpose.
 
-## 25. Clientes que son consumidores
+## 25. Customers that are consumers
 
-25.1. **Declaración del tipo de comprador.** Antes de pagar, el Cliente declara en la Plataforma si adquiere el servicio para una
-necesidad intrínsecamente ligada a su actividad económica (por ejemplo, una agencia que prepara datos para los proyectos de sus
-clientes) o como destinatario final para una necesidad que no lo está. Kauro no presume que un Cliente no es consumidor. Si el
-Cliente es consumidor según el artículo 5, numeral 3, de la Ley 1480 de 2011, se aplica esta sección cualquiera que haya sido su
-declaración, y ninguna otra disposición de estos Términos limita los derechos que esa ley le da.
+25.1. **Buyer-type declaration.** Before paying, the Customer declares on the Platform whether it acquires the service for a need
+intrinsically linked to its economic activity (for example, an agency preparing data for its clients' projects) or as a final
+recipient for a need that is not. Kauro does not presume that a Customer is not a consumer. If the Customer is a consumer under
+article 5, numeral 3, of Ley 1480 de 2011, this section applies whatever its declaration was, and no other provision of these
+Terms limits the rights that law gives it.
 
-25.2. **Información antes de comprar.** La Plataforma informa, antes de la compra y en el mismo medio: la identidad de Kauro
-(sección 1.1); la descripción del servicio (secciones 3 y 7.6, el Plan y la Cotización); el precio total en pesos colombianos
-con todos los impuestos y costos (sección 7.7); los medios de pago; el plazo de prestación del servicio que indica la Cotización; la vigencia de la oferta; y el
-derecho de retracto con el procedimiento para ejercerlo. Estos Términos y los demás documentos del contrato pueden consultarse,
-imprimirse y descargarse en todo momento, antes y después de la compra.
+25.2. **Information before buying.** Before the purchase and in the same medium, the Platform states: Kauro's identity
+(section 1.1); the description of the service (sections 3 and 7.6, the Plan and the Quote); the total price in Colombian pesos
+with all taxes and costs (section 7.7); the means of payment; the delivery time the Quote indicates; the validity of the offer;
+and the right of withdrawal with the procedure to exercise it. These Terms and the other contract documents may be consulted,
+printed and downloaded at any time, before and after the purchase.
 
-25.3. **Resumen y aceptación.** Antes de terminar la compra, la Plataforma muestra un resumen del Pedido (servicio, modo, unidades,
-precio, impuestos y total) que el Cliente puede corregir o cancelar y descargar. La aceptación es expresa y queda registrada.
+25.3. **Summary and acceptance.** Before completing the purchase, the Platform shows a summary of the Order (service, mode,
+units, price, taxes and total) that the Customer can correct, cancel and download. Acceptance is express and recorded.
 
-25.4. **Acuse de recibo.** A más tardar el día calendario siguiente al Pedido, Kauro envía un acuse de recibo con el plazo de
-prestación, el precio exacto con impuestos y la forma de pago.
+25.4. **Acknowledgment of receipt.** No later than the calendar day after the Order, Kauro sends an acknowledgment of receipt
+with the delivery time, the exact price with taxes and the form of payment.
 
-25.5. **Retracto.** El consumidor puede retractarse dentro de los cinco (5) días hábiles siguientes a la celebración del contrato,
-desde la Plataforma o escribiendo a [correo de notificaciones] con la referencia del Pedido. El contrato se resuelve y Kauro
-devuelve todo lo pagado, sin descuentos, por el mismo medio de pago o por el que acuerden, dentro de los quince (15) días
-calendario siguientes al ejercicio del derecho, una vez el consumidor entregue los datos correctos que se le pidan para hacerlo.
-El retracto no procede si la prestación del servicio ya comenzó con el acuerdo del consumidor: por eso, dentro de esos cinco días
-Kauro solo empieza el procesamiento pagado si el consumidor lo pide de forma expresa en la Plataforma después de ser informado de
-que con ello pierde el retracto; si no lo pide, Kauro espera a que venza el plazo.
+25.5. **Withdrawal.** The consumer may withdraw within five (5) business days after the contract is made, from the Platform or by
+writing to [notice email] with the Order reference. The contract is terminated and Kauro returns everything paid, without
+deductions, by the same means of payment or one agreed, within fifteen (15) calendar days after the right is exercised, once the
+consumer provides the correct data requested for it. Withdrawal does not apply if performance of the service has already begun
+with the consumer's agreement: therefore, within those five days Kauro starts paid processing only if the consumer expressly asks
+for it on the Platform after being told that this loses the right of withdrawal; if the consumer does not ask, Kauro waits for the
+period to expire.
 
-25.6. **Plazo de prestación y falta de disponibilidad.** Kauro presta el servicio dentro del plazo aceptado en la Cotización o, si
-no se indicó, dentro de los treinta (30) días calendario siguientes al día en que el consumidor hizo el Pedido. Si en cualquier
-momento antes de ese plazo Kauro sabe que no podrá prestar el servicio (por ejemplo, por falta de capacidad o porque el alcance
-no se puede atender), se lo informa **de inmediato**; el consumidor puede entonces terminar el contrato y recibir la devolución de
-todo lo pagado, sin retenciones ni descuentos, dentro de los quince (15) días calendario siguientes, o pedir una segunda fecha. Si
-Kauro supera el plazo, el consumidor tiene el mismo derecho de terminar y recibir la devolución en quince (15) días calendario.
+25.6. **Delivery time and unavailability.** Kauro provides the service within the time accepted in the Quote or, if none was
+stated, within thirty (30) calendar days after the day the consumer placed the Order. If at any time before that deadline Kauro
+knows it will not be able to provide the service (for example, for lack of capacity or because the scope cannot be served), it
+informs the consumer **immediately**; the consumer may then terminate the contract and receive a refund of everything paid,
+without retentions or deductions, within fifteen (15) calendar days, or ask for a second date. If Kauro exceeds the deadline,
+the consumer has the same right to terminate and receive the refund within fifteen (15) calendar days.
 
-25.7. **Reversión del pago.** Se aplica cuando el consumidor pagó por comercio electrónico con tarjeta de crédito, débito u otro
-instrumento de pago electrónico y tanto Kauro como el emisor del instrumento están domiciliados en Colombia. La Plataforma no ofrece hoy
-pago con tarjeta ni con otros instrumentos electrónicos (sección 8.1); esta sección recoge el derecho legal y solo se aplica si
-un pago de ese tipo llegara a existir. Causales: fraude,
-operación no solicitada, servicio no recibido, o servicio que no corresponde a lo pedido o es defectuoso. El consumidor presenta
-queja a Kauro por la Plataforma, por correo a [correo de notificaciones] o verbalmente, **dentro de los cinco (5) días hábiles
-siguientes** a: la fecha en que tuvo noticia de la operación fraudulenta o no solicitada; la fecha en que debió recibir el
-servicio (el Paquete, según el plazo de la sección 25.6), si no lo recibió; o la fecha en que lo recibió, si no corresponde a lo
-pedido o es defectuoso. La queja indica las razones, la causal, el valor por el que se pide la reversión y el instrumento al que se
-cargó la operación. Por cualquier medio que se presente, Kauro entrega de inmediato una constancia descargable con la fecha y la
-causal.
+25.7. **Payment reversal.** This applies when the consumer paid by e-commerce with a credit card, debit card or other electronic
+payment instrument and both Kauro and the instrument's issuer are domiciled in Colombia. The Platform does not currently offer
+payment by card or other electronic instruments (section 8.1); this section records the statutory right and applies only if a
+payment of that kind ever comes to exist. Grounds: fraud, unrequested transaction, service not received, or service that does not
+correspond to what was ordered or is defective. The consumer files a complaint with Kauro through the Platform, by email to
+[notice email] or verbally, **within five (5) business days** after: the date the consumer learned of the fraudulent or
+unrequested transaction; the date it should have received the service (the Package, per the time in section 25.6), if it did not
+receive it; or the date it received it, if it does not correspond to what was ordered or is defective. The complaint states the
+reasons, the ground, the amount for which reversal is requested and the instrument to which the transaction was charged. However
+it is filed, Kauro immediately delivers a downloadable acknowledgment with the date and the ground.
 
-Dentro del mismo plazo de cinco (5) días hábiles se notifica al emisor del instrumento de pago, por los canales que el emisor
-disponga. Si el consumidor no es el titular del instrumento (por ejemplo, pagó con la tarjeta de otra persona), **esa
-notificación la debe presentar el titular del producto financiero**; el consumidor sigue presentando su queja a Kauro. La
-notificación al emisor contiene como mínimo: (1) las razones de la solicitud; (2) la causal; (3) el valor; (4) la identificación
-de la transacción con su número, fecha y hora, si es el caso; (5) la cuenta, tarjeta o instrumento al que se cargó; y (6) la
-constancia de la queja presentada a Kauro. Los participantes del proceso de pago deben tener un formulario de solicitud de
-reversión, pero el consumidor puede usar cualquier otro documento que cumpla estos requisitos.
+Within the same five (5) business days the issuer of the payment instrument is notified, through the channels the issuer
+provides. If the consumer is not the holder of the instrument (for example, it paid with another person's card), **that
+notification must be filed by the holder of the financial product**; the consumer still files its complaint with Kauro. The
+notification to the issuer contains at least: (1) the reasons for the request; (2) the ground; (3) the amount; (4) the
+identification of the transaction with its number, date and time, if applicable; (5) the account, card or instrument to which it
+was charged; and (6) the acknowledgment of the complaint filed with Kauro. Participants in the payment process must have a
+reversal request form, but the consumer may use any other document that meets these requirements.
 
-Presentada la solicitud al emisor, los participantes del proceso de pago tienen **quince (15) días hábiles** para hacer efectiva
-la reversión. Si la cuenta de Kauro no tiene fondos suficientes y la reversión es parcial, **Kauro reembolsa directamente al
-consumidor** el valor o el monto faltante. Si Kauro ya había devuelto el precio directamente y la reversión también procede, el
-consumidor devuelve esos recursos a Kauro. Kauro **no vuelve a cobrar ni pide volver a cargar** la transacción mientras la
-reversión no esté resuelta: solo si una autoridad jurisdiccional o administrativa determina, mediante decisión **en firme**, que
-la reversión no era procedente, y una vez notificada esa decisión, el emisor puede cargar definitivamente la transacción al
-consumidor.
+Once the request is filed with the issuer, the participants in the payment process have **fifteen (15) business days** to make the
+reversal effective. If Kauro's account has insufficient funds and the reversal is partial, **Kauro refunds the consumer directly**
+the amount or the missing portion. If Kauro had already returned the price directly and the reversal also proceeds, the consumer
+returns those funds to Kauro. Kauro **does not charge again or ask for the transaction to be charged again** while the reversal is
+unresolved: only if a judicial or administrative authority determines, by a **final** decision, that the reversal was not
+appropriate, and once that decision is notified, may the issuer definitively charge the transaction to the consumer.
 
-25.8. **Peticiones, quejas y reclamos.** La Plataforma ofrece un canal de atención que entrega un número de radicado con la fecha y
-la hora de cada petición, queja o reclamo y permite hacerle seguimiento. Si el consumidor reclama de forma verbal o telefónica,
-Kauro le entrega constancia escrita con la fecha y el objeto del reclamo. Kauro responde cada reclamación directa **dentro de los
-quince (15) días hábiles** siguientes a su recepción, con las pruebas en que se basa. El sitio y la Plataforma muestran un enlace
-visible a la Superintendencia de Industria y Comercio (www.sic.gov.co).
+25.8. **Petitions, complaints and claims.** The Platform offers a service channel that gives a case number with the date and time
+of each petition, complaint or claim and allows it to be tracked. If the consumer claims verbally or by phone, Kauro gives it a
+written acknowledgment with the date and subject of the claim. Kauro answers each direct claim **within fifteen (15) business
+days** after receiving it, with the evidence it relies on. The site and the Platform show a visible link to the Superintendencia
+de Industria y Comercio (www.sic.gov.co).
 
-25.9. **Garantía y remedios.** Si Kauro incumple la prestación del servicio, el consumidor **elige** entre que se le preste el
-servicio en las condiciones contratadas o que se le devuelva el precio pagado; la sección 11 (remedio a elección de Kauro) no se le
-aplica en lo que reduzca esa elección. Ninguna disposición de las secciones 10 y 11 limita los derechos de esta sección ni los
-demás derechos irrenunciables del consumidor.
-<!-- law: C-36, C-37 (Ley 1480 de 2011 arts. 5 num. 3, 7, 11 num. 3, 46, 47 —modificado por la Ley 2439 de 2024—, 50 —literales b, g y h modificados por la Ley 2439 de 2024—, 51 y 58 num. 5 lit. b y c; Decreto 1074 de 2015 arts. 2.2.2.51.1, 2.2.2.51.2, 2.2.2.51.4 a 2.2.2.51.10 y 2.2.2.51.12) · auth: A3 §3.7 (Clientes Internos admitidos); 02 §7 Quote and purchase · CHECKLIST A-05 · resolución S-23 -->
+25.9. **Warranty and remedies.** If Kauro fails to provide the service, the consumer **chooses** between having the service
+provided under the contracted conditions or having the price paid refunded; section 11 (remedy at Kauro's choice) does not
+apply to it to the extent it would reduce that choice. Nothing in sections 10 and 11 limits the rights in this section or the
+consumer's other non-waivable rights.
+<!-- law: C-36, C-37 (Ley 1480 de 2011 arts. 5 num. 3, 7, 11 num. 3, 46, 47 —amended by Ley 2439 de 2024—, 50 —items b, g and h amended by Ley 2439 de 2024—, 51 and 58 num. 5 lit. b and c; Decreto 1074 de 2015 arts. 2.2.2.51.1, 2.2.2.51.2, 2.2.2.51.4 to 2.2.2.51.10 and 2.2.2.51.12) · auth: A3 §3.7 (Internal Customers admitted); 02 §7 Quote and purchase · CHECKLIST A-05 · resolution S-23 -->
 
-## Anexo A. Tarifa de referencia para Clientes que no son consumidores (USD, antes de impuestos)
+## Annex A. Reference rates for Customers that are not consumers (USD, before taxes)
 
-Esta tabla **no es un precio para consumidores**: a un consumidor se le informa el total en pesos colombianos con impuestos
-incluidos (sección 7.7). Aplica solo a los modos que la Plataforma muestre como disponibles al emitir la Cotización. Las bandas superiores a 500.000
-unidades no están disponibles hasta que se acepte el envoltorio mayor.
+This table **is not a consumer price**: a consumer is informed of the total in Colombian pesos with taxes included (section 7.7).
+It applies only to the modes the Platform shows as available when the Quote is issued. Bands above 500,000 units are not
+available until the larger envelope is accepted.
 
-| Unidades facturables | CLEAN | HUBSPOT | SALESFORCE |
+| Billable Units | CLEAN | HUBSPOT | SALESFORCE |
 |---|---:|---:|---:|
-| 1–50.000 | 695 | 1.295 | 1.495 |
-| 50.001–150.000 | 1.095 | 1.995 | 2.295 |
-| 150.001–500.000 | 1.795 | 2.995 | 3.495 |
-| 500.001–1.000.000 | No disponible | No disponible | No disponible |
+| 1–50,000 | 695 | 1,295 | 1,495 |
+| 50,001–150,000 | 1,095 | 1,995 | 2,295 |
+| 150,001–500,000 | 1,795 | 2,995 | 3,495 |
+| 500,001–1,000,000 | Not available | Not available | Not available |
 
-Ejemplo de cálculo: HUBSPOT con 50.000 unidades cuesta USD 1.295; con 50.001 unidades, USD 1.995. Con descuento de recurrencia
-del 5 %, la primera banda queda en USD 1.230,25 antes de impuestos.
+Calculation example: HUBSPOT with 50,000 units costs USD 1,295; with 50,001 units, USD 1,995. With a 5% recurrence discount, the
+first band comes to USD 1,230.25 before taxes.
 <!-- auth: 16 §Price schedule; 16 §Quote calculation; A3 §3.4 -->
