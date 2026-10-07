@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { CreateQuoteView, PurchaseRebinder } from "@kauro/application";
 import { PROVIDER_CALL_TIMEOUT_MS, StaleVersionFailure } from "@kauro/domain";
-import { admitJob, faultCell, queueJob, simulatedCrashOf, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
+import { admitJob, faultCell, queueJob, simulatedCrashOf, type FaultContext, type HarnessConnection, invariantsAfterEach } from "@kauro/persistence/testing";
 import { createPurchaseRebinder } from "../src/index.js";
 import { agentOf, bought, integrationWorld, oracleRows, refundedThrough, replacementPlanOf, type Agent, type IntegrationWorld, type Paid } from "./integration-support.js";
 import { bindCells, contend, open } from "./b10-cells-support.js";
@@ -23,6 +23,8 @@ import { sellingAgency } from "./commission-support.js";
 import { asProblem, call, completed, freshKey, ids, outcome, replayTextOf, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => iw.h.oracle);
 before(async () => {
   iw = await integrationWorld();
   bindCells(iw);

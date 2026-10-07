@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { after, before } from "node:test";
 import type { SellerTerminationView, WebhookAck } from "@kauro/application";
 import type { UserId } from "@kauro/domain";
-import { connectionPid, faultCell, openConnection, recordClaim, recordProspect, recordServiceAssignment, type FaultContext, type HarnessConnection, type RecordedSeller } from "@kauro/persistence/testing";
+import { connectionPid, faultCell, openConnection, recordClaim, recordProspect, recordServiceAssignment, type FaultContext, type HarnessConnection, type RecordedSeller, invariantsAfterEach } from "@kauro/persistence/testing";
 import { deliver } from "./payment-support.js";
 import { agentOf, assignedThrough, claimed, integrationWorld, opportunityOf, oracleRows, orderedThrough, planOf, quoted, seller, terminationBody, type IntegrationWorld } from "./integration-support.js";
 import { bindCells, contend, converting, runConsumer, type Actor } from "./b10-cells-support.js";
@@ -20,6 +20,8 @@ import { candidateSeller } from "./sellers-support.js";
 import { call, completed, freshKey, ids, outcome, type Person, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => iw.h.oracle);
 /** Every harness connection of these cells waits for a lock at most 60 s (lock_timeout): an ordering defect fails its cell, never hangs the file. */
 const bounded = (login: Parameters<IntegrationWorld["h"]["pg"]["clientConfig"]>[0]): Promise<HarnessConnection> => openConnection({ ...iw.h.pg.clientConfig(login), options: "-c lock_timeout=60000" });
 const open = bounded;
