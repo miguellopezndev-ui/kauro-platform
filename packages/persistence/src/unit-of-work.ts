@@ -30,7 +30,7 @@
  * each context to the verified pool of its runtime group (one login per group).
  */
 import { randomBytes } from "node:crypto";
-import type { Id } from "@kauro/contracts";
+import type { Id, UtcInstant } from "@kauro/contracts";
 import {
   DomainFailure,
   actorOf,
@@ -67,6 +67,7 @@ import {
 } from "@kauro/domain";
 import type { PoolClient } from "pg";
 import { serverInstantOf } from "./source/rows.js";
+import { PgBankRoutes } from "./repositories/bank-routes.js";
 import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
 import { PgExecutionDiscovery } from "./execution/discovery.js";
@@ -577,6 +578,18 @@ export function purchasedSubjectsOf(uow: UnitOfWork): PgPurchasedSubjects {
   return uow.purchasedSubjects;
 }
 
+/** The bank-transfer route's tables in a commerce unit of work of this package (lane L-ROUTE). */
+export function bankRoutesOf(uow: UnitOfWork): PgBankRoutes {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the bank routes are read in a commerce unit of work of @kauro/persistence");
+  return uow.bankRoutes;
+}
+
+/** The effect instant of a commerce unit of work of this package (read after its locks). */
+export function effectInstantOf(uow: UnitOfWork): Promise<UtcInstant> {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the effect instant is read in a commerce unit of work of @kauro/persistence");
+  return uow.effectInstant();
+}
+
 /** The periodic pass's queries of a commerce unit of work of this package (D-PROTO-B4; stage-2 mandate M3). */
 export function paymentSweepsOf(uow: UnitOfWork): PgPaymentSweeps {
   if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the payment sweeps read a commerce unit of work of @kauro/persistence");
@@ -606,6 +619,8 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   readonly paymentSweeps: PgPaymentSweeps;
   /** The request side's reads (implementation mandate M4, D-REQ-B2): shared halves, order, capture and policy queries. */
   readonly requestReads: PgCommerceRequestReads;
+  /** The bank-transfer route's tables (migration 0046, lane L-ROUTE), read through bankRoutesOf(uow). */
+  readonly bankRoutes: PgBankRoutes;
   #scopeAgencyId: AgencyId | null = null;
   #financeAgencyId: AgencyId | null = null;
   #causation: CausationId | null = null;
@@ -619,6 +634,18 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
     this.purchasedSubjects = new PgPurchasedSubjects(client);
     this.paymentSweeps = new PgPaymentSweeps(client);
     this.requestReads = new PgCommerceRequestReads(client);
+    this.bankRoutes = new PgBankRoutes(client);
+  }
+
+  /**
+   * The effect instant of this unit of work (kauro.effect_now(): the server's instant of this statement, read AFTER the locks the caller
+   * took, so a deadline that passed while it waited counts; ACH-ROUTE §7.24 I2Δ, R2/I1/I2/I3 EXPIRY cells).
+   */
+  async effectInstant(): Promise<UtcInstant> {
+    const r = await execute<{ at: string }>(this.client, "SELECT to_char(kauro.effect_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS at");
+    const at = r.rows[0]?.at;
+    if (at === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the server answered no effect instant");
+    return at as UtcInstant;
   }
 
   protected override onJournalEntry(entryId: JournalEntryId): void {

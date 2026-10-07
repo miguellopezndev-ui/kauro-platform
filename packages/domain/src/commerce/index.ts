@@ -140,3 +140,18 @@ export {
 
 export type { ServiceRole, ServiceIdentity } from "./principals.js";
 export { SERVICE_ROLE_TABLE, serviceHoldsRole, CORPORATE_ROLES, isCorporateCommandRole, COMMERCE_POLICY_VERSION } from "./principals.js";
+
+export type { BankRouteState, BankRouteRollout, BankRouteEventType, TransferWindow, BankRouteDetails, BankRouteRecord, BankRouteVersionRecord, BankTransferInstructionRecord } from "./bank-route.js";
+export {
+  BANK_ROUTE_STATES,
+  BANK_ROUTE_ROLLOUTS,
+  BANK_TRANSFER_ROUTE_KIND,
+  BANK_ROUTE_AGGREGATE_KINDS,
+  BANK_ROUTE_EVENT_TYPES,
+  BANK_ROUTE_EVENT_PAYLOAD_ALLOWLIST,
+  BANK_ROUTE_EVENT_SUBSCRIPTIONS,
+  TRANSFER_REFERENCE_PATTERN,
+  transferReferenceOf,
+  isTransferReference,
+  transferWindowOf,
+} from "./bank-route.js";
