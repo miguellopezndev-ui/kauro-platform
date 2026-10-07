@@ -445,6 +445,16 @@ a payment order (CMD043-RACE: B09's CreatePaymentOrder takes the agency's shared
 CloseAgency the row FOR NO KEY UPDATE and at once the exclusive half; a refund (CMD031) takes no agency shared half and is ordered after the closure, KC006 guarding CLOSED), an activation or a closure against a reader of the agency in both
 lock orders (CMD002-RACE, CMD043-RACE lock-order cells).
 
+**Exception: the tail entry takes the agency recurrence after the corporate locks (lane 6c, migration 0045, adversary ADV-6).** KC011
+(`termination_tail_entries_enumerated`) takes the shared half of `kauro.agency_recurrence` for the listed claim's agency when CMD050
+inserts the tail entry, so after the seller, agency-commission and claim locks the termination already holds, against the order above
+(agency recurrence before prospect and claim). The order is inverted only toward holders that cannot close a cycle: the exclusive half is
+taken only by the first-purchase designation (the reconciler), a refund's completion and a capture's reversal (0028), and none of their
+transactions takes a seller, agency-commission or claim lock; every other taker (CreateQuote, KC011) takes the shared half, which never
+blocks another shared half. A termination therefore waits for at most one such writer, which never waits for it. The windows KC011 and
+CMD047 judge are compared at `kauro.effect_now()` after those waits and again at COMMIT (0045, D10-GAP-11), and the two cells that prove
+it let real time pass during an observed wait (a sleep moves no interleaving there: the wait is observed in `pg_stat_activity` first).
+
 ## 11. Ports, fakes and implementers
 
 | port (package) | purpose | real implementer | shipped binding until then (D10-BIND-1) | test double |
