@@ -336,6 +336,21 @@ export class PgAttributionRepository implements AttributionRepository {
     return r.rows.map(claimRecord);
   }
 
+  /**
+   * Whether the claim is due to lapse now, by lapsedClaims's own comparison on the database clock: a SUBMITTED or DISPUTED claim at its
+   * review deadline, an ACCEPTED one at its termination tail's end or else its acceptance window's. The CLAIM_WINDOWS pass asks it again
+   * after the claim's lock, so a claim accepted while the pass waited (its window now running) is settled, never lapsed.
+   */
+  async claimLapsed(claimId: AttributionClaimId): Promise<boolean> {
+    const r = await execute<{ due: boolean }>(
+      this.db,
+      `SELECT (CASE WHEN c.state = 'ACCEPTED' THEN coalesce((SELECT max(t.ends_at) FROM kauro.termination_tail_entries t WHERE t.claim_id = c.claim_id), c.expires_at) ELSE c.review_deadline_at END) <= kauro.server_now() AS due
+         FROM kauro.attribution_claims c WHERE c.claim_id = $1 AND c.state IN ${LIVE}`,
+      [claimId],
+    );
+    return r.rows[0]?.due === true;
+  }
+
   // allocations (D10-ATTR-1) -------------------------------------------------------------------------------------------------------
 
   async getAllocation(allocationId: AttributionAllocationId): Promise<AttributionAllocationRecord | null> {

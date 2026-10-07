@@ -501,6 +501,8 @@ export interface AttributionRepository {
   transitionClaim(claimId: AttributionClaimId, expectedVersion: number, change: ClaimChange, now: UtcInstant): Promise<VersionedWrite<AttributionClaimRecord>>;
   /** The CLAIM_WINDOWS sweep's work: live claims past their review deadline, acceptance window or tail. */
   lapsedClaims(now: UtcInstant, limit: number): Promise<ReadonlyArray<AttributionClaimRecord>>;
+  /** Whether the claim is due to lapse now (lapsedClaims's comparison on the database clock), asked again after its lock by CLAIM_WINDOWS. */
+  claimLapsed(claimId: AttributionClaimId): Promise<boolean>;
 
   getAllocation(allocationId: AttributionAllocationId): Promise<AttributionAllocationRecord | null>;
   /** The agency's frozen allocation (one per agency; ATTRIBUTION_EXISTS), or null. */
