@@ -8,9 +8,9 @@
 // reader (LINEAGE_MISSING), swapped in on the payment service's own re-binder for the cell only. PostgreSQL 17 through the runtime login roles;
 // the superuser only reads. Nothing sleeps, except the bounded real-time wait of a timeout cell for an answer that must come.
 import assert from "node:assert/strict";
-import { after, before } from "node:test";
+import { after, before, test } from "node:test";
 import type { CreateQuoteView, PurchaseRebinder } from "@kauro/application";
-import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
+import { DomainFailure, PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
 import { admitJob, faultCell, queueJob, simulatedCrashOf, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { createPurchaseRebinder } from "../src/index.js";
 import { agentOf, bought, integrationWorld, oracleRows, refundedThrough, replacementPlanOf, type Agent, type IntegrationWorld, type Paid } from "./integration-support.js";
@@ -877,6 +877,86 @@ const moneyRows = async (): Promise<Record<string, unknown>> =>
               (SELECT count(*) FROM kauro.purchase_rebindings)::int AS rebindings`,
     )
   )[0]!;
+
+faultCell(
+  {
+    id: "REPL_REVOKE",
+    step: "CMD027 included-replacement protocol / REVOCATION: an ordinary CreateQuote over a re-bound replacement whose entitlement a full refund revoked",
+    fault: "revocation",
+    expect:
+      "RACE (replacement): after the re-binding, a full service refund of the purchase approved and not yet executed leaves the re-bound entitlement ACTIVE (B09 design CommercialAuthorization: authority_revoked on a full service refund, at its completion; 0016 quotes_release_guard reads COMPLETED refunds), so CreateQuote of the project is the replacement protocol's 409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT with nothing written; once the refund completed (the entitlement REVOKED) it issues 201 superseding the replacement exactly once; no capture, refund, ledger, entitlement or re-binding row changes in either phase and the allowance stays spent",
+  },
+  async (ctx) => {
+    const x = await fixture("repl-refund-supersede");
+    const rebound = view(await quoteCall(x.a, x.plan, freshKey("repl-refund-rebind")));
+    assert.equal(rebound.replacement?.outcome, "REBOUND");
+    const replacementId = rebound.quote.quoteId;
+    const p = x.paid.purchase;
+    // a full service refund of the purchase, approved and not executed
+    const requested = completed<{ refund: { refundId: string } }>(
+      await call(iw.w, { url: paymentRoutes.requestRefund(p.projectId), token: x.a.billing.token, agency: x.a.s.agency.agencyId, key: freshKey("repl-refund-request"), body: { reasonCode: "The client cancelled before execution", evidenceRef: ids.next() } }),
+      201,
+    );
+    const refundId = requested.data.refund.refundId;
+    const approved = await call(iw.w, {
+      url: paymentRoutes.approveRefund(refundId),
+      token: iw.owner.token,
+      agency: null,
+      key: freshKey("repl-refund-approve"),
+      body: { expectedVersion: 1, serviceCents: x.paid.quote.quote.serviceCents, taxCents: "0", authorizationRef: await iw.w.stepUp(iw.owner) },
+    });
+    assert.equal(approved.status, 200, approved.text);
+    const live = (await oracleRows<{ authorization_id: string; state: string }>(iw, "SELECT authorization_id, state FROM kauro.commercial_authorizations WHERE quote_id = $1", [replacementId]))[0]!;
+    assert.equal(live.state, "ACTIVE", "an approved refund not yet executed leaves the re-bound entitlement ACTIVE (B09 CommercialAuthorization: revoked at the full refund's completion)");
+    // (a) the refund not executed: the paid purchase stands and its one included replacement is spent
+    const before = await moneyRows();
+    const refusedKey = freshKey("repl-refund-before");
+    const refused = await ctx.operation("an ordinary CreateQuote before the refund executes", () => quoteCall(x.a, x.plan, refusedKey));
+    assert.equal(outcome(iw.w, refused), "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT", `the paid purchase stands: ${refused.status >= 400 ? "" : refused.text}`);
+    assert.equal((await iw.w.journal(refusedKey))?.state ?? null, null, "nothing journaled");
+    assert.deepEqual((await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE quote_id = $1", [replacementId])).map((r) => r.state), ["ACCEPTED_FOR_CHECKOUT"]);
+    assert.deepEqual(await stateOf(x, refusedKey).then((s) => s.replacements), ["ACCEPTED_FOR_CHECKOUT"], "no quote written");
+    assert.deepEqual(await moneyRows(), before, "no money or entitlement row changed");
+    // (b) the refund completed: the ordinary issuance supersedes the refunded replacement, money untouched, the allowance still spent
+    const executed = await execute(iw.pw, refundId, { expectedVersion: 2 });
+    assert.equal(executed.status, 200, executed.text);
+    assert.equal(await authorizationState(live.authorization_id), "REVOKED", "the completed full refund revoked the re-bound entitlement");
+    const afterRefund = await moneyRows();
+    const issuedKey = freshKey("repl-refund-after");
+    const issued = view(await ctx.operation("an ordinary CreateQuote after the refund completed", () => quoteCall(x.a, x.plan, issuedKey)));
+    assert.equal(issued.supersededQuoteId, replacementId, "the refunded replacement is superseded");
+    assert.equal(issued.replacement, undefined, "an ordinary quote, not a replacement");
+    assert.deepEqual(await moneyRows(), afterRefund, "no capture, refund, ledger, entitlement or re-binding row changed");
+    const s = await stateOf(x, issuedKey);
+    assert.deepEqual(s.rebindings, [[p.quoteId, replacementId, 1]], "the allowance stays spent: one re-binding, ordinal 1");
+    assert.deepEqual(s.replacements, ["SUPERSEDED"]);
+    assert.equal(s.journal, "COMMITTED");
+    const issuances = await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.quote_issuances WHERE quote_id = $1", [issued.quote.quoteId]);
+    assert.equal(issuances[0]!.n, 1, "one issuance of the new quote");
+    assert.equal(view(await quoteCall(x.a, x.plan, issuedKey)).quote.quoteId, issued.quote.quoteId, "the same key replays its one quote: superseded exactly once");
+  },
+);
+
+
+test("ADV-9: a STALE_VERSION of the payment service's re-binder is answered as itself, never relabelled as the project's live quote changing with the project's quote as current (D10-GAP-25: CreateQuote adds current only to LiveQuoteChangedFailure)", async () => {
+  const x = await fixture("repl-rebinder-stale");
+  const key = freshKey("repl-rebinder-stale");
+  const seen = iw.w.internalErrors.length;
+  // the re-binder's own refusal, a stale write it cannot name (no current): the defect is its own and must reach the response check as itself
+  const reply = await withRebinder(async () => {
+    throw new DomainFailure("STALE_VERSION", "the re-binder's own write found another version");
+  }, () => quoteCall(x.a, x.plan, key));
+  assert.equal(outcome(iw.w, reply), "422 INTEGRITY_FAILURE RESPONSE_CONTRACT_VIOLATION", "the re-binder's STALE_VERSION is not dressed as the project's live quote with its current");
+  const violations = iw.w.internalErrors.slice(seen).map((e) => (e.error instanceof Error ? e.error.message : String(e.error)));
+  assert.ok(violations.some((m) => m.includes("STALE_VERSION") && m.includes("lacks current")), `the response check names the re-binder's own STALE_VERSION: ${violations.join(" | ")}`);
+  const s = await stateOf(x, key);
+  untouched(x, s);
+  assert.deepEqual([s.replacements, s.journal], [["ISSUED"], "RESERVED"], "the intent stays open, nothing re-bound");
+  // the same key then re-binds once with the real re-binder
+  const resumed = view(await quoteCall(x.a, x.plan, key));
+  assert.equal(resumed.replacement?.outcome, "REBOUND");
+  reboundOnce(x, await stateOf(x, key), resumed.quote.quoteId);
+});
 
 faultCell(
   {
