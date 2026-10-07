@@ -430,7 +430,7 @@ faultCell(
       "RACE (lock order): F holds the project's first-issuance lock (it waited behind the first issuance D and read D's quote X live) and R holds X's row lock after reading X live and finding it expired by the QUOTE_EXPIRY pass. Both orders are forced: F's request for X's row first (observed waiting on R), and R's next lock first (before F asks for X): R never waits on the first-issuance lock while holding a row, so no 40P01 and no 503; R answers the retryable 409 STALE_VERSION with the project's quote as current and writes nothing, F issues once (201), and R's retry supersedes it once. With no first-issuance holder, R takes that lock after X's row and issues 201",
   },
   async (ctx) => {
-    for (const order of ["R's next lock first"] as const) { // RED run: this sub-case only
+    for (const order of (["R's next lock first"] as ReadonlyArray<"F's row request first" | "R's next lock first">)) { // RED run: this sub-case only
       assert.ok((await freeSlots()) >= 1, "a founding slot is free for the cell");
       const tag = order === "F's row request first" ? "f" : "r";
       const { a, plan } = await fresh(`first-order-${tag}`);
