@@ -277,9 +277,9 @@ export class PgAttributionRepository implements AttributionRepository {
     return r.rows[0]?.ok === true;
   }
 
-  /** The review deadline judged by the database (kauro.server_now(), D10-CLOCK-1) with the lapse's comparison: the deadline instant itself is past. */
+  /** The review deadline judged by the database at the instant of this statement (kauro.effect_now(), after every wait before it; D10-GAP-11, ADV-1) with the lapse's comparison: the deadline instant itself is past. */
   async reviewDeadlineReached(claimId: AttributionClaimId): Promise<boolean> {
-    const r = await execute<{ reached: boolean }>(this.db, "SELECT review_deadline_at <= kauro.server_now() AS reached FROM kauro.attribution_claims WHERE claim_id = $1", [claimId]);
+    const r = await execute<{ reached: boolean }>(this.db, "SELECT review_deadline_at <= kauro.effect_now() AS reached FROM kauro.attribution_claims WHERE claim_id = $1", [claimId]);
     return r.rows[0]?.reached === true;
   }
 
@@ -344,7 +344,7 @@ export class PgAttributionRepository implements AttributionRepository {
   async claimLapsed(claimId: AttributionClaimId): Promise<boolean> {
     const r = await execute<{ due: boolean }>(
       this.db,
-      `SELECT (CASE WHEN c.state = 'ACCEPTED' THEN coalesce((SELECT max(t.ends_at) FROM kauro.termination_tail_entries t WHERE t.claim_id = c.claim_id), c.expires_at) ELSE c.review_deadline_at END) <= kauro.server_now() AS due
+      `SELECT (CASE WHEN c.state = 'ACCEPTED' THEN coalesce((SELECT max(t.ends_at) FROM kauro.termination_tail_entries t WHERE t.claim_id = c.claim_id), c.expires_at) ELSE c.review_deadline_at END) <= kauro.effect_now() AS due
          FROM kauro.attribution_claims c WHERE c.claim_id = $1 AND c.state IN ${LIVE}`,
       [claimId],
     );

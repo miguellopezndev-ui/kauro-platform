@@ -3,6 +3,8 @@
 -- Each part closes one RED cell of docs/design/B10-matrix-status/6c.md with a lock the racing command already takes (design §10, D10-TX-1):
 --   * TAIL_PURCHASE_RACE: a termination's tail entry (KC011) reads the agency's purchases under the shared half of the agency's recurrence
 --     lock, whose exclusive half the first-purchase designation takes (0028): the two serialize in both orders.
+--   * ADV-1: an acceptance and a tail entry are judged at COMMIT against kauro.effect_now() (as 0040): a claim accepted past its review
+--     deadline (KC021 CLAIM_EXPIRED) or a tail entry whose claim's window ended before the COMMIT (KC011) commits nothing.
 -- Idempotent.
 
 -- --- TAIL_PURCHASE_RACE: KC011 under the agency's recurrence lock ---------------------------------------------------------------------
@@ -11,7 +13,10 @@ CREATE OR REPLACE FUNCTION kauro.termination_tail_entries_enumerated() RETURNS t
 $$
 BEGIN
   -- the reader's half of the agency's recurrence lock (as CreateQuote, D10-REC-2): a designation in flight commits first and its purchase
-  -- is seen below; a designation arriving later waits for this termination's COMMIT
+  -- is seen below; a designation arriving later waits for this termination's COMMIT. Lock order (ADV-6, design §10): taken after the
+  -- seller, agency-commission and claim locks of CMD050, against §10's agency-recurrence-before-claim order; no cycle, since the holders of
+  -- the exclusive half (the designation, a refund's completion, a capture's reversal: 0028) take no seller, commission-subject or claim lock
+  -- in their transactions, and every other taker (CreateQuote, this trigger) takes only the shared half.
   PERFORM kauro.await_transition('kauro.agency_recurrence', NEW.agency_id::text);
   IF NOT EXISTS (
        SELECT 1 FROM kauro.seller_terminations t JOIN kauro.termination_manifests m ON m.manifest_id = t.manifest_id
@@ -20,6 +25,9 @@ BEGIN
      OR NOT EXISTS (
        SELECT 1 FROM kauro.attribution_claims c
         WHERE c.claim_id = NEW.claim_id AND c.seller_id = NEW.seller_id AND c.agency_id = NEW.agency_id AND c.state = 'ACCEPTED' AND c.expires_at > NEW.effective_at
+          -- the claim's window judged at this statement's instant too, after the wait above (kauro.effect_now(); ADV-1, D10-GAP-11): a window
+          -- that ended while this termination waited enumerates nothing
+          AND c.expires_at > kauro.effect_now()
      )
      OR EXISTS (SELECT 1 FROM kauro.qualifying_purchases q WHERE q.agency_id = NEW.agency_id) THEN
     RAISE EXCEPTION 'TAIL_NOT_ENUMERATED: claim % is no enumerated, accepted and unexpired opportunity of an agency without a purchase', NEW.claim_id USING ERRCODE = 'KC011';
@@ -43,15 +51,15 @@ CREATE TRIGGER identities_assurance_transition_lock BEFORE UPDATE OF email_verif
 -- --- AGREEMENT_EXP, CORP_REV: the seller's agreement changes under the seller's transition lock ------------------------------------------
 -- 0029 takes the writer's half of kauro.sellers on a state change only. The agreement a seller acts under is read under the seller's reader
 -- half by every command resting on it (the seller's authorizer for ClaimProspect, D10-CTX-1) and under the writer's half by ActivateSeller
--- (lockSeller): a new version put in force (sellers.agreement_id) and the owner's withdrawal or re-dating of an agreement
--- (seller_agreements.starts_at/ends_at) take the same writer's half, so a claim or an activation and the agreement change commit one after
+-- (lockSeller): a new version put in force (sellers.agreement_id) and the owner's withdrawal of an agreement (seller_agreements.ends_at;
+-- starts_at never changes, seller_agreements_immutable) take the same writer's half, so a claim or an activation and the agreement change commit one after
 -- the other in both orders, never across each other.
 DROP TRIGGER IF EXISTS sellers_agreement_transition_lock ON kauro.sellers;
 CREATE TRIGGER sellers_agreement_transition_lock BEFORE UPDATE OF agreement_id ON kauro.sellers
   FOR EACH ROW WHEN (OLD.agreement_id IS DISTINCT FROM NEW.agreement_id) EXECUTE FUNCTION kauro.take_transition_lock('kauro.sellers', 'seller_id');
 DROP TRIGGER IF EXISTS seller_agreements_transition_lock ON kauro.seller_agreements;
-CREATE TRIGGER seller_agreements_transition_lock BEFORE UPDATE OF starts_at, ends_at ON kauro.seller_agreements
-  FOR EACH ROW WHEN (OLD.starts_at IS DISTINCT FROM NEW.starts_at OR OLD.ends_at IS DISTINCT FROM NEW.ends_at)
+CREATE TRIGGER seller_agreements_transition_lock BEFORE UPDATE OF ends_at ON kauro.seller_agreements
+  FOR EACH ROW WHEN (OLD.ends_at IS DISTINCT FROM NEW.ends_at)
   EXECUTE FUNCTION kauro.take_transition_lock('kauro.sellers', 'seller_id');
 
 -- --- CMD_EXP_ASSURE: the activation's step-up judged again at COMMIT (as 0040 for payouts) --------------------------------------------
@@ -84,3 +92,40 @@ $$;
 DROP TRIGGER IF EXISTS sellers_activation_step_up_at_commit ON kauro.sellers;
 CREATE CONSTRAINT TRIGGER sellers_activation_step_up_at_commit AFTER UPDATE OF state ON kauro.sellers
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.state = 'ACTIVE' AND OLD.state = 'CANDIDATE') EXECUTE FUNCTION kauro.seller_activation_step_up_at_commit();
+
+-- --- ADV-1: the claim windows judged again at COMMIT (as 0040; D10-GAP-11, D10-GAP-14) ------------------------------------------------
+-- CMD047 and KC011 judge the windows at the instant of their statements (kauro.effect_now(), after their waits); a deadline can still pass
+-- between that statement and the COMMIT. Two constraint triggers, INITIALLY DEFERRED, judge them once more when the transaction commits:
+-- a claim that became ACCEPTED in it needs its review deadline still ahead (KC021, PRECONDITION_FAILED CLAIM_EXPIRED), a tail entry born in
+-- it needs its claim's acceptance window still running (KC011, TAIL_NOT_ENUMERATED). Nothing of the transaction commits otherwise.
+CREATE OR REPLACE FUNCTION kauro.attribution_claims_accepted_in_window() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM kauro.attribution_claims c
+     WHERE c.claim_id = NEW.claim_id AND c.state = 'ACCEPTED' AND c.accepted_at = NEW.accepted_at AND c.review_deadline_at <= kauro.effect_now()
+  ) THEN
+    RAISE EXCEPTION 'CLAIM_EXPIRED: claim % was accepted past its review deadline', NEW.claim_id USING ERRCODE = 'KC021';
+  END IF;
+  RETURN NULL;
+END
+$$;
+DROP TRIGGER IF EXISTS attribution_claims_accepted_in_window ON kauro.attribution_claims;
+CREATE CONSTRAINT TRIGGER attribution_claims_accepted_in_window AFTER UPDATE OF state ON kauro.attribution_claims
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.state = 'ACCEPTED' AND OLD.state IN ('SUBMITTED', 'DISPUTED'))
+  EXECUTE FUNCTION kauro.attribution_claims_accepted_in_window();
+
+CREATE OR REPLACE FUNCTION kauro.termination_tail_entries_in_window() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM kauro.attribution_claims c WHERE c.claim_id = NEW.claim_id AND c.expires_at > kauro.effect_now()) THEN
+    RAISE EXCEPTION 'TAIL_NOT_ENUMERATED: the window of claim % ended before the termination committed', NEW.claim_id USING ERRCODE = 'KC011';
+  END IF;
+  RETURN NULL;
+END
+$$;
+DROP TRIGGER IF EXISTS termination_tail_entries_in_window ON kauro.termination_tail_entries;
+CREATE CONSTRAINT TRIGGER termination_tail_entries_in_window AFTER INSERT ON kauro.termination_tail_entries
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.termination_tail_entries_in_window();

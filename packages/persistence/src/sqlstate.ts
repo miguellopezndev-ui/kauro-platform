@@ -68,6 +68,8 @@ export const SQLSTATE = Object.freeze({
   PAYABLE_OWNER: "KC019",
   // package B10 (migration 0040, B10G-R7 r2): a payout's step-up expired before its COMMIT
   STEP_UP_EXPIRED: "KC020",
+  // package B10 (migration 0045, lane 6c ADV-1): a claim accepted past its review deadline, judged at COMMIT
+  CLAIM_ACCEPTED_PAST_DEADLINE: "KC021",
   // package B10 (migration 0028): the agency closure residuals the lifecycle adapter surfaces (docs/design/B10-commercial-domain.md §12)
   CLOSURE_RESIDUALS_OPEN: "KC006",
   // package B08 (migrations 0021..0023; docs/design/B08-audit-approval-jobs.md §9, D8-SQL-1): the fence of an attempt or a step, the
@@ -151,6 +153,8 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KC019: { code: "INTEGRITY_FAILURE" },
   // a payout whose step-up expired between its writes and its COMMIT (0040, D10-GAP-14): the approval's own outcome for a stale proof
   KC020: { code: "ASSURANCE_REQUIRED", reason: "STEP_UP_STALE" },
+  // an acceptance whose claim's review deadline passed before its COMMIT (0045): CMD047's own outcome for a lapsed claim
+  KC021: { code: "PRECONDITION_FAILED", reason: "CLAIM_EXPIRED" },
   // CLOSING -> CLOSED while a payment, refund, authorization, tax document or reconciliation case of the agency is open (D10-AGY-4)
   KC006: { code: "PRECONDITION_FAILED", reason: "CLOSURE_RESIDUALS_OPEN" },
   // package B08 (D8-SQL-1): the control plane treats a lost fence as "the attempt or step lost" (DONE); a lost authority refuses the

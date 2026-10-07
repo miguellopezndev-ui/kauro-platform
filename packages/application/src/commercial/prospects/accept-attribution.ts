@@ -65,8 +65,8 @@ export function acceptAttributionHandler(runtime: CommerceRequestRuntime, co: Pr
           const claim = await attribution.lockClaim(claimId);
           if (claim === null) throw new NotFoundFailure("claim");
           checkExpectedVersion(claim, body.expectedVersion);
-          // the review deadline on the database clock, after the claim lock (the CLAIM_WINDOWS lapse's comparison): a claim under review
-          // or lapsed past it is CLAIM_EXPIRED whether or not the sweep has run yet
+          // the review deadline at the database's instant of this statement (kauro.effect_now(), so after the agency and claim locks this unit waited on;
+          // the CLAIM_WINDOWS lapse's comparison): a claim under review or lapsed past it is CLAIM_EXPIRED whether or not the sweep has run yet
           await refuseLapsed(claim, true);
           if (!REVIEWABLE.has(claim.state)) {
             throw new DomainFailure("PRECONDITION_FAILED", "the claim is not under review", { reason: "CLAIM_NOT_REVIEWABLE", currentVersion: claim.version, currentState: claim.state });
@@ -101,6 +101,9 @@ export function acceptAttributionHandler(runtime: CommerceRequestRuntime, co: Pr
             }
             beneficiaries.set(shareClaim.claimId, shareClaim);
           }
+          // judged again after the last lock taken before the writes (the share claims): a deadline crossed while this unit waited refuses it;
+          // the database judges every acceptance once more at COMMIT (0045 attribution_claims_accepted_in_window, KC021)
+          await refuseLapsed(claim, true);
           const competing = (await attribution.claimsOfProspect(claim.prospectId)).filter((c) => !beneficiaries.has(c.claimId) && REVIEWABLE.has(c.state));
           await attribution.freezeAllocation(allocation.allocationId, now);
           let accepted: AttributionClaimRecord = claim;

@@ -479,7 +479,7 @@ export interface AttributionRepository {
   /** The claim FOR UPDATE, after its prospect's claims lock (CMD047, CMD050). */
   lockClaim(claimId: AttributionClaimId): Promise<AttributionClaimRecord | null>;
   /**
-   * Whether the claim's review deadline is reached on the database clock (review_deadline_at <= kauro.server_now(), the CLAIM_WINDOWS
+   * Whether the claim's review deadline is reached on the database clock (review_deadline_at <= kauro.effect_now() after every wait before it, the CLAIM_WINDOWS
    * lapse's own comparison at its microsecond grain): CMD047 refuses such a claim CLAIM_EXPIRED whether or not the sweep lapsed it.
    */
   reviewDeadlineReached(claimId: AttributionClaimId): Promise<boolean>;
