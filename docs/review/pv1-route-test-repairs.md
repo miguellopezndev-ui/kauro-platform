@@ -29,3 +29,13 @@ Local Windows run on 86de0c7 plus this patch: 42/45 pass. bank-route-migrations:
 - Proposed expectation: `404 NOT_FOUND NOT_A_MEMBER` (B06 R8: a former member gets no existence oracle).
 - Probe on a temporary dist copy, since restored: with that code, all 3 cells pass, including every later withdrawal (route participant, enabled state, plan approval, details replaced, details artifact).
 - Not changed here, because the change is an expectation.
+
+## Coordinator ruling R-1 (EXPECTATION CHANGE): revoked billing membership answers 404 NOT_FOUND NOT_A_MEMBER
+
+- **Ruling.** In I1/I2/I3-REVOCATION, the billing-membership withdrawal now expects `404 NOT_FOUND NOT_A_MEMBER` instead of `403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE`.
+- **This is an expectation change, not a harness repair.** It is listed for Codex.
+- **Reason.** This is the accepted B06 behaviour for a revoked membership: a revoked member gets no existence signal. The route cells follow the accepted package.
+  - apps/api/test/pipeline-authorization.test.ts:220 (`assert.equal(outcome(w, revoked), "404 NOT_FOUND NOT_A_MEMBER")`)
+  - apps/api/test/pipeline-authorization.test.ts:286 (`r9-revoked-first`, expected `404 NOT_FOUND NOT_A_MEMBER`)
+  - apps/api/test/cmd044-create-support-case.test.ts:218 ("a revoked membership" -> `404 NOT_FOUND NOT_A_MEMBER`)
+- **Unchanged.** Every other withdrawal in these cells keeps its expected code, as do the NOTHING_ISSUED footprints, the next-read refusal and the no-account-digits checks.

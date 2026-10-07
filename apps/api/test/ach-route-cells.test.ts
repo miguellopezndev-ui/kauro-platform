@@ -806,7 +806,7 @@ cell(`RACE ACH-M-I1-RETRY (retry): ${I1}`, "retry", async (ctx) => {
 cell(`DENY ACH-M-I1-REVOCATION (revocation): ${I1}`, "revocation", async (ctx) => {
   // each binding prerequisite withdrawn while the readiness read waits on the project lock
   const withdrawals: ReadonlyArray<readonly [string, (b: { a: Agent }, r: RouteView, holder: HarnessConnection) => Promise<unknown>, string]> = [
-    ["billing membership", async (b, _r, holder) => revokeBilling(holder, b.a), "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
+    ["billing membership", async (b, _r, holder) => revokeBilling(holder, b.a), "404 NOT_FOUND NOT_A_MEMBER"],
     ["route participant", async (_b, r, holder) => holder.query("DELETE FROM kauro.bank_route_participants WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
     ["route enabled state", async (_b, r, holder) => holder.query("UPDATE kauro.bank_routes SET state = 'VERIFIED' WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
     ["plan approval", async (b) => withdrawPlan(b as Buyer), "409 PRECONDITION_FAILED PLAN_WITHDRAWN"],
@@ -992,7 +992,7 @@ cell(`RACE ACH-M-I2-RETRY (retry): ${I2}`, "retry", async (ctx) => {
 cell(`DENY ACH-M-I2-REVOCATION (revocation): ${I2}`, "revocation", async (ctx) => {
   // each issuance prerequisite revoked while Kinstructions waits at the route lock; a replaced route version re-reads its window (I2Δ)
   const revocations: ReadonlyArray<readonly [string, (b: { a: Agent }, r: RouteView, holder: HarnessConnection) => Promise<unknown>, string]> = [
-    ["billing membership", async (b, _r, holder) => revokeBilling(holder, b.a), "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
+    ["billing membership", async (b, _r, holder) => revokeBilling(holder, b.a), "404 NOT_FOUND NOT_A_MEMBER"],
     ["route details replaced", async (_b, r, holder) => holder.query("UPDATE kauro.bank_routes SET state = 'PENDING_VERIFICATION', current_version = current_version + 1 WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
     ["route participant", async (_b, r, holder) => holder.query("DELETE FROM kauro.bank_route_participants WHERE route_id = $1", [r.routeId]), "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
   ];
@@ -1225,7 +1225,7 @@ cell(`DENY ACH-M-I3-REVOCATION (revocation): ${I3}`, "revocation", async (ctx) =
   }
   const bearer = (x: Issued, withdraw: () => Promise<unknown>): Reader => ({ read: () => readInstructions(x.b, x.orderId), withdraw });
   const withdrawals: ReadonlyArray<readonly [string, (x: Issued) => Promise<Reader>, (r: Reply) => boolean]> = [
-    ["membership", async (x) => bearer(x, () => bw.iw.w.asTenant(x.b.a.s.agency, (c) => revokeBilling(c, x.b.a))), (r) => code(r) === "403 NOT_AUTHORIZED MEMBERSHIP_NOT_ACTIVE"],
+    ["membership", async (x) => bearer(x, () => bw.iw.w.asTenant(x.b.a.s.agency, (c) => revokeBilling(c, x.b.a))), (r) => code(r) === "404 NOT_FOUND NOT_A_MEMBER"],
     ["route enabled", async (x) => bearer(x, () => bw.iw.h.oracle.query("UPDATE kauro.bank_routes SET state = 'VERIFIED' WHERE route_id = $1", [x.r.routeId])), (r) => code(r) === "409 PRECONDITION_FAILED ROUTE_NOT_ENABLED"],
     ["details artifact", async (x) => bearer(x, async () => bw.evidence.corrupt(await detailsRefOf(x.r.routeId), new TextEncoder().encode("{}"))), (r) => code(r) === "422 INTEGRITY_FAILURE HASH_MISMATCH"],
   ];
