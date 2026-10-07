@@ -44,14 +44,22 @@ Tests: `packages/persistence/test/bank-route-migrations.test.ts` covers the paym
 
 Kroute (enable, disable) takes the route row FOR UPDATE before the owner's access decision.
 
-Kinstructions takes locks in this order:
-1. the quote row FOR UPDATE;
-2. the route row FOR SHARE;
-3. the access decision.
+Kinstructions takes locks in the B09 order of the provider CMD028 (D-ACH-04 "locks checkout facts in B09 order"; r1 fix, ADV-PV1R-1):
+1. the access decision (identity and membership shared halves, held to COMMIT);
+2. the journal;
+3. the project row FOR NO KEY UPDATE (one issuance of a project at a time; before the subject halves, as every project writer takes it:
+   CreateRevision locks the project, then the agency, then the revision);
+4. the purchased subject's shared halves (agency, capability, approval, source revision, target contract);
+5. the route row FOR SHARE;
+6. the quote row FOR UPDATE, last.
 
-The RACE and REVOCATION cells already cover this order: ACH-M-R2-REVOCATION, ACH-M-I1-REVOCATION and ACH-M-I2-REVOCATION.
+CMD043 close-agency takes the agency's exclusive half and then the quote: an issuance waits at the agency half holding no quote, so no cycle.
+Covered by `ADV-PV1R-1 RACE ACH-M-I1-RACE (lock order, CMD043 close-agency vs bank issuance, both orders)` (40P01 -> 503 with the old order),
+and by ACH-M-R2-REVOCATION, ACH-M-I1-REVOCATION, ACH-M-I2-REVOCATION (r1 revocation form: each withdrawal holds its own lock).
 
-Reads of the internal evidence store happen inside the transaction where the cells require it (decision c): Kroute enable after the lock, and I3 before its access decision.
+Reads of the internal evidence store happen inside the transaction where the cells require it (decision c): Kroute enable after the lock.
+I3 reads the caller's membership first under a savepoint rolled back at once (no evidence read for a non-member, no membership half held
+across the store read), then the artifact, then decides at the guard instant (access, session, route, allowlist, bank order, effect clock).
 
 ## Lane departures and matrix status (r1, ADV-PV1R-9)
 
@@ -72,6 +80,16 @@ Reads of the internal evidence store happen inside the transaction where the cel
 3. counts as open in the plan inspections (`commerce-inspections.ts:40`).
 E1 removes these effects with the listed PaymentOrder edge `INTENT_CREATED -> CANCELLED` (0015 transition list) and snapshot `order_state` -> EXPIRED (`transfer_deadline_reached`). Cells: ACH-M-E1-*, L-INBOUND.
 
-**Lock order.** The "Lock order (rule 13) recorded in 0046" section above describes a50db87 (quote, then route, then access). ADV-PV1R-1 rejects that order. The builder's fix must rewrite this section, the 0046 comment and §7.28 to the order the code takes. The red cell is `ADV-PV1R-1 RACE ACH-M-I1-RACE ...`.
+**Lock order.** Rewritten by the r1 fix (4746fb0): the section above, the 0046 comment and `bank-routes.ts` name the same order the code takes. ACH-ROUTE §7.28 (docs lane, pw-pv1-docs) still needs the Kinstructions row added: GAP -> docs lane. The red cell is `ADV-PV1R-1 RACE ACH-M-I1-RACE ...`.
 
 **ADV-PV1R-5 / RR-6.** The allowlist version is checked twice: by isParticipant (bank-routes.ts:251) and by the tenant read policy (0046:271). The narrowing cell goes red only when both are reverted.
+
+## r1 fix (4746fb0, 5a7c7b8): accepted-package files touched
+
+| Package | File | Change | Covering test (red with the change reverted) |
+|---|---|---|---|
+| B09 | `packages/domain/src/commerce/failure-reasons.ts` | Closed set gains `INSTRUCTIONS_NOT_AVAILABLE` (RR-2), appended last. | `ADV-PV1R-3 DENY ACH-M-I3-REVOCATION (bank order state)`; `commercial-rules.test.ts` (B09 reasons stand where they stood). |
+| B09 | `packages/application/src/commerce/outcomes.ts` | CMD028 catalogue gains `PRECONDITION_FAILED DETAILS_EXPIRED` (RR-1). | `ADV-PV1R-2 DENY ACH-M-I2-EXPIRY (details validity)`; `outcome-catalogue.test.ts`. |
+| B06/B09 | `apps/api/openapi.json`, `apps/web/src/api/generated.ts` | Regenerated (Problem reason enum, CMD028 problem catalogue). | `pnpm run openapi`, `pnpm run web-client` checks. |
+| B06 | `packages/persistence/migrations/0046_bank_routes.sql` | kauro_app column grants on `bank_routes` / `bank_route_versions` without `created_by`, `verified_by`, `verification_evidence_ref`; new column `details_valid_until` (set with the verification, whole-verification CHECK, set-once trigger). | `ADV-PV1R-10 DENY RLS (tenant columns of a bank route)`; `bank-route-migrations.test.ts` 3/3. |
+| B09 lane files | `instructions.ts`, `route-config.ts`, `bank-routes.ts`, `ports.ts`, `bank-route.ts`, `bank-route-routes.ts` | Lane-owned (not accepted). | `docs/review/pv1-route-r1-fix-proof.md`. |
