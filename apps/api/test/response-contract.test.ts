@@ -229,6 +229,14 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/payments/webhooks/:provider", "ReceivePaymentWebhook", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD030" } }],
       ["POST", "/api/v1/refunds/:refundId/execute", "ExecuteRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD033" }, 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
       ["POST", "/api/v1/payment-orders/:orderId/reconcile", "ReconcilePayment", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD034" } }],
+      // the bank-transfer route's operational routes (Payments V1, lane L-ROUTE), registered with the payment routes in every edition
+      ["POST", "/api/v1/operations/bank-routes", "configureBankRoute", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:configureBankRoute:201" } }],
+      ["POST", "/api/v1/operations/bank-routes/:routeId/verify", "verifyBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:verifyBankRoute:200" } }],
+      ["POST", "/api/v1/operations/bank-routes/:routeId/enable", "enableBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:enableBankRoute:200" } }],
+      ["POST", "/api/v1/operations/bank-routes/:routeId/disable", "disableBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:disableBankRoute:200" } }],
+      ["POST", "/api/v1/operations/bank-routes/:routeId/details", "replaceBankRouteDetails", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:replaceBankRouteDetails:200" } }],
+      ["GET", "/api/v1/operations/bank-routes/:routeId", "getBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankRoute:200" } }],
+      ["GET", "/api/v1/payment-orders/:orderId/transfer-instructions", "getTransferInstructions", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getTransferInstructions:200" } }],
       // the commission group's service routes of package B10 (mandate B10-STATEMENTS-PAYOUTS), served in every edition, synchronous
       ["POST", "/api/v1/sales/commission-periods/:periodId/close", "CloseCommissionPeriod", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD051" } }],
       ["POST", "/api/v1/sales/statements/:statementId/reconcile-payout", "ReconcileCommissionPayout", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD053" } }],
