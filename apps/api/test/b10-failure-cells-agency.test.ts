@@ -17,14 +17,13 @@ import { agentOf, anotherClient, bought, integrationWorld, oracleRows, planOf, q
 import { bindCells, open } from "./b10-cells-support.js";
 import { paymentRoutes } from "./commerce-support.js";
 import type { SqlStep } from "./fault-support.js";
-import { blockedBy, routedUnitsIssueWithTheRegistryPolicy } from "./b10-cells-6a-support.js";
+import { blockedBy } from "./b10-cells-6a-support.js";
 import { call, completed, freshKey, ids, outcome, routes, type Person, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
 before(async () => {
   iw = await integrationWorld();
   bindCells(iw);
-  routedUnitsIssueWithTheRegistryPolicy();
   await publishAgreementVersions(iw.h, { terms: "TERMS-6A-1", privacy: "PRIVACY-6A-1" });
 });
 after(async () => {

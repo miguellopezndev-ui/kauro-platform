@@ -17,14 +17,12 @@ import { agentOf, integrationWorld, oracleRows, planOf, quoted, type Agent, type
 import { bindCells, failureOf, open, sweepOn } from "./b10-cells-support.js";
 import { checkoutOf, quoteFactsOf, type Checkout } from "./commission-support.js";
 import type { SqlStep } from "./fault-support.js";
-import { routedUnitsIssueWithTheRegistryPolicy } from "./b10-cells-6a-support.js";
 import { call, clock, completed, freshKey, ids, outcome, sha, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
 before(async () => {
   iw = await integrationWorld();
   bindCells(iw);
-  routedUnitsIssueWithTheRegistryPolicy();
 });
 after(async () => {
   await iw.stop();
