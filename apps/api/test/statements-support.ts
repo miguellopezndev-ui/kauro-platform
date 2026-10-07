@@ -154,7 +154,7 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
     ...(options.sessions === true ? { sessions: true } : {}),
     commissions: async (h) => {
       const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database } as const;
-      const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs() });
+      const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs(), environment: "LOCAL" });
       opened.pools = pools;
       const units = new StandingUnits(pools.pools, () => (standing === null ? null : { at: standing }));
       return { binding: { units: faults.wrap(units), calendar, payoutEvidence: { integrationClass: payouts.integrationClass, verify: (r) => (faults.verifier === null ? payouts.verify(r) : (faults.verifier(r, (x) => payouts.verify(x)) as ReturnType<typeof payouts.verify>)) }, providerTimer: { start: (ms) => (faults.timer === null ? realProviderCallTimer.start(ms) : faults.timer(ms)) }, hold: serviceHolds.hook }, close: () => pools.close() };

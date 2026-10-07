@@ -211,7 +211,7 @@ test("configuration of the operating limits: the api pool stays inside the four-
   // R34: behind the platform's load balancer the hop count is a deployment fact
   assert.equal(loadConfig(base).http.trustedProxyHops, 0);
   assert.equal(loadConfig({ ...base, KAURO_HTTP_TRUSTED_PROXY_HOPS: "2" }).http.trustedProxyHops, 2);
-  assert.throws(() => loadConfig({ ...base, KAURO_ENVIRONMENT: "LIVE", KAURO_AUTH_BEARER_TOKENS_FILE: undefined }), configError("KAURO_HTTP_TRUSTED_PROXY_HOPS"));
+  assert.throws(() => loadConfig({ ...base, KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "localhost", KAURO_AUTH_BEARER_TOKENS_FILE: undefined }), configError("KAURO_HTTP_TRUSTED_PROXY_HOPS"));
   assert.throws(() => loadConfig({ ...base, KAURO_HTTP_TRUSTED_PROXY_HOPS: "5" }), configError("KAURO_HTTP_TRUSTED_PROXY_HOPS"));
   // R36 / R35
   assert.deepEqual(
@@ -238,19 +238,19 @@ test("configuration of the operating limits: the api pool stays inside the four-
   // N7: migrations on start are a LOCAL convenience; SANDBOX and LIVE migrate with the one-shot job before traffic shifts
   for (const environment of ["SANDBOX", "LIVE"]) {
     assert.throws(
-      () => loadConfig({ ...base, KAURO_ENVIRONMENT: environment, KAURO_AUTH_BEARER_TOKENS_FILE: undefined, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner }),
+      () => loadConfig({ ...base, KAURO_ENVIRONMENT: environment, KAURO_DB_HOST: "localhost", KAURO_AUTH_BEARER_TOKENS_FILE: undefined, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner }),
       configError("KAURO_DB_MIGRATE_ON_START"),
       environment,
     );
   }
   assert.throws(() => loadConfig({ ...base, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"), "a password file without migrations on start");
   // the job's own configuration: the password in its environment or as a file, never both, and never configuration
-  assert.deepEqual(loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "10.0.0.5", KAURO_DB_NAME: "kauro", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_TLS_CA_FILE: "ca.pem" }), {
+  assert.deepEqual(loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "db.example.test", KAURO_DB_NAME: "kauro", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_TLS_CA_FILE: "ca.pem" }), {
     environment: "LIVE",
-    migrator: { host: "10.0.0.5", port: 5432, database: "kauro", user: ROLES.owner, tlsCaFile: "ca.pem", connectTimeoutMs: 5_000, statementTimeoutMs: 120_000, lockTimeoutMs: 5_000, passwordFile: null },
+    migrator: { host: "db.example.test", port: 5432, database: "kauro", user: ROLES.owner, tlsCaFile: "ca.pem", connectTimeoutMs: 5_000, statementTimeoutMs: 120_000, lockTimeoutMs: 5_000, passwordFile: null },
   });
-  assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"));
-  assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_USER: ROLES.owner, KAURO_DB_MIGRATOR_USER: ROLES.owner }), configError("KAURO_DB_MIGRATOR_USER"));
+  assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "localhost", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"));
+  assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "localhost", KAURO_DB_USER: ROLES.owner, KAURO_DB_MIGRATOR_USER: ROLES.owner }), configError("KAURO_DB_MIGRATOR_USER"));
 });
 
 test("R44/N7: bootstrap never holds the owner's credential in an environment — it refuses KAURO_DB_MIGRATOR_PASSWORD by name before anything opens; LOCAL migrations on start read the password from a file, and it is no part of the configuration the running process keeps", async () => {

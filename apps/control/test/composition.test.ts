@@ -41,7 +41,7 @@ function productionSources(): ReadonlyArray<{ readonly path: string; readonly te
 
 test("the composition root opens only a kauro_control pool, assembles one sweeper for each SOURCE_SWEEPERS name and the four source-lifecycle consumers, imports no test-only subpath, and one cycle over a settled database acts on nothing and fails nothing", { timeout: 300_000 }, async () => {
   // the control plane's pool: a request handlers' login is refused at start; the control plane's own is accepted
-  const base = { host: "127.0.0.1", port: env.h.pg.port, database: ROLES.database, poolMax: 2 };
+  const base = { host: "127.0.0.1", port: env.h.pg.port, database: ROLES.database, poolMax: 2, environment: "LOCAL" as const };
   await assert.rejects(openControlDatabase({ ...base, user: ROLES.appLogin }), /must be a member of kauro_control/);
   const opened = await openControlDatabase({ ...base, user: ROLES.controlLogin });
   try {

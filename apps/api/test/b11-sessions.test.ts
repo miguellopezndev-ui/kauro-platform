@@ -522,7 +522,7 @@ test("W2 identity configuration: GET /api/v1/public/identity-config announces th
   const config = loadConfig(base);
   assert.deepEqual(config.identity, { keySource: "CONTRACT_FAKE", projectId: "kauro-local", appOrigins: ["https://localhost:44300"], fakeJwksFile: "jwks.json", fakeEndpoint: "/__kauro-identity", assuranceDatabase: { user: "kauro_session", poolMax: 1 } });
   const refusedBy = (variable: string) => (e: unknown) => e instanceof ConfigError && e.message.startsWith(`${variable}:`);
-  const live = { ...base, KAURO_ENVIRONMENT: "LIVE", KAURO_AUTH_BEARER_TOKENS_FILE: undefined, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: "cursor.key", KAURO_DB_TLS_CA_FILE: "ca.pem", KAURO_IDENTITY_FAKE_JWKS_FILE: undefined, KAURO_IDENTITY_FAKE_ENDPOINT: undefined };
+  const live = { ...base, KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "localhost", KAURO_AUTH_BEARER_TOKENS_FILE: undefined, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: "cursor.key", KAURO_DB_TLS_CA_FILE: "ca.pem", KAURO_IDENTITY_FAKE_JWKS_FILE: undefined, KAURO_IDENTITY_FAKE_ENDPOINT: undefined };
   assert.throws(() => loadConfig(live), refusedBy("KAURO_IDENTITY_KEY_SOURCE"), "CONTRACT_FAKE outside LOCAL");
   assert.equal(loadConfig({ ...live, KAURO_IDENTITY_KEY_SOURCE: "GOOGLE_X509", KAURO_APP_ORIGINS: "https://app.kauro.example" }).identity?.keySource, "GOOGLE_X509");
   assert.throws(() => loadConfig({ ...live, KAURO_IDENTITY_KEY_SOURCE: "GOOGLE_X509", KAURO_APP_ORIGINS: "http://app.kauro.example" }), refusedBy("KAURO_APP_ORIGINS"), "plain http outside LOCAL");

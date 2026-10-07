@@ -10,9 +10,9 @@
  * bind their own. Nothing in the product wiring binds a contract fake (D10-FAKE-1): a test hands its fake to createCommissionService.
  */
 import type { PreparationCompletionSource } from "@kauro/application";
-import type { Clock, CommissionPolicy, RandomBytes } from "@kauro/domain";
+import type { Clock, CommissionPolicy, Environment, RandomBytes } from "@kauro/domain";
 import type { KauroPool, PgCommercialUnitOfWorkFactory, PoolErrorSink, RuntimeRole } from "@kauro/persistence";
-import { createCommercialUnitOfWorkFactory, createPool } from "@kauro/persistence";
+import { connectionSecurityOf, createCommercialUnitOfWorkFactory, createPool } from "@kauro/persistence";
 import type { DatabaseConnectionConfig } from "../config.js";
 
 /** Where an interleaving is fixed or a crash injected (tests only, like B09's hold points): after an effect, before its settlement. */
@@ -34,8 +34,8 @@ export interface CommissionServiceAssembly {
 
 /** The logins of the commission service's pools: each a member of exactly its runtime group. */
 export interface CommissionDatabases {
-  readonly commission: DatabaseConnectionConfig & { readonly poolMax: number };
-  readonly control: DatabaseConnectionConfig & { readonly poolMax: number };
+  readonly commission: DatabaseConnectionConfig & { readonly poolMax: number; readonly passwordFile?: string };
+  readonly control: DatabaseConnectionConfig & { readonly poolMax: number; readonly passwordFile?: string };
 }
 
 export interface CommissionPools {
@@ -57,10 +57,11 @@ async function verified(pool: KauroPool, role: RuntimeRole): Promise<void> {
  * Opens the commission service's verified pools and builds B10's commercial unit-of-work factory over them. Nothing stays open when
  * a login is refused.
  */
-export async function openCommissionPools(databases: CommissionDatabases, deps: { readonly clock: Clock; readonly random: RandomBytes; readonly statementTimeoutMs?: number; readonly onPoolError?: PoolErrorSink }): Promise<CommissionPools> {
+export async function openCommissionPools(databases: CommissionDatabases, deps: { readonly clock: Clock; readonly random: RandomBytes; readonly statementTimeoutMs?: number; readonly onPoolError?: PoolErrorSink; readonly environment: Environment }): Promise<CommissionPools> {
   const open = (config: CommissionDatabases["commission"], suffix: string): KauroPool => {
-    const { poolMax, ...connection } = config;
-    return createPool({ ...connection, max: poolMax, applicationName: `${COMMISSION_APPLICATION_NAME}-${suffix}`, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+    const { poolMax, password, passwordFile, tlsCaFile, ...connection } = config;
+    const security = connectionSecurityOf(deps.environment, { host: connection.host, ...(password === undefined ? {} : { password }), ...(passwordFile === undefined ? {} : { passwordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }) });
+    return createPool({ ...connection, ...security, max: poolMax, applicationName: `${COMMISSION_APPLICATION_NAME}-${suffix}`, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
   };
   const commission = open(databases.commission, "service");
   const control = open(databases.control, "dispatcher");

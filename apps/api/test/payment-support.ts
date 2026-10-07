@@ -147,7 +147,7 @@ export async function paymentWorld(options: { readonly requestSide?: boolean; re
   // the payment service over its three verified pools beside the api's request-handler pool (the composition's own assembly)
   const open = async (h: World["h"], db: World["db"]): Promise<{ readonly service: PaymentService; readonly pools: PaymentPools }> => {
     const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, poolMax: 4 } as const;
-    const pools = await openPaymentPools(db.pool, { payment: { ...base, user: ROLES.paymentLogin }, control: { ...base, user: ROLES.controlLogin }, ingress: { ...base, user: ROLES.ingressLogin } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs() });
+    const pools = await openPaymentPools(db.pool, { payment: { ...base, user: ROLES.paymentLogin }, control: { ...base, user: ROLES.controlLogin }, ingress: { ...base, user: ROLES.ingressLogin } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs(), environment: "LOCAL" });
     const service = createPaymentService({
       assembly: { commerce: options.wrapCommerce === undefined ? pools.commerce : options.wrapCommerce(pools.commerce), ingress: pools.ingress, ingressFacts: pools.ingressFacts, provider: paypal, verifiers: [verifier], evidence, serviceAuthenticator: services, fiscalBridge, hold: (command, point) => holds.pass(command, point) },
       environment: "LOCAL",

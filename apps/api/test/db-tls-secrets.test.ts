@@ -98,3 +98,9 @@ test("I-3: a refusal never carries a secret's value; an unreadable or empty file
   assert.throws(() => loadConfig(cursorEnv({ KAURO_DB_PASSWORD_FILE: empty })), refused("KAURO_DB_PASSWORD_FILE"));
   assert.ok(!JSON.stringify(loadConfig(cursorEnv()).environment).includes("secret"));
 });
+
+test("I-2: outside LOCAL the database host is a DNS name (pg verifies an IP literal against 'localhost'); LOCAL keeps its IP", () => {
+  assert.throws(() => loadConfig(cursorEnv({ KAURO_DB_HOST: "10.0.0.5" })), refused("KAURO_DB_HOST"));
+  assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "10.0.0.5", KAURO_DB_MIGRATOR_USER: "kauro_owner", KAURO_DB_TLS_CA_FILE: caFile }), refused("KAURO_DB_HOST"));
+  assert.equal(loadConfig({ KAURO_ENVIRONMENT: "LOCAL", KAURO_DB_HOST: "127.0.0.1", KAURO_DB_USER: "kauro_app_login", KAURO_DB_POOL_MAX: "4" }).database.host, "127.0.0.1");
+});

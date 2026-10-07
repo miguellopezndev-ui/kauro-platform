@@ -46,9 +46,9 @@ import type {
   SourceSweeperName,
 } from "@kauro/application";
 import { SOURCE_SWEEPERS, type ExecutionSweeperName } from "@kauro/application";
-import { createIdGenerator, toUtcInstant, type Clock, type IdGenerator, type LeaseOwnerId, type SourceUnitOfWorkFactory } from "@kauro/domain";
+import { createIdGenerator, toUtcInstant, type Clock, type Environment, type IdGenerator, type LeaseOwnerId, type SourceUnitOfWorkFactory } from "@kauro/domain";
 import { IsolatedContainerInspector, IsolatedSelectionEvaluator } from "@kauro/data-plane";
-import { createPool, createUnitOfWorkFactory, type KauroPool, type PoolErrorSink } from "@kauro/persistence";
+import { connectionSecurityOf, createPool, createUnitOfWorkFactory, type KauroPool, type PoolErrorSink } from "@kauro/persistence";
 import { AuthorityJournal } from "./consumers/authority-journal.js";
 import { SelectionEvaluation } from "./consumers/selection-evaluation.js";
 import { StorageLifecycle } from "./consumers/storage-lifecycle.js";
@@ -215,6 +215,10 @@ export interface ControlDatabaseConfig {
   readonly database: string;
   readonly user: string;
   readonly password?: string;
+  /** Outside LOCAL the connection is certificate-verified and its password is a file (I-2, I-3): see connectionSecurityOf. */
+  readonly environment: Environment;
+  readonly passwordFile?: string;
+  readonly tlsCaFile?: string;
   /** The control plane's connection budget (07 "Connection budget"). */
   readonly poolMax: number;
   readonly statementTimeoutMs?: number;
@@ -237,7 +241,7 @@ export async function openControlDatabase(config: ControlDatabaseConfig): Promis
     port: config.port,
     database: config.database,
     user: config.user,
-    ...(config.password === undefined ? {} : { password: config.password }),
+    ...connectionSecurityOf(config.environment, { host: config.host, ...(config.password === undefined ? {} : { password: config.password }), ...(config.passwordFile === undefined ? {} : { passwordFile: config.passwordFile }), ...(config.tlsCaFile === undefined ? {} : { tlsCaFile: config.tlsCaFile }) }),
     max: config.poolMax,
     applicationName: CONTROL_APPLICATION_NAME,
     ...(config.onPoolError === undefined ? {} : { onError: config.onPoolError }),

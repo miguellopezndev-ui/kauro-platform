@@ -15,10 +15,10 @@
  * verified service identity (AUTHENTICATION_REQUIRED, with the anonymous denial recorded).
  */
 import type { DurableOperation, FiscalDocumentBridge, PaymentProviderAdapter, ProtocolPoint, ProviderEvidenceStore, ServiceAuthenticator, WebhookVerifier } from "@kauro/application";
-import type { Clock, CommerceUnitOfWorkFactory, InboxIngress, RandomBytes } from "@kauro/domain";
+import type { Clock, CommerceUnitOfWorkFactory, Environment, InboxIngress, RandomBytes } from "@kauro/domain";
 import { createIdGenerator } from "@kauro/domain";
 import type { IngressFactRecorder, KauroPool, PoolErrorSink, RuntimeRole } from "@kauro/persistence";
-import { PgInboxIngress, PgIngressFactRecorder, createCommerceUnitOfWorkFactory, createPool } from "@kauro/persistence";
+import { PgInboxIngress, PgIngressFactRecorder, connectionSecurityOf, createCommerceUnitOfWorkFactory, createPool } from "@kauro/persistence";
 import type { DatabaseConnectionConfig } from "../config.js";
 
 /** The external ports an edition binds to the payment service (B15 provider adapters); B07's lineage is the platform's own (edition.ts). */
@@ -58,9 +58,9 @@ export interface PaymentServiceAssembly extends PaymentServiceAdapters {
 
 /** The logins of the payment service's pools: each a member of exactly its runtime group. */
 export interface PaymentDatabases {
-  readonly payment: DatabaseConnectionConfig & { readonly poolMax: number };
-  readonly control: DatabaseConnectionConfig & { readonly poolMax: number };
-  readonly ingress: DatabaseConnectionConfig & { readonly poolMax: number };
+  readonly payment: DatabaseConnectionConfig & { readonly poolMax: number; readonly passwordFile?: string };
+  readonly control: DatabaseConnectionConfig & { readonly poolMax: number; readonly passwordFile?: string };
+  readonly ingress: DatabaseConnectionConfig & { readonly poolMax: number; readonly passwordFile?: string };
 }
 
 export interface PaymentPools {
@@ -85,10 +85,11 @@ async function verified(pool: KauroPool, role: RuntimeRole): Promise<void> {
  * unit-of-work factory over the three command groups, B06's inbox ingress and the ingress fact recorder. Nothing stays open when a
  * login is refused.
  */
-export async function openPaymentPools(app: KauroPool, databases: PaymentDatabases, deps: { readonly clock: Clock; readonly random: RandomBytes; readonly statementTimeoutMs?: number; readonly onPoolError?: PoolErrorSink }): Promise<PaymentPools> {
+export async function openPaymentPools(app: KauroPool, databases: PaymentDatabases, deps: { readonly clock: Clock; readonly random: RandomBytes; readonly statementTimeoutMs?: number; readonly onPoolError?: PoolErrorSink; readonly environment: Environment }): Promise<PaymentPools> {
   const open = (config: PaymentDatabases["payment"], suffix: string): KauroPool => {
-    const { poolMax, ...connection } = config;
-    return createPool({ ...connection, max: poolMax, applicationName: `${PAYMENT_APPLICATION_NAME}-${suffix}`, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+    const { poolMax, password, passwordFile, tlsCaFile, ...connection } = config;
+    const security = connectionSecurityOf(deps.environment, { host: connection.host, ...(password === undefined ? {} : { password }), ...(passwordFile === undefined ? {} : { passwordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }) });
+    return createPool({ ...connection, ...security, max: poolMax, applicationName: `${PAYMENT_APPLICATION_NAME}-${suffix}`, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
   };
   const payment = open(databases.payment, "service");
   const control = open(databases.control, "dispatcher");

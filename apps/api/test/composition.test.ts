@@ -107,7 +107,7 @@ test("configuration: every variable is validated and a missing or malformed one 
   assert.throws(() => loadConfig(envOf({ KAURO_DB_MIGRATE_ON_START: "true" })), configError("KAURO_DB_MIGRATOR_USER"));
   assert.throws(() => loadConfig(envOf({ KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.appLogin })), configError("KAURO_DB_MIGRATOR_USER"));
   // the LOCAL bearer-token file is refused outside LOCAL
-  assert.throws(() => loadConfig(envOf({ KAURO_ENVIRONMENT: "SANDBOX", KAURO_AUTH_BEARER_TOKENS_FILE: "tokens.json" })), configError("KAURO_AUTH_BEARER_TOKENS_FILE"));
+  assert.throws(() => loadConfig(envOf({ KAURO_ENVIRONMENT: "SANDBOX", KAURO_DB_HOST: "localhost", KAURO_AUTH_BEARER_TOKENS_FILE: "tokens.json" })), configError("KAURO_AUTH_BEARER_TOKENS_FILE"));
   // secrets never appear in a refusal
   assert.throws(() => loadConfig(envOf({ KAURO_DB_PASSWORD: "hunter2-secret", KAURO_DB_POOL_MAX: "99" })), (e: unknown) => configError("KAURO_DB_POOL_MAX")(e) && !(e as Error).message.includes("hunter2"));
   // a complete LOCAL environment with its defaults
@@ -143,8 +143,8 @@ test("authentication of this edition: the LOCAL bearer-token file is a closed do
   refused(JSON.stringify({ subjects: [{ ...entry, token: "short" }] }), "16..512");
   for (const environment of ["SANDBOX", "LIVE"]) {
     // outside LOCAL the list cursors' key is a required shared secret (N16); with it, the missing verifier refuses the start
-    assert.throws(() => loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1" })), configError("KAURO_API_CURSOR_KEY_FILE"), environment);
-    assert.throws(() => authenticatorOf(loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: "cursor.key", KAURO_DB_TLS_CA_FILE: "ca.pem" }))), configError("KAURO_ENVIRONMENT"), environment);
+    assert.throws(() => loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_DB_HOST: "localhost", KAURO_HTTP_TRUSTED_PROXY_HOPS: "1" })), configError("KAURO_API_CURSOR_KEY_FILE"), environment);
+    assert.throws(() => authenticatorOf(loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_DB_HOST: "localhost", KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: "cursor.key", KAURO_DB_TLS_CA_FILE: "ca.pem" }))), configError("KAURO_ENVIRONMENT"), environment);
   }
   assert.throws(() => authenticatorOf(loadConfig(envOf())), configError("KAURO_AUTH_BEARER_TOKENS_FILE"));
 });

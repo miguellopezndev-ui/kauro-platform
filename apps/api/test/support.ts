@@ -614,6 +614,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const h = await startHarness();
   const db = await openDatabase({
     database: { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, poolMax: 6, statementTimeoutMs: raceStatementTimeoutMs() },
+    environment: "LOCAL",
     migrateOnStart: null,
     ...(options.sessions === true ? { identity: { assuranceDatabase: { user: ROLES.assuranceLogin, poolMax: 2 } } } : {}),
   });

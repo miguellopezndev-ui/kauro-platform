@@ -12,6 +12,7 @@
  * Every variable is validated here; a malformed or missing value refuses the start with the variable name (never its value).
  */
 import { readFileSync } from "node:fs";
+import { isIP } from "node:net";
 import { isApplicationOrigin } from "@kauro/application";
 import type { Environment } from "@kauro/domain";
 import { ENVIRONMENTS, PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
@@ -240,6 +241,11 @@ function roleName(env: Env, name: string): string {
   return v;
 }
 
+/** I-2: outside LOCAL the host is a DNS name: pg gives the TLS layer no server name for an IP literal, so the name check would run against "localhost". */
+function requireDnsHost(host: string, environment: Environment): void {
+  if (environment !== "LOCAL" && isIP(host) !== 0) throw new ConfigError("KAURO_DB_HOST", "must be a DNS name outside LOCAL: the certificate is verified against the host name dialled");
+}
+
 function migratorOf(env: Env, host: string, port: number, database: string, runtimeUser: string | undefined): MigratorConfig {
   const tlsCaFile = optional(env, DB_TLS_CA_FILE_VARIABLE);
   const migratorUser = roleName(env, "KAURO_DB_MIGRATOR_USER");
@@ -282,6 +288,7 @@ export function loadConfig(env: Env = process.env): ApiConfig {
     throw new ConfigError(MIGRATOR_PASSWORD_VARIABLE, "is never accepted by the serving process: the one-shot migration job (node dist/src/migrate.js) holds the owner's credential");
   }
   const host = optional(env, "KAURO_DB_HOST") ?? "127.0.0.1";
+  requireDnsHost(host, environment);
   const port = integer(env, "KAURO_DB_PORT", 5432, 1, 65535);
   const database = optional(env, "KAURO_DB_NAME") ?? "kauro";
   const runtimeUser = roleName(env, "KAURO_DB_USER");
@@ -440,6 +447,7 @@ export function loadMigrationJobConfig(env: Env = process.env): MigrationJobConf
     throw new ConfigError(MIGRATOR_PASSWORD_FILE_VARIABLE, `is exclusive with ${MIGRATOR_PASSWORD_VARIABLE}`);
   }
   const host = optional(env, "KAURO_DB_HOST") ?? "127.0.0.1";
+  requireDnsHost(host, environment);
   const port = integer(env, "KAURO_DB_PORT", 5432, 1, 65535);
   const database = optional(env, "KAURO_DB_NAME") ?? "kauro";
   const migrator = migratorOf(env, host, port, database, optional(env, "KAURO_DB_USER"));
