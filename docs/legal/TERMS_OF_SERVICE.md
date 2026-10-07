@@ -262,20 +262,40 @@ mismo total. El precio informado coincide con el cobrado; si aparecen dos precio
 ## 8. Pagos
 
 8.1. **Medios de pago.** Kauro trabaja por proyecto: no hay suscripciones ni cargos recurrentes automáticos. Para clientes de
-Estados Unidos, la Plataforma ofrece un único medio de pago, **cuando esté habilitada**: **transferencia bancaria en EE. UU.
-(ACH o transferencia doméstica a los mismos datos)**, recibida en la cuenta empresarial de Kauro, con una referencia única por
-Pedido. Esta opción solo se muestra mientras está habilitada; Kauro puede no ofrecerla, y la Plataforma no ofrece pago con
-tarjeta ni otros medios.
+Estados Unidos, el único medio de pago previsto es la **transferencia bancaria en EE. UU. (ACH o transferencia doméstica a los
+mismos datos)**, recibida en la cuenta empresarial de Kauro, con una referencia única por Pedido. Kauro no cobra ni acepta
+pagos por esta vía hasta que la ruta esté habilitada; solo se muestra **cuando esté habilitada**, y Kauro puede no ofrecerla.
+La Plataforma no ofrece pago con tarjeta ni otros medios.
 
 Un Cliente que paga mediante una plataforma de cuentas por pagar paga a los datos bancarios que Kauro haya indicado para ese
 Pedido. Kauro no está integrado con esas plataformas.
 <!-- auth: amendments/A8_PAYMENT_ROUTING.md §1 y §2 (reglas 2, 3, 4, 5); 15 §Initial payment decision · Payments V1 (decisión del dueño 2026-10-07): PayPal fuera del lanzamiento, no se ofrece tarjeta; una sola ruta condicionada -->
 
-8.2. **Cuándo un Pedido está pagado.** Una página de retorno del proveedor no prueba el pago. Un Pedido está pagado solo cuando
-Kauro concilia un crédito entrante, con evidencia del banco, por el **monto exacto y en la moneda** del Pedido. Un crédito
-confirmado después del vencimiento del Pedido se trata según las reglas de vencimiento de la Cotización (sección 6) y, si no
-puede acreditarse al mismo precio, se devuelve. Los cargos que cobre el banco o la plataforma del Cliente por enviar el pago corren por cuenta del Cliente; las
-comisiones de recepción y de procesamiento del lado de Kauro corren por cuenta de Kauro y no se suman al total.
+8.2. **Cuándo se considera pagado un Pedido por transferencia bancaria.** Una página de retorno o el aviso de que el Cliente
+inició una transferencia no prueban el pago.
+
+1. Un Pedido se considera pagado solo cuando Kauro concilia un abono **recibido** en la cuenta de Kauro por el **monto exacto en
+   USD** del Pedido, con la referencia del Pedido y verificado con evidencia bancaria. Iniciar o programar una transferencia no es
+   confirmación de pago.
+2. Las instrucciones de pago muestran una **fecha límite** y una fecha recomendada de envío ("enviar antes de"). Kauro no garantiza
+   cuánto tarda el banco del Cliente ni el sistema bancario en acreditar la transferencia.
+3. Para decidir si el pago llegó a tiempo cuenta la **fecha y hora en que el banco registra el abono**, según el comprobante
+   bancario, con el margen técnico indicado en las instrucciones de pago. No cuenta la fecha en que el Cliente inició la
+   transferencia ni la fecha en que Kauro termina de conciliarla.
+4. Si el abono quedó registrado a tiempo, Kauro respeta el precio aceptado aunque confirme el pago después de la fecha límite,
+   **siempre que**, al momento de confirmarlo, sigan siendo válidos los archivos o la fuente, el destino, el tratamiento legal y
+   fiscal y el alcance de entrega del Pedido, y el proyecto no tenga otra compra abierta o pagada. Esto no depende de si Kauro ya
+   había marcado el Pedido como vencido.
+5. Si el abono quedó registrado después de ese momento, o alguna de esas condiciones ya no se cumple, Kauro **no inicia el
+   trabajo**: registra el dinero recibido y lo **devuelve** conforme a la sección 10; el Cliente puede pedir una nueva Cotización.
+6. Un pago parcial, un pago mayor, un pago con otra referencia o enviado por un pagador distinto al titular de facturación aceptado
+   queda **en revisión**: no habilita el trabajo y se devuelve conforme a la sección 10. Kauro no pide completar la diferencia con
+   un segundo pago.
+7. Kauro no pide un segundo pago mientras un pago enviado no esté conciliado. El Cliente no debe pagar de nuevo mientras su pago
+   esté en camino o en revisión.
+
+Los cargos que cobre el banco o la plataforma del Cliente por enviar el pago corren por cuenta del Cliente; las comisiones de
+recepción y de procesamiento del lado de Kauro corren por cuenta de Kauro y no se suman al total.
 <!-- auth: 02 §7 ("Payment return pages do not assert payment success"); A8 §3 ("the order paid only on a reconciled credit of the exact amount and currency"); 15 §Money vocabulary ("only explicitly disclosed permitted charges"); 15 §Fee reference and example · resolución de silencio S-09 -->
 
 8.3. **Sin doble cobro.** Kauro no pide un segundo pago mientras un pago enviado no esté conciliado; los pagos inciertos se

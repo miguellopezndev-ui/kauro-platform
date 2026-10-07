@@ -22,3 +22,11 @@ Spec: PAYMENTS-V1-REPLAN §8; owner decision 2026-10-07-PAYMENTS-V1; D-19 TODO. 
 
 Not changed (checked): PRIVACY_NOTICE, PIA_BEDROCK, LAWYER_LATER (no PayPal/ACH wording); CHECKLIST S-09 (sender-side fees, rail-neutral); ToS Annex A.
 Ambiguities: DV1-06 text is not in the repo; row 3 uses the mandate's summary only (honor at same price per quote expiry rules, else return). Row 7/12 wording "unos días" is final only after A-20 measures the lag.
+
+## Round 2 (Codex REJECT F-01 MAJOR, F-02 MINOR; owner Addendum)
+| # | File : section | Before -> after | Reason |
+|---|---|---|---|
+| 16 | TERMS 8.2 (replaces row 3) | summary sentence -> the seven DV1-06 safeguards inline (exact USD credit received + bank evidence; deadline and "enviar antes de", no bank-timing guarantee; bank booking time within the tolerance in the instructions; on-time honoured at same price if files/source, target, legal/fiscal treatment, scope valid and no other open/paid purchase; else not started, recorded and returned per s.10, new Quote; partial/over/other reference/payer under review and returned, no top-up; no second payment request). Source: dv1-06-for-legal.md (r8, 97b5bb8); no tolerance number, no new promise. Fee sentence kept as closing paragraph | F-01 |
+| 17 | TERMS 8.1 (amends row 1) | "la Plataforma ofrece ... cuando esté habilitada" -> "el único medio previsto es ...; Kauro no cobra ni acepta pagos por esta vía hasta que la ruta esté habilitada; solo se muestra cuando esté habilitada" | Owner Addendum: no implication of collecting before ENABLED |
+| 18 | CHECKLIST A-20 | added "Deadline: during the real-account qualification, before the deletion texts (ToS 13.4, DPA 13.2) are published" | F-02 |
+Note: 3.1 "cobra el precio acordado" describes the service flow and was left; flag if Codex wants it conditional.
