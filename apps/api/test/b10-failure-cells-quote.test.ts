@@ -14,10 +14,10 @@ import type { CreateQuoteView } from "@kauro/application";
 import { commercialSourceReadsOf } from "@kauro/persistence";
 import { FaultPoints, faultCell, openConnection, connectionPid, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { agentOf, integrationWorld, oracleRows, planOf, quoted, type Agent, type IntegrationWorld } from "./integration-support.js";
-import { bindCells, failureOf, open, sweepOn } from "./b10-cells-support.js";
+import { bindCells, contend, failureOf, open, sweepOn } from "./b10-cells-support.js";
 import { checkoutOf, quoteFactsOf, type Checkout } from "./commission-support.js";
 import type { SqlStep } from "./fault-support.js";
-import { call, clock, completed, freshKey, ids, outcome, sha, type PlanFixture, type Reply } from "./support.js";
+import { asProblem, call, clock, completed, freshKey, ids, outcome, sha, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
 before(async () => {
@@ -630,8 +630,11 @@ faultCell(
 
 // --- LIVE_QUOTE_RACE ---------------------------------------------------------------------------------------------------------------
 
-/** CreateQuote's live-quote reads (lockLiveQuote): the 2nd and the 3rd round, each a plain read followed by the FOR UPDATE of the quote it names. */
-const LIVE_READ = (nth: number): SqlStep => ({ label: `live_read_${nth}`, match: /SELECT quote_id FROM kauro\.quotes\s+WHERE agency_id = \$1 AND project_id = \$2/, nth });
+/**
+ * CreateQuote's nth live-quote read (lockLiveQuote over PgQuoteReads.liveQuoteOf), a plain read followed by the FOR UPDATE of the quote it
+ * names. Anchored on liveQuoteOf's own predicate (the double parenthesis before replaces_quote_id), never the issuance core's supersession read.
+ */
+const LIVE_READ = (nth: number): SqlStep => ({ label: `live_read_${nth}`, match: /^SELECT quote_id FROM kauro\.quotes\s+WHERE agency_id = \$1 AND project_id = \$2\s+AND \(\(replaces_quote_id IS NULL AND state IN/, nth });
 
 /** The money and entitlement rows of the whole world (this file's database): a quote race changes none of them. */
 const moneyRows = async (): Promise<Record<string, unknown>> =>
@@ -643,8 +646,9 @@ const moneyRows = async (): Promise<Record<string, unknown>> =>
               (SELECT count(*) FROM kauro.commercial_authorizations)::int AS authorizations, (SELECT count(*) FROM kauro.purchase_rebindings)::int AS rebindings`,
     )
   )[0]!;
+/** The project's quotes, superseded ones first in creation order, the live one last (a held issuance may have started before the one it supersedes). */
 const chainOf = async (plan: PlanFixture): Promise<Array<readonly [string, string, string | null]>> =>
-  (await oracleRows<{ quote_id: string; state: string; superseded_by_quote_id: string | null }>(iw, "SELECT quote_id, state, superseded_by_quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY created_at", [plan.projectId])).map(
+  (await oracleRows<{ quote_id: string; state: string; superseded_by_quote_id: string | null }>(iw, "SELECT quote_id, state, superseded_by_quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY state = 'ISSUED', created_at", [plan.projectId])).map(
     (q) => [q.quote_id, q.state, q.superseded_by_quote_id] as const,
   );
 
@@ -654,7 +658,7 @@ faultCell(
     step: "CMD027 CreateQuote (issuance) / RACE: W3 the project's live quote superseded between the live-quote read and its FOR UPDATE, three rounds running",
     fault: "race",
     expect:
-      "RACE: a CreateQuote whose project's live quote is superseded by another issuance between its live-quote read and its lock, in each of its three rounds (the first observed waiting on the superseding issuance's row lock), is refused 409 PRECONDITION_FAILED OPERATION_PENDING with nothing written; the same key and a fresh key then each issue exactly once, in both orders, and no money or entitlement row changes",
+      "RACE: a CreateQuote whose project's live quote is superseded by another issuance between its live-quote read and its lock, in each of its three rounds (the first observed waiting on the superseding issuance's row lock), is refused the retryable 409 STALE_VERSION carrying the project's live quote as current, with nothing written; the same key and a fresh key then each issue exactly once, in both orders, and no money or entitlement row changes",
   },
   async (ctx) => {
     for (const order of ["same key first", "fresh key first"] as const) {
@@ -690,9 +694,13 @@ faultCell(
       }
       assert.equal(late.status, "fulfilled");
       const refused = late.status === "fulfilled" ? late.value : (undefined as never);
-      assert.equal(outcome(iw.w, refused), "409 PRECONDITION_FAILED OPERATION_PENDING", `the late request is refused after three rounds, never an issuance on a superseded quote: ${outcome(iw.w, refused)}`);
-      // nothing written by the late request: its journal entry, no quote, issuance or event of its own
+      assert.equal(outcome(iw.w, refused), "409 STALE_VERSION -", `the late request is refused after three rounds, never an issuance on a superseded quote: ${outcome(iw.w, refused)}`);
       const [q1, q2, q3] = superseding as [string, string, string];
+      const problem = asProblem(iw.w, refused);
+      assert.equal(problem.retryable, true, "the refusal of a race is retryable (the same key then issues once)");
+      const live = (await oracleRows<{ version: number }>(iw, "SELECT version::int AS version FROM kauro.quotes WHERE quote_id = $1", [q3]))[0]!;
+      assert.deepEqual(problem.current, { version: live.version, state: "ISSUED" }, "current is the project's live quote, read after the last round");
+      // nothing written by the late request: its journal entry, no quote, issuance or event of its own
       assert.deepEqual(await chainOf(plan), [[q0, "SUPERSEDED", q1], [q1, "SUPERSEDED", q2], [q2, "SUPERSEDED", q3], [q3, "ISSUED", null]], "only the three superseding issuances wrote quotes");
       assert.equal((await iw.w.journal(lateKey))?.state ?? null, null, "the refused key journaled nothing");
       const issuances = await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.quote_issuances WHERE project_id = $1", [plan.projectId]);
@@ -713,6 +721,82 @@ faultCell(
       assert.equal(after[0]!.n, 6);
       assert.deepEqual(await moneyRows(), money, "no order, capture, refund, ledger entry, entitlement or re-binding changed");
       await giveSlotBack(a, plan);
+    }
+  },
+);
+
+// --- FIRST_ISSUE_RACE --------------------------------------------------------------------------------------------------------------
+
+faultCell(
+  {
+    id: "FIRST_ISSUE_RACE",
+    step: "CMD027 CreateQuote (issuance) / RACE: W3 two first issuances of a project with no live quote",
+    fault: "race",
+    expect:
+      "RACE: two CreateQuotes under different keys on a project with no live quote, in both orders, the second observed waiting on the first held before its COMMIT and the second held after its live-quote read while the first commits: the issuances serialize on the project and the second supersedes the first (201 naming it), never 422 INTEGRITY_FAILURE; each key journals its one quote and no money or entitlement row changes",
+  },
+  async (ctx) => {
+    for (const order of ["key A first", "key B first"] as const) {
+      const tag = order === "key A first" ? "a" : "b";
+      const keyA = freshKey(`first-race-${tag}-a`);
+      const keyB = freshKey(`first-race-${tag}-b`);
+      const [firstKey, secondKey] = order === "key A first" ? [keyA, keyB] : [keyB, keyA];
+      // 1. the second waits on the first, held before its COMMIT with its quote inserted
+      {
+        const { a, plan } = await fresh(`first-race-wait-${tag}`);
+        const money = await moneyRows();
+        const raced = await contend(
+          ctx,
+          { name: `the first issuance (${order})`, login: "kauro_app_test", holdAt: "uow.before-commit", run: (conn) => quoteOn(ctx, conn, a, plan, firstKey) },
+          { name: "the other key's first issuance", login: "kauro_app_test", holdAt: "-", run: (conn) => quoteOn(ctx, conn, a, plan, secondKey) },
+          `two first issuances of one project (${order})`,
+        );
+        assert.equal(raced.holder.status, "fulfilled");
+        assert.equal(raced.waiter.status, "fulfilled");
+        const first = raced.holder.status === "fulfilled" ? (raced.holder.value as Reply) : (undefined as never);
+        const second = raced.waiter.status === "fulfilled" ? (raced.waiter.value as Reply) : (undefined as never);
+        assert.equal(first.status, 201, `the first issues: ${first.text}`);
+        assert.equal(second.status, 201, `the waiting issuance supersedes the first, never 422: ${second.status === 201 ? "" : outcome(iw.w, second)}`);
+        const q1 = view(first).quote.quoteId;
+        const q2 = view(second);
+        assert.equal(q2.supersededQuoteId, q1, "the second supersedes the first");
+        assert.deepEqual(await chainOf(plan), [[q1, "SUPERSEDED", q2.quote.quoteId], [q2.quote.quoteId, "ISSUED", null]]);
+        assert.equal((await iw.w.journal(firstKey))?.state, "COMMITTED");
+        assert.equal((await iw.w.journal(secondKey))?.state, "COMMITTED");
+        assert.deepEqual(await moneyRows(), money, "no order, capture, refund, ledger entry, entitlement or re-binding changed");
+        await giveSlotBack(a, plan);
+      }
+      // 2. the second held right after its live-quote read found none, while the first issues and commits
+      {
+        const { a, plan } = await fresh(`first-race-read-${tag}`);
+        const money = await moneyRows();
+        const lc = await open("kauro_app_test");
+        let held: PromiseSettledResult<Reply>;
+        let q1: string;
+        try {
+          const read = ctx.points.pause("db.live_read_1.after");
+          const second = ctx.operation("the other key's first issuance, held after its live-quote read", () => quoteOn(ctx, lc, a, plan, secondKey, [LIVE_READ(1)])).then(
+            (v): PromiseSettledResult<Reply> => ({ status: "fulfilled", value: v }),
+            (reason: unknown): PromiseSettledResult<Reply> => ({ status: "rejected", reason }),
+          );
+          await read.reachedBy(second);
+          q1 = view(await ctx.operation(`the first issuance (${order}), run to its answer`, () => quoteCall(a, plan, firstKey))).quote.quoteId;
+          read.release();
+          held = await second;
+        } finally {
+          await lc.end();
+        }
+        assert.equal(held.status, "fulfilled");
+        const reply = held.status === "fulfilled" ? held.value : (undefined as never);
+        assert.equal(reply.status, 201, `the held issuance supersedes the first, never 422: ${reply.status === 201 ? "" : outcome(iw.w, reply)}`);
+        const q2 = view(reply);
+        assert.equal(q2.supersededQuoteId, q1);
+        assert.deepEqual(await chainOf(plan), [[q1, "SUPERSEDED", q2.quote.quoteId], [q2.quote.quoteId, "ISSUED", null]]);
+        assert.equal((await iw.w.journal(firstKey))?.state, "COMMITTED");
+        assert.equal((await iw.w.journal(secondKey))?.state, "COMMITTED");
+        assert.deepEqual(await moneyRows(), money);
+        await giveSlotBack(a, plan);
+      }
     }
   },
 );

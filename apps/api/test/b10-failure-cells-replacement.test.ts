@@ -17,7 +17,7 @@ import { agentOf, bought, integrationWorld, oracleRows, refundedThrough, replace
 import { bindCells, contend, open } from "./b10-cells-support.js";
 import { blockedBy } from "./b10-cells-6a-support.js";
 import type { SqlStep } from "./fault-support.js";
-import { call, completed, freshKey, ids, outcome, replayTextOf, type PlanFixture, type Reply } from "./support.js";
+import { asProblem, call, completed, freshKey, ids, outcome, replayTextOf, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
 before(async () => {
@@ -127,7 +127,7 @@ async function withRebinder<T>(rebind: PurchaseRebinder["rebind"], fn: () => Pro
 const refusing = <T>(fn: () => Promise<T>): Promise<T> => withRebinder((uow, input) => withoutLineage.rebind(uow, input), fn);
 
 /** The project's live-quote read of CreateQuote (a plain read; the FOR UPDATE of the quote it names follows in the next statement). */
-const LIVE_READ: SqlStep = { label: "live_read", match: /SELECT quote_id FROM kauro\.quotes\s+WHERE agency_id = \$1 AND project_id = \$2/ };
+const LIVE_READ: SqlStep = { label: "live_read", match: /^SELECT quote_id FROM kauro\.quotes\s+WHERE agency_id = \$1 AND project_id = \$2\s+AND \(\(replaces_quote_id IS NULL AND state IN/ };
 const JOURNAL_COMMIT: SqlStep = { label: "journal_commit", match: /UPDATE kauro\.command_journal SET state = 'COMMITTED'/ };
 const QUOTE_INSERT: SqlStep = { label: "quote_insert", match: /INSERT INTO kauro\.quotes \(/ };
 const ISSUANCE: SqlStep = { label: "issuance", match: /INSERT INTO kauro\.quote_issuances/ };
@@ -142,7 +142,7 @@ faultCell(
     step: "CMD027 included-replacement protocol / RACE: S1 intent, two keys contending for the one paid allowance",
     fault: "race",
     expect:
-      "RACE (replacement): hold one replacement before its settlement and start another key on the same paid purchase, in both orders: exactly one re-binding and one allowance ordinal, the other refused with nothing written and, retried, REPLACEMENT_ALLOWANCE_SPENT",
+      "RACE (replacement): hold one replacement before its settlement and start another key on the same paid purchase, in both orders: exactly one re-binding and one allowance ordinal, the other refused with nothing written (OPERATION_PENDING retryable, or REPLACEMENT_ALLOWANCE_SPENT) and, retried, REPLACEMENT_ALLOWANCE_SPENT; and with the other key's live-quote read before the first key's re-binding and its lock after it, in both orders, the late key is refused REPLACEMENT_ALLOWANCE_SPENT on the quote live at its lock, never 422 INTEGRITY_FAILURE, and a retry under the same or a fresh key writes nothing",
   },
   async (ctx) => {
     // one corrected revision is current at a time, so both keys replace with the one approved plan; each order is its own paid purchase
@@ -168,6 +168,8 @@ faultCell(
         ["409 PRECONDITION_FAILED OPERATION_PENDING", "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT"].includes(outcome(iw.w, waited)),
         `the waiter is refused, never a second replacement: ${outcome(iw.w, waited)}`,
       );
+      // a replacement still pending is retryable: the same key retries once the pending one settles (and then reads the allowance spent)
+      if (outcome(iw.w, waited) === "409 PRECONDITION_FAILED OPERATION_PENDING") assert.equal(asProblem(iw.w, waited).retryable, true, "OPERATION_PENDING is retryable");
       const s = await stateOf(x, waiterKey);
       reboundOnce(x, s, held.quote.quoteId);
       assert.deepEqual(s.replacements, ["ACCEPTED_FOR_CHECKOUT"], "one replacement quote: the waiter wrote none");
