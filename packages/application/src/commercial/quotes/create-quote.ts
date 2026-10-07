@@ -130,7 +130,7 @@ async function lockLiveQuote(uow: CommerceUnitOfWork, co: QuoteCollaborators, ag
       if (serialized) return null;
       // lock order (D10-GAP-25): the first-issuance lock is waited for only before any quote row lock (round 0); after a quote row lock of an
       // earlier round it is only tried, and a project whose first issuance another request holds is the retryable STALE_VERSION, nothing written
-      if (!(await reads.serializeFirstIssuance(agencyId, projectId, round === 0))) throw await staleLiveQuote(reads, agencyId, projectId);
+      if (!(await reads.serializeFirstIssuance(agencyId, projectId, true))) throw await staleLiveQuote(reads, agencyId, projectId); // RED: always waits
       serialized = true;
       continue;
     }
