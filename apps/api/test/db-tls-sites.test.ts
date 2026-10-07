@@ -126,3 +126,22 @@ test("ADV-8: the TLS cluster requires the password (scram): a wrong one is refus
   writeFileSync(wrong, "not-the-cluster-password\n");
   await assert.rejects(openDatabase({ environment: "SANDBOX", database: { ...login(ROLES.appLogin), passwordFile: wrong, statementTimeoutMs: 10_000 }, migrateOnStart: null }), /password authentication failed/i);
 });
+
+test("ADV-7: when the assurance password file cannot be read, the runtime pool opened before it is closed, not leaked", async () => {
+  await assert.rejects(
+    openDatabase({
+      environment: "SANDBOX",
+      database: { ...login(ROLES.appLogin), statementTimeoutMs: 10_000 },
+      migrateOnStart: null,
+      identity: { assuranceDatabase: { user: ROLES.assuranceLogin, poolMax: 1, passwordFile: join(dir, "no-such-file") } },
+    }),
+    named("KAURO_DB_ASSURANCE_PASSWORD_FILE"),
+  );
+  // a bounded wait for the server to reap the closed backends (each check is one query; 20 x 50 ms at most)
+  let left = await backends(API_APPLICATION_NAME);
+  for (let i = 0; i < 20 && left.length > 0; i++) {
+    await new Promise((r) => setTimeout(r, 50));
+    left = await backends(API_APPLICATION_NAME);
+  }
+  assert.deepEqual(left, [], "no backend of the runtime pool stays open");
+});

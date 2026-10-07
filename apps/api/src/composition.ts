@@ -147,16 +147,17 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   const boundary = config.identity?.assuranceDatabase;
   if (boundary !== undefined) {
     const { poolMax: boundaryMax, user: boundaryUser, password: boundaryPassword, passwordFile: boundaryPasswordFile } = boundary;
-    const boundarySecurity = connectionSecurityOf(config.environment, { host: connection.host, ...(boundaryPassword === undefined ? {} : { password: boundaryPassword }), ...(boundaryPasswordFile === undefined ? {} : { passwordFile: boundaryPasswordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), names: { password: "KAURO_DB_ASSURANCE_PASSWORD", passwordFile: "KAURO_DB_ASSURANCE_PASSWORD_FILE" } });
-    assurancePool = createPool({ host: connection.host, port: connection.port, database: connection.database, user: boundaryUser, ...boundarySecurity, max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
     try {
+      // the password file is read inside the try: a failure closes the runtime pool opened above, never leaks it (ADV-7)
+      const boundarySecurity = connectionSecurityOf(config.environment, { host: connection.host, ...(boundaryPassword === undefined ? {} : { password: boundaryPassword }), ...(boundaryPasswordFile === undefined ? {} : { passwordFile: boundaryPasswordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), names: { password: "KAURO_DB_ASSURANCE_PASSWORD", passwordFile: "KAURO_DB_ASSURANCE_PASSWORD_FILE" } });
+      assurancePool = createPool({ host: connection.host, port: connection.port, database: connection.database, user: boundaryUser, ...boundarySecurity, max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
       const { client, connection: verified } = await assurancePool.acquire();
       client.release();
       if (verified.role !== "kauro_assurance") {
         throw new Error(`the session boundary's login must be a member of kauro_assurance; ${verified.loginRole} is a member of ${verified.role} (B06 D-EVID-1, B11 D-AUTH-1)`);
       }
     } catch (e) {
-      await assurancePool.end();
+      await assurancePool?.end();
       await pool.end();
       throw e;
     }
