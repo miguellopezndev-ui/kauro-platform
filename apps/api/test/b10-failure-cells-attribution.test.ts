@@ -478,7 +478,7 @@ faultCell(
   async (ctx) => {
     const one = await lapseFirst(ctx, "lapse-accept-cmd047");
     assert.deepEqual([one.claim.state, one.frozen], ["EXPIRED", false], "lapse first: the claim EXPIRED, no allocation frozen");
-    assert.match(one.accept, /^409 (STALE_VERSION -|PRECONDITION_FAILED CLAIM_EXPIRED)$/, "lapse first: the acceptance that waited on the lapse is refused (the claim it read moved on)");
+    assert.equal(one.accept, "409 STALE_VERSION -", "lapse first: the acceptance that waited on the lapse is refused (the claim it read moved on: expectedVersion is checked first)");
     assert.equal(one.acceptCurrent, "409 PRECONDITION_FAILED CLAIM_EXPIRED", "lapse first: accepting the lapsed claim at its current version is CLAIM_EXPIRED");
     assert.deepEqual([(await claimOf(one.claimId)).state, (await allocationOf(one.allocationId)).frozen], ["EXPIRED", false], "lapse first: still no allocation");
     const two = await acceptFirst(ctx, "lapse-accept-cmd047");

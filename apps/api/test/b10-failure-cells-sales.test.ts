@@ -190,8 +190,10 @@ faultCell(
 // TERM_ACCEPT: TerminateSeller racing AcceptAttribution of the seller's claim, in both orders
 // =====================================================================================================================================
 
-/** A refused acceptance: the claim moved on (its expected version is stale), the seller is not ACTIVE, or the claim is no longer under review. */
-const REFUSED_ACCEPTANCE = /^409 (PRECONDITION_FAILED (SELLER_NOT_ACTIVE|CLAIM_NOT_REVIEWABLE|CLAIM_EXPIRED)|STALE_VERSION -)$/;
+/** The refusal of an acceptance whose own claim the termination moved on: its expected version is stale (B06 order: expectedVersion before the state checks). */
+const STALE_CLAIM = /^409 STALE_VERSION -$/;
+/** The refusal of an acceptance whose allocation names the terminated seller's claim (EXPIRED by the termination, its deadline far off): not under review. */
+const SHARE_NOT_REVIEWABLE = /^409 PRECONDITION_FAILED CLAIM_NOT_REVIEWABLE$/;
 
 faultCell(
   {
@@ -219,7 +221,7 @@ faultCell(
         assert.deepEqual([t.data.claimsExpired, t.data.tailEntries], [1, 0], "the termination expires the accepted, unlisted claim");
         assert.equal(await frozen(allocationId), true);
       } else {
-        assert.match(said(valueOf(accepted as PromiseSettledResult<Reply>, "AcceptAttribution")), REFUSED_ACCEPTANCE, "the acceptance that waited is refused");
+        assert.match(said(valueOf(accepted as PromiseSettledResult<Reply>, "AcceptAttribution")), STALE_CLAIM, "the acceptance that waited is refused: its claim moved on");
         assert.equal(await frozen(allocationId), false, "no allocation frozen");
       }
       assert.deepEqual(await claimStates([op.claimId]), ["EXPIRED"], `${order}: no live share for the TERMINATED seller`);
@@ -230,7 +232,7 @@ faultCell(
     const op = await opportunityOf(iw, s, "term-accept-1-after", { accept: false });
     const allocationId = await prepareAllocation(iw.h, { ownerUserId: iw.owner.userId, agencyId: op.a.s.agency.agencyId, prospectId: op.prospectId, shares: [{ seller: s, claimId: op.claimId, shareBps: 10_000 }] });
     completed<SellerTerminationView>(await terminate(s.sellerId, freshKey("term-accept-1-after"), await terminationBody(iw, s.sellerId, [])), 200);
-    await ctx.fenced("an acceptance of the terminated seller's claim", () => refusedWith(acceptClaim(op.claimId, allocationId, freshKey("term-accept-1-fenced"))), isRefusal(REFUSED_ACCEPTANCE));
+    await ctx.fenced("an acceptance of the terminated seller's claim", () => refusedWith(acceptClaim(op.claimId, allocationId, freshKey("term-accept-1-fenced"))), isRefusal(STALE_CLAIM));
     assert.equal(await frozen(allocationId), false);
   },
 );
@@ -269,12 +271,12 @@ faultCell(
         assert.equal(said(valueOf(accepted as PromiseSettledResult<Reply>, "AcceptAttribution")), "200");
         assert.deepEqual([await frozen(allocationId), ...(await claimStates(att.claimIds))], [true, "EXPIRED", "ACCEPTED"], "X's share EXPIRED with X, Y's ACCEPTED");
       } else {
-        assert.match(said(valueOf(accepted as PromiseSettledResult<Reply>, "AcceptAttribution")), REFUSED_ACCEPTANCE);
+        assert.match(said(valueOf(accepted as PromiseSettledResult<Reply>, "AcceptAttribution")), SHARE_NOT_REVIEWABLE, "the acceptance naming X's expired share");
         assert.deepEqual([await frozen(allocationId), ...(await claimStates(att.claimIds))], [false, "EXPIRED", "SUBMITTED"], "nothing frozen; X's claim EXPIRED, Y's left SUBMITTED");
       }
       assert.equal(await tailsOf(x.sellerId), 0, `${order}: no tail for X`);
       if (order === "TERMINATION_FIRST") {
-        await ctx.fenced("the split's acceptance after X's termination", () => refusedWith(acceptClaim(att.claimIds[1]!, allocationId, freshKey(`${label}-fenced`))), isRefusal(REFUSED_ACCEPTANCE));
+        await ctx.fenced("the split's acceptance after X's termination", () => refusedWith(acceptClaim(att.claimIds[1]!, allocationId, freshKey(`${label}-fenced`))), isRefusal(SHARE_NOT_REVIEWABLE));
         assert.equal(await frozen(allocationId), false);
       }
     }
