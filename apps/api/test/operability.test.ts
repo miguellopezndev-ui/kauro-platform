@@ -283,7 +283,7 @@ test("N7: a serving process (node dist/src/main.js) given the owner's password i
     assert.match(refused.stderr, /kauro-api failed to start: ConfigError: KAURO_DB_MIGRATOR_PASSWORD: is never accepted by the serving process/);
     assert.ok(!refused.stderr.includes(MIGRATOR_SECRET) && !refused.stdout.includes(MIGRATOR_SECRET), "never the value");
     assert.ok(!refused.stderr.includes("listening"), "it never listened");
-    const job = { KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: fresh.tls?.host ?? "", KAURO_DB_TLS_CA_FILE: fresh.tls?.caFile ?? "", KAURO_DB_PORT: String(fresh.port), KAURO_DB_NAME: ROLES.database, KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET };
+    const job = { KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: fresh.tls?.host ?? "", KAURO_DB_TLS_CA_FILE: fresh.tls?.caFile ?? "", KAURO_DB_PORT: String(fresh.port), KAURO_DB_NAME: ROLES.database, KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: fresh.tls?.password ?? "" };
     const first = await runProcess(MIGRATE_ENTRY, job, "the migration job on a fresh database");
     assert.equal(first.code, 0, first.stderr);
     assert.equal(first.stdout, `kauro-migrate LIVE: migrations applied: ${listMigrations().length}, already applied: 0\n`);
@@ -295,7 +295,7 @@ test("N7: a serving process (node dist/src/main.js) given the owner's password i
     assert.equal(superuser.code, 1);
     assert.match(superuser.stderr, /kauro-migrate failed: MigratorRoleError: /);
     // the in-process form of the job, with the password from a file
-    const inProcess = await runMigrationJob({ ...job, KAURO_DB_MIGRATOR_PASSWORD: undefined, KAURO_DB_MIGRATOR_PASSWORD_FILE: passwordFile() });
+    const inProcess = await runMigrationJob({ ...job, KAURO_DB_MIGRATOR_PASSWORD: undefined, KAURO_DB_MIGRATOR_PASSWORD_FILE: fresh.tls?.passwordFile });
     assert.deepEqual([inProcess.result.applied.length, inProcess.result.skipped.length], [0, listMigrations().length]);
   } finally {
     await fresh.stop();

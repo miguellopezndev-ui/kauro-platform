@@ -733,7 +733,7 @@ test("W2 deployment path: bootstrap binds the session boundary from the environm
     const tlsCluster = await startTemporaryPostgres({ tls: true });
     let sandbox: Awaited<ReturnType<typeof bootstrap>>;
     try {
-    sandbox = await bootstrap({ ...base, KAURO_DB_HOST: tlsCluster.tls?.host, KAURO_DB_PORT: String(tlsCluster.port), KAURO_DB_TLS_CA_FILE: tlsCluster.tls?.caFile, KAURO_ENVIRONMENT: "SANDBOX", KAURO_HTTP_PORT: String(await freePort()), KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: cursorKey, KAURO_IDENTITY_KEY_SOURCE: "GOOGLE_X509", KAURO_APP_ORIGINS: "https://app.kauro.example" }, { logger: false });
+    sandbox = await bootstrap({ ...base, KAURO_DB_HOST: tlsCluster.tls?.host, KAURO_DB_PORT: String(tlsCluster.port), KAURO_DB_TLS_CA_FILE: tlsCluster.tls?.caFile, KAURO_DB_PASSWORD_FILE: tlsCluster.tls?.passwordFile, KAURO_DB_ASSURANCE_PASSWORD_FILE: tlsCluster.tls?.passwordFile, KAURO_ENVIRONMENT: "SANDBOX", KAURO_HTTP_PORT: String(await freePort()), KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: cursorKey, KAURO_IDENTITY_KEY_SOURCE: "GOOGLE_X509", KAURO_APP_ORIGINS: "https://app.kauro.example" }, { logger: false });
     try {
       assert.deepEqual(await (await fetch(`${sandbox.address}/api/v1/public/identity-config`)).json(), { adapter: "IDENTITY_PLATFORM", projectId: "kauro-boot" });
     } finally {

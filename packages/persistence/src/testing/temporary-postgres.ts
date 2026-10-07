@@ -43,7 +43,7 @@ export interface TemporaryPostgres {
   readonly dataDir: string;
   readonly migrations: ApplyResult;
   /** Present when started with `tls: true`: the CA file to hand to KAURO_DB_TLS_CA_FILE and the host name the certificate names. */
-  readonly tls?: { readonly caFile: string; readonly host: "localhost" };
+  readonly tls?: { readonly caFile: string; readonly host: "localhost"; /** Every login of a TLS cluster has this password (scram-sha-256), and passwordFile holds it with a trailing newline. */ readonly password: string; readonly passwordFile: string };
   /** A connected client as the given role (LOGIN roles only). The caller ends it. */
   connect(role: LoginRole): Promise<Client>;
   /** The connection settings of a client as the given role, for a connection someone else opens (the fault harness's openConnection). */
@@ -133,6 +133,9 @@ function openssl(args: string[], cwd: string): void {
 }
 
 /** A throw-away CA and a server certificate for DNS:localhost, the server's copies installed in the data directory. */
+/** Every login of a TLS cluster is scram-authenticated with this password: a connection that drops its password setting fails (ADV-8). */
+export const TLS_CLUSTER_PASSWORD = "kauro-tls-cluster-secret";
+
 function generateTlsFiles(base: string, dataDir: string): NonNullable<TemporaryPostgres["tls"]> {
   openssl(["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "ca.key", "-out", "ca.crt", "-days", "2", "-subj", "/CN=kauro-test-ca"], base);
   writeFileSync(join(base, "server.ext"), "subjectAltName=DNS:localhost" + "\n");
@@ -144,7 +147,7 @@ function generateTlsFiles(base: string, dataDir: string): NonNullable<TemporaryP
   copyFileSync(join(base, "server.crt"), join(dataDir, "server.crt"));
   copyFileSync(join(base, "server.key"), join(dataDir, "server.key"));
   if (process.platform !== "win32") spawnSync("chmod", ["600", join(dataDir, "server.key")]);
-  return { caFile: join(base, "ca.crt"), host: "localhost" };
+  return { caFile: join(base, "ca.crt"), host: "localhost", password: TLS_CLUSTER_PASSWORD, passwordFile: join(base, "pw") };
 }
 
 export async function startTemporaryPostgres(options: StartOptions = {}): Promise<TemporaryPostgres> {
@@ -154,12 +157,15 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
   const bin = pgbin();
   const base = mkdtempSync(join(tmpdir(), "kauro-pg-"));
   const dataDir = join(base, "data");
-  run(exe(bin, "initdb"), ["-D", dataDir, "-U", ROLES.superuser, "-A", "trust", "-E", "UTF8", "--no-locale"], "initdb");
+  // a TLS cluster authenticates every login with scram-sha-256 and one known password (initdb sets the superuser's from the file)
+  if (options.tls === true) writeFileSync(join(base, "pw"), `${TLS_CLUSTER_PASSWORD}\n`);
+  const auth = options.tls === true ? ["-A", "scram-sha-256", "--pwfile", join(base, "pw")] : ["-A", "trust"];
+  run(exe(bin, "initdb"), ["-D", dataDir, "-U", ROLES.superuser, ...auth, "-E", "UTF8", "--no-locale"], "initdb");
+  let tls: TemporaryPostgres["tls"];
+  if (options.tls === true) tls = generateTlsFiles(base, dataDir);
   // The free port is probed, released and then bound by the server: another process can take it in between (ci-local 89f7b90,
   // "could not bind": Address already in use on Linux, "Only one usage of each socket address" on Windows). That bind failure,
   // and only that one, starts again on a newly probed port.
-  let tls: TemporaryPostgres["tls"];
-  if (options.tls === true) tls = generateTlsFiles(base, dataDir);
   const nextPort = options.portSource ?? freePort;
   let port = 0;
   for (let attempt = 1; ; attempt++) {
@@ -180,7 +186,8 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
 
   // a TLS cluster is dialled by its certificate's name and verified, like every deployment connection
   const verified = tls === undefined ? {} : { ssl: { ca: readFileSync(tls.caFile, "utf8"), rejectUnauthorized: true } };
-  const clientConfig = (role: string, database: string = ROLES.database): ClientConfig => ({ host: tls === undefined ? "127.0.0.1" : tls.host, port, user: role, database, application_name: `kauro-test-${role}`, ...verified });
+  const pwd = tls === undefined ? "" : ` PASSWORD '${tls.password}'`;
+  const clientConfig = (role: string, database: string = ROLES.database): ClientConfig => ({ host: tls === undefined ? "127.0.0.1" : tls.host, port, user: role, database, application_name: `kauro-test-${role}`, ...verified, ...(tls === undefined ? {} : { password: tls.password }) });
   const connect = async (role: string, database: string = ROLES.database): Promise<Client> => {
     const c = new Client(clientConfig(role, database));
     await c.connect();
@@ -198,7 +205,7 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
   try {
     const su = await connect(ROLES.superuser, "postgres");
     try {
-      await su.query(`CREATE ROLE ${ROLES.owner} LOGIN CREATEROLE NOSUPERUSER NOBYPASSRLS NOCREATEDB`);
+      await su.query(`CREATE ROLE ${ROLES.owner} LOGIN CREATEROLE NOSUPERUSER NOBYPASSRLS NOCREATEDB${pwd}`);
       await su.query(`CREATE DATABASE ${ROLES.database} OWNER ${ROLES.owner}`);
     } finally {
       await su.end();
@@ -213,13 +220,13 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
       }
       const su2 = await connect(ROLES.superuser, "postgres");
       try {
-        await su2.query(`CREATE ROLE ${ROLES.appLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.app}`);
-        await su2.query(`CREATE ROLE ${ROLES.controlLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.control}`);
-        await su2.query(`CREATE ROLE ${ROLES.assuranceLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.assurance}`);
-        await su2.query(`CREATE ROLE ${ROLES.validatorLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.validator}`);
-        await su2.query(`CREATE ROLE ${ROLES.ingressLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.ingress}`);
-        await su2.query(`CREATE ROLE ${ROLES.paymentLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.payment}`);
-        await su2.query(`CREATE ROLE ${ROLES.commissionLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.commission}`);
+        await su2.query(`CREATE ROLE ${ROLES.appLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.app}${pwd}`);
+        await su2.query(`CREATE ROLE ${ROLES.controlLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.control}${pwd}`);
+        await su2.query(`CREATE ROLE ${ROLES.assuranceLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.assurance}${pwd}`);
+        await su2.query(`CREATE ROLE ${ROLES.validatorLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.validator}${pwd}`);
+        await su2.query(`CREATE ROLE ${ROLES.ingressLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.ingress}${pwd}`);
+        await su2.query(`CREATE ROLE ${ROLES.paymentLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.payment}${pwd}`);
+        await su2.query(`CREATE ROLE ${ROLES.commissionLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.commission}${pwd}`);
       } finally {
         await su2.end();
       }

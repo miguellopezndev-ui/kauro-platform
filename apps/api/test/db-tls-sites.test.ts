@@ -8,16 +8,15 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "@kauro/persistence/testing";
 import { API_APPLICATION_NAME, COMMISSION_APPLICATION_NAME, PAYMENT_APPLICATION_NAME, SESSIONS_APPLICATION_NAME, openCommissionPools, openDatabase, openPaymentPools, runMigrationJob, systemClock, systemRandom } from "../src/index.js";
-import { listMigrations } from "@kauro/persistence";
+import { ConnectionSecurityError, listMigrations } from "@kauro/persistence";
 
 let pg: TemporaryPostgres;
 let dir: string;
-let passwordFile: string;
+
 before(async () => {
   pg = await startTemporaryPostgres({ tls: true });
   dir = mkdtempSync(join(tmpdir(), "kauro-api-tls-sites-"));
-  passwordFile = join(dir, "pw");
-  writeFileSync(passwordFile, "not-checked-under-trust\n");
+
 });
 after(async () => {
   await pg.stop();
@@ -26,7 +25,7 @@ after(async () => {
 
 function login(user: string, poolMax = 1): { host: string; port: number; database: string; user: string; poolMax: number; tlsCaFile: string; passwordFile: string } {
   assert.ok(pg.tls);
-  return { host: pg.tls.host, port: pg.port, database: ROLES.database, user, poolMax, tlsCaFile: pg.tls.caFile, passwordFile };
+  return { host: pg.tls.host, port: pg.port, database: ROLES.database, user, poolMax, tlsCaFile: pg.tls.caFile, passwordFile: pg.tls.passwordFile };
 }
 
 /** The server's own account of the open backends: [application_name, ssl] for the application names that start with `prefix`. */
@@ -48,7 +47,7 @@ test("ADV-1: the api runtime pool and the session boundary's pool (SANDBOX) are 
     environment: "SANDBOX",
     database: { ...login(ROLES.appLogin, 2), statementTimeoutMs: 10_000 },
     migrateOnStart: null,
-    identity: { assuranceDatabase: { user: ROLES.assuranceLogin, poolMax: 1, passwordFile } },
+    identity: { assuranceDatabase: { user: ROLES.assuranceLogin, poolMax: 1, passwordFile: pg.tls?.passwordFile ?? "" } },
   });
   try {
     assert.deepEqual(await backends(API_APPLICATION_NAME), [
@@ -95,9 +94,35 @@ test("ADV-1: the migration job connects to the TLS-only cluster with its CA (a c
       KAURO_DB_NAME: ROLES.database,
       KAURO_DB_MIGRATOR_USER: ROLES.owner,
       KAURO_DB_TLS_CA_FILE: fresh.tls.caFile,
+      KAURO_DB_MIGRATOR_PASSWORD_FILE: fresh.tls.passwordFile,
     });
     assert.equal(ran.result.applied.length, listMigrations().length);
   } finally {
     await fresh.stop();
   }
+});
+
+const named = (variable: string) => (e: unknown) => e instanceof ConnectionSecurityError && e.variable === variable;
+
+test("ADV-8: outside LOCAL a missing runtime password file and a missing assurance password file each refuse the start, naming their own variable", async () => {
+  const missing = join(dir, "no-such-file");
+  await assert.rejects(
+    openDatabase({ environment: "SANDBOX", database: { ...login(ROLES.appLogin), passwordFile: missing, statementTimeoutMs: 10_000 }, migrateOnStart: null }),
+    named("KAURO_DB_PASSWORD_FILE"),
+  );
+  await assert.rejects(
+    openDatabase({
+      environment: "SANDBOX",
+      database: { ...login(ROLES.appLogin), statementTimeoutMs: 10_000 },
+      migrateOnStart: null,
+      identity: { assuranceDatabase: { user: ROLES.assuranceLogin, poolMax: 1, passwordFile: missing } },
+    }),
+    named("KAURO_DB_ASSURANCE_PASSWORD_FILE"),
+  );
+});
+
+test("ADV-8: the TLS cluster requires the password (scram): a wrong one is refused by the server, so a site that drops its password setting fails", async () => {
+  const wrong = join(dir, "wrong-password");
+  writeFileSync(wrong, "not-the-cluster-password\n");
+  await assert.rejects(openDatabase({ environment: "SANDBOX", database: { ...login(ROLES.appLogin), passwordFile: wrong, statementTimeoutMs: 10_000 }, migrateOnStart: null }), /password authentication failed/i);
 });
