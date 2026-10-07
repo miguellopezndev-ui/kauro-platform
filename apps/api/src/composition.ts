@@ -28,8 +28,8 @@ import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } fro
 import type { UtcInstant } from "@kauro/contracts";
 import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
-import type { ApplyResult, DatabaseTls, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { readFileSync } from "node:fs";
+import { ConnectionSecurityError } from "@kauro/persistence";
+import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
 import { bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, connectionSecurityOf, createPool, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import { commercialPrincipalReader } from "./commercial-principals.js";
@@ -107,7 +107,9 @@ export interface DatabaseDependencies {
  */
 export function applyMigrationsWith(environment: Environment, migrator: MigratorConfig, password: string | undefined): Promise<ApplyResult> {
   const { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs, passwordFile: _passwordFile, tlsCaFile, ...connection } = migrator;
-  const { tls } = connectionSecurityOf(environment, { host: connection.host, ...(tlsCaFile === undefined ? {} : { tlsCaFile }) });
+  const { tls } = connectionSecurityOf(environment, { host: connection.host, passwordRequired: false, ...(tlsCaFile === undefined ? {} : { tlsCaFile }) });
+  // the migrator's credential is its own (N7); outside LOCAL it is explicit, so pg never falls back to PGPASSWORD or a pgpass file (ADV-9)
+  if (environment !== "LOCAL" && password === undefined) throw new ConnectionSecurityError("KAURO_DB_MIGRATOR_PASSWORD", "is required outside LOCAL (or KAURO_DB_MIGRATOR_PASSWORD_FILE): the migration connection is always given its password explicitly");
   return applyMigrationsAs(
     { ...connection, ...(password === undefined ? {} : { password }), ...(tls === undefined ? {} : { tls }), applicationName: `${API_APPLICATION_NAME}-migrator` },
     { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs },

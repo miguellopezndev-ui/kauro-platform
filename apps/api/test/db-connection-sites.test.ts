@@ -123,8 +123,9 @@ test("every connection site of apps/ and packages/*/src is known, and each compo
   }
 });
 
-const login = { host: "db.example.test", port: 1, database: "kauro", user: "u", poolMax: 1 };
+const login = { host: "db.example.test", port: 1, database: "kauro", user: "u", poolMax: 1, passwordFile: "pw" };
 const secure = { ...login, tlsCaFile: "ca.pem" };
+const plain = { host: "db.example.test", port: 1, database: "kauro", user: "u", poolMax: 1, tlsCaFile: "ca.pem", password: "x" };
 const deps = (environment: "SANDBOX" | "LIVE") => ({ clock: { now: () => 0 } as never, random: (() => new Uint8Array(1)) as never, environment });
 const refused = (variable: string) => (e: unknown) => e instanceof ConnectionSecurityError && e.message.startsWith(`${variable}:`);
 
@@ -132,11 +133,11 @@ test("the commission and payment roots refuse SANDBOX and LIVE without a CA, wit
   for (const environment of ["SANDBOX", "LIVE"] as const) {
     const ok = { commission: login, control: login };
     await assert.rejects(openCommissionPools(ok, deps(environment)), refused("KAURO_DB_TLS_CA_FILE"));
-    await assert.rejects(openCommissionPools({ commission: { ...secure, password: "x" }, control: secure }, deps(environment)), refused("KAURO_DB_PASSWORD"));
+    await assert.rejects(openCommissionPools({ commission: plain, control: secure }, deps(environment)), refused("KAURO_DB_PASSWORD"));
     await assert.rejects(openCommissionPools({ commission: { ...secure, host: "10.0.0.1" }, control: secure }, deps(environment)), refused("KAURO_DB_HOST"));
     const pay = { payment: login, control: login, ingress: login };
     await assert.rejects(openPaymentPools({} as never, pay, deps(environment)), refused("KAURO_DB_TLS_CA_FILE"));
-    await assert.rejects(openPaymentPools({} as never, { payment: { ...secure, password: "x" }, control: secure, ingress: secure }, deps(environment)), refused("KAURO_DB_PASSWORD"));
+    await assert.rejects(openPaymentPools({} as never, { payment: plain, control: secure, ingress: secure }, deps(environment)), refused("KAURO_DB_PASSWORD"));
     await assert.rejects(openPaymentPools({} as never, { payment: { ...secure, host: "10.0.0.1" }, control: secure, ingress: secure }, deps(environment)), refused("KAURO_DB_HOST"));
   }
 });

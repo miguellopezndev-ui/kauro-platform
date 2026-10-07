@@ -5,7 +5,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { ConfigError, loadConfig, loadMigrationJobConfig } from "../src/index.js";
+import { ConnectionSecurityError } from "@kauro/persistence";
+import { ConfigError, applyMigrationsWith, loadConfig, loadMigrationJobConfig } from "../src/index.js";
 
 let dir: string;
 let caFile: string;
@@ -101,4 +102,18 @@ test("I-2: outside LOCAL the database host is a DNS name (pg verifies an IP lite
   assert.throws(() => loadConfig(cursorEnv({ KAURO_DB_HOST: "10.0.0.5" })), refused("KAURO_DB_HOST"));
   assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "10.0.0.5", KAURO_DB_MIGRATOR_USER: "kauro_owner", KAURO_DB_TLS_CA_FILE: caFile }), refused("KAURO_DB_HOST"));
   assert.equal(loadConfig({ KAURO_ENVIRONMENT: "LOCAL", KAURO_DB_HOST: "127.0.0.1", KAURO_DB_USER: "kauro_app_login", KAURO_DB_POOL_MAX: "4" }).database.host, "127.0.0.1");
+});
+
+test("ADV-9: outside LOCAL the runtime and assurance password files are required, and PGPASSWORD / PGPASSFILE in the environment refuse the start", () => {
+  assert.throws(() => loadConfig(cursorEnv({ KAURO_DB_PASSWORD_FILE: undefined })), refused("KAURO_DB_PASSWORD_FILE"));
+  assert.throws(() => loadConfig(identityEnv({ KAURO_DB_ASSURANCE_PASSWORD_FILE: undefined })), refused("KAURO_DB_ASSURANCE_PASSWORD_FILE"));
+  for (const variable of ["PGPASSWORD", "PGPASSFILE"]) {
+    assert.throws(() => loadConfig(cursorEnv({ [variable]: "zzz-value" })), refused(variable, "zzz-value"));
+    assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "db.example.test", KAURO_DB_MIGRATOR_USER: "kauro_owner", KAURO_DB_TLS_CA_FILE: caFile, [variable]: "zzz-value" }), refused(variable, "zzz-value"));
+  }
+});
+
+test("ADV-9: the migration connection outside LOCAL needs an explicit password (never pg's PGPASSWORD / pgpass fallback)", async () => {
+  const migrator = { host: "db.example.test", port: 1, database: "kauro", user: "kauro_owner", tlsCaFile: caFile, connectTimeoutMs: 100, statementTimeoutMs: 1000, lockTimeoutMs: 100, passwordFile: null };
+  await assert.rejects(async () => applyMigrationsWith("LIVE", migrator, undefined), (e: unknown) => e instanceof ConnectionSecurityError && e.variable === "KAURO_DB_MIGRATOR_PASSWORD");
 });

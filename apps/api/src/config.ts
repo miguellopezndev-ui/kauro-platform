@@ -160,9 +160,9 @@ export const DB_TLS_CA_FILE_VARIABLE = "KAURO_DB_TLS_CA_FILE";
  * becomes a ConfigError naming the variable. The values it reads are not kept here: the composition resolves them again when it
  * opens the connection, so the rule has a single source.
  */
-function checkConnectionSecurity(environment: Environment, input: ConnectionSecurityInput): void {
+function checkConnectionSecurity(environment: Environment, input: ConnectionSecurityInput, env: Env): void {
   try {
-    connectionSecurityOf(environment, { ...input, validateOnly: true });
+    connectionSecurityOf(environment, { ...input, validateOnly: true, processEnv: env });
   } catch (e) {
     if (e instanceof ConnectionSecurityError) throw new ConfigError(e.variable, e.problem);
     throw e;
@@ -338,10 +338,10 @@ export function loadConfig(env: Env = process.env): ApiConfig {
   // every instance behind the load balancer must open the cursors another one sealed (10 "Pagination, search and exports")
   if (config.cursorKeyFile === null && environment !== "LOCAL") throw new ConfigError(CURSOR_KEY_FILE_VARIABLE, "is required outside LOCAL: every instance seals and opens the same list cursors");
   // I-2, I-3: outside LOCAL the database is reached over verified TLS, by a DNS name, with file passwords, or not at all
-  checkConnectionSecurity(environment, { host, ...(runtimePassword === undefined ? {} : { password: runtimePassword }), ...(runtimePasswordFile === undefined ? {} : { passwordFile: runtimePasswordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }) });
+  checkConnectionSecurity(environment, { host, ...(runtimePassword === undefined ? {} : { password: runtimePassword }), ...(runtimePasswordFile === undefined ? {} : { passwordFile: runtimePasswordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }) }, env);
   if (identity !== null) {
     const login = identity.assuranceDatabase;
-    checkConnectionSecurity(environment, { host, ...(login.password === undefined ? {} : { password: login.password }), ...(login.passwordFile === undefined ? {} : { passwordFile: login.passwordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), names: { password: "KAURO_DB_ASSURANCE_PASSWORD", passwordFile: "KAURO_DB_ASSURANCE_PASSWORD_FILE" } });
+    checkConnectionSecurity(environment, { host, ...(login.password === undefined ? {} : { password: login.password }), ...(login.passwordFile === undefined ? {} : { passwordFile: login.passwordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), names: { password: "KAURO_DB_ASSURANCE_PASSWORD", passwordFile: "KAURO_DB_ASSURANCE_PASSWORD_FILE" } }, env);
   }
   return identity === null ? config : { ...config, identity };
 }
@@ -451,6 +451,6 @@ export function loadMigrationJobConfig(env: Env = process.env): MigrationJobConf
   const port = integer(env, "KAURO_DB_PORT", 5432, 1, 65535);
   const database = optional(env, "KAURO_DB_NAME") ?? "kauro";
   const migrator = migratorOf(env, host, port, database, optional(env, "KAURO_DB_USER"));
-  checkConnectionSecurity(environment, { host, ...(migrator.tlsCaFile === undefined ? {} : { tlsCaFile: migrator.tlsCaFile }) });
+  checkConnectionSecurity(environment, { host, passwordRequired: false, ...(migrator.tlsCaFile === undefined ? {} : { tlsCaFile: migrator.tlsCaFile }) }, env);
   return { environment, migrator };
 }

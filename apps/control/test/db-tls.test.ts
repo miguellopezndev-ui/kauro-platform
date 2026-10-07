@@ -9,11 +9,11 @@ const refused = (variable: string) => (e: unknown) => e instanceof ConnectionSec
 
 test("openControlDatabase and openValidatorReceipts refuse SANDBOX and LIVE without a CA, with a plain password or with an IP host", async () => {
   for (const environment of ["SANDBOX", "LIVE"] as const) {
-    await assert.rejects(openControlDatabase({ ...base, environment }), refused("KAURO_DB_TLS_CA_FILE"));
+    await assert.rejects(openControlDatabase({ ...base, passwordFile: "pw", environment }), refused("KAURO_DB_TLS_CA_FILE"));
     await assert.rejects(openControlDatabase({ ...base, environment, password: "x", tlsCaFile: "ca.pem" }), refused("KAURO_DB_PASSWORD"));
-    await assert.rejects(openControlDatabase({ ...base, environment, host: "10.0.0.1", tlsCaFile: "ca.pem" }), refused("KAURO_DB_HOST"));
-    await assert.rejects(openValidatorReceipts({ ...base, environment }, "t"), refused("KAURO_DB_TLS_CA_FILE"));
+    await assert.rejects(openControlDatabase({ ...base, environment, host: "10.0.0.1", passwordFile: "pw", tlsCaFile: "ca.pem" }), refused("KAURO_DB_HOST"));
+    await assert.rejects(openValidatorReceipts({ ...base, passwordFile: "pw", environment }, "t"), refused("KAURO_DB_TLS_CA_FILE"));
     await assert.rejects(openValidatorReceipts({ ...base, environment, password: "x", tlsCaFile: "ca.pem" }, "t"), refused("KAURO_DB_PASSWORD"));
-    await assert.rejects(openValidatorReceipts({ ...base, environment, host: "10.0.0.1", tlsCaFile: "ca.pem" }, "t"), refused("KAURO_DB_HOST"));
+    await assert.rejects(openValidatorReceipts({ ...base, environment, host: "10.0.0.1", passwordFile: "pw", tlsCaFile: "ca.pem" }, "t"), refused("KAURO_DB_HOST"));
   }
 });

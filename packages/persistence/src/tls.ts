@@ -32,6 +32,10 @@ export interface ConnectionSecurityInput {
   readonly passwordFile?: string;
   /** The CA file (KAURO_DB_TLS_CA_FILE); required outside LOCAL (I-2). */
   readonly tlsCaFile?: string;
+  /** The environment to look for PGPASSWORD, PGPASSFILE and PGSSLMODE in (default: process.env). */
+  readonly processEnv?: Readonly<Record<string, string | undefined>>;
+  /** Outside LOCAL a password file is required unless the caller holds the credential itself (the migrator) and requires it explicitly. Default true. */
+  readonly passwordRequired?: boolean;
   /** Check the shape of the configuration (what is required, refused, exclusive) without reading any file: the start-up check of a configuration loader. */
   readonly validateOnly?: boolean;
   /** The variables the deployment names these inputs by, for the refusal text (default: the runtime login's). */
@@ -53,14 +57,20 @@ export class ConnectionSecurityError extends Error {
  */
 export function connectionSecurityOf(environment: "LOCAL" | "SANDBOX" | "LIVE", input: ConnectionSecurityInput): { readonly password?: string; readonly tls?: DatabaseTls } {
   const local = environment === "LOCAL";
+  // pg takes the password, the pgpass file and the TLS mode from these when the connection settings leave them out: outside LOCAL they are refused (ADV-9)
+  const processEnv = input.processEnv ?? process.env;
+  if (!local) {
+    for (const variable of ["PGPASSWORD", "PGPASSFILE", "PGSSLMODE"]) {
+      if ((processEnv[variable] ?? "") !== "") throw new ConnectionSecurityError(variable, "must not be set outside LOCAL: pg would take the password or the TLS mode from it instead of the configured file and CA");
+    }
+  }
   const names = input.names ?? { password: "KAURO_DB_PASSWORD", passwordFile: "KAURO_DB_PASSWORD_FILE" };
   if (input.password !== undefined && input.passwordFile !== undefined) throw new ConnectionSecurityError(names.passwordFile, `is exclusive with ${names.password}`);
   if (input.password !== undefined && !local) throw new ConnectionSecurityError(names.password, `is accepted in the LOCAL environment only: SANDBOX and LIVE receive the password as a mounted secret file (${names.passwordFile})`);
   if (!local && isIP(input.host) !== 0) throw new ConnectionSecurityError("KAURO_DB_HOST", "must be a DNS name outside LOCAL: the certificate is verified against the host name dialled");
-  if (input.validateOnly === true) {
-    if (input.tlsCaFile === undefined && !local) throw new ConnectionSecurityError("KAURO_DB_TLS_CA_FILE", "is required outside LOCAL: the database connection verifies the server certificate against this CA");
-    return {};
-  }
+  if (!local && input.passwordRequired !== false && input.passwordFile === undefined) throw new ConnectionSecurityError(names.passwordFile, "is required outside LOCAL: the password is a mounted secret file, and pg is always given it explicitly");
+  if (input.tlsCaFile === undefined && !local) throw new ConnectionSecurityError("KAURO_DB_TLS_CA_FILE", "is required outside LOCAL: the database connection verifies the server certificate against this CA");
+  if (input.validateOnly === true) return {};
   let password = input.password;
   if (input.passwordFile !== undefined) {
     password = readFileOf(names.passwordFile, input.passwordFile).replace(/\r?\n$/, "");
@@ -71,8 +81,6 @@ export function connectionSecurityOf(environment: "LOCAL" | "SANDBOX" | "LIVE", 
     const ca = readFileOf("KAURO_DB_TLS_CA_FILE", input.tlsCaFile);
     if (!ca.includes("-----BEGIN CERTIFICATE-----")) throw new ConnectionSecurityError("KAURO_DB_TLS_CA_FILE", "names a file that holds no PEM certificate");
     tls = { ca };
-  } else if (!local) {
-    throw new ConnectionSecurityError("KAURO_DB_TLS_CA_FILE", "is required outside LOCAL: the database connection verifies the server certificate against this CA");
   }
   return { ...(password === undefined ? {} : { password }), ...(tls === undefined ? {} : { tls }) };
 }

@@ -48,3 +48,27 @@ test("a missing, empty or non-PEM file is refused by variable, never with its co
   assert.throws(() => connectionSecurityOf("LOCAL", { host: "h", passwordFile: empty }), refusedBy("KAURO_DB_PASSWORD_FILE"));
   assert.throws(() => connectionSecurityOf("LOCAL", { host: "h", tlsCaFile: junk }), refusedBy("KAURO_DB_TLS_CA_FILE"));
 });
+
+test("ADV-9: outside LOCAL a password FILE is required (pg would otherwise consult PGPASSWORD or a pgpass file), the result always carries an explicit password, and LOCAL is unchanged", () => {
+  for (const environment of ["SANDBOX", "LIVE"] as const) {
+    assert.throws(() => connectionSecurityOf(environment, { host: "db.example.test", tlsCaFile: ca }), refusedBy("KAURO_DB_PASSWORD_FILE"), environment);
+    assert.throws(() => connectionSecurityOf(environment, { host: "db.example.test", tlsCaFile: ca, validateOnly: true }), refusedBy("KAURO_DB_PASSWORD_FILE"), `${environment} validateOnly`);
+    assert.throws(() => connectionSecurityOf(environment, { host: "db.example.test", tlsCaFile: ca, names: { password: "KAURO_DB_ASSURANCE_PASSWORD", passwordFile: "KAURO_DB_ASSURANCE_PASSWORD_FILE" } }), refusedBy("KAURO_DB_ASSURANCE_PASSWORD_FILE"));
+    assert.equal(typeof connectionSecurityOf(environment, { host: "db.example.test", tlsCaFile: ca, passwordFile: pw }).password, "string");
+    // the migrator holds its own credential: the caller says so, and the call site then requires an explicit password itself
+    assert.doesNotThrow(() => connectionSecurityOf(environment, { host: "db.example.test", tlsCaFile: ca, passwordRequired: false }));
+  }
+  assert.deepEqual(connectionSecurityOf("LOCAL", { host: "127.0.0.1" }), {});
+});
+
+test("ADV-9: outside LOCAL PGPASSWORD, PGPASSFILE and PGSSLMODE in the environment refuse the start by name; LOCAL ignores them", () => {
+  const ok = { host: "db.example.test", tlsCaFile: ca, passwordFile: pw };
+  for (const variable of ["PGPASSWORD", "PGPASSFILE", "PGSSLMODE"]) {
+    for (const environment of ["SANDBOX", "LIVE"] as const) {
+      assert.throws(() => connectionSecurityOf(environment, { ...ok, processEnv: { [variable]: "zzz-value" } }), refusedBy(variable, "zzz-value"), `${environment} ${variable}`);
+      assert.throws(() => connectionSecurityOf(environment, { ...ok, validateOnly: true, processEnv: { [variable]: "zzz-value" } }), refusedBy(variable, "zzz-value"));
+    }
+    assert.deepEqual(connectionSecurityOf("LOCAL", { host: "127.0.0.1", processEnv: { [variable]: "x" } }), {});
+  }
+  assert.equal(connectionSecurityOf("LIVE", { ...ok, processEnv: { PGPASSWORD: "" } }).password, "file-secret", "an empty variable is unset");
+});
