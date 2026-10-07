@@ -5,7 +5,8 @@ repositorio y aquí solo figura que fueron recibidas. Cada tarjeta nueva o cambi
 Formato: decisión exacta, recomendación única, qué habilita, qué pasa si dices no, impacto en dinero / seguridad / fecha,
 ejemplo, riesgos, si cambia R2, cómo responder.
 
-Última actualización: 2026-10-07 (D-22 respondida; D-23 y D-24 completas).
+Última actualización: 2026-10-07 (D-22 respondida; D-23 abierto; D-24 A).
+
 
 ## D-22 Columna numérica sin separador decimal declarado (B03 CAP04) — antes del 10-oct; desbloquea el resellado del corpus B04 (lanes K/P)
 - Qué decide R2 (no es tu decisión): R2 03 "Numbers and currency-like fields" exige una gramática explícita: un locale declarado o una interpretación por campo ya resuelta, y prohíbe elegirla por una muestra o por mayoría. MC 3.0.0 hace lo mismo: sin separador declarado solo acepta dígitos planos y marca el resto AMBIGUOUS (`transform/transformations.ts:441`). Por eso IC ya no puede adivinar la coma a partir de los datos, y mientras no haya gramática la columna se pregunta a la agencia y se preserva sin transformar (KEEP).
@@ -30,6 +31,7 @@ ejemplo, riesgos, si cambia R2, cómo responder.
 - **Riesgos:** (1) soporte puede responder de forma informal o vaga: solo cuenta lo que diga por escrito y, mejor, con enlace a documentación; una respuesta ambigua se registra pero **no** cambia las reglas. (2) Soporte podría ofrecer "cambiar algo en la cuenta": no aceptar cambios de configuración por ese canal sin pasármelos primero.
 - **¿Cambia R2?:** **no.** Solo aporta hechos del proveedor; las reglas de R2 15 (UNCERTAIN retiene la reserva, caso visible) siguen iguales.
 - **Cómo responder:** "D-23 abierto" (y luego pegas o adjuntas la respuesta de PayPal), o "D-23 no".
+- **RESPUESTA 2026-10-07: D-23 abierto.** Ticket abierto por el dueño; respuesta de PayPal pendiente (se registrará como evidencia al llegar). Mientras tanto rigen las reglas de "desconocido = no prueba".
 
 ## D-24 Qué hacer con un reembolso que sigue incierto después de 30 días de re-chequeo — antes de B19 (≈ 16-oct)
 - **Decisión exacta:** cuando un reembolso a PayPal quedó **incierto** (la respuesta se perdió y PayPal nunca lo mostró ni lo negó) y se agotan los re-chequeos automáticos de 30 días, ¿qué hace Kauro con el monto reservado?
@@ -45,3 +47,4 @@ ejemplo, riesgos, si cambia R2, cómo responder.
 - **Riesgos:** A: casos acumulados si nadie los atiende; una agencia esperando una respuesta. Mitigación: aviso diario de casos abiertos > 30 días en tu reporte; se esperan casos raros (solo cuando se pierde la respuesta Y PayPal nunca lo muestra). B: pago doble, disputa con el cliente/PayPal, y una enmienda de R2.
 - **¿Cambia R2?:** A **no** (es lo que R2 15 ya exige: UNCERTAIN retiene la reserva y agotar reintentos deja un caso visible). B **sí** (requiere enmendar R2 15).
 - **Cómo responder:** "D-24 A" o "D-24 B".
+- **RESPUESTA 2026-10-07: D-24 A.** Un reembolso incierto tras 30 días de re-chequeo queda reservado con caso abierto hasta resolución manual del dueño con evidencia del panel de PayPal (auditada); nunca liberación automática. Aplica también si finanzas corrigió primero. R2 sin cambios.
