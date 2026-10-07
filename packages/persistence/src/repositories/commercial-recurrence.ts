@@ -10,6 +10,7 @@
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import {
   DomainFailure,
+  LiveQuoteChangedFailure,
   baseServiceCents,
   quoteAmounts,
   quoteTermsHash,
@@ -202,7 +203,8 @@ export class PgRecurrenceRepository implements RecurrenceRepository {
       const previous = await this.founding.reservationOfQuote(superseded.quoteId);
       if (previous !== null && (previous.state === "RESERVED" || previous.state === "RECONCILIATION_HOLD")) {
         const write = await this.founding.release(previous.reservationId, previous.version, request.issuedAt);
-        if (write.kind !== "APPLIED") throw new DomainFailure("STALE_VERSION", "the superseded quote's reservation changed", { currentVersion: write.currentVersion });
+        // retryable, the project's quote as current (CMD027 adds it): never the reservation's version as if it were the quote's (D10-GAP-25)
+        if (write.kind !== "APPLIED") throw new LiveQuoteChangedFailure("the superseded quote's reservation changed between its read and its release");
         released = write.record;
       }
     }

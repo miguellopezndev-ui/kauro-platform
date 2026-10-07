@@ -20,9 +20,10 @@ export interface QuoteReads {
   liveQuoteOf(agencyId: AgencyId, projectId: ProjectId): Promise<QuoteId | null>;
   /**
    * The exclusive half of the project's first-issuance subject, held to COMMIT (D10-GAP-25): taken by CreateQuote only, when the project has
-   * no live quote to lock, so two first issuances of one project serialize.
+   * no live quote to lock, so two first issuances of one project serialize. `wait` false only tries it (never waits after a quote row lock):
+   * false when another transaction holds it.
    */
-  serializeFirstIssuance(agencyId: AgencyId, projectId: ProjectId): Promise<void>;
+  serializeFirstIssuance(agencyId: AgencyId, projectId: ProjectId, wait: boolean): Promise<boolean>;
   /** The version and state of the project's live quote, else of its latest quote; null when the project has none (STALE_VERSION's current). */
   currentQuoteOf(agencyId: AgencyId, projectId: ProjectId): Promise<{ readonly version: number; readonly state: string } | null>;
   /** The replacement of `quoteId` that is drafted or issued and not yet accepted by a re-binding, or null. */

@@ -41,6 +41,7 @@ import type {
 import {
   DomainFailure,
   IdempotencyConflictFailure,
+  LiveQuoteChangedFailure,
   NotFoundFailure,
   OFFERED_CAPABILITY_STATES,
   baseServiceCents,
@@ -127,7 +128,9 @@ async function lockLiveQuote(uow: CommerceUnitOfWork, co: QuoteCollaborators, ag
     const liveId = await reads.liveQuoteOf(agencyId, projectId);
     if (liveId === null) {
       if (serialized) return null;
-      await reads.serializeFirstIssuance(agencyId, projectId);
+      // lock order (D10-GAP-25): the first-issuance lock is waited for only before any quote row lock (round 0); after a quote row lock of an
+      // earlier round it is only tried, and a project whose first issuance another request holds is the retryable STALE_VERSION, nothing written
+      if (!(await reads.serializeFirstIssuance(agencyId, projectId, round === 0))) throw await staleLiveQuote(reads, agencyId, projectId);
       serialized = true;
       continue;
     }
@@ -234,7 +237,9 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
           if (reservation.kind === "PENDING") {
             // a replacement whose intent committed and whose answer did not: it resumes from the issuance its journal entry recorded
             const issuance = await co.recurrence(uow).issuanceOfEntry(reservation.entry.entryId);
-            if (issuance === null || issuance.replacesQuoteId === undefined) throw new DomainFailure("PRECONDITION_FAILED", "the same logical operation is still pending", { reason: "OPERATION_PENDING" }, true);
+            // the ordinary issuance commits its answer with its quote and a replacement's intent commits its issuance with the entry: an open entry
+            // without a replacement issuance is a breach that never clears, never a retryable pending operation (D10-GAP-25)
+            if (issuance === null || issuance.replacesQuoteId === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "a journal entry is open without the replacement issuance it commits with");
             return { kind: "REPLACEMENT", replacement: await replacementContextOf(uow, co, issuance), resumed: true };
           }
           const entryId = reservation.entryId;
@@ -303,7 +308,7 @@ export function createQuoteHandler(runtime: CommerceRequestRuntime, co: QuoteCol
       } catch (e) {
         if (!(e instanceof DomainFailure) || e.code === "INTERNAL_ERROR") throw e;
         // a second live quote refused by quotes_one_live_per_project (sqlstate.ts: STALE_VERSION without the row) answers with the project's quote
-        if (e.code === "STALE_VERSION" && e.details.currentVersion === undefined) {
+        if (e instanceof LiveQuoteChangedFailure) {
           const stale = await runtime.unitOfWork.run(context, (uow) => staleLiveQuote(co.reads(uow), agencyId, projectId));
           stale.cause = e;
           return resultOf<CreateQuoteView>(stale, envelope.correlationId);

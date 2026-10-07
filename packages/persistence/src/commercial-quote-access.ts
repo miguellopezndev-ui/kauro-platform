@@ -69,8 +69,13 @@ export class PgQuoteReads {
   }
 
   /** D10-GAP-25: the exclusive transaction-level advisory lock of the project's first issuance (only CreateQuote takes it). */
-  async serializeFirstIssuance(_agencyId: AgencyId, projectId: ProjectId): Promise<void> {
-    await execute(this.db, "SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.quotes:first-issuance', $1))", [projectId]);
+  async serializeFirstIssuance(_agencyId: AgencyId, projectId: ProjectId, wait: boolean): Promise<boolean> {
+    if (wait) {
+      await execute(this.db, "SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.quotes:first-issuance', $1))", [projectId]);
+      return true;
+    }
+    const r = await execute<{ ok: boolean }>(this.db, "SELECT pg_try_advisory_xact_lock(kauro.transition_key('kauro.quotes:first-issuance', $1)) AS ok", [projectId]);
+    return r.rows[0]?.ok === true;
   }
 
   /** The project's live quote's version and state, else its latest quote's (null: the project has no quote). */

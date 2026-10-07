@@ -5,7 +5,7 @@
  * the failure taxonomy of @kauro/domain. Adapters catch a pg DatabaseError, read `code`, and raise the DomainFailure the command contract names;
  * the SQL message never leaves the server (10 "Responses and safe errors").
  */
-import { DomainFailure, StaleVersionFailure, type FailureCode, type FailureReason } from "@kauro/domain";
+import { DomainFailure, LiveQuoteChangedFailure, StaleVersionFailure, type FailureCode, type FailureReason } from "@kauro/domain";
 
 export const SQLSTATE = Object.freeze({
   LAST_OWNER: "KA001",
@@ -245,7 +245,7 @@ const COMMERCE_UNIQUE_FAILURES: Readonly<Record<string, () => DomainFailure>> = 
   refunds_one_requested_per_origin: () => new DomainFailure("PRECONDITION_FAILED", "a request of this capture already awaits review", { reason: "REFUND_REQUEST_OPEN" }),
   domain_events_capture_completed_once: () => new DomainFailure("INTEGRITY_FAILURE", "a capture publishes its completion once", { reason: "EVENT_MISSING" }),
   // design §12, D10-GAP-25: a second live quote of a project is STALE_VERSION (retryable); CMD027 adds the live quote as current
-  quotes_one_live_per_project: () => new DomainFailure("STALE_VERSION", "the project's live quote changed under this request", {}, true),
+  quotes_one_live_per_project: () => new LiveQuoteChangedFailure("the project's live quote changed under this request (quotes_one_live_per_project)"),
 });
 
 /**
