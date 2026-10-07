@@ -1,5 +1,10 @@
 # ACH bank-transfer route — owner amendment A8
 
+Design revision **r8** (2026-10-07): r7 plus the fixes of Codex design r7 (REJECT, six MAJOR: ACH-R7-01..06) and the PV1 owner
+Addendum (no production without collection; one real payment for both qualification legs; R2 15 §Initial payment decision
+paragraph 1 superseded). Changed: DV1-04, DV1-06, DV1-08, §6 evidence types, §7.21–§7.22 (X1, X4, X2, G2Δ/G4Δ, X3, NR,
+predicate controls), SI2, P1Δ, §7.28–§7.29 (lock order, enablement), §8 and §10 (r7 → r8 list). The r7 paragraph below is history.
+
 Design only, revision **r7** (2026-10-07): r6 (Codex design ACCEPT on `473718f`) plus the owner decision **Payments V1**
 (`docs/authority/decisions/2026-10-07-PAYMENTS-V1.md`, "PV1"), which supersedes A8's PayPal rank-2 route, parks PayPal and makes
 the V1 rail a USD bank transfer (ACH or domestic wire to the same details) received on Wise Business USD account details,
@@ -55,15 +60,28 @@ CHECKLIST S-09). Instructions read "US bank transfer (ACH or domestic wire to th
 artifact verbatim (a separate wire routing number only if that artifact states one; none is inferred, D-ACH-04 unchanged). No
 wire-specific state, field, command or code path exists beyond the rail value. Case ACH-22.
 
-**DV1-04 — Route states and exposure (A8 rule 2; PV1 §2, §5).** D-ACH-02's machine stands: PENDING_VERIFICATION → VERIFIED →
-ENABLED by configuration, with verification evidence for PV1 §2 (a)–(d). The first ENABLED version has a controlled-participant
-rollout (participant allowlist in route data); general exposure and any public "accepts ACH" copy follow only after ACH-LIVE-01
-**and** ACH-REFUND-LIVE-01 pass (PV1 §2 (e)–(f), §5). With the route not ENABLED the platform shows no bank details and offers no
-alternative route; a buyer with no enabled route gets no instructions and no order (K-9:
-`apps/web/test/checkout-bank-transfer.test.ts` :: "DENY no enabled route for the buyer: no instructions, no order"). Gates:
-**G-PRODUCTION** (B19, 17-oct) may go live with the route not ENABLED, labelled limited availability (S086); **G-BUSINESS**
-("commercially live", R2 15 §Initial payment decision: accept a legitimate payment, reconcile it, deliver, issue the fiscal
-evidence, refund where applicable) needs ACH-LIVE-01, ACH-REFUND-LIVE-01, a fiscal document and delivery.
+**DV1-04 — Route states, enablement and production (A8 rule 2; PV1 §2, §5; r8: PV1 Addendum items 1–4).** D-ACH-02's machine
+stands: PENDING_VERIFICATION → VERIFIED → ENABLED by configuration, with verification evidence for PV1 §2 (a)–(d). ENABLED has a
+route-data `rollout`: **CONTROLLED** (participant allowlist; used only for the qualification payment) and **GENERAL**.
+- **Enable condition (Addendum item 2).** CONTROLLED → GENERAL requires **one real test payment used for both legs**: (a) its ACH
+  credit received and reconciled in Kauro (ACH-LIVE-01: C5/C6 confirmation, P1 capture, P2 booking); and (b) the refund of **that
+  same payment** declared (X1), **sent** from Wise and recorded in Kauro (G2) with Wise's send receipt as classified execution
+  evidence (ACH-REFUND-LIVE-01). Arrival at the payer is **not** awaited. A later return or bounce of that refund follows the normal
+  bounce flow (G3, then a new declared attempt X4 only after the bounce is recorded; never a re-send while an attempt is DECLARED or
+  UNCERTAIN). If the send receipt does not satisfy G2's predicates (K-8: e.g. no destination field), the refund stays UNCERTAIN and
+  GENERAL is not enabled until X3 records it with stronger evidence.
+- **Production (Addendum item 1, D-26 "mover fecha").** There is no production without collection: B19 production requires the
+  route ENABLED with rollout GENERAL. Production date = max(2026-10-17, the day GENERAL is enabled). If the Wise USD details are not
+  live on 2026-10-12 20:00 (Bogota), the date moves; PayPal is not reintroduced (PV1 §2). [SUPERSEDED r8: the r7 text "G-PRODUCTION
+  may go live with the route not ENABLED, labelled limited availability".]
+- **"Commercially live" (Addendum item 4; R2 15 §Initial payment decision paragraph 3).** The label additionally needs delivery of
+  the purchased scope and the fiscal evidence on a real order (the test's invoice and its credit note are produced during the test).
+  It governs the claim, not the enable switch. R2 15 §Initial payment decision paragraph 1 (PayPal as the initial candidate) is
+  superseded by PV1 (Addendum item 3); paragraphs 2 and 3 stand.
+- **Exposure.** No public "accepts ACH" copy before GENERAL (PV1 §5). With the route not ENABLED (or CONTROLLED for a non-listed
+  buyer) the platform shows no bank details and offers no alternative route; such a buyer gets no instructions and no order (K-9:
+  `apps/web/test/checkout-bank-transfer.test.ts` :: "DENY no enabled route for the buyer: no instructions, no order"). A failed
+  qualification returns the route to VERIFIED (D-ACH-02).
 
 **DV1-05 — Admission (D-ACH-06, KP004).** Work is admitted (an ACTIVE CommercialAuthorization) only from one COMPLETED exact capture
 of a reconciled credit plus every purchased-subject guard. Partial, over, wrong-reference, other-payer and non-USD receipts are
@@ -75,22 +93,31 @@ days"; "Wire: Usually within minutes, and up to 1 working day"), and "Kauro conf
 deadline "money received after it is returned" (subject to DV1-06); partial/over/other payer = "under review" with no top-up
 prompt and advice not to pay again (R2 15). Hidden unless ENABLED. S-E tests: `apps/web/test/checkout-bank-transfer*.test.ts`.
 
-**DV1-06 — On-time credit confirmed late (R2 15 §Price and source expiry races; K-2).** R2 15: "If capture becomes confirmed
-after a race with expiry, reconcile the exact original terms. The initial policy honors the same price only when source, target,
-legal treatment and delivery scope remain valid; otherwise refund and issue a new quote." With owner-manual reconciliation a
-customer who paid on time is confirmed after the deadline routinely, so r6 D-ACH-10's blanket refusal would return money paid on
-time. Rule (BANK_TRANSFER only, order EXPIRED by `transfer_deadline_reached`; a ROUTE_SWITCH retirement stays return-only per
-D-ACH-06): an exact single credit is **on time** iff its `bookedAt` — taken from the classified stored evidence (C4/SI1), never
-from a draft field alone — satisfies `issuedAt − tolerance ≤ bookedAt ≤ transferExpiresAt` and `bookedAt ≤ confirmedAt +
-tolerance`, where `confirmedAt` is C6's effect instant (DB clock) and `tolerance` is the route version's named, versioned
-provider-time tolerance (PV1 D-15 generic rule). P1 then applies `EXPIRED → CAPTURED` (`on_time_credit_applied_late`) and issues
-a CommercialAuthorization only if every D-ACH-09 subject guard re-read under lock at effect passes (source available, approval
-current, target, legal/fiscal treatment, delivery scope, capability and capacity/reservation, route not revoked) **and** the
-project has no other open or paid order/purchase. Otherwise the order stays EXPIRED with the capture recorded,
-CAPTURE_WITHOUT_VALID_SUBJECT and an owner-review return (R2 15 "otherwise refund"). A `bookedAt` outside the tolerance is
-PROVIDER_TIME_UNVERIFIED: recorded, not honored, reviewed. E1 keeps r6 behaviour (no premature release); a reservation
-released or taken by then fails the capacity guard, so the credit is returned, never over-sold. Cells: §7.24 P1Δ;
-case ACH-21. Supersedes the D-ACH-10 sentences marked below.
+**DV1-06 — On-time credit confirmed late (R2 15 §Price and source expiry races; K-2; r8: ACH-R7-05, ACH-R7-06).** R2 15:
+"If capture becomes confirmed after a race with expiry, reconcile the exact original terms. The initial policy honors the same
+price only when source, target, legal treatment and delivery scope remain valid; otherwise refund and issue a new quote." With
+owner-manual reconciliation a customer who paid on time is routinely confirmed after the deadline; r6 D-ACH-10's blanket refusal
+would return money paid on time. Rule (BANK_TRANSFER only), **the same whether or not E1 has run**:
+- **Named tolerance.** `providerTimeTolerance` is route-version data (name, value, source, version; PV1 D-15 generic rule). The same
+  value governs the B10 commission HELD rule. Its value is set at configure (R2) and reviewed; the design fixes the comparisons.
+- **Timeliness (price), from the booking instant.** `bookedAt` comes only from classified stored evidence (C4/SI1), never from a
+  draft field alone (a draft value that differs from the evidence → REVIEW). An exact single credit is **on time** iff
+  `bookedAt ≤ transferExpiresAt + providerTimeTolerance` (DEADLINE predicate). It is **time-verified** iff
+  `issuedAt − providerTimeTolerance ≤ bookedAt ≤ confirmedAt + providerTimeTolerance` (PROVIDER-TIME predicate; `confirmedAt` = C6's
+  effect instant, DB clock); failing it is PROVIDER_TIME_UNVERIFIED (recorded, reviewed, never honored).
+- **Subject validity, at the effect.** Re-read under the D-ACH-09 subject locks at P1's effect (R2 "remain valid"): source available,
+  approval current, target, legal/fiscal treatment, delivery scope, capability and capacity/reservation, route not revoked, payer =
+  accepted billing identity, and no other open or paid order/purchase of the project (SUBJECT predicate).
+- **One effect for every sweep order.** P1 takes the order lock and branches on the locked state and `effectNow`, not on whether
+  E1 ran: (a) AWAITING_TRANSFER and `effectNow < transferExpiresAt` → r6 `exact_credit_applied`; (b) AWAITING_TRANSFER with
+  `effectNow ≥ transferExpiresAt` (E1 not yet run) **or** EXPIRED by `transfer_deadline_reached` → if DEADLINE, PROVIDER-TIME and
+  SUBJECT all hold: `on_time_credit_applied_late` → CAPTURED (edge from AWAITING_TRANSFER and from EXPIRED, BANK_TRANSFER only) and
+  the CommercialAuthorization; otherwise one COMMIT records the capture, leaves the order EXPIRED (writing `transfer_deadline_reached`
+  itself when E1 has not run), opens CAPTURE_WITHOUT_VALID_SUBJECT or PROVIDER_TIME_UNVERIFIED and the owner-review return; (c) EXPIRED
+  by ROUTE_SWITCH → return-only (D-ACH-06). E1 after (b) sees CAPTURED or EXPIRED and changes nothing. The r6 D-ACH-09 sentence "if
+  the deadline is reached … deny a new CommercialAuthorization" is superseded for case (b) only.
+- Partial and non-exact credits are unchanged (RECEIVED_REVIEW / return). Cells: §7.24 P1Δ; case ACH-21. The plain-language text
+  the ToS 8.2 mirrors is `docs/review/dv1-06-for-legal.md`.
 
 **DV1-07 — Transfer window.** The route version carries `minimumTransferWindow` (an interval, versioned data with source: the
 timing upper bound of the accepted rails plus the owner reconciliation allowance; the value is set at configure (R2) and
@@ -98,25 +125,61 @@ reviewed, the design fixes only the comparison). I2 refuses `TRANSFER_WINDOW_TOO
 `transferExpiresAt − effectNow < minimumTransferWindow`; otherwise the snapshot freezes `sendBy = transferExpiresAt −
 minimumTransferWindow`, shown in the pending view. Cells: §7.24 I2Δ.
 
-**DV1-08 — Manual refund execution declared before money moves (PV1 §4; K-1, K-6).** Rail-agnostic contract for both source
-scopes (CAPTURE refund, BANK_CREDIT treasury refund): request (agency BILLING) → APPROVED (active KAURO_OWNER, fresh step-up,
-KP008 segregation, exact components, destination digest = payer evidence, refundable-balance reservation, F2) → **X1** declare:
-APPROVED → SUBMITTING `manual_execution_declared` with frozen amount, digest, `declaredAt` and reference
-`kauro-refund-<refundId>`, no PaymentAttempt → owner executes in the bank app → **G2** record: SUBMITTING|UNCERTAIN → COMPLETED
-`manual_return_recorded` only with classified outbound evidence whose `bankExecutionId` is unique across both scopes (one money
-source per execution) → `refund.completed` drives revenue/cash (P3), seller commission (B10 consumers, unchanged) and the credit
-note (D-FISC-B2); the receipt artifact is kept. **X2**: SUBMITTING past `declaredAt + manualExecutionWindow` (route data) →
-UNCERTAIN with an UNCERTAIN_EFFECT case, share held. **X3** (D-24 A): owner-only resolution, EXECUTED with evidence → COMPLETED,
-NOT_EXECUTED → FAILED `owner_attested_no_effect` only with SI2 coverage of `[declaredAt, effectNow − coverageLag]` holding no debit
-that carries the reference or the amount plus destination digest. **NR**: no entry point re-sends or re-instructs a SUBMITTING or
-UNCERTAIN refund; CMD033 on a BANK_TRANSFER refund is 409 `MANUAL_RAIL_NO_AUTOMATED_OUTBOUND`. B09's `authorization_lapsed` lapses
-only APPROVED refunds, never a declared one (K-6). A declaration made after the owner already sent is allowed (it records intent;
-G2 still needs evidence); a debit sent without declaration stays an SI2 orphan until declared and recorded. **K-10** (outbound
-reference fidelity unproven): G2 does not require the reference in the evidence; identity is `bankExecutionId` + amount + destination
-digest + the declared refund; a present reference that differs from the declared one goes to REVIEW, never completion;
-ACH-REFUND-LIVE-01 records the real field. Supersedes the D-ACH-21 G2 guard "Refund APPROVED" and D-ACH-19's
-"APPROVED→COMPLETED with a record FK". G5 (RecordOverReturn) and P4 (write-off) are LATER; in V1 such a debit stays an SI2 orphan
-and the period is never BALANCED (§7.27 FC-G5). Cells: §7.21–§7.22; cases RFG-01..RFG-03, ACH-REFUND-LIVE-01.
+**DV1-08 — Manual outbound execution declared before money moves (PV1 §4; K-1, K-6; r8: ACH-R7-01..04).** Rail-agnostic,
+both source scopes (CAPTURE refund, BANK_CREDIT treasury refund).
+- **Execution attempts.** Every V1 outbound movement of route money is one `outbound_execution_attempts` row (scope union as
+  D-ACH-19): kind RETURN (a refund or treasury refund) or RESEND (re-send of a bounced return). Machine: DECLARED → UNCERTAIN;
+  DECLARED or UNCERTAIN → RECORDED or NOT_EXECUTED. Frozen at declaration: kind, source, refund or parent bounce, amount, currency,
+  `declaredAt` (DB clock), declared destination (`accountDigest`, `accountLast4`, `routingDigest`, computed from the approved destination
+  evidence) and reference `kauro-refund-<refundId>-<n>` (n = attempt number of that refund; 1 for its RETURN).
+- **Declare.** **X1** (RETURN): Refund APPROVED → SUBMITTING `manual_execution_declared` and attempt DECLARED; no PaymentAttempt.
+  **X4** (RESEND): only after G3 recorded a bounce of the same source (evidence that the previous execution's money came back), with
+  amount ≤ that bounce's open REFUND_PAYABLE `O` less other open attempts; the Refund stays COMPLETED (D-ACH-18); attempt DECLARED.
+- **Fence (NEVER-RESEND by construction).** A partial unique index allows at most one attempt per source in DECLARED or UNCERTAIN; X1
+  and X4 refuse `EXECUTION_ATTEMPT_OPEN`. A new attempt exists only after the previous one is RECORDED and then bounced (G3), or is
+  NOT_EXECUTED (X3). No path creates, re-instructs or re-displays an attempt while another of the same source is DECLARED or UNCERTAIN.
+- **Instructions only from a committed declaration (ACH-R7-01).** The owner queue shows amount, destination and reference to send
+  only for a DECLARED attempt after its COMMIT. There is no send-before-declare path: an execution earlier than its declaration is
+  never recorded as that attempt (E-TIME below); such a debit is an undeclared orphan (below).
+- **Normalized evidence (ACH-R7-03, K-8).** `OutboundEvidence` and `StatementDebit` (§6) carry `bankExecutionId`, `amountCents`,
+  `currency`, `executedAt: UtcInstant | null`, `reference: string | null` (as the provider shows it, never repaired) and
+  `destination: DestinationEvidence` (`accountDigest`, `accountLast4`, `routingDigest`, each nullable). A classifier fills only what
+  the bytes show; an absent field is null, never inferred.
+- **Record (G2 RETURN, G4 RESEND).** DECLARED or UNCERTAIN → RECORDED (RETURN: Refund SUBMITTING or UNCERTAIN → COMPLETED
+  `manual_return_recorded`, then `refund.completed` drives revenue/cash (P3), seller commission (B10 consumers) and the credit note
+  (D-FISC-B2); RESEND: REFUND_PAYABLE settled) only if each predicate holds (rule 12, one control each): **E-ID** `bankExecutionId`
+  present and unused across both scopes; **E-AMT** amount and currency equal the attempt; **E-TIME** `executedAt` present and
+  `≥ declaredAt` (strict, no tolerance); **E-DEST** destination proven (`accountDigest` equal, or `accountLast4` and `routingDigest`
+  both equal) and **no E-DEST-CONFLICT** (no present destination field differs); **no E-REF-CONFLICT** (a present reference equals the
+  attempt's). A failing predicate refuses with its own code, changes nothing and opens a REVIEW case. If real artifacts never carry a
+  destination field, G2 cannot complete and the attempt stays frozen for X3 with stronger evidence (K-8, K-10): nothing completes on
+  weaker evidence.
+- **Window (X2).** DECLARED with `effectNow ≥ declaredAt + manualExecutionWindow` (route data) → UNCERTAIN, UNCERTAIN_EFFECT case;
+  the reserved share or payable stays held.
+- **Owner resolution (X3, D-24 A).** EXECUTED: the G2/G4 predicates on the supplied evidence → RECORDED. NOT_EXECUTED → attempt
+  NOT_EXECUTED (RETURN: Refund → FAILED `owner_attested_no_effect`, share released; RESEND: payable stays open) only if **NX-LAG**
+  `effectNow ≥ declaredAt + manualExecutionWindow + coverageLag`, **NX-COVERAGE** SI2 coverage of the account's outbound stream is
+  contiguous over `[declaredAt, effectNow − coverageLag]`, and **NX-NO-POTENTIAL** no potentially matching debit lies in it. A debit
+  is **excluded** only if it is linked to another RECORDED attempt, has another currency, or has E-DEST-CONFLICT against this attempt;
+  every other debit — including one with null reference and null destination — is potentially matching and keeps the attempt
+  UNCERTAIN (`POTENTIAL_MATCH_UNRESOLVED`).
+- **Undeclared debits (ACH-R7-01).** SI2 links a debit only to a RECORDED attempt by `bankExecutionId`. An unlinked debit that is
+  potentially matching (definition above) for a refund of the account that is APPROVED, has an open attempt, or reached a terminal
+  state within the covered interval, and that was executed before any declaration of it, opens UNDECLARED_OUTBOUND naming them and
+  sets `execution_frozen` on every open refund of that source: X1/X4 refuse `EXECUTION_FROZEN`, B09's `authorization_lapsed` skips
+  frozen refunds, the share stays reserved, the period is never BALANCED. Resolving UNDECLARED_OUTBOUND is LATER 2026-11-30 with G5/P4
+  (FC-G5). Residual (K-11): money an owner sends outside Kauro before importing the statement cannot be prevented by software; the
+  queue never shows send details without a declaration, and the import surfaces and freezes it.
+- **Lock order (rule 13, ACH-R7-04; §7.28).** L1 account outbound-stream lock (transaction advisory lock on
+  `(environment, accountRef, OUTBOUND)`) → L2 source booking locks in source-id order → L3 refund and attempt rows
+  (`FOR NO KEY UPDATE`) → L4 execution-identity uniqueness. X1, X4, G2, G4, X3 and SI2 take L1 first; X3 reads coverage and debit
+  absence only under L1 and SI2 inserts debit lines only under L1, so absence and insertion serialize. X2, F2, G3, G6, P1, C6 and
+  `authorization_lapsed` never take L1; no actor takes L1 while holding L2–L4, a credit lock or a B09 subject lock.
+- **Other entry points.** CMD033 on a BANK_TRANSFER refund is 409 `MANUAL_RAIL_NO_AUTOMATED_OUTBOUND`; `authorization_lapsed` lapses
+  only APPROVED, unfrozen refunds, never a declared one (K-6); `refund.*` consumers emit no instruction.
+- Supersedes the D-ACH-21 G2 guard "Refund APPROVED", the G4 guard "a bounced record" (now: a DECLARED or UNCERTAIN RESEND attempt)
+  and D-ACH-19's "APPROVED→COMPLETED with a record FK". G5 and P4 are LATER (FC-G5). Cells: §7.21–§7.22, §7.28; cases RFG-01..RFG-04,
+  ACH-REFUND-LIVE-01.
 
 **DV1-09 — Automated-provider live remainders DEFERRED (PV1 §1, §6; K-5).** The live halves of CMD029, CMD030, CMD033, CMD034 and
 R2-061's webhook half belong to an automated provider rail (PayPal, parked). Their B09 local SIMULATED evidence stays (simulator
@@ -130,7 +193,7 @@ C4, C5, C6, S3 (actor SI2), M1, M2, P1 (+DV1-06), P2, E1, F1, F2, G1, G2, G3, G4
 accepted billing identity, else MATCH_REVIEW → return only; K-7), G5, P4 (oversized/unrecorded debit stays an SI2 orphan). LATER
 cells keep status GAP; their paths are unreachable in V1 and §7.27 proves it. V1 cells that read payer authorization (M2, P1, F2
 REVOCATION) assert the billing-identity rule. The date is a board date (no owner act); a LATER row becomes V1 only through a
-design delta with its own review.
+design delta with its own review. **r8:** V1 adds rows X4 and the G2Δ/G4Δ deltas (§7.21–§7.22) and the lock-order and enablement cells (§7.28–§7.29).
 
 ## 1. Scope and decisions
 
@@ -321,7 +384,7 @@ source contracts explicitly. Existing currency/payee/tenant composite FKs still 
 
 Receipt evidence is durable regardless of revoked sales authority. At application, if the deadline is reached, route is revoked,
 source expired, approval withdrawn, capability restricted, agency disabled, legal/fiscal configuration invalid or the project
-was retired/switched, record the actual capture, deny a new CommercialAuthorization and open the case/remedy return. The
+was retired/switched, record the actual capture, deny a new CommercialAuthorization and open the case/remedy return. [r8: except DV1-06 case (b), an exact credit booked on time.] The
 receipt path must therefore separate “may record actual money” from “may issue authority”; do not let an expired actor mint
 authority, and do not discard the provider's money because a checkout guard fails. A rejected owner's *confirmation* leaves the
 draft untrusted; already confirmed/provider-authenticated observations remain recoverable by the service after that owner
@@ -432,7 +495,7 @@ restricted Wise transfer evidence artifact (classified by the pure `classifyOutb
 | RecordExecutedReturn (G2) | Refund APPROVED [SUPERSEDED r7: SUBMITTING or UNCERTAIN, declared by X1, DV1-08]; amount, currency USD and destination digest equal the approval; amount ≤ current refundable balance; evidence shows a completed/sent outbound debit from the route's account | `manual_outbound_records` row, Refund APPROVED→COMPLETED (proposed edge `manual_return_recorded`, BANK_TRANSFER only), `refund.completed` with frozen discharge and observed fee, journal, audit/events/outbox |
 | RecordOverReturn (G5) | Original return path only: money already left Wise as the source's return but RecordExecutedReturn is refused (e.g. a reversal observed after approval); **refused while the source has an open REFUND_PAYABLE (`O > 0`)**; reason and evidence required | Record row (kind OVER_RETURN), OVER_RETURN case, `outbound.over_returned` with frozen `e`; when a refund was APPROVED, its APPROVED→COMPLETED with `refund.completed` (B09 members, returned components `d`), journal, events |
 | RecordReturnBounce (G3) | A recorded transfer, Wise evidence that it came back, returned cash `B ≤ P` | Bounce row on the record (once per transfer), `outbound.bounced` with frozen allocation, RETURN_BOUNCED case, journal, events; the Refund stays COMPLETED |
-| RecordResend (G4) | A bounced record of the same source; amount ≤ open REFUND_PAYABLE of that record less other resends, **otherwise REFUSED** (`RESEND_EXCEEDS_PAYABLE`, nothing written); new Wise transfer ID; destination digest rule of D-ACH-13 | Record row (kind RESEND, parent bounce FK), `outbound.resent` settling REFUND_PAYABLE, journal, events |
+| RecordResend (G4) | [SUPERSEDED r8: a DECLARED or UNCERTAIN RESEND attempt (X4), DV1-08] A bounced record of the same source; amount ≤ open REFUND_PAYABLE of that record less other resends, **otherwise REFUSED** (`RESEND_EXCEEDS_PAYABLE`, nothing written); new Wise transfer ID; destination digest rule of D-ACH-13 | Record row (kind RESEND, parent bounce FK), `outbound.resent` settling REFUND_PAYABLE, journal, events |
 
 RecordExecutedReturn refuses any amount above the refundable balance, so the platform never classifies an over-return as a
 refund. If the owner had already sent the money, the refusal does not hide it: statement reconciliation lists outgoing debits
@@ -595,8 +658,12 @@ interface CreditPage {
   readonly credits: ReadonlyArray<IncomingCredit>; readonly nextCursor: Cursor; readonly complete: boolean;
   readonly coverageStart: UtcInstant; readonly coverageEnd: UtcInstant;
 }
-interface OutboundEvidence extends Evidence { // classified manual Wise transfer artifact (D-ACH-21)
-  readonly bankExecutionId: string; readonly accountRef: BankAccountRef; readonly destinationDigest: Sha256Hex;
+// r8 (ACH-R7-03): destination fields as the evidence shows them; null when absent, never inferred.
+type DestinationEvidence = { readonly accountDigest: Sha256Hex | null; readonly accountLast4: string | null;
+  readonly routingDigest: Sha256Hex | null };
+interface OutboundEvidence extends Evidence { // classified manual execution artifact, e.g. a send receipt (D-ACH-21, DV1-08)
+  readonly bankExecutionId: string; readonly accountRef: BankAccountRef; readonly destination: DestinationEvidence;
+  readonly reference: string | null; readonly executedAt: UtcInstant | null; // r8 E-REF-CONFLICT, E-TIME
   readonly amountCents: bigint; readonly currency: string; readonly feeCents: bigint | null;
   readonly status: "SENT" | "COMPLETED" | "BOUNCED" | "CANCELLED" | "UNRECOGNIZED";
   readonly returnedCents: bigint | null; readonly observedAt: UtcInstant;
@@ -697,7 +764,7 @@ interface StatementDebit extends Evidence {          // outgoing line on the rou
   readonly accountRef: BankAccountRef; readonly debitId: string;     // statement-line identity, stable
   readonly bankExecutionId: string | null;                // provider execution id when the line carries one
   readonly amountCents: bigint; readonly currency: string; readonly feeCents: bigint | null;
-  readonly destinationDigest: Sha256Hex | null;
+  readonly destination: DestinationEvidence; readonly reference: string | null; readonly executedAt: UtcInstant | null; // r8
   readonly status: "SENT" | "COMPLETED" | "RETURNED" | "UNRECOGNIZED"; readonly returnedCents: bigint | null;
   readonly bookedAt: UtcInstant | null; readonly observedAt: UtcInstant;
 }
@@ -889,19 +956,35 @@ Each row maps all eight columns; observing an orphan records a reconciliation fa
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
 | **P4** *[LATER 2026-11-30: fail-closed in V1]* `Kwriteoff`: reviewed `reconciliation_case.resolved.v1` correction RETURN_LOSS `w` ≤ open receivable, assurance, journal, events | **GAP ACH-M-P4-RACE**: `w` ≤ open receivable at effect. Invariant: receivable + written off = `X`; a later bounce credits RETURN_LOSS back (M3′). Inject: hold case and source booking locks; Krecordbounce/second write-off both orders. | **GAP ACH-M-P4-TIMEOUT**: Recover by journal. Invariant: no double write-off. Inject: COMMIT response timeout. | **GAP ACH-M-P4-EXPIRY**: Refuse stale proof. Invariant: effect-time step-up. Inject: cross proof validity. | **GAP ACH-M-P4-CRASH-BEFORE**: Case open; no posting. Invariant: atomic. Inject: crash after last write before Kwriteoff COMMIT. | **GAP ACH-M-P4-CRASH-AFTER**: Replay. Invariant: one correction. Inject: lose answer after COMMIT. | **GAP ACH-M-P4-RETRY**: Replay or conflict. Invariant: amount immutable. Inject: same key, changed amount. | **GAP ACH-M-P4-REVOCATION**: Refuse. Invariant: KAURO_OWNER grant, identity, step-up. Inject: withdraw each. | **GAP ACH-M-P4-PARTIAL**: Rollback. Invariant: no revenue/tax/commission/authority line. Inject: fail correction/journal/event write; assert exact cents. |
-### 7.21 Declare manual refund execution and lapse its window (DV1-08) — r7, V1
-File `packages/persistence/test/refund-generic-cells.test.ts`; both source scopes per cell. Locks: source booking lock, then
-refund row (D-ACH-13); no call-out.
+### 7.21 Declare an outbound execution attempt and lapse its window (DV1-08) — r8, V1
+File `packages/persistence/test/refund-generic-cells.test.ts`; each cell runs both source scopes and, for X2, both attempt kinds
+(RETURN, RESEND) inside its one title. Locks per §7.28 (X1, X4: L1 → L2 → L3 → L4; X2: L3 only); no call-out.
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| **X1** *[V1]* `Kdeclare` DeclareRefundExecution (owner): Refund APPROVED→SUBMITTING `manual_execution_declared`, frozen amount/components, destination digest, reference `kauro-refund-<refundId>`, `declaredAt`, journal, audit/events/outbox | **GAP** `RACE RFG-M-X1-RACE (both orders): Declare manual refund execution` — X1 vs X1 (two keys), vs G6 reversal, vs F2 second approval, vs B09 `authorization_lapsed`, vs owner revocation, each held at the source booking lock in both orders: one declaration; reversal first → X1 refused DOUBLE_RETURN_RISK, nothing declared; X1 first → reversal opens DOUBLE_RETURN_RISK on the SUBMITTING refund, share stays reserved; `authorization_lapsed` never lapses SUBMITTING (K-6). | **GAP** `RACE RFG-M-X1-TIMEOUT (lock and COMMIT timeout): Declare manual refund execution` — lock wait/statement timeout: nothing written, reserved cents unchanged; lost COMMIT answer: the same key returns the one declaration. | **GAP** `DENY RFG-M-X1-EXPIRY (step-up and destination evidence validity): Declare manual refund execution` — DB clock at validity −1 ms declares; 0/+1 ms after the lock wait refused, nothing written. | **GAP** `RACE RFG-M-X1-CRASH-BEFORE (crash before Kdeclare COMMIT): Declare manual refund execution` — crash after the outbox write: refund APPROVED, no reference, no journal, reservation unchanged. | **GAP** `RACE RFG-M-X1-CRASH-AFTER (lost answer): Declare manual refund execution` — replay after COMMIT returns the same reference and `declaredAt`; one event. | **GAP** `RACE RFG-M-X1-RETRY (replay and conflict): Declare manual refund execution` — same key/body replays; same key other amount/digest 409 BODY_CONFLICT; new key on SUBMITTING or UNCERTAIN 409 REFUND_EXECUTION_DECLARED. | **GAP** `DENY RFG-M-X1-REVOCATION (each prerequisite): Declare manual refund execution` — owner grant, verified identity, session, step-up, approval current, destination evidence, payer billing identity, each withdrawn at the held lock: refused, nothing declared. | **GAP** `RACE RFG-M-X1-PARTIAL (later write fails): Declare manual refund execution` — fail at journal, audit, event, outbox in turn: full rollback, APPROVED, reserved cents unchanged. |
-| **X2** *[V1]* `Kexecwindow` sweep pass (PAYMENT_SERVICE, fenced lease): SUBMITTING with `effectNow ≥ declaredAt + manualExecutionWindow` → UNCERTAIN `manual_execution_window_lapsed`, UNCERTAIN_EFFECT case, events; share held | **GAP** `RACE RFG-M-X2-RACE (both orders): Lapse manual execution window` — vs G2 held at the refund row both orders: G2 first → pass skips COMPLETED; pass first → UNCERTAIN, then G2 completes once and the case becomes EXPLAINED. | **GAP** `RACE RFG-M-X2-TIMEOUT (statement timeout): Lapse manual execution window` — nothing committed; the next pass transitions once. | **GAP** `RACE RFG-M-X2-EXPIRY (window boundary): Lapse manual execution window` — DB clock window −1 ms stays SUBMITTING; 0 and +1 ms UNCERTAIN. | **GAP** `RACE RFG-M-X2-CRASH-BEFORE (crash before Kexecwindow COMMIT): Lapse manual execution window` — stays SUBMITTING, no case. | **GAP** `RACE RFG-M-X2-CRASH-AFTER (lost settle): Lapse manual execution window` — next pass adds no second case or event. | **GAP** `RACE RFG-M-X2-RETRY (two sweepers and redelivery): Lapse manual execution window` — concurrent passes: one transition, one case; stale-fence pass commits nothing. | **GAP** `RACE RFG-M-X2-REVOCATION (route disabled, owner revoked, lease lost): Lapse manual execution window` — still UNCERTAIN; the share is never released; a lost fence commits nothing. | **GAP** `RACE RFG-M-X2-PARTIAL (case insert fails): Lapse manual execution window` — fail at case, then event: rollback, SUBMITTING. |
+| **X1** *[V1]* `Kdeclare` DeclareRefundExecution (owner): Refund APPROVED→SUBMITTING `manual_execution_declared`, attempt RETURN DECLARED with frozen amount, destination fields, reference `kauro-refund-<refundId>-1`, `declaredAt`, journal, audit/events/outbox | **GAP** `RACE RFG-M-X1-RACE (both orders): Declare manual refund execution` — X1 vs X1 (two keys), vs G6 reversal, vs F2 second approval, vs `authorization_lapsed`, vs SI2 freezing the source (UNDECLARED_OUTBOUND), vs owner revocation, each held at its lock in both orders: one declaration; reversal first → DOUBLE_RETURN_RISK refusal; SI2 freeze first → EXECUTION_FROZEN; X1 first → SI2 correlates the debit with the attempt; `authorization_lapsed` never lapses SUBMITTING (K-6). | **GAP** `RACE RFG-M-X1-TIMEOUT (lock and COMMIT timeout): Declare manual refund execution` — nothing written, reserved cents unchanged; lost COMMIT answer: the same key returns the one declaration. | **GAP** `DENY RFG-M-X1-EXPIRY (step-up and destination evidence validity): Declare manual refund execution` — validity −1 ms declares; 0/+1 ms after the lock wait refused, nothing written. | **GAP** `RACE RFG-M-X1-CRASH-BEFORE (crash before Kdeclare COMMIT): Declare manual refund execution` — refund APPROVED, no attempt, no reference, no send instructions visible, reservation unchanged. | **GAP** `RACE RFG-M-X1-CRASH-AFTER (lost answer): Declare manual refund execution` — replay returns the same attempt, reference and `declaredAt`; one event. | **GAP** `RACE RFG-M-X1-RETRY (replay and conflict): Declare manual refund execution` — same key/body replays; same key other amount/destination 409 BODY_CONFLICT; new key while an attempt of the source is DECLARED/UNCERTAIN 409 EXECUTION_ATTEMPT_OPEN. | **GAP** `DENY RFG-M-X1-REVOCATION (each prerequisite): Declare manual refund execution` — owner grant, verified identity, session, step-up, approval current, destination evidence, billing identity, each withdrawn at the held lock: refused, nothing declared. | **GAP** `RACE RFG-M-X1-PARTIAL (later write fails): Declare manual refund execution` — fail at attempt, journal, audit, event, outbox in turn: full rollback, APPROVED, reserved cents unchanged. |
+| **X4** *[V1]* `Kdeclareresend` DeclareResendExecution (owner): attempt RESEND DECLARED for a recorded bounce, amount ≤ `O` less open attempts, frozen fields, reference `kauro-refund-<refundId>-<n>`, journal, audit/events/outbox; Refund stays COMPLETED | **GAP** `RACE RFG-M-X4-RACE (both orders): Declare a resend execution` — X4 vs X4, vs G3 recording a second bounce, vs G4, vs SI2 freezing the source, held at L1/L2 in both orders: at most one open attempt per source; the payable never covers two attempts. | **GAP** `RACE RFG-M-X4-TIMEOUT (lock and COMMIT timeout): Declare a resend execution` — nothing; same key once. | **GAP** `DENY RFG-M-X4-EXPIRY (step-up and destination evidence validity): Declare a resend execution` — −1 ms declares; 0/+1 ms refused. | **GAP** `RACE RFG-M-X4-CRASH-BEFORE (crash before Kdeclareresend COMMIT): Declare a resend execution` — no attempt, payable unchanged, nothing shown to send. | **GAP** `RACE RFG-M-X4-CRASH-AFTER (lost answer): Declare a resend execution` — replay returns the same attempt; one event. | **GAP** `RACE RFG-M-X4-RETRY (replay, conflict, open attempt): Declare a resend execution` — same key replays; other amount 409; any key while an attempt is DECLARED/UNCERTAIN 409 EXECUTION_ATTEMPT_OPEN; no recorded bounce 409 NO_RECORDED_BOUNCE; amount > `O` 409 RESEND_EXCEEDS_PAYABLE. | **GAP** `DENY RFG-M-X4-REVOCATION (each prerequisite): Declare a resend execution` — grant, identity, session, step-up, destination evidence withdrawn at the held lock: refused. | **GAP** `RACE RFG-M-X4-PARTIAL (later write fails): Declare a resend execution` — fail at journal, audit, event, outbox: rollback, payable unchanged. |
+| **X2** *[V1]* `Kexecwindow` sweep pass (PAYMENT_SERVICE, fenced lease): attempt DECLARED with `effectNow ≥ declaredAt + manualExecutionWindow` → UNCERTAIN `manual_execution_window_lapsed` (RETURN: Refund SUBMITTING→UNCERTAIN), UNCERTAIN_EFFECT case, events; share/payable held | **GAP** `RACE RFG-M-X2-RACE (both orders): Lapse manual execution window` — vs G2/G4 at the attempt row both orders: record first → pass skips RECORDED; pass first → UNCERTAIN, then the record completes once and the case becomes EXPLAINED. | **GAP** `RACE RFG-M-X2-TIMEOUT (statement timeout): Lapse manual execution window` — nothing; next pass once. | **GAP** `RACE RFG-M-X2-EXPIRY (window boundary): Lapse manual execution window` — window −1 ms DECLARED; 0 and +1 ms UNCERTAIN (DB clock). | **GAP** `RACE RFG-M-X2-CRASH-BEFORE (crash before Kexecwindow COMMIT): Lapse manual execution window` — DECLARED, no case. | **GAP** `RACE RFG-M-X2-CRASH-AFTER (lost settle): Lapse manual execution window` — no second case or event. | **GAP** `RACE RFG-M-X2-RETRY (two sweepers and redelivery): Lapse manual execution window` — one transition, one case; stale fence commits nothing. | **GAP** `RACE RFG-M-X2-REVOCATION (route disabled, owner revoked, lease lost): Lapse manual execution window` — still UNCERTAIN; share/payable never released. | **GAP** `RACE RFG-M-X2-PARTIAL (case insert fails): Lapse manual execution window` — rollback, DECLARED. |
 
-### 7.22 Resolve uncertain refund and NEVER-RESEND (DV1-08, PV1 §4, D-24 A) — r7, V1
+### 7.22 Record and resolve an attempt; NEVER-RESEND (DV1-08, PV1 §4, D-24 A) — r8, V1
+G2Δ and G4Δ are deltas on the r6 rows G2/G4 (their r6 cells stay; these add the attempt guard). Locks: L1 → L2 → L3 → L4.
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| **X3** *[V1]* `Kresolve` ResolveUncertainRefund (owner): UNCERTAIN → COMPLETED with the G2 footprint (EXECUTED + classified evidence) or → FAILED `owner_attested_no_effect` (NOT_EXECUTED + SI2 coverage), share released, audit row, case EXPLAINED | **GAP** `RACE RFG-M-X3-RACE (both orders): Resolve uncertain refund` — vs G2 and vs SI2 importing a matching debit: G2 first → REFUND_NOT_UNCERTAIN; SI2 first → OWNER_RESOLUTION_CONTRADICTS_EVIDENCE; NOT_EXECUTED first → the later evidence opens REFUND_TERMINAL_CONTRADICTED and the debit stays an orphan (period not BALANCED); no committed fact changes. | **GAP** `RACE RFG-M-X3-TIMEOUT (lock and COMMIT timeout): Resolve uncertain refund` — nothing; same key once. | **GAP** `DENY RFG-M-X3-EXPIRY (coverage lag and step-up): Resolve uncertain refund` — NOT_EXECUTED before `declaredAt + window + coverageLag` or with SI2 coverage ending earlier refused; stale step-up refused. | **GAP** `RACE RFG-M-X3-CRASH-BEFORE (crash before Kresolve COMMIT): Resolve uncertain refund` — UNCERTAIN, share held, case OPEN, no audit. | **GAP** `RACE RFG-M-X3-CRASH-AFTER (lost answer): Resolve uncertain refund` — replay returns the committed outcome; one event. | **GAP** `RACE RFG-M-X3-RETRY (replay and conflict): Resolve uncertain refund` — identical replays; other outcome, execution id or evidence 409. | **GAP** `DENY RFG-M-X3-REVOCATION (owner authority, both orders): Resolve uncertain refund` — non-owner, no step-up, owner revoked at the membership half in both orders: NOT_AUTHORIZED, nothing. | **GAP** `RACE RFG-M-X3-PARTIAL (audit insert fails): Resolve uncertain refund` — rollback of refund, case, share, money source, events. |
-| **NR** *[V1]* NEVER-RESEND across every entry point (closure property, no own write) | **GAP** `DENY RFG-M-NR-RACE (every entry point): NEVER-RESEND while a refund is SUBMITTING or UNCERTAIN` — X1 replay returns the one reference; a new X1 key 409; CMD033 on a BANK_TRANSFER refund 409 MANUAL_RAIL_NO_AUTOMATED_OUTBOUND; a second F2 approval cannot reserve the held share; the owner-queue projection offers no send/declare action; G4 refused without a recorded bounce; X2/X3 and every `refund.*` consumer redelivery emit no instruction. Interleavings are proven by RFG-M-X1/X2/X3-RACE (rule 1). | N/A: no own write; each entry point's TIMEOUT is its own row's cell. | N/A: no deadline of its own; X2/X3 EXPIRY cover the window. | N/A: no own COMMIT. | N/A: no own COMMIT. | **GAP** asserted inside RFG-M-NR-RACE ("X1 replay returns the one reference") and RFG-M-X1-RETRY. | N/A: no authority unlocks a resend; every entry point refuses whatever the actor's authority. | N/A: no own write. |
+| **G2Δ/G4Δ** *[V1]* `Krecordreturn`/`Krecordresend` against a DECLARED or UNCERTAIN attempt; predicates E-ID, E-AMT, E-TIME, E-DEST, no E-DEST-CONFLICT, no E-REF-CONFLICT | **GAP** `RACE RFG-M-G2D-RACE (both orders): Record a declared execution` — G2 vs X3 and vs SI2 linking the same debit, at L1 both orders: one RECORDED attempt, one link, one `refund.completed`. | **GAP** base ACH-M-G2-TIMEOUT / ACH-M-G4-TIMEOUT. | **GAP** base ACH-M-G2-EXPIRY / ACH-M-G4-EXPIRY. | **GAP** `DENY RFG-M-G2D-CRASH-BEFORE (execution before declaration): Record a declared execution` — money sent, then X1 crashes before COMMIT or X1 runs later: evidence `executedAt < declaredAt` → EXECUTION_PRECEDES_DECLARATION, nothing recorded; with no attempt → NO_DECLARED_ATTEMPT; the debit stays an undeclared orphan (§7.23 SI2-UNDECLARED). | **GAP** base ACH-M-G2-CRASH-AFTER / ACH-M-G4-CRASH-AFTER. | **GAP** base ACH-M-G2-RETRY / ACH-M-G4-RETRY (execution id across scopes). | **GAP** base ACH-M-G2-REVOCATION / ACH-M-G4-REVOCATION. | **GAP** base ACH-M-G2-PARTIAL / ACH-M-G4-PARTIAL (footprint adds the attempt transition). |
+| **X3** *[V1]* `Kresolve` ResolveUncertainExecution (owner): UNCERTAIN attempt → RECORDED (EXECUTED, G2/G4 predicates) or NOT_EXECUTED (NX-LAG, NX-COVERAGE, NX-NO-POTENTIAL; RETURN refund → FAILED `owner_attested_no_effect`, share released), audit row, case EXPLAINED | **GAP** `RACE RFG-M-X3-RACE (both orders): Resolve uncertain execution` — NOT_EXECUTED vs SI2 importing a potentially matching debit, both at L1: SI2 first → POTENTIAL_MATCH_UNRESOLVED, attempt UNCERTAIN; X3 first → NOT_EXECUTED commits and SI2 then opens REFUND_TERMINAL_CONTRADICTED with the debit orphaned (period not BALANCED); vs G2 → REFUND_NOT_UNCERTAIN; no committed fact changes. | **GAP** `RACE RFG-M-X3-TIMEOUT (lock and COMMIT timeout): Resolve uncertain execution` — nothing; same key once. | **GAP** `DENY RFG-M-X3-EXPIRY (coverage lag and step-up): Resolve uncertain execution` — `declaredAt + window + coverageLag` −1 ms refused, 0 accepted (other predicates holding); stale step-up refused. | **GAP** `RACE RFG-M-X3-CRASH-BEFORE (crash before Kresolve COMMIT): Resolve uncertain execution` — UNCERTAIN, share held, case OPEN, no audit. | **GAP** `RACE RFG-M-X3-CRASH-AFTER (lost answer): Resolve uncertain execution` — replay returns the outcome; one event. | **GAP** `RACE RFG-M-X3-RETRY (replay and conflict): Resolve uncertain execution` — identical replays; other outcome, execution id or evidence 409. | **GAP** `DENY RFG-M-X3-REVOCATION (owner authority, both orders): Resolve uncertain execution` — non-owner, no step-up, owner revoked at the membership half in both orders: NOT_AUTHORIZED. | **GAP** `RACE RFG-M-X3-PARTIAL (audit insert fails): Resolve uncertain execution` — rollback of attempt, refund, case, share, money source, events. |
+| **NR** *[V1]* NEVER-RESEND across every entry point (closure property, no own write) | **GAP** `DENY RFG-M-NR-RACE (every entry point): NEVER-RESEND while an execution attempt is DECLARED or UNCERTAIN` — X1/X4 new key 409 EXECUTION_ATTEMPT_OPEN; X1/X4 replay returns the one attempt; CMD033 on a BANK_TRANSFER refund 409 MANUAL_RAIL_NO_AUTOMATED_OUTBOUND; a second F2 approval cannot reserve the held share; G4 without a DECLARED/UNCERTAIN RESEND attempt refused; the owner queue shows send details only for the one DECLARED attempt; X2, X3 and every `refund.*` consumer redelivery emit no instruction. Interleavings: RFG-M-X1/X4/X2/X3-RACE (rule 1). | N/A: no own write. | N/A: no own deadline; X2/X3 EXPIRY. | N/A: no own COMMIT. | N/A: no own COMMIT. | **GAP** asserted inside RFG-M-NR-RACE and RFG-M-X1-RETRY, RFG-M-X4-RETRY. | N/A: no authority unlocks a resend. | N/A: no own write. |
+
+**Predicate controls (rule 12; one forged control each; tier 1).** `packages/persistence/test/refund-generic-cells.test.ts`:
+- "DENY RFG-P-E-ID (execution id absent or used in either scope): Record a declared execution"
+- "DENY RFG-P-E-AMT (amount or currency differs from the attempt): Record a declared execution"
+- "DENY RFG-P-E-TIME (executedAt absent, or before declaredAt by 1 ms): Record a declared execution"
+- "DENY RFG-P-E-DEST-UNPROVEN (all destination fields null, or only last4 present): Record a declared execution"
+- "DENY RFG-P-E-DEST-CONFLICT (one present destination field differs): Record a declared execution"
+- "DENY RFG-P-E-REF-CONFLICT (a present reference differs from the attempt's): Record a declared execution"
+- "OK RFG-P-E-ALL (every predicate holds; reference null): Record a declared execution"
+- "DENY RFG-P-NX-LAG (one ms before declaredAt + window + coverageLag): Resolve uncertain execution"
+- "DENY RFG-P-NX-COVERAGE (a one-day gap in imported coverage): Resolve uncertain execution"
+- "DENY RFG-P-NX-POTENTIAL (one unlinked debit with null reference and null destination in the interval): Resolve uncertain execution"
+- "OK RFG-P-NX-EXCLUDED (only debits linked elsewhere, in another currency or with a conflicting destination): Resolve uncertain execution"
 
 ### 7.23 Owner statement import (DV1-02; replaces API sweeps; realises S3) — r7, V1
 File `packages/persistence/test/ach-inbound-cells.test.ts`. SI2 locks the account/environment statement stream, then the
@@ -909,14 +992,14 @@ credit/execution identity locks shared with C6, G2 and X3.
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
 | **SI1** *[V1]* Outside-transaction ProviderEvidenceStore.get of the imported statement, hash verification, pure `classifyStatement`; no write | **GAP** `OK ACH-M-SI1-RACE (concurrent reads): Read and classify a statement artifact` — two concurrent reads of one ref return identical classifications; no lock, no write (state races are SI2's). Tier 3. | **GAP** `RACE ACH-M-SI1-TIMEOUT (store timeout): Read and classify a statement artifact` — EVIDENCE_UNAVAILABLE; nothing written, coverage unchanged. | N/A: read; freshness (`to`, route version) is decided in SI2 under lock. | N/A: no write; nothing exists before the await. | **GAP** `RACE ACH-M-SI1-CRASH-AFTER (lost classification): Read and classify a statement artifact` — recovery rereads the same ref, reverifies the bytes and classifies again; no cached result is trusted. | **GAP** `DENY ACH-M-SI1-RETRY (replay and rejected evidence): Read and classify a statement artifact` — same digest same result; unknown, malformed, hash-mismatch, unauthenticated → REJECTED, nothing written. | N/A: pure read, no authority acquired; authority is checked at SI2's effect. | N/A: no write (truncated bytes are MALFORMED, RETRY cell). |
-| **SI2** *[V1]* `Kstatement` ImportStatementCoverage (owner, step-up): coverage `[from,to]` per account/environment, lines by bank transaction id, credit/debit links, RECORD_REQUIRED/orphan exceptions, BALANCED only with zero orphans, journal, audit/events | **GAP** `RACE ACH-M-SI2-RACE (both orders): Import statement coverage` — overlapping imports at the stream lock; vs G2, C6 and X3 at the identity lock, both orders: no duplicate line; record first links, debit first leaves an orphan until a matching record links it. | **GAP** `RACE ACH-M-SI2-TIMEOUT (lock and COMMIT timeout): Import statement coverage` — nothing; same key once. | **GAP** `DENY ACH-M-SI2-EXPIRY (coverage end and route version): Import statement coverage` — `to > effectNow` or outside the account's route version refused; stale step-up refused. | **GAP** `RACE ACH-M-SI2-CRASH-BEFORE (crash before Kstatement COMMIT): Import statement coverage` — no line, coverage or exception. | **GAP** `RACE ACH-M-SI2-CRASH-AFTER (lost answer): Import statement coverage` — replay returns the committed coverage. | **GAP** `RACE ACH-M-SI2-RETRY (replay, conflict, changed line): Import statement coverage` — same key replays; same key other artifact 409; an overlapping artifact with identical lines adds nothing; a changed immutable amount → PROVIDER_INCONSISTENCY, no overwrite. | **GAP** `DENY ACH-M-SI2-REVOCATION (each prerequisite): Import statement coverage` — grant, identity, session, step-up withdrawn at the held lock: NOT_AUTHORIZED, nothing. | **GAP** `RACE ACH-M-SI2-PARTIAL (Nth line fails): Import statement coverage` — fail at the Nth line, an exception, an event: no partial coverage. |
+| **SI2** *[V1]* `Kstatement` ImportStatementCoverage (owner, step-up), under L1 then the identity locks it links (§7.28): coverage `[from,to]` per account/environment, lines by bank transaction id, debit links to RECORDED attempts, orphan/RECORD_REQUIRED and UNDECLARED_OUTBOUND exceptions with `execution_frozen`, BALANCED only with zero orphans, journal, audit/events | **GAP** `RACE ACH-M-SI2-RACE (both orders): Import statement coverage` — overlapping imports serialize at L1; vs G2/G4, X1 and X3 at L1, vs C6 at the credit identity lock, both orders: no duplicate line; record first links, debit first stays an orphan until a RECORDED attempt with its execution id links it; vs X3 see RFG-M-X3-RACE. | **GAP** `RACE ACH-M-SI2-TIMEOUT (lock and COMMIT timeout): Import statement coverage` — nothing; same key once. | **GAP** `DENY ACH-M-SI2-EXPIRY (coverage end and route version): Import statement coverage` — `to > effectNow` or outside the account's route version refused; stale step-up refused. | **GAP** `RACE ACH-M-SI2-CRASH-BEFORE (crash before Kstatement COMMIT): Import statement coverage` — no line, coverage, exception or freeze. | **GAP** `RACE ACH-M-SI2-CRASH-AFTER (lost answer): Import statement coverage` — replay returns the committed coverage. | **GAP** `RACE ACH-M-SI2-RETRY (replay, conflict, changed line): Import statement coverage` — same key replays; same key other artifact 409; overlapping identical lines add nothing; a changed immutable amount → PROVIDER_INCONSISTENCY, no overwrite. | **GAP** `DENY ACH-M-SI2-REVOCATION (each prerequisite): Import statement coverage` — grant, identity, session, step-up withdrawn at the held lock: NOT_AUTHORIZED. | **GAP** `RACE ACH-M-SI2-PARTIAL (Nth line fails): Import statement coverage` — fail at the Nth line, an exception, a freeze, an event: no partial coverage, no freeze. |
 
 ### 7.24 Deltas on P1 (DV1-06) and I2 (DV1-07) — r7, V1
 P1Δ in `ach-inbound-cells.test.ts`, I2Δ in `ach-route-cells.test.ts`. "Base" cells: the base row's test also runs the delta
 path inside its one title (no new title); the delta adds no write, await or lock.
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| **P1Δ** *[V1]* `Kapply` on an EXPIRED (`transfer_deadline_reached`) order: EXPIRED→CAPTURED `on_time_credit_applied_late` or capture recorded with return | **GAP** `RACE ACH-M-P1D-RACE (expiry sweep, both orders): Apply an on-time credit confirmed late` — E1 vs P1 at the order lock: one capture, one CAPTURED, at most one authorization; P1 first → E1 preserves CAPTURED. | **GAP** base ACH-M-P1-TIMEOUT, run on the late path too. | **GAP** `RACE ACH-M-P1D-EXPIRY (booking deadline and tolerance): Apply an on-time credit confirmed late` — `bookedAt` = deadline −1 ms and = deadline honored; +1 ms recorded, no authority, return request; `bookedAt > confirmedAt + tolerance` or `< issuedAt − tolerance` PROVIDER_TIME_UNVERIFIED review; a draft `bookedAt` that differs from the evidence → REVIEW. | **GAP** base ACH-M-P1-CRASH-BEFORE (footprint adds the EXPIRED→CAPTURED edge). | **GAP** base ACH-M-P1-CRASH-AFTER. | **GAP** base ACH-M-P1-RETRY. | **GAP** `DENY ACH-M-P1D-REVOCATION (subject guards at late apply): Apply an on-time credit confirmed late` — source deleted/expired, approval withdrawn, target changed, legal/fiscal treatment invalid, route revoked, capacity/reservation gone, another purchase of the project exists, billing identity changed: each → order stays EXPIRED, capture recorded, CAPTURE_WITHOUT_VALID_SUBJECT, owner-review return, no authority. | **GAP** base ACH-M-P1-PARTIAL. |
+| **P1Δ** *[V1]* `Kapply` on an exact credit when `effectNow ≥ transferExpiresAt`, order AWAITING_TRANSFER (E1 not run) or EXPIRED by `transfer_deadline_reached`: → CAPTURED `on_time_credit_applied_late` + authorization, or capture recorded with the order EXPIRED and a return (DV1-06) | **GAP** `RACE ACH-M-P1D-RACE (expiry sweep, both orders and unswept): Apply an on-time credit confirmed late` — E1 vs P1 at the order lock in both orders, and P1 with E1 never run: the same outcome in all three (one capture, at most one authorization; CAPTURED when DEADLINE, PROVIDER-TIME and SUBJECT hold, else EXPIRED with the capture and a return); E1 after P1 changes nothing. | **GAP** base ACH-M-P1-TIMEOUT, run on the late path too. | **GAP** `RACE ACH-M-P1D-EXPIRY (deadline plus named tolerance): Apply an on-time credit confirmed late` — with `N = transferExpiresAt + providerTimeTolerance` (route-version data): `bookedAt` = N −1 ms and = N honored; N +1 ms recorded, no authority, return; the cell runs twice with two tolerance versions and binds the version in force on the order's route version; `bookedAt > confirmedAt + providerTimeTolerance` or `< issuedAt − providerTimeTolerance` → PROVIDER_TIME_UNVERIFIED; a draft `bookedAt` differing from the evidence → REVIEW. | **GAP** base ACH-M-P1-CRASH-BEFORE (footprint adds the AWAITING_TRANSFER/EXPIRED→CAPTURED edge, or the capture plus `transfer_deadline_reached`). | **GAP** base ACH-M-P1-CRASH-AFTER. | **GAP** base ACH-M-P1-RETRY. | **GAP** `DENY ACH-M-P1D-REVOCATION (subject guards at late apply): Apply an on-time credit confirmed late` — source deleted/expired, approval withdrawn, target changed, legal/fiscal treatment invalid, route revoked, capacity/reservation gone, another purchase of the project exists, billing identity changed: each alone → EXPIRED with the capture recorded, CAPTURE_WITHOUT_VALID_SUBJECT, return, no authority. | **GAP** base ACH-M-P1-PARTIAL. |
 | **I2Δ** *[V1]* `Kinstructions` window guard and frozen `sendBy` | **GAP** base ACH-M-I2-RACE. | **GAP** base ACH-M-I2-TIMEOUT. | **GAP** `DENY ACH-M-I2D-EXPIRY (transfer window): Issue transfer instructions with a minimum window` — `deadline − effectNow` = window −1 ms → TRANSFER_WINDOW_TOO_SHORT, nothing written; = window → issued with `sendBy = deadline − window`; effectNow read after the lock wait. | **GAP** base ACH-M-I2-CRASH-BEFORE. | **GAP** base ACH-M-I2-CRASH-AFTER (replay returns the frozen `sendBy`). | **GAP** base ACH-M-I2-RETRY. | **GAP** base ACH-M-I2-REVOCATION (route version replaced: window re-read). | **GAP** base ACH-M-I2-PARTIAL. |
 
 ### 7.25 Settlement observation (R2-085, R2 15 §Settlement and withdrawal) — r7, V1 (live after D-14)
@@ -942,6 +1025,27 @@ File `packages/persistence/test/settlement-cells.test.ts`. Captured, held, provi
   statements".
 - **FC-RAIL** (DV1-09): `apps/api/test/refund-generic-v1.test.ts` :: "DENY CMD033 on a manual-rail refund: 409
   MANUAL_RAIL_NO_AUTOMATED_OUTBOUND, nothing written" (also asserted inside RFG-M-NR-RACE).
+
+### 7.28 Outbound lock order (rule 13; DV1-08) — r8, V1
+| Lock | Kind | Taken by (in this order) | Already held when taken | Never taken by |
+|---|---|---|---|---|
+| L1 account outbound stream | transaction advisory lock `(environment, accountRef, OUTBOUND)`, exclusive | X1, X4, G2, G4, X3, SI2 — always first | nothing | X2, F2, G3, G6, P1, C6, `authorization_lapsed`; any actor holding L2–L4, a credit lock or a B09 subject lock |
+| Lc credit identity (D-ACH-09) | credit uniqueness lock, in credit-id order | SI2 (after L1, for credit lines); C6, P1, G6, attribution (first) | L1 for SI2; nothing otherwise | any actor holding L2–L4 or a B09 subject lock |
+| L2 source booking | row lock on the source, `FOR NO KEY UPDATE` (D-ACH-13) | X1, X4, G2, G4, X3, SI2 (freeze), in source-id order; F2, G3, G6 | L1 and, for SI2, Lc (G6: Lc; F2, G3: nothing) | — |
+| L3 refund / attempt rows | `FOR NO KEY UPDATE` | every writer of a refund or attempt | L1, L2 (X2 and `authorization_lapsed`: nothing) | — |
+| L4 execution-identity uniqueness | unique index `(environment, accountRef, bankExecutionId)` across both scopes | G2, G4, X3 EXECUTED, SI2 links | L1–L3 | — |
+
+SI2 inserts debit lines and X3 reads coverage and debit absence only while holding L1, so NOT_EXECUTED and the insertion of a
+matching debit serialize (ACH-R7-04). Lock-order cells (red without the ordering guard):
+- `refund-generic-cells.test.ts` :: "RACE RFG-M-LOCK-L1 (opposite order): an actor holding a source booking lock never waits for the outbound-stream lock — G6 holds L2 while SI2 holds L1 and wants L2, both orders, no 40P01"
+- `refund-generic-cells.test.ts` :: "RACE RFG-M-LOCK-L3 (sweep without L1): X2 and authorization_lapsed hold an attempt or refund row while X1 holds L1 and L2 and wants it, both orders, no 40P01"
+- `ach-inbound-cells.test.ts` :: "DENY ACH-M-SI2-UNDECLARED (debit executed before any declaration): Import statement coverage — UNDECLARED_OUTBOUND opened, open refunds of the source frozen, X1/X4 refused EXECUTION_FROZEN, authorization_lapsed skips them, period not BALANCED"
+
+### 7.29 Enablement guard (DV1-04, PV1 Addendum item 2) — r8, V1
+- `packages/persistence/test/ach-route-cells.test.ts` :: "DENY ACH-M-R2-GENERAL (enable condition): rollout GENERAL is refused unless one
+  payment has its credit reconciled and its own refund RECORDED with send evidence — a credit without its refund, a refund of another
+  payment and a refund still DECLARED or UNCERTAIN are each refused; payer arrival is not required" (runs inside R2's lock, so its
+  RACE/CRASH/RETRY/PARTIAL cells are R2's: ACH-M-R2-*).
 
 ## 8. Cases and gates
 
@@ -988,14 +1092,15 @@ registry. The matrix and acceptance cases below are proposals for that implement
 | ACH-17 | Every matrix cell injected at its own boundary; security/log/evidence minimization and service fencing verified | All 280 GAP cells (r7: V1 176, LATER 104; see below) |
 | ACH-18 | Payer authorization lifecycle: verify/replace/revoke with evidence, step-up and both-order races against matching, apply and refund approval | V1–V3, M2, P1, F2 |
 | ACH-19 | D-ACH-20 boundary: with ACH ENABLED no automated outbound path is reachable; Appendix A requirements are listed and unchanged | G2, review of code paths |
-| ACH-LIVE-01 | One legitimate real USD ACH credit to the verified Wise Business details, reconciled end to end with duplicate replay adding nothing | I2, C4–C6 or C1–C8, M1–M2, P1–P2 |
+| ACH-LIVE-01 | One legitimate real USD ACH credit to the verified Wise Business details, reconciled end to end with duplicate replay adding nothing [r8: the qualification payment, route CONTROLLED; its own refund is ACH-REFUND-LIVE-01; both together enable GENERAL, DV1-04] | I2, C4–C6 or C1–C8, M1–M2, P1–P2 |
 | ACH-20 (r7) | Owner statement import: classified statement coverage by bank transaction id, overlapping/conflicting imports, orphan debits and RECORD_REQUIRED exceptions, BALANCED only with zero orphans, coverage feeding X3 NOT_EXECUTED | SI1–SI2, S3, G2, X3 |
-| ACH-21 (r7) | DV1-06: exact credit booked on time and confirmed after the deadline — honored only with every subject guard and no other purchase; booking +1 ms, outside tolerance or failed guard → recorded, no authority, return | P1Δ, E1 |
+| ACH-21 (r8) | DV1-06: exact credit booked by `transferExpiresAt + providerTimeTolerance` and confirmed after the deadline, whether or not E1 ran — honored only with PROVIDER-TIME and every SUBJECT guard and no other purchase; N+1 ms, unverified time or a failed guard → recorded, no authority, return | P1Δ, E1 |
 | ACH-22 (r7) | DV1-03: a DOMESTIC_WIRE credit to the same details matches exactly like ACH (gross vs obligation, fee observed separately); OTHER/UNKNOWN/Swift/conversion → review | M1–M2, P1–P2 |
 | RFG-01 (r7) | A manual-rail refund is declared, executed outside Kauro and recorded once with evidence: `refund.completed` once; revenue/cash, seller commission and credit-note draft adjusted by exact cents; receipt kept | F2, X1, G2, P3 |
 | RFG-02 (r7) | No path marks a refund COMPLETED without classified execution evidence; no execution id completes two refunds; NEVER-RESEND on every entry point | G1–G2, X1–X3, NR |
 | RFG-03 (r7) | D-24 A: an UNCERTAIN refund stays reserved until the owner resolves it with evidence | X2–X3 |
-| ACH-REFUND-LIVE-01 (r7) | One controlled real refund of the ACH-LIVE-01 payment: approve (owner, step-up), declare (X1), execute in the bank app with the reference, record (G2) with classified evidence, import the statement (SI2) linking the debit and balancing the period; one `refund.completed`; exact revenue/cash/commission/credit-note cents; replay adds nothing; real reference-field fidelity recorded (K-10) | F1–F2, X1, G1–G2, SI1–SI2, P3 |
+| RFG-04 (r8) | A bounced refund is re-sent only through a new declared attempt after the bounce is recorded; never while an attempt of the source is DECLARED or UNCERTAIN; the resend is recorded only against that attempt | G3, X4, G2Δ/G4Δ, X2, X3, NR |
+| ACH-REFUND-LIVE-01 (r8) | The refund of **the same** ACH-LIVE-01 payment: approve (owner, step-up), declare (X1), **send** from Wise with the reference, record (G2) with Wise's send receipt as classified execution evidence (all G2 predicates); one `refund.completed`; exact revenue/cash/commission/credit-note cents; replay adds nothing; reference-field fidelity recorded (K-10). Arrival at the payer is not awaited; a later bounce follows G3 then X4. With ACH-LIVE-01 it is the CONTROLLED→GENERAL condition (DV1-04) | F1–F2, X1, G1–G2, P3 (SI2 later, not a condition) |
 
 **r7 updates of the rows above.** ACH-01's "PayPal-only launch works" reads "launch with the route not ENABLED works: no details,
 no order (K-9)" [SUPERSEDED r7: PayPal-only]. ACH-11's "ACH retirement→PayPal" reads "explicit retirement before any other
@@ -1025,7 +1130,7 @@ input/expected/actual results and artifact digests in restricted evidence; redac
 reviewer acceptance opens general ACH exposure (r7: together with ACH-REFUND-LIVE-01, DV1-04); failure returns to VERIFIED/disabled or PENDING_VERIFICATION as appropriate.
 No CONTRACT_FAKE or screenshot can satisfy this gate.
 
-PayPal's existing G-PAYMENT and launch obligations remain. Wise unavailability leaves PayPal-only launch viable. **[SUPERSEDED r7: PayPal is parked. G-PRODUCTION may go live with the route not ENABLED (limited availability, S086); G-BUSINESS needs ACH-LIVE-01, ACH-REFUND-LIVE-01, a fiscal document and delivery (DV1-04). If the Wise USD details are not live by 2026-10-12 20:00, owner card D-26 applies; PayPal is not reintroduced (PV1 §2).]** This inbound
+PayPal's existing G-PAYMENT and launch obligations remain. Wise unavailability leaves PayPal-only launch viable. **[SUPERSEDED r7/r8: PayPal is parked. No production without collection: B19 needs the route ENABLED with rollout GENERAL, enabled by ACH-LIVE-01 and ACH-REFUND-LIVE-01 on one payment; production date = max(2026-10-17, GENERAL); if the Wise USD details are not live on 2026-10-12 20:00 the date moves (DV1-04, PV1 Addendum). "Commercially live" additionally needs delivery and the fiscal evidence.]** This inbound
 live gate does not claim outbound automation, which is Phase 2 (Appendix A) with its own design review and live outbound gate.
 The Phase 1 manual return procedure (approve in Kauro, declare (X1), send in the bank app, record with evidence) must be reviewable and recoverable when
 controlled ACH receiving is enabled.
@@ -1048,6 +1153,21 @@ controlled ACH receiving is enabled.
 | 12 | `ACH-case-map.md` (new), `B09-case-map.md` (appendix only) | Evidence classes per case; B09 PARTIAL "remaining: B15" re-targeted without changing any accepted row or title | mandate §6 |
 
 Not changed: every r6 cell text and test title; D-ACH-03, 05, 07, 09, 11, 12, 13, 15 (except renames), 16, 18; Appendix A.
+
+## 10. r7 → r8 change list (Codex design r7 REJECT, `tools/review/out/ach-design-r7-c20b536fd03d`; PV1 Addendum)
+
+| # | Finding / source | Change (by construction) | Cells |
+|---|---|---|---|
+| 1 | ACH-R7-01 CRASH-BEFORE | Send-before-declare path removed; send details shown only from a committed declaration; E-TIME `executedAt ≥ declaredAt` (strict); an earlier debit is an undeclared orphan with UNDECLARED_OUTBOUND, `execution_frozen`, lapse skipped, period not BALANCED (resolution LATER with G5/P4) | RFG-M-G2D-CRASH-BEFORE, RFG-M-X1-CRASH-BEFORE, ACH-M-SI2-UNDECLARED, RFG-P-E-TIME |
+| 2 | ACH-R7-02 RACE | Generic `outbound_execution_attempts` (RETURN, RESEND) with DECLARED/UNCERTAIN/RECORDED/NOT_EXECUTED; new row X4 (declare resend after a recorded bounce); G4 records only a declared RESEND attempt; partial unique index = one open attempt per source; X2/X3/NR cover both kinds | RFG-M-X4-* (8), RFG-M-G2D-RACE, RFG-M-X1-RETRY, RFG-M-NR-RACE |
+| 3 | ACH-R7-03 HONESTY | `OutboundEvidence`/`StatementDebit` gain `executedAt`, `reference`, `destination: DestinationEvidence` (all nullable, never inferred); G2/G4 predicates E-ID, E-AMT, E-TIME, E-DEST, E-DEST-CONFLICT, E-REF-CONFLICT; X3 NOT_EXECUTED treats every non-excluded debit (incl. all-null fields) as potentially matching | RFG-P-E-* (7), RFG-P-NX-* (4) |
+| 4 | ACH-R7-04 RACE | Lock order L1 stream → credit identity → L2 → L3 → L4 (§7.28); X3 absence read and SI2 line insertion both under L1 | RFG-M-X3-RACE, ACH-M-SI2-RACE, RFG-M-LOCK-L1, RFG-M-LOCK-L3 |
+| 5 | ACH-R7-05 RACE | DV1-06 branches on locked state and `effectNow`, covering AWAITING_TRANSFER past deadline (E1 not run) and EXPIRED alike; same outcome in every sweep order | ACH-M-P1D-RACE |
+| 6 | ACH-R7-06 EXPIRY | DEADLINE predicate `bookedAt ≤ transferExpiresAt + providerTimeTolerance` (named, versioned route data); N−1/N/N+1 cells under two tolerance versions; ACH-21 oracle aligned | ACH-M-P1D-EXPIRY |
+| 7 | PV1 Addendum 1 | No production without collection: B19 needs ENABLED/GENERAL; date = max(17-oct, GENERAL); r7 G-PRODUCTION-with-route-closed text SUPERSEDED (here, ACH-case-map, B09 appendix, PLAN_MAESTRO) | — |
+| 8 | PV1 Addendum 2 | One payment, both legs: reconciled credit + refund of that payment SENT and recorded with Wise's send receipt; arrival not awaited; bounce → G3 then X4 | ACH-M-R2-GENERAL; ACH-LIVE-01, ACH-REFUND-LIVE-01 |
+| 9 | PV1 Addendum 3–4 | R2 15 §Initial payment decision paragraph 1 superseded; paragraph 3 governs the "commercially live" label only | — |
+| 10 | Legal | Plain-language DV1-06 text for ToS 8.2: `docs/review/dv1-06-for-legal.md` | — |
 
 ## Appendix A. Phase 2 (post-launch): automated Wise outbound — not designed here
 

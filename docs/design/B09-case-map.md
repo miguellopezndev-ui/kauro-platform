@@ -255,6 +255,6 @@ The table has three columns so the row parsers of `tools/test/b09-case-map.test.
 | S060 | B10 | unchanged |
 
 The simulator self-tests in `packages/application/test/commerce-fakes.test.ts` stay (every accepted B09/B10 test uses the
-simulator) and are labelled "simulator self-test, not V1 rail evidence". G-PAYMENT's live half reads: G-PRODUCTION may pass with
-the bank route not ENABLED (limited availability, S086); G-BUSINESS needs ACH-LIVE-01, ACH-REFUND-LIVE-01, a fiscal document and
-delivery (ACH-ROUTE DV1-04).
+simulator) and are labelled "simulator self-test, not V1 rail evidence". G-PAYMENT's live half reads (ACH-ROUTE r8 DV1-04): no
+production without collection; the route reaches GENERAL only with ACH-LIVE-01 and ACH-REFUND-LIVE-01 on one payment (credit
+reconciled, its refund sent and recorded with the send receipt); "commercially live" also needs delivery and the fiscal document.

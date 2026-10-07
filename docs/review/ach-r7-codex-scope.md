@@ -51,3 +51,10 @@ Kind: design-time delta review of one package design (A7 §5 draft: one design-t
 
 ## Budget
 One round, high effort, bundle ≤ the diff + the slices above (no whole repos or docs). Expected verdict format: tools/review JSON.
+
+## r8 re-check scope (after r7 REJECT)
+
+Delta `c20b536..<r8 head>` only; findings ACH-R7-01..06 re-checked against ACH-ROUTE §10 (r7 → r8 list) and the cells it names;
+plus the PV1 Addendum (bde2dac): no production without collection, one payment for both legs, R2 15 §Initial payment decision
+paragraph 1 superseded. High effort (money). Files: ACH-ROUTE.md (§0 DV1-04/06/08, §6 evidence types, §7.21–§7.22, SI2, P1Δ,
+§7.28–§7.29, §8, §10), ACH-case-map.md, B09-case-map.md appendix, `docs/review/dv1-06-for-legal.md`.

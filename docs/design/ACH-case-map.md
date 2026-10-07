@@ -1,6 +1,6 @@
 # ACH / bank-transfer route — case map (Payments V1)
 
-Design-time map for [ACH-ROUTE r7](ACH-ROUTE.md) under the owner decision Payments V1
+Design-time map for [ACH-ROUTE r8](ACH-ROUTE.md) under the owner decision Payments V1
 (`docs/authority/decisions/2026-10-07-PAYMENTS-V1.md`, "PV1"). Every proposed bank-route case and every registry case whose
 remainder PV1 re-targets is listed with its **target evidence class**, its current status and the tests that will carry it, as
 `file :: "exact title"`. No test exists yet: every row is **PLANNED** until its lane lands; the lane then rewrites the status
@@ -42,15 +42,16 @@ Lanes (PAYMENTS-V1-REPLAN §9): KIT, L-ROUTE, L-INBOUND, L-REFUND, L-SETTLE, S-B
 | ACH-18 | LATER 2026-11-30 | GAP | — | V1–V3 | V1 replacement: `packages/persistence/test/ach-inbound-cells.test.ts` :: "DENY ACH-M-FC-V (payer authorization LATER): a credit whose payer is not the order's accepted billing identity goes to MATCH_REVIEW and can only be returned; no payer-authorization command is served" |
 | ACH-19 | EXECUTED_LOCAL | PLANNED | L-REFUND | G2, NR | `apps/api/test/refund-generic-v1.test.ts` :: "DENY CMD033 on a manual-rail refund: 409 MANUAL_RAIL_NO_AUTOMATED_OUTBOUND, nothing written" |
 | ACH-20 | PARTIAL (format: ACH-LIVE-01) | PLANNED | L-INBOUND | SI1–SI2, S3, G2, X3 | `packages/persistence/test/ach-inbound-cells.test.ts` :: "ACH-20 OK: an imported statement covers its interval once by bank transaction id, links recorded debits, keeps orphans open and is BALANCED only with zero orphans" |
-| ACH-21 | EXECUTED_LOCAL | PLANNED | L-INBOUND | P1Δ, E1 | `packages/persistence/test/ach-inbound-cells.test.ts` :: "ACH-21 OK (R2 15 expiry race): a credit booked by the deadline and confirmed later is honored only with every subject guard valid and no other purchase; otherwise it is recorded and returned" |
+| ACH-21 | EXECUTED_LOCAL | PLANNED | L-INBOUND | P1Δ, E1 | `packages/persistence/test/ach-inbound-cells.test.ts` :: "ACH-21 OK (R2 15 expiry race): a credit booked by the deadline plus the route's provider-time tolerance and confirmed later is honored whether or not the expiry sweep ran, only with every subject guard valid and no other purchase; otherwise it is recorded and returned" |
 | ACH-22 | PARTIAL (format: ACH-LIVE-01) | PLANNED | L-INBOUND | M1–M2, P1–P2 | `packages/persistence/test/ach-inbound-cells.test.ts` :: "ACH-22 OK: a domestic wire to the same details matches exactly like ACH on gross; its fee is observed separately; other rails go to review" |
 | RFG-01 | EXECUTED_LOCAL | PLANNED | L-REFUND | F2, X1, G2, P3 | `apps/api/test/refund-generic-v1.test.ts` :: "RFG-01 OK: a manual-rail refund is declared, executed outside Kauro and recorded once with its evidence - refund.completed once, revenue/cash, seller commission and credit-note draft adjusted by exact cents, receipt kept" |
 | RFG-02 | EXECUTED_LOCAL | PLANNED | L-REFUND | G1–G2, X1–X3, NR | `apps/api/test/refund-generic-v1.test.ts` :: "RFG-02 DENY: no path marks a refund COMPLETED without classified execution evidence, and no execution id completes two refunds" |
 | RFG-03 | EXECUTED_LOCAL | PLANNED | L-REFUND | X2–X3 | `apps/api/test/refund-generic-v1.test.ts` :: "RFG-03 OK (D-24 A): an UNCERTAIN refund stays reserved until the owner resolves it with evidence" |
+| RFG-04 | EXECUTED_LOCAL | PLANNED | L-REFUND | G3, X4, G2Δ/G4Δ, X2, X3, NR | `apps/api/test/refund-generic-v1.test.ts` :: "RFG-04 RACE: a bounced refund is re-sent only through a new declared attempt after the bounce is recorded, never while an attempt of the source is DECLARED or UNCERTAIN" |
 | DV1-01 | EXECUTED_LOCAL | PLANNED | KIT | — | `packages/application/test/bank-route-genericity.test.ts` :: "DENY DV1-01 genericity: no type, table, column, enum value or event type added for the bank-transfer route names a provider" |
 | K-9 | EXECUTED_LOCAL | PLANNED | S-E | — | `apps/web/test/checkout-bank-transfer.test.ts` :: "DENY no enabled route for the buyer: no instructions, no order" |
-| ACH-LIVE-01 | LIVE | BLOCKED_OWNER (D-14, D-13, D-25) | B15 | I2, C4–C6, SI1–SI2, M1–M2, P1–P2 | restricted evidence per `docs/payments/ACH-REAL-TEST-PLAN-2026-10-07.md` |
-| ACH-REFUND-LIVE-01 | LIVE | BLOCKED_OWNER (after ACH-LIVE-01) | B15 | F1–F2, X1, G1–G2, SI1–SI2, P3 | restricted evidence per the same plan |
+| ACH-LIVE-01 | LIVE | BLOCKED_OWNER (D-14, D-13, D-25) | B15 | I2, C4–C6, M1–M2, P1–P2 | the qualification payment (route ENABLED, rollout CONTROLLED): its ACH credit received and reconciled in Kauro; restricted evidence per `docs/payments/ACH-REAL-TEST-PLAN-2026-10-07.md` |
+| ACH-REFUND-LIVE-01 | LIVE | BLOCKED_OWNER (after ACH-LIVE-01) | B15 | F1–F2, X1, G1–G2, P3 | the refund of **that same payment** declared (X1), SENT from Wise and recorded (G2) with Wise's send receipt as execution evidence; arrival at the payer is not awaited; a later bounce follows G3 then X4. ACH-LIVE-01 + ACH-REFUND-LIVE-01 = the CONTROLLED→GENERAL enable condition (ACH-ROUTE DV1-04; `ach-route-cells.test.ts` :: "DENY ACH-M-R2-GENERAL …") |
 
 ## 2. Registry cases re-targeted by PV1 (titles of accepted tests unchanged)
 
@@ -66,17 +67,18 @@ Lanes (PAYMENTS-V1-REPLAN §9): KIT, L-ROUTE, L-INBOUND, L-REFUND, L-SETTLE, S-B
 | R2-082..R2-084, CMD035-* (B15) | — | unchanged (fiscal adapter, S-B) | B15 map |
 | S066 (B11) | per B11 map | EXECUTED_LOCAL `apps/web/test/operation-runner.test.ts` S066 title + "RACE ACH-M-I2-CRASH-AFTER (lost answer): Issue transfer instructions"; LIVE in ACH-LIVE-01 issuance | B11 map (S-E) |
 | CMD052, CMD053, R2-103, R2-104 (B10) | per B10 map | unchanged EXECUTED_LOCAL; live payout → lane PAYOUT-MANUAL, LATER 2026-11-30 (first PAYABLE line ≥ Dec-2026, R2 17) | B10 map |
-| S086, S081, S083 (B19) | — | S086: ACH-02 visibility cells + "limited availability" label under G-PRODUCTION; S081, S083 unchanged | ACH-02, `ach-route-cells.test.ts` I3 titles |
+| S086, S081, S083 (B19) | — | S086: ACH-02 visibility cells (no production without collection, DV1-04); S081, S083 unchanged | ACH-02, `ach-route-cells.test.ts` I3 titles |
 | S065, R2-074, R2-126 (B16); B18 walk | — | nonprod manual records: provider half SIMULATED, restore EXECUTED | B16/B18 maps |
 
 Simulator self-tests kept in `packages/application/test/commerce-fakes.test.ts` ("PayPal Orders v2 contract fake: …",
 "WebhookVerifier contract fake: …", "R2-080 (Windows flake …)") are labelled **"simulator self-test, not V1 rail evidence"**; they
 stay because every accepted B09/B10 test uses the simulator (deleting them would edit accepted B09 files).
 
-## 3. Gates
+## 3. Gates (r8, PV1 Addendum)
 
-- **G-PRODUCTION** (B19, 17-oct): may pass with the bank route not ENABLED, labelled limited availability (S086); requires the
-  V1 cells above EXECUTED_LOCAL on main (checkpoint CP-V1, 14-oct 20:00).
-- **G-BUSINESS** ("commercially live", R2 15 §Initial payment decision): ACH-LIVE-01 and ACH-REFUND-LIVE-01 LIVE, a fiscal document
-  issued and the purchased scope delivered. If the Wise USD details are not live by 2026-10-12 20:00, owner card D-26 applies;
-  PayPal is not reintroduced (PV1 §2).
+- **Production (B19)** requires the bank route ENABLED with rollout GENERAL; there is no production with collection closed.
+  Production date = max(2026-10-17, the day GENERAL is enabled); V1 cells EXECUTED_LOCAL on main by checkpoint CP-V1 (14-oct 20:00).
+- **GENERAL** = ACH-LIVE-01 and ACH-REFUND-LIVE-01 on one payment (credit reconciled; its refund sent and recorded with the send
+  receipt). If the Wise USD details are not live by 2026-10-12 20:00, the production date moves; PayPal is not reintroduced.
+- **"Commercially live"** (R2 15 §Initial payment decision paragraph 3) additionally needs delivery and the fiscal evidence on a
+  real order (the test's invoice and credit note). [SUPERSEDED r8: the r7 G-PRODUCTION-with-route-not-ENABLED text.]
