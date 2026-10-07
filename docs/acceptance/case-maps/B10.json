@@ -3,7 +3,7 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B10-case-map.md",
-  "sha256": "1078f3d69a4c5da6d5103d0b2116428c8d9d29783b6f33ae00a07675e17d6f4f"
+  "sha256": "04bf0a87c8c48cb48ebbd5b92e740671bd053af17779f6b40659c39c8053ed52"
  },
  "rows": [
   {
@@ -270,7 +270,7 @@
   },
   {
    "case": "R2-104",
-   "class": "EXECUTED_LOCAL",
+   "class": "PARTIAL",
    "test": [
     "packages/domain/test/commercial-money.test.ts :: R2-104 (example 7): a paid 4921-cent line revised to 4121 shows accrual 4921, payout 4921, adjustment -800 and balance -800; a later eligible amount is offset only under SIGNED_FUTURE_OFFSET terms, otherwise the balance is an owner REPAYMENT_REVIEW, WRITE_OFF or DISPUTE item",
     "packages/persistence/test/b10-ledger-migrations.test.ts :: R2-104 at the database: an offset against a later line is refused without SIGNED_FUTURE_OFFSET terms (KC017), a PAID line moves to ADJUSTED with an appended adjustment, and its paid cents and payout rows never change",
@@ -278,8 +278,10 @@
    ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B10"
+   ],
+   "claimed": "PARTIAL"
   },
   {
    "case": "R2-105",

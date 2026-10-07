@@ -167,7 +167,7 @@
   {
    "case": "R2-104",
    "package": "B10",
-   "claimed": "EXECUTED_LOCAL",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null

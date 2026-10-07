@@ -304,3 +304,13 @@ test("every sidecar citation of a tools/test file names a test that exists in th
     }
   }
 });
+
+test("a PARTIAL remainder kept by the package itself for a later lane names its own package; a remainder named by nobody stays unowned", () => {
+  const map = (later) => `| case | status | rows | later package and case |\n|---|---|---|---|\n| R2-104 | PARTIAL | \`packages/x/test/a.test.ts\` :: "R2-104: offset" | ${later} |\n`;
+  const own = convertTableMap(map("offset capacity open until lane B10-OFFSET (B10 lane B10-OFFSET, no registry case)"), { packages: ["B10"], registry });
+  assert.deepEqual(own[0].inheritedTo, ["B10"]);
+  const nobody = convertTableMap(map("offset capacity still open"), { packages: ["B10"], registry });
+  assert.deepEqual(nobody[0].inheritedTo, []);
+  const sidecar = JSON.parse(read("docs/acceptance/case-maps/B10.json"));
+  assert.deepEqual(sidecar.rows.find((r) => r.case === "R2-104").inheritedTo, ["B10"], "B10's R2-104 as main states it");
+});

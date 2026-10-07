@@ -2029,7 +2029,7 @@
    "case": "R2-104",
    "package": "B10",
    "gate": "G-COMMERCIAL",
-   "claimed": "EXECUTED_LOCAL",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -4139,8 +4139,8 @@
    "title": "Agency recurrence and commission domain",
    "cases": 64,
    "counts": {
-    "EXECUTED_LOCAL": 54,
-    "PARTIAL": 10
+    "EXECUTED_LOCAL": 53,
+    "PARTIAL": 11
    },
    "status": "IN_PROGRESS",
    "acceptedSubject": null,

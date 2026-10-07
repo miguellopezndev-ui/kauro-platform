@@ -159,13 +159,17 @@ export function detailOf(text, caseId) {
 
 /**
  * The packages a non-executed row hands its remainder to: the other packages it names; when it names none, the packages of the
- * other registry cases it names (MC-07's real counterpart R2-017 is B02's own case).
+ * other registry cases it names (MC-07's real counterpart R2-017 is B02's own case); when it names neither, its own package if it
+ * names it as the holder of the rest (B10's R2-104: "B10 lane B10-OFFSET, no registry case").
  */
 export function remainderOwners(text, caseId, pkg, registry) {
   const others = [...new Set(text.match(PACKAGE_ID) ?? [])].filter((p) => p !== pkg);
   if (others.length) return others.sort();
   const ids = text.match(/\b(MC-\d\d|IC-\d\d|CAP\d\d|S\d{3}|R2-\d{3}|CMD\d{3}-(?:OK|DENY|RACE))\b/g) ?? [];
-  return [...new Set(ids.filter((id) => id !== caseId).map((id) => registry.owner.get(id)).filter(Boolean))].sort();
+  const viaCases = [...new Set(ids.filter((id) => id !== caseId).map((id) => registry.owner.get(id)).filter(Boolean))].sort();
+  if (viaCases.length) return viaCases;
+  // a remainder the package keeps for one of its own later lanes ("B10 lane B10-OFFSET, no registry case")
+  return (text.match(PACKAGE_ID) ?? []).includes(pkg) ? [pkg] : [];
 }
 
 const unquoted = (text) => text.replace(/`[^`]*`|"(?:[^"\\]|\\.)*"/g, " ");
