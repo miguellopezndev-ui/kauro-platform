@@ -126,6 +126,8 @@ async function withRebinder<T>(rebind: PurchaseRebinder["rebind"], fn: () => Pro
 }
 const refusing = <T>(fn: () => Promise<T>): Promise<T> => withRebinder((uow, input) => withoutLineage.rebind(uow, input), fn);
 
+/** The project's live-quote read of CreateQuote (a plain read; the FOR UPDATE of the quote it names follows in the next statement). */
+const LIVE_READ: SqlStep = { label: "live_read", match: /SELECT quote_id FROM kauro\.quotes\s+WHERE agency_id = \$1 AND project_id = \$2/ };
 const JOURNAL_COMMIT: SqlStep = { label: "journal_commit", match: /UPDATE kauro\.command_journal SET state = 'COMMITTED'/ };
 const QUOTE_INSERT: SqlStep = { label: "quote_insert", match: /INSERT INTO kauro\.quotes \(/ };
 const ISSUANCE: SqlStep = { label: "issuance", match: /INSERT INTO kauro\.quote_issuances/ };
@@ -173,6 +175,51 @@ faultCell(
       // the same key again, the race over: the allowance is spent and nothing is written
       assert.equal(outcome(iw.w, await quoteCall(x.a, waiterPlan, waiterKey)), "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT");
       reboundOnce(x, await stateOf(x, waiterKey), held.quote.quoteId);
+    }
+    // the same contention where the other key read the project's live quote before the first key's re-binding committed and locks it after
+    // (main run 37557133856, Windows: the live-quote read is not a lock, and the re-binding may update the paid quote's row before a waiter
+    // woken by the intent's COMMIT takes it): the late key must conclude from the quote that is live once its lock is held, never from the
+    // superseded paid quote it read before, so it is refused REPLACEMENT_ALLOWANCE_SPENT with nothing written, never a second quote
+    for (const order of ["key A late", "key B late"] as const) {
+      const x = await fixture(`repl-race-late-${order === "key A late" ? "a" : "b"}`);
+      const keyA = freshKey("repl-race-late-a");
+      const keyB = freshKey("repl-race-late-b");
+      const [lateKey, firstKey] = order === "key A late" ? [keyA, keyB] : [keyB, keyA];
+      const lateConn = await open("kauro_app_test");
+      try {
+        const read = ctx.points.pause("db.live_read.after");
+        const late = ctx.operation(`the replacement of ${order}, held after its live-quote read`, () => quoteOn(ctx, lateConn, x, lateKey, [LIVE_READ])).then(
+          (v): PromiseSettledResult<Reply> => ({ status: "fulfilled", value: v }),
+          (reason: unknown): PromiseSettledResult<Reply> => ({ status: "rejected", reason }),
+        );
+        await read.reachedBy(late);
+        // the first key's whole replacement runs meanwhile: intent, re-binding (the paid quote SUPERSEDED) and completion
+        const first = await ctx.operation("the first key's replacement, run to its answer", () => quoteCall(x.a, x.plan, firstKey));
+        const done = view(first);
+        assert.equal(done.replacement?.outcome, "REBOUND", "the first key re-binds the purchase while the late key holds its live-quote read");
+        assert.equal((await stateOf(x, firstKey)).paidQuote, "SUPERSEDED", "the paid quote the late key read is superseded before it locks it");
+        read.release();
+        const answered = await late;
+        assert.equal(answered.status, "fulfilled");
+        const refused = answered.status === "fulfilled" ? answered.value : (undefined as never);
+        assert.equal(outcome(iw.w, refused), "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT", `the late key is refused on the quote live at its lock, never a second replacement: ${outcome(iw.w, refused)}`);
+        const s = await stateOf(x, lateKey);
+        reboundOnce(x, s, done.quote.quoteId);
+        assert.deepEqual(s.replacements, ["ACCEPTED_FOR_CHECKOUT"], "one replacement quote: the late key wrote none");
+        assert.equal(s.journal, null, "the refused key journaled nothing");
+        assert.equal((await stateOf(x, firstKey)).journal, "COMMITTED");
+        // retried with the same key and with a fresh key, the race over: the same refusal, nothing written
+        assert.equal(outcome(iw.w, await quoteCall(x.a, x.plan, lateKey)), "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT");
+        const fresh = freshKey("repl-race-late-fresh");
+        assert.equal(outcome(iw.w, await quoteCall(x.a, x.plan, fresh)), "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT");
+        const after = await stateOf(x, fresh);
+        reboundOnce(x, after, done.quote.quoteId);
+        assert.deepEqual(after.replacements, ["ACCEPTED_FOR_CHECKOUT"]);
+        assert.equal(after.journal, null);
+        assert.equal((await stateOf(x, lateKey)).journal, null);
+      } finally {
+        await lateConn.end();
+      }
     }
   },
 );
