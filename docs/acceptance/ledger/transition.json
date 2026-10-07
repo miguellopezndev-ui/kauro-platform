@@ -24,8 +24,8 @@
    "id": "A4",
    "title": "Operating model (package acceptance, the 441-case ledger)",
    "effective": "2026-09-29",
-   "location": "operator host: authority/r2/amendments/A4_OPERATING_MODEL.md",
-   "sha256": null,
+   "location": "docs/authority/amendments/A4_OPERATING_MODEL.md",
+   "sha256": "add6aeec54c3580087816d90f249365cae2495f03b3bd31703b11db0b74f493e",
    "application": "PROSPECTIVE",
    "changesRegistry": false,
    "note": "retires the ChatGPT mandate loop; work in flight keeps its clock and scope until its next package close"
@@ -34,8 +34,8 @@
    "id": "A5",
    "title": "CMD020-CMD024 split between the cores and B08",
    "effective": "2026-10-01",
-   "location": "operator host: authority/r2/amendments/A5_CMD024_SPLIT.md",
-   "sha256": null,
+   "location": "docs/authority/amendments/A5_CMD024_SPLIT.md",
+   "sha256": "00b1ff7b6ac439ab8345bbfca73f9a457487a43eeececc8c418bc5cc4f4eb1e3",
    "application": "PROSPECTIVE",
    "changesRegistry": false,
    "note": "carried by tools/package-brief.mjs; the registry stays byte-identical"
@@ -43,12 +43,12 @@
   {
    "id": "A6",
    "title": "Bound acceptance and later diffs",
-   "effective": null,
-   "location": "operator host: authority/r2/amendments/A6_*.md",
-   "sha256": null,
+   "effective": "2026-10-04",
+   "location": "docs/authority/amendments/A6_ACCEPTANCE_BINDING.md",
+   "sha256": "2be3050771b88d4c9556ec23a78720c8dd31abd25b4d0c00fbf502ccc9f4f2f4",
    "application": "PROSPECTIVE",
    "changesRegistry": false,
-   "note": "date and hash not observable from this repository; B records them with the A7 re-issue"
+   "note": "owner decision of 2026-10-04 (the text states it); bound acceptance"
   },
   {
    "id": "A8",
