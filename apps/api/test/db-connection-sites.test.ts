@@ -2,7 +2,8 @@
 // every site that builds a pool or a client in apps/ and packages/*/src; each non-persistence site must call connectionSecurityOf
 // (the one rule), and the persistence sites must derive ssl only from sslOptionsOf (rejectUnauthorized: true).
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
@@ -14,17 +15,34 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..
 
 const EXTENSIONS = [".ts", ".tsx", ".js", ".mjs", ".cjs"];
 
-/** Build output, vendored and generated directories are never source (verify produces apps/web/.next/standalone/.../server.js, for one). */
-const NOT_SOURCE: ReadonlySet<string> = new Set(["node_modules", "dist", "build", ".next", "out", "coverage", "vendor", ".turbo", ".git", "test"]);
+/**
+ * Only TRACKED source is scanned (git ls-files): build output (.next, dist, coverage, ...) is untracked, so it is excluded because it
+ * is not shipped source, while a tracked directory that happens to be named build/, out/ or vendor/ (a Next route folder, say) is
+ * scanned. Only a package's own test/ directory at its root is skipped.
+ */
+function trackedSources(repo: string): string[] {
+  const listed = spawnSync("git", ["ls-files", "-z", "--", "apps", "packages"], { cwd: repo, encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
+  assert.equal(listed.status, 0, `git ls-files failed: ${listed.stderr}`);
+  return listed.stdout
+    .split("\0")
+    .filter((f) => f !== "" && EXTENSIONS.some((e) => f.endsWith(e)) && !f.endsWith(".d.ts") && !/^(?:apps|packages)\/[^/]+\/test\//.test(f))
+    .sort();
+}
 
-function sources(dir: string, out: string[] = []): string[] {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (NOT_SOURCE.has(entry.name)) continue;
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) sources(path, out);
-    else if (EXTENSIONS.some((e) => entry.name.endsWith(e)) && !entry.name.endsWith(".d.ts")) out.push(path);
-  }
-  return out;
+/** A throw-away repository: `tracked` files are added to the index, `untracked` ones are only written. */
+function tempRepo(tracked: Record<string, string>, untracked: Record<string, string> = {}): { dir: string; done(): void } {
+  const dir = mkdtempSync(join(tmpdir(), "kauro-scan-repo-"));
+  const write = (files: Record<string, string>): void => {
+    for (const [rel, text] of Object.entries(files)) {
+      mkdirSync(join(dir, dirname(rel)), { recursive: true });
+      writeFileSync(join(dir, rel), text);
+    }
+  };
+  assert.equal(spawnSync("git", ["init", "-q"], { cwd: dir, windowsHide: true }).status, 0);
+  write(tracked);
+  assert.equal(spawnSync("git", ["add", "-A"], { cwd: dir, windowsHide: true }).status, 0);
+  write(untracked);
+  return { dir, done: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
 function code(text: string): string {
@@ -95,26 +113,33 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
   };
   for (const [name, text] of Object.entries(forms)) assert.ok(isSite(text), `not caught: ${name}`);
   for (const text of ['import type { PoolClient } from "pg";', 'import { type Client } from "pg";', "// new Pool(\nexport const a = 1;", 'export type { Pool } from "pg";', 'export const superuser = "postgres";']) assert.ok(!isSite(text), text);
-  const dir = mkdtempSync(join(tmpdir(), "kauro-scan-"));
+  const files = Object.fromEntries(["a.ts", "b.js", "c.mjs", "d.cjs"].map((n) => [`apps/x/src/${n}`, forms["new pg.Pool("] ?? ""]));
+  const repo = tempRepo(files);
   try {
-    for (const name of ["a.ts", "b.js", "c.mjs", "d.cjs"]) writeFileSync(join(dir, name), forms["new pg.Pool("] ?? "");
-    assert.deepEqual(sources(dir).map((f) => relative(dir, f)).sort(), ["a.ts", "b.js", "c.mjs", "d.cjs"]);
+    assert.deepEqual(trackedSources(repo.dir), Object.keys(files));
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    repo.done();
   }
 });
 
-test("scan self-test: only source is scanned: a connection-looking file under .next/, dist/, build/ or node_modules/ is ignored, one under src/ is caught", () => {
-  const dir = mkdtempSync(join(tmpdir(), "kauro-scan-src-"));
-  const looks = ['import pg from "pg";', "export const p = new pg.Pool({});"].join("\n");
+test("scan self-test: only tracked source is scanned: src/build/db.ts, src/out/db.ts and src/vendor/db.ts are caught, an untracked .next/ file and a package-root test/ are not", () => {
+  const looks = ["import pg from \"pg\";", "export const p = new pg.Pool({});"].join("\n");
+  const repo = tempRepo(
+    {
+      "apps/web/src/build/db.ts": looks,
+      "apps/web/src/out/db.ts": looks,
+      "apps/web/src/app/out/db.ts": looks,
+      "packages/x/src/vendor/db.ts": looks,
+      "apps/web/src/test/db.ts": looks,
+      "apps/web/test/db.test.ts": looks,
+      "apps/web/src/types.d.ts": looks,
+    },
+    { "apps/web/.next/standalone/apps/web/server.js": looks, "apps/web/dist/db.js": looks },
+  );
   try {
-    for (const where of ["src", ".next/standalone/apps/web", "dist/src", "build", "node_modules/pg", "coverage", "out"]) {
-      mkdirSync(join(dir, where), { recursive: true });
-      writeFileSync(join(dir, where, "server.js"), looks);
-    }
-    assert.deepEqual(sources(dir).map((f) => relative(dir, f).split("\\").join("/")), ["src/server.js"]);
+    assert.deepEqual(trackedSources(repo.dir), ["apps/web/src/app/out/db.ts", "apps/web/src/build/db.ts", "apps/web/src/out/db.ts", "apps/web/src/test/db.ts", "packages/x/src/vendor/db.ts"]);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    repo.done();
   }
 });
 
@@ -137,14 +162,7 @@ test("scan self-test: a TLS setting outside tls.ts is caught in every form", () 
 });
 
 test("every connection site of apps/ and packages/*/src is known, and each composition root applies connectionSecurityOf", () => {
-  const dirs = [join(root, "apps"), ...readdirSync(join(root, "packages")).map((p) => join(root, "packages", p, "src"))];
-  const files = dirs.flatMap((d) => {
-    try {
-      return sources(d);
-    } catch {
-      return [];
-    }
-  });
+  const files = trackedSources(root).map((f) => join(root, f));
   const found = new Map<string, string>();
   for (const file of files) {
     const rel = relative(root, file).replaceAll("\\", "/");
