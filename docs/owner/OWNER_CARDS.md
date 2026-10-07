@@ -5,10 +5,10 @@ repositorio y aquí solo figura que fueron recibidas. Cada tarjeta nueva o cambi
 Formato: decisión exacta, recomendación única, qué habilita, qué pasa si dices no, impacto en dinero / seguridad / fecha,
 ejemplo, riesgos, si cambia R2, cómo responder.
 
-Última actualización: 2026-10-07 (Pagos V1: D-13 cambia, D-25 corregida, D-26 preparada; D-15 SUPERSEDED en lo de PayPal; D-22; D-23 cancelada; D-24 A).
+Última actualización: 2026-10-07 (D-26 decidida: mover fecha; D-25 ajuste de la prueba; D-13 respuesta; D-15 SUPERSEDED en lo de PayPal; D-22; D-23 cancelada; D-24 A).
 
 
-## D-13 Abrir Wise Business y pasar KYC — [CAMBIO 2026-10-07 por Pagos V1: ahora es el ÚNICO rail de cobro de V1; el texto "producción sale con PayPal" queda SUPERSEDED; requiere la sociedad registrada (D-14)] — desbloquea la ruta ACH
+## D-13 Abrir Wise Business y pasar KYC — [RESPUESTA 2026-10-07: "abro Wise Business en cuanto tenga NIT"] [CAMBIO 2026-10-07 por Pagos V1: ahora es el ÚNICO rail de cobro de V1; el texto "producción sale con PayPal" queda SUPERSEDED; requiere la sociedad registrada (D-14)] — desbloquea la ruta ACH
 - Dónde: https://wise.com/business → cuenta empresarial a nombre de Kauro Data S.A.S.
 - Hacer: registro + KYC; pedir los datos de cuenta en USD (recepción ACH doméstica de EE. UU.).
 - Costo: según Wise (verificar en la cuenta; no se asume tarifa).
@@ -73,7 +73,7 @@ ejemplo, riesgos, si cambia R2, cómo responder.
 - **Riesgos:** el pagador se equivoca de referencia o de monto (se prueba justo el caso "en revisión, no pagado"); el ACH tarda hasta 4 días; Wise retiene la primera recepción para revisión (posible en cuentas nuevas).
 - **¿Cambia R2?:** no.
 - **Cómo responder:** "D-25 <nombre o tipo de pagador>" (no necesito datos bancarios aquí; los gestionas tú directamente con el pagador), o "D-25 no hay pagador".
-- **RESPUESTA 2026-10-07: "hay posible pagador".** Pagador probable, no confirmado. Pendiente del dueño: confirmar con él (consentimiento escrito de prueba con devolución, USD 25, ACH desde cuenta bancaria de EE. UU.) antes de que Wise habilite los datos USD. Sin datos personales en el repositorio.
+- **RESPUESTA 2026-10-07 (actualizada): "hay posible pagador en EE. UU.; lo confirmo cuando tenga la SAS".** AJUSTE del dueño: la prueba usa el mismo pago para cobro y devolución; el cobro se habilita con (a) el ACH recibido y conciliado y (b) la devolución de ese mismo pago enviada desde Wise y registrada en Kauro con su comprobante de envío (no se espera la llegada al pagador). Anterior: Pagador probable, no confirmado. Pendiente del dueño: confirmar con él (consentimiento escrito de prueba con devolución, USD 25, ACH desde cuenta bancaria de EE. UU.) antes de que Wise habilite los datos USD. Sin datos personales en el repositorio.
 
 ## D-26 Si Wise no está activo el 12-oct 20:00 — cómo salimos a producción (Pagos V1) — PREPARADA; solo se decide si se cumple la condición
 - **Condición que la activa:** el 12-oct a las 20:00 (Bogotá) los datos USD de Wise Business de KAURO DATA S.A.S. no están habilitados (sociedad sin registrar, KYC pendiente o datos USD no emitidos).
@@ -88,3 +88,4 @@ ejemplo, riesgos, si cambia R2, cómo responder.
 - **Riesgos:** agencias que quieran pagar antes de abrir el cobro (se les muestra "disponible pronto", nunca datos bancarios); presión por abrir el cobro sin prueba real (prohibido por Pagos V1 §2).
 - **¿Cambia R2?:** no (R2 15 "Initial payment decision": comercialmente vivo exige pago real + devolución + documento fiscal + entrega).
 - **Cómo responder (solo si se activa):** "D-26 salir con cobro cerrado" o "D-26 mover fecha".
+- **RESPUESTA 2026-10-07 (decidida por adelantado): "D-26 mover fecha".** No se sale a producción sin poder cobrar. Si la condición se activa el 12-oct 20:00, la fecha de producción se mueve hasta que el cobro esté habilitado (la recomendación del builder queda descartada).
