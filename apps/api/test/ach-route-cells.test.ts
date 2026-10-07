@@ -1474,7 +1474,7 @@ advCell(`ADV-PV1R-1 RACE ACH-M-I1-RACE (lock order, CMD043 close-agency vs bank 
     if (first === "close") {
       assert.equal(closed.status, 200, replies);
       assert.deepEqual([agency!.state, quote!.state], ["CLOSING", "WITHDRAWN"], "the closure withdrew the open quote");
-      assert.ok(issued.status === 404 || issued.status === 409, `the issuance behind it is refused: ${replies}`);
+      assert.equal(code(issued), "409 PRECONDITION_FAILED AGENCY_NOT_ACTIVE", `the issuance behind it is refused exactly AGENCY_NOT_ACTIVE: ${replies}`);
       assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED);
     } else {
       assert.equal(issued.status, 201, replies);
@@ -1573,6 +1573,16 @@ advCell(`ADV-PV1R-3 DENY ACH-M-I3-REVOCATION (bank order state): the transfer in
   }
 });
 
+test(`ADV-PV1R-12 DENY ACH-M-I3-REVOCATION (PARTIALLY_RECEIVED): an order the bank snapshot marks PARTIALLY_RECEIVED is not served its full obligation amount; the read is refused INSTRUCTIONS_NOT_AVAILABLE with no account digits (GAP: remaining amount, L-INBOUND E1)`, async () => {
+  const x = await issuedOrder("adv12-partial");
+  assert.equal((await readInstructions(x.b, x.orderId)).status, 200, "served while AWAITING_TRANSFER");
+  const moved = await bw.iw.h.oracle.query("UPDATE kauro.bank_transfer_instructions SET order_state = 'PARTIALLY_RECEIVED' WHERE order_id::text = $1 AND order_state = 'AWAITING_TRANSFER'", [x.orderId]);
+  assert.equal(moved.rowCount, 1, "the bank order moved AWAITING_TRANSFER -> PARTIALLY_RECEIVED");
+  const reply = await readInstructions(x.b, x.orderId);
+  assert.equal(code(reply), INSTRUCTIONS_NOT_AVAILABLE, "no instructions (and no full amount) for a partially received order");
+  assert.ok(!reply.text.includes(ACCOUNT_DIGITS) && !reply.text.includes("026073150") && !reply.text.includes(x.reference), "no account digit, routing digit or reference");
+});
+
 advCell(`ADV-PV1R-4 RACE ACH-M-R1-RACE (stale evidence naming the replacement's version): a verify that read version-1 evidence before a replacement committed is refused STALE_VERSION even when its expectedVersion is 2, and version 2 stays unverified until a verify reads its own evidence`, "ACH-M-R1-RACE", "race", async (ctx) => {
   // the seen-version guard decides (route-config.ts:296): expectedVersion = 2 equals the locked current version, so only the version whose
   // evidence the verify read (1) refuses it. Without that guard the verify marks version 2 VERIFIED on version-1 evidence.
@@ -1642,11 +1652,17 @@ test(`ADV-PV1R-5 DENY ACH-M-I3-REVOCATION (allowlist narrowed by re-enable): the
   noAccountDigits(hidden, "dropped agency");
 });
 
+/** ADV-PV1R-14: wall-clock allowance for the setup of the real-time cell (configure + step-up + verify body + lock wait) on a loaded leg. */
+const ADV7_SETUP_ALLOWANCE_MS = 20_000;
+
 advCell(`ADV-PV1R-7 DENY ACH-M-R1-EXPIRY (product effect clock, no step clock): details whose validUntil passes in real time while the verify waits at the route lock are refused DETAILS_EXPIRED, judged by kauro.effect_now() after the wait, not by the transaction start`, "ACH-M-R1-EXPIRY", "race", async (ctx) => {
   // no step clock is set, so the harness proxy (fault-support.ts repositioned) calls the product effectInstant SQL itself; the deadline is
   // crossed by the database's own clock between the transaction's start and the effect read: red if effectInstant reads transaction_timestamp()
   assert.equal(bw.iw.faults.clock, null, "no step clock: the product effect instant answers");
-  const validUntil = Date.now() + 4_000;
+  // ADV-PV1R-14: the setup (configure at its effect instant, step-up proof, two connections, the lock wait) must finish before validUntil.
+  // The kit declares no slack constant, so the allowance is a named constant; setup outrunning it refuses as a harness precondition.
+  const setupStarted = Date.now();
+  const validUntil = setupStarted + ADV7_SETUP_ALLOWANCE_MS;
   const r = await configured("adv7", { validUntil: iso(validUntil) });
   const body = await verifyBody(r);
   const holder = await openHolder();
@@ -1655,7 +1671,7 @@ advCell(`ADV-PV1R-7 DENY ACH-M-R1-EXPIRY (product effect clock, no step clock): 
     await holder.query("BEGIN");
     await holder.query("SELECT 1 FROM kauro.bank_routes WHERE route_id = $1 FOR NO KEY UPDATE", [r.routeId]);
     const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: wc, holder: connectionPid(holder) }, () => on(ctx, wc, () => owner(bankRoutes.verify(r.routeId), body)), "verify waits at the route lock");
-    assert.ok(Date.now() < validUntil, "the verify started and waits before the validity passes");
+    assert.ok(Date.now() < validUntil, `HARNESS PRECONDITION (not a product assertion): setup took ${Date.now() - setupStarted} ms, longer than the ${ADV7_SETUP_ALLOWANCE_MS} ms allowance`);
     await new Promise<void>((resolve) => setTimeout(resolve, Math.max(0, validUntil - Date.now() + 300)));
     assert.equal((await q<{ crossed: boolean }>("SELECT clock_timestamp() > $1::timestamptz AS crossed", [iso(validUntil)]))[0]!.crossed, true, "the database clock passed validUntil during the wait");
     await holder.query("ROLLBACK");
@@ -1757,11 +1773,13 @@ test(`ADV-PV1R-10 DENY RLS (tenant columns of a bank route): a participant agenc
         return String((e as { code?: string }).code);
       }
     });
-  const versions = await asAgency<Record<string, unknown>>(b.a.s.agency, "SELECT verified_by::text AS a, created_by::text AS b, verification_evidence_ref AS c, details_artifact_ref AS d FROM kauro.bank_route_versions WHERE route_id = $1");
-  const route = await asAgency<Record<string, unknown>>(b.a.s.agency, "SELECT created_by::text AS a FROM kauro.bank_routes WHERE route_id = $1");
-  const hidden = (x: Record<string, unknown>[] | string): boolean => x === "42501" || (Array.isArray(x) && x.every((row) => Object.values(row).every((v) => v === null)));
-  assert.ok(hidden(versions), `participant: version owner ids and evidence refs are denied or NULL (got ${JSON.stringify(versions)})`);
-  assert.ok(hidden(route), `participant: route owner id denied or NULL (got ${JSON.stringify(route)})`);
+  // ADV-PV1R-13: one statement per withheld column, so re-granting any single column turns its own assertion red
+  for (const [table, column] of [["bank_route_versions", "verified_by::text"], ["bank_route_versions", "created_by::text"], ["bank_route_versions", "verification_evidence_ref"], ["bank_routes", "created_by::text"]] as const) {
+    const got = await asAgency<Record<string, unknown>>(b.a.s.agency, `SELECT ${column} AS v FROM kauro.${table} WHERE route_id = $1`);
+    assert.equal(got, "42501", `participant: ${table}.${column} is denied (got ${JSON.stringify(got)})`);
+  }
+  const visible = await asAgency<Record<string, unknown>>(b.a.s.agency, "SELECT details_artifact_ref AS v FROM kauro.bank_route_versions WHERE route_id = $1");
+  assert.ok(Array.isArray(visible) && visible.length === 1, `participant: the tenant-visible details reference stays readable (got ${JSON.stringify(visible)})`);
   const outsider = await agentOf(bw.iw, `adv10-rls-outsider-${++seq}`);
   assert.deepEqual(await asAgency(outsider.s.agency, "SELECT route_id FROM kauro.bank_routes WHERE route_id = $1"), [], "non-participant: no route row");
   assert.deepEqual(await asAgency(outsider.s.agency, "SELECT route_version FROM kauro.bank_route_versions WHERE route_id = $1"), [], "non-participant: no version row");
@@ -1801,6 +1819,44 @@ test(`ADV-PV1R-11 DENY ACH-M-R1-RETRY (integration class and provider bound at e
   );
   assert.equal(code(providerRefused), "409 PRECONDITION_FAILED DETAILS_ACCOUNT_MISMATCH", "another provider's evidence never replaces the route's");
   assert.deepEqual((({ state, current_version, versions, events }) => [state, current_version, versions, events])(await routeRow(r2.routeId)), ["PENDING_VERIFICATION", 1, 1, 1]);
+});
+
+test(`ADV-PV1R-6 DENY ACH-M-I3-EXPIRY (session): a browser session whose idle expiry passes while the instructions read is held at its artifact read is refused with no account digits, exactly as a read after the expiry`, async () => {
+  const main = bw;
+  const sessionsWorld = await bankWorld({ sessions: true });
+  bw = sessionsWorld;
+  try {
+    const x = await issuedOrder("adv6-expiry");
+    const idf = bw.iw.w.identity();
+    const session = await idf.signIn(x.b.a.billing);
+    const cookieRead = (): Promise<Reply> => call(bw.iw.w, { method: "GET", url: bankRoutes.instructions(x.orderId), token: null, agency: x.b.a.s.agency.agencyId, key: null, contentType: null, headers: { cookie: session.cookie, origin: idf.origin } });
+    const live = await cookieRead();
+    assert.equal(live.status, 200, `served under a live session (${code(live)})`);
+    let reached!: () => void;
+    let go!: () => void;
+    const atRead = new Promise<void>((resolve) => (reached = resolve));
+    const released = new Promise<void>((resolve) => (go = resolve));
+    const running = withStoreHook(await detailsRefOf(x.r.routeId), async () => {
+      reached();
+      await released;
+    }, cookieRead);
+    await atRead;
+    // the idle expiry passes during the held read: the session row's idle_expires_at is set just after its last_seen_at (the CHECK allows nothing
+    // earlier), which the world's real clock has passed within milliseconds. bankWorld does not take a movable session clock.
+    const aged = await bw.iw.h.oracle.query("UPDATE kauro.web_sessions SET idle_expires_at = last_seen_at + interval '1 millisecond' WHERE secret_sha256 = $1", [session.secretSha256]);
+    assert.equal(aged.rowCount, 1, "the session row aged through its idle expiry");
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    go();
+    const held = await running;
+    const next = await cookieRead();
+    assert.equal(next.status, 401, `a read after the expiry is unauthenticated (${code(next)})`);
+    assert.equal(code(held), code(next), "the held read is refused like a read after the expiry");
+    noAccountDigits(held, "session expired during the read");
+    noAccountDigits(next, "next read");
+  } finally {
+    bw = main;
+    await sessionsWorld.stop();
+  }
 });
 
 test(`ADV-PV1R-6 DENY ACH-M-I3-REVOCATION (session): a browser session revoked while the instructions read is held at its artifact read is refused with no account digits, exactly as a read after the revocation`, async () => {

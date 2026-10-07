@@ -44,7 +44,7 @@ Tests: `packages/persistence/test/bank-route-migrations.test.ts` covers the paym
 
 Kroute (enable, disable) takes the route row FOR UPDATE before the owner's access decision.
 
-Kinstructions takes locks in the B09 order of the provider CMD028 (D-ACH-04 "locks checkout facts in B09 order"; r1 fix, ADV-PV1R-1):
+Kinstructions takes locks in the bank issuance order below: the checkout facts in the B09 sequence (subject halves, then route, then quote; D-ACH-04 "locks checkout facts in B09 order"), preceded by the project row, which the provider CMD028 path never locks (r1 fix, ADV-PV1R-1):
 1. the access decision (identity and membership shared halves, held to COMMIT);
 2. the journal;
 3. the project row FOR NO KEY UPDATE (one issuance of a project at a time; before the subject halves, as every project writer takes it:
@@ -66,7 +66,8 @@ across the store read), then the artifact, then decides at the guard instant (ac
 **Wrong test path (docs lane).** The case map (ACH-01..03, ACH-case-map.md:25-27) and ACH-ROUTE.md §7.29 cite `packages/persistence/test/ach-route-cells.test.ts`. The cells are in `apps/api/test/ach-route-cells.test.ts`; the migration facts are in `packages/persistence/test/bank-route-migrations.test.ts`. Both documents belong to the docs lane (pv1/docs), not this worktree. The correction goes to that lane with this note.
 
 **§7.1-§7.3 rows.** Each design cell R1, R2, I1, I2 and I3 x {RACE, TIMEOUT, EXPIRY, CRASH-BEFORE, CRASH-AFTER, RETRY, REVOCATION, PARTIAL} is C in `apps/api/test/ach-route-cells.test.ts` under its exact title, `<VERB> ACH-M-<row>-<column> (<family>): <row label>`, plus the r1 cells prefixed `ADV-PV1R-<n>`. Sub-cases that are not run are GAP:
-- I3-REVOCATION session half: C, `ADV-PV1R-6 DENY ACH-M-I3-REVOCATION (session)` (RR-4). I3-EXPIRY session-expiry half: GAP.
+- I3-EXPIRY session half: C, `ADV-PV1R-6 DENY ACH-M-I3-EXPIRY (session)` (r2).
+- I3-REVOCATION session half: C, `ADV-PV1R-6 DENY ACH-M-I3-REVOCATION (session)` (RR-4). 
 - R2-GENERAL with a reconciled credit (P1/P2): GAP -> L-INBOUND.
 - R2-GENERAL with a refund DECLARED / UNCERTAIN / RECORDED (X1/G2): GAP -> L-REFUND. The title claims more than is run; the comment discloses it.
 - I1/I2-REVOCATION capability and source withdrawals: GAP. I2-delta with a different window: GAP, because no product command changes the window (replaceDetails copies it).
@@ -93,3 +94,7 @@ E1 removes these effects with the listed PaymentOrder edge `INTENT_CREATED -> CA
 | B06/B09 | `apps/api/openapi.json`, `apps/web/src/api/generated.ts` | Regenerated (Problem reason enum, CMD028 problem catalogue). | `pnpm run openapi`, `pnpm run web-client` checks. |
 | B06 | `packages/persistence/migrations/0046_bank_routes.sql` | kauro_app column grants on `bank_routes` / `bank_route_versions` without `created_by`, `verified_by`, `verification_evidence_ref`; new column `details_valid_until` (set with the verification, whole-verification CHECK, set-once trigger). | `ADV-PV1R-10 DENY RLS (tenant columns of a bank route)`; `bank-route-migrations.test.ts` 3/3. |
 | B09 lane files | `instructions.ts`, `route-config.ts`, `bank-routes.ts`, `ports.ts`, `bank-route.ts`, `bank-route-routes.ts` | Lane-owned (not accepted). | `docs/review/pv1-route-r1-fix-proof.md`. |
+
+## Open GAPs with owner lane (r2)
+- **Show remaining amount for PARTIALLY_RECEIVED** (ADV-PV1R-12): owner L-INBOUND (E1). Until then I3 excludes PARTIALLY_RECEIVED from the readable states and answers `409 PRECONDITION_FAILED INSTRUCTIONS_NOT_AVAILABLE` with no digits (cell `ADV-PV1R-12 DENY ACH-M-I3-REVOCATION (PARTIALLY_RECEIVED)`). L-INBOUND must add the cell: I3 on a PARTIALLY_RECEIVED order shows remaining = obligation - allocated, never the full obligation as the amount to send.
+- **Payment order open half of I3-REVOCATION** (ADV-PV1R-3): owner L-INBOUND (E1). No writer in this lane moves a bank order's `payment_orders.state` off INTENT_CREATED, so only the snapshot `order_state` half is covered; E1 must move the snapshot and the order in one unit and add the cell.

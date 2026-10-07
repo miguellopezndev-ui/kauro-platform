@@ -23,8 +23,8 @@
  * (ADV-PV1R-10). Then the snapshot and the route's evidence reference, the details artifact read from the restricted store and classified (internal
  * store read; no membership lock is held across it, so a withdrawal meanwhile is never blocked by the read), and at the guard instant
  * after it: the member's access again, the caller's session again (ADV-PV1R-6), the route FOR SHARE, the agency still on the allowlist in
- * force (else the foreign answer NOT_FOUND, ADV-PV1R-5), the bank order re-read (served only while AWAITING_TRANSFER or
- * PARTIALLY_RECEIVED, D-ACH-05; else INSTRUCTIONS_NOT_AVAILABLE, ADV-PV1R-3) and the effect instant: the details validity
+ * force (else the foreign answer NOT_FOUND, ADV-PV1R-5), the bank order re-read (served only while AWAITING_TRANSFER,
+ * D-ACH-05, ADV-PV1R-12; else INSTRUCTIONS_NOT_AVAILABLE, ADV-PV1R-3) and the effect instant: the details validity
  * (INSTRUCTIONS_NOT_AVAILABLE) and the instruction deadline (INSTRUCTIONS_EXPIRED). Every failure of the evidence is answered after these,
  * and no part of the snapshot is ever answered with a refusal.
  */
@@ -232,8 +232,12 @@ export function isBankTransferRequest(body: CreatePaymentOrderBody): boolean {
   return body.routeKind === BANK_TRANSFER_ROUTE_KIND;
 }
 
-/** The bank order states whose instructions stay readable (D-ACH-05): EXPIRED stops them, RECEIVED_REVIEW and CAPTURED are closed. */
-const OPEN_BANK_ORDER_STATES: ReadonlySet<string> = new Set(["AWAITING_TRANSFER", "PARTIALLY_RECEIVED"]);
+/**
+ * The bank order states whose instructions stay readable (D-ACH-05): EXPIRED stops them, RECEIVED_REVIEW and CAPTURED are closed.
+ * PARTIALLY_RECEIVED is excluded until L-INBOUND E1 provides the remaining amount (ADV-PV1R-12): the snapshot carries only the full obligation,
+ * which must never be shown as the amount to send once a partial credit landed. Fails closed: INSTRUCTIONS_NOT_AVAILABLE.
+ */
+const OPEN_BANK_ORDER_STATES: ReadonlySet<string> = new Set(["AWAITING_TRANSFER"]);
 const instructionsNotAvailable = (): DomainFailure => new DomainFailure("PRECONDITION_FAILED", "the transfer instructions are not available", { reason: "INSTRUCTIONS_NOT_AVAILABLE" });
 
 /** The caller's session ended (revoked or expired) before the guard instant: answered as an unauthenticated request (the unit of work returns it: a throw would be an internal error). */

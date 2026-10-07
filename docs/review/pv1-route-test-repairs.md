@@ -75,3 +75,10 @@ Defect: part (2) set `v2 = Date.now() + 5 d` after part (1) had advanced the con
 (`v2 - window - 2 ms` = +3 d) moved the clock backwards and the harness threw RangeError before the product was called.
 Change: `v2 = Date.now() + 9 d` (window 2 d, so the issuance instant +7 d is after part (1)). Assertions unchanged
 (transferExpiresAt = validUntil, sendBy = validUntil - window). Harness-use repair, not a weakening; found by the r1 fix builder.
+
+## r2 (adversary r2, `docs/review/pv1-route-adversary-r2.md`): test changes
+RELAXED: 0.
+- ADV-PV1R-1 RACE ACH-M-I1-RACE, closure-first branch: `status === 404 || 409` -> exactly `409 PRECONDITION_FAILED AGENCY_NOT_ACTIVE`. STRONGER.
+- ADV-PV1R-10 DENY RLS: one bundled SELECT with `hidden()` (denied or all NULL) -> one statement per withheld column (versions.verified_by, versions.created_by, versions.verification_evidence_ref, routes.created_by), each must be 42501, plus a positive check that details_artifact_ref stays readable. STRONGER (re-granting any single column turns its assertion red; proven).
+- ADV-PV1R-7 ... R1-EXPIRY: `validUntil = now + 4 s` -> `now + ADV7_SETUP_ALLOWANCE_MS` (20 s named constant; the kit declares no slack constant); the pre-assert now names itself a harness precondition. The product assertion (DETAILS_EXPIRED after the wait, and the database clock past validUntil) is unchanged. SETUP.
+- New cells: `ADV-PV1R-12 DENY ACH-M-I3-REVOCATION (PARTIALLY_RECEIVED)`, `ADV-PV1R-6 DENY ACH-M-I3-EXPIRY (session)` (sessions opt-in, RR-4; expiry set by ageing the session row's idle_expires_at to just after last_seen_at while the read is held, because bankWorld takes no movable session clock). EQUAL (new coverage).
