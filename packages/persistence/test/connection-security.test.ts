@@ -72,3 +72,20 @@ test("ADV-9: outside LOCAL PGPASSWORD, PGPASSFILE and PGSSLMODE in the environme
   }
   assert.equal(connectionSecurityOf("LIVE", { ...ok, processEnv: { PGPASSWORD: "" } }).password, "file-secret", "an empty variable is unset");
 });
+
+test("DB-TLS-R1: outside LOCAL the host must be a DNS name pg dials itself: an empty, blank, socket-path, bracketed or malformed host is refused (pg would fall back to PGHOST or a socket with no TLS server name), and PGHOST/PGHOSTADDR in the environment refuse the start", () => {
+  const ok = { tlsCaFile: ca, passwordFile: pw };
+  for (const environment of ["SANDBOX", "LIVE"] as const) {
+    for (const host of ["", " ", "db.example.test ", "/var/run/postgresql", "[::1]", "db..example.test", "-db.example.test", "db.example.test,other.test", "db_example.test", "a".repeat(64) + ".test"]) {
+      assert.throws(() => connectionSecurityOf(environment, { ...ok, host }), refusedBy("KAURO_DB_HOST"), `${environment} ${JSON.stringify(host)}`);
+      assert.throws(() => connectionSecurityOf(environment, { ...ok, host, validateOnly: true }), refusedBy("KAURO_DB_HOST"), `${environment} validateOnly ${JSON.stringify(host)}`);
+    }
+    for (const variable of ["PGHOST", "PGHOSTADDR"]) {
+      assert.throws(() => connectionSecurityOf(environment, { ...ok, host: "db.example.test", processEnv: { [variable]: "192.0.2.10" } }), refusedBy(variable, "192.0.2.10"), `${environment} ${variable}`);
+    }
+    for (const host of ["db.example.test", "kauro-db-1.cluster-abc.us-east-1.rds.amazonaws.com", "DB.Example.TEST"]) {
+      assert.equal(connectionSecurityOf(environment, { ...ok, host }).password, "file-secret", `${environment} ${host}`);
+    }
+  }
+  assert.deepEqual(connectionSecurityOf("LOCAL", { host: "", processEnv: { PGHOST: "127.0.0.1" } }), {}, "LOCAL is unchanged");
+});

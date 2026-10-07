@@ -55,19 +55,23 @@ export class ConnectionSecurityError extends Error {
  * DNS name (pg gives the TLS layer no server name for an IP literal, so the name check would be against "localhost"), the password
  * is read from its file and the plain value is refused. In LOCAL, nothing is required. A refusal names the variable, never a value.
  */
+/** A DNS host name: dot-separated labels of letters, digits and inner hyphens, each at most 63 characters, 253 in all. */
+const DNS_NAME = /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
+
 export function connectionSecurityOf(environment: "LOCAL" | "SANDBOX" | "LIVE", input: ConnectionSecurityInput): { readonly password?: string; readonly tls?: DatabaseTls } {
   const local = environment === "LOCAL";
   // pg takes the password, the pgpass file and the TLS mode from these when the connection settings leave them out: outside LOCAL they are refused (ADV-9)
   const processEnv = input.processEnv ?? process.env;
   if (!local) {
-    for (const variable of ["PGPASSWORD", "PGPASSFILE", "PGSSLMODE"]) {
+    for (const variable of ["PGPASSWORD", "PGPASSFILE", "PGSSLMODE", "PGHOST", "PGHOSTADDR"]) {
       if ((processEnv[variable] ?? "") !== "") throw new ConnectionSecurityError(variable, "must not be set outside LOCAL: pg would take the password or the TLS mode from it instead of the configured file and CA");
     }
   }
   const names = input.names ?? { password: "KAURO_DB_PASSWORD", passwordFile: "KAURO_DB_PASSWORD_FILE" };
   if (input.password !== undefined && input.passwordFile !== undefined) throw new ConnectionSecurityError(names.passwordFile, `is exclusive with ${names.password}`);
   if (input.password !== undefined && !local) throw new ConnectionSecurityError(names.password, `is accepted in the LOCAL environment only: SANDBOX and LIVE receive the password as a mounted secret file (${names.passwordFile})`);
-  if (!local && isIP(input.host) !== 0) throw new ConnectionSecurityError("KAURO_DB_HOST", "must be a DNS name outside LOCAL: the certificate is verified against the host name dialled");
+  // DB-TLS-R1: an empty host makes pg fall back to PGHOST (an IP there leaves TLS with no server name), a path is a socket: only a DNS name
+  if (!local && (isIP(input.host) !== 0 || !DNS_NAME.test(input.host))) throw new ConnectionSecurityError("KAURO_DB_HOST", "must be a DNS name outside LOCAL: the certificate is verified against the host name dialled");
   if (!local && input.passwordRequired !== false && input.passwordFile === undefined) throw new ConnectionSecurityError(names.passwordFile, "is required outside LOCAL: the password is a mounted secret file, and pg is always given it explicitly");
   if (input.tlsCaFile === undefined && !local) throw new ConnectionSecurityError("KAURO_DB_TLS_CA_FILE", "is required outside LOCAL: the database connection verifies the server certificate against this CA");
   if (input.validateOnly === true) return {};
