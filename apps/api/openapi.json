@@ -15266,7 +15266,7 @@
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 17 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 18 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -15388,6 +15388,12 @@
                 "reason": "TRANSFER_WINDOW_TOO_SHORT",
                 "layer": "COMMAND",
                 "meaning": "the time left before the instruction deadline is shorter than the route's minimum transfer window"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "DETAILS_EXPIRED",
+                "layer": "COMMAND",
+                "meaning": "the validity of the route version's verified account details passed at the effect instant: no order and no instructions"
               }
             ]
           },
@@ -32818,6 +32824,7 @@
               "DETAILS_ACCOUNT_MISMATCH",
               "GENERAL_ENABLE_CONDITION_UNMET",
               "INSTRUCTIONS_EXPIRED",
+              "INSTRUCTIONS_NOT_AVAILABLE",
               "EXECUTION_FENCED",
               "EXECUTION_AUTHORITY_LOST",
               "CAPACITY_LEDGER",
