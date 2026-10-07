@@ -5,7 +5,7 @@ repositorio y aquí solo figura que fueron recibidas. Cada tarjeta nueva o cambi
 Formato: decisión exacta, recomendación única, qué habilita, qué pasa si dices no, impacto en dinero / seguridad / fecha,
 ejemplo, riesgos, si cambia R2, cómo responder.
 
-Última actualización: 2026-10-07 (D-25 nueva: pagador EE. UU. para prueba ACH; D-15 SUPERSEDED en lo de PayPal; D-22; D-23 cancelada; D-24 A).
+Última actualización: 2026-10-07 (D-25: hay posible pagador; D-15 SUPERSEDED en lo de PayPal; D-22; D-23 cancelada; D-24 A).
 
 
 ## D-15 Regla de tolerancia de reloj del proveedor (ejemplo 10) — [SUPERSEDED 2026-10-07 en lo específico de PayPal (Pagos V1); la regla genérica de tolerancia nombrada y versionada sigue obligatoria para todo rail, incluido el crédito ACH] — antes de B15 en vivo (≈ 12-oct); desbloquea POLICY-PROVIDER-SKEW
@@ -67,3 +67,4 @@ ejemplo, riesgos, si cambia R2, cómo responder.
 - **Riesgos:** el pagador se equivoca de referencia o de monto (se prueba justo el caso "en revisión, no pagado"); el ACH tarda hasta 4 días; Wise retiene la primera recepción para revisión (posible en cuentas nuevas).
 - **¿Cambia R2?:** no.
 - **Cómo responder:** "D-25 <nombre o tipo de pagador>" (no necesito datos bancarios aquí; los gestionas tú directamente con el pagador), o "D-25 no hay pagador".
+- **RESPUESTA 2026-10-07: "hay posible pagador".** Pagador probable, no confirmado. Pendiente del dueño: confirmar con él (consentimiento escrito de prueba con devolución, USD 25, ACH desde cuenta bancaria de EE. UU.) antes de que Wise habilite los datos USD. Sin datos personales en el repositorio.
