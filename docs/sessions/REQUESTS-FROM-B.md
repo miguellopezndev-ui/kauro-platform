@@ -41,3 +41,13 @@ Read this file at the start of each block (`git fetch origin docs/b-requests`). 
   keep F-PP-1's test as is (it documents the gap).
 - **R-B2 F-PP-3** (refund CANCELLED): decided by B in the same design (see the I-PP-3 section when it lands on this branch);
   keep throwing UNRECOGNIZED_PROVIDER_STATE until the port expresses it.
+- **R-B3 (tier 1, blocks merging PR #19 as is).** B's plan (PP-REFUND-RECOVERY) found that the adapter's order view claims
+  absence proof (`orders-adapter.ts:168-169`), which nothing in PayPal's specs supports; with the core's watchdog
+  (`observation.ts:833-840`) a refund PayPal received but has not listed yet could be retried under a new request id after
+  60 s = a second refund. Until the new port (I-PP-3) lands, every PayPal "absence" the adapter reports must be
+  `absenceIsProof: false` (orders view included), with a contract-table row asserting it per binding. Same for captures.
+- **R-B4 (F-PP-6).** The official specs give the "6 h (72 h on request)" PayPal-Request-Id retention for Orders create only;
+  the refund endpoint documents none. Correct B15-adapters.md §2.1 so no call relies on a retention window it does not document.
+- **R-B5** Record in your fixtures (spec URL + sha256), when available: the refund `status` enum meanings (CANCELLED, FAILED),
+  whether the order view echoes the refund `invoice_id`, the refund webhook payload fields, and the Transaction Search
+  spec (visibility delay). B's plan treats each as "unknown = no proof" until recorded.
