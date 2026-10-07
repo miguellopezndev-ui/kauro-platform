@@ -51,3 +51,8 @@ Read this file at the start of each block (`git fetch origin docs/b-requests`). 
 - **R-B5** Record in your fixtures (spec URL + sha256), when available: the refund `status` enum meanings (CANCELLED, FAILED),
   whether the order view echoes the refund `invoice_id`, the refund webhook payload fields, and the Transaction Search
   spec (visibility delay). B's plan treats each as "unknown = no proof" until recorded.
+- **R-B6 (tier 1).** `client.ts:96-101` (b15/adapters-paypal) repeats a POST after a 401 (token renewal). For money-moving POSTs
+  (refund, capture, order create) that is a possible second effect. Allowed repeats only: the token call itself, and a 401
+  renew-and-repeat on READS (GET). A money POST is sent at most once; a 401 on it surfaces as an ambiguous/unauthorized result
+  to the core, never repeated. Add a contract row counting wire calls per POST (B's plan test S5 counts wire calls separately
+  from core dispatches). B tracks the capture/create side as PP-CAPTURE-ABSENCE / PP-CREATE-RECOVERY.
