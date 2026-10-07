@@ -10,7 +10,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { CreateQuoteView, PurchaseRebinder } from "@kauro/application";
-import { DomainFailure, PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
+import { PROVIDER_CALL_TIMEOUT_MS, StaleVersionFailure } from "@kauro/domain";
 import { admitJob, faultCell, queueJob, simulatedCrashOf, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { createPurchaseRebinder } from "../src/index.js";
 import { agentOf, bought, integrationWorld, oracleRows, refundedThrough, replacementPlanOf, type Agent, type IntegrationWorld, type Paid } from "./integration-support.js";
@@ -19,6 +19,7 @@ import { blockedBy } from "./b10-cells-6a-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { paymentRoutes } from "./commerce-support.js";
 import { execute } from "./payment-support.js";
+import { sellingAgency } from "./commission-support.js";
 import { asProblem, call, completed, freshKey, ids, outcome, replayTextOf, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
@@ -932,24 +933,68 @@ test(
 );
 
 
-test("ADV-9: a STALE_VERSION of the payment service's re-binder is answered as itself, never relabelled as the project's live quote changing with the project's quote as current (D10-GAP-25: CreateQuote adds current only to LiveQuoteChangedFailure)", async () => {
+test("ADV-9/ADV-11: a STALE_VERSION of the payment service's re-binder (the real shape: the version and state of the authorization it lost on) that is not a re-binding observed by identity is answered as the retryable STALE_VERSION of CMD027 with the project's live quote as current, never the authorization's version and state; the same key then re-binds once", async () => {
   const x = await fixture("repl-rebinder-stale");
   const key = freshKey("repl-rebinder-stale");
-  const seen = iw.w.internalErrors.length;
-  // the re-binder's own refusal, a stale write it cannot name (no current): the defect is its own and must reach the response check as itself
+  // the re-binder's revoke lost its CAS on the paid authorization (an execution admission CONSUMED it meanwhile): StaleVersionFailure of that row
   const reply = await withRebinder(async () => {
-    throw new DomainFailure("STALE_VERSION", "the re-binder's own write found another version");
+    throw new StaleVersionFailure(7, "CONSUMED");
   }, () => quoteCall(x.a, x.plan, key));
-  assert.equal(outcome(iw.w, reply), "422 INTEGRITY_FAILURE RESPONSE_CONTRACT_VIOLATION", "the re-binder's STALE_VERSION is not dressed as the project's live quote with its current");
-  const violations = iw.w.internalErrors.slice(seen).map((e) => (e.error instanceof Error ? e.error.message : String(e.error)));
-  assert.ok(violations.some((m) => m.includes("STALE_VERSION") && m.includes("lacks current")), `the response check names the re-binder's own STALE_VERSION: ${violations.join(" | ")}`);
+  assert.equal(reply.status >= 400 ? outcome(iw.w, reply) : `${reply.status} ${reply.text}`, "409 STALE_VERSION -");
+  const problem = asProblem(iw.w, reply);
+  assert.equal(problem.retryable, true);
+  const paid = (await oracleRows<{ version: number; state: string }>(iw, "SELECT version::int AS version, state FROM kauro.quotes WHERE quote_id = $1", [x.paid.purchase.quoteId]))[0]!;
+  assert.deepEqual(problem.current, { version: paid.version, state: paid.state }, "current is the project's live quote (the paid quote), never the authorization's {7, CONSUMED}");
   const s = await stateOf(x, key);
   untouched(x, s);
   assert.deepEqual([s.replacements, s.journal], [["ISSUED"], "RESERVED"], "the intent stays open, nothing re-bound");
-  // the same key then re-binds once with the real re-binder
   const resumed = view(await quoteCall(x.a, x.plan, key));
   assert.equal(resumed.replacement?.outcome, "REBOUND");
   reboundOnce(x, await stateOf(x, key), resumed.quote.quoteId);
+});
+
+
+test("REPL_REVOKE (sequence, taxed purchase, ADV-10): after the re-binding, a full SERVICE refund of a taxed purchase that returns no tax is refused at approval 409 PRECONDITION_FAILED REFUND_TAX_INCONSISTENT (0016 refunds_commitment_ceiling, KP012: the tax follows the service cumulatively, a refund leaving no service basis returns the whole remaining tax), so a revoked entitlement over unreturned tax is unreachable through the refund path and the entitlement stays ACTIVE; the full refund with its tax, once completed, lets CreateQuote supersede the replacement exactly once (201) with no money or entitlement row changed", async () => {
+  const s0 = await sellingAgency(iw as never, "repl-refund-taxed", { treatment: "DOMESTIC_TAXABLE", rule: "RATE_HALF_UP", rateBps: 1900 });
+  iw.buyers.set(s0.agency.agencyId, "AGENCY");
+  const billing = await iw.w.person("repl-refund-taxed-billing");
+  await iw.h.addMember(s0.agency, billing.userId, "BILLING");
+  const a = { s: s0, billing } as Agent;
+  const paid = await bought(iw, a, "repl-refund-taxed-paid", { units: 50_000 });
+  assert.ok(BigInt(paid.quote.quote.taxCents) > 0n, `the purchase is taxed: ${paid.quote.quote.taxCents}`);
+  const plan = await replacementPlanOf(iw, a, paid, { units: 45_000, seed: "repl-refund-taxed-replacement" });
+  const x: Fixture = { a, paid, plan };
+  const rebound = view(await quoteCall(a, plan, freshKey("repl-refund-taxed-rebind")));
+  assert.equal(rebound.replacement?.outcome, "REBOUND");
+  const replacementId = rebound.quote.quoteId;
+  const p = paid.purchase;
+  const requested = completed<{ refund: { refundId: string } }>(
+    await call(iw.w, { url: paymentRoutes.requestRefund(p.projectId), token: billing.token, agency: s0.agency.agencyId, key: freshKey("repl-refund-taxed-request"), body: { reasonCode: "The client cancelled before execution", evidenceRef: ids.next() } }),
+    201,
+  );
+  const refundId = requested.data.refund.refundId;
+  const approve = async (taxCents: string): Promise<Reply> =>
+    call(iw.w, { url: paymentRoutes.approveRefund(refundId), token: iw.owner.token, agency: null, key: freshKey("repl-refund-taxed-approve"), body: { expectedVersion: 1, serviceCents: paid.quote.quote.serviceCents, taxCents, authorizationRef: await iw.w.stepUp(iw.owner) } });
+  const before = await moneyRows();
+  const serviceOnly = await approve("0");
+  assert.equal(serviceOnly.status >= 400 ? outcome(iw.w, serviceOnly) : `${serviceOnly.status}`, "409 PRECONDITION_FAILED REFUND_TAX_INCONSISTENT", "a full service refund that returns no tax is refused at approval");
+  assert.deepEqual(await moneyRows(), before, "nothing committed");
+  const live = (await oracleRows<{ authorization_id: string; state: string }>(iw, "SELECT authorization_id, state FROM kauro.commercial_authorizations WHERE quote_id = $1", [replacementId]))[0]!;
+  assert.equal(live.state, "ACTIVE", "the re-bound entitlement stands");
+  const withTax = await approve(paid.quote.quote.taxCents);
+  assert.equal(withTax.status, 200, withTax.text);
+  const executed = await execute(iw.pw, refundId, { expectedVersion: 2 });
+  assert.equal(executed.status, 200, executed.text);
+  assert.equal(await authorizationState(live.authorization_id), "REVOKED");
+  const afterRefund = await moneyRows();
+  const issuedKey = freshKey("repl-refund-taxed-after");
+  const issued = view(await quoteCall(a, plan, issuedKey));
+  assert.equal(issued.supersededQuoteId, replacementId, "the wholly refunded replacement is superseded");
+  assert.deepEqual(await moneyRows(), afterRefund, "no capture, refund, ledger, entitlement or re-binding row changed");
+  const s = await stateOf(x, issuedKey);
+  assert.deepEqual(s.rebindings, [[p.quoteId, replacementId, 1]], "the allowance stays spent");
+  assert.deepEqual(s.replacements, ["SUPERSEDED"]);
+  assert.equal(view(await quoteCall(a, plan, issuedKey)).quote.quoteId, issued.quote.quoteId, "superseded exactly once: the same key replays");
 });
 
 faultCell(
@@ -959,7 +1004,7 @@ faultCell(
     fault: "crash-before-commit",
     at: "uow",
     expect:
-      "RACE (crash before COMMIT): a replacement left open by a crash before its SERVICE COMMIT whose journal entry then has no issuance (an invariant breach, injected) is answered 422 INTEGRITY_FAILURE, not retryable, never a retryable OPERATION_PENDING a client would retry forever; nothing is written",
+      "DEFENCE (forced state after a crash before COMMIT): a replacement left open by a crash before its SERVICE COMMIT whose journal entry then has no issuance (an invariant breach, injected) is answered 422 INTEGRITY_FAILURE, not retryable, never a retryable OPERATION_PENDING a client would retry forever; nothing is written",
   },
   async (ctx) => {
     const x = await fixture("repl-corrupt-entry");

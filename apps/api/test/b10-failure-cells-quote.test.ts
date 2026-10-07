@@ -15,6 +15,7 @@ import { commercialSourceReadsOf } from "@kauro/persistence";
 import { FaultPoints, faultCell, openConnection, connectionPid, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { agentOf, integrationWorld, oracleRows, planOf, quoted, type Agent, type IntegrationWorld } from "./integration-support.js";
 import { bindCells, contend, failureOf, open, sweepOn } from "./b10-cells-support.js";
+import { blockedBy } from "./b10-cells-6a-support.js";
 import { checkoutOf, quoteFactsOf, type Checkout } from "./commission-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { asProblem, call, clock, completed, freshKey, ids, outcome, sha, type PlanFixture, type Reply } from "./support.js";
@@ -423,19 +424,18 @@ const settle = <T>(p: Promise<T>): Promise<PromiseSettledResult<T>> =>
 faultCell(
   {
     id: "FIRST_ISSUE_RACE",
-    step: "CMD027 CreateQuote (issuance) / RACE: W3 the first-issuance lock against a quote row lock, both orders",
+    step:     "CMD027 CreateQuote (issuance) / RACE: W3 the first-issuance lock against a quote row lock, both orders",
     fault: "race",
     expect:
-      "RACE (lock order): one CreateQuote holds the project's first-issuance lock (it waited behind the first issuance and read its quote live) while another holds that quote's row lock after reading it live and finding it expired by the QUOTE_EXPIRY pass; in both orders the row holder never waits on the first-issuance lock: no 40P01 and no 503, the row holder answers the retryable 409 STALE_VERSION with the project's quote as current and writes nothing, the first-lock holder then issues once (201), and the row key's retry supersedes it once",
+      "RACE (lock order): F holds the project's first-issuance lock (it waited behind the first issuance D and read D's quote X live) and R holds X's row lock after reading X live and finding it expired by the QUOTE_EXPIRY pass. Both orders are forced: F's request for X's row first (observed waiting on R), and R's next lock first (before F asks for X): R never waits on the first-issuance lock while holding a row, so no 40P01 and no 503; R answers the retryable 409 STALE_VERSION with the project's quote as current and writes nothing, F issues once (201), and R's retry supersedes it once. With no first-issuance holder, R takes that lock after X's row and issues 201",
   },
   async (ctx) => {
-    for (const order of ["key A holds the row", "key B holds the row"] as const) {
+    for (const order of ["F's row request first", "R's next lock first"] as const) {
       assert.ok((await freeSlots()) >= 1, "a founding slot is free for the cell");
-      const tag = order === "key A holds the row" ? "a" : "b";
+      const tag = order === "F's row request first" ? "f" : "r";
       const { a, plan } = await fresh(`first-order-${tag}`);
-      const keyA = freshKey(`first-order-${tag}-a`);
-      const keyB = freshKey(`first-order-${tag}-b`);
-      const [rowKey, firstKey] = order === "key A holds the row" ? [keyA, keyB] : [keyB, keyA];
+      const rowKey = freshKey(`first-order-${tag}-r`);
+      const firstKey = freshKey(`first-order-${tag}-f`);
       const money = await moneyRows();
       const dc = await open("kauro_app_test");
       const fc = await open("kauro_app_test");
@@ -449,15 +449,15 @@ faultCell(
         const hold = ctx.points.pause("uow.before-commit");
         const d = ctx.operation("the first issuance of the project (holder)", () => quoteOn(ctx, dc, a, plan, freshKey(`first-order-${tag}-d`)));
         await hold.reachedBy(d);
-        // the first-lock key read no live quote and waits behind D on the first-issuance lock; once D commits it re-reads X live and stops there
+        // F read no live quote and waits behind D on the first-issuance lock; once D commits it re-reads X live and stops there
         const reread = ctx.points.pause(`db.f_live_read_2.after`);
-        const waiting = await ctx.mustWait(iw.h.oracle, { waiter: fc, holder: connectionPid(dc) }, (c) => quoteOn(ctx, c, a, plan, firstKey, [liveReadOf("f", 2)]), "the first-lock key waiting behind the first issuance");
+        const waiting = await ctx.mustWait(iw.h.oracle, { waiter: fc, holder: connectionPid(dc) }, (c) => quoteOn(ctx, c, a, plan, firstKey, [liveReadOf("f", 2)]), "F waiting behind the first issuance");
         hold.release();
         x = view(await d).quote.quoteId;
         await reread.reachedBy(waiting.pending);
-        // the row key reads X live and stops before its lock
+        // R reads X live and stops before its lock
         const read = ctx.points.pause("db.r_live_read_1.after");
-        const rowOp = settle(ctx.operation("the row key, held after its live-quote read", () => quoteOn(ctx, rc, a, plan, rowKey, [liveReadOf("r", 1), quoteLockOf("r", 1)])));
+        const rowOp = settle(ctx.operation("R, held after its live-quote read", () => quoteOn(ctx, rc, a, plan, rowKey, [liveReadOf("r", 1), quoteLockOf("r", 1)])));
         await read.reachedBy(rowOp);
         // the QUOTE_EXPIRY pass expires X (it stops being live) while neither holds its row
         const [reservation] = await reservationsOf(a.s.agency.agencyId);
@@ -465,14 +465,30 @@ faultCell(
         const report = (await expiryPassOn(ctx, sc, reservation.ends_at)) as Report;
         assert.deepEqual(report.items.filter((i) => i.subject === reservation.reservation_id).map((i) => i.outcome), ["RELEASED"]);
         assert.equal(await quoteState(x), "EXPIRED");
-        // the row key takes X's row lock and stops; then the first-lock key goes for X's row and the row key for what is live now (nothing)
+        // R takes X's row lock and stops
         const locked = ctx.points.pause("db.r_quote_lock_1.after");
         read.release();
         await locked.reachedBy(rowOp);
-        reread.release();
-        locked.release();
-        first = await waiting.pending;
-        row = await rowOp;
+        if (order === "F's row request first") {
+          // F asks for X's row and is observed waiting on R; then R goes for the next lock
+          reread.release();
+          await blockedBy(iw.h.oracle, connectionPid(rc), "");
+          locked.release();
+          row = await rowOp;
+          first = await waiting.pending;
+        } else {
+          // R goes for the next lock while F still holds the first-issuance lock and has not asked for X: R must answer, never wait on F
+          locked.release();
+          const waitedOnF = blockedBy(iw.h.oracle, connectionPid(fc), "").then(
+            () => "R waited on the first-issuance lock F holds, while holding X's row",
+            () => "R did not wait",
+          );
+          const settledFirst = await Promise.race([rowOp.then(() => "R answered"), waitedOnF]);
+          reread.release();
+          row = await rowOp;
+          first = await waiting.pending;
+          assert.equal(settledFirst, "R answered", "lock order: R never waits on the first-issuance lock after a quote row lock");
+        }
       } finally {
         await dc.end();
         await fc.end();
@@ -484,19 +500,49 @@ faultCell(
       const firstReply = first.status === "fulfilled" ? (first.value as Reply) : (undefined as never);
       const rowReply = row.status === "fulfilled" ? row.value : (undefined as never);
       const seenOf = (r: Reply): string => (r.status >= 400 ? outcome(iw.w, r) : `${r.status}`);
-      assert.deepEqual([seenOf(rowReply), seenOf(firstReply)], ["409 STALE_VERSION -", "201"], "row key refused retryable, first-lock key issues: never a deadlock (40P01, answered 503)");
-      await assertStaleWithCurrent(rowReply, x, "the row key, never 40P01 or 503");
+      assert.deepEqual([seenOf(rowReply), seenOf(firstReply)], ["409 STALE_VERSION -", "201"], `${order}: R refused retryable, F issues: never a deadlock (40P01, answered 503)`);
+      await assertStaleWithCurrent(rowReply, x, "R, never 40P01 or 503");
       assert.equal((await iw.w.journal(rowKey))?.state ?? null, null, "the refused key journaled nothing");
       const q1 = view(firstReply).quote.quoteId;
       assert.equal(view(firstReply).supersededQuoteId, undefined, "X expired: nothing to supersede");
       assert.equal((await iw.w.journal(firstKey))?.state, "COMMITTED");
       assert.deepEqual(await chainOf(plan), [[x, "EXPIRED", null], [q1, "ISSUED", null]], "the refused key wrote nothing");
-      // the row key's retry then supersedes the first-lock key's quote once, and the first-lock key replays its one quote
+      // R's retry then supersedes F's quote once, and F replays its one quote
       const q2 = view(await quoteCall(a, plan, rowKey));
       assert.equal(q2.supersededQuoteId, q1);
-      assert.equal(view(await quoteCall(a, plan, firstKey)).quote.quoteId, q1, "the first-lock key replays its quote");
+      assert.equal(view(await quoteCall(a, plan, firstKey)).quote.quoteId, q1, "F replays its quote");
       assert.deepEqual(await chainOf(plan), [[x, "EXPIRED", null], [q1, "SUPERSEDED", q2.quote.quoteId], [q2.quote.quoteId, "ISSUED", null]]);
       assert.deepEqual(await moneyRows(), money);
+    }
+    // no first-issuance holder: R holds X's row, finds X expired and no live quote, takes the first-issuance lock (tried, free) and issues 201
+    {
+      assert.ok((await freeSlots()) >= 1, "a founding slot is free for the cell");
+      const { a, plan } = await fresh("first-order-free");
+      const x = (await quoted(iw, a, plan)).quote.quoteId;
+      const rowKey = freshKey("first-order-free-r");
+      const rc = await open("kauro_app_test");
+      const sc = await open("kauro_commission_test");
+      let row: PromiseSettledResult<Reply>;
+      try {
+        const read = ctx.points.pause("db.r_live_read_1.after");
+        const rowOp = settle(ctx.operation("R, held after its live-quote read (no first-issuance holder)", () => quoteOn(ctx, rc, a, plan, rowKey, [liveReadOf("r", 1)])));
+        await read.reachedBy(rowOp);
+        const [reservation] = await reservationsOf(a.s.agency.agencyId);
+        assert.ok(reservation !== undefined && reservation.quote_id === x && reservation.state === "RESERVED");
+        await expiryPassOn(ctx, sc, reservation.ends_at);
+        assert.equal(await quoteState(x), "EXPIRED");
+        read.release();
+        row = await rowOp;
+      } finally {
+        await rc.end();
+        await sc.end();
+      }
+      assert.equal(row.status, "fulfilled");
+      const reply = row.status === "fulfilled" ? row.value : (undefined as never);
+      assert.equal(reply.status >= 400 ? outcome(iw.w, reply) : `${reply.status}`, "201", "the tried first-issuance lock is free: R issues");
+      const q = view(reply);
+      assert.equal(q.supersededQuoteId, undefined);
+      assert.deepEqual(await chainOf(plan), [[x, "EXPIRED", null], [q.quote.quoteId, "ISSUED", null]]);
     }
   },
 );
@@ -507,7 +553,7 @@ faultCell(
     step: "CMD027 CreateQuote (issuance) / RACE: W3 the superseded quote's reservation changed between its read and its release",
     fault: "race",
     expect:
-      "RACE: another writer changing the superseded quote's founding reservation, uncommitted while the issuance reads it, so that the issuance's release waits on it: once it commits the release finds another version and CreateQuote answers the retryable 409 STALE_VERSION carrying the project's live quote as current, nothing written; the same key then supersedes once",
+      "DEFENCE (forced state, an injected writer: the QUOTE_EXPIRY pass and CMD043 lock the quote before its reservation and so wait on the issuance's quote lock; the only product writer of the reservation that does not is a capture consuming it, LOCK_NOKEY): another writer changing the superseded quote's founding reservation, uncommitted while the issuance reads it, so that the issuance's release waits on it: once it commits the release finds another version and CreateQuote answers the retryable 409 STALE_VERSION carrying the project's live quote as current, nothing written; the same key then supersedes once",
   },
   async (ctx) => {
     assert.ok((await freeSlots()) >= 1, "a founding slot is free for the cell");
@@ -548,7 +594,7 @@ faultCell(
     step: "CMD027 CreateQuote (issuance) / RACE: W4 a live quote appearing between the supersession read and the quote insert",
     fault: "race",
     expect:
-      "RACE: another writer making a quote of the project live, uncommitted while the issuance finds none to supersede, so that the issuance's insert waits on it: once it commits quotes_one_live_per_project refuses the insert and CreateQuote answers the retryable 409 STALE_VERSION carrying that quote as current, never 422 INTEGRITY_FAILURE, nothing written; the same key then supersedes it once",
+      "DEFENCE (forced state, an injected writer: no product writer makes a quote live while CreateQuote holds the project's live quote or its first-issuance lock): another writer making a quote of the project live, uncommitted while the issuance finds none to supersede, so that the issuance's insert waits on it: once it commits quotes_one_live_per_project refuses the insert and CreateQuote answers the retryable 409 STALE_VERSION carrying that quote as current, never 422 INTEGRITY_FAILURE, nothing written; the same key then supersedes it once",
   },
   async (ctx) => {
     assert.ok((await freeSlots()) >= 1, "a founding slot is free for the cell");
