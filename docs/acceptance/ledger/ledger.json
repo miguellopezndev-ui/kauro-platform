@@ -400,7 +400,7 @@
    "case": "IC-01",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -409,7 +409,7 @@
    "case": "IC-02",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -418,7 +418,7 @@
    "case": "IC-03",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -427,7 +427,7 @@
    "case": "IC-04",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -436,7 +436,7 @@
    "case": "IC-05",
    "package": "B03",
    "gate": "G-IC-PRIVACY",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -445,7 +445,7 @@
    "case": "IC-06",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -454,7 +454,7 @@
    "case": "IC-07",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -463,7 +463,7 @@
    "case": "IC-08",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -472,7 +472,7 @@
    "case": "IC-09",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -481,7 +481,7 @@
    "case": "IC-12",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -490,7 +490,7 @@
    "case": "S036",
    "package": "B03",
    "gate": "G-IC-PRIVACY",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -499,7 +499,7 @@
    "case": "S037",
    "package": "B03",
    "gate": "G-IC-PRIVACY",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -508,7 +508,7 @@
    "case": "S038",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -517,7 +517,7 @@
    "case": "S039",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -526,7 +526,7 @@
    "case": "S040",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -535,7 +535,7 @@
    "case": "S041",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -544,7 +544,7 @@
    "case": "S095",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -553,7 +553,7 @@
    "case": "CAP01",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -562,7 +562,7 @@
    "case": "CAP02",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -571,7 +571,7 @@
    "case": "CAP03",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -580,7 +580,7 @@
    "case": "CAP04",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -589,7 +589,7 @@
    "case": "CAP05",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -598,7 +598,7 @@
    "case": "CAP06",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -607,7 +607,7 @@
    "case": "CAP07",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -616,7 +616,7 @@
    "case": "CAP08",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -625,7 +625,7 @@
    "case": "CAP09",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -634,7 +634,7 @@
    "case": "CAP10",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -643,7 +643,7 @@
    "case": "CAP11",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -652,7 +652,7 @@
    "case": "CAP12",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -661,7 +661,7 @@
    "case": "R2-027",
    "package": "B03",
    "gate": "G-IC-PRIVACY",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -670,7 +670,7 @@
    "case": "R2-028",
    "package": "B03",
    "gate": "G-IC-PRIVACY",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -679,7 +679,7 @@
    "case": "R2-029",
    "package": "B03",
    "gate": "G-IC-PRIVACY",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -688,7 +688,7 @@
    "case": "R2-030",
    "package": "B03",
    "gate": "G-IC-PRIVACY",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -697,7 +697,7 @@
    "case": "R2-031",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -706,7 +706,7 @@
    "case": "R2-032",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -715,7 +715,7 @@
    "case": "R2-033",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -724,7 +724,7 @@
    "case": "R2-034",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -733,7 +733,7 @@
    "case": "R2-035",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -742,7 +742,7 @@
    "case": "R2-036",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -751,7 +751,7 @@
    "case": "R2-037",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -760,7 +760,7 @@
    "case": "R2-038",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -769,7 +769,7 @@
    "case": "CMD020-OK",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -778,7 +778,7 @@
    "case": "CMD020-DENY",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -787,7 +787,7 @@
    "case": "CMD020-RACE",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -796,7 +796,7 @@
    "case": "CMD021-OK",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -805,7 +805,7 @@
    "case": "CMD021-DENY",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -814,7 +814,7 @@
    "case": "CMD021-RACE",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -823,7 +823,7 @@
    "case": "CMD022-OK",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -832,7 +832,7 @@
    "case": "CMD022-DENY",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -841,7 +841,7 @@
    "case": "CMD022-RACE",
    "package": "B03",
    "gate": "G-IC-KERNEL",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -850,7 +850,7 @@
    "case": "IC-10",
    "package": "B04",
    "gate": "G-IC-QUALITY",
-   "claimed": null,
+   "claimed": "NOT_EXECUTED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -859,7 +859,7 @@
    "case": "IC-11",
    "package": "B04",
    "gate": "G-IC-QUALITY",
-   "claimed": null,
+   "claimed": "NOT_EXECUTED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -868,7 +868,7 @@
    "case": "IC-13",
    "package": "B04",
    "gate": "G-IC-QUALITY",
-   "claimed": null,
+   "claimed": "NOT_EXECUTED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -877,7 +877,7 @@
    "case": "S042",
    "package": "B04",
    "gate": "G-IC-QUALITY",
-   "claimed": null,
+   "claimed": "NOT_EXECUTED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -886,7 +886,7 @@
    "case": "S043",
    "package": "B04",
    "gate": "G-IC-QUALITY",
-   "claimed": null,
+   "claimed": "NOT_EXECUTED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -895,7 +895,7 @@
    "case": "S044",
    "package": "B04",
    "gate": "G-IC-QUALITY",
-   "claimed": null,
+   "claimed": "NOT_EXECUTED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -904,7 +904,7 @@
    "case": "S091",
    "package": "B04",
    "gate": "G-IC-QUALITY",
-   "claimed": null,
+   "claimed": "NOT_EXECUTED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -913,7 +913,7 @@
    "case": "R2-039",
    "package": "B04",
    "gate": "G-IC-QUALITY",
-   "claimed": null,
+   "claimed": "NOT_EXECUTED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -922,7 +922,7 @@
    "case": "R2-040",
    "package": "B04",
    "gate": "G-IC-QUALITY",
-   "claimed": null,
+   "claimed": "NOT_EXECUTED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -931,7 +931,7 @@
    "case": "R2-041",
    "package": "B04",
    "gate": "G-IC-QUALITY",
-   "claimed": null,
+   "claimed": "NOT_EXECUTED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -940,7 +940,7 @@
    "case": "R2-042",
    "package": "B04",
    "gate": "G-IC-QUALITY",
-   "claimed": null,
+   "claimed": "NOT_EXECUTED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -4017,9 +4017,11 @@
    "title": "Intelligence offline kernel and compiler",
    "cases": 50,
    "counts": {
-    "MISSING": 50
+    "PARTIAL": 26,
+    "EXECUTED_LOCAL": 2,
+    "SIMULATED": 22
    },
-   "status": "INCOMPLETE_MAP",
+   "status": "IN_PROGRESS",
    "acceptedSubject": null,
    "rounds": [],
    "waitingFor": ""
@@ -4029,9 +4031,9 @@
    "title": "Model qualification and Intelligence release",
    "cases": 11,
    "counts": {
-    "MISSING": 11
+    "NOT_EXECUTED": 11
    },
-   "status": "INCOMPLETE_MAP",
+   "status": "NOT_STARTED",
    "acceptedSubject": null,
    "rounds": [],
    "waitingFor": ""
@@ -4299,309 +4301,114 @@
    "detail": "MC@3b4b0aea4f18: PLANNED (PLANNED(post-publication))"
   },
   {
-   "kind": "MISSING_CASE",
-   "subject": "IC-01",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "IC-02",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "IC-03",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "IC-04",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
-   "subject": "IC-05",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "IC-06",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "IC-07",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "IC-08",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
-   "subject": "IC-09",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "IC-12",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "S036",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "S037",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "S038",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "S039",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
-   "subject": "S040",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "S041",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "S095",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "CAP01",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "CAP02",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "CAP03",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "CAP04",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "CAP05",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "CAP06",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "CAP07",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "CAP08",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "CAP09",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "CAP10",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "CAP11",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "CAP12",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
-   "subject": "R2-027",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "R2-028",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "R2-029",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "R2-030",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
-   "subject": "R2-031",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "R2-032",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "R2-033",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "R2-034",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "R2-035",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "R2-036",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "R2-037",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
-   "kind": "MISSING_CASE",
+   "kind": "REMAINDER_WITHOUT_OWNER",
    "subject": "R2-038",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "CMD020-OK",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "CMD020-DENY",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "CMD020-RACE",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "CMD021-OK",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "CMD021-DENY",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "CMD021-RACE",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "CMD022-OK",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "CMD022-DENY",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "CMD022-RACE",
-   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "IC-10",
-   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "IC-11",
-   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "IC-13",
-   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "S042",
-   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "S043",
-   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "S044",
-   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "S091",
-   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "R2-039",
-   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "R2-040",
-   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "R2-041",
-   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
-  },
-  {
-   "kind": "MISSING_CASE",
-   "subject": "R2-042",
-   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
+   "detail": "IC-B03@2d01430fea63: SIMULATED names no package or case that carries the rest"
   },
   {
    "kind": "PLANNED_OUTSIDE_B20_B21",
@@ -4657,21 +4464,6 @@
    "kind": "OWNER_DATE_MISSING",
    "subject": "R2-122",
    "detail": "B21: PLANNED_POST_B19 without the owner's date"
-  },
-  {
-   "kind": "README_CLAIM_WITHOUT_REVIEW",
-   "subject": "B06",
-   "detail": "README names commit 4b33e26; the accepted subject is d9bbfd0 (B06-round3-d9bbfd0)"
-  },
-  {
-   "kind": "README_CLAIM_WITHOUT_REVIEW",
-   "subject": "B07",
-   "detail": "README names commit 4b33e26; the accepted subject is d9bbfd0 (B07-round7-d9bbfd0)"
-  },
-  {
-   "kind": "README_CLAIM_WITHOUT_REVIEW",
-   "subject": "B09",
-   "detail": "README names commit 4b33e26; the accepted subject is d9bbfd0 (B09-round5-d9bbfd0)"
   }
  ]
 }

@@ -1,0 +1,136 @@
+{
+ "id": "IC-B04",
+ "repository": "miguellopezndev-ui/kauro-intelligence-core",
+ "path": "docs/design/B04-case-map.md",
+ "commit": "dbd64afa248eded5561a54f3535881f65e15dcfd",
+ "sha256": "f63a4ec172703b8d7136c76ac2e4ca029e0fc3489d64713748809ffd7ca2366b",
+ "packages": [
+  "B04"
+ ],
+ "generatedBy": "node tools/ledger.mjs --ic <checkout>/docs/design/B04-case-map.md@dbd64afa248eded5561a54f3535881f65e15dcfd --write",
+ "rows": [
+  {
+   "case": "IC-10",
+   "class": "NOT_EXECUTED",
+   "test": [
+    "test/b04-scorer-validity.test.ts :: IC-10: over the sealed seeds, a real result with an invented field beside its expected fields, or with a receipt of another run, another configuration or older than the run, scores incorrect for that reason",
+    "test/b04-campaign.test.ts :: IC-10 live: every fixture of each qualification run is scored on the whole result and its own receipts"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": null
+  },
+  {
+   "case": "IC-11",
+   "class": "NOT_EXECUTED",
+   "test": [
+    "test/b04-qualification.test.ts :: IC-11: one report submitted three times, or three reports sharing a provider message id or request digest, is RUNS_NOT_INDEPENDENT; three reports with disjoint receipts qualify",
+    "test/b04-qualification.test.ts :: IC-11: a campaign whose next request does not fit the remaining grant stops before sending, and a run whose projected cost does not fit does not start"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": null
+  },
+  {
+   "case": "IC-13",
+   "class": "NOT_EXECUTED",
+   "test": [
+    "test/b04-bedrock-wire.test.ts :: IC-13 Bedrock: a body with temperature, top_p, metadata, stream, anthropic_beta, a model member or an unknown member is refused BEFORE_SEND with no byte written; the InvokeModel body with anthropic_version bedrock-2023-05-31 passes"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": null
+  },
+  {
+   "case": "S042",
+   "class": "NOT_EXECUTED",
+   "test": [
+    "test/b04-corpus.test.ts :: S042: six hundred renamings of one example have one fingerprint and fail corpusShortfall; the sealed corpus has 600 distinct fingerprints in the five families and 60 disjoint pilot fixtures"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": null
+  },
+  {
+   "case": "S043",
+   "class": "NOT_EXECUTED",
+   "test": [
+    "test/b04-scorer-validity.test.ts :: S043: an always-abstaining candidate over the sealed seeds has zero hard-gate violations and fails SUPPORTED correctness in every run"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": null
+  },
+  {
+   "case": "S044",
+   "class": "NOT_EXECUTED",
+   "test": [
+    "test/b04-qualification.test.ts :: S044: reports whose subjects differ in served model, prompt bundle, policy, core, package, scorer or corpus are not aggregated, and a run whose receipts show a served-model change is invalid"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": null
+  },
+  {
+   "case": "S091",
+   "class": "NOT_EXECUTED",
+   "test": [
+    "test/b04-policy.test.ts :: S091: a candidate without a read-back privacy and retention record, Gemini among them, is refused by admission before any request; Sonnet 5.5 and Opus 5.5 with their records are admitted"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": null
+  },
+  {
+   "case": "R2-039",
+   "class": "NOT_EXECUTED",
+   "test": [
+    "test/b04-qualification.test.ts :: R2-039: a copied run or a replay of stored responses is refused as a run by subject and receipt identity; the replay may re-score and is labelled REPLAY"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": null
+  },
+  {
+   "case": "R2-040",
+   "class": "NOT_EXECUTED",
+   "test": [
+    "test/b04-corpus.test.ts :: R2-040: a request receipt carrying a truth canary or a corpus file name invalidates that evaluation and blocks further funded dispatch until the corpus is resealed"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": null
+  },
+  {
+   "case": "R2-041",
+   "class": "NOT_EXECUTED",
+   "test": [
+    "test/b04-policy.test.ts :: R2-041: a cheaper candidate with a provider-minimum retention class fails eligibility before any cost comparison and is never selected"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": null
+  },
+  {
+   "case": "R2-042",
+   "class": "NOT_EXECUTED",
+   "test": [
+    "test/b04-scorer-validity.test.ts :: R2-042: a safe but useless candidate fails the supported utility thresholds independently of its safety score"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": null
+  }
+ ]
+}

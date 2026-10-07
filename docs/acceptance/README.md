@@ -16,8 +16,8 @@ operator host).
 | B00 Observed baseline and business readiness | 4: 2 EXECUTED_LOCAL, 2 NOT_EXECUTED | IN_PROGRESS | — | — | — |
 | B01 Migration semantics and hostile inputs | 33: 29 EXECUTED_LOCAL, 3 PARTIAL, 1 PLANNED | IN_PROGRESS | — | — | — |
 | B02 Migration qualification and distribution | 7: 4 EXECUTED_LOCAL, 1 SIMULATED, 2 PLANNED | IN_PROGRESS | — | — | — |
-| B03 Intelligence offline kernel and compiler | 50: 50 MISSING | INCOMPLETE_MAP | — | — | — |
-| B04 Model qualification and Intelligence release | 11: 11 MISSING | INCOMPLETE_MAP | — | — | — |
+| B03 Intelligence offline kernel and compiler | 50: 2 EXECUTED_LOCAL, 26 PARTIAL, 22 SIMULATED | IN_PROGRESS | — | — | — |
+| B04 Model qualification and Intelligence release | 11: 11 NOT_EXECUTED | NOT_STARTED | — | — | — |
 | B05 Monorepo and shared contracts | 3: 3 NOT_EXECUTED | NOT_STARTED | — | — | — |
 | B06 Domain, database and authorization | 29: 18 EXECUTED_LOCAL, 11 PARTIAL | REVIEW_ACCEPTED | `d9bbfd0` · B06-round3-d9bbfd0 | 3: REJECT a7203f0 → ACCEPT 4b33e26 → ACCEPT d9bbfd0 | B05 → B02, B04 → B01, B03 → B00 |
 | B07 Upload, inspection and source lifecycle | 23: 11 EXECUTED_LOCAL, 12 PARTIAL | REVIEW_ACCEPTED | `d9bbfd0` · B07-round7-d9bbfd0 | 7: REJECT 0f15636 → REJECT 6b670e3 → REJECT 77d5fa6 → REJECT 09faf25 → ACCEPT d23af32 → ACCEPT 4b33e26 → ACCEPT d9bbfd0 | B06 → B05 → B02, B04 → B01, B03 → B00 |
