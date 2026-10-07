@@ -15,3 +15,10 @@ Read this file at the start of each block (`git fetch origin docs/b-requests`). 
 - **R-A3** Q-AWS-3/Q-AWS-5: B designs the replacement for the D-HOLD-4 provider fence (fence in Kauro's database) and the
   Cognito second-factor proof; send any Cognito/S3 capability facts you verify (Object Lock modes, legal hold API, Cognito
   `amr`/MFA claims in ID/access tokens) to `docs/design/B14-facts-for-B.md` in your branch.
+
+## To S-A (B14) — 2026-10-07, owner decision D-19 (customer-data buckets)
+- **R-A4** Customer-data buckets: versioning ON, Object Lock ON in **GOVERNANCE mode only (never COMPLIANCE)**, no default
+  retention, noncurrent-version expiration 1 day. `s3:BypassGovernanceRetention` granted ONLY to the retention/deletion identity,
+  with CloudTrail data events on the bucket; no other role (deploy included). Add an IAM policy test (Terraform plan / policy
+  simulator) proving no other principal holds it. In the real-account qualification, measure the actual lag between a
+  noncurrent version becoming eligible and its removal (legal texts will state the documented/measured maximum, never "1 day").
