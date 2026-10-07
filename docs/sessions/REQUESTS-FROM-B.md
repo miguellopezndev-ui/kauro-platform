@@ -63,3 +63,34 @@ Read this file at the start of each block (`git fetch origin docs/b-requests`). 
   (UNKNOWN); "6 h (72 h)" is for Orders create only; refund status enum CANCELLED/FAILED/PENDING/COMPLETED has no stated money
   meaning (CANCELLED/FAILED stay unrecognized-for-money). The adapter must expose no API that can re-POST a refund for an
   existing attempt; B adds the test `NEVER-RESEND` over every entry point.
+
+## To ALL sessions — 2026-10-07 OWNER DECISION "Payments V1" (supersedes PayPal as launch rail)
+Full text: `docs/authority/decisions/2026-10-07-PAYMENTS-V1.md` (branch docs/payments-v1-decision, 586714a).
+- PayPal is OUT of the launch, PARKED (not deleted). Zero quota/time/CI/money on PayPal without a new owner authorisation.
+- V1 target rail: USD invoice -> ACH (or wire, same details) -> Wise Business USD details of KAURO DATA S.A.S. -> reconciliation
+  in Kauro. Not confirmed until registered company, Wise approved, USD details + ACH receiving enabled, and a real controlled
+  collection AND refund test reconcile correctly. If Wise is late, PayPal is NOT reintroduced (B escalates to the owner).
+- Generic contracts stay (rail, payment evidence, reconciliation, refund, reversal, ledger, seller commission and fiscal
+  consequences, receipt/entitlement). Nothing becomes Wise-specific. Nothing wire-specific is built.
+- Refunds stay mandatory; for ACH/Wise a safe manual-assisted refund is fine (authorised, idempotent in Kauro, adjusts
+  revenue/cash/commission/fiscal evidence, receipt kept, never "refunded" without real execution evidence, no double refund).
+  Any rail: an uncertain refund is NEVER re-sent, only queried; still uncertain -> owner resolution (D-24 A).
+- Do not state publicly that Kauro accepts ACH until proven on the real account.
+
+## To S-B (B15) — 2026-10-07, Payments V1
+- **R-B8 STOP PayPal.** Close PR #19 / `b15/adapters-paypal` with ONE status commit: a `DEFERRED.md` (or a section at the top of
+  `docs/design/B15-adapters.md` on that branch) stating "DEFERRED by owner decision 2026-10-07 (Payments V1); parked as
+  contingency; not merged; resumes only by explicit owner decision", listing F-PP-1..7 and R-B1..R-B7 as open-if-resumed.
+  Convert PR #19 to draft, remove `ready-to-merge` if present. No further work on it: R-B1..R-B7 are suspended.
+- Continue B15 on the non-PayPal adapters (Alegra / fiscal, others in your block). No new code only for PayPal.
+
+## To S-E (B11 stage 2 / B13) — 2026-10-07, Payments V1
+- **R-E1 Checkout A8 (10-11) changes:** no PayPal option. The V1 customer payment is a USD invoice paid by ACH or wire to the
+  same USD account details (shown only when the route is ENABLED by configuration; never hard-coded; no public "we accept ACH"
+  claim until the route is VERIFIED).
+- **R-E2 Payment-pending experience (ACH takes 1-3 business days):** design and test (a) work is admitted ONLY with confirmed
+  funds (reconciled credit of the exact amount and currency); (b) what the agency sees while the payment is in transit
+  (invoice issued, instructions, unique payment reference, "awaiting funds", expected window); (c) how the quote's validity
+  relates to a payment in transit (quote expiry vs. an invoice already issued: propose the rule with its R2/B09 citation, B
+  confirms before you build); (d) partial / over / wrong-reference payments shown as "under review", never as paid.
+  Generic route model only (no Wise-specific screens or names in contracts).
