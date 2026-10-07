@@ -78,13 +78,18 @@ export class PgQuoteReads {
     return r.rows[0]?.ok === true;
   }
 
-  /** The project's live quote's version and state, else its latest quote's (null: the project has no quote). */
+  /**
+   * The project's live quote's version and state, else the head of its chain (a quote nothing superseded; the latest-created head when the
+   * project has several, e.g. an expired one and a withdrawn one); null when the project has no quote. A superseded predecessor is never
+   * current, whatever its created_at: the host clock can step back (ADV-18).
+   */
   async currentQuoteOf(agencyId: AgencyId, projectId: ProjectId): Promise<{ readonly version: number; readonly state: string } | null> {
     const r = await execute<{ version: string | number; state: string }>(
       this.db,
       `SELECT version, state FROM kauro.quotes
         WHERE agency_id = $1 AND project_id = $2
-        ORDER BY ((replaces_quote_id IS NULL AND state IN ('DRAFT', 'ISSUED', 'ACCEPTED_FOR_CHECKOUT')) OR state = 'ACCEPTED_FOR_CHECKOUT') DESC, created_at DESC
+        ORDER BY ((replaces_quote_id IS NULL AND state IN ('DRAFT', 'ISSUED', 'ACCEPTED_FOR_CHECKOUT')) OR state = 'ACCEPTED_FOR_CHECKOUT') DESC,
+                 (superseded_by_quote_id IS NULL) DESC, created_at DESC, quote_id DESC
         LIMIT 1`,
       [agencyId, projectId],
     );
