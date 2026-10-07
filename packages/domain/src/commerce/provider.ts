@@ -9,7 +9,7 @@
  * UNRECOGNIZED_PROVIDER_STATE and block consequential assumptions").
  */
 import { DOMAINS, canonicalBytes, rawDigest, structuredDigest, type CanonicalValue, type Sha256Hex, type UtcInstant } from "@kauro/contracts";
-import type { CaptureStatus, FundsState, PaymentEnvironment, ProviderExceptionKind, ScopeKind } from "./records.js";
+import type { BankAccountRef, BankCreditId, BankCreditStatus, BankRail, CaptureStatus, FundsState, ObservedBankRail, PaymentEnvironment, ProviderExceptionKind, ScopeKind } from "./records.js";
 
 /** The provider exception vocabulary, in the order of migration 0016 provider_event_exceptions.kind (the persistence test proves it equal). */
 export const PROVIDER_EXCEPTION_KINDS: ReadonlyArray<ProviderExceptionKind> = Object.freeze([
@@ -184,4 +184,156 @@ export interface PaymentIntentPreimage {
 
 export function paymentIntentHash(p: PaymentIntentPreimage): Sha256Hex {
   return rawDigest(canonicalBytes({ domain: PAYMENT_INTENT_DOMAIN, version: 1, payload: p }));
+}
+
+// --- bank evidence vocabulary (Payments V1, ACH-ROUTE D-ACH-15, §6.1; DV1-01: provider-neutral) -------------------------------------------
+//
+// Normalized shapes a bank-evidence classifier produces from authenticated, hash-verified stored bytes. A field the bytes do not show is
+// null, never inferred (ACH-R7-03, K-8). The vendor payload, its field names and statement formats live only in the adapter package.
+
+/** The opaque locator of an artifact and its expected digest; never classifier input (the bytes come from the restricted store). */
+export interface BankEvidenceRef {
+  readonly evidenceHash: Sha256Hex;
+  readonly artifactRef: string;
+}
+
+/** The result of the pure classification of stored bytes: only CLASSIFIED permits comparison and a later effect (fail closed). */
+export const EVIDENCE_REJECTION_CODES = ["UNKNOWN_EVIDENCE", "MALFORMED_EVIDENCE", "HASH_MISMATCH", "UNAUTHENTICATED_EVIDENCE"] as const;
+export type EvidenceRejectionCode = (typeof EVIDENCE_REJECTION_CODES)[number];
+export type EvidenceClassification<T> =
+  | { readonly kind: "CLASSIFIED"; readonly value: T }
+  | { readonly kind: "REJECTED"; readonly code: EvidenceRejectionCode };
+
+/** The safe operational condition of exactly one refused request (never evidence of a money effect, never an AmbiguityReason). */
+export const OPERATIONAL_CODES = ["AUTH_FAILED", "PERMISSION_DENIED", "SCA_REQUIRED", "RATE_LIMITED", "CAPABILITY_UNAVAILABLE", "VALIDATION_REJECTED"] as const;
+export type OperationalCode = (typeof OPERATIONAL_CODES)[number];
+export interface Operational {
+  readonly code: OperationalCode;
+  readonly requestHash: Sha256Hex;
+  readonly retryAfterSeconds?: number;
+}
+
+/** What one port read returned. COMPLETED means conclusive port evidence: the inner status still decides whether money completed. */
+export type BankOutcome<T> =
+  | ({ readonly kind: "COMPLETED"; readonly value: T } & BankEvidenceRef)
+  | ({ readonly kind: "PENDING"; readonly retryAfterSeconds?: number } & BankEvidenceRef)
+  | ({ readonly kind: "PROVED_NO_EFFECT"; readonly outcomeCode: string; readonly absenceIsProof: true } & BankEvidenceRef)
+  | { readonly kind: "AMBIGUOUS"; readonly reason: AmbiguityReason }
+  | ({ readonly kind: "UNRECOGNIZED"; readonly safeStatusCode: string } & BankEvidenceRef)
+  /** The provider refused this read; dispatch refusals are Phase 2. */
+  | { readonly kind: "REFUSED"; readonly operational: Operational };
+
+/** The receiving account's details as verified (restricted instruction data: never telemetry, logs or events). */
+export interface UsdBankAccountDetails {
+  readonly accountRef: BankAccountRef;
+  readonly detailsVersion: string;
+  readonly currency: "USD";
+  readonly acceptedRails: ReadonlyArray<BankRail>;
+  readonly payeeDigest: Sha256Hex;
+  readonly beneficiaryName: string;
+  readonly bankName: string;
+  readonly routingNumber: string;
+  readonly accountNumber: string;
+  readonly accountType: "CHECKING" | "SAVINGS";
+  readonly additionalFields: Readonly<Record<string, string>>;
+  readonly verifiedAt: UtcInstant;
+}
+
+export interface IncomingCredit extends BankEvidenceRef {
+  readonly accountRef: BankAccountRef;
+  readonly creditId: BankCreditId;
+  readonly environment: PaymentEnvironment;
+  readonly rail: ObservedBankRail;
+  /** Observed, not silently constrained to USD. */
+  readonly currency: string;
+  /** null blocks exact-payment application. */
+  readonly grossCents: bigint | null;
+  readonly netCents: bigint | null;
+  /** Unknown is null, never zero; an explicit observed zero is valid. */
+  readonly feeCents: bigint | null;
+  readonly payeeDigest: Sha256Hex;
+  readonly reference: string | null;
+  readonly payerDigest: Sha256Hex | null;
+  readonly payerEvidenceRef: string | null;
+  readonly status: BankCreditStatus;
+  /** D-ACH-18 principal of a return of this credit. */
+  readonly reversedCents: bigint | null;
+  readonly fundsState: FundsState;
+  readonly bookedAt: UtcInstant | null;
+  readonly observedAt: UtcInstant;
+}
+
+export interface CreditPage {
+  readonly credits: ReadonlyArray<IncomingCredit>;
+  readonly nextCursor: string;
+  readonly complete: boolean;
+  readonly coverageStart: UtcInstant;
+  readonly coverageEnd: UtcInstant;
+}
+
+/**
+ * The destination fields as the evidence shows them; null when absent. `full` is restricted: never persisted in clear, logged or put in
+ * an event; the application keys it into the destination fingerprint in memory and discards it (DV1-10).
+ */
+export interface DestinationEvidence {
+  readonly accountDigest: Sha256Hex | null;
+  readonly accountLast4: string | null;
+  readonly routingDigest: Sha256Hex | null;
+  readonly full: { readonly routingNumber: string; readonly accountNumber: string; readonly holderName: string } | null;
+  readonly recipientRef: string | null;
+  readonly recipientVersion: string | null;
+}
+
+export const OUTBOUND_EVIDENCE_STATUSES = ["SENT", "COMPLETED", "BOUNCED", "CANCELLED", "UNRECOGNIZED"] as const;
+/** A classified manual execution artifact, e.g. a send receipt (D-ACH-21, DV1-08). */
+export interface OutboundEvidence extends BankEvidenceRef {
+  readonly bankExecutionId: string;
+  readonly accountRef: BankAccountRef;
+  readonly destination: DestinationEvidence;
+  /** As the provider shows it, never repaired. */
+  readonly reference: string | null;
+  readonly executedAt: UtcInstant | null;
+  readonly amountCents: bigint;
+  readonly currency: string;
+  readonly feeCents: bigint | null;
+  readonly status: (typeof OUTBOUND_EVIDENCE_STATUSES)[number];
+  readonly returnedCents: bigint | null;
+  readonly observedAt: UtcInstant;
+}
+
+export const STATEMENT_DEBIT_STATUSES = ["SENT", "COMPLETED", "RETURNED", "UNRECOGNIZED"] as const;
+/** An outgoing line on the route's balance. */
+export interface StatementDebit extends BankEvidenceRef {
+  readonly accountRef: BankAccountRef;
+  /** The statement-line identity, stable. */
+  readonly debitId: string;
+  /** null when the line carries none: an unrecorded debit by definition. */
+  readonly bankExecutionId: string | null;
+  readonly amountCents: bigint;
+  readonly currency: string;
+  readonly feeCents: bigint | null;
+  readonly destination: DestinationEvidence;
+  readonly reference: string | null;
+  readonly executedAt: UtcInstant | null;
+  readonly status: (typeof STATEMENT_DEBIT_STATUSES)[number];
+  readonly returnedCents: bigint | null;
+  readonly bookedAt: UtcInstant | null;
+  readonly observedAt: UtcInstant;
+}
+
+export interface DebitPage {
+  readonly debits: ReadonlyArray<StatementDebit>;
+  readonly nextCursor: string;
+  readonly complete: boolean;
+  readonly coverageStart: UtcInstant;
+  readonly coverageEnd: UtcInstant;
+}
+
+/** One owner-imported statement artifact, classified (SI1). */
+export interface StatementPage extends BankEvidenceRef {
+  readonly accountRef: BankAccountRef;
+  readonly coverageStart: UtcInstant;
+  readonly coverageEnd: UtcInstant;
+  readonly credits: ReadonlyArray<IncomingCredit>;
+  readonly debits: ReadonlyArray<StatementDebit>;
 }

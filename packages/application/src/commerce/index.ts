@@ -101,6 +101,11 @@ export type {
   SourceAvailabilityReader,
   SourceLineageReader,
   PurchaseRebinder,
+  StoredBankEvidence,
+  BankEvidenceStore,
+  BankTransferEvidencePort,
+  BankEvidenceReadPortV1,
+  DestinationFingerprinter,
 } from "./ports.js";
 export type { ProviderEffect, DurableOperation, IntentOutcome, DispatchTicket, SettleInput, SettleOutcome, ProviderCommandPhases } from "./protocol.js";
 export { DISPATCH_TIMEOUT_SECONDS, DISPATCH_WATCHDOG_MARGIN_SECONDS, MAX_ATTEMPTS_PER_OPERATION, PENDING_POLL_AFTER_SECONDS } from "./protocol.js";

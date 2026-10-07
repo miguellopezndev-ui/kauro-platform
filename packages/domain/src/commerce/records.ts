@@ -632,3 +632,106 @@ export interface ProviderEventExceptionRecord {
   readonly evidenceHash: Sha256Hex;
   readonly observedAt: UtcInstant;
 }
+
+// --- bank-transfer route vocabulary (Payments V1, docs/design/ACH-ROUTE.md r12; lane KIT) -----------------------------------------------
+//
+// Rail- and provider-agnostic (DV1-01): no name below, in a table or in an event names a provider; `ProviderId` is route-version data
+// ("wise" is configuration, never a type literal). These are shared types and closed vocabularies only; the guards and the behaviour
+// that use them belong to the lanes L-ROUTE, L-INBOUND, L-REFUND and L-SETTLE. Migration 0045 mirrors every closed list below in
+// kauro.bank_vocabulary (the persistence test proves the two equal).
+
+/** The route kind of the V1 bank-transfer route (D-ACH-02; PaymentRouteRecord keeps its provider kinds untouched). */
+export type PaymentRouteKind = "PROVIDER_CHECKOUT" | "BANK_TRANSFER";
+/** The immutable account/profile/balance mapping of the receiving account at the provider; carries no credential (D-ACH-15). */
+export type BankAccountRef = Branded<string, "BankAccountRef">;
+/** The provider of a route version, as data (DV1-01). */
+export type ProviderId = string;
+/** The account-scoped provider identity of an incoming credit, never the reference or memo (D-ACH-07). */
+export type BankCreditId = Branded<string, "BankCreditId">;
+/** The provider-side identity of one outbound execution (r6 "Wise transfer ID"; DV1-01 `bankExecutionId`). */
+export type BankExecutionId = Branded<string, "BankExecutionId">;
+export type ExecutionAttemptId = Branded<string, "ExecutionAttemptId">;
+export type ExecutionOfferId = Branded<string, "ExecutionOfferId">;
+export type StatementImportId = Branded<string, "StatementImportId">;
+export type TreasuryRefundId = Branded<string, "TreasuryRefundId">;
+
+/** The rails a route version accepts (DV1-03); the version carries its own subset as data. */
+export const BANK_RAILS = ["ACH", "DOMESTIC_WIRE"] as const;
+export type BankRail = (typeof BANK_RAILS)[number];
+/** A rail as observed: anything outside the accepted set stays a review exception (DV1-03). */
+export type ObservedBankRail = BankRail | "OTHER" | "UNKNOWN";
+
+/** The route's integration class. OWNER_MANUAL is the V1 mode (DV1-02): the owner enters and imports, Kauro classifies stored evidence. */
+export type BankIntegrationClass = IntegrationClass | "OWNER_MANUAL";
+/** D-ACH-02 / DV1-04. */
+export type BankRouteState = "PENDING_VERIFICATION" | "VERIFIED" | "ENABLED" | "DISABLED";
+export type BankRollout = "CONTROLLED" | "GENERAL";
+
+/** D-ACH-05, DV1-06: the customer-facing order states added for BANK_TRANSFER (not part of the PaymentOrder registry contract; see machines.ts BANK_ORDER_EXTENSION). */
+export const BANK_ORDER_STATES = ["AWAITING_TRANSFER", "PARTIALLY_RECEIVED", "RECEIVED_REVIEW"] as const;
+export type BankOrderState = (typeof BANK_ORDER_STATES)[number];
+
+/** D-ACH-07: the operational states of an observed incoming credit. */
+export const BANK_CREDIT_STATES = ["DRAFT_MANUAL", "OBSERVED", "MATCH_REVIEW", "MATCHED", "APPLIED", "RETURN_REVIEW"] as const;
+export type BankCreditState = (typeof BANK_CREDIT_STATES)[number];
+/** Where a credit observation came from (D-ACH-07; OWNER_MANUAL in addition to PROVIDER_QUERY). */
+export const BANK_CREDIT_SOURCES = ["OWNER_MANUAL", "PROVIDER_QUERY"] as const;
+export type BankCreditSource = (typeof BANK_CREDIT_SOURCES)[number];
+/** The status of a credit or debit as the evidence shows it (never coerced; UNRECOGNIZED blocks consequences). */
+export const BANK_CREDIT_STATUSES = ["PENDING", "COMPLETED", "DENIED", "REVERSED", "UNRECOGNIZED"] as const;
+export type BankCreditStatus = (typeof BANK_CREDIT_STATUSES)[number];
+
+/** DV1-08: one V1 outbound movement of route money. RETURN is a refund or treasury refund, RESEND the re-send of a bounced return. */
+export const EXECUTION_ATTEMPT_KINDS = ["RETURN", "RESEND"] as const;
+export type ExecutionAttemptKind = (typeof EXECUTION_ATTEMPT_KINDS)[number];
+/** DV1-08 machine: DECLARED -> UNCERTAIN; DECLARED or UNCERTAIN -> RECORDED or NOT_EXECUTED. */
+export const EXECUTION_ATTEMPT_STATES = ["DECLARED", "UNCERTAIN", "RECORDED", "NOT_EXECUTED"] as const;
+export type ExecutionAttemptState = (typeof EXECUTION_ATTEMPT_STATES)[number];
+/** The states in which an attempt is open: at most one per source (the NEVER-RESEND fence, DV1-08). */
+export const EXECUTION_ATTEMPT_OPEN_STATES: ReadonlyArray<ExecutionAttemptState> = Object.freeze(["DECLARED", "UNCERTAIN"]);
+/** D-ACH-13 / D-ACH-19: the closed source union of a refund of route money. */
+export const EXECUTION_SOURCE_KINDS = ["CAPTURE", "BANK_CREDIT"] as const;
+export type ExecutionSourceKind = (typeof EXECUTION_SOURCE_KINDS)[number];
+/** DV1-10: what proved "sent to the approved destination". Anything else is DESTINATION_UNPROVEN. */
+export const DESTINATION_PROOFS = ["DP_FULL", "DP_RECIPIENT"] as const;
+export type DestinationProof = (typeof DESTINATION_PROOFS)[number];
+/** DV1-11: the commands whose request writes an execution offer first (Koffer): G2, G4 and X3-EXECUTED. */
+export const EXECUTION_OFFER_COMMANDS = ["RECORD_RETURN", "RECORD_RESEND", "RESOLVE_EXECUTED"] as const;
+export type ExecutionOfferCommand = (typeof EXECUTION_OFFER_COMMANDS)[number];
+/** DV1-11: the gate outcome of the evidence read of one offer (the four rejections of §6 plus a classified result and the store's own failure). */
+export const EXECUTION_GATE_OUTCOMES = ["CLASSIFIED", "UNKNOWN_EVIDENCE", "MALFORMED_EVIDENCE", "HASH_MISMATCH", "UNAUTHENTICATED_EVIDENCE", "EVIDENCE_UNAVAILABLE"] as const;
+export type ExecutionGateOutcome = (typeof EXECUTION_GATE_OUTCOMES)[number];
+/** DV1-10 correlation of a debit with an attempt; any one of them blocks NOT_EXECUTED. */
+export const DEBIT_CORRELATIONS = ["CORR_REF", "CORR_RECIPIENT", "CORR_OFFERED", "CORR_DF"] as const;
+export type DebitCorrelation = (typeof DEBIT_CORRELATIONS)[number];
+/** DV1-08/10: the review cases the manual outbound path opens (kinds of the bank review cases; the lane that opens one adds its row). */
+export const BANK_CASE_KINDS = [
+  "UNCERTAIN_EFFECT",
+  "DESTINATION_UNPROVEN",
+  "REFUND_TERMINAL_CONTRADICTED",
+  "UNDECLARED_OUTBOUND",
+  "POTENTIAL_MATCH_UNRESOLVED",
+  "RETURN_BOUNCED",
+  "DOUBLE_RETURN_RISK",
+  "MATCH_REVIEW",
+  "PROVIDER_TIME_UNVERIFIED",
+  "RECORD_REQUIRED",
+] as const;
+export type BankCaseKind = (typeof BANK_CASE_KINDS)[number];
+/** The kinds of line an imported statement carries (SI2): an incoming credit or an outgoing debit. */
+export const STATEMENT_LINE_KINDS = ["CREDIT", "DEBIT"] as const;
+export type StatementLineKind = (typeof STATEMENT_LINE_KINDS)[number];
+/** The two independent coverage streams of an account (DV1-02; completing one never covers the other). */
+export const COVERAGE_STREAMS = ["INBOUND", "OUTBOUND"] as const;
+export type CoverageStream = (typeof COVERAGE_STREAMS)[number];
+
+/** The version of the destination normalization and canonical encoding (DV1-11); a fingerprint is comparable only under the same four values. */
+export const DESTINATION_NORM_VERSION = "destination-norm-v1";
+/** What a stored destination fingerprint is: the keyed HMAC, never the numbers (DV1-10). */
+export interface DestinationFingerprintRecord {
+  /** Lower-case hex HMAC-SHA256 under the key named below. */
+  readonly fingerprint: Sha256Hex;
+  readonly keyId: string;
+  readonly keyVersion: number;
+  readonly normVersion: string;
+}
