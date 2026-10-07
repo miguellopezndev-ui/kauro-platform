@@ -114,7 +114,10 @@ export async function issueReplacement(
   if ((await c.rebindings.listForCapture(authorization.captureId)).length >= allowance) {
     throw refuse("REPLACEMENT_ALLOWANCE_SPENT", "the one included pre-execution source replacement is spent", { currentVersion: live.version, currentState: live.state });
   }
-  if ((await reads.pendingReplacementOf(agencyId, live.quoteId)) !== null) throw refuse("OPERATION_PENDING", "a replacement of the paid quote is still pending");
+  // retryable: the pending replacement settles or is withdrawn, and the retry then reads the allowance spent or free
+  if ((await reads.pendingReplacementOf(agencyId, live.quoteId)) !== null) {
+    throw new DomainFailure("PRECONDITION_FAILED", "a replacement of the paid quote is still pending", { reason: "OPERATION_PENDING" }, true);
+  }
 
   const paidSnapshot = await c.quotes.snapshot(live.quoteId);
   if (paidSnapshot === null) throw new DomainFailure("INTEGRITY_FAILURE", "the paid quote has no eligibility snapshot");

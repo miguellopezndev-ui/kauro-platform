@@ -68,6 +68,25 @@ export class PgQuoteReads {
     return (r.rows[0]?.quote_id as QuoteId | undefined) ?? null;
   }
 
+  /** D10-GAP-25: the exclusive transaction-level advisory lock of the project's first issuance (only CreateQuote takes it). */
+  async serializeFirstIssuance(_agencyId: AgencyId, projectId: ProjectId): Promise<void> {
+    await execute(this.db, "SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.quotes:first-issuance', $1))", [projectId]);
+  }
+
+  /** The project's live quote's version and state, else its latest quote's (null: the project has no quote). */
+  async currentQuoteOf(agencyId: AgencyId, projectId: ProjectId): Promise<{ readonly version: number; readonly state: string } | null> {
+    const r = await execute<{ version: string | number; state: string }>(
+      this.db,
+      `SELECT version, state FROM kauro.quotes
+        WHERE agency_id = $1 AND project_id = $2
+        ORDER BY ((replaces_quote_id IS NULL AND state IN ('DRAFT', 'ISSUED', 'ACCEPTED_FOR_CHECKOUT')) OR state = 'ACCEPTED_FOR_CHECKOUT') DESC, created_at DESC
+        LIMIT 1`,
+      [agencyId, projectId],
+    );
+    const row = r.rows[0];
+    return row === undefined ? null : { version: Number(row.version), state: row.state };
+  }
+
   /** The replacement of `quoteId` that is drafted or issued and not yet accepted by a re-binding (at most one: quotes_one_pending_replacement). */
   async pendingReplacementOf(agencyId: AgencyId, quoteId: QuoteId): Promise<QuoteId | null> {
     const r = await execute<{ quote_id: string }>(
