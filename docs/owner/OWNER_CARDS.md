@@ -5,8 +5,14 @@ repositorio y aquí solo figura que fueron recibidas. Cada tarjeta nueva o cambi
 Formato: decisión exacta, recomendación única, qué habilita, qué pasa si dices no, impacto en dinero / seguridad / fecha,
 ejemplo, riesgos, si cambia R2, cómo responder.
 
-Última actualización: 2026-10-07 (D-25: hay posible pagador; D-15 SUPERSEDED en lo de PayPal; D-22; D-23 cancelada; D-24 A).
+Última actualización: 2026-10-07 (Pagos V1: D-13 cambia, D-25 corregida, D-26 preparada; D-15 SUPERSEDED en lo de PayPal; D-22; D-23 cancelada; D-24 A).
 
+
+## D-13 Abrir Wise Business y pasar KYC — [CAMBIO 2026-10-07 por Pagos V1: ahora es el ÚNICO rail de cobro de V1; el texto "producción sale con PayPal" queda SUPERSEDED; requiere la sociedad registrada (D-14)] — desbloquea la ruta ACH
+- Dónde: https://wise.com/business → cuenta empresarial a nombre de Kauro Data S.A.S.
+- Hacer: registro + KYC; pedir los datos de cuenta en USD (recepción ACH doméstica de EE. UU.).
+- Costo: según Wise (verificar en la cuenta; no se asume tarifa).
+- Hecho cuando: la cuenta muestra datos USD con routing/account number; me lo dices y lo verifico con un primer crédito real conciliado. Hasta entonces la ruta ACH queda PENDING_VERIFICATION y producción sale con PayPal.
 
 ## D-15 Regla de tolerancia de reloj del proveedor (ejemplo 10) — [SUPERSEDED 2026-10-07 en lo específico de PayPal (Pagos V1); la regla genérica de tolerancia nombrada y versionada sigue obligatoria para todo rail, incluido el crédito ACH] — antes de B15 en vivo (≈ 12-oct); desbloquea POLICY-PROVIDER-SKEW
 - Qué pasa: hoy una compra posterior se marca HELD (PROVIDER_TIME_UNVERIFIED) si la hora de completado que reporta PayPal es aunque sea 1 ms posterior a nuestra confirmación. En producción los relojes de PayPal y de la base difieren entre milisegundos y segundos, y PayPal reporta con resolución de segundos: habrá retenciones falsas de comisiones (seguras, pero son cola operativa y demoras para los vendedores).
@@ -57,9 +63,9 @@ ejemplo, riesgos, si cambia R2, cómo responder.
 
 ## D-25 Pagador en EE. UU. para la prueba real de ACH (Pagos V1) — antes del 10-oct; desbloquea la confirmación del rail V1 y el gate de B19
 - **Decisión exacta:** ¿quién en EE. UU. hará un ACH real de **USD 25** a los datos USD de Wise Business de KAURO DATA S.A.S. y aceptará recibir la devolución de prueba?
-- **Recomendación:** **una persona o empresa de confianza en EE. UU. con cuenta bancaria de EE. UU.** (conocido o cliente piloto), con su consentimiento por escrito de que es una prueba con devolución. Plan completo: `docs/payments/ACH-REAL-TEST-PLAN-2026-10-07.md` (rama docs/payments-v1-decision).
+- **Recomendación:** **una persona o empresa de confianza en EE. UU. con cuenta bancaria de EE. UU.** (conocido o cliente piloto), con su consentimiento por escrito de que es una prueba con devolución. **CORRECCIÓN 2026-10-07 (replanteo Pagos V1):** el cobro de prueba es una **factura real de bajo monto que tú autorizas específicamente**, con la **referencia que genera Kauro**; el costo de salida de la devolución necesita una línea de grant; **no se permite pagar desde una cuenta propia del dueño en EE. UU.** (R2 15 prohíbe el auto-pago), así que la alternativa "(b) cuenta bancaria propia" queda descartada. Plan completo: `docs/payments/ACH-REAL-TEST-PLAN-2026-10-07.md` (rama docs/payments-v1-decision).
 - **Qué habilita:** confirmar el rail V1 de punta a punta (cobro ACH real + conciliación + devolución controlada con evidencia), que es el gate de B19, y recién entonces poder decir públicamente que Kauro acepta ACH.
-- **Si dices no / no hay pagador:** el rail V1 no puede confirmarse; producción tendría que salir con el cobro deshabilitado (ruta ACH en estado pendiente) hasta que aparezca un pagador o el primer cliente real acepte ser la prueba. Alternativas reales: (a) primer cliente real de bajo monto con consentimiento explícito de prueba; (b) una cuenta bancaria propia en EE. UU. si existiera (no se abre ninguna nueva sin tu decisión). No se reintroduce PayPal.
+- **Si dices no / no hay pagador:** el rail V1 no puede confirmarse; producción tendría que salir con el cobro deshabilitado (ruta ACH en estado pendiente) hasta que aparezca un pagador o el primer cliente real acepte ser la prueba. Alternativas reales: (a) primer cliente real de bajo monto con consentimiento explícito de prueba; ~~(b) una cuenta bancaria propia en EE. UU.~~ (descartada: R2 15 prohíbe el auto-pago). No se reintroduce PayPal.
 - **Impacto en dinero:** USD 25 que vuelven con la devolución; la recepción ACH no tiene comisión de Wise según su ayuda oficial; la salida de la devolución cuesta lo que muestre la cuenta al ejecutarla (se registra).
 - **Impacto en seguridad:** el pagador solo recibe los datos USD de la cuenta y la referencia de pago; ningún acceso a Kauro ni a Wise. La devolución exige tu autorización en Kauro y queda auditada.
 - **Impacto en fecha:** la prueba solo puede hacerse con la sociedad registrada (D-14) y Wise aprobado; si el pagador está listo antes, la prueba se hace el mismo día que Wise habilite los datos USD (el ACH puede tardar hasta 4 días hábiles). Sin pagador, el gate de B19 queda bloqueado.
@@ -68,3 +74,17 @@ ejemplo, riesgos, si cambia R2, cómo responder.
 - **¿Cambia R2?:** no.
 - **Cómo responder:** "D-25 <nombre o tipo de pagador>" (no necesito datos bancarios aquí; los gestionas tú directamente con el pagador), o "D-25 no hay pagador".
 - **RESPUESTA 2026-10-07: "hay posible pagador".** Pagador probable, no confirmado. Pendiente del dueño: confirmar con él (consentimiento escrito de prueba con devolución, USD 25, ACH desde cuenta bancaria de EE. UU.) antes de que Wise habilite los datos USD. Sin datos personales en el repositorio.
+
+## D-26 Si Wise no está activo el 12-oct 20:00 — cómo salimos a producción (Pagos V1) — PREPARADA; solo se decide si se cumple la condición
+- **Condición que la activa:** el 12-oct a las 20:00 (Bogotá) los datos USD de Wise Business de KAURO DATA S.A.S. no están habilitados (sociedad sin registrar, KYC pendiente o datos USD no emitidos).
+- **Decisión exacta:** ¿salimos a producción el 17-oct con el cobro **cerrado** (ruta ACH configurada pero no habilitada, etiqueta honesta de "disponibilidad limitada") y abrimos el cobro cuando Wise esté vivo y pase la prueba real, o movemos la fecha de producción?
+- **Recomendación:** **salir el 17-oct con el cobro cerrado y etiqueta honesta (G-PRODUCTION), y abrir el cobro (G-BUSINESS) en cuanto Wise esté vivo + la prueba ACH real con devolución (≈ Wise + 4 días hábiles).** No se reintroduce PayPal.
+- **Qué habilita:** que todo lo demás de Kauro (agencias, proyectos, migraciones) salga a producción a tiempo, sin prometer un cobro que aún no está probado.
+- **Si dices no:** se mueve la fecha de producción hasta que Wise esté vivo y probado; todo lo demás espera.
+- **Impacto en dinero:** con la recomendación, no hay ingresos hasta que se abra el cobro (días); no hay riesgo de cobrar mal. Moviendo la fecha, igual no hay ingresos y además se retrasa todo.
+- **Impacto en seguridad:** ninguno negativo; la ruta cerrada no muestra datos bancarios a nadie.
+- **Impacto en fecha:** recomendación = producción técnica 17-oct, "comercialmente vivo" = Wise vivo + prueba real (posiblemente después del 19-oct). Alternativa = producción completa después del 19-oct.
+- **Ejemplo:** Wise aprueba el 14-oct; el 15-oct el pagador envía USD 25; llega el 16-oct; se concilia y se devuelve el 17-oct; el 18-oct se habilita el cobro. Si Wise aprueba el 22-oct, el cobro se abre ≈ 28-oct, pero Kauro ya está en producción desde el 17-oct.
+- **Riesgos:** agencias que quieran pagar antes de abrir el cobro (se les muestra "disponible pronto", nunca datos bancarios); presión por abrir el cobro sin prueba real (prohibido por Pagos V1 §2).
+- **¿Cambia R2?:** no (R2 15 "Initial payment decision": comercialmente vivo exige pago real + devolución + documento fiscal + entrega).
+- **Cómo responder (solo si se activa):** "D-26 salir con cobro cerrado" o "D-26 mover fecha".
