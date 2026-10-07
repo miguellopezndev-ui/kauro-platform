@@ -100,3 +100,14 @@ Full text: `docs/authority/decisions/2026-10-07-PAYMENTS-V1.md` (branch docs/pay
   working day." The same domestic USD account details receive both ACH and wire from US senders; receiving ACH has no fee
   ("No fees for ACH or 6.11 USD for wires"), a domestic wire has a receiving fee. Show timing as data (versioned config with
   source URL and access date, A8 rule 7), never hard-coded; design the pending state for up to 4 working days.
+
+## To S-E (B11/B13) and ALL sessions — 2026-10-07, OWNER: English only by default
+- **R-E3 (binding).** Customers are US companies. NOT ONE user-visible text in the site/app (pages, emails, errors, PDFs/HTML
+  reports, legal pages) may be Spanish by default. Default locale = English (en-US) everywhere.
+- **Language switcher:** add it if it fits your plan without moving 14-oct: all user-visible strings come from a message catalog
+  keyed by locale (no hard-coded copy), a visible language selector, the choice remembered per user, English as default and as
+  fallback for any missing key. At launch only the English catalog is required; another locale (e.g. es) is added later as a
+  catalog, never by default. Tests: (a) a scan that fails if any non-English user-visible string ships in the default catalog or
+  is hard-coded in components; (b) missing-key fallback to English; (c) the selector persists and switches.
+- Legal texts render in English by default (B is converting docs/legal to English-primary); a Spanish legal copy, if Colombian
+  law needs one, is only reachable through the language selector.
