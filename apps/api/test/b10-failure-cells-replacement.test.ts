@@ -71,7 +71,8 @@ async function stateOf(x: Fixture, key: string): Promise<ReplacementState> {
   const rebindings = await oracleRows<{ from_quote_id: string; to_quote_id: string; allowance_ordinal: number }>(iw, "SELECT from_quote_id, to_quote_id, allowance_ordinal FROM kauro.purchase_rebindings WHERE capture_id = $1 ORDER BY created_at", [p.captureId]);
   const authorizations = await oracleRows<{ quote_id: string; state: string; revocation_code: string | null }>(iw, "SELECT quote_id, state, revocation_code FROM kauro.commercial_authorizations WHERE capture_id = $1 ORDER BY created_at", [p.captureId]);
   const paidQuote = (await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE quote_id = $1", [p.quoteId]))[0]!.state;
-  const replacements = await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE replaces_quote_id = $1 ORDER BY created_at", [p.quoteId]);
+  // states in state order, never created_at order (a host clock can step back, ADV-17): the lists compared hold at most one replacement
+  const replacements = await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE replaces_quote_id = $1 ORDER BY state, quote_id", [p.quoteId]);
   return {
     rebindings: rebindings.map((r) => [r.from_quote_id, r.to_quote_id, r.allowance_ordinal] as const),
     authorizations: authorizations.map((a) => [a.quote_id, a.state, a.revocation_code] as const),
@@ -98,7 +99,12 @@ function reboundOnce(x: Fixture, s: ReplacementState, replacementQuoteId: string
   assert.equal(s.paidQuote, "SUPERSEDED");
 }
 
-const replacementOf = async (x: Fixture): Promise<string> => (await oracleRows<{ quote_id: string }>(iw, "SELECT quote_id FROM kauro.quotes WHERE replaces_quote_id = $1 ORDER BY created_at DESC LIMIT 1", [x.paid.purchase.quoteId]))[0]!.quote_id;
+/** The paid quote's one replacement (every caller has exactly one; never "the latest by created_at", a host clock can step back, ADV-17). */
+const replacementOf = async (x: Fixture): Promise<string> => {
+  const rows = await oracleRows<{ quote_id: string }>(iw, "SELECT quote_id FROM kauro.quotes WHERE replaces_quote_id = $1", [x.paid.purchase.quoteId]);
+  assert.equal(rows.length, 1, "the paid quote has exactly one replacement");
+  return rows[0]!.quote_id;
+};
 const withdrawnEvents = async (quoteId: string): Promise<number> => (await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.domain_events WHERE aggregate_id = $1 AND event_type = 'quote.withdrawn.v1'", [quoteId]))[0]!.n;
 
 /** The view of a replacement answered 201. */
@@ -954,7 +960,7 @@ test("ADV-9/ADV-11: a STALE_VERSION of the payment service's re-binder (the real
 });
 
 
-test("REPL_REVOKE (sequence, taxed purchase, ADV-10): after the re-binding, a full SERVICE refund of a taxed purchase that returns no tax is refused at approval 409 PRECONDITION_FAILED REFUND_TAX_INCONSISTENT (0016 refunds_commitment_ceiling, KP012: the tax follows the service cumulatively, a refund leaving no service basis returns the whole remaining tax), so a revoked entitlement over unreturned tax is unreachable through the refund path and the entitlement stays ACTIVE; the full refund with its tax, once completed, lets CreateQuote supersede the replacement exactly once (201) with no money or entitlement row changed", async () => {
+test("REPL_REVOKE (sequence, taxed purchase, ADV-10): after the re-binding, a single full SERVICE refund of a taxed purchase that returns no tax is refused at approval 409 PRECONDITION_FAILED REFUND_TAX_INCONSISTENT (0016 refunds_commitment_ceiling, KP012: the tax follows the service cumulatively, a refund leaving no service basis returns the whole remaining tax) and the entitlement stays ACTIVE (not covered here, GAP lane B09-TAX-ROUNDING: the KP012 remainder after a failed booked refund and the chargeback path); the full refund with its tax, once completed, lets CreateQuote supersede the replacement exactly once (201) with no money or entitlement row changed", async () => {
   const s0 = await sellingAgency(iw as never, "repl-refund-taxed", { treatment: "DOMESTIC_TAXABLE", rule: "RATE_HALF_UP", rateBps: 1900 });
   iw.buyers.set(s0.agency.agencyId, "AGENCY");
   const billing = await iw.w.person("repl-refund-taxed-billing");

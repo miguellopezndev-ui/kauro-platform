@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { CreateQuoteView } from "@kauro/application";
-import { commercialSourceReadsOf } from "@kauro/persistence";
+import { commercialSourceReadsOf, quoteReadsOf } from "@kauro/persistence";
 import { FaultPoints, faultCell, openConnection, connectionPid, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { agentOf, integrationWorld, oracleRows, planOf, quoted, type Agent, type IntegrationWorld } from "./integration-support.js";
 import { bindCells, contend, failureOf, open, sweepOn } from "./b10-cells-support.js";
@@ -168,14 +168,13 @@ faultCell(
       ["quote-par-w3-insert", "db.quote_insert.before", "the issuance failing after the release and before the new quote insert"],
     ] as const) {
       let previous = "";
-      const { a, issued } = await issuanceFailsAt(ctx, label, what, at, [SUPERSEDE, RELEASE, QUOTE_INSERT], async (agent, plan) => {
+      const { a, plan: issuedPlan, issued } = await issuanceFailsAt(ctx, label, what, at, [SUPERSEDE, RELEASE, QUOTE_INSERT], async (agent, plan) => {
         const first = await quoted(iw, agent, plan);
         assert.equal(first.eligibility.foundingOffer, "RESERVED", "the previous quote holds a founding reservation");
         previous = first.quote.quoteId;
       });
       assert.equal(issued.supersededQuoteId, previous, "the same key supersedes the previous quote once");
-      const chain = await oracleRows<{ quote_id: string; state: string; superseded_by_quote_id: string | null }>(iw, "SELECT quote_id, state, superseded_by_quote_id FROM kauro.quotes WHERE agency_id = $1 ORDER BY created_at", [a.s.agency.agencyId]);
-      assert.deepEqual(chain.map((q) => [q.quote_id, q.state, q.superseded_by_quote_id]), [[previous, "SUPERSEDED", issued.quote.quoteId], [issued.quote.quoteId, "ISSUED", null]]);
+      await assertChain(issuedPlan, [[previous, "SUPERSEDED", issued.quote.quoteId], [issued.quote.quoteId, "ISSUED", null]]);
       assert.deepEqual((await reservationsOf(a.s.agency.agencyId)).map((r) => [r.quote_id, r.state, r.release_reason]), [[previous, "RELEASED", "QUOTE_SUPERSEDED"]], "released once, the new quote never inherits it");
     }
   },
@@ -888,8 +887,11 @@ const moneyRows = async (): Promise<Record<string, unknown>> =>
     )
   )[0]!;
 /**
- * The project's quotes as (quote, state, successor) rows in quote-id order: a chain is its supersession links, never its creation instants
- * (an issuance's transaction may start before the quote it supersedes; under CPU load one did by 77 ms, stress gate on a178581 and 728c405).
+ * The project's quotes as (quote, state, successor) rows in quote-id order: a chain is its supersession links, never its creation instants.
+ * created_at (transaction_timestamp) and the UUIDv7 ids (Date.now) follow the host's wall clock, which can step back: on the stress gate of
+ * a178581 and 728c405 the WSL host ran two time-sync sources and stepped back at least 228 ms (adversary ADV-17 of c6787a5, from the UUIDv7
+ * mint instants), so a quote committed later carried an earlier created_at. An issuance whose transaction starts before the quote it
+ * supersedes (held between its BEGIN and its live-quote read) inverts them legitimately as well.
  */
 const chainOf = async (plan: PlanFixture): Promise<Array<readonly [string, string, string | null]>> =>
   (await oracleRows<{ quote_id: string; state: string; superseded_by_quote_id: string | null }>(iw, "SELECT quote_id, state, superseded_by_quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY quote_id", [plan.projectId])).map(
@@ -1067,7 +1069,7 @@ faultCell(
 
 // --- the supersession chain does not follow the creation instants ------------------------------------------------------------------
 
-test("W3 supersession order is not creation order: an issuance whose transaction started before the quote it supersedes (held after its BEGIN, before its live-quote read, while another key issues) supersedes it once; the chain is read by its supersession links, never by created_at (stress gate 1/20 on LIVE_QUOTE_RACE, a178581 and 728c405: q1 created 77 ms before q0 under CPU load)", async () => {
+test("W3 supersession order is not creation order: an issuance whose transaction started before the quote it supersedes (held after its BEGIN, before its live-quote read, while another key issues) supersedes it once; the chain is read by its supersession links, never by created_at (the stress gate's 1/20 on LIVE_QUOTE_RACE was a host clock step, ADV-17; this inversion is the legitimate one)", async () => {
   const { a, plan } = await fresh("chain-order");
   const q0 = (await quoted(iw, a, plan)).quote.quoteId;
   const points = new FaultPoints();
@@ -1088,8 +1090,49 @@ test("W3 supersession order is not creation order: an issuance whose transaction
     await conn.end();
   }
   const c = (await quoted(iw, a, plan)).quote.quoteId;
-  const instants = await oracleRows<{ quote_id: string }>(iw, "SELECT quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY created_at", [plan.projectId]);
-  assert.deepEqual(instants.map((r) => r.quote_id), [q0, b, qa, c], "B's creation instant precedes A's: creation order is not supersession order");
   await assertChain(plan, [[q0, "SUPERSEDED", qa], [qa, "SUPERSEDED", b], [b, "SUPERSEDED", c], [c, "ISSUED", null]], `the chain q0 -> A -> B -> C: ${await chainDetail(plan)}`);
   await giveSlotBack(a, plan);
+});
+
+// --- a host clock stepping back (ADV-17, ADV-18 of c6787a5) -----------------------------------------------------------------------
+
+/**
+ * The instants a host clock that stepped back writes (the WSL host stepped back at least 228 ms on the stress gate): each later quote of the
+ * chain gets an EARLIER created_at and issued_at than the one it superseded. Written by the database owner with triggers off (a forced
+ * state: the product stamps transaction_timestamp(), and the host clock, not the product, decides it).
+ */
+async function stepClockBack(quoteIds: ReadonlyArray<string>, stepMs = 228): Promise<void> {
+  for (const [i, quoteId] of quoteIds.entries()) {
+    await ownerWrite("UPDATE kauro.quotes SET created_at = created_at - make_interval(secs => $2::double precision), issued_at = issued_at - make_interval(secs => $2::double precision) WHERE quote_id = $1", [quoteId, ((i + 1) * stepMs) / 1000 + 10]);
+  }
+}
+
+test("CLOCK STEP (ADV-17): a host clock stepping back between the issuances of one project (each later quote stamped earlier than the one it superseded) changes neither the chain nor CMD027: the next CreateQuote supersedes the live quote once, the same key replays it, and the chain is read by its links", async () => {
+  const { a, plan } = await fresh("clock-step");
+  const q0 = (await quoted(iw, a, plan)).quote.quoteId;
+  const qa = (await quoted(iw, a, plan)).quote.quoteId;
+  const qb = (await quoted(iw, a, plan)).quote.quoteId;
+  await stepClockBack([qa, qb]);
+  const stamped = await oracleRows<{ quote_id: string }>(iw, "SELECT quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY created_at", [plan.projectId]);
+  assert.deepEqual(stamped.map((r) => r.quote_id), [qb, qa, q0], "the stepped clock stamped the chain in reverse");
+  const key = freshKey("clock-step");
+  const next = view(await quoteCall(a, plan, key));
+  assert.equal(next.supersededQuoteId, qb, "CreateQuote supersedes the live quote, whatever its creation instant");
+  assert.equal(view(await quoteCall(a, plan, key)).quote.quoteId, next.quote.quoteId, "the same key replays its one quote");
+  await assertChain(plan, [[q0, "SUPERSEDED", qa], [qa, "SUPERSEDED", qb], [qb, "SUPERSEDED", next.quote.quoteId], [next.quote.quoteId, "ISSUED", null]]);
+  await giveSlotBack(a, plan);
+});
+
+test("CLOCK STEP (ADV-18): with no live quote, STALE_VERSION's current is the head of the project's chain (the quote nothing superseded), never a superseded predecessor that a stepped-back clock stamped later", async () => {
+  const { a, plan } = await fresh("clock-step-current");
+  const q0 = (await quoted(iw, a, plan)).quote.quoteId;
+  const qa = (await quoted(iw, a, plan)).quote.quoteId;
+  const qb = (await quoteCall(a, plan, freshKey("clock-step-current-b")).then(view)).quote.quoteId;
+  // the clock stepped back before qb was stamped: qb, the head, carries an instant earlier than qa's; then qb stops being live
+  await stepClockBack([qb], 2_000);
+  await ownerWrite("UPDATE kauro.quotes SET state = 'EXPIRED', version = version + 1 WHERE quote_id = $1", [qb]);
+  const head = (await oracleRows<{ version: number; state: string }>(iw, "SELECT version::int AS version, state FROM kauro.quotes WHERE quote_id = $1", [qb]))[0]!;
+  const current = await iw.h.commerce.run(iw.h.tenant(a.s.agency.agencyId as never, a.s.agency.ownerUserId), async (uow) => quoteReadsOf(uow).currentQuoteOf(a.s.agency.agencyId as never, plan.projectId as never));
+  assert.deepEqual(current, { version: head.version, state: "EXPIRED" }, `current is the chain's head qb, never the superseded qa (${qa}) the clock stamped later: ${await chainDetail(plan)}`);
+  assert.ok(q0 !== qb);
 });
