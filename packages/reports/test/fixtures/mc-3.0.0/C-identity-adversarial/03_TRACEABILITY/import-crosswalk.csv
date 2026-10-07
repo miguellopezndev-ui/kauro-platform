@@ -1,0 +1,4 @@
+import_path,import_row_number,association_key,migration_key,object,survivor_row_locator_id
+01_IMPORT/hubspot/contacts.csv,1,,mk_contact_0c35863979af2543da0c,CONTACT,F-9d54546c3ed8:S0:R3
+01_IMPORT/hubspot/contacts.csv,2,,mk_contact_b9480e7a0434d2787753,CONTACT,F-bbfd2003e6d8:S0:R2
+01_IMPORT/hubspot/contacts.csv,3,,mk_contact_d540b42e2ad6bea9f2fe,CONTACT,F-9d54546c3ed8:S0:R2
