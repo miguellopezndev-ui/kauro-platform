@@ -1,0 +1,27 @@
+{
+ "gate": "G-FISCAL_LOCAL",
+ "manual": "15",
+ "package": "B09",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "R2-128",
+   "package": "B09",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  }
+ ],
+ "casePackages": [
+  "B09"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B09",
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0"
+  }
+ ],
+ "status": "DEMONSTRATED"
+}

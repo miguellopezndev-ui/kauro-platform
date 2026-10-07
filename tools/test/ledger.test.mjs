@@ -1,0 +1,295 @@
+// The acceptance ledger (tools/ledger.mjs, amendment A4 "the 441-case ledger is computed by a tool"): the single row schema of
+// the sidecars and their mechanical conversion from the case maps, every registry case exactly once, the external maps pinned
+// to a path and a commit, every failure the ledger must refuse (each with its negative control), the package status computed
+// from program.json dependencies, and the committed outputs equal to a fresh computation.
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test } from "node:test";
+import { readCaseMap } from "../evidence.mjs";
+import {
+  CLASSES,
+  citationsIn,
+  computeLedger,
+  convertExternal,
+  convertStatusBlocks,
+  convertTableMap,
+  ledgerFiles,
+  ledgerOfRepo,
+  loadRegistry,
+  main,
+  readInputs,
+  readPinned,
+  readSidecars,
+  reviewIndex,
+} from "../ledger.mjs";
+
+const root = join(import.meta.dirname, "..", "..");
+const registry = loadRegistry(root);
+const read = (p) => readFileSync(join(root, p), "utf8");
+
+// --- a synthetic program for the negative controls ---------------------------------------------------------------------------------
+
+/** A registry of four packages: P0 ← P1 ← P2, and B20 after P2; two cases each. */
+function fixtureRegistry() {
+  const program = [
+    { id: "B00", title: "zero", dependsOn: [], caseIds: ["S001", "S002"] },
+    { id: "B01", title: "one", dependsOn: ["B00"], caseIds: ["S003", "S004"] },
+    { id: "B02", title: "two", dependsOn: ["B01"], caseIds: ["S005", "S006"] },
+    { id: "B20", title: "after launch", dependsOn: ["B02"], caseIds: ["S007", "S008"] },
+  ];
+  const cases = new Map(program.flatMap((p) => p.caseIds.map((id) => [id, { id, gate: `G-${p.id}`, package: p.id }])));
+  const owner = new Map(program.flatMap((p) => p.caseIds.map((id) => [id, p.id])));
+  const gates = program.map((p) => ({ id: `G-${p.id}`, owner: "21", package: p.id, caseIds: p.caseIds, evidenceRule: "rule" }));
+  return { program, cases, owner, gates, provenance: { files: { "cases.json": "aa" } }, hashes: { "cases.json": "aa" } };
+}
+const row = (id, klass, extra = {}) => ({ case: id, class: klass, test: [`t.test.ts :: ${id}`], commit: null, reviewId: null, inheritedTo: [], ...extra });
+const review = (pkg, round, verdict, cases, commit = `c${pkg}${round}`) => ({ id: `${pkg}-round${round}-${commit}`, package: pkg, round, commit, verdict, cases });
+/** A clean fixture: every package reviewed and accepted, B20 planned after launch with the owner's date. */
+function clean() {
+  const reviews = ["B00", "B01", "B02"].map((p, i) => review(p, 1, "ACCEPT", fixtureRegistry().program[i].caseIds.map((id) => ({ id, claimed_status: "EXECUTED_LOCAL", agree: true }))));
+  const sidecars = ["B00", "B01", "B02"].map((p, i) => ({
+    package: p,
+    rows: fixtureRegistry().program[i].caseIds.map((id) => row(id, "EXECUTED_LOCAL", { reviewId: reviews[i].id, commit: reviews[i].commit })),
+  }));
+  sidecars.push({ package: "B20", rows: ["S007", "S008"].map((id) => row(id, "PLANNED_POST_B19", { test: [], ownerDate: "2026-11-30" })) });
+  return { registry: fixtureRegistry(), sidecars, reviews };
+}
+const kinds = (ledger) => ledger.violations.map((v) => `${v.kind} ${v.subject}`).sort();
+
+test("the clean fixture has no violation: every case demonstrated with its review id and commit, every package ACCEPTED through its dependencies", () => {
+  const ledger = computeLedger(clean());
+  assert.deepEqual(kinds(ledger), []);
+  assert.deepEqual(ledger.packages.map((p) => p.status), ["ACCEPTED", "ACCEPTED", "ACCEPTED", "NOT_STARTED"]);
+  const s003 = ledger.cases.find((c) => c.case === "S003");
+  assert.deepEqual([s003.demonstrated, s003.reviewId, s003.commit], ["EXECUTED_LOCAL", "B01-round1-cB011", "cB011"]);
+  assert.deepEqual(ledger.gates.find((g) => g.gate === "G-B01").acceptedSubjects, [{ package: "B01", commit: "cB011", reviewId: "B01-round1-cB011" }]);
+});
+
+test("a missing case fails: a case of the registry without a row, a duplicated row, a row for a case the registry does not have", () => {
+  const f = clean();
+  f.sidecars[1].rows.pop();
+  f.sidecars[0].rows.push(row("S001", "EXECUTED_LOCAL"), row("S999", "EXECUTED_LOCAL"));
+  const ledger = computeLedger(f);
+  assert.deepEqual(kinds(ledger), ["DUPLICATE_CASE S001", "MISSING_CASE S004", "UNKNOWN_CASE S999"]);
+  assert.equal(ledger.packages.find((p) => p.package === "B01").status, "INCOMPLETE_MAP");
+  const unavailable = computeLedger({ ...clean(), sidecars: clean().sidecars.filter((s) => s.package !== "B02"), missingInputs: [{ id: "MC", packages: ["B02"], reason: "not pinned" }] });
+  assert.match(unavailable.violations.find((v) => v.subject === "S005").detail, /input MC unavailable \(not pinned\)/);
+});
+
+test("a cross citation without the inherited mark fails: a row for another package's case must name that package in inheritedTo; a PARTIAL row must name who carries the rest", () => {
+  const f = clean();
+  f.sidecars[2].rows.push(row("S003", "EXECUTED_LOCAL"));
+  f.sidecars[1].rows[0] = row("S003", "PARTIAL");
+  assert.deepEqual(kinds(computeLedger(f)), ["CROSS_CITATION_WITHOUT_INHERITED S003", "REMAINDER_WITHOUT_OWNER S003"]);
+  // the control: marked, the inherited row strengthens the case's claimed class and the PARTIAL row names its heir
+  const g = clean();
+  g.sidecars[2].rows.push(row("S003", "EXECUTED_LOCAL", { inheritedTo: ["B01"] }));
+  g.sidecars[1].rows[0] = row("S003", "PARTIAL", { inheritedTo: ["B02"] });
+  const ledger = computeLedger(g);
+  assert.deepEqual(kinds(ledger), []);
+  assert.equal(ledger.cases.find((c) => c.case === "S003").claimed, "EXECUTED_LOCAL");
+  assert.equal(ledger.cases.find((c) => c.case === "S003").demonstrated, null, "the inherited row is not reviewed: claimed, not demonstrated");
+});
+
+test("a PASS without review fails: a review id that does not exist, that rejects, that is not the package's latest round or whose entry disagrees with the row's class", () => {
+  for (const [label, mutate] of [
+    ["unknown review", (f) => { f.sidecars[0].rows[0].reviewId = "B00-round9-x"; }],
+    ["rejecting review", (f) => { f.reviews[0].verdict = "REJECT"; }],
+    ["superseded round", (f) => { f.reviews.push(review("B00", 2, "ACCEPT", [])); }],
+    ["disagreeing entry", (f) => { f.reviews[0].cases[0].agree = false; }],
+    ["other class", (f) => { f.reviews[0].cases[0].claimed_status = "PARTIAL"; }],
+  ]) {
+    const f = clean();
+    mutate(f);
+    const ledger = computeLedger(f);
+    assert.ok(ledger.violations.some((v) => v.kind === "PASS_WITHOUT_REVIEW" && v.subject === "S001"), label);
+    assert.equal(ledger.cases.find((c) => c.case === "S001").demonstrated, null, `${label}: not demonstrated`);
+  }
+});
+
+test("a re-check covers only its findings (A4 (c)): a case's verdict is its latest entry across the rounds, the subject is the latest accepting round", () => {
+  const f = clean();
+  f.reviews[1] = review("B01", 1, "REJECT", [{ id: "S003", claimed_status: "EXECUTED_LOCAL", agree: true }, { id: "S004", claimed_status: "EXECUTED_LOCAL", agree: false }]);
+  f.reviews.push(review("B01", 2, "ACCEPT", [{ id: "S004", claimed_status: "EXECUTED_LOCAL", agree: true }], "fix1"));
+  f.sidecars[1].rows = f.sidecars[1].rows.map((r) => ({ ...r, reviewId: "B01-round2-fix1", commit: "fix1" }));
+  const ledger = computeLedger(f);
+  assert.deepEqual(kinds(ledger), []);
+  assert.deepEqual(ledger.packages.find((p) => p.package === "B01").acceptedSubject, { commit: "fix1", reviewId: "B01-round2-fix1" });
+  const { reviewOf } = reviewIndex(f.reviews);
+  assert.equal(reviewOf("B01", "S003", "EXECUTED_LOCAL")?.id, "B01-round2-fix1");
+  f.reviews[f.reviews.length - 1].cases.push({ id: "S003", agree: false });
+  assert.equal(reviewIndex(f.reviews).reviewOf("B01", "S003", "EXECUTED_LOCAL"), null, "a later disagreeing entry withdraws the case");
+});
+
+test("a PLANNED case outside B20/B21 fails; in B20/B21 the only planned class is PLANNED_POST_B19 and it needs the owner's date", () => {
+  const f = clean();
+  f.sidecars[1].rows[0] = row("S003", "PLANNED");
+  f.sidecars[3].rows[0] = row("S007", "PLANNED");
+  f.sidecars[3].rows[1].ownerDate = null;
+  assert.deepEqual(kinds(computeLedger(f)), ["OWNER_DATE_MISSING S008", "PLANNED_OUTSIDE_B20_B21 S003", "POST_LAUNCH_CLASS S007"]);
+  const g = clean();
+  g.sidecars[0].rows[0] = row("S001", "PLANNED_POST_B19", { ownerDate: "2026-11-30" });
+  assert.deepEqual(kinds(computeLedger(g)), ["PLANNED_OUTSIDE_B20_B21 S001"]);
+});
+
+test("a package is REVIEW_ACCEPTED until every dependency is ACCEPTED, and names what it waits for nearest first", () => {
+  const f = clean();
+  f.reviews = f.reviews.filter((r) => r.package !== "B00");
+  f.sidecars[0].rows = f.sidecars[0].rows.map((r) => ({ ...r, reviewId: null }));
+  const ledger = computeLedger(f);
+  assert.deepEqual(ledger.packages.map((p) => [p.package, p.status, p.waitingFor]), [
+    ["B00", "IN_PROGRESS", ""],
+    ["B01", "REVIEW_ACCEPTED", "B00"],
+    ["B02", "REVIEW_ACCEPTED", "B01 → B00"],
+    ["B20", "NOT_STARTED", ""],
+  ]);
+});
+
+test("an inherited obligation left open keeps the receiving package from acceptance; COVERED or an owner-signed NOT_APPLICABLE releases it", () => {
+  const f = clean();
+  f.sidecars[2].obligations = [{ id: "B10-CELL-1", from: "B10", status: "OPEN" }];
+  let ledger = computeLedger(f);
+  assert.deepEqual(kinds(ledger), ["OPEN_INHERITED_OBLIGATION B10-CELL-1"]);
+  assert.equal(ledger.packages.find((p) => p.package === "B02").status, "IN_PROGRESS");
+  f.sidecars[2].obligations = [{ id: "B10-CELL-1", from: "B10", status: "NOT_APPLICABLE", reason: "r" }];
+  assert.deepEqual(kinds(computeLedger(f)), ["OPEN_INHERITED_OBLIGATION B10-CELL-1"], "NOT_APPLICABLE needs the owner's signature");
+  f.sidecars[2].obligations = [{ id: "B10-CELL-1", from: "B10", status: "NOT_APPLICABLE", reason: "r", ownerSigned: "2026-10-12" }];
+  assert.deepEqual(kinds(computeLedger(f)), []);
+});
+
+test("a changed vendored registry fails against PROVENANCE.json", () => {
+  const f = clean();
+  f.registry.hashes["cases.json"] = "bb";
+  assert.deepEqual(kinds(computeLedger(f)), ["REGISTRY_HASH_MISMATCH cases.json"]);
+});
+
+// --- reading the case maps ---------------------------------------------------------------------------------------------------------
+
+test("citations: carried files, `and ::` continuations, MC's backticked titles and golden corpora, nested describe :: it titles", () => {
+  assert.deepEqual([...citationsIn('`a/x.test.ts` :: "one" and :: "two"; `b/y.test.ts` :: "three"')], ["a/x.test.ts :: one", "a/x.test.ts :: two", "b/y.test.ts :: three"]);
+  assert.deepEqual([...citationsIn(':: "carried"', "c/z.test.ts")], ["c/z.test.ts :: carried"]);
+  assert.deepEqual([...citationsIn("`test/u.test.ts` :: `t1`; `t2`. golden `G17-x` :: `delivers`")], ["test/u.test.ts :: t1", "test/u.test.ts :: t2", "golden G17-x :: delivers"]);
+  assert.deepEqual([...citationsIn('`e/s.spec.ts` :: "describe" :: "it"')], ["e/s.spec.ts :: describe :: it"]);
+  assert.deepEqual([...citationsIn("the `b07/integration` branch and \"a quote\"")], []);
+});
+
+test("the sidecars of B06 and B09 cite exactly the tests tools/evidence.mjs seals from their case maps", () => {
+  for (const pkg of ["B06", "B09"]) {
+    const sealed = readCaseMap(read(`docs/design/${pkg}-case-map.md`));
+    const sidecar = JSON.parse(read(`docs/acceptance/case-maps/${pkg}.json`));
+    for (const r of sealed) {
+      const mine = sidecar.rows.find((x) => x.case === r.caseId);
+      assert.deepEqual(new Set(mine.test), new Set(r.citations.map((c) => `${c.file} :: ${c.title}`)), `${pkg} ${r.caseId}`);
+    }
+  }
+});
+
+test("the IC block format: a case's block, its Status line, its citations and commit; a block of another package is not read", () => {
+  const text = [
+    "## IC-01 Deterministic kernel",
+    "Status: EXECUTED_LOCAL",
+    'Tests: `test/kernel.test.ts` :: "IC-01: the same input compiles to the same bytes"',
+    "Commit: `abc1234`",
+    "",
+    "### CAP01 Capability",
+    "**Status:** PARTIAL — the live half belongs to B04",
+    "",
+    "- **S001** not ours",
+    "Status: EXECUTED_LOCAL",
+  ].join("\n");
+  const reg = { owner: new Map([["IC-01", "B03"], ["CAP01", "B03"], ["S001", "B00"]]) };
+  assert.deepEqual(convertStatusBlocks(text, { packages: ["B03"], registry: reg }), [
+    { case: "IC-01", class: "EXECUTED_LOCAL", test: ["test/kernel.test.ts :: IC-01: the same input compiles to the same bytes"], commit: "abc1234", reviewId: null, inheritedTo: [], claimed: "EXECUTED_LOCAL" },
+    { case: "CAP01", class: "PARTIAL", test: [], commit: null, reviewId: null, inheritedTo: ["B04"], claimed: "PARTIAL — the live half belongs to B04" },
+  ]);
+});
+
+// --- the repository ----------------------------------------------------------------------------------------------------------------
+
+test("every registry case of every platform package appears exactly once in its sidecar, in the single row schema, and the sidecars equal the mechanical conversion of the case maps", () => {
+  const sidecars = readSidecars(root);
+  const external = readInputs(root).external.flatMap((i) => i.packages);
+  assert.deepEqual(sidecars.map((s) => s.package), registry.program.map((p) => p.id).filter((p) => !external.includes(p)));
+  for (const s of sidecars) {
+    const pkg = registry.program.find((p) => p.id === s.package);
+    assert.deepEqual(s.rows.map((r) => r.case).sort(), [...pkg.caseIds].sort(), `${s.package}: each case exactly once`);
+    for (const r of s.rows) {
+      for (const key of ["case", "class", "test", "commit", "reviewId", "inheritedTo"]) assert.ok(key in r, `${s.package} ${r.case}: ${key}`);
+      assert.ok(CLASSES.includes(r.class), `${s.package} ${r.case}: class ${r.class}`);
+      assert.ok(r.test.every((t) => / :: /.test(t)), `${s.package} ${r.case}: every test is "file :: title"`);
+      if (r.class !== "NOT_EXECUTED" && r.class !== "PLANNED_POST_B19") assert.ok(r.test.length > 0, `${s.package} ${r.case}: a claimed class cites its tests`);
+    }
+    if (s.source.file) assert.equal(s.source.sha256, createHash("sha256").update(read(s.source.file)).digest("hex"), `${s.package}: converted from the committed map`);
+  }
+  const lines = [];
+  assert.equal(main(["sidecars"], root, (l) => lines.push(l)), 0, lines.join("\n"));
+});
+
+test("the external maps are pinned to a path and a commit and read through git at that commit; the snapshot must equal a fresh conversion", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ledger-pin-"));
+  try {
+    const git = (...a) => execFileSync("git", ["-C", dir, ...a], { encoding: "utf8" }).trim();
+    git("init", "-q");
+    git("config", "user.email", "t@example.invalid");
+    git("config", "user.name", "t");
+    mkdirSync(join(dir, "docs"));
+    const map = (status) => `| case | status | proving test (file :: title) | commit |\n|---|---|---|---|\n| MC-01 | ${status} | \`test/a.test.ts\` :: \`refuses\` | \`ed09809\` |\n`;
+    writeFileSync(join(dir, "docs", "map.md"), map("EXECUTED_LOCAL"));
+    git("add", ".");
+    git("commit", "-qm", "one");
+    const first = git("rev-parse", "HEAD");
+    writeFileSync(join(dir, "docs", "map.md"), map("PLANNED(M9)"));
+    git("commit", "-qam", "two");
+    const pinned = readPinned(`${join(dir, "docs", "map.md")}@${first.slice(0, 7)}`);
+    assert.deepEqual([pinned.path, pinned.commit], ["docs/map.md", first]);
+    const input = { id: "MC", flag: "mc", repository: "r", path: "docs/map.md", commit: first, format: "table", packages: ["B01"] };
+    const snap = convertExternal(input, pinned, registry);
+    assert.deepEqual(snap.rows.map((r) => [r.case, r.class, r.test, r.commit]), [["MC-01", "EXECUTED_LOCAL", ["test/a.test.ts :: refuses"], "ed09809"]], "the bytes at the pinned commit, not the working tree");
+
+    // through the command line, in a copy of the repository's inputs: the snapshot is written, then refused once it drifts
+    const repo = mkdtempSync(join(tmpdir(), "ledger-repo-"));
+    for (const p of ["packages/contracts/registry", "docs/acceptance/case-maps", "docs/acceptance/reviews", "docs/acceptance/README.md"]) cpSync(join(root, p), join(repo, p), { recursive: true });
+    mkdirSync(join(repo, "docs/acceptance/ledger"), { recursive: true });
+    writeFileSync(join(repo, "docs/acceptance/ledger/inputs.json"), JSON.stringify({ external: [input] }));
+    const spec = `${join(dir, "docs", "map.md")}@${first}`;
+    main(["--mc", spec, "--write"], repo, () => {});
+    assert.equal(ledgerOfRepo(repo).ledger.violations.filter((v) => v.kind === "EXTERNAL_SNAPSHOT_DRIFT").length, 0);
+    const snapFile = join(repo, "docs/acceptance/ledger/external", `MC-${first.slice(0, 12)}.json`);
+    const tampered = JSON.parse(readFileSync(snapFile, "utf8"));
+    tampered.rows[0].class = "EXECUTED_PROVIDER";
+    writeFileSync(snapFile, JSON.stringify(tampered));
+    assert.ok(ledgerOfRepo(repo, { _: [], "--mc": [spec] }).ledger.violations.some((v) => v.kind === "EXTERNAL_SNAPSHOT_DRIFT"), "a snapshot that differs from its pinned map is refused");
+    const second = git("rev-parse", "HEAD");
+    assert.ok(ledgerOfRepo(repo, { _: [], "--mc": [`${join(dir, "docs", "map.md")}@${second}`] }).ledger.violations.some((v) => v.kind === "EXTERNAL_SNAPSHOT_DRIFT" && /pinned/.test(v.detail)), "another commit than the pinned one is refused");
+    rmSync(repo, { recursive: true, force: true });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the ledger lists the 441 registry cases; the only missing ones belong to an external map not yet pinned, and the committed ledger, gate records and README table equal a fresh computation", () => {
+  const { ledger, missingInputs } = ledgerOfRepo(root);
+  assert.equal(ledger.cases.length, 441);
+  assert.equal(new Set(ledger.cases.map((c) => c.case)).size, 441);
+  const unpinned = new Set(missingInputs.flatMap((m) => m.packages));
+  const missing = ledger.violations.filter((v) => v.kind === "MISSING_CASE");
+  assert.deepEqual(missing.map((v) => v.subject).sort(), ledger.cases.filter((c) => unpinned.has(c.package)).map((c) => c.case).sort());
+  for (const [path, content] of Object.entries(ledgerFiles(ledger))) assert.equal(read(path), content, `${path} is stale — run node tools/ledger.mjs --write`);
+  // the README's hand table claims no acceptance the ledger does not compute
+  assert.deepEqual(ledger.violations.filter((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW"), []);
+});
+
+// A platform case map in the table format converts with the review that accepts it; a row that lost its review agreement is a claim.
+test("conversion: a table row takes its class from the status column, its review from the accepting round, and hands a PARTIAL remainder to the packages it names", () => {
+  const text = "| case | status | rows | later package and case |\n|---|---|---|---|\n| S035 | PARTIAL | `packages/x/test/a.test.ts` :: \"S035: cleans\" | B14 — the Batch scratch |\n| S055 | EXECUTED_LOCAL | `packages/x/test/a.test.ts` :: \"S055: atomic\" | none (B14 repeats it) |\n";
+  const reviews = [review("B08", 1, "ACCEPT", [{ id: "S035", claimed_status: "PARTIAL", agree: true }, { id: "S055", claimed_status: "EXECUTED_LOCAL", agree: false }], "88cf29d")];
+  const rows = convertTableMap(text, { packages: ["B08"], registry, reviewOf: reviewIndex(reviews).reviewOf });
+  assert.deepEqual(rows.map((r) => [r.case, r.class, r.reviewId, r.commit, r.inheritedTo]), [
+    ["S035", "PARTIAL", "B08-round1-88cf29d", "88cf29d", ["B14"]],
+    ["S055", "EXECUTED_LOCAL", null, null, []],
+  ]);
+});

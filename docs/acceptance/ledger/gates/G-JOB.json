@@ -1,0 +1,131 @@
+{
+ "gate": "G-JOB",
+ "manual": "07",
+ "package": "B08",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "S035",
+   "package": "B08",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "S055",
+   "package": "B08",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "S056",
+   "package": "B08",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "S061",
+   "package": "B08",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "S062",
+   "package": "B08",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "S075",
+   "package": "B08",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "R2-045",
+   "package": "B08",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "R2-046",
+   "package": "B08",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "CMD036-OK",
+   "package": "B08",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "CMD036-DENY",
+   "package": "B08",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "CMD036-RACE",
+   "package": "B08",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "CMD037-OK",
+   "package": "B08",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "CMD037-DENY",
+   "package": "B08",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "CMD037-RACE",
+   "package": "B08",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  }
+ ],
+ "casePackages": [
+  "B08"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B08",
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d"
+  }
+ ],
+ "status": "DEMONSTRATED"
+}

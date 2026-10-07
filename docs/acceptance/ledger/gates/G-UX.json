@@ -1,0 +1,83 @@
+{
+ "gate": "G-UX",
+ "manual": "11",
+ "package": "B11",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "S066",
+   "package": "B11",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S067",
+   "package": "B11",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S068",
+   "package": "B11",
+   "claimed": "PLANNED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S069",
+   "package": "B11",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S070",
+   "package": "B11",
+   "claimed": "PLANNED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD044-OK",
+   "package": "B11",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD044-DENY",
+   "package": "B11",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD044-RACE",
+   "package": "B11",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B11"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B11",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

@@ -1,0 +1,51 @@
+{
+ "gate": "G-MC-RELEASE",
+ "manual": "04",
+ "package": "B02",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "MC-07",
+   "package": "B02",
+   "claimed": "SIMULATED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S034",
+   "package": "B02",
+   "claimed": "PLANNED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S092",
+   "package": "B02",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-017",
+   "package": "B02",
+   "claimed": "PLANNED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B02"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B02",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

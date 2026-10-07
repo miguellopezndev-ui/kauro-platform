@@ -1,0 +1,59 @@
+{
+ "gate": "G-UX_AGENCY",
+ "manual": "11",
+ "package": "B11",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "R2-062",
+   "package": "B11",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-063",
+   "package": "B11",
+   "claimed": "PLANNED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-064",
+   "package": "B11",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-065",
+   "package": "B11",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-134",
+   "package": "B11",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B11"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B11",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

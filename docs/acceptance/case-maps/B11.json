@@ -1,0 +1,188 @@
+{
+ "package": "B11",
+ "generatedBy": "node tools/ledger.mjs sidecars --write",
+ "source": {
+  "file": "docs/design/B11-case-map.md",
+  "sha256": "2540828c8a854eee8b20062dbd3eec638eea364150869ab947a2e2807c7e7cb8"
+ },
+ "rows": [
+  {
+   "case": "S066",
+   "class": "PARTIAL",
+   "test": [
+    "apps/web/test/operation-runner.test.ts :: S066: one logical intent keeps one idempotency key — a double activation, a lost response and a reload of CreatePaymentOrder and CapturePayment reuse the key derived from the quote version and the order, and never mint another",
+    "apps/web/e2e/s066-payment-recovery.spec.ts :: S066: a double click, a lost CapturePayment response and a reload during payment end in one payment order and one capture — the page says Checking payment until the server reconciles and never offers another payment while the result is uncertain"
+   ],
+   "commit": "082564c, ebb06d1",
+   "reviewId": null,
+   "inheritedTo": [
+    "B09",
+    "B10",
+    "B15"
+   ],
+   "claimed": "**PARTIAL** — idempotency-key half EXECUTED_LOCAL (W3); browser half PLANNED (W9)"
+  },
+  {
+   "case": "S067",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/b11-sessions.test.ts :: S067: a revoked or expired session reads nothing — every read with its cookie answers 401, the revoke answer clears the cookie and the site data, is idempotent, and no reply is cacheable",
+    "apps/web/e2e/s067-browser-privacy.spec.ts :: S067: after logout, back navigation, reload and a prefetched link show no value of the previous session in Chromium, Firefox and WebKit — no agency A sentinel from the back/forward cache, the HTTP cache, an RSC payload or the api :: S067: switching from agency A to agency B clears A's view before B loads — no A sentinel in the DOM, in B's network log or RSC payloads, or after back navigation"
+   ],
+   "commit": "0470497",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "**PARTIAL** — api half EXECUTED_LOCAL (W2); browser half PLANNED (W6)"
+  },
+  {
+   "case": "S068",
+   "class": "PLANNED",
+   "test": [
+    "apps/web/e2e/s068-forms-keyboard.spec.ts :: S068: every form of the bound journeys completes by keyboard alone — each field labelled, focus visible and in order, refusals focused in an error summary and associated to their fields, no mouse-only step, axe clean :: S068: at 320 CSS px (400 % zoom) and 200 % text every form reflows without horizontal scrolling, clipped controls or lost focus"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B08",
+    "B16",
+    "B17"
+   ],
+   "claimed": "**MISSING** — PLANNED (W6)"
+  },
+  {
+   "case": "S069",
+   "class": "PARTIAL",
+   "test": [
+    "packages/ui/test/safe-text.test.ts :: S069: an untrusted label renders as inert text inside a bidi-isolated element — markup, script, formula prefixes and U+202E/U+2066 controls are neither executed nor allowed to reorder the surrounding text",
+    "apps/web/e2e/s069-hostile-names.spec.ts :: S069: an agency, client and project named with markup and bidirectional controls render inert on every bound screen and in the printed report view; no request leaves the origin and no policy violation fires"
+   ],
+   "commit": "cf6e9d1, f2ffb86",
+   "reviewId": null,
+   "inheritedTo": [
+    "B13"
+   ],
+   "claimed": "**PARTIAL** — primitive half EXECUTED_LOCAL (W1); browser half PLANNED (W10)"
+  },
+  {
+   "case": "S070",
+   "class": "PLANNED",
+   "test": [
+    "apps/web/e2e/s070-report-print.spec.ts :: S070: a long branded report view prints to Letter and to A4 — page boxes of 612×792 and 595.28×841.89 points, every count equal to its DTO, table headers repeated on each page, no row split, legends kept with their tables, text as text (fonts with ToUnicode maps)"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B08",
+    "B13"
+   ],
+   "claimed": "**MISSING** — PLANNED (W10)"
+  },
+  {
+   "case": "R2-062",
+   "class": "PARTIAL",
+   "test": [
+    "packages/ui/test/confirm-dialog.test.ts :: R2-062: the confirmation dialog has no default action — no form, every button type=button, initial focus on the heading, approve disabled until each disclosed effect is acknowledged, and each effect's error referenced by that effect's control",
+    "apps/web/e2e/r2-062-keyboard-approval.spec.ts :: R2-062: a CLEAR confirmation answered by keyboard — Enter approves nothing, the server's refusal is announced and focused in the error summary, the error is associated to the exact CLEAR effect, and no approval row exists before the explicit activation"
+   ],
+   "commit": "cf6e9d1, f2ffb86",
+   "reviewId": null,
+   "inheritedTo": [
+    "B08"
+   ],
+   "claimed": "**PARTIAL** — dialog half EXECUTED_LOCAL (W1); browser half PLANNED (W8)"
+  },
+  {
+   "case": "R2-063",
+   "class": "PLANNED",
+   "test": [
+    "apps/web/e2e/r2-063-stale-quote-tab.spec.ts :: R2-063: two tabs on the old and the new revision — the old tab returning from payment approval reads the order, its quote and the approved plan from the server, shows the newer revision as stale and offers no execution of the unapproved revision"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B08",
+    "B10"
+   ],
+   "claimed": "**MISSING** — PLANNED (W9)"
+  },
+  {
+   "case": "R2-064",
+   "class": "PARTIAL",
+   "test": [
+    "apps/web/test/navigation-guard.test.ts :: R2-064: local edits, saved draft, validated and approved are four separate statuses; leaving with local edits needs Stay, Save draft or Discard, and no status is derived from local edits",
+    "apps/web/e2e/r2-064-unsaved-decisions.spec.ts :: R2-064: an enum-map edit left before saving raises a recoverable warning on in-app navigation, back and tab close — Stay keeps the edit, Save draft records one RevisePlan revision, and no path presents the local edit as validated or approved",
+    "packages/ui/test/navigation-guard.test.ts :: D-DS-1: the guard asks the browser to confirm leaving the document and, in the capture phase, asks the person before a link inside the application is followed :: D-DS-1: when the caller takes over the question, a click that would leave is held and handed over with its destination, and proceed follows it once, as the original click, past the guard"
+   ],
+   "commit": "6335bc7, da54519, 082564c, ebb06d1",
+   "reviewId": null,
+   "inheritedTo": [
+    "B08"
+   ],
+   "claimed": "**PARTIAL** — status-model half EXECUTED_LOCAL (W3); browser half PLANNED (W8)"
+  },
+  {
+   "case": "R2-065",
+   "class": "PARTIAL",
+   "test": [
+    "packages/ui/test/count-denominators.test.ts :: R2-065: the count panel shows physical rows, billable source units and output rows as three labelled measures with their definitions, never one records figure",
+    "apps/web/e2e/r2-065-count-denominators.spec.ts :: R2-065: a flat source projected into companies, contacts and relationship files shows the sealed revision's physical rows and billable source units and each output file's rows, each with its definition"
+   ],
+   "commit": "cf6e9d1, f2ffb86",
+   "reviewId": null,
+   "inheritedTo": [
+    "B08",
+    "B13"
+   ],
+   "claimed": "**PARTIAL** — panel half EXECUTED_LOCAL (W1); browser half PLANNED (W7)"
+  },
+  {
+   "case": "R2-134",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/b11-sessions.test.ts :: R2-134: a session opened after expiry carries no invitation or acceptance state, and sign-in answers the same for an unknown, a disabled and an existing identity",
+    "apps/web/e2e/r2-134-expired-login-legal.spec.ts :: R2-134: an invitation that expires while its invitee re-authenticates and reads a newly versioned agreement is not revived, the new version is not accepted without an explicit act on it, and the page states the next action without revealing whether an account exists"
+   ],
+   "commit": "0470497",
+   "reviewId": null,
+   "inheritedTo": [
+    "B10",
+    "B16"
+   ],
+   "claimed": "**PARTIAL** — api half EXECUTED_LOCAL (W2; identity provider SIMULATED); browser half PLANNED (W6)"
+  },
+  {
+   "case": "CMD044-OK",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd044-create-support-case.test.ts :: OK: a member with access to the project opens a classified case — 201 with its category, severity, OPEN state and the covered-hours next review; one case, one support_case.opened.v1 event without the summary, one journal entry",
+    "apps/web/e2e/cmd044-support-case.spec.ts :: CMD044: the support form warns against secrets and CRM rows, shows the server's refusal with the secure-upload route, and shows the created case with its next response time after a lost response"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "**PARTIAL** — api half EXECUTED_LOCAL (W4); web half PLANNED (W10)"
+  },
+  {
+   "case": "CMD044-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd044-create-support-case.test.ts :: DENY: a foreign tenant, a wrong role and then one missing prerequisite — another agency's project answers 404 like a nonexistent one, a suspended membership 403, a summary with a private key or CRM rows 422 with the secure-upload next action; no case, event, outbox record or log line holds the submitted text"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "**EXECUTED_LOCAL** — W4, verified at the stage-1 head (INT-1)"
+  },
+  {
+   "case": "CMD044-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd044-create-support-case.test.ts :: RACE: an identical retry, the same key with another digest (IDEMPOTENCY_CONFLICT) and a crash at the intent/commit boundary — at most one case, the retry replays it, the conflict creates nothing, and a crash before COMMIT leaves nothing for the retry to duplicate"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "**EXECUTED_LOCAL** — W4, verified at the stage-1 head (INT-1)"
+  }
+ ]
+}

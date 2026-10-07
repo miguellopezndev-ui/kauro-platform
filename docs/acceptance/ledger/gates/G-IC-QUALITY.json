@@ -1,0 +1,107 @@
+{
+ "gate": "G-IC-QUALITY",
+ "manual": "06",
+ "package": "B04",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "IC-10",
+   "package": "B04",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-11",
+   "package": "B04",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-13",
+   "package": "B04",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S042",
+   "package": "B04",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S043",
+   "package": "B04",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S044",
+   "package": "B04",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S091",
+   "package": "B04",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-039",
+   "package": "B04",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-040",
+   "package": "B04",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-041",
+   "package": "B04",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-042",
+   "package": "B04",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B04"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B04",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

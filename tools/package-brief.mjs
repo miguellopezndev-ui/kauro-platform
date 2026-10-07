@@ -2,32 +2,27 @@
 // with their evidence rule, every case with its expected outcome, the commands under its gates, the screens that belong to its
 // surfaces and the manuals it cites. Usage: node tools/package-brief.mjs B06 [--json]. The brief is the input of an implementation
 // wave; it never replaces reading the manuals.
+//
+// The gates of a brief are the union of the gates of the package's cases, and its commands are every command one of whose triad
+// cases (CMDnnn-OK, -DENY, -RACE) is in the package's caseIds. `pkg.gates` alone is not that set: a package can own cases of a gate
+// it does not list (B16 owns G-TENANT's CMD003-CMD007 and CMD038; B11 owns CMD044 of G-UX), and filtering by it dropped them
+// from the brief (tools/test/package-brief.test.mjs checks the 22 packages).
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const reg = (f) => JSON.parse(readFileSync(join(root, "packages", "contracts", "registry", f), "utf8"));
 const list = (v) => (Array.isArray(v) ? v : Object.values(v).find(Array.isArray) ?? []);
 
-const [pkgId, flag] = process.argv.slice(2);
-if (!pkgId) {
-  console.error("usage: node tools/package-brief.mjs <B00..B21> [--json]");
-  process.exit(2);
-}
 const program = list(reg("program.json").packages ?? reg("program.json"));
-const pkg = program.find((p) => p.id === pkgId);
-if (!pkg) {
-  console.error(`package ${pkgId} not found in registry/program.json`);
-  process.exit(2);
-}
 const cases = new Map(list(reg("cases.json")).map((c) => [c.id, c]));
 for (const c of list(reg("additional_scenarios.json"))) {
   const id = c.id ?? c.scenarioId ?? c.caseId;
   if (id && !cases.has(id)) cases.set(id, c);
 }
-const gates = list(reg("gates.json")).filter((g) => (pkg.gates ?? []).includes(g.id));
-const commands = list(reg("commands.json")).filter((c) => (pkg.gates ?? []).includes(c.gate));
+const allGates = list(reg("gates.json"));
+const allCommands = list(reg("commands.json"));
 const contracts = list(reg("contracts.json"));
 const machines = list(reg("state_transitions.json"));
 const screens = list(reg("screens.json"));
@@ -49,21 +44,46 @@ const a5Note = (id) => {
       : "";
 };
 
-const brief = {
+/** The brief of one package; null when the package is not in registry/program.json. */
+export function buildBrief(pkgId) {
+  const pkg = program.find((p) => p.id === pkgId);
+  if (!pkg) return null;
+  const caseIds = pkg.caseIds ?? [];
+  const gateIds = new Set(caseIds.map((id) => cases.get(id)?.gate).filter(Boolean));
+  const triads = new Set(caseIds.map((id) => /^(CMD\d{3})-(OK|DENY|RACE)$/.exec(id)?.[1]).filter(Boolean));
+  return {
   package: pkg,
-  gates: gates.map((g) => ({ id: g.id, owner: g.owner, evidenceRule: g.evidenceRule, cases: g.caseIds })),
-  cases: (pkg.caseIds ?? []).map((id) => cases.get(id) ?? { id, missing: true }),
-  commands,
-  contracts: contracts.filter((c) => (pkg.docs ?? []).includes(c.owner)).map((c) => c.name),
-  stateMachines: machines.map((m) => m.contract),
-  screens: screens.filter((s) => (pkg.docs ?? []).some((d) => String(s.owner ?? "").includes(d))).map((s) => s.id),
-};
+    package: pkg,
+    gates: allGates.filter((g) => gateIds.has(g.id)).map((g) => ({ id: g.id, owner: g.owner, evidenceRule: g.evidenceRule, cases: g.caseIds })),
+    cases: caseIds.map((id) => cases.get(id) ?? { id, missing: true }),
+    commands: allCommands.filter((c) => triads.has(c.id)),
+    contracts: contracts.filter((c) => (pkg.docs ?? []).includes(c.owner)).map((c) => c.name),
+    stateMachines: machines.map((m) => m.contract),
+    screens: screens.filter((s) => (pkg.docs ?? []).some((d) => String(s.owner ?? "").includes(d))).map((s) => s.id),
+  };
+}
 
-if (flag === "--json") {
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+const [pkgId, flag] = isMain ? process.argv.slice(2) : [];
+if (isMain && !pkgId) {
+  console.error("usage: node tools/package-brief.mjs <B00..B21> [--json]");
+  process.exit(2);
+}
+const brief = isMain ? buildBrief(pkgId) : null;
+if (isMain && !brief) {
+  console.error(`package ${pkgId} not found in registry/program.json`);
+  process.exit(2);
+}
+const pkg = brief?.package;
+const commands = brief?.commands ?? [];
+
+if (!isMain) {
+  // imported: buildBrief only
+} else if (flag === "--json") {
   console.log(JSON.stringify(brief, null, 1));
 } else {
   console.log(`# ${pkg.id} — ${pkg.title}\n`);
-  console.log(`depends on: ${(pkg.dependsOn ?? []).join(", ") || "-"} · gates: ${(pkg.gates ?? []).join(", ")} · manuals: ${(pkg.docs ?? []).join(", ")}`);
+  console.log(`depends on: ${(pkg.dependsOn ?? []).join(", ") || "-"} · gates: ${brief.gates.map((g) => g.id).join(", ")} · manuals: ${(pkg.docs ?? []).join(", ")}`);
   console.log(`\nscope: ${pkg.scope}\nwork: ${pkg.work}\nowner action: ${pkg.ownerAction}\n`);
   for (const g of brief.gates) console.log(`gate ${g.id} (manual ${g.owner}) — evidence rule: ${g.evidenceRule}`);
   console.log(`\n## Cases (${brief.cases.length})`);
