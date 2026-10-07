@@ -283,7 +283,7 @@ export function testTarget(root, file) {
   return { file: rel.split(sep).join("/"), dir, manifest, compiled, concurrency };
 }
 
-export async function runTest(target, concurrency = target.concurrency, { timeoutMs, killer = killRunner, postKillWaitMs = 10_000, classifyMissingApi } = {}) {
+export async function runTest(target, concurrency = target.concurrency, { timeoutMs, killer = killRunner, postKillWaitMs = 10_000, classifyMissingApi, namePatterns = [] } = {}) {
   if (!existsSync(target.compiled)) throw new Error(`compiled test is missing: ${target.compiled}`);
   const eventsDir = mkdtempSync(join(tmpdir(), "kauro-events-"));
   const eventsFile = join(eventsDir, "events.jsonl");
@@ -309,6 +309,8 @@ export async function runTest(target, concurrency = target.concurrency, { timeou
       `--test-reporter=${REPORTER}`, "--test-reporter-destination=stderr"];
     if (concurrency !== undefined) args.push(`--test-concurrency=${concurrency}`);
     if (timeoutMs) args.push(`--test-timeout=${Math.max(1, Math.floor(timeoutMs * 0.8))}`);
+    // only the named tests of the file (stress-cells --changed); a pattern that matches nothing runs zero tests, which is a FAIL
+    for (const pattern of namePatterns) args.push(`--test-name-pattern=${pattern}`);
     args.push(target.compiled);
     const env = { ...process.env, CI: "true", FORCE_COLOR: "0", KAURO_TEST_EVENTS: eventsFile };
     delete env.NODE_TEST_CONTEXT;

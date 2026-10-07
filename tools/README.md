@@ -20,7 +20,19 @@ node tools/red-proof.mjs <base> <head> --tests apps/api/test/example.test.ts,pac
 node tools/red-proof.mjs <base> <head> --tests apps/api/test/example.test.ts --out /tmp/red-proof.json
 node tools/stress-cells.mjs apps/api/dist/test/example.test.js 20
 node tools/stress-cells.mjs packages/persistence/dist/test/example.test.js 50 --concurrency 2
+node tools/stress-cells.mjs --changed --base origin/main 20 --cpu-load
 ```
+
+`--changed` is the merge gate for the defect class WIN-TIMING-AFTER-GREEN-PR (owner 2026-10-07: a race/timeout cell green once on
+its PR turned main red on Windows). `tools/changed-cells.mjs` reads `git diff -U0 <base>...HEAD` of the test files and selects
+every timing cell the change adds, edits or deletes a line in: a `faultCell` whose fault is race, timeout or expiry, a test whose
+title names RACE/TIMEOUT/EXPIRY, or one whose body drives the interleaving harness (contend, bothOrders, mustWait, concurrently).
+Each file runs N times with only those cells (`--test-name-pattern`, exact titles; a non-literal title runs the whole file), and
+`--cpu-load` keeps `stress-ng` on every core for the whole gate (Linux only). A wait cap written as a literal in a changed timing
+cell (setTimeout/sleep/wait*/until* with a number, or a timeout/wait/deadline/pause/bound in ms assigned one) FAILS before any run:
+derive it from the harness bounds (`packages/persistence/src/testing/faults/bounds.ts`). The builder runs it through run-heavy
+(kind `stress-cells`, `tools/ci-local/stress-cells-linux.sh` in WSL) and its merge hook refuses a platform PR without a green
+receipt for the PR head.
 
 Red proof resolves both revisions to commits, creates a shared temporary clone and a detached Git worktree, and reverts
 every changed source or persistence migration path to base. Tests and their support files remain at head. It installs with
