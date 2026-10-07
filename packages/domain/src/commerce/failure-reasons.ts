@@ -95,6 +95,15 @@ export const COMMERCE_FAILURE_REASONS = [
   "MALFORMED_EVIDENCE",
   "UNAUTHENTICATED_EVIDENCE",
   "EVIDENCE_UNAVAILABLE",
+  // the route configuration and instruction issuance of the bank-transfer route (lane L-ROUTE; ACH-ROUTE §7.1-§7.3, §7.29)
+  "ROUTE_VERSION_CHANGED",
+  "OPEN_ORDER_EXISTS",
+  "ROUTE_NOT_ENABLED",
+  "ROUTE_NOT_VERIFIED",
+  "DETAILS_EXPIRED",
+  "DETAILS_ACCOUNT_MISMATCH",
+  "GENERAL_ENABLE_CONDITION_UNMET",
+  "INSTRUCTIONS_EXPIRED",
 ] as const;
 
 export type CommerceFailureReason = (typeof COMMERCE_FAILURE_REASONS)[number];
