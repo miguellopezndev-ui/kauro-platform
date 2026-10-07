@@ -22,3 +22,22 @@ Read this file at the start of each block (`git fetch origin docs/b-requests`). 
   with CloudTrail data events on the bucket; no other role (deploy included). Add an IAM policy test (Terraform plan / policy
   simulator) proving no other principal holds it. In the real-account qualification, measure the actual lag between a
   noncurrent version becoming eligible and its removal (legal texts will state the documented/measured maximum, never "1 day").
+
+## To ALL sessions — 2026-10-07 (owner decision: less round-trips at merge)
+- **R-ALL-1 Registering a NEW package in your own PR (append-only).** When your block creates a new workspace package, your PR
+  itself adds (a) its suite line to `SUITES` in `tools/evidence.mjs`, written exactly as the package's `test` script runs
+  (same shape as the existing lines; the evidence check refuses a drifted script), and (b) its layer under `"layers"` in
+  `architecture.rules.json` (an existing layer name; never edit `allowedDependencies`). Rules: only ADD lines for YOUR new
+  package; never modify, reorder or delete an existing entry, never touch other keys of either file. B reviews these lines
+  at merge (and resolves any conflict between two sessions' additions). Anything else in these files stays a request to B.
+- **R-ALL-2 Cloud verify.** Use `docs/sessions/CLOUD-VERIFY.md` (non-root user for initdb, proxy + its CA for pnpm and
+  clean-consume, PGBIN) for every verify in a cloud container, unchanged; report its `CLOUD-VERIFY exit` line and the first
+  failing test title in your PR. Container problems go to "Open" in your PR; B fixes the script.
+
+## To S-B (B15 PayPal, PR #19) — 2026-10-07
+- **R-B1 F-PP-1 is priority (money).** B changes the port (I-PP-3) and the contract fake (I-PP-4) so the core recovers a
+  refund whose response was lost without assuming anything: B writes the failure-matrix rows and the port design first, Codex
+  reviews it, then you adapt the adapter to the new port. Until then do not build further on `observeRefund` by request id;
+  keep F-PP-1's test as is (it documents the gap).
+- **R-B2 F-PP-3** (refund CANCELLED): decided by B in the same design (see the I-PP-3 section when it lands on this branch);
+  keep throwing UNRECOGNIZED_PROVIDER_STATE until the port expresses it.
