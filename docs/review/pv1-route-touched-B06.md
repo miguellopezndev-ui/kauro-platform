@@ -109,3 +109,16 @@ E1 removes these effects with the listed PaymentOrder edge `INTENT_CREATED -> CA
 | B06 | `apps/api/src/composition.ts` | `registerBankRouteRoutes` no longer receives `authenticator`. | PV1R-01 tests. |
 | B06 | `docs/design/B06-state-command-event-matrix.md` | Regenerated (4 Refund manual edges as L-REFUND planned-not-implemented; stale PV1 error-catalogue rows). | `tools/test/matrix.test.mjs` 8/8; `pnpm run matrix`. |
 | B06 | `tools/matrix.mjs` | `EDGE_OWNERS.Refund` + 4 owner entries. | `matrix.test.mjs` PV1R-05 (2). |
+
+## Codex r2 fix (53f6940, 2c2bf59, 2001f2f): accepted-package files touched (TIME-AFTER-AWAIT, template rule 15)
+
+| Package | File | Change | Covering test (red with the change reverted) |
+|---|---|---|---|
+| B06/B11 | `packages/application/src/ports/sessions.ts` | `WebSessionStore.resume` takes `now: () => UtcInstant` (read by the store immediately before its touch statement). | `PV1R-02 DENY ACH-M-R2-EXPIRY (session expires during the cookie authentication's own store wait)`; b11-sessions 41/41 with b10-family-templates. |
+| B06/B11 | `packages/application/src/sessions/service.ts` | `resume` judges liveness at a clock read after the store returned (PV1R-02). | same cell (200 -> 401 reverted). |
+| B06/B11 | `packages/persistence/src/web-sessions.ts` | `resume` reads its instant inside the boundary transaction, just before the touch UPDATE. | same cell. |
+| B06/B11 | `apps/api/src/authenticator.ts`, `apps/api/src/sessions.ts` | `Authentication.SUBJECT` gains optional `liveUntil` (session credentials: min(idle, absolute) as resumed). Additive. | `PV1R-02 DENY ACH-M-I3-EXPIRY (... final authentication's own store wait)` (red with resume fix also reverted). |
+| B05/B09 | `packages/application/src/ports/assurance-and-admission.ts` | `AssuranceOutcome.FRESH.freshUntil?` (optional, additive). | PV1R-03 r2 cells (6). |
+| B05 | `packages/authorization/src/assurance.ts` | `createAssuranceVerifier` returns `freshUntil` = min(issued + window + 1 ms, expiry); verdicts unchanged. | PV1R-03 r2 cells (6); authorization tests 11/11. |
+| B06 | `docs/design/FAILURE-MATRIX-TEMPLATE.md` | Rule 15 TIME-AFTER-AWAIT. | n/a (doc). |
+| B09 lane files | `instructions.ts`, `route-config.ts`, `bank-route-routes.ts` | Lane-owned. | `docs/review/pv1-route-codex-r2-fix-proof.md`. |
