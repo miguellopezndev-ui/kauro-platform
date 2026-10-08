@@ -1,11 +1,11 @@
 // The 6c cells of the B10 failure matrix on the seller commands and their authority (docs/design/B10-failure-matrix.md "GAP list, by risk"
-// items TERM_ACCEPT, CLAIM_LAPSE_ACCEPT (CMD050), TERM_PAR, TAIL_PURCHASE_RACE, SELLER_IDENT_RACE, CORP_REV, CMD_EXP_ASSURE, SELLER_ACT_RACE),
+// items TERM_ACCEPT, CLAIM_LAPSE_ACCEPT (CMD050), CLAIM_LAPSE_TAIL, TERM_PAR, TAIL_PURCHASE_RACE, SELLER_IDENT_RACE, CORP_REV, CMD_EXP_ASSURE, SELLER_ACT_RACE),
 // each a cell of the common fault harness (docs/design/FAULT-HARNESS.md). The REAL routes of CMD045..CMD050 run their REAL unit of work over a
 // connection the harness opened (test/fault-support.ts); the payment service's REAL reconciler designates the first purchase through the REAL
 // webhook. A race cell holds one actor at a named point and observes the other waiting on it in pg_stat_activity, in both orders; a revocation
 // cell lets the revocation take effect and then observes the command refused; an expiry cell moves the controlled clock past the deadline and
 // puts the instant on the command's own transaction; a partial cell fails a later write after an earlier one answered. PostgreSQL 17 through
-// the runtime login roles; the superuser only reads (and, as the platform's security operations, disables an identity). Nothing sleeps.
+// the runtime login roles; the superuser only reads (and, as the platform's security operations, disables an identity). Nothing sleeps a fixed time (a deadline crossed during a lock wait waits only the remainder the database measures, crossedWhileWaiting).
 import assert from "node:assert/strict";
 import { after, before } from "node:test";
 import type { SellerTerminationView, WebhookAck } from "@kauro/application";
@@ -13,7 +13,7 @@ import type { UserId } from "@kauro/domain";
 import { connectionPid, faultCell, openConnection, recordClaim, recordProspect, recordServiceAssignment, type FaultContext, type HarnessConnection, type RecordedSeller, invariantsAfterEach } from "@kauro/persistence/testing";
 import { deliver } from "./payment-support.js";
 import { agentOf, assignedThrough, claimed, integrationWorld, opportunityOf, oracleRows, orderedThrough, planOf, quoted, seller, terminationBody, type IntegrationWorld } from "./integration-support.js";
-import { bindCells, contend, converting, runConsumer, type Actor } from "./b10-cells-support.js";
+import { bindCells, contend, converting, crossedWhileWaiting, effectClockBefore, observeBlockedBy, runConsumer, type Actor } from "./b10-cells-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { prepareAllocation, recordClaimEvidence, recordSourceEvidence } from "./sales-support.js";
 import { candidateSeller } from "./sellers-support.js";
@@ -201,7 +201,7 @@ faultCell(
     step: "CMD047 AcceptAttribution / REVOCATION: W allocation + shares + claims state + pools terms (one COMMIT)",
     fault: "revocation",
     expect:
-      "RACE: TerminateSeller racing AcceptAttribution of the seller's claim in both orders with the lock wait observed: an acceptance that committed first is ruled by the termination (its claim, not in the manifest, EXPIRED with the seller: no live share, no tail, no entitlement for the TERMINATED seller); an acceptance that waited on the termination is refused 409 (STALE_VERSION of the claim the termination moved on, SELLER_NOT_ACTIVE or the claim no longer under review) with the allocation unfrozen; every acceptance after the termination is refused the same way",
+      "RACE: TerminateSeller racing AcceptAttribution of the seller's claim in both orders with the lock wait observed: an acceptance that committed first is ruled by the termination (its claim, not in the manifest, EXPIRED with the seller: no live share, no tail, no entitlement for the TERMINATED seller); an acceptance that waited on the termination is refused 409 STALE_VERSION (the claim the termination moved on; expectedVersion is checked first) with the allocation unfrozen; every acceptance after the termination is refused 409 STALE_VERSION the same way",
   },
   async (ctx) => {
     for (const order of ["ACCEPT_FIRST", "TERMINATION_FIRST"] as const) {
@@ -243,7 +243,7 @@ faultCell(
     step: "CMD050 TerminateSeller / REVOCATION: W seller + assignments + prospects + entitlements + claims + tail entries (one COMMIT)",
     fault: "revocation",
     expect:
-      "RACE: AcceptAttribution of a 6000/4000 split landing while one of its two sellers is terminated, in both orders with the lock wait observed: accepted first, the terminated seller's unlisted claim EXPIRED by the termination and the other seller's claim ACCEPTED under the frozen allocation (no live share and no tail for the TERMINATED seller); terminated first, the acceptance naming the terminated seller's share is refused 409 and nothing is frozen, the other seller's claim left SUBMITTED",
+      "RACE: AcceptAttribution of a 6000/4000 split landing while one of its two sellers is terminated, in both orders with the lock wait observed: accepted first, the terminated seller's unlisted claim EXPIRED by the termination and the other seller's claim ACCEPTED under the frozen allocation (no live share and no tail for the TERMINATED seller); terminated first, the acceptance naming the terminated seller's share is refused 409 PRECONDITION_FAILED CLAIM_NOT_REVIEWABLE (X's claim EXPIRED by the termination) and nothing is frozen, the other seller's claim left SUBMITTED",
   },
   async (ctx) => {
     for (const order of ["ACCEPT_FIRST", "TERMINATION_FIRST"] as const) {
@@ -346,22 +346,13 @@ faultCell(
         const holding = ctx.operation("TerminateSeller (holder)", () => routed(ctx, hc, [], () => terminate(x.s.sellerId, freshKey("tail-race-2"), x.body)));
         await pause.reachedBy(holding);
         const delivering = deliver(iw.pw, "PAYMENT.CAPTURE.COMPLETED", x.providerCaptureId);
-        let blocked = false;
         let finished = false;
         void delivering.then(() => (finished = true), () => (finished = true));
-        try {
-          const limit = Date.now() + 10_000;
-          while (!blocked && !finished && Date.now() < limit) {
-            const r = await iw.h.oracle.query<{ n: number }>("SELECT count(*)::int AS n FROM pg_stat_activity WHERE $1 = ANY (pg_blocking_pids(pid))", [connectionPid(hc)]);
-            blocked = r.rows[0]!.n > 0;
-            if (!blocked) await new Promise((res) => setTimeout(res, 10));
-          }
-        } finally {
-          pause.release();
-        }
+        // the reconciler runs on the payment service's own pool (no harness connection for ctx.mustWait): observed within the harness bounds
+        const blocked = await afterward(() => observeBlockedBy(connectionPid(hc), "kauro_payment_test", () => finished, "the designation while the termination holds the listed agency's tail entry"), () => pause.release());
         const t = completed<SellerTerminationView>(await holding, 200);
         assert.equal(completed<WebhookAck>((await delivering).reply, 200).data.inboxState, "APPLIED");
-        assert.equal(blocked, true, "the designation waited on the termination holding the listed agency's tail entry (it committed without waiting otherwise)");
+        assert.ok(blocked > 0, "the designation waited on the termination holding the listed agency's tail entry (it committed without waiting otherwise)");
         assert.equal(t.data.tailEntries, 1);
         const [order] = await oracleRows<{ precedes: boolean }>(
           iw,
@@ -426,10 +417,11 @@ faultCell(
 );
 
 
-// CLAIM_LAPSE_ACCEPT (X, ADV-1): the listed claim's window ending while TerminateSeller waits on the agency's recurrence lock
+// CLAIM_LAPSE_TAIL (X, ADV-1, ADV-7): the listed claim's acceptance window ending after the termination's KC011 judgement began, during its
+// wait on the agency's recurrence lock, or between its tail entry and its COMMIT (0045 termination_tail_entries_in_window)
 faultCell(
   {
-    id: "CLAIM_LAPSE_ACCEPT",
+    id: "CLAIM_LAPSE_TAIL",
     step: "CMD050 TerminateSeller / RACE: X manifest entry whose claim lapses while the termination waits on the agency's recurrence lock",
     fault: "race",
     expect:
@@ -439,10 +431,9 @@ faultCell(
     const s = await seller(iw, "lapse-during-wait");
     const op = await opportunityOf(iw, s, "lapse-during-wait");
     const [row] = await oracleRows<{ expires_at: string }>(iw, `SELECT to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS expires_at FROM kauro.attribution_claims WHERE claim_id = $1`, [op.claimId]);
+    const expiresAt = row!.expires_at;
     const body = await terminationBody(iw, s.sellerId, [op.claimId]);
     const before = await sellerRow(s.sellerId);
-    // the termination's server clock half a second before the claim's window ends, from its seller lock on
-    ctx.clock.set(msOf(row!.expires_at) - 500);
     const holder = await open("kauro_app_test");
     const waiter = await open("kauro_app_test");
     const key = freshKey("lapse-during-wait");
@@ -450,18 +441,20 @@ faultCell(
       await holder.query("BEGIN");
       await holder.query("SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.agency_recurrence', $1))", [op.a.s.agency.agencyId]);
       const pause = ctx.points.pause("db.seller_lock.before");
+      let instant = "";
       const waiting = await ctx.mustWait(iw.h.oracle, { waiter, holder: connectionPid(holder) }, async (conn) => {
         const running = routed(ctx, conn, [SELLER_LOCK], () => terminate(s.sellerId, key, body));
         try {
           await pause.reachedBy(running);
-          await ctx.clock.onServer(conn);
+          // the termination's effect clock the harness margin before the window's end at its seller lock (ADV-8: no literal margin)
+          instant = await effectClockBefore(ctx, conn, expiresAt);
         } finally {
           pause.release();
         }
         return running;
       }, "the termination while the agency's recurrence lock is held");
-      // the claim's window ends while the termination waits (its effect clock runs on with its transaction)
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      // the claim's window ends while the termination waits: its effect clock, measured on the database, runs past it (never a fixed sleep)
+      await crossedWhileWaiting(waiter, holder, instant, expiresAt, "the termination waiting on the agency's recurrence lock");
       await holder.query("COMMIT");
       assert.equal(said(valueOf(await waiting.pending, "TerminateSeller")), "409 PRECONDITION_FAILED TAIL_NOT_ENUMERATED", "a window that ended during the wait enumerates no tail");
     } finally {
@@ -471,6 +464,54 @@ faultCell(
     assert.deepEqual(await sellerRow(s.sellerId), before, "the seller stays ACTIVE at its version");
     assert.deepEqual([...(await claimStates([op.claimId])), await tailsOf(s.sellerId)], ["ACCEPTED", 0]);
     assert.notEqual(await journalState(key), "COMMITTED");
+  },
+);
+
+faultCell(
+  {
+    id: "CLAIM_LAPSE_TAIL",
+    step: "CMD050 TerminateSeller / EXPIRY: X manifest entry whose claim's window ends between its tail entry and the COMMIT",
+    fault: "expiry",
+    expect:
+      "DENY: TerminateSeller whose listed ACCEPTED claim's acceptance window was still running when its tail entry was written (KC011 judged at the insert) and ends while the termination stands at its COMMIT is 409 PRECONDITION_FAILED TAIL_NOT_ENUMERATED (the COMMIT judge termination_tail_entries_in_window) and commits nothing: the seller ACTIVE at its version, the claim ACCEPTED, no tail entry, no committed journal answer",
+  },
+  async (ctx) => {
+    const s = await seller(iw, "lapse-at-commit");
+    const op = await opportunityOf(iw, s, "lapse-at-commit");
+    const [row] = await oracleRows<{ expires_at: string }>(iw, `SELECT to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS expires_at FROM kauro.attribution_claims WHERE claim_id = $1`, [op.claimId]);
+    const expiresAt = row!.expires_at;
+    ctx.deadline(msOf(expiresAt) + (/\.\d{3}000Z$/.test(expiresAt) ? 0 : 1), "the listed claim's acceptance window's end");
+    const body = await terminationBody(iw, s.sellerId, [op.claimId]);
+    const before = await sellerRow(s.sellerId);
+    const key = freshKey("lapse-at-commit");
+    const conn = await open("kauro_app_test");
+    let reply: Reply;
+    try {
+      const pause = ctx.points.pause("uow.before-commit");
+      const passedBefore = ctx.points.passed.length;
+      reply = await ctx.operation("the termination, its database clock moved past the claim's window end at its COMMIT", async (opn) => {
+        const running = routed(ctx, conn, [TAIL_INSERT], () => terminate(s.sellerId, key, body));
+        try {
+          await pause.reachedBy(running);
+          assert.ok(ctx.points.passed.slice(passedBefore).includes("db.tail_insert.after"), "the tail entry was written (KC011 admitted it) before the COMMIT");
+          const ahead = await conn.query<{ ahead: boolean }>("SELECT kauro.effect_now() < $1::timestamptz AS ahead", [expiresAt]);
+          assert.equal(ahead.rows[0]!.ahead, true, "the claim's window is still running when the termination reaches its COMMIT");
+          ctx.clock.past(expiresAt);
+          await opn.clock.onServer(conn);
+          const crossed = await conn.query<{ crossed: boolean }>("SELECT kauro.effect_now() >= $1::timestamptz AS crossed", [expiresAt]);
+          assert.equal(crossed.rows[0]!.crossed, true, "the database clock crossed the window's end before the COMMIT");
+        } finally {
+          pause.release();
+        }
+        return running;
+      });
+    } finally {
+      await conn.end();
+    }
+    assert.equal(said(reply), "409 PRECONDITION_FAILED TAIL_NOT_ENUMERATED", "a window that ended before the COMMIT enumerates no tail");
+    assert.deepEqual(await sellerRow(s.sellerId), before, "the seller stays ACTIVE at its version");
+    assert.deepEqual([...(await claimStates([op.claimId])), await tailsOf(s.sellerId)], ["ACCEPTED", 0], "the claim ACCEPTED, no tail entry");
+    assert.notEqual(await journalState(key), "COMMITTED", "no committed answer is journaled");
   },
 );
 // =====================================================================================================================================

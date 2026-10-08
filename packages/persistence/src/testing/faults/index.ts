@@ -5,7 +5,7 @@
  * @kauro/persistence/testing.
  */
 export { controlledClock } from "./clock.js";
-export { INJECTED_STATEMENT_TIMEOUT_MS, LOCK_WAIT_OBSERVATION_MS, RACE_STATEMENT_TIMEOUT_MS, raceStatementTimeoutMs } from "./bounds.js";
+export { EFFECT_CLOCK_MARGIN_MS, INJECTED_STATEMENT_TIMEOUT_MS, LOCK_WAIT_OBSERVATION_MS, LOCK_WAIT_POLL_ATTEMPTS, LOCK_WAIT_POLL_INTERVAL_MS, RACE_STATEMENT_TIMEOUT_MS, raceStatementTimeoutMs } from "./bounds.js";
 export type { ControlledClock, ClockMove, ClockUse, InstantLike } from "./clock.js";
 export { FaultPoints, SimulatedCrash, simulatedCrashOf, crashedAt, FaultPointNotReached, crashableFactory, instrumentPort, connectionPid, terminateBackend } from "./points.js";
 export type { Pause, ArmedCrash, CommitCrash } from "./points.js";

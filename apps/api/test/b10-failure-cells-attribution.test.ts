@@ -5,15 +5,15 @@
 // a partial cell fails a later write of the unit after an earlier one answered, a race cell holds one actor at a named point and observes
 // the other waiting on it in pg_stat_activity, an expiry cell moves the controlled clock past the deadline and puts the instant on the
 // command's own transaction (the database clock decides, D10-CLOCK-1). PostgreSQL 17 through the runtime login roles; the superuser only
-// reads. Nothing sleeps.
+// reads. Nothing sleeps a fixed time (a deadline crossed during a lock wait waits only the remainder the database measures, crossedWhileWaiting).
 import assert from "node:assert/strict";
 import { after, before } from "node:test";
 import type { AttributionView, ProspectView, SalesAccountView } from "@kauro/application";
 import type { UserId } from "@kauro/domain";
 import { organizationKeyOf } from "@kauro/domain";
-import { connectionPid, faultCell, openConnection, recordProspect, recordServiceAssignment, type FaultContext, type HarnessConnection, type RecordedSeller, invariantsAfterEach } from "@kauro/persistence/testing";
+import { connectionPid, EFFECT_CLOCK_MARGIN_MS, faultCell, openConnection, recordProspect, recordServiceAssignment, type FaultContext, type HarnessConnection, type RecordedSeller, invariantsAfterEach } from "@kauro/persistence/testing";
 import { agentOf, assignedThrough, claimed, integrationWorld, oracleRows, seller, type IntegrationWorld } from "./integration-support.js";
-import { bindCells, contend, itemOf, mustHaveSettled, sweepOn, type Actor } from "./b10-cells-support.js";
+import { bindCells, contend, crossedWhileWaiting, effectClockBefore, itemOf, mustHaveSettled, sweepOn, type Actor } from "./b10-cells-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { asOperator, prepareAllocation, recordClaimEvidence, recordSourceEvidence } from "./sales-support.js";
 import { call, completed, freshKey, ids, outcome, sha, type Person, type Reply } from "./support.js";
@@ -322,6 +322,12 @@ faultCell(
 // =====================================================================================================================================
 
 const CLAIM_LOCK: SqlStep = { label: "claim_lock", match: /FROM kauro\.attribution_claims WHERE claim_id = \$1 FOR UPDATE/ };
+/** The nth judge of `claimId`'s review deadline in the unit (reviewDeadlineReached: CMD047 judges the named claim at :70 and again at :106). */
+const DEADLINE_JUDGE = (claimId: string, nth: number): SqlStep => ({ label: "deadline_judge", match: /SELECT review_deadline_at\b.* AS reached FROM kauro\.attribution_claims/, when: (params) => params[0] === claimId, nth });
+/** The lock of one share's claim (CMD047's loop over the allocation's shares, accept-attribution.ts:97). */
+const SHARE_LOCK = (claimId: string): SqlStep => ({ label: "share_lock", match: /FROM kauro\.attribution_claims WHERE claim_id = \$1 FOR UPDATE/, when: (params) => params[0] === claimId });
+/** The first whole millisecond not before a database instant (microseconds): the controlled clock's grain. */
+const firstNotBefore = (iso: string): number => msOf(iso) + (/\.\d{3}000Z$/.test(iso) ? 0 : 1);
 
 /**
  * AcceptAttribution on `conn`, its transaction's database clock standing at the controlled clock's instant from its claim lock on: the route
@@ -375,24 +381,39 @@ faultCell(
     step: "CMD047 AcceptAttribution / EXPIRY: W2 claim lapse against the CLAIM_WINDOWS sweep (deadline instant exactly)",
     fault: "expiry",
     expect:
-      "DENY: on the database clock the review deadline instant itself is past (the lapse's own comparison, review_deadline_at <= now): AcceptAttribution standing two seconds before the deadline (its effect clock runs on with the transaction, kauro.effect_now()) accepts (200, the allocation frozen at 10000 bps, the claim ACCEPTED), standing at the first millisecond not before it is 409 CLAIM_EXPIRED and writes nothing",
+      "DENY: on the database clock the review deadline instant itself is past (the lapse's own comparison, review_deadline_at <= now): AcceptAttribution whose last deadline judge stands less than the harness margin EFFECT_CLOCK_MARGIN_MS (half a second) before the deadline on its effect clock (kauro.effect_now(), which runs on with the transaction to the COMMIT judge) accepts (200, the allocation frozen at 10000 bps, the claim ACCEPTED), standing at the first millisecond not before it is 409 CLAIM_EXPIRED and writes nothing",
   },
   async (ctx) => {
     const early = await dueOpportunity("claim-deadline-early", 60);
     const exact = await dueOpportunity("claim-deadline-exact", 90);
-    // two seconds before the early deadline (the deadline is judged at kauro.effect_now(), the controlled instant plus the time the transaction
-    // has run: a margin the unit never takes), and the first whole millisecond not before the exact one (the controlled clock's grain)
-    const beforeEarly = msOf(early.deadline) - 2_000;
+    // the first whole millisecond not before the exact deadline (the controlled clock's grain)
     const exactFirst = msOf(exact.deadline) + (/\.\d{3}000Z$/.test(exact.deadline) ? 0 : 1);
-    assert.ok(beforeEarly < exactFirst);
     ctx.deadline(exactFirst, "the claim's review deadline instant");
 
-    ctx.clock.set(beforeEarly);
+    // the admit leg (ADV-8): the effect clock placed EFFECT_CLOCK_MARGIN_MS before the early deadline at the acceptance's last application
+    // judge (the second reviewDeadlineReached of the claim, accept-attribution.ts:106). The tightest the effect clock allows: it runs on with
+    // the transaction, and the statements left to the COMMIT, whose KC021 judge reads it once more, must still find the deadline ahead; under
+    // one second, so a judge comparing a second early refuses this leg
     const keyEarly = freshKey("claim-deadline-early");
     const c1 = await open("kauro_app_test");
     try {
-      const reply = await acceptAtClock(ctx, c1, early.claimId, early.allocationId, keyEarly, "the acceptance two seconds before the deadline");
-      assert.equal(said(reply), "200", "two seconds before the deadline the claim is still under review");
+      const pause = ctx.points.pause("db.deadline_judge.before");
+      const reply = await ctx.operation("the acceptance whose last judge stands just before the deadline", async () => {
+        const running = routed(ctx, c1, [DEADLINE_JUDGE(early.claimId, 2)], () => acceptClaim(early.claimId, early.allocationId, keyEarly));
+        try {
+          await pause.reachedBy(running);
+          await effectClockBefore(ctx, c1, early.deadline);
+          const at = await c1.query<{ ahead: boolean; within: boolean }>(
+            "SELECT kauro.effect_now() < $1::timestamptz AS ahead, kauro.effect_now() >= $1::timestamptz - make_interval(secs => $2::double precision / 1000) AS within",
+            [early.deadline, EFFECT_CLOCK_MARGIN_MS],
+          );
+          assert.deepEqual({ ...at.rows[0] }, { ahead: true, within: true }, "the last judge stands before the deadline, by less than the harness margin");
+        } finally {
+          pause.release();
+        }
+        return running;
+      });
+      assert.equal(said(reply), "200", "less than the margin before the deadline the claim is still under review");
     } finally {
       await c1.end();
     }
@@ -428,8 +449,6 @@ faultCell(
   async (ctx) => {
     const o = await dueOpportunity("claim-deadline-waited", 60);
     const before = await allocationOf(o.allocationId);
-    // the acceptance's server clock half a second before the deadline from its agency lock on
-    ctx.clock.set(msOf(o.deadline) - 500);
     const holder = await open("kauro_app_test");
     const waiter = await open("kauro_app_test");
     const key = freshKey("claim-deadline-waited");
@@ -437,18 +456,20 @@ faultCell(
       await holder.query("BEGIN");
       await holder.query("SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.agency_commissions', $1))", [o.agencyId]);
       const pause = ctx.points.pause("db.agency_lock.before");
+      let instant = "";
       const waiting = await ctx.mustWait(iw.h.oracle, { waiter, holder: connectionPid(holder) }, async (conn) => {
           const running = routed(ctx, conn, [AGENCY_LOCK], () => acceptClaim(o.claimId, o.allocationId, key));
           try {
             await pause.reachedBy(running);
-            await ctx.clock.onServer(conn);
+            // the acceptance's effect clock the harness margin before the deadline at its agency lock (ADV-8: no literal margin)
+            instant = await effectClockBefore(ctx, conn, o.deadline);
           } finally {
             pause.release();
           }
           return running;
         }, "the acceptance while the agency's commission subject is held");
-      // the deadline passes while the acceptance waits (its effect clock runs on with its transaction)
-      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      // the deadline passes while the acceptance waits: its effect clock, measured on the database, runs past it (never a fixed sleep)
+      await crossedWhileWaiting(waiter, holder, instant, o.deadline, "the acceptance waiting on the agency's commission subject");
       await holder.query("COMMIT");
       assert.equal(said(valueOf(await waiting.pending, "the acceptance")), "409 PRECONDITION_FAILED CLAIM_EXPIRED", "a deadline crossed during the wait refuses the acceptance");
     } finally {
@@ -458,6 +479,124 @@ faultCell(
     assert.deepEqual(await allocationOf(o.allocationId), before, "the allocation is not frozen");
     assert.deepEqual(await claimOf(o.claimId), { state: "SUBMITTED", version: 1 }, "the claim is left for the CLAIM_WINDOWS sweep");
     assert.notEqual(await journalState(key), "COMMITTED");
+  },
+);
+
+// =====================================================================================================================================
+// CLAIM_DEADLINE (ADV-7): the review deadline passing after every statement judged it, refused only by the COMMIT judge
+// (0045 attribution_claims_accepted_in_window, KC021, mapped to 409 PRECONDITION_FAILED CLAIM_EXPIRED by sqlstate.ts)
+// =====================================================================================================================================
+
+faultCell(
+  {
+    id: "CLAIM_DEADLINE",
+    step: "CMD047 AcceptAttribution / EXPIRY: W allocation + shares + claims state + pools terms (one COMMIT), the deadline passing between the writes and the COMMIT",
+    fault: "expiry",
+    expect:
+      "DENY: AcceptAttribution whose statements all judged the claim's review deadline ahead and wrote the claim ACCEPTED, and whose database clock passes the deadline while it stands at its COMMIT, is 409 PRECONDITION_FAILED CLAIM_EXPIRED (the COMMIT judge KC021) and commits nothing: the allocation unfrozen at its version, the claim SUBMITTED at version 1, no committed journal answer",
+  },
+  async (ctx) => {
+    const o = await dueOpportunity("claim-deadline-commit", 60);
+    ctx.deadline(firstNotBefore(o.deadline), "the claim's review deadline");
+    const before = await allocationOf(o.allocationId);
+    const key = freshKey("claim-deadline-commit");
+    const conn = await open("kauro_app_test");
+    let reply: Reply;
+    try {
+      const pause = ctx.points.pause("uow.before-commit");
+      reply = await ctx.operation("the acceptance, its database clock moved past the review deadline at its COMMIT", async (op) => {
+        const running = routed(ctx, conn, [], () => acceptClaim(o.claimId, o.allocationId, key));
+        try {
+          await pause.reachedBy(running);
+          const written = await conn.query<{ state: string; ahead: boolean }>("SELECT state, kauro.effect_now() < review_deadline_at AS ahead FROM kauro.attribution_claims WHERE claim_id = $1", [o.claimId]);
+          assert.deepEqual({ ...written.rows[0] }, { state: "ACCEPTED", ahead: true }, "the acceptance wrote the claim ACCEPTED with its review deadline still ahead");
+          ctx.clock.past(o.deadline);
+          await op.clock.onServer(conn);
+          const crossed = await conn.query<{ crossed: boolean }>("SELECT review_deadline_at <= kauro.effect_now() AS crossed FROM kauro.attribution_claims WHERE claim_id = $1", [o.claimId]);
+          assert.equal(crossed.rows[0]!.crossed, true, "the database clock crossed the review deadline before the COMMIT");
+        } finally {
+          pause.release();
+        }
+        return running;
+      });
+    } finally {
+      await conn.end();
+    }
+    assert.equal(said(reply), "409 PRECONDITION_FAILED CLAIM_EXPIRED", "an acceptance whose review deadline passed before its COMMIT commits nothing (KC021)");
+    assert.deepEqual(await allocationOf(o.allocationId), before, "the allocation is not frozen");
+    assert.deepEqual(await claimOf(o.claimId), { state: "SUBMITTED", version: 1 }, "the claim is left SUBMITTED for the CLAIM_WINDOWS sweep");
+    assert.notEqual(await journalState(key), "COMMITTED", "no committed answer is journaled");
+  },
+);
+
+faultCell(
+  {
+    id: "CLAIM_DEADLINE",
+    step: "CMD047 AcceptAttribution / EXPIRY: W allocation + shares + claims state + pools terms (one COMMIT), a share's deadline passing while the unit waits on a later share's claim",
+    fault: "race",
+    expect:
+      "RACE: a 4000/3000/3000 split whose acceptance judged share X's review deadline ahead when it locked X's claim, then waits on share Y's claim (held by another session) until X's deadline has passed, is 409 PRECONDITION_FAILED CLAIM_EXPIRED and writes nothing: the allocation unfrozen at its version, the three claims SUBMITTED at version 1, no committed journal answer (the last application judge reads the named claim only; X is refused at COMMIT, KC021)",
+  },
+  async (ctx) => {
+    const label = "claim-deadline-split";
+    const a = await agentOf(iw, `${label}-agency`);
+    const named = await seller(iw, `${label}-named`);
+    // the shares are locked in seller order (allocation_shares ORDER BY seller_id): X, whose deadline is near, before Y
+    const [sx, sy] = [await seller(iw, `${label}-a`), await seller(iw, `${label}-b`)].sort((p, q) => (p.sellerId < q.sellerId ? -1 : 1)) as [RecordedSeller, RecordedSeller];
+    const prospect = await recordProspect(iw.h, { by: named, domain: `${label}.example` });
+    const m = await claimDueIn(named, prospect.prospectId, HOUR_S);
+    const x = await claimDueIn(sx, prospect.prospectId, 60);
+    const y = await claimDueIn(sy, prospect.prospectId, HOUR_S);
+    const claimIds = [m.claimId, x.claimId, y.claimId];
+    const allocationId = await prepareAllocation(iw.h, {
+      ownerUserId: iw.owner.userId,
+      agencyId: a.s.agency.agencyId,
+      prospectId: prospect.prospectId,
+      shares: [
+        { seller: named, claimId: m.claimId, shareBps: 4_000 },
+        { seller: sx, claimId: x.claimId, shareBps: 3_000 },
+        { seller: sy, claimId: y.claimId, shareBps: 3_000 },
+      ],
+    });
+    ctx.deadline(firstNotBefore(x.deadline), "share X's review deadline");
+    const before = await allocationOf(allocationId);
+    const holder = await open("kauro_app_test");
+    const waiter = await open("kauro_app_test");
+    const key = freshKey(label);
+    try {
+      await holder.query("BEGIN ISOLATION LEVEL READ COMMITTED");
+      await holder.query("SELECT set_config('kauro.agency_id', '', true), set_config('kauro.user_id', $1, true), set_config('kauro.finance_agency_id', '', true)", [iw.owner.userId]);
+      const held = await holder.query("SELECT claim_id FROM kauro.attribution_claims WHERE claim_id = $1 FOR UPDATE", [y.claimId]);
+      assert.equal(held.rowCount, 1, "another session holds share Y's claim");
+      const pause = ctx.points.pause("db.share_lock.before");
+      const waiting = await ctx.mustWait(iw.h.oracle, { waiter, holder: connectionPid(holder) }, async (conn) => {
+          const running = routed(ctx, conn, [SHARE_LOCK(y.claimId)], () => acceptClaim(m.claimId, allocationId, key));
+          try {
+            await pause.reachedBy(running);
+            // X locked and judged (its deadline ahead), Y's lock next: X's deadline passes here, the named claim's stays ahead
+            const judged = await conn.query<{ x_ahead: boolean }>("SELECT kauro.effect_now() < review_deadline_at AS x_ahead FROM kauro.attribution_claims WHERE claim_id = $1", [x.claimId]);
+            assert.equal(judged.rows[0]!.x_ahead, true, "share X's deadline was ahead when the acceptance judged it");
+            ctx.clock.past(x.deadline);
+            await ctx.clock.onServer(conn);
+            const now = await conn.query<{ x_passed: boolean; m_ahead: boolean }>(
+              "SELECT (SELECT review_deadline_at FROM kauro.attribution_claims WHERE claim_id = $1) <= kauro.effect_now() AS x_passed, (SELECT review_deadline_at FROM kauro.attribution_claims WHERE claim_id = $2) > kauro.effect_now() AS m_ahead",
+              [x.claimId, m.claimId],
+            );
+            assert.deepEqual({ ...now.rows[0] }, { x_passed: true, m_ahead: true }, "X's deadline passed, the named claim's still ahead, as the acceptance takes Y's lock");
+          } finally {
+            pause.release();
+          }
+          return running;
+        }, "the split's acceptance while another session holds share Y's claim");
+      await holder.query("COMMIT");
+      assert.equal(said(valueOf(await waiting.pending, "the acceptance")), "409 PRECONDITION_FAILED CLAIM_EXPIRED", "share X's deadline passed while the acceptance waited on share Y's claim: refused at COMMIT");
+    } finally {
+      await holder.end();
+      await waiter.end();
+    }
+    assert.deepEqual(await allocationOf(allocationId), before, "the allocation is not frozen");
+    assert.deepEqual(await claimsOf(claimIds), [["SUBMITTED", 1], ["SUBMITTED", 1], ["SUBMITTED", 1]], "no share's claim ACCEPTED");
+    assert.notEqual(await journalState(key), "COMMITTED", "no committed answer is journaled");
   },
 );
 
