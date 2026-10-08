@@ -84,11 +84,23 @@ export interface ResumedSession {
   readonly session: WebSessionRecord;
 }
 
+/**
+ * A session judged under its row lock (FAILURE-MATRIX-TEMPLATE rule 16): the holder reads its clock after the lock was granted, judges
+ * `liveAt` at that instant, completes its effect and only then calls `release`; a revocation that began after the lock waits until then.
+ */
+export interface HeldSession extends ResumedSession {
+  /** Not revoked, before the idle and the absolute deadlines of the row as locked. */
+  liveAt(nowMs: number): boolean;
+  release(): Promise<void>;
+}
+
 export interface SessionService {
   /** `replacing`: the secret of the session cookie the sign-in request carried, which the new session replaces (ended once open). */
   open(request: { readonly correlationId: CorrelationId; readonly idToken: string; readonly replacing?: string | null }): Promise<SessionOutcome<{ readonly secret: string; readonly view: SessionView }>>;
   /** The live session of a secret and its subject, or null; moves last-seen at most once a minute. */
   resume(secret: string): Promise<ResumedSession | null>;
+  /** The session of a secret under its row lock until `release` (touched as `resume` touches), or null when no session has that secret. */
+  hold(secret: string): Promise<HeldSession | null>;
   viewOf(secret: string, session: WebSessionRecord): SessionView;
   revoke(request: { readonly correlationId: CorrelationId; readonly secret: string | null }): Promise<SessionOutcome<null>>;
   stepUp(request: { readonly correlationId: CorrelationId; readonly subject: AuthenticatedSubject; readonly secret: string | null; readonly idToken: string }): Promise<SessionOutcome<StepUpProofView>>;
@@ -112,6 +124,15 @@ function factsOf(token: VerifiedIdentityToken, userId: UserId): IdentityFacts {
     emailVerifiedAt: token.emailVerified ? token.issuedAt : null,
     mfaEnrolledAt: token.secondFactor !== null ? token.authTime : null,
     state: "ACTIVE",
+  };
+}
+
+/** The authenticated subject of a session: its person with the facts its token proved at sign-in. */
+function subjectOfSession(session: WebSessionRecord): AuthenticatedSubject {
+  return {
+    identity: { userId: session.userId, emailVerifiedAt: session.emailVerifiedAt, mfaEnrolledAt: session.mfaAt, state: "ACTIVE" },
+    provider: session.provider,
+    subjectHash: session.subjectHash,
   };
 }
 
@@ -204,12 +225,14 @@ export function createSessionService(deps: SessionServiceDependencies): SessionS
       // liveness judged at an instant read after the store returned (TIME-AFTER-AWAIT, PV1R-02 r2): a session that expires while the store
       // waits (its connection, its statement) is ended, never judged at a sample taken before the wait
       if (session === null || !isLive(session, Date.parse(deps.clock.now()))) return null;
-      const subject: AuthenticatedSubject = {
-        identity: { userId: session.userId, emailVerifiedAt: session.emailVerifiedAt, mfaEnrolledAt: session.mfaAt, state: "ACTIVE" },
-        provider: session.provider,
-        subjectHash: session.subjectHash,
-      };
-      return { subject, session };
+      return { subject: subjectOfSession(session), session };
+    },
+
+    async hold(secret) {
+      const held = await deps.store.hold(sessionSecretDigest(secret), () => deps.clock.now(), SESSION_POLICY.idleSeconds, SESSION_POLICY.touchSeconds);
+      if (held === null) return null;
+      const session = held.session;
+      return { subject: subjectOfSession(session), session, liveAt: (nowMs) => isLive(session, nowMs), release: () => held.release() };
     },
 
     revoke: ({ correlationId, secret }) =>

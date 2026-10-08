@@ -81,11 +81,20 @@ function sessionOf(r: SessionRow): StoredWebSession {
 /** Statement bound of one boundary transaction: it waits on nobody for long (a session row lock at most). */
 export const WEB_SESSION_STATEMENT_TIMEOUT_MS = 5_000;
 
+/** A session judged under its row lock, held until `release` (the guarded effect is complete by then). */
+export interface HeldStoredWebSession {
+  readonly session: StoredWebSession;
+  release(): Promise<void>;
+}
+
 export class PgWebSessionStore {
   constructor(private readonly pool: KauroPool) {}
 
-  /** One transaction on a verified kauro_assurance connection with only the given settings bound; COMMIT is checked. */
-  async #boundary<T>(bind: { readonly userId: UserId | null; readonly sessionSha256: Sha256Hex | null }, work: (client: PoolClient) => Promise<T>): Promise<T> {
+  /**
+   * Opens one transaction on a verified kauro_assurance connection with only the given settings bound. The caller ends it exactly once:
+   * `commit` (checked) or `rollback`; either returns the connection (destroyed when its ROLLBACK failed).
+   */
+  async #begin(bind: { readonly userId: UserId | null; readonly sessionSha256: Sha256Hex | null }): Promise<{ readonly client: PoolClient; commit(): Promise<void>; rollback(): Promise<void> }> {
     let acquired: Awaited<ReturnType<KauroPool["acquire"]>>;
     try {
       acquired = await this.pool.acquire();
@@ -100,25 +109,85 @@ export class PgWebSessionStore {
       client.release();
       throw new DomainFailure("INTEGRITY_FAILURE", `web sessions are kept only by kauro_assurance; this pool is ${connection.role} (08 Database isolation)`);
     }
-    let destroy: Error | undefined;
-    try {
-      await execute(client, "BEGIN");
-      await execute(client, `SET LOCAL statement_timeout = '${WEB_SESSION_STATEMENT_TIMEOUT_MS}ms'`);
-      await execute(client, "SELECT set_config('kauro.user_id', $1, true), set_config('kauro.session_sha256', $2, true)", [bind.userId ?? "", bind.sessionSha256 ?? ""]);
-      const out = await work(client);
-      const commit = await execute(client, "COMMIT");
-      if (commit.command !== "COMMIT") throw new DomainFailure("INTEGRITY_FAILURE", "the session transaction was aborted by an earlier refusal and did not commit");
-      return out;
-    } catch (e) {
+    let ended = false;
+    const rollback = async (): Promise<void> => {
+      if (ended) return;
+      ended = true;
+      let destroy: Error | undefined;
       try {
         await client.query("ROLLBACK");
       } catch (rollbackError) {
         destroy = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+      } finally {
+        client.release(destroy);
       }
+    };
+    const commit = async (): Promise<void> => {
+      if (ended) throw new DomainFailure("INTEGRITY_FAILURE", "a session transaction ends once");
+      let committed: Awaited<ReturnType<typeof execute>>;
+      try {
+        committed = await execute(client, "COMMIT");
+      } catch (e) {
+        await rollback();
+        throw e;
+      }
+      if (committed.command !== "COMMIT") {
+        await rollback();
+        throw new DomainFailure("INTEGRITY_FAILURE", "the session transaction was aborted by an earlier refusal and did not commit");
+      }
+      ended = true;
+      client.release();
+    };
+    try {
+      await execute(client, "BEGIN");
+      await execute(client, `SET LOCAL statement_timeout = '${WEB_SESSION_STATEMENT_TIMEOUT_MS}ms'`);
+      await execute(client, "SELECT set_config('kauro.user_id', $1, true), set_config('kauro.session_sha256', $2, true)", [bind.userId ?? "", bind.sessionSha256 ?? ""]);
+    } catch (e) {
+      await rollback();
       throw e;
-    } finally {
-      client.release(destroy);
     }
+    return { client, commit, rollback };
+  }
+
+  /** One transaction on a verified kauro_assurance connection with only the given settings bound; COMMIT is checked. */
+  async #boundary<T>(bind: { readonly userId: UserId | null; readonly sessionSha256: Sha256Hex | null }, work: (client: PoolClient) => Promise<T>): Promise<T> {
+    const tx = await this.#begin(bind);
+    let out: T;
+    try {
+      out = await work(tx.client);
+    } catch (e) {
+      await tx.rollback();
+      throw e;
+    }
+    await tx.commit();
+    return out;
+  }
+
+  /**
+   * The session the hash names judged under its row lock (FAILURE-MATRIX-TEMPLATE rule 16, PV1R-02 r3): the row is locked FOR UPDATE first
+   * (the lock a revocation's and every other touch's UPDATE conflict with), THEN the instant is read, THEN the touch is decided and written
+   * at that instant: a resume that waited on the row while the idle deadline passed judges the deadline at an instant after its wait and
+   * never renews an ended session. Null when no session has the hash.
+   */
+  async #lockedResume(client: PoolClient, secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<StoredWebSession | null> {
+    const locked = await execute<SessionRow>(client, `SELECT ${COLUMNS} FROM kauro.web_sessions WHERE secret_sha256 = $1 FOR UPDATE`, [secretSha256]);
+    const row = locked.rows[0];
+    if (row === undefined) return null;
+    // the instant, read after the lock is granted, immediately before the statement that judges it
+    const at = now();
+    // a live session whose last-seen is at least `touchSeconds` old moves it (at most once a minute: 07 connection budget)
+    const touched = await execute<SessionRow>(
+      client,
+      `UPDATE kauro.web_sessions
+          SET last_seen_at = $2::timestamptz,
+              idle_expires_at = LEAST($2::timestamptz + make_interval(secs => $3::integer), absolute_expires_at)
+        WHERE secret_sha256 = $1 AND revoked_at IS NULL
+          AND idle_expires_at > $2::timestamptz AND absolute_expires_at > $2::timestamptz
+          AND last_seen_at <= $2::timestamptz - make_interval(secs => $4::integer)
+      RETURNING ${COLUMNS}`,
+      [secretSha256, at, idleSeconds, touchSeconds],
+    );
+    return sessionOf(touched.rows[0] ?? row);
   }
 
   async open(session: NewStoredWebSession, secretSha256: Sha256Hex, _correlationId: CorrelationId): Promise<void> {
@@ -134,25 +203,33 @@ export class PgWebSessionStore {
 
   async resume(secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<StoredWebSession | null> {
     if (!Number.isInteger(idleSeconds) || idleSeconds <= 0 || !Number.isInteger(touchSeconds) || touchSeconds < 0) throw new RangeError("idle and touch windows are whole seconds");
-    return this.#boundary({ userId: null, sessionSha256: secretSha256 }, async (client) => {
-      // a live session whose last-seen is at least `touchSeconds` old moves it (at most once a minute: 07 connection budget);
-      // a concurrent revocation holds the row lock first and the re-evaluated condition then leaves it untouched. The instant is read here,
-      // after the connection and the transaction binding, immediately before the statement that judges it (TIME-AFTER-AWAIT, PV1R-02 r2)
-      const at = now();
-      const touched = await execute<SessionRow>(
-        client,
-        `UPDATE kauro.web_sessions
-            SET last_seen_at = $2::timestamptz,
-                idle_expires_at = LEAST($2::timestamptz + make_interval(secs => $3::integer), absolute_expires_at)
-          WHERE secret_sha256 = $1 AND revoked_at IS NULL
-            AND idle_expires_at > $2::timestamptz AND absolute_expires_at > $2::timestamptz
-            AND last_seen_at <= $2::timestamptz - make_interval(secs => $4::integer)
-        RETURNING ${COLUMNS}`,
-        [secretSha256, at, idleSeconds, touchSeconds],
-      );
-      const row = touched.rows[0] ?? (await execute<SessionRow>(client, `SELECT ${COLUMNS} FROM kauro.web_sessions WHERE secret_sha256 = $1`, [secretSha256])).rows[0];
-      return row === undefined ? null : sessionOf(row);
-    });
+    return this.#boundary({ userId: null, sessionSha256: secretSha256 }, (client) => this.#lockedResume(client, secretSha256, now, idleSeconds, touchSeconds));
+  }
+
+  async hold(secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<HeldStoredWebSession | null> {
+    if (!Number.isInteger(idleSeconds) || idleSeconds <= 0 || !Number.isInteger(touchSeconds) || touchSeconds < 0) throw new RangeError("idle and touch windows are whole seconds");
+    const tx = await this.#begin({ userId: null, sessionSha256: secretSha256 });
+    let session: StoredWebSession | null;
+    try {
+      session = await this.#lockedResume(tx.client, secretSha256, now, idleSeconds, touchSeconds);
+    } catch (e) {
+      await tx.rollback();
+      throw e;
+    }
+    if (session === null) {
+      await tx.commit();
+      return null;
+    }
+    let released = false;
+    return {
+      session,
+      // COMMIT keeps the touch; the row lock ends with the transaction
+      release: async () => {
+        if (released) return;
+        released = true;
+        await tx.commit();
+      },
+    };
   }
 
   async revoke(secretSha256: Sha256Hex, at: UtcInstant, reason: string): Promise<{ readonly outcome: "REVOKED"; readonly userId: UserId } | { readonly outcome: "ENDED" | "UNKNOWN" }> {

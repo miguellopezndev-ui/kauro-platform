@@ -28,7 +28,7 @@ export { createPool, classifyError, KauroPool, PrivilegedRoleError, RUNTIME_ROLE
 export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
 export { PgWebSessionStore, WEB_SESSION_STATEMENT_TIMEOUT_MS } from "./web-sessions.js";
-export type { StoredWebSession, NewStoredWebSession } from "./web-sessions.js";
+export type { StoredWebSession, NewStoredWebSession, HeldStoredWebSession } from "./web-sessions.js";
 export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf, bankRoutesOf, effectInstantOf } from "./unit-of-work.js";
 export { PgBankRoutes } from "./repositories/bank-routes.js";
 export type { NewBankRoute, NewBankRouteVersion, NewTransferInstructions } from "./repositories/bank-routes.js";

@@ -119,4 +119,4 @@ export type {
   CommercialScopeInspector,
 } from "./source-providers.js";
 export { AUTHORITY_TOMBSTONES } from "./source-providers.js";
-export type { IdentityTokenVerifier, IdentityTokenVerification, IdentityTokenDefect, VerifiedIdentityToken, WebSessionStore, WebSessionRecord, NewWebSession } from "./sessions.js";
+export type { IdentityTokenVerifier, IdentityTokenVerification, IdentityTokenDefect, VerifiedIdentityToken, WebSessionStore, WebSessionRecord, NewWebSession, HeldWebSession } from "./sessions.js";

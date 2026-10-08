@@ -78,6 +78,13 @@ export interface WebSessionRecord {
 
 export type NewWebSession = Omit<WebSessionRecord, "stepUpProofId" | "stepUpFreshUntil" | "revokedAt" | "revokeReason">;
 
+/** A session read (and touched when due) under its row lock, held until `release` (FAILURE-MATRIX-TEMPLATE rule 16). */
+export interface HeldWebSession {
+  readonly session: WebSessionRecord;
+  /** Ends the holding transaction (keeping its touch) and with it the row lock; idempotent. */
+  release(): Promise<void>;
+}
+
 export interface WebSessionStore {
   /** Records a new session under the identity it binds; `secretSha256` is the SHA-256 of the secret the cookie carries. */
   open(session: NewWebSession, secretSha256: Sha256Hex, correlationId: CorrelationId): Promise<void>;
@@ -85,10 +92,16 @@ export interface WebSessionStore {
    * The session the secret hash names, as it stands after this call: when it is live at `now` and its last-seen instant is at
    * least `touchSeconds` old, last-seen moves to `now` and the idle deadline to min(now + idleSeconds, the absolute deadline)
    * first. Null when no session has that hash. Liveness is the caller's decision on the returned record, at an instant it reads
-   * after this call returned. `now` is read by the store immediately before its touch statement, after its connection is acquired
-   * and its transaction bound (TIME-AFTER-AWAIT, PV1R-02 r2): a wait for the connection never touches an expired session.
+   * after this call returned. The store locks the session row first (the lock its revocation and every touch conflict with) and
+   * reads `now` only once the lock is granted, immediately before the touch statement (FAILURE-MATRIX-TEMPLATE rule 16, PV1R-02 r3):
+   * neither a wait for the connection nor a wait on the row lock ever touches, or renews, a session that ended meanwhile.
    */
   resume(secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<WebSessionRecord | null>;
+  /**
+   * `resume` whose transaction stays open: the session row stays locked until `release`, so a revocation (or another touch) that starts
+   * after the lock was granted waits until the holder's effect is complete. Null (nothing held) when no session has that hash.
+   */
+  hold(secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<HeldWebSession | null>;
   /**
    * Ends the session the hash names, once: REVOKED (with its person) when it was live at `at`; ENDED when it was already revoked
    * or past a deadline (nothing changes); UNKNOWN when no session has that hash.
