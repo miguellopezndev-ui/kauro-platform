@@ -6,7 +6,8 @@
  * committed before the lock is seen; one that starts after it waits until the effect is complete — reordering awaits is not a fix.
  *
  * Lock order: the session row is the LAST lock an effect takes (access -> journal -> project -> subject -> route -> quote -> session): its
- * holder waits on no other row once it holds it, and the session's writers (revoke, touch, step-up) hold no other row.
+ * holder waits on no other row once it holds it, and the session's writers (revoke, touch, step-up) hold no other row. A step-up's proof INSERT
+ * takes a FOR KEY SHARE lock on the person's identity row (FK) after the session lock; no code takes a write lock on that row: no deadlock.
  */
 import type { Clock } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";

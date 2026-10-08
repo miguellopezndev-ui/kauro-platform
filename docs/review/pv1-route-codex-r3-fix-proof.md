@@ -22,7 +22,7 @@ Lock / clock order per path:
   await; released at `bank-route-routes.ts:179`.
 
 Deadlock check. Within a unit the session row is the LAST lock (access -> journal -> project -> subject -> route -> quote -> session); its
-writers (revoke, touch) hold no other row. Pools nest app -> assurance in beforeCommit, and assurance -> app on the denial path: a denial is recorded through the app pool (runtime.ts, route-config.ts) while the session lock is held; that wait is bounded by the 5 s connection and statement timeouts and no effect escapes (the unit is rolled back before the denial is recorded). An assurance holder can therefore wait on the app pool, for at most those 5 s. A second
+writers (revoke, touch, step-up) hold no other row. The step-up's proof INSERT takes a FOR KEY SHARE lock on the person's identity row (FK) after the session lock; no code takes a write lock on that row, so there is no deadlock. Pools nest app -> assurance in beforeCommit, and assurance -> app on the denial path: a denial is recorded through the app pool (runtime.ts, route-config.ts) while the session lock is held; that wait is bounded by the 5 s connection and statement timeouts and no effect escapes (the unit is rolled back before the denial is recorded). An assurance holder can therefore wait on the app pool, for at most those 5 s. A second
 judgment of the same request reuses the held row (7f5c361) instead of self-waiting until the 5 s statement timeout; release resets it.
 Every hold transaction runs with `SET LOCAL statement_timeout` 5000 ms and the pool's idle-in-transaction timeout.
 
@@ -72,8 +72,8 @@ Fix: `SessionStore.revoke(secret, now: () => UtcInstant, reason)` locks the row 
 existing predicate (deadlines at that instant: past a deadline = ENDED, no REVOKED row, no ALLOW fact) and stamps revoked_at with that
 instant. Logout (service.ts) and the replaced-session revoke on sign-in pass the clock, not a sampled instant. The replay branch of
 runCommerceCommand takes `judgedUnderHold(envelope.authority, runtime.clock)` before returning the journaled body (held until the transport
-releases, after COMMIT). The replaced-session revoke shares the store function (no separate cell). recordStepUp (sampled recordedAt, no deadline
-predicate) is NOT changed: GAP, outside the packet.
+releases, after COMMIT). The replaced-session revoke shares the store function and has its own cells (items B below). recordStepUp is fixed (items A
+below), not a gap.
 
 ADV-3 (evidence). runtime-boundary.json: 349 inserted lines, 0 removed. The missing entries were taken from the failing test output (tables
 of kauro_app/kauro_control/kauro_payment, column grants of bank_routes, bank_route_versions, bank_transfer_instructions, and the policies of
@@ -107,3 +107,12 @@ refuses when the session is revoked or past its idle or absolute deadline at tha
 session row (not an issuance); it is the same session row lock an issuance holds.
 
 Green (Windows): ach-route-cells 112/112; b11 session files 37/37; CMD027-034 + b09 57/57; persistence runtime-boundary, source-migrations, migrations, bank-route-migrations 46/46; tsc clean (application, persistence, api).
+
+## r7 ADV-1 (adversary r7 on 418f073; base b60fe6a)
+Test 3d63d3b, fix b06f83f. The 300 s re-authentication age and the proof's instants (issuedAt, expiresAt) moved from the service (early clock
+sample) into `recordStepUp`, judged at the instant read after the session lock (no-session branch: inside the transaction, after its connection wait).
+The store returns RECORDED (with the proof), ENDED or STALE; STALE maps to the existing ASSURANCE_REQUIRED STEP_UP_STALE (the service's refuse path,
+which answers 403 as in b11-sessions, not 422).
+- Red on b60fe6a: 301 s wait, actual '201 SUCCESS -', expected '403 ASSURANCE_REQUIRED STEP_UP_STALE'. The 299 s control records (201).
+- Revert proof (age judged at a sample taken before the lock): the same cell returns '201 SUCCESS -' for the 301 s wait.
+ADV-2 (docs): the gap sentence above and the pool/lock sentence in the deadlock check are corrected; authority.ts header states the identity-row lock.
