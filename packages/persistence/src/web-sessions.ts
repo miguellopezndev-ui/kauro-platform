@@ -132,11 +132,13 @@ export class PgWebSessionStore {
     });
   }
 
-  async resume(secretSha256: Sha256Hex, now: UtcInstant, idleSeconds: number, touchSeconds: number): Promise<StoredWebSession | null> {
+  async resume(secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<StoredWebSession | null> {
     if (!Number.isInteger(idleSeconds) || idleSeconds <= 0 || !Number.isInteger(touchSeconds) || touchSeconds < 0) throw new RangeError("idle and touch windows are whole seconds");
     return this.#boundary({ userId: null, sessionSha256: secretSha256 }, async (client) => {
       // a live session whose last-seen is at least `touchSeconds` old moves it (at most once a minute: 07 connection budget);
-      // a concurrent revocation holds the row lock first and the re-evaluated condition then leaves it untouched
+      // a concurrent revocation holds the row lock first and the re-evaluated condition then leaves it untouched. The instant is read here,
+      // after the connection and the transaction binding, immediately before the statement that judges it (TIME-AFTER-AWAIT, PV1R-02 r2)
+      const at = now();
       const touched = await execute<SessionRow>(
         client,
         `UPDATE kauro.web_sessions
@@ -146,7 +148,7 @@ export class PgWebSessionStore {
             AND idle_expires_at > $2::timestamptz AND absolute_expires_at > $2::timestamptz
             AND last_seen_at <= $2::timestamptz - make_interval(secs => $4::integer)
         RETURNING ${COLUMNS}`,
-        [secretSha256, now, idleSeconds, touchSeconds],
+        [secretSha256, at, idleSeconds, touchSeconds],
       );
       const row = touched.rows[0] ?? (await execute<SessionRow>(client, `SELECT ${COLUMNS} FROM kauro.web_sessions WHERE secret_sha256 = $1`, [secretSha256])).rows[0];
       return row === undefined ? null : sessionOf(row);

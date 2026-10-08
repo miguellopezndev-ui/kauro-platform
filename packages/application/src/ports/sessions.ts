@@ -84,9 +84,11 @@ export interface WebSessionStore {
   /**
    * The session the secret hash names, as it stands after this call: when it is live at `now` and its last-seen instant is at
    * least `touchSeconds` old, last-seen moves to `now` and the idle deadline to min(now + idleSeconds, the absolute deadline)
-   * first. Null when no session has that hash. Liveness is the caller's decision on the returned record.
+   * first. Null when no session has that hash. Liveness is the caller's decision on the returned record, at an instant it reads
+   * after this call returned. `now` is read by the store immediately before its touch statement, after its connection is acquired
+   * and its transaction bound (TIME-AFTER-AWAIT, PV1R-02 r2): a wait for the connection never touches an expired session.
    */
-  resume(secretSha256: Sha256Hex, now: UtcInstant, idleSeconds: number, touchSeconds: number): Promise<WebSessionRecord | null>;
+  resume(secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<WebSessionRecord | null>;
   /**
    * Ends the session the hash names, once: REVOKED (with its person) when it was live at `at`; ENDED when it was already revoked
    * or past a deadline (nothing changes); UNKNOWN when no session has that hash.

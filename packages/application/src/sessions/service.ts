@@ -200,9 +200,10 @@ export function createSessionService(deps: SessionServiceDependencies): SessionS
       }),
 
     async resume(secret) {
-      const now = deps.clock.now();
-      const session = await deps.store.resume(sessionSecretDigest(secret), now, SESSION_POLICY.idleSeconds, SESSION_POLICY.touchSeconds);
-      if (session === null || !isLive(session, Date.parse(now))) return null;
+      const session = await deps.store.resume(sessionSecretDigest(secret), () => deps.clock.now(), SESSION_POLICY.idleSeconds, SESSION_POLICY.touchSeconds);
+      // liveness judged at an instant read after the store returned (TIME-AFTER-AWAIT, PV1R-02 r2): a session that expires while the store
+      // waits (its connection, its statement) is ended, never judged at a sample taken before the wait
+      if (session === null || !isLive(session, Date.parse(deps.clock.now()))) return null;
       const subject: AuthenticatedSubject = {
         identity: { userId: session.userId, emailVerifiedAt: session.emailVerifiedAt, mfaEnrolledAt: session.mfaAt, state: "ACTIVE" },
         provider: session.provider,
