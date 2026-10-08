@@ -29,7 +29,7 @@ import type { UtcInstant } from "@kauro/contracts";
 import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { bankRoutesOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
+import { bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import { commercialPrincipalReader } from "./commercial-principals.js";
 import type { ApiConfig, IdentityConfig, MigratorConfig } from "./config.js";
@@ -365,7 +365,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   if (assembly.sessions !== undefined) {
     const bound = assembly.sessions;
     assertIdentityConfig(assembly.environment, bound.identityConfig);
-    const service = createSessionService({ unitOfWork: runtime.unitOfWork, clock, ids, random: assembly.random ?? systemRandom, verifier: bound.verifier, store: bound.store });
+    const service = createSessionService({ unitOfWork: runtime.unitOfWork, clock, ids, random: assembly.random ?? systemRandom, verifier: bound.verifier, store: bound.store, fence: { lockPresented: (uow, secretSha256, userId) => sessionFenceOf(uow).lockPresented(secretSha256, userId) } });
     authenticator = createSessionAuthenticator(assembly.authenticator, service, bound.appOrigins);
     sessions = { service, authenticator, appOrigins: bound.appOrigins, identityConfig: bound.identityConfig };
   }
