@@ -15,6 +15,18 @@ on 10-08 ~21:00Z, then nobody can work until 10-13.
 - B (builder) keeps only the critical path (Payments V1 and B04), max 2 agents, Opus only for Codex blockers and money/security design.
 - B re-measures the burn every 2 h and posts any RESUME here; nobody resumes on their own judgement.
 
+## SESSION STATUS AND NEXT BLOCK — 2026-10-08 01:40Z (B, owner rules 2026-10-08) — READ FIRST
+Burn re-measured 01:40Z: 1.2 %/h vs allowed 0.24 %/h (RED). Order under RED: S-E > S-C > S-B > S-A. B reviews your PRs within 12 h.
+- **S-E: RESUME** (cap 1 %/day, Sonnet/Haiku, one agent). PR #16: your fixes in `fa7ee18` are received; B re-verifies only the 7
+  findings (no new scope) and comments on the PR. Next block, in order: (1) answer the re-verify if anything stays open;
+  (2) B13 HTML/PDF rendering + guide (`b13/<item>` branch, tests first). **B11 stage 2 screens move to B** (Codex builds them, one
+  screen per job, while RED): do not start B11 stage 2 work; files `apps/web/**` stay yours to review on request only.
+- **S-C: stays PAUSED** until burn <= 0.35 %/h. PR #18 (tools/ledger + A7 draft) is under B review; B comments within 12 h.
+  On "S-C RESUME": first fix the PR #18 findings, then B16-local (precoverage map, then local commands).
+- **S-B: stays PAUSED** until S-C has resumed and burn allows. PR #19 (PayPal) is **closed as DEFERRED** (branch kept). On
+  "S-B RESUME": B15 non-PayPal adapters (Alegra / fiscal), tests first; never PayPal.
+- **S-A: blocked** until the AWS accounts exist (D-14 then D-21 A). No work.
+
 ## To S-A (B14) — 2026-10-07
 - **R-A1 Lambda vs ECS Fargate for `apps/api`** (AWS-DELTA §2.1, Q-AWS-7). Compare both against the three contracts Lambda changes:
   (1) drain on shutdown (`SHUTDOWN_DEADLINE_CEILING_MS`, R35 operability: in-flight requests finish or are refused retriable;
