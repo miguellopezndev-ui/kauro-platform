@@ -3126,3 +3126,17 @@ cell(`B r6 DENY ACH-M-I3-REVOCATION (idle deadline of the replaced session passe
     assert.deepEqual(facts, [], "no revocation fact for a session that ended before the revoking instant");
   });
 });
+
+// === adversary r7 ADV-1 on 418f073: the 300 s re-authentication age is judged at the post-lock instant too ==================================
+
+test("C r7 DENY ACH-M-R2-EXPIRY (re-authentication ages past 300 s while the step-up waits on the session row): the step-up is refused 403 ASSURANCE_REQUIRED STEP_UP_STALE and records no proof; the same wait 1 s short of the window records it", async () => {
+  await onMovedSessions("adv-r7-stale", async () => {
+    const live = await stepUpBlocked(299_000, "unchanged");
+    assert.equal(code(live.reply), "201 SUCCESS -", "control: a re-authentication 299 s old at the post-lock instant is recorded");
+    assert.equal(live.proofs.length, live.before + 1, "control: one proof recorded");
+    const r = await stepUpBlocked(301_000, "unchanged");
+    assert.equal(code(r.reply), "403 ASSURANCE_REQUIRED STEP_UP_STALE", "a re-authentication 301 s old at the post-lock instant is stale");
+    assert.equal(r.proofs.length, r.before, "no step-up proof recorded");
+    assert.ok(r.reached);
+  });
+});
