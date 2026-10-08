@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 import { ConnectionSecurityError } from "@kauro/persistence";
 import { openCommissionPools, openPaymentPools } from "../src/index.js";
 
@@ -45,10 +46,17 @@ function tempRepo(tracked: Record<string, string>, untracked: Record<string, str
   return { dir, done: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
+/**
+ * ADV-10 (1896dea): comments removed by the TypeScript parser and printer, which know strings, templates and regular
+ * expressions ("a//b" is not a comment); a bare scanner loses its place at template tails and regex literals.
+ */
+const printer = ts.createPrinter({ removeComments: true });
+function withoutComments(text: string): string {
+  return printer.printFile(ts.createSourceFile("scan.ts", text, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS));
+}
+
 function code(text: string): string {
-  return text
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:"'])\/\/.*$/gm, "$1")
+  return withoutComments(text)
     // ADV-8 (56673d9): one spelling per form before matching: `import (`/`require (` -> `import(`, a template literal without
     // substitutions -> a quoted string, so the patterns need not enumerate spacing and quoting variants
     .replace(/\b(import|require)\s+\(/g, "$1(")
@@ -103,7 +111,8 @@ function persistenceProblem(rel: string, text: string): string | undefined {
   const c = code(text);
   if (CONSTRUCTS.test(c) && !text.includes("sslOptionsOf(")) return `${rel} derives ssl from sslOptionsOf`;
   if (CONSTRUCTS_KAURO_POOL.test(c) && rel !== "packages/persistence/src/pool.ts") return `${rel} constructs KauroPool outside pool.ts`;
-  if (!POOL_VALUE_HOLDERS.has(rel) && POOL_VALUE_IMPORTS.some((f) => f.test(c))) return `${rel} takes KauroPool or createPool as a value outside pool.ts and index.ts`;
+  // ADV-9 (1896dea): createPool is not even mentioned elsewhere, so no import route (index namespace, run-time import) can wrap it
+  if (!POOL_VALUE_HOLDERS.has(rel) && (POOL_VALUE_IMPORTS.some((f) => f.test(c)) || /\bcreatePool\b/.test(c))) return `${rel} takes KauroPool or createPool as a value outside pool.ts and index.ts`;
   return undefined;
 }
 
@@ -164,6 +173,7 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
     "star re-export of persistence": 'export * from "@kauro/persistence";',
     "spaced dynamic import of pg": 'const m = await import ("pg");\nconst p = new m["Pool"](cfg);',
     "template-literal import of pg": "const m = await import(`pg`);",
+    "a site after a string holding //": 'const u = "a//b"; const p = new (await import("pg")).Pool({});',
   };
   for (const [name, text] of Object.entries(forms)) assert.ok(isSite(text), `not caught: ${name}`);
   for (const text of ['import type { PoolClient } from "pg";', 'import { type Client } from "pg";', "// new Pool(\nexport const a = 1;", 'export type { Pool } from "pg";', 'import type { KauroPool } from "@kauro/persistence";', 'import { type KauroPool } from "@kauro/persistence";', 'export const superuser = "postgres";', 'function f(): KauroPool {\n  return x;\n}\nconst { a, b } = y;', 'function f({ pool }: { pool: KauroPool } = d) {}']) assert.ok(!isSite(text), text);
@@ -178,6 +188,7 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
     ["packages/persistence/src/wrap.ts", 'export const p = async (c) => new (await import("./pool.js")).KauroPool(c);'],
     ["packages/persistence/src/migrations/runner.ts", 'import { createPool as mk } from "../pool.js";\nexport const open = (c) => mk(c);'],
     ["packages/persistence/src/wrap.ts", "export const p = async (c) => (await import (`./pool.js`)).createPool(c);"],
+    ["packages/persistence/src/migrations/runner.ts", 'import * as I from "../index.js";\nexport const open = (c) => I.createPool(c);'],
   ] as const) assert.equal(persistenceProblem(rel, text), `${rel} takes KauroPool or createPool as a value outside pool.ts and index.ts`, text);
   for (const [rel, text] of [
     ["packages/persistence/src/evidence.ts", 'import type { KauroPool, RuntimeRole } from "./pool.js";\nexport const f = (pool: KauroPool) => pool;'],
