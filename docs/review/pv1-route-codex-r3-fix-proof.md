@@ -124,3 +124,10 @@ takes (>= 0), and the store's own judgment admits at most 300000 ms: `created_at
 re-authentication's own instant); `expires_at - issued_at` === 900000 ms. The 301 s cell already asserts no proof row (`proofs.length === before`).
 Mutation proof (web-sessions.ts `const issuedMs = Math.min(authMs, atMs);` -> `const issuedMs = atMs;`): the control fails with
 `created_at - issued_at ... in [299000, 300000] ms (was 0)`; restored, green.
+
+## r9 (adversary r9 on e4202bd): the C r7 control no longer rides a 1000 ms margin
+Test-only. The 299 s control left 1000 ms to the limit; auth_time is whole seconds (up to 999 ms older than the mint) plus harness time, so ~2 of 10
+runs judged it stale. The control now waits 240 s (60 s margin) and asserts `created_at - issued_at` in [240000, 300000] ms and
+`expires_at - issued_at` === 900000 ms. The 301 s refusal cell is unchanged and safe: flooring auth_time only makes the re-authentication older, so
+301 s stays above 300 s. Stability: the step-up cells (3 A r6 + C r7) ran 20 consecutive times on Windows, 20/20 green (4/4 each), longest run
+55.6 s (others 35-45 s). Mutation `const issuedMs = atMs;` (web-sessions.ts:294): the control fails with `... in [240000, 300000] ms (was 0)`; restored.
