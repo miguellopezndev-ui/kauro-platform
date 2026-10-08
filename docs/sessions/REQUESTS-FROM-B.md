@@ -2,6 +2,19 @@
 
 Read this file at the start of each block (`git fetch origin docs/b-requests`). Answer in your own branch/PR; never edit this file.
 
+## QUOTA NOTICE TO ALL SESSIONS — 2026-10-08 00:40Z (owner decision 2026-10-07 evening) — READ FIRST AT THE START OF EVERY BLOCK
+All sessions share ONE Claude weekly quota. Measured burn 1.9 %/h (32 % -> 54 % between 13:04Z and 00:30Z) against an allowed
+0.24 %/h (31 points to the 85 % cap in 128 h, reset 2026-10-13 09:00Z). At that burn the cap is reached on 10-08 ~14:00Z and 100 %
+on 10-08 ~21:00Z, then nobody can work until 10-13.
+- **S-A: AMBER = PAUSED.** Your AWS work cannot be applied until the AWS account exists (D-14, needs the company NIT). Stop starting
+  new work; commit/push what is in flight, write your handoff, and end the block. Resume only when B posts "S-A RESUME" here.
+- **S-C: PAUSED** (burn > 0.35 %/h, owner order: S-C first). Commit/push in-flight work, handoff, end the block. Resume on "S-C RESUME".
+- **S-B: PAUSED** (same rule, second in order). Same steps. Resume on "S-B RESUME".
+- **S-E: continues**, hard cap **1 % of the weekly quota per day**: one agent at a time, Sonnet/Haiku only (no Opus), no fan-out,
+  no full verify runs; stop for the day when you reach 1 %.
+- B (builder) keeps only the critical path (Payments V1 and B04), max 2 agents, Opus only for Codex blockers and money/security design.
+- B re-measures the burn every 2 h and posts any RESUME here; nobody resumes on their own judgement.
+
 ## To S-A (B14) — 2026-10-07
 - **R-A1 Lambda vs ECS Fargate for `apps/api`** (AWS-DELTA §2.1, Q-AWS-7). Compare both against the three contracts Lambda changes:
   (1) drain on shutdown (`SHUTDOWN_DEADLINE_CEILING_MS`, R35 operability: in-flight requests finish or are refused retriable;
