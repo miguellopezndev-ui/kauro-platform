@@ -22,14 +22,14 @@
  *            ASSURANCE_REQUIRED (STEP_UP_NOT_OWNED, STEP_UP_MISSING, STEP_UP_STALE) and DENY facts of the caller's stream.
  */
 import type { UtcInstant } from "@kauro/contracts";
-import type { AssuranceProofId, Clock, CorrelationId, IdGenerator, IdentityFacts, RandomBytes, UnitOfWorkFactory, UserId } from "@kauro/domain";
+import type { AssuranceProofId, Clock, CorrelationId, IdGenerator, IdentityFacts, RandomBytes, UnitOfWork, UnitOfWorkFactory, UserId } from "@kauro/domain";
 import { DomainFailure, identityUserId, subjectDigest, toUtcInstant } from "@kauro/domain";
 import { credentialEnded } from "../api/authority.js";
 import type { AuthenticatedSubject } from "../api/envelope.js";
 import { problemOf, type Problem } from "../api/problems.js";
 import { recordDenialFact, recordIdentityFact, refuseAnonymously } from "../commands/runtime.js";
 import { STEP_UP_FRESHNESS_SECONDS } from "../ports/assurance-and-admission.js";
-import type { IdentityTokenVerifier, StepUpRequest, VerifiedIdentityToken, WebSessionRecord, WebSessionStore } from "../ports/sessions.js";
+import type { IdentityTokenVerifier, SessionFence, StepUpRequest, VerifiedIdentityToken, WebSessionRecord, WebSessionStore } from "../ports/sessions.js";
 import { SESSION_POLICY, csrfTokenOf, mintSessionSecret, sessionSecretDigest } from "./protocol.js";
 
 /** The policy version every fact of this boundary names (08 "Audit events": policy version is recorded). */
@@ -76,6 +76,8 @@ export interface SessionServiceDependencies {
   readonly verifier: IdentityTokenVerifier;
   /** The authentication boundary's store (kauro_assurance). */
   readonly store: WebSessionStore;
+  /** The session fence of the request handlers' unit of work (PV1R-07 r4): the presented session locked FOR SHARE in the effect's own transaction. */
+  readonly fence: SessionFence;
 }
 
 export type SessionOutcome<T> = { readonly kind: "OK"; readonly value: T } | { readonly kind: "PROBLEM"; readonly problem: Problem };
@@ -86,13 +88,13 @@ export interface ResumedSession {
 }
 
 /**
- * A session judged under its row lock (FAILURE-MATRIX-TEMPLATE rule 16): the holder reads its clock after the lock was granted, judges
- * `liveAt` at that instant, completes its effect and only then calls `release`; a revocation that began after the lock waits until then.
+ * A session judged under the fence (FAILURE-MATRIX-TEMPLATE rule 16): locked FOR SHARE inside the effect's own unit of work, the caller reads
+ * its clock after the lock was granted and judges `liveAt` at that instant; a revocation that began after the lock waits until the unit's COMMIT
+ * (the release is that COMMIT).
  */
-export interface HeldSession extends ResumedSession {
+export interface HeldSession {
   /** Not revoked, before the idle and the absolute deadlines of the row as locked. */
   liveAt(nowMs: number): boolean;
-  release(): Promise<void>;
 }
 
 export interface SessionService {
@@ -100,8 +102,8 @@ export interface SessionService {
   open(request: { readonly correlationId: CorrelationId; readonly idToken: string; readonly replacing?: string | null }): Promise<SessionOutcome<{ readonly secret: string; readonly view: SessionView }>>;
   /** The live session of a secret and its subject, or null; moves last-seen at most once a minute. */
   resume(secret: string): Promise<ResumedSession | null>;
-  /** The session of a secret under its row lock until `release` (touched as `resume` touches), or null when no session has that secret. */
-  hold(secret: string): Promise<HeldSession | null>;
+  /** The session of a secret locked FOR SHARE in `uow`'s own transaction for `userId`, as locked; null when no session has that secret for that person. */
+  holdIn(uow: UnitOfWork, secret: string, userId: UserId): Promise<HeldSession | null>;
   viewOf(secret: string, session: WebSessionRecord): SessionView;
   revoke(request: { readonly correlationId: CorrelationId; readonly secret: string | null }): Promise<SessionOutcome<null>>;
   stepUp(request: { readonly correlationId: CorrelationId; readonly subject: AuthenticatedSubject; readonly secret: string | null; readonly idToken: string }): Promise<SessionOutcome<StepUpProofView>>;
@@ -137,8 +139,12 @@ function subjectOfSession(session: WebSessionRecord): AuthenticatedSubject {
   };
 }
 
-function isLive(session: WebSessionRecord, nowMs: number): boolean {
+function isLiveRow(session: Pick<WebSessionRecord, "revokedAt" | "idleExpiresAt" | "absoluteExpiresAt">, nowMs: number): boolean {
   return session.revokedAt === null && nowMs < Date.parse(session.idleExpiresAt) && nowMs < Date.parse(session.absoluteExpiresAt);
+}
+
+function isLive(session: WebSessionRecord, nowMs: number): boolean {
+  return isLiveRow(session, nowMs);
 }
 
 export function createSessionService(deps: SessionServiceDependencies): SessionService {
@@ -229,11 +235,10 @@ export function createSessionService(deps: SessionServiceDependencies): SessionS
       return { subject: subjectOfSession(session), session };
     },
 
-    async hold(secret) {
-      const held = await deps.store.hold(sessionSecretDigest(secret), () => deps.clock.now(), SESSION_POLICY.idleSeconds, SESSION_POLICY.touchSeconds);
-      if (held === null) return null;
-      const session = held.session;
-      return { subject: subjectOfSession(session), session, liveAt: (nowMs) => isLive(session, nowMs), release: () => held.release() };
+    async holdIn(uow, secret, userId) {
+      const locked = await deps.fence.lockPresented(uow, sessionSecretDigest(secret), userId);
+      if (locked === null) return null;
+      return { liveAt: (nowMs) => isLiveRow(locked, nowMs) };
     },
 
     revoke: ({ correlationId, secret }) =>

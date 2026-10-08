@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { AuthenticatedSubject } from "@kauro/application";
 import { isCalendarDateTime } from "@kauro/application";
-import { identityUserId, type DomainFailure } from "@kauro/domain";
+import { identityUserId, type DomainFailure, type UnitOfWork } from "@kauro/domain";
 
 export interface Authenticator {
   authenticate(headers: Readonly<Record<string, string | undefined>>): Promise<AuthenticatedSubject | null>;
@@ -24,19 +24,18 @@ export interface Authenticator {
    */
   authenticateRequest?(request: AuthenticationRequest): Promise<Authentication>;
   /**
-   * The request's credential held for an effect it authorizes (FAILURE-MATRIX-TEMPLATE rule 16), when the authenticator has a lockable
-   * credential: a cookie session's row locked (FOR UPDATE, the lock its revocation and every touch take) and touched as a resume touches,
-   * until `release`; `liveAt` judges the row as locked at an instant the caller reads after the hold. Null when the request presents no
-   * credential that names a session or subject.
+   * The request's credential held for an effect it authorizes (FAILURE-MATRIX-TEMPLATE rule 16, PV1R-07 r4), when the authenticator has a
+   * lockable credential: a cookie session's row locked FOR SHARE inside `uow`'s own transaction for `userId` (the lock its revocation and every
+   * touch conflict with; the unit's COMMIT is the release); `liveAt` judges the row as locked at an instant the caller reads after the hold.
+   * Null when the request presents no credential that names a session or subject.
    */
-  holdRequest?(request: AuthenticationRequest): Promise<HeldCredential | null>;
+  holdRequest?(request: AuthenticationRequest, uow: UnitOfWork, userId: string): Promise<HeldCredential | null>;
 }
 
 /** A credential as held by holdRequest. */
 export interface HeldCredential {
   readonly userId: string;
   liveAt(nowMs: number): boolean;
-  release(): Promise<void>;
 }
 
 /** What authentication sees of a request: its method and its lowercased single-valued headers. */

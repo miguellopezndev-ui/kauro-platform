@@ -13,7 +13,7 @@
  *    in one transaction of the same group.
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
-import type { AssuranceProof, CorrelationId, UserId } from "@kauro/domain";
+import type { AssuranceProof, CorrelationId, UnitOfWork, UserId } from "@kauro/domain";
 
 /** The facts a verified ID token establishes (the documented Identity Platform claim shape). */
 export interface VerifiedIdentityToken {
@@ -78,11 +78,21 @@ export interface WebSessionRecord {
 
 export type NewWebSession = Omit<WebSessionRecord, "stepUpProofId" | "stepUpFreshUntil" | "revokedAt" | "revokeReason">;
 
-/** A session read (and touched when due) under its row lock, held until `release` (FAILURE-MATRIX-TEMPLATE rule 16). */
-export interface HeldWebSession {
-  readonly session: WebSessionRecord;
-  /** Ends the holding transaction (keeping its touch) and with it the row lock; idempotent. */
-  release(): Promise<void>;
+/** The judged columns of a session row as the fence's locking statement returned them. */
+export interface FencedWebSession {
+  readonly revokedAt: UtcInstant | null;
+  readonly idleExpiresAt: UtcInstant;
+  readonly absoluteExpiresAt: UtcInstant;
+}
+
+/**
+ * The session fence (migration 0047, PV1R-07 r4; FAILURE-MATRIX-TEMPLATE rule 16): the session a unit of work's request presents, locked FOR SHARE
+ * inside THAT unit's own transaction and returned as locked. The lock, the judgment read, the effect and the COMMIT are one transaction on one
+ * backend; every writer of the row (revoke, resume touch, step-up) waits until that transaction ends. No clock is read here: the caller reads its
+ * clock after this returned and judges the row. Null when no session has that hash for that person.
+ */
+export interface SessionFence {
+  lockPresented(uow: UnitOfWork, secretSha256: Sha256Hex, userId: UserId): Promise<FencedWebSession | null>;
 }
 
 /**
@@ -112,11 +122,6 @@ export interface WebSessionStore {
    * neither a wait for the connection nor a wait on the row lock ever touches, or renews, a session that ended meanwhile.
    */
   resume(secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<WebSessionRecord | null>;
-  /**
-   * `resume` whose transaction stays open: the session row stays locked until `release`, so a revocation (or another touch) that starts
-   * after the lock was granted waits until the holder's effect is complete. Null (nothing held) when no session has that hash.
-   */
-  hold(secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<HeldWebSession | null>;
   /**
    * Ends the session the hash names, once: REVOKED (with its person) when it was live at the instant `now` returns; ENDED when it was
    * already revoked or past a deadline at that instant (nothing changes); UNKNOWN when no session has that hash. The store locks the row

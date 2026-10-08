@@ -228,9 +228,9 @@ async function assuredAt(co: BankRouteCollaborators, uow: CommerceUnitOfWork, us
  */
 function judgedAtCommit(co: BankRouteCollaborators, uow: CommerceUnitOfWork, userId: UserId, authorizationRef: string, detailsValidUntil: string | null, authority: RequestAuthority | undefined, clock: Clock): void {
   beforeCommitOf(uow, async () => {
-    // rule 16 (PV1R-07 r3): the caller's session row locked first (held until the transport releases it, after COMMIT), THEN the proof read
+    // rule 16 (PV1R-07 r4): the caller's session row locked FOR SHARE in this unit (its COMMIT is the release), THEN the proof read
     // and the effect clock with their judgments (PV1R-03 r2), THEN the session judged at the process clock read last; only COMMIT follows
-    await judgedUnderHold(authority, clock, async () => void (await assuredAt(co, uow, userId, authorizationRef, detailsValidUntil)));
+    await judgedUnderHold(authority, uow, clock, async () => void (await assuredAt(co, uow, userId, authorizationRef, detailsValidUntil)));
   });
 }
 
@@ -494,8 +494,8 @@ export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: Ban
           const route = await co.routes(uow).read(request.routeId);
           if (route === null) throw new NotFoundFailure("bank route");
           const view = { route: bankRouteView(route, await currentVersionOf(uow, route)) };
-          // rule 16: the view is answered only under the caller's session as held (row locked, THEN the clock, THEN the judgment)
-          await judgedUnderHold(request.authority, runtime.clock);
+          // rule 16: the view is answered only under the caller's session as fenced in this unit (row locked FOR SHARE, THEN the clock, THEN the judgment)
+          await judgedUnderHold(request.authority, uow, runtime.clock);
           return view;
         });
         return { kind: "READ", view };

@@ -161,9 +161,9 @@ export async function issueBankTransfer(runtime: CommerceRequestRuntime, co: Com
       // details validity and the minimum window to the fixed transfer deadline are judged at it; crossing either refuses with nothing issued
       const transferExpiresAtMs = window.transferExpiresAtMs;
       beforeCommitOf(uow, async () => {
-        // rule 16 (PV1R-07 r3): the buyer's session row locked first (until the transport releases it, after COMMIT), THEN the effect clock
+        // rule 16 (PV1R-07 r4): the buyer's session row locked FOR SHARE in THIS unit (the COMMIT below is the release), THEN the effect clock
         // and its judgments, THEN the session judged at the process clock read last; only COMMIT follows
-        await judgedUnderHold(envelope.authority, runtime.clock, async () => {
+        await judgedUnderHold(envelope.authority, uow, runtime.clock, async () => {
           const at = Date.parse(await bank.effectNow(uow));
           if (!(at < detailsValidUntilMs)) throw new DomainFailure("PRECONDITION_FAILED", "the route's verified account details expired", { reason: "DETAILS_EXPIRED" });
           if (transferExpiresAtMs - at < version.minimumTransferWindowMs) throw new DomainFailure("PRECONDITION_FAILED", "the transfer window left is shorter than the route's minimum", { reason: "TRANSFER_WINDOW_TOO_SHORT" });
@@ -332,14 +332,14 @@ export async function readTransferInstructions(
       const current = await repo.instructionsOf(request.orderId);
       if (current === null) throw new NotFoundFailure("payment order");
       if (!OPEN_BANK_ORDER_STATES.has(current.orderState)) throw instructionsNotAvailable();
-      // rule 16 (PV1R-02, PV1R-07 r3; PV1R-06 r2): the final authority judgment under the lock its writers take. The caller's session row is
-      // locked FIRST (a revocation committed before is seen; one that starts after waits until the transport releases the row, after the
-      // view is built), THEN the effect clock is read (its own statement, after the lock was granted), THEN every time judgment is taken
+      // rule 16 (PV1R-02, PV1R-07 r4; PV1R-06 r2): the final authority judgment under the lock its writers take. The caller's session row is
+      // locked FOR SHARE FIRST, in this unit (a revocation committed before is seen; one that starts after waits until this unit's COMMIT,
+      // after the view is built), THEN the effect clock is read (its own statement, after the lock was granted), THEN every time judgment is taken
       // at instants read after the last await (the details validity and the instruction deadline at the effect instant; the session as
       // locked at the process clock read last) and the view is built with no await in between
       let held: CredentialHold | null = null;
       if (request.authority !== undefined) {
-        held = await request.authority.hold();
+        held = await request.authority.hold(uow);
         if (held === null) return SESSION_ENDED;
       }
       const effect = Date.parse(await bank.effectNow(uow));

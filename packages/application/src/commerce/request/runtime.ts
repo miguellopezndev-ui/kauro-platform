@@ -304,9 +304,9 @@ export async function runCommerceCommand<Body, View>(runtime: CommerceRequestRun
         const status = reservation.entry.responseStatus;
         if ((status !== 200 && status !== 201) || reservation.entry.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "journaled entry is COMMITTED without a complete response");
         // rule 16 (adversary r6 ADV-2): a replay hands out the journaled response, secrets included, so the cookie session that asks is judged
-        // exactly as the fresh path judges it: its row locked first (held until the transport releases it, after COMMIT), THEN the clock, THEN
+        // exactly as the fresh path judges it: its row locked FOR SHARE first in this unit (its COMMIT is the release), THEN the clock, THEN
         // the judgment; a credential that ended is refused 401 and the stored body is not returned
-        await judgedUnderHold(envelope.authority, runtime.clock);
+        await judgedUnderHold(envelope.authority, uow, runtime.clock);
         return new Replayed(status, reservation.entry.responseBody);
       }
       if (reservation.kind === "CONFLICT") throw new IdempotencyConflictFailure();

@@ -101,15 +101,10 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
         const authenticated = await kit.subjectOrRefusal(request, headers, action, { correlationId, agencyId: null });
         if (authenticated.kind === "PROBLEM") return kit.sendProblem(r, authenticated.problem);
         const subject = authenticated.subject;
-        // rule 16 (PV1R-07 r3): the command judges the caller's credential under its lock at COMMIT; the lock is released once it returned
-        const held = kit.requestAuthority(request, headers, subject.identity.userId, correlationId);
+        // rule 16 (PV1R-07 r4): the command fences the caller's credential FOR SHARE in its own unit and judges it at COMMIT (that COMMIT is the release)
+        const authority = kit.requestAuthority(request, headers, subject.identity.userId);
         return guarded(r, correlationId, async () => {
-          let result: CommandResult<unknown>;
-          try {
-            result = await run({ environment: deps.environment, correlationId, idempotencyKey: key, subject, path, body: admitted.body, receivedAt: deps.clock.now(), authority: held.authority });
-          } finally {
-            await held.release();
-          }
+          const result: CommandResult<unknown> = await run({ environment: deps.environment, correlationId, idempotencyKey: key, subject, path, body: admitted.body, receivedAt: deps.clock.now(), authority });
           return replyOf(kit, r, result);
         });
       },
@@ -148,12 +143,8 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
   read("getBankRoute", async (request, correlationId, path, headers) => {
     const authenticated = await kit.subjectOrRefusal(request, headers, "READ_BANK_ROUTE", { correlationId, agencyId: null });
     if (authenticated.kind === "PROBLEM") return authenticated;
-    const held = kit.requestAuthority(request, headers, authenticated.subject.identity.userId, correlationId);
-    try {
-      return await deps.handlers.get({ correlationId, subject: authenticated.subject, routeId: path["routeId"]!, authority: held.authority });
-    } finally {
-      await held.release();
-    }
+    const authority = kit.requestAuthority(request, headers, authenticated.subject.identity.userId);
+    return await deps.handlers.get({ correlationId, subject: authenticated.subject, routeId: path["routeId"]!, authority });
   });
 
   read("getTransferInstructions", async (request, correlationId, path, headers) => {
@@ -169,15 +160,10 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
       if (again.kind !== "SUBJECT" || again.subject.identity.userId !== subject.identity.userId) return null;
       return { liveUntil: again.liveUntil ?? null };
     };
-    // the FINAL judgment under the session row's lock (rule 16, PV1R-02 and PV1R-07 r3): held from before the effect clock until the view
-    // is built and the projection returned; a revocation that starts meanwhile waits for it
-    const held = kit.requestAuthority(request, headers, subject.identity.userId, correlationId);
-    let answer: Awaited<ReturnType<typeof readTransferInstructions>>;
-    try {
-      answer = await readTransferInstructions(deps.runtime, deps.bank, { subject, agencyId: (selector ?? null) as never, correlationId, orderId: path["orderId"]!, stillAuthenticated, authority: held.authority });
-    } finally {
-      await held.release();
-    }
+    // the FINAL judgment under the session row's lock (rule 16, PV1R-02 and PV1R-07 r4): taken FOR SHARE in the read's own unit before the effect
+    // clock and held until that unit's COMMIT, after the view is built; a revocation that starts meanwhile waits for it
+    const authority = kit.requestAuthority(request, headers, subject.identity.userId);
+    const answer = await readTransferInstructions(deps.runtime, deps.bank, { subject, agencyId: (selector ?? null) as never, correlationId, orderId: path["orderId"]!, stillAuthenticated, authority });
     if (answer.kind === "UNAUTHENTICATED") return { kind: "PROBLEM", problem: await deps.refuseUnauthenticated("READ_TRANSFER_INSTRUCTIONS", { correlationId, agencyId: null }) };
     return answer;
   });
