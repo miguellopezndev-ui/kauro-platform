@@ -230,7 +230,7 @@ function importGuide(pkg: VerifiedPackage): ImportStep[] {
     const m = NUMBERED_PART.exec(path);
     return m === null ? null : Number(m[1]);
   };
-  const objectOf = (path: string): CoreObject | null => pkg.importFiles.get(path)?.object ?? null;
+  const objectOf = (path: string): CoreObject | null => (Object.hasOwn(pkg.importFiles, path) ? pkg.importFiles[path]?.object : null) ?? null;
   const records = imports
     .filter((a) => objectOf(a.path) !== null)
     .sort((a, b) => {
@@ -243,7 +243,7 @@ function importGuide(pkg: VerifiedPackage): ImportStep[] {
     path: a.path,
     sha256: a.sha256,
     object: objectOf(a.path),
-    association: pkg.importFiles.get(a.path)?.association ?? null,
+    association: (Object.hasOwn(pkg.importFiles, a.path) ? pkg.importFiles[a.path]?.association : null) ?? null,
     part: partOf(a.path),
     records: fig(a.rowCount ?? 0, a.path, "records excluding the header"),
   }));

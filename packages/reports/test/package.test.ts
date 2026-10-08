@@ -226,6 +226,21 @@ describe("ADV-2, ADV-6: strings from the package are from the core's closed voca
     }
   });
 
+  it("ADV-8: an adapterVersion, targetContractHash or input fileId outside the core's vocabulary is refused, each on its own", () => {
+    const edits: [string, (m: Record<string, any>) => void][] = [
+      ["adapterVersion", (m) => (m["target"].adapterVersion = "<b>1.0.0</b>")],
+      ["targetContractHash", (m) => (m["target"].targetContractHash = "tc_<svg onload=x>")],
+      ["fileId", (m) => (m["inputs"][0].fileId = 'F-"><img src=x>')],
+    ];
+    for (const [field, edit] of edits) {
+      const files = loadPackage("D-salesforce");
+      const manifest = manifestOf(files);
+      edit(manifest);
+      writeManifest(files, manifest);
+      assert.deepEqual(codes(files), ["MANIFEST_MALFORMED"], field);
+    }
+  });
+
   it("R5: an artifact path with markup is refused, and the refusal does not quote it", () => {
     const files = loadPackage("D-salesforce");
     renameArtifact(files, "02_EXCEPTIONS/formula-risk.csv", "02_EXCEPTIONS/<svg onload=alert(1)>.csv");
