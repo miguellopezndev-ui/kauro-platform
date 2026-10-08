@@ -107,8 +107,7 @@ Pause points: I3 final effect read = first `kauro.effect_now()` statement on `co
 `FROM kauro.bank_routes WHERE route_id = $1 FOR SHARE` (`repositories/bank-routes.ts:181`) -- design-neutral arming that replaces
 `FINAL_I3_RESUME`; "before the final judgment" in commands = `.after` of the last `kauro.effect_now()` of the unit (nth from a control run's
 statement log); "before COMMIT" = `.before` of the `COMMIT` statement on `conn` (fallback: `.after` of that last effect read).
-Expected post-fix answer on holder loss: the unit's connection failure; observed and pinned: 500 INTERNAL_ERROR (K2: no SQLSTATE on the
-dead socket, so the 57P01 -> CAPACITY_UNAVAILABLE mapping at `sqlstate.ts:174` is not reached). File A = `apps/api/test/ach-route-cells.test.ts`.
+Expected post-fix answer on holder loss: the unit's connection failure; observed and pinned: 500 INTERNAL_ERROR (K2: the 57P01 reaches the idle client, not a query; so the 57P01 -> CAPACITY_UNAVAILABLE mapping at `sqlstate.ts:174` is not reached). File A = `apps/api/test/ach-route-cells.test.ts`.
 
 | Id | file :: title | Red on ac9a2ed (expected failing assertion) |
 |---|---|---|
@@ -145,7 +144,8 @@ RULE16-SELF-WAIT (:2917) tests `requestAuthorityOf` caching that no longer exist
   08 does not promise remote erasure of downloaded data). Cells :2798, S1.
 - K2: holder loss answers 500 INTERNAL_ERROR, not 401 (the transaction carrying the judgment is gone); the acceptance criterion requires no
   effect and no successful view, and the next request is 401. Cells H1-H6 pin exactly 500: a terminated backend surfaces to the unit as a
-  connection loss with no SQLSTATE reaching `sqlstate.ts` (57P01 is not delivered on the dead socket), so CAPACITY_UNAVAILABLE (503) is not
+  connection loss with no SQLSTATE reaching `sqlstate.ts` (the FATAL 57P01 arrives while the client is idle between statements, so it is
+  emitted on the client, not on a query; the next statement fails with a connection error), so CAPACITY_UNAVAILABLE (503) is not
   produced. A retry with the same idempotency key settles the outcome: nothing was committed, and after the revocation it is refused (H7).
 - K3: concurrent requests of one session: a resume touch waits behind an effect's fence (bounded by the unit; the fence is the last lock).
   Logout/resume past 5 s fail retryable with nothing changed (B11 D-W3-9: the page keeps the CSRF token to retry). Cells T2, T3.
