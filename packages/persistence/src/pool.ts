@@ -121,6 +121,12 @@ function isRuntimeRole(value: string): value is RuntimeRole {
   return (RUNTIME_ROLES as ReadonlyArray<string>).includes(value);
 }
 
+/**
+ * DB-TLS-R3: the only way to a KauroPool is createPool. The token is module-private, so no import route (an alias, a namespace or
+ * computed member, the index re-export, a run-time import) can construct one elsewhere; the connection-site scan stays a tripwire.
+ */
+const CREATE: unique symbol = Symbol("KauroPool.create");
+
 /** A pool whose every physical connection was verified to be an unprivileged runtime role of one known group. */
 export class KauroPool {
   readonly #pool: Pool;
@@ -128,7 +134,8 @@ export class KauroPool {
   readonly #sink: PoolErrorSink;
   readonly config: PoolConfig;
 
-  constructor(config: PoolConfig) {
+  constructor(config: PoolConfig, token: typeof CREATE) {
+    if (token !== CREATE) throw new TypeError("KauroPool is constructed by createPool only (DB-TLS-R3)");
     if (!Number.isInteger(config.max) || config.max < 1 || config.max > 24) {
       throw new RangeError("pool max must be an integer between 1 and 24 (07 connection budget: the application ceiling is twenty-four)");
     }
@@ -237,5 +244,5 @@ export class KauroPool {
 }
 
 export function createPool(config: PoolConfig): KauroPool {
-  return new KauroPool(config);
+  return new KauroPool(config, CREATE);
 }

@@ -4,7 +4,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { ConnectionSecurityError, connectionSecurityOf } from "../src/index.js";
+import { ConnectionSecurityError, connectionSecurityOf, createPool, KauroPool } from "../src/index.js";
+import * as persistence from "../src/index.js";
 
 let dir: string;
 let ca: string;
@@ -90,4 +91,18 @@ test("DB-TLS-R1: outside LOCAL the host must be a DNS name pg dials itself: an e
     }
   }
   assert.deepEqual(connectionSecurityOf("LOCAL", { host: "", processEnv: { PGHOST: "127.0.0.1" } }), {}, "LOCAL is unchanged");
+});
+
+test("DB-TLS-R3: a KauroPool is constructed by createPool only: the class taken by any import route refuses construction before a pg pool exists", async () => {
+  const config = { host: "db.example.test", port: 1, database: "kauro", user: "u", max: 1, applicationName: "db-tls-r3" };
+  const Constructor = KauroPool as unknown as new (...args: unknown[]) => unknown;
+  const Member = (persistence as unknown as Record<string, new (...args: unknown[]) => unknown>)["KauroPool"]!;
+  const RunTime = ((await import("../src/index.js")) as unknown as Record<string, new (...args: unknown[]) => unknown>)["KauroPool"]!;
+  for (const [route, C] of [["named import", Constructor], ["namespace computed member", Member], ["run-time import", RunTime]] as const) {
+    assert.throws(() => new C(config), /KauroPool is constructed by createPool only/, route);
+    assert.throws(() => new C(config, Symbol("KauroPool.create")), /KauroPool is constructed by createPool only/, `${route}: a look-alike token`);
+  }
+  const pool = createPool(config);
+  assert.ok(pool instanceof KauroPool, "createPool still constructs one");
+  await pool.end();
 });
