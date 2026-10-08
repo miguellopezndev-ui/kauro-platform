@@ -15,6 +15,17 @@ import type { PoolClient } from "pg";
 import type { KauroPool } from "./pool.js";
 import { execute, instant, text } from "./sql.js";
 
+/** A step-up to record (the application's StepUpRequest): the store decides its instants after the session lock. */
+export interface StoredStepUpRequest {
+  readonly proofId: AssuranceProof["proofId"];
+  readonly userId: UserId;
+  readonly kind: AssuranceProof["kind"];
+  readonly method: AssuranceProof["method"];
+  readonly authTime: UtcInstant;
+  readonly maxAgeSeconds: number;
+  readonly freshnessSeconds: number;
+}
+
 /** A web session as the store reads it (the application's WebSessionRecord). */
 export interface StoredWebSession {
   readonly sessionId: string;
@@ -256,30 +267,46 @@ export class PgWebSessionStore {
     });
   }
 
-  /** Rule 16 (coordinator item A): the session row is locked FOR UPDATE first, THEN the instant is read, THEN the session is judged at it. */
-  async recordStepUp(proof: AssuranceProof, correlationId: CorrelationId, now: () => UtcInstant, sessionSha256: Sha256Hex | null): Promise<"RECORDED" | "ENDED"> {
-    return this.#boundary({ userId: proof.userId, sessionSha256 }, async (client) => {
-      let recordedAt: UtcInstant;
-      if (sessionSha256 === null) {
-        recordedAt = now();
-      } else {
-        const locked = await execute(client, "SELECT 1 FROM kauro.web_sessions WHERE secret_sha256 = $1 AND user_id = $2 FOR UPDATE", [sessionSha256, proof.userId]);
+  /**
+   * Rule 16 (coordinator item A; adversary r7 ADV-1): the session row is locked FOR UPDATE first (with no session the connection is the only
+   * wait, and the instant is read inside the transaction), THEN the instant is read, THEN the session and the re-authentication's age are
+   * judged at it, THEN the proof is recorded at it. The proof's FK takes a FOR KEY SHARE lock on the person's identity row after the session
+   * lock; no code takes a write lock on that row, so no deadlock.
+   */
+  async recordStepUp(request: StoredStepUpRequest, correlationId: CorrelationId, now: () => UtcInstant, sessionSha256: Sha256Hex | null): Promise<{ readonly outcome: "RECORDED"; readonly proof: AssuranceProof } | { readonly outcome: "ENDED" | "STALE" }> {
+    return this.#boundary({ userId: request.userId, sessionSha256 }, async (client) => {
+      if (sessionSha256 !== null) {
+        const locked = await execute(client, "SELECT 1 FROM kauro.web_sessions WHERE secret_sha256 = $1 AND user_id = $2 FOR UPDATE", [sessionSha256, request.userId]);
         if (locked.rowCount !== 1) throw new DomainFailure("INTEGRITY_FAILURE", "the step-up names a session that is not the live session of its person");
-        recordedAt = now();
+      }
+      const recordedAt = now();
+      if (sessionSha256 !== null) {
         const live = await execute(
           client,
           `SELECT 1 FROM kauro.web_sessions WHERE secret_sha256 = $1 AND revoked_at IS NULL AND idle_expires_at > $2::timestamptz AND absolute_expires_at > $2::timestamptz`,
           [sessionSha256, recordedAt],
         );
-        if (live.rowCount !== 1) return "ENDED" as const;
+        if (live.rowCount !== 1) return { outcome: "ENDED" as const };
       }
+      const atMs = Date.parse(recordedAt);
+      const authMs = Date.parse(request.authTime);
+      if (atMs - authMs > request.maxAgeSeconds * 1000) return { outcome: "STALE" as const };
+      const issuedMs = Math.min(authMs, atMs);
+      const proof: AssuranceProof = {
+        proofId: request.proofId,
+        userId: request.userId,
+        kind: request.kind,
+        method: request.method,
+        issuedAt: new Date(issuedMs).toISOString() as UtcInstant,
+        expiresAt: new Date(issuedMs + request.freshnessSeconds * 1000).toISOString() as UtcInstant,
+      };
       await execute(
         client,
         `INSERT INTO kauro.assurance_proofs (proof_id, user_id, kind, method, issued_at, expires_at, correlation_id, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [proof.proofId, proof.userId, proof.kind, proof.method, proof.issuedAt, proof.expiresAt, correlationId, recordedAt],
       );
-      if (sessionSha256 === null) return "RECORDED" as const;
+      if (sessionSha256 === null) return { outcome: "RECORDED" as const, proof };
       const bound = await execute(
         client,
         `UPDATE kauro.web_sessions SET step_up_proof_id = $2, step_up_fresh_until = $3
@@ -287,7 +314,7 @@ export class PgWebSessionStore {
         [sessionSha256, proof.proofId, proof.expiresAt, proof.userId],
       );
       if (bound.rowCount !== 1) throw new DomainFailure("INTEGRITY_FAILURE", "the step-up names a session that is not the live session of its person");
-      return "RECORDED" as const;
+      return { outcome: "RECORDED" as const, proof };
     });
   }
 }

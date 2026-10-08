@@ -29,7 +29,7 @@ import type { AuthenticatedSubject } from "../api/envelope.js";
 import { problemOf, type Problem } from "../api/problems.js";
 import { recordDenialFact, recordIdentityFact, refuseAnonymously } from "../commands/runtime.js";
 import { STEP_UP_FRESHNESS_SECONDS } from "../ports/assurance-and-admission.js";
-import type { IdentityTokenVerifier, VerifiedIdentityToken, WebSessionRecord, WebSessionStore } from "../ports/sessions.js";
+import type { IdentityTokenVerifier, StepUpRequest, VerifiedIdentityToken, WebSessionRecord, WebSessionStore } from "../ports/sessions.js";
 import { SESSION_POLICY, csrfTokenOf, mintSessionSecret, sessionSecretDigest } from "./protocol.js";
 
 /** The policy version every fact of this boundary names (08 "Audit events": policy version is recorded). */
@@ -262,24 +262,22 @@ export function createSessionService(deps: SessionServiceDependencies): SessionS
           return refuse(new DomainFailure("ASSURANCE_REQUIRED", "the re-authentication is another person's", { reason: "STEP_UP_NOT_OWNED" }));
         }
         if (token.secondFactor === null) return refuse(new DomainFailure("ASSURANCE_REQUIRED", "the re-authentication has no second factor", { reason: "STEP_UP_MISSING" }));
-        const now = deps.clock.now();
-        if (Date.parse(now) - Date.parse(token.authTime) > SESSION_POLICY.stepUpReauthenticationSeconds * 1000) {
-          return refuse(new DomainFailure("ASSURANCE_REQUIRED", "the re-authentication is too old", { reason: "STEP_UP_STALE" }));
-        }
-        // the proof is the re-authentication itself: issued when the person re-authenticated (never later than now), fresh for
-        // the B06 window (D-ASSUR-1)
-        const issuedAt = earlier(token.authTime, now);
-        const proof = {
+        // the proof is the re-authentication itself: issued when the person re-authenticated (never later than now), fresh for the B06 window
+        // (D-ASSUR-1). Its age (300 s) and its instants are judged by the store at the instant it reads AFTER the session lock (rule 16, r7 ADV-1)
+        const request: StepUpRequest = {
           proofId: deps.ids.next() as AssuranceProofId,
           userId,
-          kind: "STEP_UP" as const,
-          method: token.secondFactor === "totp" ? ("TOTP" as const) : ("IDP_REAUTH" as const),
-          issuedAt,
-          expiresAt: plusSeconds(issuedAt, STEP_UP_FRESHNESS_SECONDS),
+          kind: "STEP_UP",
+          method: token.secondFactor === "totp" ? "TOTP" : "IDP_REAUTH",
+          authTime: token.authTime,
+          maxAgeSeconds: SESSION_POLICY.stepUpReauthenticationSeconds,
+          freshnessSeconds: STEP_UP_FRESHNESS_SECONDS,
         };
-        const recorded = await deps.store.recordStepUp(proof, correlationId, () => deps.clock.now(), secret === null ? null : sessionSecretDigest(secret));
+        const recorded = await deps.store.recordStepUp(request, correlationId, () => deps.clock.now(), secret === null ? null : sessionSecretDigest(secret));
         // the session ended (revoked, idle or absolute deadline) before the lock was granted: the unauthenticated answer, nothing recorded
-        if (recorded === "ENDED") throw credentialEnded();
+        if (recorded.outcome === "ENDED") throw credentialEnded();
+        if (recorded.outcome !== "RECORDED") return refuse(new DomainFailure("ASSURANCE_REQUIRED", "the re-authentication is too old", { reason: "STEP_UP_STALE" }));
+        const proof = recorded.proof;
         await recordIdentityFact(runtime, { userId, action: SESSION_ACTIONS.stepUp, outcome: "ALLOW", reasonCode: SESSION_ALLOW_REASONS.stepUpIssued, assuranceClass: "STEP_UP", policyVersion: SESSION_POLICY_VERSION, correlationId });
         return { kind: "OK", value: { proofId: proof.proofId, expiresAt: proof.expiresAt } };
       }),

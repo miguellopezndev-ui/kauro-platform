@@ -85,6 +85,21 @@ export interface HeldWebSession {
   release(): Promise<void>;
 }
 
+/**
+ * A step-up to record. The proof's instants are decided by the store at the instant it reads after the session lock (rule 16, adversary r7
+ * ADV-1): STALE when the re-authentication is more than `maxAgeSeconds` old then (nothing recorded); else issued at the earlier of `authTime`
+ * and that instant and fresh for `freshnessSeconds`.
+ */
+export interface StepUpRequest {
+  readonly proofId: AssuranceProof["proofId"];
+  readonly userId: UserId;
+  readonly kind: AssuranceProof["kind"];
+  readonly method: AssuranceProof["method"];
+  readonly authTime: UtcInstant;
+  readonly maxAgeSeconds: number;
+  readonly freshnessSeconds: number;
+}
+
 export interface WebSessionStore {
   /** Records a new session under the identity it binds; `secretSha256` is the SHA-256 of the secret the cookie carries. */
   open(session: NewWebSession, secretSha256: Sha256Hex, correlationId: CorrelationId): Promise<void>;
@@ -114,5 +129,5 @@ export interface WebSessionStore {
    * store locks its row FOR UPDATE first and reads `now` only once the lock is granted (rule 16, coordinator item A): a session revoked or past a
    * deadline at that instant records nothing and the answer is ENDED; otherwise the proof is recorded at that instant.
    */
-  recordStepUp(proof: AssuranceProof, correlationId: CorrelationId, now: () => UtcInstant, sessionSha256: Sha256Hex | null): Promise<"RECORDED" | "ENDED">;
+  recordStepUp(request: StepUpRequest, correlationId: CorrelationId, now: () => UtcInstant, sessionSha256: Sha256Hex | null): Promise<{ readonly outcome: "RECORDED"; readonly proof: AssuranceProof } | { readonly outcome: "ENDED" | "STALE" }>;
 }
