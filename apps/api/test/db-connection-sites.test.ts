@@ -80,10 +80,23 @@ const CONSTRUCTS = /\bnew\s+(?:[\w$]+\s*\.\s*)*(?:Pool|Client)\s*\(/;
 /** ADV-3 (a88da2e): KauroPool is constructed in pool.ts (createPool) only; a persistence wrapper elsewhere would hand apps a pool whose callers are not sites. */
 const CONSTRUCTS_KAURO_POOL = /\bnew\s+(?:[\w$]+\s*\.\s*)*KauroPool\s*\(/;
 
+/**
+ * DB-TLS-R3 (fdf3360): inside persistence every value path to KauroPool starts at an import of the pool module, so only pool.ts
+ * (defines it) and index.ts (the package's re-export) may take it as a value; elsewhere it is a type only, which closes aliases,
+ * parenthesized constructors, destructuring and computed members at their source.
+ */
+const POOL_VALUE_IMPORTS: ReadonlyArray<RegExp> = [
+  /\b(?:import|export)\s+(?!type\b)\{[^}]*(?<!type\s)\bKauroPool\b[^}]*\}\s*from\b/,
+  /\b(?:import|export)\s+(?!type\b)\*(?:\s+as\s+[\w$]+)?\s+from\s*["'][^"']*\/pool(?:\.js)?["']/,
+  /(?:\brequire\(\s*|\bimport\(\s*)["'][^"']*\/pool(?:\.js)?["']/,
+];
+const POOL_VALUE_HOLDERS = new Set(["packages/persistence/src/pool.ts", "packages/persistence/src/index.ts"]);
+
 function persistenceProblem(rel: string, text: string): string | undefined {
   const c = code(text);
   if (CONSTRUCTS.test(c) && !text.includes("sslOptionsOf(")) return `${rel} derives ssl from sslOptionsOf`;
   if (CONSTRUCTS_KAURO_POOL.test(c) && rel !== "packages/persistence/src/pool.ts") return `${rel} constructs KauroPool outside pool.ts`;
+  if (!POOL_VALUE_HOLDERS.has(rel) && POOL_VALUE_IMPORTS.some((f) => f.test(c))) return `${rel} takes KauroPool as a value outside pool.ts and index.ts`;
   return undefined;
 }
 
@@ -148,6 +161,18 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
   // ADV-3 (a88da2e): a persistence file other than pool.ts that constructs KauroPool is refused; pool.ts may
   assert.equal(persistenceProblem("packages/persistence/src/wrap.ts", 'import { KauroPool } from "./pool.js";\nexport const p = (c) => new KauroPool(c);'), "packages/persistence/src/wrap.ts constructs KauroPool outside pool.ts");
   assert.equal(persistenceProblem("packages/persistence/src/pool.ts", "export function createPool(config) {\n  return new KauroPool(config);\n}"), undefined);
+  // DB-TLS-R3 (fdf3360): aliased, parenthesized, destructured, computed and run-time forms, also in an already-listed site (runner.ts)
+  for (const [rel, text] of [
+    ["packages/persistence/src/migrations/runner.ts", 'import { KauroPool as K } from "../pool.js";\nexport const p = (c) => new (K)(c);'],
+    ["packages/persistence/src/wrap.ts", 'import * as P from "./pool.js";\nexport const p = (c) => new P["KauroPool"](c);'],
+    ["packages/persistence/src/wrap.ts", 'import * as P from "./pool.js";\nconst { KauroPool: K } = P;\nexport const p = (c) => new K(c);'],
+    ["packages/persistence/src/wrap.ts", 'export const p = async (c) => new (await import("./pool.js")).KauroPool(c);'],
+  ] as const) assert.equal(persistenceProblem(rel, text), `${rel} takes KauroPool as a value outside pool.ts and index.ts`, text);
+  for (const [rel, text] of [
+    ["packages/persistence/src/evidence.ts", 'import type { KauroPool, RuntimeRole } from "./pool.js";\nexport const f = (pool: KauroPool) => pool;'],
+    ["packages/persistence/src/testing/harness.ts", 'import { createPool, type KauroPool } from "../pool.js";'],
+    ["packages/persistence/src/index.ts", 'export { createPool, KauroPool } from "./pool.js";'],
+  ] as const) assert.equal(persistenceProblem(rel, text), undefined, text);
   const files = Object.fromEntries(["a.ts", "b.js", "c.mjs", "d.cjs"].map((n) => [`apps/x/src/${n}`, forms["new pg.Pool("] ?? ""]));
   const repo = tempRepo(files);
   try {
@@ -204,6 +229,11 @@ test("every connection site of apps/ and packages/*/src is known, and each compo
     if (rel.startsWith("packages/persistence/src/testing/")) continue; // the test-only subpath (the architecture gate keeps it out of production)
     const text = readFileSync(file, "utf8");
     if (isSite(text)) found.set(rel, text);
+    // DB-TLS-R3: every persistence source, listed site or not, takes KauroPool as a type only (pool.ts and index.ts excepted)
+    if (rel.startsWith("packages/persistence/src/")) {
+      const problem = persistenceProblem(rel, text);
+      assert.equal(problem, undefined, problem);
+    }
     if (rel !== "packages/persistence/src/tls.ts") assert.deepEqual(tlsViolations(text), [], `${rel}: TLS settings belong in tls.ts`);
   }
   assert.deepEqual(
