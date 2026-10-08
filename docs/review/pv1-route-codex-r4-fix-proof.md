@@ -14,7 +14,7 @@ then `git apply patch` and rebuild (tests, fixture and docs untouched).
 | F1 fence vs revoke | `error: permission denied for table web_sessions` (42501) | revoke waits behind the app backend, then revokes |
 
 ## Observed status after holder loss (pinned)
-All 15 H1-H6 cells: exactly `500 INTERNAL_ERROR -` (design K2: the unit's connection failure, the next request is 401). The cells accept only that value.
+All 14 H1-H6 holder-loss cells (H1/H2 2, H3 4 commands x 2 positions = 8, H4 2, H5 1, H6 1): exactly `500 INTERNAL_ERROR -` (design K2: the unit's connection failure, the next request is 401). The cells accept only that value. H7 (post-COMMIT answer loss, then revocation; replay refused) is a separate scenario, not a holder termination.
 
 ## Focused runs on the fix
 persistence: migrations, runtime-boundary (P1), source-migrations (unchanged, green), aggregate-kinds, session-fence (F1-F6, T2, T3): 58/58.
