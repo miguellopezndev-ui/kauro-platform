@@ -109,6 +109,10 @@ export interface WebSessionStore {
    * is stamped, and a deadline judged, at an instant after any wait on a holder of the row.
    */
   revoke(secretSha256: Sha256Hex, now: () => UtcInstant, reason: string): Promise<{ readonly outcome: "REVOKED"; readonly userId: UserId } | { readonly outcome: "ENDED" | "UNKNOWN" }>;
-  /** Records a step-up proof of `proof.userId` and, when `sessionSha256` is given, makes it that session's latest step-up. */
-  recordStepUp(proof: AssuranceProof, correlationId: CorrelationId, recordedAt: UtcInstant, sessionSha256: Sha256Hex | null): Promise<void>;
+  /**
+   * Records a step-up proof of `proof.userId` and, when `sessionSha256` is given, makes it that session's latest step-up. With a session the
+   * store locks its row FOR UPDATE first and reads `now` only once the lock is granted (rule 16, coordinator item A): a session revoked or past a
+   * deadline at that instant records nothing and the answer is ENDED; otherwise the proof is recorded at that instant.
+   */
+  recordStepUp(proof: AssuranceProof, correlationId: CorrelationId, now: () => UtcInstant, sessionSha256: Sha256Hex | null): Promise<"RECORDED" | "ENDED">;
 }

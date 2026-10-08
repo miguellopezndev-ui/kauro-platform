@@ -24,6 +24,7 @@
 import type { UtcInstant } from "@kauro/contracts";
 import type { AssuranceProofId, Clock, CorrelationId, IdGenerator, IdentityFacts, RandomBytes, UnitOfWorkFactory, UserId } from "@kauro/domain";
 import { DomainFailure, identityUserId, subjectDigest, toUtcInstant } from "@kauro/domain";
+import { credentialEnded } from "../api/authority.js";
 import type { AuthenticatedSubject } from "../api/envelope.js";
 import { problemOf, type Problem } from "../api/problems.js";
 import { recordDenialFact, recordIdentityFact, refuseAnonymously } from "../commands/runtime.js";
@@ -276,7 +277,9 @@ export function createSessionService(deps: SessionServiceDependencies): SessionS
           issuedAt,
           expiresAt: plusSeconds(issuedAt, STEP_UP_FRESHNESS_SECONDS),
         };
-        await deps.store.recordStepUp(proof, correlationId, now, secret === null ? null : sessionSecretDigest(secret));
+        const recorded = await deps.store.recordStepUp(proof, correlationId, () => deps.clock.now(), secret === null ? null : sessionSecretDigest(secret));
+        // the session ended (revoked, idle or absolute deadline) before the lock was granted: the unauthenticated answer, nothing recorded
+        if (recorded === "ENDED") throw credentialEnded();
         await recordIdentityFact(runtime, { userId, action: SESSION_ACTIONS.stepUp, outcome: "ALLOW", reasonCode: SESSION_ALLOW_REASONS.stepUpIssued, assuranceClass: "STEP_UP", policyVersion: SESSION_POLICY_VERSION, correlationId });
         return { kind: "OK", value: { proofId: proof.proofId, expiresAt: proof.expiresAt } };
       }),
