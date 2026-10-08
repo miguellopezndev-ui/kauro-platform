@@ -2971,6 +2971,8 @@ async function logoutBehindHeldRead(ctx: FaultContext, label: string, moveMs: nu
   await ctx.revoked(`${label}: the logout committed once the held read released the row`, async () => {
     done = ok(await revocation!);
   });
+  const next = await nextRefused(ctx, `${label}: the next request`, cookieRead);
+  assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", `${label}: the next request is refused`);
   return { held, standing, movedTo, session, done };
 }
 
@@ -3022,6 +3024,7 @@ cell(`ADV-2 r6 DENY ACH-M-I2-REVOCATION (CMD028 replay judged under the session 
     }, issueCall);
     assert.equal(code(replay), "401 AUTHENTICATION_REQUIRED -", "the replay of a revoked session is refused");
     assert.ok(!replay.text.includes(reference), "no transfer reference in the replay's body");
+    assert.equal(code(await nextRefused(ctx, "the next replay", issueCall)), "401 AUTHENTICATION_REQUIRED -", "the next replay is refused too");
     assert.ok(reached, "the replay took a session lock after its authentication");
   });
 });

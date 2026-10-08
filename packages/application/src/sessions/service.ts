@@ -212,7 +212,7 @@ export function createSessionService(deps: SessionServiceDependencies): SessionS
         await recordIdentityFact(runtime, { userId, action: SESSION_ACTIONS.open, outcome: "ALLOW", reasonCode: SESSION_ALLOW_REASONS.opened, assuranceClass: "SESSION", policyVersion: SESSION_POLICY_VERSION, correlationId });
         // the browser holds one session: the one its cookie named before this sign-in ends now (no session outlives its cookie)
         if (replacing !== null) {
-          const ended = await deps.store.revoke(sessionSecretDigest(replacing), now, REPLACED_REASON);
+          const ended = await deps.store.revoke(sessionSecretDigest(replacing), () => deps.clock.now(), REPLACED_REASON);
           if (ended.outcome === "REVOKED") {
             await recordIdentityFact(runtime, { userId: ended.userId, action: SESSION_ACTIONS.revoke, outcome: "ALLOW", reasonCode: SESSION_ALLOW_REASONS.revoked, assuranceClass: "SESSION", policyVersion: SESSION_POLICY_VERSION, correlationId });
           }
@@ -239,7 +239,7 @@ export function createSessionService(deps: SessionServiceDependencies): SessionS
       outcomeOf(correlationId, async () => {
         if (secret === null) return { kind: "OK", value: null };
         // the person the fact names is the session's; a secret that names no session, or one already ended, records nothing
-        const revoked = await deps.store.revoke(sessionSecretDigest(secret), deps.clock.now(), LOGOUT_REASON);
+        const revoked = await deps.store.revoke(sessionSecretDigest(secret), () => deps.clock.now(), LOGOUT_REASON);
         if (revoked.outcome === "REVOKED") {
           await recordIdentityFact(runtime, { userId: revoked.userId, action: SESSION_ACTIONS.revoke, outcome: "ALLOW", reasonCode: SESSION_ALLOW_REASONS.revoked, assuranceClass: "SESSION", policyVersion: SESSION_POLICY_VERSION, correlationId });
         }

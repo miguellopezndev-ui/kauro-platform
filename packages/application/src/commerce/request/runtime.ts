@@ -42,6 +42,7 @@ import type {
   UserId,
 } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, IdempotencyConflictFailure, actorOf, commandRequestDigest } from "@kauro/domain";
+import { judgedUnderHold } from "../../api/authority.js";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { problemOf, type Problem } from "../../api/problems.js";
 import type { ReadRequest, ReadResult, ReadSpec } from "../../queries/reads.js";
@@ -302,6 +303,10 @@ export async function runCommerceCommand<Body, View>(runtime: CommerceRequestRun
       if (reservation.kind === "REPLAY") {
         const status = reservation.entry.responseStatus;
         if ((status !== 200 && status !== 201) || reservation.entry.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "journaled entry is COMMITTED without a complete response");
+        // rule 16 (adversary r6 ADV-2): a replay hands out the journaled response, secrets included, so the cookie session that asks is judged
+        // exactly as the fresh path judges it: its row locked first (held until the transport releases it, after COMMIT), THEN the clock, THEN
+        // the judgment; a credential that ended is refused 401 and the stored body is not returned
+        await judgedUnderHold(envelope.authority, runtime.clock);
         return new Replayed(status, reservation.entry.responseBody);
       }
       if (reservation.kind === "CONFLICT") throw new IdempotencyConflictFailure();

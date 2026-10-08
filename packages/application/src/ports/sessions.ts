@@ -103,10 +103,12 @@ export interface WebSessionStore {
    */
   hold(secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<HeldWebSession | null>;
   /**
-   * Ends the session the hash names, once: REVOKED (with its person) when it was live at `at`; ENDED when it was already revoked
-   * or past a deadline (nothing changes); UNKNOWN when no session has that hash.
+   * Ends the session the hash names, once: REVOKED (with its person) when it was live at the instant `now` returns; ENDED when it was
+   * already revoked or past a deadline at that instant (nothing changes); UNKNOWN when no session has that hash. The store locks the row
+   * FOR UPDATE first and reads `now` only once the lock is granted (FAILURE-MATRIX-TEMPLATE rule 16, adversary r6 ADV-1): the revocation
+   * is stamped, and a deadline judged, at an instant after any wait on a holder of the row.
    */
-  revoke(secretSha256: Sha256Hex, at: UtcInstant, reason: string): Promise<{ readonly outcome: "REVOKED"; readonly userId: UserId } | { readonly outcome: "ENDED" | "UNKNOWN" }>;
+  revoke(secretSha256: Sha256Hex, now: () => UtcInstant, reason: string): Promise<{ readonly outcome: "REVOKED"; readonly userId: UserId } | { readonly outcome: "ENDED" | "UNKNOWN" }>;
   /** Records a step-up proof of `proof.userId` and, when `sessionSha256` is given, makes it that session's latest step-up. */
   recordStepUp(proof: AssuranceProof, correlationId: CorrelationId, recordedAt: UtcInstant, sessionSha256: Sha256Hex | null): Promise<void>;
 }

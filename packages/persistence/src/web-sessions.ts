@@ -232,8 +232,16 @@ export class PgWebSessionStore {
     };
   }
 
-  async revoke(secretSha256: Sha256Hex, at: UtcInstant, reason: string): Promise<{ readonly outcome: "REVOKED"; readonly userId: UserId } | { readonly outcome: "ENDED" | "UNKNOWN" }> {
+  /**
+   * Rule 16 (adversary r6 ADV-1): the row is locked FOR UPDATE first (the lock a holder's touch and every other writer take), THEN the instant
+   * is read, THEN the session is judged at it: past a deadline then it is ENDED (never REVOKED), live it is revoked at that same instant, so
+   * revoked_at is never before the last touch of a holder this wait was behind.
+   */
+  async revoke(secretSha256: Sha256Hex, now: () => UtcInstant, reason: string): Promise<{ readonly outcome: "REVOKED"; readonly userId: UserId } | { readonly outcome: "ENDED" | "UNKNOWN" }> {
     return this.#boundary({ userId: null, sessionSha256: secretSha256 }, async (client) => {
+      const locked = await execute(client, "SELECT 1 FROM kauro.web_sessions WHERE secret_sha256 = $1 FOR UPDATE", [secretSha256]);
+      if (locked.rowCount === 0) return { outcome: "UNKNOWN" as const };
+      const at = now();
       const ended = await execute<{ user_id: string }>(
         client,
         `UPDATE kauro.web_sessions SET revoked_at = $2::timestamptz, revoke_reason = $3
