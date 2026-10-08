@@ -2780,7 +2780,7 @@ async function revocationStanding(session: BrowserSession, timeoutMs = 3_000): P
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
     if ((await sessionRowOf(session)).revoked) return "COMMITTED";
-    if ((await n("SELECT 1 FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE '%UPDATE kauro.web_sessions SET revoked_at%'")) > 0) return "WAITING";
+    if ((await n("SELECT 1 FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND (query LIKE '%UPDATE kauro.web_sessions SET revoked_at%' OR query LIKE '%FROM kauro.web_sessions WHERE secret_sha256 = $1 FOR UPDATE%')")) > 0) return "WAITING";
     await pauseMs(10);
   }
   return "NEITHER";
@@ -2935,4 +2935,93 @@ test("RULE16-SELF-WAIT DENY ACH-M-R2-RETRY (second judgment of one request): a r
   assert.equal(holds, 2, "a judgment after the release holds the row again");
   await handle.release();
   assert.equal(releases, 2);
+});
+
+// === internal adversary r6 on 68ab5cc (docs/review/pv1-route-adversary-r6.md): ADV-1 revoke instant, ADV-2 CMD028 replay ================
+// Rule 16 for the writers of the authority itself: the revoking transaction takes the session row lock FIRST, THEN reads its clock, THEN judges
+// (a session past a deadline at that instant is ENDED, not REVOKED) and writes at that instant.
+
+interface SessionStamps {
+  readonly lastSeen: number;
+  readonly revokedAt: number | null;
+}
+async function sessionStampsOf(session: BrowserSession): Promise<SessionStamps> {
+  const [row] = await q<{ last_seen_at: Date; revoked_at: Date | null }>("SELECT last_seen_at, revoked_at FROM kauro.web_sessions WHERE secret_sha256 = $1", [session.secretSha256]);
+  assert.ok(row !== undefined, "the session row exists");
+  return { lastSeen: row.last_seen_at.getTime(), revokedAt: row.revoked_at === null ? null : row.revoked_at.getTime() };
+}
+
+/** An instructions read holds the session row at its effect-clock read; `during` starts the logout (it must wait on the row) and moves the process clock by `moveMs`. */
+async function logoutBehindHeldRead(ctx: FaultContext, label: string, moveMs: number): Promise<{ readonly held: Reply; readonly standing: string | null; readonly movedTo: number; readonly session: BrowserSession; readonly done: Reply }> {
+  const x = await issuedOrder(label);
+  const session = await bw.iw.w.identity().signIn(x.b.a.billing);
+  const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
+  const clock = bw.iw.w.processClock;
+  clock.advance(61_000); // a touch is due: the held read renews the session at its lock
+  let revocation: Promise<PromiseSettledResult<Reply>> | null = null;
+  let standing: string | null = null;
+  let movedTo = 0;
+  const held = await readHeldAtEffectRead(ctx, label, cookieRead, async () => {
+    revocation = settle(revokeThroughProduct(session));
+    standing = await revocationStanding(session);
+    clock.advance(moveMs);
+    movedTo = clock.nowMs();
+  });
+  let done!: Reply;
+  await ctx.revoked(`${label}: the logout committed once the held read released the row`, async () => {
+    done = ok(await revocation!);
+  });
+  return { held, standing, movedTo, session, done };
+}
+
+cell(`ADV-1 r6 DENY ACH-M-I3-REVOCATION (logout instant read after the row lock wait): a logout that waits on the session row held by a guarded read, with the process clock moving on while it waits, revokes at an instant read after its lock was granted: revoked_at is not before the read's touch (last_seen_at) nor before the instant the row was released, and the logout is answered 204`, "revocation", async (ctx) => {
+  await onMovedSessions("adv1r6-instant", async () => {
+    const r = await logoutBehindHeldRead(ctx, "adv1r6-instant", 5_000);
+    assert.equal(r.standing, "WAITING", "the logout waits on the session row the read holds");
+    assert.equal(code(r.held), "200 SUCCESS -", "the read, ordered before the logout, is served");
+    assert.equal(r.done.status, 204, `the logout commits (${code(r.done)})`);
+    const stamps = await sessionStampsOf(r.session);
+    assert.ok(stamps.revokedAt !== null, "the session is revoked");
+    assert.ok(stamps.revokedAt! >= stamps.lastSeen, `revoked_at (${stamps.revokedAt}) is not before the touch under the same lock (${stamps.lastSeen})`);
+    assert.ok(stamps.revokedAt! >= r.movedTo, `revoked_at (${stamps.revokedAt}) is read after the wait on the row, not before it (the clock stood at ${r.movedTo} when the row was released)`);
+  });
+});
+
+cell(`ADV-1 r6 DENY ACH-M-I3-REVOCATION (idle deadline passes while the logout waits on the session row): a logout that waits on the row of a session whose idle deadline passes during the wait finds the session ENDED at its post-lock instant: the row is not marked revoked and no SESSION_REVOKE ALLOW fact is recorded; the logout is still answered 204`, "revocation", async (ctx) => {
+  await onMovedSessions("adv1r6-ended", async () => {
+    const r = await logoutBehindHeldRead(ctx, "adv1r6-ended", 31 * 60_000);
+    assert.equal(r.standing, "WAITING", "the logout waits on the session row the read holds");
+    assert.equal(code(r.held), "401 AUTHENTICATION_REQUIRED -", "the read judged after the idle deadline is refused");
+    assert.equal(r.done.status, 204, `the logout is answered 204 (${code(r.done)})`);
+    const stamps = await sessionStampsOf(r.session);
+    assert.equal(stamps.revokedAt, null, "an expired session is ended, not revoked");
+    const facts = await q<{ outcome: string }>("SELECT outcome FROM kauro.security_events WHERE action = 'SESSION_REVOKE' AND actor_id = $1", [r.session.view.userId]);
+    assert.deepEqual(facts, [], "no revocation fact for a session that ended before the revoking instant");
+  });
+});
+
+cell(`ADV-2 r6 DENY ACH-M-I2-REVOCATION (CMD028 replay judged under the session lock): the replay of a committed issuance key by a cookie session revoked (committed) before the replay's session lock is refused 401 AUTHENTICATION_REQUIRED and its body carries no transfer reference; the replay of the same key by a live session answers the stored response`, "revocation", async (ctx) => {
+  await onSessions(async () => {
+    const b = await buyer("adv2r6-replay");
+    const r = await enabled("adv2r6-replay", [b.a.s.agency.agencyId]);
+    const session = await bw.iw.w.identity().signIn(b.a.billing);
+    const key = freshKey("adv2r6-replay");
+    const issueCall = (): Promise<Reply> => browserCall(session, { url: bankRoutes.order(b.quote.quote.quoteId), body: issueBody(b, r), agency: b.a.s.agency.agencyId, key });
+    const first = await issueCall();
+    assert.equal(code(first), "201 SUCCESS -", "the first issuance commits");
+    const reference = completed<IssuedView>(first, 201).data.transfer.reference;
+    const live = await issueCall();
+    assert.equal(code(live), "201 SUCCESS -", "control: the replay under a live session answers the stored response");
+    assert.ok(live.text.includes(reference), "control: the stored response carries the reference");
+    // the replay's session lock is its SECOND session transaction (the first is the request's authentication)
+    const { out: replay, reached } = await withNthSessionTransaction(2, async () => {
+      await ctx.revoked("session revoked through the product before the replay's lock", async () => {
+        const done = await revokeThroughProduct(session);
+        assert.equal(done.status, 204, `the revocation commits (${code(done)})`);
+      });
+    }, issueCall);
+    assert.equal(code(replay), "401 AUTHENTICATION_REQUIRED -", "the replay of a revoked session is refused");
+    assert.ok(!replay.text.includes(reference), "no transfer reference in the replay's body");
+    assert.ok(reached, "the replay took a session lock after its authentication");
+  });
 });
