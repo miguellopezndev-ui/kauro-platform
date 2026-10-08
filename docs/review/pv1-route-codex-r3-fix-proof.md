@@ -116,3 +116,11 @@ which answers 403 as in b11-sessions, not 422).
 - Red on b60fe6a: 301 s wait, actual '201 SUCCESS -', expected '403 ASSURANCE_REQUIRED STEP_UP_STALE'. The 299 s control records (201).
 - Revert proof (age judged at a sample taken before the lock): the same cell returns '201 SUCCESS -' for the 301 s wait.
 ADV-2 (docs): the gap sentence above and the pool/lock sentence in the deadlock check are corrected; authority.ts header states the identity-row lock.
+
+## r8 (adversary r8 on 9b849a4): the proof instants are pinned
+The C r7 299 s control cell now reads the new proof row. Bound derived from the cell: the token is minted (auth time T0) before the wait; the cell
+advances the process clock by exactly 299000 ms while the store waits on the row, so the recording instant is T0 + 299000 + the real time the harness
+takes (>= 0), and the store's own judgment admits at most 300000 ms: `created_at - issued_at` lies in [299000, 300000] ms (issued_at is the
+re-authentication's own instant); `expires_at - issued_at` === 900000 ms. The 301 s cell already asserts no proof row (`proofs.length === before`).
+Mutation proof (web-sessions.ts `const issuedMs = Math.min(authMs, atMs);` -> `const issuedMs = atMs;`): the control fails with
+`created_at - issued_at ... in [299000, 300000] ms (was 0)`; restored, green.

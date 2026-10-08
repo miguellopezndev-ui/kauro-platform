@@ -3134,6 +3134,14 @@ test("C r7 DENY ACH-M-R2-EXPIRY (re-authentication ages past 300 s while the ste
     const live = await stepUpBlocked(299_000, "unchanged");
     assert.equal(code(live.reply), "201 SUCCESS -", "control: a re-authentication 299 s old at the post-lock instant is recorded");
     assert.equal(live.proofs.length, live.before + 1, "control: one proof recorded");
+    // the proof's instants are pinned (r8): issued_at is the re-authentication's own instant (never the later recording instant), so the recording
+    // instant is exactly the 299 s wait plus the real time the harness took after the token was minted, and the judgment admits at most 300 s:
+    // created_at - issued_at lies in [299000, 300000] ms; the freshness window is 900000 ms
+    const [row] = await q<{ issued_at: Date; created_at: Date; expires_at: Date }>("SELECT issued_at, created_at, expires_at FROM kauro.assurance_proofs WHERE kind = 'STEP_UP' ORDER BY created_at DESC LIMIT 1");
+    assert.ok(row !== undefined, "control: the proof row exists");
+    const age = row.created_at.getTime() - row.issued_at.getTime();
+    assert.ok(age >= 299_000 && age <= 300_000, `control: created_at - issued_at is the re-authentication's age at the recording instant, in [299000, 300000] ms (was ${age})`);
+    assert.equal(row.expires_at.getTime() - row.issued_at.getTime(), 900_000, "control: the proof is fresh for 900000 ms from its issue");
     const r = await stepUpBlocked(301_000, "unchanged");
     assert.equal(code(r.reply), "403 ASSURANCE_REQUIRED STEP_UP_STALE", "a re-authentication 301 s old at the post-lock instant is stale");
     assert.equal(r.proofs.length, r.before, "no step-up proof recorded");
