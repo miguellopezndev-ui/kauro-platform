@@ -2633,3 +2633,279 @@ for (const fact of ["price", "source"] as const) {
     assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED, "nothing issued");
   });
 }
+
+// === Codex r3 on f348af1 (docs/review/pv1-route-codex-r3.json): PV1R-02, PV1R-07 — FAILURE-MATRIX-TEMPLATE rule 16 =====================
+// An authority judgment that gates an effect is taken under a lock that conflicts with the writer that revokes or renews that authority, with
+// the clock read after the lock is granted and the effect completed before the lock is released. Each cell makes the authority's writer race
+// the judgment at the lock itself: a resume waiting on the session row while the idle deadline passes (PV1R-02), a revocation started while
+// the guarded read waits on its effect clock (PV1R-07), a revocation committed before the final guard's lock and before a command's COMMIT.
+
+/** Runs `before` when the authentication boundary's pool hands out its `nth` connection during `fn` (before that transaction's first statement). */
+async function withNthSessionTransaction<T>(nth: number, before: () => Promise<void>, fn: () => Promise<T>): Promise<{ readonly out: T; readonly reached: boolean }> {
+  const pool = bw.iw.w.db.assurancePool as unknown as { acquire: () => Promise<unknown> } | null;
+  assert.ok(pool !== null, "a sessions-enabled world binds the authentication boundary's pool");
+  const real = pool.acquire;
+  let seen = 0;
+  let reached = false;
+  pool.acquire = async () => {
+    const acquired = await real.call(pool);
+    if (++seen === nth) {
+      reached = true;
+      await before();
+    }
+    return acquired;
+  };
+  try {
+    return { out: await fn(), reached };
+  } finally {
+    pool.acquire = real;
+  }
+}
+interface SessionRowState {
+  readonly lastSeen: number;
+  readonly idle: number;
+  readonly revoked: boolean;
+}
+async function sessionRowOf(session: BrowserSession): Promise<SessionRowState> {
+  const [row] = await q<{ last_seen_at: Date; idle_expires_at: Date; revoked_at: Date | null }>("SELECT last_seen_at, idle_expires_at, revoked_at FROM kauro.web_sessions WHERE secret_sha256 = $1", [session.secretSha256]);
+  assert.ok(row !== undefined, "the session row exists");
+  return { lastSeen: row.last_seen_at.getTime(), idle: row.idle_expires_at.getTime(), revoked: row.revoked_at !== null };
+}
+const pauseMs = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+/** True once some backend is observed waiting on a lock `pid` holds (pg_blocking_pids), within `timeoutMs`. */
+async function blockedBehind(pid: number, timeoutMs = 4_000): Promise<boolean> {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    if ((await n("SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))", [pid])) > 0) return true;
+    await pauseMs(10);
+  }
+  return false;
+}
+/** The product's logout of `session` (POST /api/v1/sessions/current/revoke with its cookie, Origin and CSRF token). */
+const revokeThroughProduct = (session: BrowserSession): Promise<Reply> =>
+  call(bw.iw.w, { url: sessionPaths.revoke, token: null, agency: null, key: null, headers: { cookie: session.cookie, origin: bw.iw.w.identity().origin, "x-kauro-csrf": session.view.csrfToken } });
+const settle = <T>(p: Promise<T>): Promise<PromiseSettledResult<T>> => p.then((value) => ({ status: "fulfilled", value }) as const, (reason: unknown) => ({ status: "rejected", reason }) as const);
+
+/**
+ * PV1R-02 crossing: when the authentication boundary hands out its `nth` connection during `request`, the process clock moves to the session's
+ * idle deadline - LEAD_MS (a touch is due: last-seen is minutes old) and another transaction takes the session row FOR UPDATE, unchanged. Once
+ * the session transaction is observed blocked on that row, the clock moves `crossMs` on and the row is released (inside the 5 s statement
+ * bound). The world's process clock is real time plus an offset (it keeps running), so the lead before the deadline is LEAD_MS rather than 1 ms
+ * (the time the harness itself takes between the move and the release must not cross it in the control); the crossing is LEAD_MS + 2 ms.
+ */
+const LEAD_MS = 2_000;
+async function resumeBlockedAcrossIdle(session: BrowserSession, nth: number, crossMs: number, request: () => Promise<Reply>): Promise<{ readonly reply: Reply; readonly idle: number }> {
+  const clock = bw.iw.w.processClock;
+  const idle = (await sessionRowOf(session)).idle;
+  let crossing: Promise<Error | null> = Promise.resolve(null);
+  const { out, reached } = await withNthSessionTransaction(nth, async () => {
+    assert.ok(idle - LEAD_MS - clock.nowMs() >= 60_000, "the session's last-seen is at least the touch window old at the crossing (a touch is due)");
+    clock.advance(idle - LEAD_MS - clock.nowMs());
+    const holder = await openHolder();
+    await holder.query("BEGIN");
+    const locked = await holder.query("SELECT 1 FROM kauro.web_sessions WHERE secret_sha256 = $1 FOR UPDATE", [session.secretSha256]);
+    assert.equal(locked.rowCount, 1, "the session row is held unchanged by another transaction");
+    crossing = (async (): Promise<Error | null> => {
+      try {
+        assert.ok(await blockedBehind(connectionPid(holder)), "the resume's session statement is observed blocked on the held session row");
+        if (crossMs > 0) clock.advance(crossMs);
+        return null;
+      } finally {
+        await holder.query("COMMIT");
+        await holder.end();
+      }
+    })().catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+  }, request);
+  const failed = await crossing;
+  if (failed !== null) throw failed;
+  assert.ok(reached, `the session transaction ${nth} of the request met the held row`);
+  return { reply: out, idle };
+}
+
+test(`PV1R-02 DENY ACH-M-R2-EXPIRY (session idle deadline crossed while the cookie resume waits on the session row lock): a touch-eligible session shortly before its idle deadline whose getBankRoute resume is blocked on the session row held unchanged by another transaction, released 2 ms past the deadline inside the statement bound, is refused 401 AUTHENTICATION_REQUIRED, the ended session is NOT renewed and the next request is refused; released before the deadline it is served and renewed`, async () => {
+  await onMovedSessions("pv1r02r3-get", async () => {
+    const r = await configured("pv1r02r3-get");
+    for (const ending of ["live", "idle"] as const) {
+      const session = await bw.iw.w.identity().signIn(bw.iw.owner);
+      const get = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.get(r.routeId), origin: null });
+      const before = await sessionRowOf(session);
+      const { reply: held, idle } = await resumeBlockedAcrossIdle(session, 1, ending === "live" ? 0 : LEAD_MS + 2, get);
+      const after = await sessionRowOf(session);
+      if (ending === "live") {
+        assert.equal(code(held), "200 SUCCESS -", "live: a session released before its idle deadline is served");
+        assert.ok(after.idle > idle, "live: the live session's idle deadline is renewed by the touch");
+        assert.equal(code(await get()), "200 SUCCESS -", "live: the next request is served");
+        continue;
+      }
+      assert.equal(code(held), "401 AUTHENTICATION_REQUIRED -", "idle: the resume released past the idle deadline refuses the request");
+      assert.deepEqual(after, before, "idle: the ended session is not renewed (last-seen and idle deadline unchanged)");
+      assert.equal(code(await get()), "401 AUTHENTICATION_REQUIRED -", "idle: the next request is refused");
+    }
+  });
+});
+
+test(`PV1R-02 DENY ACH-M-I3-EXPIRY (session idle deadline crossed while the FINAL I3 resume waits on the session row lock): an instructions read whose first two resumes complete without a touch and whose final resume meets the session row held unchanged shortly before its idle deadline, released 2 ms past the deadline, is refused 401 AUTHENTICATION_REQUIRED with no account or routing digits and no reference, the session is not renewed and the next request is refused; released before the deadline it is served with the exact secrets`, async () => {
+  await onMovedSessions("pv1r02r3-i3", async () => {
+    const endings = ["live", "idle"] as const;
+    const orders = new Map<string, Awaited<ReturnType<typeof issuedOrder>>>();
+    for (const ending of endings) orders.set(ending, await issuedOrder(`pv1r02r3-${ending}`));
+    for (const ending of endings) {
+      const x = orders.get(ending)!;
+      const session = await bw.iw.w.identity().signIn(x.b.a.billing);
+      const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
+      const before = await sessionRowOf(session);
+      const { reply: held, idle } = await resumeBlockedAcrossIdle(session, FINAL_I3_RESUME, ending === "live" ? 0 : LEAD_MS + 2, cookieRead);
+      const after = await sessionRowOf(session);
+      if (ending === "live") {
+        assert.equal(code(held), "200 SUCCESS -", "live: a session released before its idle deadline is served");
+        const v = held.json<InstructionsView>().instructions;
+        assert.deepEqual([v.accountNumber, v.routingNumber, v.reference], [ACCOUNT_DIGITS, "026073150", x.reference], "live: the account, the routing number and the reference");
+        assert.ok(after.idle > idle, "live: the final resume renewed the live session");
+        continue;
+      }
+      assert.equal(code(held), "401 AUTHENTICATION_REQUIRED -", "idle: the read released past the idle deadline is refused");
+      noAccountDigits(held, "idle deadline crossed during the final resume's lock wait");
+      assert.ok(!held.text.includes(x.reference), "idle: no payment reference in the held read");
+      assert.deepEqual(after, before, "idle: the first two resumes did not touch the session and the final one did not renew the ended session");
+      const next = await cookieRead();
+      assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", "idle: the next request is refused");
+      noAccountDigits(next, "next read");
+    }
+  });
+});
+
+/** Where a revocation started during a guarded wait stands within `timeoutMs`: COMMITTED (the row is revoked) or WAITING (blocked on a lock). */
+async function revocationStanding(session: BrowserSession, timeoutMs = 3_000): Promise<"COMMITTED" | "WAITING" | "NEITHER"> {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    if ((await sessionRowOf(session)).revoked) return "COMMITTED";
+    if ((await n("SELECT 1 FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE '%UPDATE kauro.web_sessions SET revoked_at%'")) > 0) return "WAITING";
+    await pauseMs(10);
+  }
+  return "NEITHER";
+}
+/** The next request, fenced by the revocation: it must be refused 401 (its answer is carried out of the fenced operation). */
+const nextRefused = async (ctx: FaultContext, what: string, request: () => Promise<Reply>): Promise<Reply> =>
+  (
+    (await ctx.fenced(what, async () => {
+      const r = await request();
+      if (r.status === 401) throw new HeldReadAnswered(r);
+      return r;
+    }, (e) => e instanceof HeldReadAnswered)) as HeldReadAnswered
+  ).reply;
+
+cell(`PV1R-07 DENY ACH-M-I3-REVOCATION (revocation started while the final guard waits on the effect clock): an instructions read held at its effect-clock read after the final authentication, during which the session is revoked through the product, never answers secrets under a committed revocation: the revocation waits on the session row the final guard holds until the view is built (the read is ordered before it and served), then commits, and the next request is refused 401 with no digits or reference; the same hold without a revocation is served with the exact secrets`, "revocation", async (ctx) => {
+  await onSessions(async () => {
+    const x = await issuedOrder("pv1r07-held");
+    const session = await bw.iw.w.identity().signIn(x.b.a.billing);
+    const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
+    const control = await readHeldAtEffectRead(ctx, "control without a revocation", cookieRead, async () => undefined);
+    assert.equal(code(control), "200 SUCCESS -", "control: served");
+    const c = control.json<InstructionsView>().instructions;
+    assert.deepEqual([c.accountNumber, c.routingNumber, c.reference], [ACCOUNT_DIGITS, "026073150", x.reference], "control: the exact secrets");
+    let revocation: Promise<PromiseSettledResult<Reply>> | null = null;
+    let standing: string | null = null;
+    const held = await readHeldAtEffectRead(ctx, "revocation during the effect-clock wait", cookieRead, async () => {
+      revocation = settle(revokeThroughProduct(session));
+      standing = await revocationStanding(session);
+    });
+    assert.equal(standing, "WAITING", "a revocation started while the final guard waits on its effect clock waits on the session row the guard holds (a revocation committed then would leave the read's authority stale)");
+    // the read was ordered before the revocation: its answer is the session's authority as it stood under the lock
+    assert.equal(code(held), "200 SUCCESS -", "the guarded read, ordered before the revocation, is served");
+    await ctx.revoked("session revoked through the product once the guarded read released the row", async () => {
+      const done = ok(await revocation!);
+      assert.equal(done.status, 204, `the revocation commits after the guarded read (${code(done)})`);
+    });
+    const refused = await nextRefused(ctx, "next request after the revocation", cookieRead);
+    assert.equal(code(refused), "401 AUTHENTICATION_REQUIRED -", "the next request is unauthenticated");
+    noAccountDigits(refused, "next read after the revocation");
+    assert.ok(!refused.text.includes(x.reference), "no payment reference after the revocation");
+  });
+});
+
+cell(`PV1R-07 DENY ACH-M-I3-REVOCATION (revocation committed before the final guard's lock): an instructions read whose final authentication begins only after the session was revoked through the product (committed) is refused 401 AUTHENTICATION_REQUIRED with no account or routing digits and no reference, like the next request`, "revocation", async (ctx) => {
+  await onSessions(async () => {
+    const x = await issuedOrder("pv1r07-before");
+    const session = await bw.iw.w.identity().signIn(x.b.a.billing);
+    const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
+    const { out: held, reached } = await withNthSessionTransaction(FINAL_I3_RESUME, async () => {
+      await ctx.revoked("session revoked through the product before the final guard's lock", async () => {
+        const done = await revokeThroughProduct(session);
+        assert.equal(done.status, 204, `the revocation commits (${code(done)})`);
+        assert.ok((await sessionRowOf(session)).revoked, "the revocation is committed");
+      });
+    }, cookieRead);
+    assert.ok(reached, "the final authentication began after the revocation committed");
+    const refused = await nextRefused(ctx, "the held read, answered after the revocation", async () => held);
+    assert.equal(code(refused), "401 AUTHENTICATION_REQUIRED -", "the held read is refused");
+    noAccountDigits(held, "revoked before the final guard");
+    assert.ok(!held.text.includes(x.reference), "no payment reference");
+    assert.equal(code(await cookieRead()), "401 AUTHENTICATION_REQUIRED -", "the next request is refused");
+  });
+});
+
+/**
+ * Sweep of rule 16 over the other effects a cookie session authorizes: `command` runs on its own connection and is held at
+ * `uow.before-commit` (its work returned); the session is revoked through the product when `revoke` is given (committed); then the command
+ * is released.
+ */
+async function heldAtCommitUnder(ctx: FaultContext, what: string, revoke: BrowserSession | null, command: () => Promise<Reply>): Promise<Reply> {
+  const conn = await open();
+  try {
+    const atCommit = ctx.points.pause("uow.before-commit");
+    const running = ctx.operation(what, () => on(ctx, conn, command));
+    const settled = settle(running);
+    await atCommit.reachedBy(running);
+    if (revoke !== null) {
+      await ctx.revoked(`${what}: the session revoked through the product while the command waits`, async () => {
+        const done = await revokeThroughProduct(revoke);
+        assert.equal(done.status, 204, `the revocation commits (${code(done)})`);
+      });
+    }
+    atCommit.release();
+    return ok(await settled);
+  } finally {
+    await conn.end();
+  }
+}
+
+for (const c of AT_COMMIT) {
+  cell(`PV1R-07 DENY ACH-M-R2-REVOCATION (session revoked during the post-authentication wait, ${c.name}): the ${c.name} command of a cookie session held before its COMMIT while the session is revoked through the product is refused 401 AUTHENTICATION_REQUIRED, leaving route, version, participant, event and outbox state unchanged and no journal entry; the same hold without a revocation commits`, "revocation", async (ctx) => {
+    await onSessions(async () => {
+      const control = await c.prepare(`pv1r07-${c.name}-ok`);
+      const cs = await bw.iw.w.identity().signIn(bw.iw.owner);
+      assert.equal(code(await heldAtCommitUnder(ctx, `${c.name} control`, null, () => browserCall(cs, { url: control.url, body: control.body }))), "200 SUCCESS -", `control: ${c.name} commits under a live session`);
+      const x = await c.prepare(`pv1r07-${c.name}`);
+      const session = await bw.iw.w.identity().signIn(bw.iw.owner);
+      const key = freshKey(`pv1r07-${c.name}`);
+      const before = await routeFootprint(x.r.routeId);
+      const reply = await heldAtCommitUnder(ctx, `${c.name} held before COMMIT`, session, () => browserCall(session, { url: x.url, body: x.body, key }));
+      assert.equal(code(reply), "401 AUTHENTICATION_REQUIRED -", `${c.name}: a session revoked before COMMIT refuses the effect`);
+      assert.deepEqual(await routeFootprint(x.r.routeId), before, `${c.name}: route, version, participant, event and outbox state unchanged`);
+      assert.equal(await bw.iw.w.journal(key), null, `${c.name}: no journal entry`);
+      const next = await nextRefused(ctx, `${c.name}: next request`, () => browserCall(session, { method: "GET", url: bankRoutes.get(x.r.routeId), origin: null }));
+      assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", `${c.name}: the next request is refused`);
+    });
+  });
+}
+
+cell(`PV1R-07 DENY ACH-M-I2-REVOCATION (session revoked during the post-authentication wait, issuance): an I1/I2 issuance of a cookie session held before its COMMIT while the session is revoked through the product is refused 401 AUTHENTICATION_REQUIRED with nothing issued (no order, no instructions, no accepted quote, no event) and no journal entry; the same hold without a revocation issues`, "revocation", async (ctx) => {
+  await onSessions(async () => {
+    const bc = await buyer("pv1r07-issue-ok");
+    const rc = await enabled("pv1r07-issue-ok", [bc.a.s.agency.agencyId]);
+    const cs = await bw.iw.w.identity().signIn(bc.a.billing);
+    const control = await heldAtCommitUnder(ctx, "issuance control", null, () => browserCall(cs, { url: bankRoutes.order(bc.quote.quote.quoteId), body: issueBody(bc, rc), agency: bc.a.s.agency.agencyId }));
+    assert.equal(code(control), "201 SUCCESS -", "control: the issuance commits under a live session");
+    const b = await buyer("pv1r07-issue");
+    const r = await enabled("pv1r07-issue", [b.a.s.agency.agencyId]);
+    const session = await bw.iw.w.identity().signIn(b.a.billing);
+    const key = freshKey("pv1r07-issue");
+    const issueCall = (k?: string): Promise<Reply> => browserCall(session, { url: bankRoutes.order(b.quote.quote.quoteId), body: issueBody(b, r), agency: b.a.s.agency.agencyId, ...(k === undefined ? {} : { key: k }) });
+    const reply = await heldAtCommitUnder(ctx, "issuance held before COMMIT", session, () => issueCall(key));
+    assert.equal(code(reply), "401 AUTHENTICATION_REQUIRED -", "a session revoked before COMMIT refuses the issuance");
+    assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED, "nothing issued");
+    assert.equal(await bw.iw.w.journal(key), null, "no journal entry");
+    const next = await nextRefused(ctx, "issuance: next request", () => issueCall());
+    assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", "the next issuance is refused");
+  });
+});
