@@ -23,12 +23,11 @@ import { after, before, test } from "node:test";
 import { BANK_FAKE_FORMAT, BANK_FAKE_PROVIDER } from "@kauro/application/testing";
 import type { CreateQuoteView } from "@kauro/application";
 import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
-import { connectionPid, crashedAt, openConnection, runCell, SimulatedCrash, type FaultContext, type FaultKind, type HarnessConnection } from "@kauro/persistence/testing";
+import { connectionPid, crashedAt, FaultPoints, openConnection, runCell, SimulatedCrash, type FaultContext, type FaultKind, type HarnessConnection } from "@kauro/persistence/testing";
 import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld } from "./bank-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { agentOf, planOf, quoted, type Agent } from "./integration-support.js";
 import { call, completed, freshKey, outcome, rawEvent, routes, sessionPaths, type BrowserSession, type Reply } from "./support.js";
-import { requestAuthorityOf } from "../src/request-authority.js";
 
 let bw: BankWorld;
 before(async () => {
@@ -2521,22 +2520,23 @@ class HeldReadAnswered extends Error {
 }
 let heldSeq = 0;
 /**
- * One I3 cookie read under `session` whose answer is held at the first `kauro.effect_now()` statement after the FINAL authentication (the
- * third resume has answered; nothing awaits the session store after that statement except the view): `during` runs while it is held.
+ * One I3 cookie read under `session` whose answer is held at its final effect-clock read: the first `kauro.effect_now()` statement on the
+ * read's connection after its route lock (`FROM kauro.bank_routes WHERE route_id = $1 FOR SHARE`), the read's final authority judgment
+ * already locked (r4 repair, design-neutral: it names the read's own statements, not the authentication boundary's): `during` runs while
+ * it is held.
  */
 async function readHeldAtEffectRead(ctx: FaultContext, what: string, read: () => Promise<Reply>, during: () => Promise<void>): Promise<Reply> {
   const conn = await open();
   try {
-    let armed = false;
-    const label = `effect-read-${++heldSeq}`;
-    const atEffect = ctx.points.pause(`db.${label}.after`);
-    const running = on(ctx, conn, () => withResumeHeld(FINAL_I3_RESUME, async () => void (armed = true), read), [{ label, match: /kauro\.effect_now\(\)/, when: () => armed }]);
+    const at = i3EffectRead();
+    const atEffect = ctx.points.pause(at.point);
+    const running = on(ctx, conn, read, at.steps);
     const settled = running.then((value) => ({ status: "fulfilled", value }) as const, (reason: unknown) => ({ status: "rejected", reason }) as const);
     await atEffect.reachedBy(running);
     await during();
     atEffect.release();
-    const { out, reached } = ok(await settled);
-    assert.ok(reached, `${what}: the final authentication's session-store statement was held`);
+    const out = ok(await settled);
+    assert.ok(at.taken(), `${what}: the read's final effect-clock read was held`);
     return out;
   } finally {
     await conn.end();
@@ -2745,29 +2745,59 @@ test(`PV1R-02 DENY ACH-M-R2-EXPIRY (session idle deadline crossed while the cook
   });
 });
 
-test(`PV1R-02 DENY ACH-M-I3-EXPIRY (session idle deadline crossed while the FINAL I3 resume waits on the session row lock): an instructions read whose first two resumes complete without a touch and whose final resume meets the session row held unchanged shortly before its idle deadline, released 2 ms past the deadline, is refused 401 AUTHENTICATION_REQUIRED with no account or routing digits and no reference, the session is not renewed and the next request is refused; released before the deadline it is served with the exact secrets`, async () => {
-  await onMovedSessions("pv1r02r3-i3", async () => {
+// E1 (PV1R-07 r4 repair of the r3 PV1R-02 I3 cell, docs/review/pv1-route-test-repairs.md): the row is held when the read's own connection
+// passes its route lock, so the read's final session judgment (wherever it locks the row) meets it; no count of authentication-boundary
+// transactions is assumed. The live control asserts the exact secrets only: whether the final judgment touches the session is not its claim.
+test(`PV1R-02 r4 DENY ACH-M-I3-EXPIRY (idle deadline crossed while the final session fence waits): an instructions read whose final session judgment, taken after its route lock, waits on the session row held unchanged by another transaction shortly before the idle deadline, released 2 ms past it, is refused 401 AUTHENTICATION_REQUIRED with no account or routing digits and no reference, the session is not renewed and the next request is refused; released before the deadline it is served with the exact secrets`, async () => {
+  await onMovedSessions("pv1r02r4-i3", async () => {
     const endings = ["live", "idle"] as const;
     const orders = new Map<string, Awaited<ReturnType<typeof issuedOrder>>>();
-    for (const ending of endings) orders.set(ending, await issuedOrder(`pv1r02r3-${ending}`));
+    for (const ending of endings) orders.set(ending, await issuedOrder(`pv1r02r4-${ending}`));
     for (const ending of endings) {
       const x = orders.get(ending)!;
       const session = await bw.iw.w.identity().signIn(x.b.a.billing);
       const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
+      const clock = bw.iw.w.processClock;
       const before = await sessionRowOf(session);
-      const { reply: held, idle } = await resumeBlockedAcrossIdle(session, FINAL_I3_RESUME, ending === "live" ? 0 : LEAD_MS + 2, cookieRead);
+      const idle = before.idle;
+      const points = new FaultPoints();
+      const label = `e1-route-${++heldSeq}`;
+      const atRoute = points.pause(`db.${label}.after`);
+      const conn = await open();
+      let held: Reply;
+      try {
+        const running = settle(bw.iw.faults.on(conn, "kauro_app", points, [{ label, match: /FROM kauro\.bank_routes WHERE route_id = \$1 FOR SHARE/ }], cookieRead));
+        await atRoute.reachedBy(running.then(() => undefined));
+        assert.ok(idle - LEAD_MS - clock.nowMs() >= 60_000, "the session's last-seen is at least the touch window old at the crossing (a touch is due)");
+        clock.advance(idle - LEAD_MS - clock.nowMs());
+        const holder = await openHolder();
+        try {
+          await holder.query("BEGIN");
+          const locked = await holder.query("SELECT 1 FROM kauro.web_sessions WHERE secret_sha256 = $1 FOR UPDATE", [session.secretSha256]);
+          assert.equal(locked.rowCount, 1, "the session row is held unchanged by another transaction");
+          atRoute.release();
+          assert.ok(await blockedBehind(connectionPid(holder)), "the read's final session judgment is observed blocked on the held session row");
+          if (ending === "idle") clock.advance(LEAD_MS + 2);
+        } finally {
+          await holder.query("COMMIT");
+          await holder.end();
+        }
+        held = ok(await running);
+      } finally {
+        await conn.end();
+      }
       const after = await sessionRowOf(session);
       if (ending === "live") {
         assert.equal(code(held), "200 SUCCESS -", "live: a session released before its idle deadline is served");
         const v = held.json<InstructionsView>().instructions;
         assert.deepEqual([v.accountNumber, v.routingNumber, v.reference], [ACCOUNT_DIGITS, "026073150", x.reference], "live: the account, the routing number and the reference");
-        assert.ok(after.idle > idle, "live: the final resume renewed the live session");
+        assert.equal(after.revoked, false, "live: the session stands");
         continue;
       }
       assert.equal(code(held), "401 AUTHENTICATION_REQUIRED -", "idle: the read released past the idle deadline is refused");
-      noAccountDigits(held, "idle deadline crossed during the final resume's lock wait");
+      noAccountDigits(held, "idle deadline crossed during the final session judgment's lock wait");
       assert.ok(!held.text.includes(x.reference), "idle: no payment reference in the held read");
-      assert.deepEqual(after, before, "idle: the first two resumes did not touch the session and the final one did not renew the ended session");
+      assert.deepEqual(after, before, "idle: the ended session is not renewed (last-seen and idle deadline unchanged)");
       const next = await cookieRead();
       assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", "idle: the next request is refused");
       noAccountDigits(next, "next read");
@@ -2824,22 +2854,33 @@ cell(`PV1R-07 DENY ACH-M-I3-REVOCATION (revocation started while the final guard
   });
 });
 
-cell(`PV1R-07 DENY ACH-M-I3-REVOCATION (revocation committed before the final guard's lock): an instructions read whose final authentication begins only after the session was revoked through the product (committed) is refused 401 AUTHENTICATION_REQUIRED with no account or routing digits and no reference, like the next request`, "revocation", async (ctx) => {
+// R1 (PV1R-07 r4 repair of the r3 cell, docs/review/pv1-route-test-repairs.md): the revocation commits while the read's own connection
+// stands at its route lock, before its final session judgment, instead of at the third authentication-boundary acquisition.
+cell(`PV1R-07 r4 DENY ACH-M-I3-REVOCATION (revocation committed before the final session fence): an instructions read whose session is revoked through the product (committed) while the read stands at its route lock, before its final session judgment, is refused 401 AUTHENTICATION_REQUIRED with no account or routing digits and no reference, like the next request`, "revocation", async (ctx) => {
   await onSessions(async () => {
-    const x = await issuedOrder("pv1r07-before");
+    const x = await issuedOrder("pv1r07r4-before");
     const session = await bw.iw.w.identity().signIn(x.b.a.billing);
     const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
-    const { out: held, reached } = await withNthSessionTransaction(FINAL_I3_RESUME, async () => {
-      await ctx.revoked("session revoked through the product before the final guard's lock", async () => {
+    const label = `r1-route-${++heldSeq}`;
+    const atRoute = ctx.points.pause(`db.${label}.after`);
+    const conn = await open();
+    let held: Reply;
+    try {
+      const running = settle(ctx.operation("read held at its route lock", () => on(ctx, conn, cookieRead, [{ label, match: /FROM kauro\.bank_routes WHERE route_id = \$1 FOR SHARE/ }])));
+      await atRoute.reachedBy(running.then(() => undefined));
+      await ctx.revoked("session revoked through the product before the final session judgment", async () => {
         const done = await revokeThroughProduct(session);
         assert.equal(done.status, 204, `the revocation commits (${code(done)})`);
         assert.ok((await sessionRowOf(session)).revoked, "the revocation is committed");
       });
-    }, cookieRead);
-    assert.ok(reached, "the final authentication began after the revocation committed");
+      atRoute.release();
+      held = ok(await running);
+    } finally {
+      await conn.end();
+    }
     const refused = await nextRefused(ctx, "the held read, answered after the revocation", async () => held);
     assert.equal(code(refused), "401 AUTHENTICATION_REQUIRED -", "the held read is refused");
-    noAccountDigits(held, "revoked before the final guard");
+    noAccountDigits(held, "revoked before the final session judgment");
     assert.ok(!held.text.includes(x.reference), "no payment reference");
     assert.equal(code(await cookieRead()), "401 AUTHENTICATION_REQUIRED -", "the next request is refused");
   });
@@ -2909,32 +2950,6 @@ cell(`PV1R-07 DENY ACH-M-I2-REVOCATION (session revoked during the post-authenti
     const next = await nextRefused(ctx, "issuance: next request", () => issueCall());
     assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", "the next issuance is refused");
   });
-});
-
-// rule 16 deadlock check (r3): one request holds its session row at most once. A second judgment of the same request (a unit retried after
-// its first COMMIT attempt, a second effect) reuses the held row instead of locking it again from another connection, which would wait on
-// its own lock until the statement timeout; after the release a judgment holds the row again
-test("RULE16-SELF-WAIT DENY ACH-M-R2-RETRY (second judgment of one request): a request's authority asked twice before its release holds the session once and judges both times at the caller's instant; after the release it holds again", async () => {
-  let holds = 0;
-  let releases = 0;
-  const authenticator = {
-    authenticate: async () => null,
-    holdRequest: async () => {
-      holds += 1;
-      return { userId: "user-1", liveAt: (nowMs: number) => nowMs < 1_000, release: async () => void (releases += 1) };
-    },
-  } as unknown as Parameters<typeof requestAuthorityOf>[0];
-  const handle = requestAuthorityOf(authenticator, { method: "POST", headers: {} }, "user-1", () => undefined);
-  const [one, two] = await Promise.all([handle.authority.hold(), handle.authority.hold()]);
-  assert.equal(holds, 1, "one hold for two judgments of the same request");
-  assert.equal(one?.liveAt(999), true);
-  assert.equal(two?.liveAt(1_000), false, "the reused hold is judged again at the caller's instant");
-  await handle.release();
-  assert.equal(releases, 1);
-  await handle.authority.hold();
-  assert.equal(holds, 2, "a judgment after the release holds the row again");
-  await handle.release();
-  assert.equal(releases, 2);
 });
 
 // === internal adversary r6 on 68ab5cc (docs/review/pv1-route-adversary-r6.md): ADV-1 revoke instant, ADV-2 CMD028 replay ================
@@ -3148,3 +3163,466 @@ test("C r7 DENY ACH-M-R2-EXPIRY (re-authentication ages past 300 s while the ste
     assert.ok(r.reached);
   });
 });
+
+// === Codex r4 on ac9a2ed (tools/review/out/pv1-route-r4-ac9a2ed0c21a): PV1R-07 r4, the session lock and the effect share one transaction ===
+// docs/review/pv1-route-pv1r07-design.md §5. Each cell holds the effect at a statement of its OWN connection, finds the backend holding the
+// session row through PostgreSQL (a superuser probe asks FOR UPDATE; pg_blocking_pids names its blocker), terminates exactly that backend,
+// revokes the session through the product (committed), then releases the effect. A lock held by another transaction than the effect's is
+// no fence: the effect must not commit nor be served; the next request is refused 401; and the holder must have been the effect's own
+// backend, with no authentication-boundary backend in a transaction (FAILURE-MATRIX-TEMPLATE rule 16, r4 amendment).
+
+/** A pause point on the effect's own connection and the statement steps that arm it. */
+interface HoldPoint {
+  readonly point: string;
+  readonly steps: ReadonlyArray<SqlStep>;
+  readonly taken: () => boolean;
+}
+const ROUTE_LOCK = /FROM kauro\.bank_routes WHERE route_id = \$1 FOR SHARE/;
+const EFFECT_READ = /kauro\.effect_now\(\)/;
+const COMMIT_STATEMENT = /^\s*COMMIT\s*$/i;
+/** I3's final effect-clock read: the first `kauro.effect_now()` on the read's connection after its route lock (`.after`: its answer held). */
+function i3EffectRead(): HoldPoint {
+  const label = `r4-i3-effect-${++heldSeq}`;
+  let locked = false;
+  let taken = false;
+  return {
+    point: `db.${label}.after`,
+    taken: () => taken,
+    steps: [
+      {
+        label: `${label}-route`,
+        match: ROUTE_LOCK,
+        when: () => {
+          locked = true;
+          return false;
+        },
+      },
+      {
+        label,
+        match: EFFECT_READ,
+        when: () => {
+          if (!locked || taken) return false;
+          taken = true;
+          return true;
+        },
+      },
+    ],
+  };
+}
+/** The order of the effect-clock reads (E) and COMMITs (C) one request runs on its connection (a control run of the same path). */
+type StatementPlan = ReadonlyArray<"E" | "C">;
+async function statementPlan(request: () => Promise<Reply>): Promise<StatementPlan> {
+  const conn = await open();
+  const seen: Array<"E" | "C"> = [];
+  try {
+    const steps: ReadonlyArray<SqlStep> = [
+      {
+        label: "plan-effect",
+        match: EFFECT_READ,
+        when: () => {
+          seen.push("E");
+          return false;
+        },
+      },
+      {
+        label: "plan-commit",
+        match: COMMIT_STATEMENT,
+        when: () => {
+          seen.push("C");
+          return false;
+        },
+      },
+    ];
+    const reply = await bw.iw.faults.on(conn, "kauro_app", new FaultPoints(), steps, request);
+    assert.ok(reply.status < 300, `the plan run of the path succeeds (${code(reply)})`);
+    return seen;
+  } finally {
+    await conn.end();
+  }
+}
+/** The nth statement matching `match` on the connection, held at `.after` (its answer) or `.before` (not yet sent). */
+function nthStatement(name: string, match: RegExp, nth: number, side: "before" | "after"): HoldPoint {
+  const label = `r4-${name}-${++heldSeq}`;
+  let k = 0;
+  let taken = false;
+  return {
+    point: `db.${label}.${side}`,
+    taken: () => taken,
+    steps: [
+      {
+        label,
+        match,
+        when: () => {
+          if (++k !== nth) return false;
+          taken = true;
+          return true;
+        },
+      },
+    ],
+  };
+}
+/** "before the final judgment": the answer of the unit's LAST effect-clock read held (the session already locked, the judgment not yet taken). */
+function finalJudgmentOf(plan: StatementPlan): HoldPoint {
+  const count = plan.filter((x) => x === "E").length;
+  assert.ok(count > 0, `the path reads its effect clock on its connection (${plan.join("")})`);
+  return nthStatement("final-judgment", EFFECT_READ, count, "after");
+}
+/** "before COMMIT": the COMMIT that follows the last effect-clock read (the last COMMIT when the path reads none), held before it is sent. */
+function commitOf(plan: StatementPlan): HoldPoint {
+  const lastE = plan.lastIndexOf("E");
+  const at = lastE < 0 ? plan.lastIndexOf("C") : plan.findIndex((x, i) => x === "C" && i > lastE);
+  assert.ok(at >= 0, `the path commits on its connection (${plan.join("")})`);
+  return nthStatement("commit", COMMIT_STATEMENT, plan.slice(0, at + 1).filter((x) => x === "C").length, "before");
+}
+
+/** What PostgreSQL said about the backend that held the session row when it was lost. */
+interface LostHolder {
+  readonly pid: number;
+  readonly usename: string;
+  readonly applicationName: string;
+  /** The holder was the effect's own connection (connectionPid of the held effect's connection). */
+  readonly own: boolean;
+  /** Backends of the authentication boundary (kauro_assurance_test) in a transaction while the effect was held. */
+  readonly boundaryInTransaction: number;
+}
+/**
+ * Holder discovery and loss (design §5): a superuser probe asks the session row FOR UPDATE (lock_timeout 10 s) without being awaited; the
+ * oracle polls pg_blocking_pids(probe) until it names a blocker; exactly one is required; that backend is terminated and gone; the probe then
+ * gets the row and rolls back (nothing of it remains).
+ */
+async function loseSessionLockHolder(session: BrowserSession, conn: HarnessConnection): Promise<LostHolder> {
+  const probe = await openHolder();
+  probe.on("error", () => undefined);
+  try {
+    await probe.query("BEGIN");
+    await probe.query("SET LOCAL lock_timeout = '10s'");
+    const probing = settle(probe.query("SELECT 1 FROM kauro.web_sessions WHERE secret_sha256 = $1 FOR UPDATE", [session.secretSha256]));
+    const probePid = connectionPid(probe);
+    let blockers: number[] = [];
+    const until = Date.now() + 4_000;
+    while (Date.now() < until) {
+      blockers = ((await q<{ b: number[] }>("SELECT pg_blocking_pids($1) AS b", [probePid]))[0]?.b ?? []).map(Number);
+      if (blockers.length > 0) break;
+      await pauseMs(10);
+    }
+    assert.equal(blockers.length, 1, `exactly one backend holds the session row while the effect is held (blockers ${JSON.stringify(blockers)})`);
+    const pid = blockers[0]!;
+    const [who] = await q<{ usename: string; application_name: string }>("SELECT usename, application_name FROM pg_stat_activity WHERE pid = $1", [pid]);
+    const boundaryInTransaction = await n("SELECT 1 FROM pg_stat_activity WHERE usename = 'kauro_assurance_test' AND xact_start IS NOT NULL");
+    const own = pid === connectionPid(conn);
+    if (own) conn.on("error", () => undefined);
+    assert.equal((await q<{ ok: boolean }>("SELECT pg_terminate_backend($1) AS ok", [pid]))[0]!.ok, true, `the holder ${pid} is terminated`);
+    let gone = false;
+    for (let i = 0; i < 400 && !gone; i++) {
+      gone = (await n("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [pid])) === 0;
+      if (!gone) await pauseMs(10);
+    }
+    assert.ok(gone, `the holder ${pid} is gone`);
+    const got = ok(await probing);
+    assert.equal(got.rowCount, 1, "the probe gets the session row once its holder is gone");
+    await probe.query("ROLLBACK");
+    return { pid, usename: who?.usename ?? "?", applicationName: who?.application_name ?? "?", own, boundaryInTransaction };
+  } finally {
+    await probe.end().catch(() => undefined);
+  }
+}
+/** The effect held at `at` on its own connection; its session-lock holder lost; the session revoked through the product (committed); released. */
+async function heldLosingHolder(ctx: FaultContext, what: string, session: BrowserSession, at: HoldPoint, request: () => Promise<Reply>): Promise<{ readonly reply: Reply; readonly lost: LostHolder }> {
+  const conn = await open();
+  conn.on("error", () => undefined);
+  try {
+    const pause = ctx.points.pause(at.point);
+    const running = ctx.operation(what, () => on(ctx, conn, request, at.steps));
+    const settled = settle(running);
+    await pause.reachedBy(running);
+    const lost = await loseSessionLockHolder(session, conn);
+    await ctx.revoked(`${what}: the session revoked through the product after its lock holder was lost`, async () => {
+      const done = await revokeThroughProduct(session);
+      assert.equal(done.status, 204, `the revocation commits (${code(done)})`);
+      assert.ok((await sessionRowOf(session)).revoked, "the revocation is committed");
+    });
+    pause.release();
+    const reply = ok(await settled);
+    assert.ok(at.taken(), `${what}: the effect was held at its own statement`);
+    return { reply, lost };
+  } finally {
+    await conn.end().catch(() => undefined);
+  }
+}
+/** No 2xx after the holder was lost: the unit's connection failure (500/503) or, if the unit re-ran, the unauthenticated answer. */
+const notServed = (r: Reply): boolean => r.status === 500 || r.status === 503 || r.status === 401;
+/** The rule 16 r4 lock assertion: the effect's own backend was the only holder, and no authentication-boundary backend was in a transaction. */
+function fencedByOwnTransaction(lost: LostHolder, what: string): void {
+  assert.equal(lost.own, true, `${what}: the only session-lock holder is the effect's own unit backend (it was ${lost.usename} / ${lost.applicationName}, pid ${lost.pid})`);
+  assert.equal(lost.boundaryInTransaction, 0, `${what}: no authentication-boundary backend is in a transaction while the effect is held`);
+}
+
+// --- H1, H2: I3 -----------------------------------------------------------------------------------------------------------------------
+
+for (const [id, at, label] of [
+  ["H1", "during the effect-clock wait", "i3-effect"],
+  ["H2", "after the view was built, before COMMIT", "i3-commit"],
+] as const) {
+  advCell(`PV1R-07 r4 DENY ACH-M-I3-REVOCATION (session-lock holder lost ${at}): an instructions read held ${id === "H1" ? "at its final effect-clock read" : "after its view was built, before its COMMIT"} whose session-row lock holder backend is terminated, the session then revoked through the product (committed), never answers secrets: no 2xx, no account or routing digits, no reference; the next request is refused 401; the only lock holder was the read's own unit backend and no authentication-boundary backend was in a transaction`, "ACH-M-I3-REVOCATION", "revocation", async (ctx) => {
+    await onSessions(async () => {
+      const x = await issuedOrder(`pv1r07r4-${label}`);
+      const session = await bw.iw.w.identity().signIn(x.b.a.billing);
+      const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
+      const hold = id === "H1" ? i3EffectRead() : commitOf(await statementPlan(cookieRead));
+      const { reply, lost } = await heldLosingHolder(ctx, `${id} read`, session, hold, cookieRead);
+      assert.ok(notServed(reply), `the read whose lock holder was lost is not served (${code(reply)})`);
+      noAccountDigits(reply, `${id}: lock holder lost`);
+      assert.ok(!reply.text.includes(x.reference), `${id}: no payment reference`);
+      const next = await nextRefused(ctx, `${id}: next request`, cookieRead);
+      assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", `${id}: the next request is refused`);
+      noAccountDigits(next, `${id}: next read`);
+      fencedByOwnTransaction(lost, id);
+    });
+  });
+}
+
+// --- H3: the four step-up route commands, at two positions ------------------------------------------------------------------------------
+
+for (const position of ["before the final judgment", "before COMMIT"] as const) {
+  for (const c of AT_COMMIT) {
+    advCell(`PV1R-07 r4 DENY ACH-M-R2-REVOCATION (session-lock holder lost ${position}, ${c.name}): the ${c.name} command whose session-lock holder backend is terminated ${position}, the session then revoked through the product, commits nothing: no 2xx, route, version, participant, event and outbox state unchanged, no journal entry; the next request is refused 401`, "ACH-M-R2-REVOCATION", "revocation", async (ctx) => {
+      await onSessions(async () => {
+        const control = await c.prepare(`pv1r07r4-${c.name}-plan`);
+        const cs = await bw.iw.w.identity().signIn(bw.iw.owner);
+        const plan = await statementPlan(() => browserCall(cs, { url: control.url, body: control.body }));
+        const x = await c.prepare(`pv1r07r4-${c.name}`);
+        const session = await bw.iw.w.identity().signIn(bw.iw.owner);
+        const key = freshKey(`pv1r07r4-${c.name}`);
+        const before = await routeFootprint(x.r.routeId);
+        const hold = position === "before COMMIT" ? commitOf(plan) : finalJudgmentOf(plan);
+        const { reply, lost } = await heldLosingHolder(ctx, `${c.name} ${position}`, session, hold, () => browserCall(session, { url: x.url, body: x.body, key }));
+        assert.ok(notServed(reply), `${c.name}: nothing commits under a lost lock (${code(reply)})`);
+        assert.deepEqual(await routeFootprint(x.r.routeId), before, `${c.name}: route, version, participant, event and outbox state unchanged`);
+        assert.equal(await bw.iw.w.journal(key), null, `${c.name}: no journal entry`);
+        const next = await nextRefused(ctx, `${c.name}: next request`, () => browserCall(session, { method: "GET", url: bankRoutes.get(x.r.routeId), origin: null }));
+        assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", `${c.name}: the next request is refused`);
+        fencedByOwnTransaction(lost, c.name);
+      });
+    });
+  }
+}
+
+// --- H4: issuance, at two positions -------------------------------------------------------------------------------------------------------
+
+for (const position of ["before the final judgment", "before COMMIT"] as const) {
+  advCell(`PV1R-07 r4 DENY ACH-M-I2-REVOCATION (session-lock holder lost ${position}, issuance): an I1/I2 issuance of a cookie session whose session-lock holder backend is terminated ${position}, the session then revoked through the product, issues nothing (no order, no instructions, no accepted quote, no event) and leaves no journal entry; the next issuance is refused 401`, "ACH-M-I2-REVOCATION", "revocation", async (ctx) => {
+    await onSessions(async () => {
+      const bc = await buyer("pv1r07r4-issue-plan");
+      const rc = await enabled("pv1r07r4-issue-plan", [bc.a.s.agency.agencyId]);
+      const cs = await bw.iw.w.identity().signIn(bc.a.billing);
+      const plan = await statementPlan(() => browserCall(cs, { url: bankRoutes.order(bc.quote.quote.quoteId), body: issueBody(bc, rc), agency: bc.a.s.agency.agencyId }));
+      const b = await buyer("pv1r07r4-issue");
+      const r = await enabled("pv1r07r4-issue", [b.a.s.agency.agencyId]);
+      const session = await bw.iw.w.identity().signIn(b.a.billing);
+      const key = freshKey("pv1r07r4-issue");
+      const issueCall = (k?: string): Promise<Reply> => browserCall(session, { url: bankRoutes.order(b.quote.quote.quoteId), body: issueBody(b, r), agency: b.a.s.agency.agencyId, ...(k === undefined ? {} : { key: k }) });
+      const hold = position === "before COMMIT" ? commitOf(plan) : finalJudgmentOf(plan);
+      const { reply, lost } = await heldLosingHolder(ctx, `issuance ${position}`, session, hold, () => issueCall(key));
+      assert.ok(notServed(reply), `issuance: nothing issued under a lost lock (${code(reply)})`);
+      assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED, "nothing issued");
+      assert.equal(await bw.iw.w.journal(key), null, "no journal entry");
+      const next = await nextRefused(ctx, "issuance: next request", () => issueCall());
+      assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", "the next issuance is refused");
+      fencedByOwnTransaction(lost, "issuance");
+    });
+  });
+}
+
+// --- H5: getBankRoute; H6: CMD028 replay -------------------------------------------------------------------------------------------------
+
+advCell(`PV1R-07 r4 DENY ACH-M-R2-REVOCATION (session-lock holder lost before COMMIT, getBankRoute): a route read whose session-lock holder backend is terminated before its COMMIT, the session then revoked through the product, answers no 2xx and no route view; the next request is refused 401`, "ACH-M-R2-REVOCATION", "revocation", async (ctx) => {
+  await onSessions(async () => {
+    const r = await configured("pv1r07r4-get");
+    const session = await bw.iw.w.identity().signIn(bw.iw.owner);
+    const get = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.get(r.routeId), origin: null });
+    const plan = await statementPlan(get);
+    const { reply, lost } = await heldLosingHolder(ctx, "getBankRoute before COMMIT", session, commitOf(plan), get);
+    assert.ok(notServed(reply), `getBankRoute: no route view under a lost lock (${code(reply)})`);
+    assert.ok(!reply.text.includes(r.detailsEvidenceHash), "getBankRoute: no route view in the body");
+    const next = await nextRefused(ctx, "getBankRoute: next request", get);
+    assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", "getBankRoute: the next request is refused");
+    fencedByOwnTransaction(lost, "getBankRoute");
+  });
+});
+
+advCell(`PV1R-07 r4 DENY ACH-M-I2-REVOCATION (session-lock holder lost before COMMIT, CMD028 replay): the replay of a committed issuance key whose session-lock holder backend is terminated before the replay unit's COMMIT, the session then revoked, never returns the stored body (no reference); next request 401`, "ACH-M-I2-REVOCATION", "revocation", async (ctx) => {
+  await onSessions(async () => {
+    const b = await buyer("pv1r07r4-replay");
+    const r = await enabled("pv1r07r4-replay", [b.a.s.agency.agencyId]);
+    const session = await bw.iw.w.identity().signIn(b.a.billing);
+    const key = freshKey("pv1r07r4-replay");
+    const issueCall = (): Promise<Reply> => browserCall(session, { url: bankRoutes.order(b.quote.quote.quoteId), body: issueBody(b, r), agency: b.a.s.agency.agencyId, key });
+    const first = await issueCall();
+    assert.equal(code(first), "201 SUCCESS -", "the first issuance commits");
+    const reference = completed<IssuedView>(first, 201).data.transfer.reference;
+    const plan = await statementPlan(issueCall);
+    const { reply, lost } = await heldLosingHolder(ctx, "CMD028 replay before COMMIT", session, commitOf(plan), issueCall);
+    assert.ok(notServed(reply), `the replay under a lost lock does not return the stored body (${code(reply)})`);
+    assert.ok(!reply.text.includes(reference), "no transfer reference in the replay's body");
+    const next = await nextRefused(ctx, "replay: next request", issueCall);
+    assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", "the next replay is refused");
+    assert.ok(!next.text.includes(reference), "no reference in the next replay");
+    fencedByOwnTransaction(lost, "CMD028 replay");
+  });
+});
+
+// --- H7: crash after COMMIT, replay after the revocation --------------------------------------------------------------------------------
+
+const H7_TITLE = `PV1R-07 r4 RACE (crash after COMMIT) ACH-M-I2-REVOCATION: an issuance whose COMMIT succeeded under a live session and whose answer was lost (uow.after-commit), replayed with the same key after the session was revoked through the product, is refused 401 without the stored body; replayed by a live session it answers the stored response`;
+test(H7_TITLE, async () => {
+  await runCell({ id: "ACH-M-I2-CRASH-AFTER", step: H7_TITLE.slice(H7_TITLE.indexOf(": ") + 2), fault: "crash-after-commit", at: "uow", expect: H7_TITLE }, async (ctx) => {
+  await onSessions(async () => {
+    const b = await buyer("pv1r07r4-h7");
+    const r = await enabled("pv1r07r4-h7", [b.a.s.agency.agencyId]);
+    const session = await bw.iw.w.identity().signIn(b.a.billing);
+    const key = freshKey("pv1r07r4-h7");
+    const issueCall = (): Promise<Reply> => browserCall(session, { url: bankRoutes.order(b.quote.quote.quoteId), body: issueBody(b, r), agency: b.a.s.agency.agencyId, key });
+    const crash = ctx.points.crash("uow.after-commit");
+    const conn = await open();
+    try {
+      const lostAnswer = await ctx.operation("issuance whose answer is lost after COMMIT", () => on(ctx, conn, issueCall));
+      await crash.reached;
+      assert.equal(lostAnswer.status, 500, `the lost answer (${code(lostAnswer)})`);
+    } finally {
+      await conn.end();
+    }
+    const [row] = await q<{ reference: string; order_state: string }>("SELECT i.reference, i.order_state FROM kauro.bank_transfer_instructions i JOIN kauro.payment_orders o ON o.order_id = i.order_id WHERE o.project_id::text = $1", [projectOf(b)]);
+    assert.ok(row !== undefined && row.order_state === "AWAITING_TRANSFER", "the issuance committed (AWAITING_TRANSFER)");
+    assert.equal((await bw.iw.w.journal(key))?.state, "COMMITTED", "the journal entry is COMMITTED");
+    const live = await issueCall();
+    assert.equal(code(live), "201 SUCCESS -", "a live session's replay answers the stored response");
+    assert.equal(completed<IssuedView>(live, 201).data.transfer.reference, row.reference, "the stored reference");
+    // the revocation commits while the replay stands at its journal reservation (after its authentication, before its session judgment)
+    const label = `h7-journal-${++heldSeq}`;
+    const atJournal = ctx.points.pause(`db.${label}.after`);
+    const rc = await open();
+    let replay: Reply;
+    try {
+      const running = settle(ctx.operation("replay held at its journal reservation", () => on(ctx, rc, issueCall, [{ label, match: /INSERT INTO kauro\.command_journal/ }])));
+      await atJournal.reachedBy(running.then(() => undefined));
+      await ctx.revoked("session revoked through the product before the replay's session judgment", async () => {
+        const done = await revokeThroughProduct(session);
+        assert.equal(done.status, 204, `the revocation commits (${code(done)})`);
+      });
+      atJournal.release();
+      replay = ok(await running);
+    } finally {
+      await rc.end();
+    }
+    assert.equal(code(replay), "401 AUTHENTICATION_REQUIRED -", "the replay after the revocation is refused");
+    assert.ok(!replay.text.includes(row.reference), "no stored reference in the refused replay");
+    const next = await nextRefused(ctx, "next replay", issueCall);
+    assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", "the next replay is refused too");
+  });
+  });
+});
+
+// --- S1: surviving holder controls --------------------------------------------------------------------------------------------------------
+
+interface SurvivingRequest {
+  readonly session: BrowserSession;
+  readonly request: () => Promise<Reply>;
+  readonly next: () => Promise<Reply>;
+  readonly success: string;
+  readonly committed: () => Promise<void>;
+}
+interface SurvivingPath {
+  readonly path: "I3" | "getBankRoute" | "issuance" | "verify";
+  readonly row: string;
+  readonly prepare: (label: string) => Promise<SurvivingRequest>;
+  /** I3 holds at its final effect-clock read; the others before the COMMIT that follows their last effect-clock read. */
+  readonly atEffectRead: boolean;
+}
+const SURVIVING: ReadonlyArray<SurvivingPath> = [
+  {
+    path: "I3",
+    row: "ACH-M-I3-RACE",
+    atEffectRead: true,
+    prepare: async (label) => {
+      const x = await issuedOrder(label);
+      const session = await bw.iw.w.identity().signIn(x.b.a.billing);
+      const request = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
+      return { session, request, next: request, success: "200 SUCCESS -", committed: async () => undefined };
+    },
+  },
+  {
+    path: "getBankRoute",
+    row: "ACH-M-R2-RACE",
+    atEffectRead: false,
+    prepare: async (label) => {
+      const r = await configured(label);
+      const session = await bw.iw.w.identity().signIn(bw.iw.owner);
+      const request = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.get(r.routeId), origin: null });
+      return { session, request, next: request, success: "200 SUCCESS -", committed: async () => undefined };
+    },
+  },
+  {
+    path: "issuance",
+    row: "ACH-M-I2-RACE",
+    atEffectRead: false,
+    prepare: async (label) => {
+      const b = await buyer(label);
+      const r = await enabled(label, [b.a.s.agency.agencyId]);
+      const session = await bw.iw.w.identity().signIn(b.a.billing);
+      const request = (): Promise<Reply> => browserCall(session, { url: bankRoutes.order(b.quote.quote.quoteId), body: issueBody(b, r), agency: b.a.s.agency.agencyId });
+      return {
+        session,
+        request,
+        next: request,
+        success: "201 SUCCESS -",
+        committed: async () => assert.deepEqual(await issuedFootprint(projectOf(b)), { orders: 1, instructions: 1, accepted: 1, events: ISSUED_EVENTS }, "issuance: the order and its instructions committed"),
+      };
+    },
+  },
+  {
+    path: "verify",
+    row: "ACH-M-R2-RACE",
+    atEffectRead: false,
+    prepare: async (label) => {
+      const x = await AT_COMMIT[0]!.prepare(label);
+      const session = await bw.iw.w.identity().signIn(bw.iw.owner);
+      const request = (): Promise<Reply> => browserCall(session, { url: x.url, body: x.body });
+      const next = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.get(x.r.routeId), origin: null });
+      return { session, request, next, success: "200 SUCCESS -", committed: async () => assert.equal((await routeRow(x.r.routeId)).state, "VERIFIED", "verify: the route committed VERIFIED") };
+    },
+  },
+];
+
+for (const p of SURVIVING) {
+  advCell(`PV1R-07 r4 OK (surviving session-lock holder, ${p.path}): held at the same point without a termination, a revocation started during the hold waits (WAITING) until the effect commits, the effect is served or committed, then the revocation commits and the next request is refused 401`, p.row, "revocation", async (ctx) => {
+    await onSessions(async () => {
+      const hold = p.atEffectRead ? i3EffectRead() : commitOf(await statementPlan((await p.prepare(`pv1r07r4-s1-${p.path}-plan`)).request));
+      const x = await p.prepare(`pv1r07r4-s1-${p.path}`);
+      const conn = await open();
+      let revocation: Promise<PromiseSettledResult<Reply>> | null = null;
+      let standing: string | null = null;
+      let reply: Reply;
+      try {
+        const pause = ctx.points.pause(hold.point);
+        const running = ctx.operation(`${p.path} held`, () => on(ctx, conn, x.request, hold.steps));
+        const settled = settle(running);
+        await pause.reachedBy(running);
+        revocation = settle(revokeThroughProduct(x.session));
+        standing = await revocationStanding(x.session);
+        pause.release();
+        reply = ok(await settled);
+      } finally {
+        await conn.end();
+      }
+      assert.equal(standing, "WAITING", `${p.path}: a revocation started during the hold waits on the session row the effect holds`);
+      assert.equal(code(reply), x.success, `${p.path}: the effect, ordered before the revocation, is served or committed`);
+      await x.committed();
+      await ctx.revoked(`${p.path}: the revocation commits once the effect released the row`, async () => {
+        const done = ok(await revocation!);
+        assert.equal(done.status, 204, `${p.path}: the revocation commits after the effect (${code(done)})`);
+      });
+      const next = await nextRefused(ctx, `${p.path}: next request`, x.next);
+      assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", `${p.path}: the next request is refused`);
+    });
+  });
+}

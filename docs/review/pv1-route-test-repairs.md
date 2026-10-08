@@ -82,3 +82,29 @@ RELAXED: 0.
 - ADV-PV1R-10 DENY RLS: one bundled SELECT with `hidden()` (denied or all NULL) -> one statement per withheld column (versions.verified_by, versions.created_by, versions.verification_evidence_ref, routes.created_by), each must be 42501, plus a positive check that details_artifact_ref stays readable. STRONGER (re-granting any single column turns its assertion red; proven).
 - ADV-PV1R-7 ... R1-EXPIRY: `validUntil = now + 4 s` -> `now + ADV7_SETUP_ALLOWANCE_MS` (20 s named constant; the kit declares no slack constant); the pre-assert now names itself a harness precondition. The product assertion (DETAILS_EXPIRED after the wait, and the database clock past validUntil) is unchanged. SETUP.
 - New cells: `ADV-PV1R-12 DENY ACH-M-I3-REVOCATION (PARTIALLY_RECEIVED)`, `ADV-PV1R-6 DENY ACH-M-I3-EXPIRY (session)` (sessions opt-in, RR-4; expiry set by ageing the session row's idle_expires_at to just after last_seen_at while the read is held, because bankWorld takes no movable session clock). EQUAL (new coverage).
+
+## PV1R-07 r4 (Codex r4 on ac9a2ed; design `pv1-route-pv1r07-design.md` §5): test repairs, written on 7bc2745 (src untouched)
+RELAXED: 0. Each repair keeps every product assertion; only the arming that named the r3 implementation (a count of
+authentication-boundary transactions or touch statements) is replaced by a point on the effect's OWN connection, which holds for the r3
+hold and for the r4 fence alike.
+- Helper `readHeldAtEffectRead`: `withResumeHeld(FINAL_I3_RESUME)` + "first effect_now once armed" -> `i3EffectRead()`: the first
+  `kauro.effect_now()` on the read's connection after its route lock statement (`FROM kauro.bank_routes WHERE route_id = $1 FOR SHARE`).
+  Its `reached` assertion now asserts that statement was held. Users unchanged and green on 7bc2745: ADV-1 (idle, absolute), PV1R-07
+  r3 "revocation started while the final guard waits", ADV-1 r6 (x2), B r6 (x2).
+- E1 replaces `PV1R-02 DENY ACH-M-I3-EXPIRY (session idle deadline crossed while the FINAL I3 resume waits on the session row lock)`
+  with `PV1R-02 r4 DENY ACH-M-I3-EXPIRY (idle deadline crossed while the final session fence waits)`: the holder takes the row FOR UPDATE
+  when the read's connection passes its route lock (not at the 3rd assurance acquisition); `blockedBehind(holder)`; cross by
+  LEAD_MS + 2 ms; release. The idle assertions are unchanged (401, no digits, no reference, row not renewed, next 401). The live arm
+  drops "the final resume renewed the live session": under r4 the final judgment does not touch (design §3.3), and renewal was never the
+  claim of this cell; it still asserts 200 with the exact account, routing number and reference.
+- R1 replaces `PV1R-07 DENY ACH-M-I3-REVOCATION (revocation committed before the final guard's lock)` with `PV1R-07 r4 DENY
+  ACH-M-I3-REVOCATION (revocation committed before the final session fence)`: the revocation commits while the read stands at its route
+  lock (instead of at the 3rd assurance acquisition). Assertions unchanged.
+- RULE16-SELF-WAIT deleted (it unit-tested the `requestAuthorityOf` hold cache, which design §3.3 removes); its claim (a second judgment
+  of one request never waits on its own lock; after the end of the transaction it is taken again) is F6 in
+  `packages/persistence/test/session-fence.test.ts`, against PostgreSQL. Rule 14 repair.
+- Not repaired here (outside this lane's packet; they arm on the r3 hold and will fail on the r4 fix, not on a defect):
+  `PV1R-02 DENY ACH-M-I3-EXPIRY (session expires during the final authentication's own store wait)` and `readHeldAtFinalAuthentication`
+  (PV1R-06 cells) use `withResumeHeld(FINAL_I3_RESUME)` (a third touch statement); `ADV-2 r6 DENY ACH-M-I2-REVOCATION (CMD028 replay
+  judged under the session lock)` uses `withNthSessionTransaction(2)` (a second assurance transaction). Design-neutral repair: arm on the
+  effect's own connection (`i3EffectRead()`; for ADV-2 r6 the journal reservation `.after`, as H7 does).
