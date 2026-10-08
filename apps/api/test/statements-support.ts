@@ -270,6 +270,17 @@ export async function openMonth(sw: StatementsWorld, month: string): Promise<str
   return periodIdOf(sw, month);
 }
 
+/**
+ * The instant a close stands at on the TEST CLOCK: `floor` (the calendar instant a cell means: every month it closes is due by then), or, once
+ * the DATABASE clock has overtaken it, the database clock plus an hour. The product refuses a close while a record created before the close is
+ * undelivered, and `created_at` is the real database time, so a literal calendar instant is a time bomb (2026-10-07T17:00Z overtook it).
+ * The later instant keeps the banking-day semantics: a month due at `floor` is due later too.
+ */
+export async function closeInstant(world: { readonly h: { readonly oracle: { query<R>(sql: string): Promise<{ rows: R[] }> } } }, floor: string): Promise<string> {
+  const dbNow = (await world.h.oracle.query<{ at: Date }>("SELECT clock_timestamp() AS at")).rows[0]!.at.getTime();
+  return new Date(Math.max(Date.parse(floor), dbNow + 3_600_000)).toISOString().replace(/.d{3}Z$/, "Z");
+}
+
 export async function periodIdOf(sw: StatementsWorld, month: string): Promise<string> {
   const r = await sw.h.oracle.query<{ period_id: string }>("SELECT period_id FROM kauro.commission_periods WHERE period_month = ($1 || '-01')::date", [month]);
   if (r.rows[0] === undefined) throw new Error(`no period of ${month}`);
@@ -285,7 +296,7 @@ export async function closeMonth(sw: StatementsWorld, month: string): Promise<{ 
   const periodId = await openMonth(sw, month);
   await drainCommissions(sw);
   const ledgerCutoffHash = await proposal(sw, periodId);
-  sw.standAt("2026-10-07T17:00:00Z");
+  sw.standAt(await closeInstant(sw, "2026-10-07T17:00:00Z"));
   try {
     return { periodId, reply: await closePeriod(sw, periodId, { ledgerCutoffHash }) };
   } finally {
