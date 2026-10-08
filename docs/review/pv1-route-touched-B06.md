@@ -98,3 +98,14 @@ E1 removes these effects with the listed PaymentOrder edge `INTENT_CREATED -> CA
 ## Open GAPs with owner lane (r2)
 - **Show remaining amount for PARTIALLY_RECEIVED** (ADV-PV1R-12): owner L-INBOUND (E1). Until then I3 excludes PARTIALLY_RECEIVED from the readable states and answers `409 PRECONDITION_FAILED INSTRUCTIONS_NOT_AVAILABLE` with no digits (cell `ADV-PV1R-12 DENY ACH-M-I3-REVOCATION (PARTIALLY_RECEIVED)`). L-INBOUND must add the cell: I3 on a PARTIALLY_RECEIVED order shows remaining = obligation - allocated, never the full obligation as the amount to send.
 - **Payment order open half of I3-REVOCATION** (ADV-PV1R-3): owner L-INBOUND (E1). No writer in this lane moves a bank order's `payment_orders.state` off INTENT_CREATED, so only the snapshot `order_state` half is covered; E1 must move the snapshot and the order in one unit and add the cell.
+
+## Codex r1 fix (6c604ac, 54260a1, 031c0e2, 3844109): accepted-package files touched
+
+| Package | File | Change | Covering test (red with the change reverted) |
+|---|---|---|---|
+| B06 | `packages/domain/src/ports/unit-of-work.ts`, `packages/domain/src/ports/index.ts` | New `PreCommitChecks` port + `beforeCommitOf` (fail closed), exported. Additive; no existing implementer changed. | PV1R-03 cells (8) in `ach-route-cells.test.ts` (with route-config.ts reverted; the port alone registers nothing). |
+| B06 | `packages/persistence/src/unit-of-work.ts` | `PgUnitOfWork.beforeCommit` / `runBeforeCommit`; `#once` runs registered checks after `work` returned, before COMMIT (only when the work was not abandoned). No-op for units that register none. | PV1R-03 cells; persistence 30/30, API regression 42/42. |
+| B06/B11 | `apps/api/src/server.ts` | `RouteKit` gains `subjectOrRefusal` (the existing command-boundary function) and `authentication`; the kit object is built once for payment and commission routes. | PV1R-01 tests (6). |
+| B06 | `apps/api/src/composition.ts` | `registerBankRouteRoutes` no longer receives `authenticator`. | PV1R-01 tests. |
+| B06 | `docs/design/B06-state-command-event-matrix.md` | Regenerated (4 Refund manual edges as L-REFUND planned-not-implemented; stale PV1 error-catalogue rows). | `tools/test/matrix.test.mjs` 8/8; `pnpm run matrix`. |
+| B06 | `tools/matrix.mjs` | `EDGE_OWNERS.Refund` + 4 owner entries. | `matrix.test.mjs` PV1R-05 (2). |
