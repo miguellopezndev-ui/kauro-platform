@@ -89,3 +89,21 @@ additions only), and the persistence/application source trees they share. The co
 Green (Windows): ach-route-cells 107/107 (104 + 3 r6 cells); b11-sessions + b11-stage1-seams + b11-public-routes 37/37; CMD027-034 and b09
 payment 57/57 (replay path of the commerce commands); persistence runtime-boundary + source-migrations + migrations + bank-route-migrations
 46/46. tsc clean for application, persistence, api.
+
+## r6 fixes, coordinator items A and B (base f50fd41)
+Tests 32cde2e (red on f50fd41), fix edbeab2. Same rule 16 shape as ADV-1: lock FOR UPDATE, read the clock, judge, write.
+
+| Item | Red on f50fd41 (actual vs expected) | Revert proof (store change reverted, one cell) |
+|---|---|---|
+| A(a) step-up instant | `the proof's created_at (1791429284933) is read after the wait on the row, not before it (the clock stood at 1791429289990 ...)` | clock sampled before the lock again: `created_at (1791429509881) ... (1791429514882)` |
+| A(b) idle passes in the wait | actual '201 SUCCESS -' expected '401 AUTHENTICATION_REQUIRED -' | no post-lock liveness check: same 201 vs 401 |
+| A(c) revoke commits in the wait | actual '422 INTEGRITY_FAILURE -' expected '401 AUTHENTICATION_REQUIRED -' | same revert: 422 vs 401 |
+| B(a) replaced session instant | green on f50fd41 (covered by the 9ca9b31 store fix; no separate src change) | revoke sample before the lock: `revoked_at (1791429610417) is read after the wait on the row (... 1791429615437 ...)` |
+| B(b) replaced session idle passes | green on f50fd41 (same) | same revert: `an expired session is ended, not revoked` |
+
+Fix: `SessionStore.recordStepUp(proof, correlationId, now, sessionSha256)` returns RECORDED or ENDED. With a session it locks the row (`secret_sha256` and the person) FOR UPDATE, reads `now()`, and
+refuses when the session is revoked or past its idle or absolute deadline at that instant: nothing is written and the service throws the existing
+`credentialEnded()` (401 AUTHENTICATION_REQUIRED). The proof's created_at is the post-lock instant. B's holder is a guarded I3 read holding the old
+session row (not an issuance); it is the same session row lock an issuance holds.
+
+Green (Windows): ach-route-cells 112/112; b11 session files 37/37; CMD027-034 + b09 57/57; persistence runtime-boundary, source-migrations, migrations, bank-route-migrations 46/46; tsc clean (application, persistence, api).
