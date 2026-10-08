@@ -129,3 +129,11 @@ instead of raising. Old: count(*) and UPDATE revoked_at -> permission denied. Ne
 `SELECT session_id` (non-granted column), UPDATE revoked_at, DELETE -> permission denied; presented hash + own user -> exactly that session
 FOR SHARE; `UPDATE ... SET session_id = gen_random_uuid()` -> IMMUTABLE_COLUMN; presented hash + another user -> 0 rows. Boundary-group
 assertions unchanged. Red on 83a51be at the old first assertion.
+
+## Round 5: packages/application exact-inventory tests (full Linux verify 0cb5e33)
+
+RULED CHANGE (new routes/fields of lane ACH-ROUTE), RELAXED: 0. The product was right in all three (schemas closed, CMD028 members optional, routes declared); the inventories were stale. Every equality stays an exact deepEqual/equal; items are listed by name in docs/review/pv1-route-touched-B06.md "PV1 inventory".
+- commerce-contracts.test.ts, CMD028 properties +routeKind, routeId (required unchanged).
+- json-schema.test.ts, counts 9 -> 16, 44 -> 49, request ids +5.
+- response-schemas.test.ts, OPERATIONAL_ROUTES +7.
+packages/application: 190/190 pass on Windows. (pnpm run build fails only in @kauro/web e2e: @axe-core/playwright not installed on this Windows tree; unrelated.)

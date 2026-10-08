@@ -87,7 +87,9 @@ test("request schemas are closed 2020-12 objects whose properties are exactly th
     assert.equal(s.$schema, "https://json-schema.org/draft/2020-12/schema");
     assert.equal(s.$id, `${REQUEST_SCHEMA_PREFIX}${id}`);
     assert.equal(s.additionalProperties, false, `${id} must reject unknown fields (R2-059)`);
-    assert.deepEqual(Object.keys(s.properties), catalogue.fields.map((f) => f.name), `${id} properties`);
+    // PV1 (lane ACH-ROUTE): CMD028 carries two OPTIONAL members beyond the vendored catalogue (routeKind, routeId), never required
+    const optionalExtension = id === "CMD028" ? ["routeKind", "routeId"] : [];
+    assert.deepEqual(Object.keys(s.properties), [...catalogue.fields.map((f) => f.name), ...optionalExtension], `${id} properties`);
     assert.deepEqual([...s.required], catalogue.fields.map((f) => f.name), `${id}: every catalogue field is required`);
     for (const f of catalogue.fields) {
       const p = s.properties[f.name]!;

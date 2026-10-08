@@ -156,3 +156,11 @@ Every signature change below is listed for the B06/B11 re-review of the touched 
 | B09 (accepted; lane hunk listed at the CMD028 table above) | `packages/application/src/commerce/request/runtime.ts` | The replay judgment receives the unit (`judgedUnderHold(authority, uow, ...)`); no release. | H6, H7 |
 | B11 (accepted test) | `apps/api/test/b11-sessions.test.ts` W2 boundary (:452; 81d2509, coordinator) | RULED CHANGE under D-AUTH-1a: the request role's first two assertions (`count(*)` and UPDATE refused) become: no presented secret -> 0 rows; `SELECT session_id`, UPDATE revoked_at, DELETE -> permission denied; only the presented session visible FOR SHARE; any UPDATE refused (IMMUTABLE_COLUMN); a session presented for another identity invisible. Boundary-group part unchanged. Title amended. | W2 |
 | integration | `apps/api/src/composition.ts` | Passes `{ lockPresented: sessionFenceOf(uow).lockPresented }` as `fence` (own commit, Codex doc-review). | n/a |
+
+## PV1 inventory (exact-inventory tests in packages/application/test, updated for lane ACH-ROUTE)
+
+| File | Test title | Old -> new |
+|---|---|---|
+| `commerce-contracts.test.ts` | request schemas are closed 2020-12 objects whose properties are exactly the catalogue fields... | CMD028 properties: `[termsHash]` -> `[termsHash, routeKind, routeId]` (the two extra members are optional; `required` stays exactly the catalogue fields) |
+| `json-schema.test.ts` | the validator compiles exactly the 73 contracts, ... | operational reply bodies 9 -> 16 (+configureBankRoute 201, verifyBankRoute, enableBankRoute, disableBankRoute, replaceBankRouteDetails, getBankRoute, getTransferInstructions 200); operational request ids +5 (configure, verify, enable, disable, replaceBankRouteDetails); total request ids 44 -> 49; title names the new counts |
+| `response-schemas.test.ts` | R23: the validator compiles the COMPLETED envelope of every served command... | OPERATIONAL_ROUTES list +7 routes (the seven above, with paths POST /api/v1/operations/bank-routes[/{routeId}/verify\|enable\|disable\|details], GET /api/v1/operations/bank-routes/{routeId}, GET /api/v1/payment-orders/{orderId}/transfer-instructions) |
