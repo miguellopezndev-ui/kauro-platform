@@ -108,3 +108,16 @@ hold and for the r4 fence alike.
   (PV1R-06 cells) use `withResumeHeld(FINAL_I3_RESUME)` (a third touch statement); `ADV-2 r6 DENY ACH-M-I2-REVOCATION (CMD028 replay
   judged under the session lock)` uses `withNthSessionTransaction(2)` (a second assurance transaction). Design-neutral repair: arm on the
   effect's own connection (`i3EffectRead()`; for ADV-2 r6 the journal reservation `.after`, as H7 does).
+
+## PV1R-07 r4 (L2, on the fix): the three tests bound to the removed separate hold (coordinator assignment)
+RELAXED: 0. Each keeps its security assertion (expired/revoked session -> no effect, no secrets, refusal); only the pause point moves, from a
+count of authentication-boundary operations (which no longer exist in the effect's path) to a statement of the request's OWN connection.
+| Test | Old pause point | New pause point |
+|---|---|---|
+| `PV1R-02 DENY ACH-M-I3-EXPIRY (session expires during the final authentication's own store wait)` | the 3rd `UPDATE kauro.web_sessions SET last_seen_at` on the assurance pool (`withResumeHeld(FINAL_I3_RESUME)`), answer held | the read's session fence statement (`... FROM kauro.web_sessions WHERE secret_sha256 = $1 AND user_id = $2 FOR SHARE`) on the read's own connection, held `.before` it is sent (`readHeldAtSessionFence`); the clock moves, released; the fence returns the row, the judgment runs at the later clock. Assertions unchanged (live served with exact digits and reference; idle/absolute 401, no digits, no reference, next request 401). Converted to its own `FaultPoints` (not a `runCell`), as before. |
+| `PV1R-06 DENY ACH-M-I3-EXPIRY` x2 (`readHeldAtFinalAuthentication`) | the same 3rd touch statement | the same fence statement `.before`, same helper; the effect clock still crosses the deadline/validity while held. Assertions unchanged (409 INSTRUCTIONS_EXPIRED / INSTRUCTIONS_NOT_AVAILABLE, no digits, no reference; control served). `FINAL_I3_RESUME` deleted (no user left). The helper's `reached` assertion became `at.taken()` inside `readHeldAtSessionFence`. |
+| `ADV-2 r6 DENY ACH-M-I2-REVOCATION (CMD028 replay judged under the session lock)` | `withNthSessionTransaction(2)`: the revocation committed on the 2nd assurance acquisition | the revocation commits while the replay stands at its `INSERT INTO kauro.command_journal` reservation on its own connection (`.after`, as H7 does), then released; the replay's fence sees the revoked row. Assertions unchanged (401, no reference, next replay 401, control replay by a live session answers the stored response). |
+Narrowing (after the first green run): H1-H6 accepted `500 | 503 | 401`; every cell was observed as exactly `500 INTERNAL_ERROR -` (the unit's
+connection failure, design K2), so `notServed` now accepts only `code(reply) === "500 INTERNAL_ERROR -"`.
+Also (builder-owned per design §5/§9, not a repair): `runtime-boundary.test.ts` P1 assertions (kauro_app on `web_sessions`) and the
+`migrations.test.ts` list (+0047).

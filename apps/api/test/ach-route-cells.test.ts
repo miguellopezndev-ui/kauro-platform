@@ -2289,8 +2289,6 @@ async function withResumeHeld<T>(nth: number, hook: () => Promise<void>, fn: () 
     pool.acquire = real;
   }
 }
-/** The I3 request's resumes, in order: the route's authentication, I3's first re-authentication, I3's FINAL authentication. */
-const FINAL_I3_RESUME = 3;
 
 /**
  * A sessions-enabled bank world of its own per cell whose process clock the cell moves forward (kept apart from the shared one and from each
@@ -2357,8 +2355,8 @@ test(`PV1R-02 DENY ACH-M-I3-EXPIRY (session expires during the final authenticat
       }
       assert.equal(code(await cookieRead()), "200 SUCCESS -", `${ending}: served under the live session before the hold`);
       const advanceMs = ending === "live" ? 1_000 : ending === "idle" ? IDLE_MS + 60_000 : 11 * 60_000;
-      const { out: held, reached } = await withResumeHeld(FINAL_I3_RESUME, async () => bw.iw.w.processClock.advance(advanceMs), cookieRead);
-      assert.ok(reached, `${ending}: the final authentication's session-store statement was held`);
+      // r4 repair (PV1R-07): the final session judgment is the fence statement of the read's own unit (FOR SHARE); the read is held before it
+      const held = await readHeldAtSessionFence(`${ending}: the read held before its session fence`, cookieRead, async () => void bw.iw.w.processClock.advance(advanceMs));
       const next = await cookieRead();
       if (ending === "live") {
         assert.equal(code(held), "200 SUCCESS -", "live: a session still live at release is served");
@@ -2378,16 +2376,16 @@ test(`PV1R-02 DENY ACH-M-I3-EXPIRY (session expires during the final authenticat
 /** I3 under a fresh browser session on the cell's step clock from `startMs`; the final authentication's store statement held while the clock moves to `crossMs`. */
 async function readHeldAtFinalAuthentication(ctx: FaultContext, what: string, x: { readonly b: { readonly a: Agent }; readonly orderId: string }, startMs: number, crossMs: number): Promise<Reply> {
   const session = await bw.iw.w.identity().signIn(x.b.a.billing);
-  const { out, reached } = await ctx.operation(what, async (op) => {
+  const out = await ctx.operation(what, async (op) => {
     bw.iw.faults.clock = op.clock;
     try {
       ctx.clock.set(startMs);
-      return await withResumeHeld(FINAL_I3_RESUME, async () => void ctx.clock.set(crossMs), () => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId }));
+      // r4 repair (PV1R-07): held before the read's own session fence (the final session judgment), the clock moved, released
+      return await readHeldAtSessionFence(what, () => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId }), async () => void ctx.clock.set(crossMs));
     } finally {
       bw.iw.faults.clock = null;
     }
   });
-  assert.ok(reached, `${what}: the final authentication's session-store statement was held`);
   return out;
 }
 const transferExpiryOf = async (orderId: string): Promise<number> => (await q<{ at: Date }>("SELECT transfer_expires_at AS at FROM kauro.bank_transfer_instructions WHERE order_id::text = $1", [orderId]))[0]!.at.getTime();
@@ -2537,6 +2535,28 @@ async function readHeldAtEffectRead(ctx: FaultContext, what: string, read: () =>
     atEffect.release();
     const out = ok(await settled);
     assert.ok(at.taken(), `${what}: the read's final effect-clock read was held`);
+    return out;
+  } finally {
+    await conn.end();
+  }
+}
+
+/** The statement of the fence (migration 0047): the presented session locked FOR SHARE in the unit's own transaction. */
+const SESSION_FENCE = /FROM kauro\.web_sessions WHERE secret_sha256 = \$1 AND user_id = \$2 FOR SHARE/;
+/** One I3 cookie read held BEFORE its session fence statement on its own connection (the fence not yet sent); `during` runs while it is held. */
+async function readHeldAtSessionFence(what: string, read: () => Promise<Reply>, during: () => Promise<void>): Promise<Reply> {
+  const conn = await open();
+  try {
+    const at = nthStatement("i3-fence", SESSION_FENCE, 1, "before");
+    const points = new FaultPoints();
+    const atFence = points.pause(at.point);
+    const running = bw.iw.faults.on(conn, "kauro_app", points, at.steps, read);
+    const settled = running.then((value) => ({ status: "fulfilled", value }) as const, (reason: unknown) => ({ status: "rejected", reason }) as const);
+    await atFence.reachedBy(running);
+    await during();
+    atFence.release();
+    const out = ok(await settled);
+    assert.ok(at.taken(), `${what}: the read's session fence statement was held`);
     return out;
   } finally {
     await conn.end();
@@ -3032,17 +3052,27 @@ cell(`ADV-2 r6 DENY ACH-M-I2-REVOCATION (CMD028 replay judged under the session 
     const live = await issueCall();
     assert.equal(code(live), "201 SUCCESS -", "control: the replay under a live session answers the stored response");
     assert.ok(live.text.includes(reference), "control: the stored response carries the reference");
-    // the replay's session lock is its SECOND session transaction (the first is the request's authentication)
-    const { out: replay, reached } = await withNthSessionTransaction(2, async () => {
-      await ctx.revoked("session revoked through the product before the replay's lock", async () => {
+    // r4 repair (PV1R-07): the revocation commits while the replay stands at its journal reservation on its own connection (after its
+    // authentication, before the session fence of its own unit), as H7 does
+    const label = `adv2r6-journal-${++heldSeq}`;
+    const atJournal = ctx.points.pause(`db.${label}.after`);
+    const rc = await open();
+    let replay: Reply;
+    try {
+      const running = settle(ctx.operation("replay held at its journal reservation", () => on(ctx, rc, issueCall, [{ label, match: /INSERT INTO kauro\.command_journal/ }])));
+      await atJournal.reachedBy(running.then(() => undefined));
+      await ctx.revoked("session revoked through the product before the replay's session fence", async () => {
         const done = await revokeThroughProduct(session);
         assert.equal(done.status, 204, `the revocation commits (${code(done)})`);
       });
-    }, issueCall);
+      atJournal.release();
+      replay = ok(await running);
+    } finally {
+      await rc.end();
+    }
     assert.equal(code(replay), "401 AUTHENTICATION_REQUIRED -", "the replay of a revoked session is refused");
     assert.ok(!replay.text.includes(reference), "no transfer reference in the replay's body");
     assert.equal(code(await nextRefused(ctx, "the next replay", issueCall)), "401 AUTHENTICATION_REQUIRED -", "the next replay is refused too");
-    assert.ok(reached, "the replay took a session lock after its authentication");
   });
 });
 
@@ -3349,8 +3379,8 @@ async function heldLosingHolder(ctx: FaultContext, what: string, session: Browse
     await conn.end().catch(() => undefined);
   }
 }
-/** No 2xx after the holder was lost: the unit's connection failure (500/503) or, if the unit re-ran, the unauthenticated answer. */
-const notServed = (r: Reply): boolean => r.status === 500 || r.status === 503 || r.status === 401;
+/** No 2xx after the holder was lost: the unit's connection failure, observed on the first green run of the r4 fix as exactly 500 INTERNAL_ERROR (design K2; pinned to one value). */
+const notServed = (r: Reply): boolean => code(r) === "500 INTERNAL_ERROR -";
 /** The rule 16 r4 lock assertion: the effect's own backend was the only holder, and no authentication-boundary backend was in a transaction. */
 function fencedByOwnTransaction(lost: LostHolder, what: string): void {
   assert.equal(lost.own, true, `${what}: the only session-lock holder is the effect's own unit backend (it was ${lost.usename} / ${lost.applicationName}, pid ${lost.pid})`);

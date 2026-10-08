@@ -140,3 +140,17 @@ Every signature change below is listed for the B06/B11 re-review of the touched 
 | B06/B11 | `apps/api/src/server.ts` | `RouteKit.requestAuthority(...)` added; the generic command path builds the handle, passes `authority` in the envelope and releases it in `finally` after `execute`. | PV1R-07 issuance cell. |
 | B06 | `docs/design/FAILURE-MATRIX-TEMPLATE.md` | Rule 16 (lock, then clock, then judge, then effect under the same lock). | n/a (doc). |
 | B09 lane files | `route-config.ts` (`judgedAtCommit` gains `authority, clock`; `get` judges under hold and records a denial also on AUTHENTICATION_REQUIRED), `instructions.ts` (I3 final hold; I1/I2 pre-commit under hold), `bank-route-routes.ts` | Lane-owned. | `docs/review/pv1-route-codex-r3-fix-proof.md`. |
+
+## PV1R-07 r4 (session fence inside the effect's own transaction; design `pv1-route-pv1r07-design.md` §8; supersedes the r3 rows above)
+| Package | File | Change | Cells |
+|---|---|---|---|
+| B11 (0025) / B06 | `packages/persistence/migrations/0047_session_fence.sql` (new; provisional number) | `kauro_app` gains column SELECT (`secret_sha256, user_id, revoked_at, idle_expires_at, absolute_expires_at`) and UPDATE (`session_id`) on `kauro.web_sessions`, a SELECT policy and an UPDATE policy (`WITH CHECK (false)`) limited to the session hash the transaction presents AND the person it binds. No function, no SECURITY DEFINER, no table privilege. B11 D-AUTH-1 "kauro_app has no privilege on it" becomes the lock-only path (amendment row D-AUTH-1a in `docs/design/B11-agency-app.md`). | F1-F6, T2, T3, P1 |
+| B06 | `packages/persistence/test/fixtures/runtime-boundary.json`, `runtime-boundary.test.ts`, `migrations.test.ts` | Matrix: additions only (kauro_app web_sessions columns, two policies); the boundary test pins exactly them; migration list +0047. B07 definer allowlist test untouched. | P1 |
+| B06 | `packages/persistence/src/unit-of-work.ts`, `index.ts`, new `session-fence.ts` | `PgUnitOfWork.sessionFence` (`PgSessionFence.lockPresented`) + `sessionFenceOf(uow)`. | F1-F6, H1-H6 |
+| B06/B11 | `packages/persistence/src/web-sessions.ts` | `hold` and `HeldStoredWebSession` removed (the separate assurance transaction no longer exists). | H1-H6 |
+| B06/B11 | `packages/application/src/ports/sessions.ts`, `ports/index.ts` | `WebSessionStore.hold`/`HeldWebSession` removed; new `SessionFence` port and `FencedWebSession`. | H1-H6 |
+| B06/B11 | `packages/application/src/sessions/service.ts` | `hold(secret)` replaced by `holdIn(uow, secret, userId)`; `HeldSession` is `{ liveAt }`; deps gain `fence`. | H1-H6 |
+| B06 | `packages/application/src/api/authority.ts` | `RequestAuthority.hold(uow)`; `judgedUnderHold(authority, uow, clock, between?)`. | H1-H6 |
+| B06/B11 | `apps/api/src/authenticator.ts`, `sessions.ts`, `request-authority.ts`, `server.ts` | `holdRequest(request, uow, userId)`; `HeldCredential` without `release`; `requestAuthorityOf` has no release list, sink or cache and returns the `RequestAuthority`; `RouteKit.requestAuthority` returns it; `held.release()` and the swallow removed. | H1-H6 |
+| B09 lane files | `route-config.ts`, `instructions.ts`, `request/runtime.ts`, `bank-route-routes.ts` | Pass the unit to the judgment; no release. | H1-H7 |
+| integration | `apps/api/src/composition.ts` | Passes `{ lockPresented: sessionFenceOf(uow).lockPresented }` as `fence` (own commit, Codex doc-review). | n/a |
