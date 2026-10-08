@@ -93,7 +93,10 @@ export function createSessionAuthenticator(bearer: Authenticator, service: Sessi
       case "SESSION": {
         if (credential.secret === null) return { kind: "NONE" };
         const resumed = await service.resume(credential.secret);
-        return resumed === null ? { kind: "NONE" } : { kind: "SUBJECT", subject: resumed.subject, sessionSecret: credential.secret };
+        if (resumed === null) return { kind: "NONE" };
+        const { idleExpiresAt, absoluteExpiresAt } = resumed.session;
+        const liveUntil = Date.parse(idleExpiresAt) <= Date.parse(absoluteExpiresAt) ? idleExpiresAt : absoluteExpiresAt;
+        return { kind: "SUBJECT", subject: resumed.subject, sessionSecret: credential.secret, liveUntil };
       }
     }
   };

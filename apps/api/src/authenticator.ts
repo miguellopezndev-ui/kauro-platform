@@ -33,7 +33,17 @@ export interface AuthenticationRequest {
 
 /** An authenticated subject, no credential at all, or credentials refused as such (the refusal's failure). */
 export type Authentication =
-  | { readonly kind: "SUBJECT"; readonly subject: AuthenticatedSubject; readonly sessionSecret: string | null }
+  | {
+      readonly kind: "SUBJECT";
+      readonly subject: AuthenticatedSubject;
+      readonly sessionSecret: string | null;
+      /**
+       * A session credential's first ended instant on the process clock (min of its idle and absolute deadlines as resumed): a caller that
+       * awaits after this authentication judges the session live at an instant it reads after its own last await (TIME-AFTER-AWAIT,
+       * PV1R-02 r2). Absent for a bearer credential (judged by its verifier when presented).
+       */
+      readonly liveUntil?: string;
+    }
   | { readonly kind: "NONE" }
   | { readonly kind: "REFUSED"; readonly failure: DomainFailure };
 

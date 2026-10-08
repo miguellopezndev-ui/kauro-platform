@@ -152,9 +152,11 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     const subject = authenticated.subject;
     // the same credentials again at the projection's guard instants (ADV-PV1R-6, PV1R-02): a session revoked or expired during the read is
     // refused exactly as a request after it (the authenticator reads the session as it stands; the bearer token as it stands)
-    const stillAuthenticated = async (): Promise<boolean> => {
+    // it answers the credential's own end (a session's deadlines on the process clock) so the projection judges it after its last await
+    const stillAuthenticated = async (): Promise<{ readonly liveUntil: string | null } | null> => {
       const again = await kit.authentication({ method: request.method, headers });
-      return again.kind === "SUBJECT" && again.subject.identity.userId === subject.identity.userId;
+      if (again.kind !== "SUBJECT" || again.subject.identity.userId !== subject.identity.userId) return null;
+      return { liveUntil: again.liveUntil ?? null };
     };
     const answer = await readTransferInstructions(deps.runtime, deps.bank, { subject, agencyId: (selector ?? null) as never, correlationId, orderId: path["orderId"]!, stillAuthenticated });
     if (answer.kind === "UNAUTHENTICATED") return { kind: "PROBLEM", problem: await deps.refuseUnauthenticated("READ_TRANSFER_INSTRUCTIONS", { correlationId, agencyId: null }) };

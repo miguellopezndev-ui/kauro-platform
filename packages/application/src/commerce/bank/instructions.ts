@@ -30,7 +30,7 @@
  */
 import type { UtcInstant } from "@kauro/contracts";
 import type { CommerceUnitOfWork, MembershipId, PaymentOrderId, PaymentOrderRecord, QuoteId, QuoteRecord, ResolvedMembership, TenantContext, UserId } from "@kauro/domain";
-import { BANK_TRANSFER_ROUTE_KIND, DomainFailure, NotFoundFailure, StaleVersionFailure, actorOf, blockerFailure, checkoutBlockers, paymentIntentHash, toUtcInstant, transferReferenceOf, transferWindowOf } from "@kauro/domain";
+import { BANK_TRANSFER_ROUTE_KIND, DomainFailure, beforeCommitOf, NotFoundFailure, StaleVersionFailure, actorOf, blockerFailure, checkoutBlockers, paymentIntentHash, toUtcInstant, transferReferenceOf, transferWindowOf } from "@kauro/domain";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { problemOf, type Problem } from "../../api/problems.js";
 import type { ReadRequest } from "../../queries/reads.js";
@@ -126,8 +126,13 @@ export async function issueBankTransfer(runtime: CommerceRequestRuntime, co: Com
       if (version === null || version.verifiedAt === null || version.detailsValidUntil === null) throw routeNotEnabled();
       const openOrder = await c.orders.findOpenForProject(q.projectId);
       const paid = await quoteIsPaid(uow, co, q);
+      // TIME-AFTER-AWAIT (r2 sweep of PV1R-03/06): every read the issuance judges is taken first (the facts at a probe instant, the source
+      // deadline), THEN the effect clock is read, and the blockers, the details validity and the window are judged at that instant with no
+      // await in between; the judgment is taken again at COMMIT below
+      const facts0 = await checkoutFactsOf(uow, co, q, read, { openOrder, paid }, await bank.effectNow(uow));
+      const sourceDeadline = await sourceDeadlineMs(uow, co, q);
       const effect = await bank.effectNow(uow);
-      const facts = await checkoutFactsOf(uow, co, q, read, { openOrder, paid }, effect);
+      const facts = { ...facts0, now: effect };
       // the bank route stands for the merchant route of a provider checkout (checked above)
       const blockers = checkoutBlockers({ ...facts, paymentRoute: { state: "QUALIFIED" } });
       const first = blockers[0];
@@ -149,8 +154,16 @@ export async function issueBankTransfer(runtime: CommerceRequestRuntime, co: Com
       const effectMs = Date.parse(effect);
       const detailsValidUntilMs = Date.parse(version.detailsValidUntil);
       if (!(effectMs < detailsValidUntilMs)) throw new DomainFailure("PRECONDITION_FAILED", "the route's verified account details expired", { reason: "DETAILS_EXPIRED" });
-      const window = transferWindowOf(effectMs, [Date.parse(q.expiresAt), await sourceDeadlineMs(uow, co, q), detailsValidUntilMs], version);
+      const window = transferWindowOf(effectMs, [Date.parse(q.expiresAt), sourceDeadline, detailsValidUntilMs], version);
       if (window.kind === "TOO_SHORT") throw new DomainFailure("PRECONDITION_FAILED", "the transfer window left is shorter than the route's minimum", { reason: "TRANSFER_WINDOW_TOO_SHORT" });
+      // the committed instant's judgment: immediately before COMMIT, after every write of the issuance, the effect clock is read again and the
+      // details validity and the minimum window to the fixed transfer deadline are judged at it; crossing either refuses with nothing issued
+      const transferExpiresAtMs = window.transferExpiresAtMs;
+      beforeCommitOf(uow, async () => {
+        const at = Date.parse(await bank.effectNow(uow));
+        if (!(at < detailsValidUntilMs)) throw new DomainFailure("PRECONDITION_FAILED", "the route's verified account details expired", { reason: "DETAILS_EXPIRED" });
+        if (transferExpiresAtMs - at < version.minimumTransferWindowMs) throw new DomainFailure("PRECONDITION_FAILED", "the transfer window left is shorter than the route's minimum", { reason: "TRANSFER_WINDOW_TOO_SHORT" });
+      });
       // I2 (Kinstructions)
       if (q.state === "ISSUED") {
         const accepted = await c.quotes.transition(quoteId, q.version, { state: "ACCEPTED_FOR_CHECKOUT" }, now);
@@ -249,8 +262,11 @@ export async function readTransferInstructions(
   bank: BankRouteCollaborators | null,
   request: Pick<ReadRequest, "subject" | "agencyId" | "correlationId"> & {
     readonly orderId: string;
-    /** Re-authenticates the request's own credentials at the guard instant (a cookie session revoked or expired meanwhile: false). */
-    readonly stillAuthenticated?: () => Promise<boolean>;
+    /**
+     * Re-authenticates the request's own credentials as they stand now: null when they no longer authenticate the caller (a cookie session
+     * revoked or expired meanwhile), else the credential's own end on the process clock (`liveUntil`, null when it has none to judge later).
+     */
+    readonly stillAuthenticated?: () => Promise<{ readonly liveUntil: string | null } | null>;
   },
 ): Promise<{ readonly kind: "READ"; readonly view: TransferInstructionsView } | { readonly kind: "PROBLEM"; readonly problem: Problem } | { readonly kind: "UNAUTHENTICATED" }> {
   const action = "READ_TRANSFER_INSTRUCTIONS";
@@ -296,7 +312,7 @@ export async function readTransferInstructions(
       }
       // the guard instant, after the store read: the member's access, the session, the route guard, the bank order and the effect instant
       if (!decided) await authorize(uow);
-      if (request.stillAuthenticated !== undefined && !(await request.stillAuthenticated())) return SESSION_ENDED;
+      if (request.stillAuthenticated !== undefined && (await request.stillAuthenticated()) === null) return SESSION_ENDED;
       if (snapshot === null || version === null || seen === null) throw new NotFoundFailure("payment order");
       const route = await repo.lockShare(snapshot.routeId);
       // an agency dropped from the CONTROLLED allowlist in force gets the foreign agency's answer (ADV-PV1R-5, ruling RR-3)
@@ -306,14 +322,24 @@ export async function readTransferInstructions(
       const current = await repo.instructionsOf(request.orderId);
       if (current === null) throw new NotFoundFailure("payment order");
       if (!OPEN_BANK_ORDER_STATES.has(current.orderState)) throw instructionsNotAvailable();
+      // TIME-AFTER-AWAIT (PV1R-02, PV1R-06 r2): the final authentication (the session store's own I/O) is the last credential wait, THEN
+      // the effect clock is read, THEN every time judgment is taken at instants read after the last await (the instruction deadline and
+      // the details validity at the effect instant, the session's own deadlines on its process clock) and the view is built with no
+      // await in between: a session that ends, or a deadline or validity crossed, during the final authentication or the clock read is
+      // refused with no secret
+      let sessionLiveUntil: number | null = null;
+      if (request.stillAuthenticated !== undefined) {
+        const still = await request.stillAuthenticated();
+        if (still === null) return SESSION_ENDED;
+        sessionLiveUntil = still.liveUntil === null ? null : Date.parse(still.liveUntil);
+      }
       const effect = Date.parse(await bank.effectNow(uow));
+      // no await below this line until the view is returned
       if (details !== null && !(effect < Date.parse(details.validUntil))) throw instructionsNotAvailable();
       if (effect >= Date.parse(current.transferExpiresAt)) throw new DomainFailure("PRECONDITION_FAILED", "the transfer instructions expired", { reason: "INSTRUCTIONS_EXPIRED" });
       if (evidenceFailure !== null) throw evidenceFailure;
       if (details === null) throw evidenceUnavailable();
-      // PV1R-02: the session judged again after the last blocking wait (the route share lock, the order and deadline guards) and
-      // immediately before the secret-bearing view: a session revoked or expired during those waits gets the authentication refusal
-      if (request.stillAuthenticated !== undefined && !(await request.stillAuthenticated())) return SESSION_ENDED;
+      if (sessionLiveUntil !== null && !(Date.parse(runtime.clock.now()) < sessionLiveUntil)) return SESSION_ENDED;
       const view: TransferInstructionsView = {
         instructions: {
           beneficiaryName: details.beneficiaryName,
