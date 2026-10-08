@@ -31,6 +31,7 @@
 import type { UtcInstant } from "@kauro/contracts";
 import type { CommerceUnitOfWork, MembershipId, PaymentOrderId, PaymentOrderRecord, QuoteId, QuoteRecord, ResolvedMembership, TenantContext, UserId } from "@kauro/domain";
 import { BANK_TRANSFER_ROUTE_KIND, DomainFailure, beforeCommitOf, NotFoundFailure, StaleVersionFailure, actorOf, blockerFailure, checkoutBlockers, paymentIntentHash, toUtcInstant, transferReferenceOf, transferWindowOf } from "@kauro/domain";
+import { judgedUnderHold, type CredentialHold, type RequestAuthority } from "../../api/authority.js";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { problemOf, type Problem } from "../../api/problems.js";
 import type { ReadRequest } from "../../queries/reads.js";
@@ -160,9 +161,13 @@ export async function issueBankTransfer(runtime: CommerceRequestRuntime, co: Com
       // details validity and the minimum window to the fixed transfer deadline are judged at it; crossing either refuses with nothing issued
       const transferExpiresAtMs = window.transferExpiresAtMs;
       beforeCommitOf(uow, async () => {
-        const at = Date.parse(await bank.effectNow(uow));
-        if (!(at < detailsValidUntilMs)) throw new DomainFailure("PRECONDITION_FAILED", "the route's verified account details expired", { reason: "DETAILS_EXPIRED" });
-        if (transferExpiresAtMs - at < version.minimumTransferWindowMs) throw new DomainFailure("PRECONDITION_FAILED", "the transfer window left is shorter than the route's minimum", { reason: "TRANSFER_WINDOW_TOO_SHORT" });
+        // rule 16 (PV1R-07 r3): the buyer's session row locked first (until the transport releases it, after COMMIT), THEN the effect clock
+        // and its judgments, THEN the session judged at the process clock read last; only COMMIT follows
+        await judgedUnderHold(envelope.authority, runtime.clock, async () => {
+          const at = Date.parse(await bank.effectNow(uow));
+          if (!(at < detailsValidUntilMs)) throw new DomainFailure("PRECONDITION_FAILED", "the route's verified account details expired", { reason: "DETAILS_EXPIRED" });
+          if (transferExpiresAtMs - at < version.minimumTransferWindowMs) throw new DomainFailure("PRECONDITION_FAILED", "the transfer window left is shorter than the route's minimum", { reason: "TRANSFER_WINDOW_TOO_SHORT" });
+        });
       });
       // I2 (Kinstructions)
       if (q.state === "ISSUED") {
@@ -267,6 +272,11 @@ export async function readTransferInstructions(
      * revoked or expired meanwhile), else the credential's own end on the process clock (`liveUntil`, null when it has none to judge later).
      */
     readonly stillAuthenticated?: () => Promise<{ readonly liveUntil: string | null } | null>;
+    /**
+     * The request's credential for the FINAL judgment (FAILURE-MATRIX-TEMPLATE rule 16): held (a cookie session's row locked) before the
+     * effect clock is read, judged at the process clock read after it, released by the transport once the projection returned.
+     */
+    readonly authority?: RequestAuthority;
   },
 ): Promise<{ readonly kind: "READ"; readonly view: TransferInstructionsView } | { readonly kind: "PROBLEM"; readonly problem: Problem } | { readonly kind: "UNAUTHENTICATED" }> {
   const action = "READ_TRANSFER_INSTRUCTIONS";
@@ -322,16 +332,15 @@ export async function readTransferInstructions(
       const current = await repo.instructionsOf(request.orderId);
       if (current === null) throw new NotFoundFailure("payment order");
       if (!OPEN_BANK_ORDER_STATES.has(current.orderState)) throw instructionsNotAvailable();
-      // TIME-AFTER-AWAIT (PV1R-02, PV1R-06 r2): the final authentication (the session store's own I/O) is the last credential wait, THEN
-      // the effect clock is read, THEN every time judgment is taken at instants read after the last await (the instruction deadline and
-      // the details validity at the effect instant, the session's own deadlines on its process clock) and the view is built with no
-      // await in between: a session that ends, or a deadline or validity crossed, during the final authentication or the clock read is
-      // refused with no secret
-      let sessionLiveUntil: number | null = null;
-      if (request.stillAuthenticated !== undefined) {
-        const still = await request.stillAuthenticated();
-        if (still === null) return SESSION_ENDED;
-        sessionLiveUntil = still.liveUntil === null ? null : Date.parse(still.liveUntil);
+      // rule 16 (PV1R-02, PV1R-07 r3; PV1R-06 r2): the final authority judgment under the lock its writers take. The caller's session row is
+      // locked FIRST (a revocation committed before is seen; one that starts after waits until the transport releases the row, after the
+      // view is built), THEN the effect clock is read (its own statement, after the lock was granted), THEN every time judgment is taken
+      // at instants read after the last await (the details validity and the instruction deadline at the effect instant; the session as
+      // locked at the process clock read last) and the view is built with no await in between
+      let held: CredentialHold | null = null;
+      if (request.authority !== undefined) {
+        held = await request.authority.hold();
+        if (held === null) return SESSION_ENDED;
       }
       const effect = Date.parse(await bank.effectNow(uow));
       // no await below this line until the view is returned
@@ -339,7 +348,7 @@ export async function readTransferInstructions(
       if (effect >= Date.parse(current.transferExpiresAt)) throw new DomainFailure("PRECONDITION_FAILED", "the transfer instructions expired", { reason: "INSTRUCTIONS_EXPIRED" });
       if (evidenceFailure !== null) throw evidenceFailure;
       if (details === null) throw evidenceUnavailable();
-      if (sessionLiveUntil !== null && !(Date.parse(runtime.clock.now()) < sessionLiveUntil)) return SESSION_ENDED;
+      if (held !== null && !held.liveAt(runtime.clock.nowMs())) return SESSION_ENDED;
       const view: TransferInstructionsView = {
         instructions: {
           beneficiaryName: details.beneficiaryName,

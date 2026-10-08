@@ -23,6 +23,20 @@ export interface Authenticator {
    * ORIGIN_REJECTED, CSRF_TOKEN_INVALID) — decided here, before the command journal is reserved. The server prefers it.
    */
   authenticateRequest?(request: AuthenticationRequest): Promise<Authentication>;
+  /**
+   * The request's credential held for an effect it authorizes (FAILURE-MATRIX-TEMPLATE rule 16), when the authenticator has a lockable
+   * credential: a cookie session's row locked (FOR UPDATE, the lock its revocation and every touch take) and touched as a resume touches,
+   * until `release`; `liveAt` judges the row as locked at an instant the caller reads after the hold. Null when the request presents no
+   * credential that names a session or subject.
+   */
+  holdRequest?(request: AuthenticationRequest): Promise<HeldCredential | null>;
+}
+
+/** A credential as held by holdRequest. */
+export interface HeldCredential {
+  readonly userId: string;
+  liveAt(nowMs: number): boolean;
+  release(): Promise<void>;
 }
 
 /** What authentication sees of a request: its method and its lowercased single-valued headers. */

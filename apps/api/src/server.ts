@@ -108,6 +108,7 @@ import {
 import type { Clock, CorrelationId, Environment, FailureReason, IdGenerator } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
 import { authenticationOf, type Authentication, type AuthenticationRequest, type Authenticator } from "./authenticator.js";
+import { requestAuthorityOf, type RequestAuthorityHandle } from "./request-authority.js";
 import { sendProblem, singleValued } from "./http.js";
 import { registerSessionRoutes, type SessionRoutesOptions } from "./sessions.js";
 import { registerPublicRoutes, type PublicApiOptions } from "./public-routes.js";
@@ -248,6 +249,8 @@ export interface RouteKit {
   subjectOrRefusal(request: FastifyRequest, headers: Readonly<Record<string, string | undefined>>, action: string, refused: UnauthenticatedRequest): Promise<{ readonly kind: "SUBJECT"; readonly subject: Extract<Authentication, { kind: "SUBJECT" }>["subject"] } | { readonly kind: "PROBLEM"; readonly problem: Problem }>;
   /** The same authenticator's answer for a request as it stands now (a re-authentication at a later guard instant). */
   authentication(request: AuthenticationRequest): Promise<Authentication>;
+  /** The request's credential authority for an effect it authorizes (rule 16): the route releases it once its work returned. */
+  requestAuthority(request: FastifyRequest, headers: Readonly<Record<string, string | undefined>>, userId: string, correlationId: string): RequestAuthorityHandle;
 }
 
 export type CommandReply<View> = CompletedResponse<View> | AcceptedResponse | Problem;
@@ -540,6 +543,7 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
     answerFrameworkError,
     subjectOrRefusal: (request, headers, action, refused) => subjectOrRefusal(options, request, headers, action, refused, sink),
     authentication: (request) => authenticationOf(options.authenticator, request),
+    requestAuthority: (request, headers, userId, correlationId) => requestAuthorityOf(options.authenticator, { method: request.method, headers }, userId, (error) => sink(correlationId, error)),
   };
   options.paymentRoutes?.(app, kit);
   options.commissionRoutes?.(app, kit);
@@ -742,13 +746,17 @@ function registerCommand<Body, View>(
       const authenticated = await subjectOrRefusal(options, request, headers, spec.id as CommandId, { correlationId: admission.admission.correlationId, agencyId: admission.admission.agencyId }, sink);
       if (authenticated.kind === "PROBLEM") return sendProblem(reply, authenticated.problem);
       const subject = authenticated.subject;
-      const envelope: CommandEnvelope<Body> = envelopeOf(spec.id as CommandId, options.environment, admission.admission, subject);
+      // the request's credential, held by an effect that judges it at its COMMIT (rule 16) and released once the command returned
+      const held = requestAuthorityOf(options.authenticator, { method: request.method, headers }, subject.identity.userId, (error) => sink(admission.admission.correlationId, error));
+      const envelope: CommandEnvelope<Body> = { ...envelopeOf(spec.id as CommandId, options.environment, admission.admission, subject), authority: held.authority };
       let result: CommandResult<View>;
       try {
         result = await execute(envelope);
       } catch (error) {
         sink(envelope.correlationId, error);
         return sendProblem(reply, internalProblem(envelope.correlationId));
+      } finally {
+        await held.release();
       }
       switch (result.kind) {
         case "COMPLETED": {

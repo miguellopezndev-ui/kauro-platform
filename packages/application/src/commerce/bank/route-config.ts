@@ -22,8 +22,9 @@
  */
 import type { CommandId, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { rawDigest } from "@kauro/contracts";
-import type { AssuranceProofId, BankRouteDetails, CausationId, BankRouteRecord, BankRouteVersionRecord, CommerceUnitOfWork, CorrelationId, Environment, OperatorContext, UserId } from "@kauro/domain";
+import type { AssuranceProofId, BankRouteDetails, CausationId, BankRouteRecord, BankRouteVersionRecord, Clock, CommerceUnitOfWork, CorrelationId, Environment, OperatorContext, UserId } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, NotFoundFailure, PROVIDER_CALL_TIMEOUT_MS, StaleVersionFailure, actorOf, beforeCommitOf, isUuidV7, toUtcInstant } from "@kauro/domain";
+import { judgedUnderHold, type RequestAuthority } from "../../api/authority.js";
 import type { AuthenticatedSubject, CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { ALLOW_REASONS } from "../../commands/runtime.js";
 import { problemOf, type Problem } from "../../api/problems.js";
@@ -97,6 +98,8 @@ export interface BankRouteRequest<Body> {
   readonly path: Readonly<Record<string, string>>;
   readonly body: Body;
   readonly receivedAt: string;
+  /** The request's credential, held at the command's COMMIT (FAILURE-MATRIX-TEMPLATE rule 16); absent for an in-process caller. */
+  readonly authority?: RequestAuthority;
 }
 
 export const BANK_ROUTE_COMMAND_IDS = Object.freeze({ configure: "CMD201", verify: "CMD202", enable: "CMD203", disable: "CMD204", details: "CMD205" } as const);
@@ -130,6 +133,7 @@ function envelopeOf<Body>(id: BankRouteCommandId, request: BankRouteRequest<Body
     path: request.path,
     body: request.body,
     receivedAt: request.receivedAt,
+    ...(request.authority === undefined ? {} : { authority: request.authority }),
   };
 }
 
@@ -222,10 +226,11 @@ async function assuredAt(co: BankRouteCollaborators, uow: CommerceUnitOfWork, us
  * and the details validity (verify, enable) and the owner's step-up are judged at it. Crossing either boundary after the command's earlier
  * decision refuses the command with nothing committed (the unit rolls back: no route change, no event, no journal row).
  */
-function judgedAtCommit(co: BankRouteCollaborators, uow: CommerceUnitOfWork, userId: UserId, authorizationRef: string, detailsValidUntil: string | null): void {
+function judgedAtCommit(co: BankRouteCollaborators, uow: CommerceUnitOfWork, userId: UserId, authorizationRef: string, detailsValidUntil: string | null, authority: RequestAuthority | undefined, clock: Clock): void {
   beforeCommitOf(uow, async () => {
-    // the proof read, then the effect clock, then the judgments (PV1R-03 r2): nothing awaits between them and COMMIT
-    await assuredAt(co, uow, userId, authorizationRef, detailsValidUntil);
+    // rule 16 (PV1R-07 r3): the caller's session row locked first (held until the transport releases it, after COMMIT), THEN the proof read
+    // and the effect clock with their judgments (PV1R-03 r2), THEN the session judged at the process clock read last; only COMMIT follows
+    await judgedUnderHold(authority, clock, async () => void (await assuredAt(co, uow, userId, authorizationRef, detailsValidUntil)));
   });
 }
 
@@ -250,7 +255,7 @@ export interface BankRouteHandlers {
   enable(request: BankRouteRequest<EnableBankRouteBody>): Promise<CommandResult<BankRouteCommandView>>;
   disable(request: BankRouteRequest<DisableBankRouteBody>): Promise<CommandResult<BankRouteCommandView>>;
   replaceDetails(request: BankRouteRequest<ReplaceBankRouteDetailsBody>): Promise<CommandResult<BankRouteCommandView>>;
-  get(request: { readonly correlationId: CorrelationId; readonly subject: AuthenticatedSubject; readonly routeId: string }): Promise<{ readonly kind: "READ"; readonly view: BankRouteCommandView } | { readonly kind: "PROBLEM"; readonly problem: Problem }>;
+  get(request: { readonly correlationId: CorrelationId; readonly subject: AuthenticatedSubject; readonly routeId: string; readonly authority?: RequestAuthority }): Promise<{ readonly kind: "READ"; readonly view: BankRouteCommandView } | { readonly kind: "PROBLEM"; readonly problem: Problem }>;
 }
 
 export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: BankRouteCollaborators): BankRouteHandlers {
@@ -339,7 +344,7 @@ export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: Ban
           if (route.currentVersion !== body.expectedVersion || route.currentVersion !== seen.currentVersion) throw routeVersionChanged(route);
           if (route.state !== "PENDING_VERIFICATION") throw unlisted(route);
           const effect = await assuredAt(co, uow, envelope.userId, body.authorizationRef, details.validUntil);
-          judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, details.validUntil);
+          judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, details.validUntil, envelope.authority, runtime.clock);
           const verified = await repo.update(routeId, route.version, { state: "VERIFIED", rollout: null, currentVersion: route.currentVersion });
           await repo.markVerified(routeId, route.currentVersion, body.verificationEvidenceRef, envelope.userId, effect, toUtcInstant(Date.parse(details.validUntil)));
           await publish(uow, causationId, verified, "bank_route.verified.v1", { routeVersion: verified.currentVersion, detailsEvidenceHash: seenVersion.detailsEvidenceHash, previousState: route.state });
@@ -381,7 +386,7 @@ export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: Ban
           const { details } = await readRouteDetails(co, version.detailsArtifactRef, version.detailsEvidenceHash, route);
           // PV1R-03: the details and the step-up judged at an instant read after the evidence read returned, never at the pre-read sample
           await assuredAt(co, uow, envelope.userId, body.authorizationRef, details.validUntil);
-          judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, details.validUntil);
+          judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, details.validUntil, envelope.authority, runtime.clock);
           if (body.rollout === "GENERAL" && !(await generalConditionHolds(uow, route, body.qualificationOrderId))) {
             throw new DomainFailure("PRECONDITION_FAILED", "the general rollout's enable condition does not hold", { reason: "GENERAL_ENABLE_CONDITION_UNMET" });
           }
@@ -420,7 +425,7 @@ export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: Ban
           if (route.currentVersion !== body.expectedVersion || route.version !== seen.version) throw routeVersionChanged(route);
           if (route.state !== "ENABLED") throw unlisted(route);
           await assuredAt(co, uow, envelope.userId, body.authorizationRef, null);
-          judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, null);
+          judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, null, envelope.authority, runtime.clock);
           const disabled = await repo.update(routeId, route.version, { state: "VERIFIED", rollout: null, currentVersion: route.currentVersion });
           await publish(uow, causationId, disabled, "bank_route.disabled.v1", { routeVersion: disabled.currentVersion, previousState: route.state });
           return { status: 200, view: { route: bankRouteView(disabled, await currentVersionOf(uow, disabled)) }, version: disabled.version, resourceKind: "bank_route", resourceId: routeId, allowFact: STEP_UP_ALLOW };
@@ -451,7 +456,7 @@ export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: Ban
           if (route === null) throw new NotFoundFailure("bank route");
           if (route.currentVersion !== body.expectedVersion) throw routeVersionChanged(route);
           await assuredAt(co, uow, envelope.userId, body.authorizationRef, null);
-          judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, null);
+          judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, null, envelope.authority, runtime.clock);
           const previous = await currentVersionOf(uow, route);
           const next = route.currentVersion + 1;
           await repo.insertVersion({
@@ -488,12 +493,15 @@ export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: Ban
           }
           const route = await co.routes(uow).read(request.routeId);
           if (route === null) throw new NotFoundFailure("bank route");
-          return { route: bankRouteView(route, await currentVersionOf(uow, route)) };
+          const view = { route: bankRouteView(route, await currentVersionOf(uow, route)) };
+          // rule 16: the view is answered only under the caller's session as held (row locked, THEN the clock, THEN the judgment)
+          await judgedUnderHold(request.authority, runtime.clock);
+          return view;
         });
         return { kind: "READ", view };
       } catch (e) {
         if (!(e instanceof DomainFailure) || e.code === "INTERNAL_ERROR") throw e;
-        if (denied) await recordCommerceDenial(runtime, context, "READ_BANK_ROUTE", e, null);
+        if (denied || e.code === "AUTHENTICATION_REQUIRED") await recordCommerceDenial(runtime, context, "READ_BANK_ROUTE", e, null);
         return { kind: "PROBLEM", problem: problemOf(e, request.correlationId) };
       }
     },

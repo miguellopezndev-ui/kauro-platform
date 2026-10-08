@@ -41,7 +41,7 @@ import {
 } from "@kauro/application";
 import type { CorrelationId, Environment } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
-import { authenticationOf, type Authentication, type AuthenticationRequest, type Authenticator } from "./authenticator.js";
+import { authenticationOf, type Authentication, type AuthenticationRequest, type Authenticator, type HeldCredential } from "./authenticator.js";
 import { sendProblem, singleValued } from "./http.js";
 
 /** What GET /api/v1/public/identity-config answers (D-AUTH-2). */
@@ -100,8 +100,32 @@ export function createSessionAuthenticator(bearer: Authenticator, service: Sessi
       }
     }
   };
+  // rule 16 (PV1R-02, PV1R-07 r3): the credential of a guarded effect, held under the session row's lock until the route releases it
+  const holdRequest = async (request: AuthenticationRequest): Promise<HeldCredential | null> => {
+    let credential;
+    try {
+      credential = presentedCredential(request, appOrigins);
+    } catch (e) {
+      if (e instanceof DomainFailure) return null;
+      throw e;
+    }
+    switch (credential.kind) {
+      case "NONE":
+        return null;
+      case "BEARER": {
+        const subject = await bearer.authenticate(request.headers);
+        return subject === null ? null : { userId: subject.identity.userId, liveAt: () => true, release: async () => undefined };
+      }
+      case "SESSION": {
+        if (credential.secret === null) return null;
+        const held = await service.hold(credential.secret);
+        return held === null ? null : { userId: held.subject.identity.userId, liveAt: (nowMs) => held.liveAt(nowMs), release: () => held.release() };
+      }
+    }
+  };
   return {
     authenticateRequest,
+    holdRequest,
     // B06's form knows no method: it is a safe request's authentication (no CSRF rule); the server uses authenticateRequest
     async authenticate(headers): Promise<AuthenticatedSubject | null> {
       const a = await authenticateRequest({ method: "GET", headers });
