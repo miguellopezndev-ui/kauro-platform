@@ -198,13 +198,24 @@ export async function readRouteDetails(co: BankRouteCollaborators, ref: string, 
   return { details: classified.value, evidence };
 }
 
-/** The owner's step-up, judged at the effect instant (ASSURANCE_REQUIRED with the verifier's reason otherwise). */
-async function assureAt(co: BankRouteCollaborators, uow: CommerceUnitOfWork, userId: UserId, authorizationRef: string, at: UtcInstant): Promise<void> {
-  const outcome = await co.assurance.verifyStepUp(uow, userId, isUuidV7(authorizationRef) ? (authorizationRef as AssuranceProofId) : undefined, at);
-  if (outcome.kind !== "FRESH") throw new DomainFailure("ASSURANCE_REQUIRED", "the owner's step-up is not fresh at the effect", { reason: outcome.reason });
-}
-
 const detailsExpired = (): DomainFailure => new DomainFailure("PRECONDITION_FAILED", "the details evidence expired", { reason: "DETAILS_EXPIRED" });
+const stepUpRefused = (reason: "STEP_UP_STALE" | "STEP_UP_MISSING" | "STEP_UP_NOT_OWNED"): DomainFailure => new DomainFailure("ASSURANCE_REQUIRED", "the owner's step-up is not fresh at the effect", { reason });
+
+/**
+ * The effect instant with the owner's step-up and (verify, enable) the details validity judged at it (TIME-AFTER-AWAIT, PV1R-03 r2):
+ * the proof is read first (the verifier's own I/O), THEN the effect clock is read, and every time judgment uses that last instant with no
+ * await after it. A proof or details validity that crosses its boundary while the proof read waits is refused, never judged at an earlier
+ * sample. DETAILS_EXPIRED precedes the step-up refusal at one instant (the order of the commands' original checks).
+ */
+async function assuredAt(co: BankRouteCollaborators, uow: CommerceUnitOfWork, userId: UserId, authorizationRef: string, detailsValidUntil: string | null): Promise<UtcInstant> {
+  const outcome = await co.assurance.verifyStepUp(uow, userId, isUuidV7(authorizationRef) ? (authorizationRef as AssuranceProofId) : undefined, await co.effectNow(uow));
+  const at = await co.effectNow(uow);
+  // no await below this line: the judgments and the instant the caller writes are this one
+  if (detailsValidUntil !== null && Date.parse(at) >= Date.parse(detailsValidUntil)) throw detailsExpired();
+  if (outcome.kind !== "FRESH") throw stepUpRefused(outcome.reason);
+  if (outcome.freshUntil === undefined || !(Date.parse(at) < Date.parse(outcome.freshUntil))) throw stepUpRefused("STEP_UP_STALE");
+  return at;
+}
 
 /**
  * The committed instant's judgement (PV1R-03): immediately before COMMIT, after every wait of the command, the effect clock is read again
@@ -213,9 +224,8 @@ const detailsExpired = (): DomainFailure => new DomainFailure("PRECONDITION_FAIL
  */
 function judgedAtCommit(co: BankRouteCollaborators, uow: CommerceUnitOfWork, userId: UserId, authorizationRef: string, detailsValidUntil: string | null): void {
   beforeCommitOf(uow, async () => {
-    const at = await co.effectNow(uow);
-    if (detailsValidUntil !== null && Date.parse(at) >= Date.parse(detailsValidUntil)) throw detailsExpired();
-    await assureAt(co, uow, userId, authorizationRef, at);
+    // the proof read, then the effect clock, then the judgments (PV1R-03 r2): nothing awaits between them and COMMIT
+    await assuredAt(co, uow, userId, authorizationRef, detailsValidUntil);
   });
 }
 
@@ -328,9 +338,7 @@ export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: Ban
           if (route === null) throw new NotFoundFailure("bank route");
           if (route.currentVersion !== body.expectedVersion || route.currentVersion !== seen.currentVersion) throw routeVersionChanged(route);
           if (route.state !== "PENDING_VERIFICATION") throw unlisted(route);
-          const effect = await co.effectNow(uow);
-          if (Date.parse(effect) >= Date.parse(details.validUntil)) throw detailsExpired();
-          await assureAt(co, uow, envelope.userId, body.authorizationRef, effect);
+          const effect = await assuredAt(co, uow, envelope.userId, body.authorizationRef, details.validUntil);
           judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, details.validUntil);
           const verified = await repo.update(routeId, route.version, { state: "VERIFIED", rollout: null, currentVersion: route.currentVersion });
           await repo.markVerified(routeId, route.currentVersion, body.verificationEvidenceRef, envelope.userId, effect, toUtcInstant(Date.parse(details.validUntil)));
@@ -368,13 +376,11 @@ export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: Ban
           if (route.state !== "VERIFIED" && route.state !== "ENABLED") throw new DomainFailure("PRECONDITION_FAILED", "the route is not verified", { reason: "ROUTE_NOT_VERIFIED", currentVersion: route.currentVersion, currentState: route.state });
           const version = await currentVersionOf(uow, route);
           if (version.verifiedAt === null) throw new DomainFailure("PRECONDITION_FAILED", "the route's current details are not verified", { reason: "ROUTE_NOT_VERIFIED", currentVersion: route.currentVersion, currentState: route.state });
-          await assureAt(co, uow, envelope.userId, body.authorizationRef, await co.effectNow(uow));
+          await assuredAt(co, uow, envelope.userId, body.authorizationRef, null);
           // the qualifying evidence still holds under the lock (internal store read, no external call-out)
           const { details } = await readRouteDetails(co, version.detailsArtifactRef, version.detailsEvidenceHash, route);
           // PV1R-03: the details and the step-up judged at an instant read after the evidence read returned, never at the pre-read sample
-          const effect = await co.effectNow(uow);
-          if (Date.parse(effect) >= Date.parse(details.validUntil)) throw detailsExpired();
-          await assureAt(co, uow, envelope.userId, body.authorizationRef, effect);
+          await assuredAt(co, uow, envelope.userId, body.authorizationRef, details.validUntil);
           judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, details.validUntil);
           if (body.rollout === "GENERAL" && !(await generalConditionHolds(uow, route, body.qualificationOrderId))) {
             throw new DomainFailure("PRECONDITION_FAILED", "the general rollout's enable condition does not hold", { reason: "GENERAL_ENABLE_CONDITION_UNMET" });
@@ -413,8 +419,7 @@ export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: Ban
           if (route === null || seen === null) throw new NotFoundFailure("bank route");
           if (route.currentVersion !== body.expectedVersion || route.version !== seen.version) throw routeVersionChanged(route);
           if (route.state !== "ENABLED") throw unlisted(route);
-          const effect = await co.effectNow(uow);
-          await assureAt(co, uow, envelope.userId, body.authorizationRef, effect);
+          await assuredAt(co, uow, envelope.userId, body.authorizationRef, null);
           judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, null);
           const disabled = await repo.update(routeId, route.version, { state: "VERIFIED", rollout: null, currentVersion: route.currentVersion });
           await publish(uow, causationId, disabled, "bank_route.disabled.v1", { routeVersion: disabled.currentVersion, previousState: route.state });
@@ -445,8 +450,7 @@ export function createBankRouteHandlers(runtime: CommerceRequestRuntime, co: Ban
           const route = await repo.lockForUpdate(routeId);
           if (route === null) throw new NotFoundFailure("bank route");
           if (route.currentVersion !== body.expectedVersion) throw routeVersionChanged(route);
-          const effect = await co.effectNow(uow);
-          await assureAt(co, uow, envelope.userId, body.authorizationRef, effect);
+          await assuredAt(co, uow, envelope.userId, body.authorizationRef, null);
           judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, null);
           const previous = await currentVersionOf(uow, route);
           const next = route.currentVersion + 1;

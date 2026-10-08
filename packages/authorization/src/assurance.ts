@@ -9,6 +9,7 @@
  */
 import type { AssuranceOutcome, AssuranceVerifier } from "@kauro/application";
 import { STEP_UP_FRESHNESS_SECONDS } from "@kauro/application";
+import type { UtcInstant } from "@kauro/contracts";
 import { isUuidV7 } from "@kauro/domain";
 
 export function createAssuranceVerifier(freshnessSeconds: number = STEP_UP_FRESHNESS_SECONDS): AssuranceVerifier {
@@ -24,7 +25,9 @@ export function createAssuranceVerifier(freshnessSeconds: number = STEP_UP_FRESH
       const expiresMs = Date.parse(proof.expiresAt);
       if (!Number.isFinite(nowMs) || !Number.isFinite(issuedMs) || !Number.isFinite(expiresMs)) return { kind: "STALE", reason: "STEP_UP_STALE" };
       if (issuedMs > nowMs || nowMs - issuedMs > freshnessSeconds * 1000 || nowMs >= expiresMs) return { kind: "STALE", reason: "STEP_UP_STALE" };
-      return { kind: "FRESH", proofId: proof.proofId, issuedAt: proof.issuedAt };
+      // the same window as a bound a caller judges at an instant read after this proof read (TIME-AFTER-AWAIT, PV1R-03)
+      const freshUntil = new Date(Math.min(issuedMs + freshnessSeconds * 1000 + 1, expiresMs)).toISOString() as UtcInstant;
+      return { kind: "FRESH", proofId: proof.proofId, issuedAt: proof.issuedAt, freshUntil };
     },
   };
 }
