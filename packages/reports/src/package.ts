@@ -127,7 +127,8 @@ export interface VerifiedPackage {
   /** Lineage rows by contribution kind and disposition, counted from `source-lineage.csv`. */
   readonly lineage: { readonly rows: number; readonly recordRows: number; readonly byKindDisposition: Readonly<Record<string, number>> };
   /** What each import file holds, from the crosswalk (record files) and the file name (association files). */
-  readonly importFiles: ReadonlyMap<string, ImportFile>;
+  /** A frozen plain object keyed by import path (not a Map: `Object.freeze` cannot stop `Map.set`; review ADV-9). */
+  readonly importFiles: Readonly<Record<string, ImportFile>>;
 }
 
 export type PackageFiles = ReadonlyMap<string, Uint8Array>;
@@ -181,8 +182,7 @@ const ASSOCIATION_KEY_COLUMNS: readonly string[] = ["association_key", "Associat
 
 function deepFreeze<T>(value: T): T {
   if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
-    if (value instanceof Map) for (const v of value.values()) deepFreeze(v);
-    else for (const v of Object.values(value)) deepFreeze(v);
+    for (const v of Object.values(value)) deepFreeze(v);
     Object.freeze(value);
   }
   return value;
@@ -483,7 +483,7 @@ export function readMigrationPackage(files: PackageFiles): VerifiedPackage {
     artifacts,
     reconciliation: rec,
     lineage: { rows: lineageRows, recordRows, byKindDisposition },
-    importFiles,
+    importFiles: Object.fromEntries(importFiles),
   });
   VERIFIED.add(verified);
   return verified;

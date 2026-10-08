@@ -109,6 +109,19 @@ describe("ADV-5: only a package the reader produced is accepted, and the model c
     const lookAlike = { ...pkg } as VerifiedPackage;
     assert.deepEqual(refusal(() => buildReportModel(lookAlike, facts("D-hubspot"))), ["PACKAGE_UNVERIFIED"]);
   });
+  it("ADV-9: a verified package cannot be changed after verification, so the model built from it is unchanged", () => {
+    const sf = readMigrationPackage(loadPackage("D-salesforce"));
+    const before = buildReportModel(sf, facts("D-salesforce")).modelHash;
+    assert.throws(() => {
+      (sf.importFiles as Record<string, unknown>)["01_IMPORT/salesforce/Account.csv"] = { object: "DEAL", association: null };
+    }, TypeError);
+    assert.throws(() => {
+      (sf.importFiles as Record<string, unknown>)["01_IMPORT/salesforce/Extra.csv"] = { object: "DEAL", association: null };
+    }, TypeError);
+    assert.equal(sf.importFiles["01_IMPORT/salesforce/Account.csv"]?.object, "COMPANY");
+    assert.equal(buildReportModel(sf, facts("D-salesforce")).modelHash, before);
+  });
+
   it("changing the facts after the build changes nothing, and the model is frozen", () => {
     const input = facts("D-hubspot") as { branding: { displayName: string }; issuer: { legalName: string } };
     const report = buildReportModel(pkg, input);
