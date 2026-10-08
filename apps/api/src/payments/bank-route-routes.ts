@@ -11,7 +11,8 @@
  *   GET  /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions  (agency member, X-Kauro-Agency) 200
  *
  * Admission of a POST: the envelope headers, the closed request schema, an Idempotency-Key, the path ids; then the person's
- * authentication (none: the anonymous denial, AUTHENTICATION_REQUIRED). Every reply carries Cache-Control: no-store (the server's hook);
+ * authentication through the server's shared command boundary with the actual method (PV1R-01: an unsafe cookie request's Origin,
+ * Sec-Fetch-Site and CSRF rule; typed credential refusals; none: the anonymous denial, AUTHENTICATION_REQUIRED). Every reply carries Cache-Control: no-store (the server's hook);
  * the instructions never carry an ETag.
  */
 import type { BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest } from "@kauro/application";
@@ -19,14 +20,12 @@ import { HEADERS, OPERATIONAL_ROUTES, admitEmptyRequest, admitHeaders, admitOper
 import type { Clock, CorrelationId, Environment } from "@kauro/domain";
 import { DomainFailure, IDEMPOTENCY_KEY, isUuid } from "@kauro/domain";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { Authenticator } from "../authenticator.js";
 import type { RouteKit } from "../server.js";
 
 export interface BankRouteRouteDependencies {
   readonly handlers: BankRouteHandlers;
   readonly runtime: CommerceRequestRuntime;
   readonly bank: BankRouteCollaborators | null;
-  readonly authenticator: Authenticator;
   readonly validator: SchemaValidator;
   readonly clock: Clock;
   readonly environment: Environment;
@@ -97,9 +96,12 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
         if (!IDEMPOTENCY_KEY.test(key)) return kit.sendProblem(r, invalid("IDEMPOTENCY_KEY_INVALID", correlationId));
         const path = pathIds(route.path, request.params, correlationId);
         if (isProblem(path)) return kit.sendProblem(r, path);
+        // PV1R-01: the shared command boundary's authentication with the request's actual method (the unsafe cookie request's Origin,
+        // Sec-Fetch-Site and session CSRF rule; typed credential refusals), before the handler runs and before any journal reservation
+        const authenticated = await kit.subjectOrRefusal(request, headers, action, { correlationId, agencyId: null });
+        if (authenticated.kind === "PROBLEM") return kit.sendProblem(r, authenticated.problem);
+        const subject = authenticated.subject;
         return guarded(r, correlationId, async () => {
-          const subject = await deps.authenticator.authenticate(headers);
-          if (subject === null) return kit.sendProblem(r, await deps.refuseUnauthenticated(action, { correlationId, agencyId: null }));
           const result = await run({ environment: deps.environment, correlationId, idempotencyKey: key, subject, path, body: admitted.body, receivedAt: deps.clock.now() });
           return replyOf(kit, r, result);
         });
@@ -136,22 +138,23 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
   }
   type FastifyReplyAnswer = { readonly kind: "READ"; readonly view: unknown } | { readonly kind: "PROBLEM"; readonly problem: Problem };
 
-  read("getBankRoute", async (_request, correlationId, path, headers) => {
-    const subject = await deps.authenticator.authenticate(headers);
-    if (subject === null) return { kind: "PROBLEM", problem: await deps.refuseUnauthenticated("READ_BANK_ROUTE", { correlationId, agencyId: null }) };
-    return deps.handlers.get({ correlationId, subject, routeId: path["routeId"]! });
+  read("getBankRoute", async (request, correlationId, path, headers) => {
+    const authenticated = await kit.subjectOrRefusal(request, headers, "READ_BANK_ROUTE", { correlationId, agencyId: null });
+    if (authenticated.kind === "PROBLEM") return authenticated;
+    return deps.handlers.get({ correlationId, subject: authenticated.subject, routeId: path["routeId"]! });
   });
 
-  read("getTransferInstructions", async (_request, correlationId, path, headers) => {
+  read("getTransferInstructions", async (request, correlationId, path, headers) => {
     const selector = headers[HEADERS.agency];
     if (selector !== undefined && !isUuid(selector)) return { kind: "PROBLEM", problem: invalid("AGENCY_SELECTOR_INVALID", correlationId) };
-    const subject = await deps.authenticator.authenticate(headers);
-    if (subject === null) return { kind: "PROBLEM", problem: await deps.refuseUnauthenticated("READ_TRANSFER_INSTRUCTIONS", { correlationId, agencyId: null }) };
-    // the same credentials again at the projection's guard instant (ADV-PV1R-6): a session revoked or expired during the read is refused
-    // exactly as a request after it (the authenticator reads the session as it stands; the bearer token as it stands)
+    const authenticated = await kit.subjectOrRefusal(request, headers, "READ_TRANSFER_INSTRUCTIONS", { correlationId, agencyId: null });
+    if (authenticated.kind === "PROBLEM") return authenticated;
+    const subject = authenticated.subject;
+    // the same credentials again at the projection's guard instants (ADV-PV1R-6, PV1R-02): a session revoked or expired during the read is
+    // refused exactly as a request after it (the authenticator reads the session as it stands; the bearer token as it stands)
     const stillAuthenticated = async (): Promise<boolean> => {
-      const again = await deps.authenticator.authenticate(headers);
-      return again !== null && again.identity.userId === subject.identity.userId;
+      const again = await kit.authentication({ method: request.method, headers });
+      return again.kind === "SUBJECT" && again.subject.identity.userId === subject.identity.userId;
     };
     const answer = await readTransferInstructions(deps.runtime, deps.bank, { subject, agencyId: (selector ?? null) as never, correlationId, orderId: path["orderId"]!, stillAuthenticated });
     if (answer.kind === "UNAUTHENTICATED") return { kind: "PROBLEM", problem: await deps.refuseUnauthenticated("READ_TRANSFER_INSTRUCTIONS", { correlationId, agencyId: null }) };

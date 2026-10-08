@@ -107,7 +107,7 @@ import {
 } from "@kauro/application";
 import type { Clock, CorrelationId, Environment, FailureReason, IdGenerator } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
-import { authenticationOf, type Authentication, type Authenticator } from "./authenticator.js";
+import { authenticationOf, type Authentication, type AuthenticationRequest, type Authenticator } from "./authenticator.js";
 import { sendProblem, singleValued } from "./http.js";
 import { registerSessionRoutes, type SessionRoutesOptions } from "./sessions.js";
 import { registerPublicRoutes, type PublicApiOptions } from "./public-routes.js";
@@ -239,6 +239,15 @@ export interface RouteKit {
   singleValued(headers: FastifyRequest["headers"]): Readonly<Record<string, string | undefined>>;
   readonly sink: (correlationId: string, error: unknown) => void;
   answerFrameworkError(error: unknown, request: FastifyRequest, reply: FastifyReply): FastifyReply;
+  /**
+   * The command boundary's authentication of a person (PV1R-01): the request-aware authenticator with the request's ACTUAL method, so an
+   * unsafe cookie request meets the Origin, Sec-Fetch-Site and session CSRF rule, and refused credentials (AMBIGUOUS_CREDENTIALS,
+   * ORIGIN_REJECTED, CSRF_TOKEN_INVALID) keep their typed refusal with its anonymous fact; no subject is the anonymous denial. Decided
+   * before any handler effect or journal reservation.
+   */
+  subjectOrRefusal(request: FastifyRequest, headers: Readonly<Record<string, string | undefined>>, action: string, refused: UnauthenticatedRequest): Promise<{ readonly kind: "SUBJECT"; readonly subject: Extract<Authentication, { kind: "SUBJECT" }>["subject"] } | { readonly kind: "PROBLEM"; readonly problem: Problem }>;
+  /** The same authenticator's answer for a request as it stands now (a re-authentication at a later guard instant). */
+  authentication(request: AuthenticationRequest): Promise<Authentication>;
 }
 
 export type CommandReply<View> = CompletedResponse<View> | AcceptedResponse | Problem;
@@ -524,8 +533,16 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
     if (!isServedCommercialRead(handler.operationId)) throw new Error(`${handler.operationId} has a handler but is not a served B10 read (COMMERCIAL_SERVED_READ_IDS of @kauro/application)`);
     registerRead(app, options, handler.admission, commercialReadRouteResponses(handler.operationId), (request) => handler.execute(request), sink);
   }
-  options.paymentRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
-  options.commissionRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
+  const kit: RouteKit = {
+    sendProblem,
+    singleValued,
+    sink,
+    answerFrameworkError,
+    subjectOrRefusal: (request, headers, action, refused) => subjectOrRefusal(options, request, headers, action, refused, sink),
+    authentication: (request) => authenticationOf(options.authenticator, request),
+  };
+  options.paymentRoutes?.(app, kit);
+  options.commissionRoutes?.(app, kit);
   if (options.sessions !== undefined) {
     registerSessionRoutes(app, { ...options.sessions, validator: options.validator, refuseUnauthenticated: options.refuseUnauthenticated, refuseCredentials: refusalOfCredentials(options), sink });
   }

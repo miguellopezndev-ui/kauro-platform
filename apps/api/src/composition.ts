@@ -461,7 +461,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     ids,
     paymentRoutes: (app, kit) => {
       registerPaymentRoutes(app, kit, { payments: assembly.payments ?? null, validator, clock, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
-      registerBankRouteRoutes(app, kit, { handlers: bankRoutes, runtime: commerceRuntime, bank, authenticator, validator, clock, environment: assembly.environment, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
+      registerBankRouteRoutes(app, kit, { handlers: bankRoutes, runtime: commerceRuntime, bank, validator, clock, environment: assembly.environment, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
     },
     commissionRoutes: (app, kit) =>
       registerCommissionRoutes(app, kit, {
