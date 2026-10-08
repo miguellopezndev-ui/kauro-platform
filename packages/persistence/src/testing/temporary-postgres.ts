@@ -92,7 +92,12 @@ export interface StartOptions {
    * the migration defines it (the migrations test proves that body).
    */
   readonly testClock?: boolean;
+  /** Where the server port comes from (default: a probed free 127.0.0.1 port). The harness's own test hands it a port in use. */
+  readonly portSource?: () => Promise<number>;
 }
+
+/** How many ports a start tries when the probed one was taken before the server bound it. */
+const PORT_ATTEMPTS = 5;
 
 /**
  * The transaction-local setting the test clock reads: seconds (a decimal, possibly negative) added to the transaction time. A
@@ -122,12 +127,25 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
   const base = mkdtempSync(join(tmpdir(), "kauro-pg-"));
   const dataDir = join(base, "data");
   run(exe(bin, "initdb"), ["-D", dataDir, "-U", ROLES.superuser, "-A", "trust", "-E", "UTF8", "--no-locale"], "initdb");
-  const port = await freePort();
-  const serverOptions = [`-p ${port}`, "-c listen_addresses=127.0.0.1", "-c fsync=off", "-c synchronous_commit=off", "-c full_page_writes=off", "-c max_connections=40"];
-  if (options.testClock !== false && offsetMs !== 0) serverOptions.push(`-c ${TEST_CLOCK_OFFSET_SETTING}=${offsetMs / 1000}`);
-  if (process.platform !== "win32") serverOptions.push(`-k ${base}`);
-  const logFile = join(base, "postgres.log");
-  run(exe(bin, "pg_ctl"), ["-D", dataDir, "-l", logFile, "-o", serverOptions.join(" "), "-w", "-t", "60", "start"], "pg_ctl start", { detached: true, logFile });
+  // The free port is probed, released and then bound by the server: another process can take it in between (ci-local 89f7b90,
+  // "could not bind": Address already in use on Linux, "Only one usage of each socket address" on Windows). That bind failure,
+  // and only that one, starts again on a newly probed port.
+  const nextPort = options.portSource ?? freePort;
+  let port = 0;
+  for (let attempt = 1; ; attempt++) {
+    port = await nextPort();
+    const serverOptions = [`-p ${port}`, "-c listen_addresses=127.0.0.1", "-c fsync=off", "-c synchronous_commit=off", "-c full_page_writes=off", "-c max_connections=40"];
+    if (options.testClock !== false && offsetMs !== 0) serverOptions.push(`-c ${TEST_CLOCK_OFFSET_SETTING}=${offsetMs / 1000}`);
+    if (process.platform !== "win32") serverOptions.push(`-k ${base}`);
+    const logFile = join(base, `postgres-${attempt}.log`);
+    try {
+      run(exe(bin, "pg_ctl"), ["-D", dataDir, "-l", logFile, "-o", serverOptions.join(" "), "-w", "-t", "60", "start"], "pg_ctl start", { detached: true, logFile });
+      break;
+    } catch (e) {
+      const portTaken = existsSync(logFile) && /could not bind IPv4 address "127\.0\.0\.1"/.test(readFileSync(logFile, "utf8"));
+      if (!portTaken || attempt >= PORT_ATTEMPTS) throw e;
+    }
+  }
 
   const clientConfig = (role: string, database: string = ROLES.database): ClientConfig => ({ host: "127.0.0.1", port, user: role, database, application_name: `kauro-test-${role}` });
   const connect = async (role: string, database: string = ROLES.database): Promise<Client> => {
