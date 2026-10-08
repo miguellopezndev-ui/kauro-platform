@@ -348,3 +348,14 @@ export const COMMERCE_EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: C
   // the reviewed resolution of a case sources the correcting ledger postings it decides (D-LEDGER-B4; B09-F15)
   { eventType: "reconciliation_case.resolved.v1", consumer: "FINANCE" },
 ]);
+
+/**
+ * The event names the Payments V1 bank-transfer route will publish (docs/design/ACH-ROUTE.md D-ACH-11, D-ACH-18, DV1-08; lane KIT). They
+ * are NAMES ONLY, deliberately not in COMMERCE_EVENT_TYPES: an event type needs an aggregate kind registered in kauro.aggregate_kinds with
+ * an agency_id and version column, and the route-scope aggregates (credit, attempt, treasury refund) have none yet. The lane that first
+ * publishes one registers its kind, its binding and its allowlist together (and its subscribers in COMMERCE_EVENT_SUBSCRIPTIONS);
+ * core/bank-postings.ts and core/return-postings.ts take their postings from these names.
+ */
+export const BANK_POSTING_EVENT_TYPES = ["bank_credit.received.v1", "bank_credit.assigned.v1", "bank_credit.reversed.v1"] as const;
+export const RETURN_POSTING_EVENT_TYPES = ["outbound.over_returned.v1", "outbound.bounced.v1", "outbound.resent.v1"] as const;
+export type BankPostingEventType = (typeof BANK_POSTING_EVENT_TYPES)[number] | (typeof RETURN_POSTING_EVENT_TYPES)[number];

@@ -13,7 +13,17 @@ import type { AgencyId, AssuranceProofId, FailureReason, UnitOfWork, UserId } fr
 export const STEP_UP_FRESHNESS_SECONDS = 900;
 
 export type AssuranceOutcome =
-  | { readonly kind: "FRESH"; readonly proofId: AssuranceProofId; readonly issuedAt: UtcInstant }
+  | {
+      readonly kind: "FRESH";
+      readonly proofId: AssuranceProofId;
+      readonly issuedAt: UtcInstant;
+      /**
+       * The first instant at which the proof no longer reads FRESH (exclusive: min(issuedAt + window + 1 ms, the proof's own expiry)). A
+       * caller whose final judgment must follow this verification's own proof read judges `instant < freshUntil` at an instant it read
+       * after that read (TIME-AFTER-AWAIT, PV1R-03). Absent: the verifier gives no bound and such a caller refuses.
+       */
+      readonly freshUntil?: UtcInstant;
+    }
   | { readonly kind: "STALE"; readonly reason: Extract<FailureReason, "STEP_UP_STALE"> }
   | { readonly kind: "MISSING"; readonly reason: Extract<FailureReason, "STEP_UP_MISSING" | "STEP_UP_NOT_OWNED"> };
 

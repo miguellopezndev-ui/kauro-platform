@@ -10,6 +10,8 @@ export { PROBLEM_TYPE_PREFIX, PROBLEM_STATUS, PROBLEM_TITLE, RETRYABLE_CODES, pr
 export type { RequestSchema, RequestSchemaCommand, RequestSchemaId } from "./api/request-schemas.js";
 export { LABEL_PATTERN, TEXT_PATTERN, REQUEST_SCHEMA_PREFIX, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, requestSchemaId } from "./api/request-schemas.js";
 export type { CommandEnvelope, CommandResult, AuthenticatedSubject, CompletedResponse, AcceptedResponse } from "./api/envelope.js";
+export type { CredentialHold, RequestAuthority } from "./api/authority.js";
+export { credentialEnded, judgedUnderHold } from "./api/authority.js";
 export { HEADERS, PRIVATE_CACHE_POLICY, REQUEST_LIMITS, SINGLE_VALUED_HEADERS, isSuccess } from "./api/envelope.js";
 export type { AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView, ReadinessBlocker, AgencyMembershipView, TeamMemberView, SupportCaseView, Page } from "./api/views.js";
 export { READINESS_BLOCKERS } from "./api/views.js";
@@ -152,7 +154,7 @@ export {
   assertApplicationOrigin,
   presentedCredential,
 } from "./sessions/protocol.js";
-export type { SessionView, StepUpProofView, SessionService, SessionServiceDependencies, SessionOutcome, ResumedSession } from "./sessions/service.js";
+export type { SessionView, StepUpProofView, SessionService, SessionServiceDependencies, SessionOutcome, ResumedSession, HeldSession } from "./sessions/service.js";
 export { createSessionService, SESSION_POLICY_VERSION, SESSION_ACTIONS, SESSION_ALLOW_REASONS, LOGOUT_REASON, REPLACED_REASON } from "./sessions/service.js";
 export type { B06Collaborators, B06Handlers, SupportHandlers, SupportOptions, ApprovalPreimage } from "./commands/handlers/index.js";
 export {

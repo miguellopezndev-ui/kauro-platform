@@ -280,6 +280,25 @@ export const COMMERCE_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.f
     members: {
       order: platform(true, ref("PaymentOrderView"), "The order."),
       quote: platform(true, ref("QuoteView"), "The quote, ACCEPTED_FOR_CHECKOUT."),
+      transfer: platform(
+        false,
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["routeId", "routeVersion", "bankState", "reference", "amountCents", "currency", "transferExpiresAt", "sendBy"],
+          properties: {
+            routeId: ID,
+            routeVersion: { type: "integer", minimum: 1, maximum: 2147483647 },
+            bankState: enumOf(["AWAITING_TRANSFER", "PARTIALLY_RECEIVED", "RECEIVED_REVIEW", "CAPTURED", "EXPIRED"]),
+            reference: { type: "string", pattern: "^K[0-9A-HJKMNP-TV-Z]{22}$" },
+            amountCents: MONEY,
+            currency: enumOf(["USD"]),
+            transferExpiresAt: UTC,
+            sendBy: UTC,
+          },
+        },
+        "Payments V1 (routeKind BANK_TRANSFER): the frozen transfer snapshot — route version, bank order state, the 23-character reference, the exact amount, the deadline and the frozen sendBy; never an account or routing number (GET .../transfer-instructions serves those).",
+      ),
     },
   },
   {

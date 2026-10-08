@@ -1,0 +1,373 @@
+{
+  "verdict": "REJECT",
+  "summary": "Three blocking authority/time defects remain: owner POST commands bypass cookie CSRF checks; I3 can disclose instructions after session expiry or revocation during a route-lock wait; owner commands can commit using expired step-up authority. Two evidence findings concern KIT vocabulary assertions and the disclosed broken matrix gate. KIT2 may own the matrix repair, but it cannot remain unresolved at merge.",
+  "verify_observed": "Supplied receipts report focused verification exit 0 on Linux and Windows: persistence 29/29, API regression 42/42, ach-route-cells 64/64, plus green typecheck, architecture, fixture-clock lint, OpenAPI and web-client checks. The referenced logs and accepted r12 design object were unavailable in this checkout; those receipts were not independently re-run. Dependencies and a running PostgreSQL database were unavailable. Dependency-free probes using actual source with stub collaborators reproduced the POST authentication bypass, I3's stale session decision, enable's stale expiry decision, vocabulary assertion blindness and matrix generator TypeError. These were source-level probes, not PostgreSQL integration tests.",
+  "omissions": 0,
+  "cases": [
+    {
+      "id": "ADV-PV1R-6",
+      "claimed_status": "CLOSED",
+      "agree": false,
+      "note": "The added expiry and revocation cells cover the artifact-read hold. Session termination during the subsequent route-lock wait still admits the held read."
+    },
+    {
+      "id": "RELAXED 0",
+      "claimed_status": "RELAXED 0",
+      "agree": true,
+      "note": "The inspected expectation changes follow the documented rulings. The new counterexamples concern missing scenarios, rather than an undocumented relaxation."
+    },
+    {
+      "id": "CAVEAT-1",
+      "claimed_status": "Matrix failure disclosed; repair assigned to KIT2",
+      "agree": true,
+      "note": "The missing Refund owners and generator crash are present. Lane assignment can wait for integration, but the required matrix/verify gate must pass before merge."
+    }
+  ],
+  "findings": [
+    {
+      "id": "PV1R-01",
+      "severity": "BLOCKING",
+      "family": "revocation",
+      "title": "Owner POST commands authenticate as safe requests and bypass Origin/CSRF requirements",
+      "file": "apps/api/src/payments/bank-route-routes.ts",
+      "line": 101,
+      "reproduction": "Use the production session authenticator with a live KAURO_OWNER cookie. Submit a valid configure request, body and idempotency key without Origin or X-Kauro-CSRF. The shared bank command boundary calls authenticate(headers), whose session adapter explicitly authenticates as GET. The handler therefore runs instead of refusing ORIGIN_REJECTED. With an allowed Origin but missing or incorrect CSRF token, it likewise runs instead of refusing CSRF_TOKEN_INVALID. The same boundary serves verify, enable, disable and details replacement. A source-level probe exercised all five actual registrations and demonstrated handler invocation while request-aware POST authentication refused the same credentials. The adapter also collapses credential refusals, including AMBIGUOUS_CREDENTIALS, into anonymous authentication failure on all seven bank routes.",
+      "acceptance_criterion": "Every cookie-authenticated owner POST must satisfy the unsafe-request Origin, fetch-site and session CSRF requirements before any command effect or journal reservation. Invalid requests must retain the prescribed refusal reason and leave no route, version, participant, event, outbox or committed journal footprint. Credential ambiguity must retain its prescribed refusal on both command and read routes.",
+      "failing_test": "In a sessions-enabled bankWorld, prepare valid state, evidence and step-up authority for each of configure, verify, enable, disable and replace-details. Submit valid bodies and fresh keys with: missing/foreign Origin; non-same-origin Sec-Fetch-Site; and allowed Origin with missing/incorrect CSRF. Assert the corresponding Origin/CSRF refusal and an unchanged command footprint. Include valid Origin/CSRF positive controls. Present cookie plus bearer credentials to each of the seven routes and assert AMBIGUOUS_CREDENTIALS rather than anonymous 401.",
+      "scope": [
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 101,
+          "why": "Shared command authentication omits the actual HTTP method and discards typed credential refusals."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 110,
+          "why": "CMD201 configure uses the affected POST boundary."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 111,
+          "why": "CMD202 verify uses the affected POST boundary."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 112,
+          "why": "CMD203 enable uses the affected POST boundary."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 113,
+          "why": "CMD204 disable uses the affected POST boundary."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 114,
+          "why": "CMD205 details replacement uses the affected POST boundary."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 140,
+          "why": "Owner route read also loses typed credential refusals through the legacy adapter."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 148,
+          "why": "Initial I3 authentication also converts credential ambiguity into anonymous authentication failure."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 153,
+          "why": "I3 reauthentication uses the same refusal-collapsing adapter."
+        },
+        {
+          "file": "apps/api/src/sessions.ts",
+          "line": 103,
+          "why": "The legacy adapter explicitly substitutes GET and returns null for REFUSED outcomes."
+        },
+        {
+          "file": "packages/application/src/sessions/protocol.ts",
+          "line": 151,
+          "why": "Defines credential ambiguity and the unsafe-request Origin/CSRF requirements bypassed by these registrations."
+        },
+        {
+          "file": "apps/api/src/server.ts",
+          "line": 565,
+          "why": "The existing command authentication boundary preserves the actual method and typed refusals; the new bank registrations bypass it."
+        }
+      ],
+      "status": "OPEN",
+      "reviewer_omission": false
+    },
+    {
+      "id": "PV1R-02",
+      "severity": "BLOCKING",
+      "family": "revocation",
+      "title": "I3 can return account digits after the session ends during its route-lock wait",
+      "file": "packages/application/src/commerce/bank/instructions.ts",
+      "line": 299,
+      "reproduction": "Start I3 using a live browser session for an enabled, eligible route and an unexpired AWAITING_TRANSFER order. Hold the route row FOR NO KEY UPDATE in another transaction without changing it. Allow I3 to finish its artifact read, membership authorization and stillAuthenticated callback, then observe it waiting at lockShare. Revoke the session through the product session-revoke endpoint, or let its expiry pass. Release the route holder by rollback. I3 does not authenticate again after the wait and returns account/routing digits and the payment reference; a subsequent request is refused. A source-level probe of the actual projection reproduced a READ containing account digits after session liveness changed during lockShare.",
+      "acceptance_criterion": "An I3 session that expires or is revoked before the projection finishes acquiring and checking its guards must receive the authentication refusal without account digits, routing digits or payment reference. This must hold for waits after the artifact read as well as during it.",
+      "failing_test": "In the sessions-enabled bankWorld, hold the eligible route row, start a cookie-authenticated I3 read, and prove via the database waiter that it has reached the route-lock wait after reauthentication. In separate cases revoke the session through the product endpoint and cross session expiry. Release the holder without changing route or order eligibility. Assert the held read is refused, contains no instruction secrets, and agrees with the next request. Include a live-session control that returns instructions.",
+      "scope": [
+        {
+          "file": "packages/application/src/commerce/bank/instructions.ts",
+          "line": 299,
+          "why": "The final session decision precedes the remaining blocking guards."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/instructions.ts",
+          "line": 301,
+          "why": "The route share lock can wait after the session decision."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/instructions.ts",
+          "line": 306,
+          "why": "Order and deadline guards continue after authentication without another session decision before constructing the secret-bearing view."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 152,
+          "why": "Supplies the reauthentication callback whose placement leaves the later wait uncovered."
+        },
+        {
+          "file": "packages/persistence/src/repositories/bank-routes.ts",
+          "line": 181,
+          "why": "The actual SELECT FOR SHARE conflicts with the holder used by the counterexample."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 1824,
+          "why": "Session-expiry coverage holds only the artifact read, before the existing reauthentication."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 1862,
+          "why": "Session-revocation coverage likewise omits termination during the later route-lock wait."
+        }
+      ],
+      "status": "OPEN",
+      "reviewer_omission": false
+    },
+    {
+      "id": "PV1R-03",
+      "severity": "BLOCKING",
+      "family": "time",
+      "title": "Owner commands can commit after their step-up expires; enable also judges details using a pre-read instant",
+      "file": "packages/application/src/commerce/bank/route-config.ts",
+      "line": 355,
+      "reproduction": "For enable, prepare verified details and owner step-up authority that expire shortly after invocation. The command samples effectNow and checks assurance, then awaits the bounded evidence-store read. Hold that read until both expiries pass, within its timeout, and release it. Details are compared with the old effect instant and the command enables the route. A source-level probe reproduced this with the actual enable handler and details-reading function. Additionally, verify, enable, disable and replace-details each check proof freshness once and perform further SQL/event/journal work before COMMIT. Holding any of those transactions after that check until the proof expires still permits its effect to commit; the generic runtime and route migration provide no later freshness decision.",
+      "acceptance_criterion": "Every owner command requiring step-up must have unexpired authority at its committed effect. Verification and enabling must also reject details that have expired before that effect. Crossing either required boundary during later work must leave the entire command footprint and journal uncommitted.",
+      "failing_test": "Prepare separate proof-only and details-only expiry cases. For enable, hold the actual evidence read after its clock/assurance check, cross the relevant expiry, and release it before the evidence timeout. Assert ASSURANCE_REQUIRED/STEP_UP_STALE or DETAILS_EXPIRED as appropriate, with no enabling footprint. For verify, enable, disable and replace-details, hold each command immediately before COMMIT, cross its proof expiry, and release; assert STEP_UP_STALE and unchanged route/version/participant/event/outbox state with no COMMITTED journal. Exercise details expiry at the same boundary for verify and enable. Include before-boundary positive controls.",
+      "scope": [
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 202,
+          "why": "Shared assurance helper evaluates freshness only at its supplied earlier instant."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 316,
+          "why": "Verify checks details and proof before additional writes, publication, version reading and COMMIT."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 355,
+          "why": "Enable samples time and checks proof before the evidence read; subsequent details validation reuses that sample."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 364,
+          "why": "Enable continues through route update, participant inserts and event publication without a later expiry decision."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 397,
+          "why": "Disable checks proof before later route/event/version work and COMMIT."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 428,
+          "why": "Details replacement checks proof before version reads/insertion, route update, publication and COMMIT."
+        },
+        {
+          "file": "packages/application/src/commerce/request/runtime.ts",
+          "line": 310,
+          "why": "The shared completion path performs security-event and journal writes after the handler, without rejudging the bank command's proof expiry."
+        },
+        {
+          "file": "packages/persistence/migrations/0046_bank_routes.sql",
+          "line": 216,
+          "why": "The route's deferred constraints enforce event footprints but do not reject expired command authority at COMMIT."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 358,
+          "why": "Existing verify expiry coverage does not cross the boundary after the final freshness decision."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 541,
+          "why": "Existing enable expiry coverage crosses expiry during the route wait, before effectNow, and therefore misses the evidence-read and pre-COMMIT counterexamples."
+        }
+      ],
+      "status": "OPEN",
+      "reviewer_omission": false
+    },
+    {
+      "id": "PV1R-04",
+      "severity": "MAJOR",
+      "family": "evidence",
+      "title": "KIT's CHECK-vocabulary test does not establish its claimed exact-set invariant",
+      "file": "packages/persistence/test/bank-kit-migrations.test.ts",
+      "line": 125,
+      "reproduction": "Add an extra allowed value such as BOGUS to outbound_execution_attempts.state while retaining the legitimate values. The test still passes because it only searches for expected token strings. Conversely, remove a legitimate value from one constraint while the same quoted token remains in another CHECK: the global concatenated search can still pass. The comment and test title claim matching vocabulary with no strangers, but neither per-column membership nor exclusion of extra values is asserted. A source-level mutation probe confirmed that an added value is invisible to the assertion loop.",
+      "acceptance_criterion": "The CHECK-vocabulary conformance claim must establish each mapped column's exact intended permitted set, including explicitly limited subsets. An extra value or missing legitimate value in any individual constraint must make the check fail, even when that token occurs in another table or constraint.",
+      "failing_test": "Mutation-test the conformance check against each mapped enum constraint: add a foreign token, and remove a legitimate token while retaining its occurrence elsewhere where possible. Assert each mutation is detected. The present assertion fails this test because foreign tokens are never examined and expected tokens are searched globally.",
+      "scope": [
+        {
+          "file": "packages/persistence/test/bank-kit-migrations.test.ts",
+          "line": 119,
+          "why": "The test advertises equality of CHECK lists with the vocabulary."
+        },
+        {
+          "file": "packages/persistence/test/bank-kit-migrations.test.ts",
+          "line": 125,
+          "why": "Combines unrelated constraints, allowing one constraint to supply another's missing token."
+        },
+        {
+          "file": "packages/persistence/test/bank-kit-migrations.test.ts",
+          "line": 128,
+          "why": "Checks only expected-token presence and never rejects extra permitted values."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 108,
+          "why": "Outbound attempt kind, state and source-kind constraints are covered only by the global presence assertion."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 136,
+          "why": "Destination-proof permitted values lack exact per-column conformance evidence."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 171,
+          "why": "Refund-destination source-kind constraint can be masked by other source-kind constraints."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 201,
+          "why": "Execution-offer command constraint lacks exclusion-of-extra-values evidence."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 214,
+          "why": "Execution gate outcomes lack exact constraint conformance evidence."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 218,
+          "why": "Outcome review-case kinds can be masked by the separate bank-review-case kind constraint."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 244,
+          "why": "Coverage-stream constraint lacks exact permitted-set evidence."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 258,
+          "why": "Statement-line kinds lack exact permitted-set evidence."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 294,
+          "why": "Debit correlations lack exact permitted-set evidence."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 307,
+          "why": "Source-freeze source kinds and the intentionally restricted reason subset are not checked independently."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 318,
+          "why": "Bank-review-case kinds lack independent conformance and can mask missing outcome case kinds."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 324,
+          "why": "Bank-review-case source kinds can be masked by the other source-kind constraints."
+        }
+      ],
+      "status": "OPEN",
+      "reviewer_omission": false
+    },
+    {
+      "id": "PV1R-05",
+      "severity": "MAJOR",
+      "family": "evidence",
+      "title": "New Refund edges leave the required matrix gate broken",
+      "file": "packages/domain/src/commerce/machines.ts",
+      "line": 110,
+      "reproduction": "Generate or check the matrix with the candidate's Refund machine and actual EDGE_OWNERS. manual_execution_declared, manual_execution_window_lapsed, manual_return_recorded and owner_attested_no_effect have no owner entries. checkSources identifies the omissions, while generateMatrix dereferences the missing entry's command and throws TypeError. A probe using the actual machine, owner table and generator reproduced the crash. This is disclosed, but pnpm verify still requires the matrix check and the committed Refund matrix omits the new transitions.",
+      "acceptance_criterion": "Before merge, every candidate Refund transition must have a truthful authority/ownership and execution-status entry consistent with the registry and committed matrix. Matrix checking must complete successfully, and the candidate must pass that required verify gate. Future lane ownership must not be represented as implemented execution.",
+      "failing_test": "Run pnpm run matrix on the built candidate and assert successful completion with no missing-owner diagnostics or generator exception. Independently enumerate the candidate Refund transition events against the ownership catalogue and assert each has a valid entry. Both checks fail for the four named events today.",
+      "scope": [
+        {
+          "file": "packages/domain/src/commerce/machines.ts",
+          "line": 110,
+          "why": "manual_execution_declared has no matrix owner."
+        },
+        {
+          "file": "packages/domain/src/commerce/machines.ts",
+          "line": 115,
+          "why": "manual_execution_window_lapsed has no matrix owner."
+        },
+        {
+          "file": "packages/domain/src/commerce/machines.ts",
+          "line": 116,
+          "why": "The SUBMITTING manual_return_recorded transition has no matrix owner."
+        },
+        {
+          "file": "packages/domain/src/commerce/machines.ts",
+          "line": 117,
+          "why": "The analogous UNCERTAIN manual_return_recorded transition has no matrix owner."
+        },
+        {
+          "file": "packages/domain/src/commerce/machines.ts",
+          "line": 118,
+          "why": "owner_attested_no_effect has no matrix owner."
+        },
+        {
+          "file": "tools/matrix.mjs",
+          "line": 273,
+          "why": "Refund ownership catalogue omits all four added event names."
+        },
+        {
+          "file": "tools/matrix.mjs",
+          "line": 926,
+          "why": "Source validation detects the missing ownership entries."
+        },
+        {
+          "file": "tools/matrix.mjs",
+          "line": 1019,
+          "why": "Matrix generation dereferences a missing owner and crashes."
+        },
+        {
+          "file": "docs/design/B06-state-command-event-matrix.md",
+          "line": 352,
+          "why": "Committed Refund matrix remains inconsistent with the candidate machine."
+        },
+        {
+          "file": "package.json",
+          "line": 24,
+          "why": "Full verify requires the failing matrix check; focused green receipts do not satisfy this gate."
+        }
+      ],
+      "status": "OPEN",
+      "reviewer_omission": false
+    }
+  ]
+}

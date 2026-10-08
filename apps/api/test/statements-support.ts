@@ -136,7 +136,7 @@ export interface StatementsWorld extends CommissionWorld {
   periods(seconds?: number): ReturnType<typeof createPeriodsSweep>;
 }
 
-export async function statementsWorld(options: { readonly commercial?: WorldOptions["commercial"] } = {}): Promise<StatementsWorld> {
+export async function statementsWorld(options: { readonly commercial?: WorldOptions["commercial"]; readonly sessions?: boolean } = {}): Promise<StatementsWorld> {
   const calendar = new ContractFakeBankingCalendar({ clock });
   const now = clock.now();
   calendar.serve({ calendarVersion: FIXTURE_CALENDAR.calendarVersion, jurisdiction: "CO", source: "TEST_FIXTURE", nonbankingDates: [...BANKING_CALENDAR_FIXTURE_NONBANKING], coversFrom: FIXTURE_CALENDAR.coversFrom, coversTo: FIXTURE_CALENDAR.coversTo, recordedAt: new Date(Date.parse(now) - 3_600_000).toISOString() as UtcInstant, evidenceHash: sha("fixture") as Sha256Hex });
@@ -150,6 +150,8 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
     wrapUnitOfWork: (inner) => faults.wrap(inner),
     wrapCommerce: (inner) => faults.wrapCommerce(inner),
     ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
+    // opt-in (PV1 L-ROUTE r1, RR-4): the B11 session boundary; absent, unchanged
+    ...(options.sessions === true ? { sessions: true } : {}),
     commissions: async (h) => {
       const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database } as const;
       const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs() });

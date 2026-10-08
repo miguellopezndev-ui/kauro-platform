@@ -21,6 +21,8 @@
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { AgencyId, EventId, EventPayload, FundsState, LedgerEntryRecord, LedgerSourceKind, PostingLine, PostingSet, RefundComponents } from "@kauro/domain";
 import { DomainFailure, capturePostings, fundsPostings, isBalanced, payloadDigest, providerFeePostings, returnPostings } from "@kauro/domain";
+import { planBankCreditPostings } from "./bank-postings.js";
+import { planReturnPostings } from "./return-postings.js";
 
 /** A delivered commerce event as the consumer read it (B06 OutboxDelivery's event, with the instant it was recorded). */
 export interface PostingSource {
@@ -136,6 +138,7 @@ export function planPostings(source: PostingSource, correction?: CaseCorrection)
       return set(source, "CORRECTION", [...mirrors, ...correction.adjust], { evidenceHash: correction.evidenceHash, reverses, ...(currency !== undefined ? { currency } : {}) });
     }
     default:
-      return { kind: "NOT_APPLICABLE", eventType: source.eventType };
+      // Payments V1 (lane KIT dispatch): the bank-transfer families plan their own events; each answers null until its lane lands
+      return planBankCreditPostings(source) ?? planReturnPostings(source) ?? { kind: "NOT_APPLICABLE", eventType: source.eventType };
   }
 }

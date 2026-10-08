@@ -164,11 +164,37 @@ class RoutedFactory extends PgCommercialUnitOfWorkFactory {
         else if (context.kind === "SERVICE" && at !== null) {
           await (uow as unknown as { client: PoolClient }).client.query(`SELECT set_config('kauro_test.clock_offset_seconds', greatest(0, extract(epoch FROM ($1::timestamptz - transaction_timestamp())))::text, true)`, [at.at]);
         }
-        return work(uow);
+        // the routed unit's session is the harness connection itself (the clock taps its raw client, never the routing proxy)
+        return work(repositioned(uow, this.clockOf, this.route.conn) as PgCommercialUnitOfWork);
       },
       options,
     );
   }
+}
+
+/**
+ * The effect instant a command reads after its locks (PgCommerceUnitOfWork.effectInstant: kauro.effect_now()), repositioned on the cell's
+ * step clock while one is set (lane L-ROUTE: owner and tenant contexts, routed or not): the transaction's server clock is put exactly on
+ * the controlled instant (clock.onServer, its consumption proven by the server probes around the next statement) and that instant is read
+ * back. Without a step clock the unit's own effect instant answers, unchanged. Test harness only.
+ */
+function repositioned<U extends object>(uow: U, clockOf: () => StepClockOf | null, session?: SqlSession): U {
+  return new Proxy(uow, {
+    get(target, prop) {
+      const value: unknown = Reflect.get(target, prop, target);
+      if (prop === "effectInstant" && typeof value === "function") {
+        return async () => {
+          const clock = clockOf();
+          if (clock === null) return (value as () => Promise<string>).call(target);
+          const client = session ?? (target as unknown as { client: SqlSession }).client;
+          await clock.onServer(client);
+          const r = await client.query<{ at: string }>(`SELECT to_char(kauro.server_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at`);
+          return r.rows[0]!.at;
+        };
+      }
+      return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+    },
+  });
 }
 
 /** A fault the database itself raised inside a trigger (SQLSTATE KT001, message `KAURO_FAULT <step> <evidence>`): what a cell asserts about the step it fired at. */
@@ -321,6 +347,11 @@ export class FaultRouting {
       get: (target, prop) => {
         const value: unknown = Reflect.get(target, prop, target);
         const route = this.#als.getStore();
+        // outside a routed invocation: the api's own unit, its effect instant repositioned while a cell's step clock is set (lane L-ROUTE)
+        if (route === undefined && prop === "run" && typeof value === "function" && this.clock !== null) {
+          return (context: ExecutionContext, work: (uow: never) => Promise<unknown>, options?: unknown) =>
+            (value as (...a: unknown[]) => Promise<unknown>).call(target, context, (uow: object) => work(repositioned(uow, () => this.clock) as never), options);
+        }
         if (route === undefined || typeof value !== "function") return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
         if (prop !== "run") return (value as (...a: unknown[]) => unknown).bind(target);
         const invocation = route.invocation;

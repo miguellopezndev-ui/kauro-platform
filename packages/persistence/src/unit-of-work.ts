@@ -30,7 +30,7 @@
  * each context to the verified pool of its runtime group (one login per group).
  */
 import { randomBytes } from "node:crypto";
-import type { Id } from "@kauro/contracts";
+import type { Id, UtcInstant } from "@kauro/contracts";
 import {
   DomainFailure,
   actorOf,
@@ -67,6 +67,8 @@ import {
 } from "@kauro/domain";
 import type { PoolClient } from "pg";
 import { serverInstantOf } from "./source/rows.js";
+import { PgBankRoutes } from "./repositories/bank-routes.js";
+import { PgSessionFence } from "./session-fence.js";
 import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
 import { PgExecutionDiscovery } from "./execution/discovery.js";
@@ -186,9 +188,12 @@ export class PgUnitOfWork implements UnitOfWork {
    * over the decision artifacts, read through decisionArtifactResolver by the api composition.
    */
   readonly auditReads: PgAuditReads;
+  /** The session fence (migration 0047, PV1R-07 r4): the presented session locked FOR SHARE inside this unit's own transaction, read through sessionFenceOf(uow). */
+  readonly sessionFence: PgSessionFence;
   #adoptedAgencyId: AgencyId | null = null;
   #resolvedMembershipId: MembershipId | null = null;
   #abandoned: Error | null = null;
+  readonly #beforeCommit: Array<() => Promise<void>> = [];
 
   constructor(
     protected readonly client: PoolClient,
@@ -198,6 +203,7 @@ export class PgUnitOfWork implements UnitOfWork {
   ) {
     this.context = context;
     this.ids = ids;
+    this.sessionFence = new PgSessionFence(client);
     this.agencies = new PgAgencyRepository(client);
     this.memberships = new PgMembershipRepository(client);
     this.invitations = new PgInvitationRepository(client);
@@ -273,6 +279,16 @@ export class PgUnitOfWork implements UnitOfWork {
 
   get abandonedWork(): Error | null {
     return this.#abandoned;
+  }
+
+  /** PreCommitChecks (PV1R-03): `check` runs after the work returned, immediately before COMMIT, in this transaction; a throw rolls it back. */
+  beforeCommit(check: () => Promise<void>): void {
+    this.#beforeCommit.push(check);
+  }
+
+  /** Runs the registered pre-commit checks in registration order (the factory, once the work returned). */
+  async runBeforeCommit(): Promise<void> {
+    for (const check of this.#beforeCommit.splice(0)) await check();
   }
 
   get resolvedMembershipId(): MembershipId | null {
@@ -467,6 +483,8 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
       const uow = open(client, ids);
       unit = uow;
       const out = await work(uow);
+      // the checks a command registered for its committed instant (PV1R-03), after every wait of its work and immediately before COMMIT
+      if (uow.abandonedWork === null) await uow.runBeforeCommit();
       if (uow.abandonedWork !== null) throw new DomainFailure("INTEGRITY_FAILURE", `a unit of work whose work was given up cannot commit; correlation ${context.correlationId}`);
       // COMMIT inside an aborted transaction block does not fail: the server answers with the ROLLBACK tag and a WARNING.
       // A handler that caught a database refusal and carried on would otherwise "succeed" having persisted nothing.
@@ -577,6 +595,24 @@ export function purchasedSubjectsOf(uow: UnitOfWork): PgPurchasedSubjects {
   return uow.purchasedSubjects;
 }
 
+/** The session fence of a unit of work of this package: the presented session locked FOR SHARE in the unit's own transaction (PV1R-07 r4). */
+export function sessionFenceOf(uow: UnitOfWork): PgSessionFence {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the session fence is taken in a unit of work of @kauro/persistence");
+  return uow.sessionFence;
+}
+
+/** The bank-transfer route's tables in a commerce unit of work of this package (lane L-ROUTE). */
+export function bankRoutesOf(uow: UnitOfWork): PgBankRoutes {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the bank routes are read in a commerce unit of work of @kauro/persistence");
+  return uow.bankRoutes;
+}
+
+/** The effect instant of a commerce unit of work of this package (read after its locks). */
+export function effectInstantOf(uow: UnitOfWork): Promise<UtcInstant> {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the effect instant is read in a commerce unit of work of @kauro/persistence");
+  return uow.effectInstant();
+}
+
 /** The periodic pass's queries of a commerce unit of work of this package (D-PROTO-B4; stage-2 mandate M3). */
 export function paymentSweepsOf(uow: UnitOfWork): PgPaymentSweeps {
   if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the payment sweeps read a commerce unit of work of @kauro/persistence");
@@ -606,6 +642,8 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   readonly paymentSweeps: PgPaymentSweeps;
   /** The request side's reads (implementation mandate M4, D-REQ-B2): shared halves, order, capture and policy queries. */
   readonly requestReads: PgCommerceRequestReads;
+  /** The bank-transfer route's tables (migration 0046, lane L-ROUTE), read through bankRoutesOf(uow). */
+  readonly bankRoutes: PgBankRoutes;
   #scopeAgencyId: AgencyId | null = null;
   #financeAgencyId: AgencyId | null = null;
   #causation: CausationId | null = null;
@@ -619,6 +657,18 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
     this.purchasedSubjects = new PgPurchasedSubjects(client);
     this.paymentSweeps = new PgPaymentSweeps(client);
     this.requestReads = new PgCommerceRequestReads(client);
+    this.bankRoutes = new PgBankRoutes(client);
+  }
+
+  /**
+   * The effect instant of this unit of work (kauro.effect_now(): the server's instant of this statement, read AFTER the locks the caller
+   * took, so a deadline that passed while it waited counts; ACH-ROUTE §7.24 I2Δ, R2/I1/I2/I3 EXPIRY cells).
+   */
+  async effectInstant(): Promise<UtcInstant> {
+    const r = await execute<{ at: string }>(this.client, "SELECT to_char(kauro.effect_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS at");
+    const at = r.rows[0]?.at;
+    if (at === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the server answered no effect instant");
+    return at as UtcInstant;
   }
 
   protected override onJournalEntry(entryId: JournalEntryId): void {
