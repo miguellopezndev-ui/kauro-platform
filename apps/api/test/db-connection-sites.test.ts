@@ -58,6 +58,9 @@ const SITE_FORMS: ReadonlyArray<RegExp> = [
   /(?<!:[ \t]*)\{[^{}\n]*\bKauroPool\b[^{}\n]*\}[ \t]*=(?!=)/,
   /[\w$)\]]\s*\.\s*KauroPool\b/,
   /(?:\brequire\(\s*|\bimport\(\s*)["']@kauro\/persistence["']/,
+  // ADV-5 (1b9e8fa): every value path to KauroPool starts at an import; a namespace import or star re-export of persistence is a site
+  // whatever is done with the namespace afterwards (multi-line or nested destructuring, defaults, computed members)
+  /\b(?:import|export)\s+(?!type\b)\*(?:\s+as\s+[\w$]+)?\s+from\s*["']@kauro\/persistence["']/,
   /\bimport\s+(?!type\b)\{[^}]*(?<!type\s)\b(?:Pool|Client)\b[^}]*\}\s*from\s*["']pg["']/,
   /\bimport\s+(?!type\b)(?:\*\s+as\s+[\w$]+|[\w$]+)\s*(?:,\s*\{[^}]*\})?\s*from\s*["']pg["']/,
   /\brequire\(\s*["']pg["']\s*\)/,
@@ -135,6 +138,10 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
     "KauroPool destructured from a namespace": 'import * as ns from "@kauro/persistence";\nconst { KauroPool: KP } = ns;\nconst p = new KP(cfg);',
     "KauroPool member taken without new": 'import * as ns from "@kauro/persistence";\nconst KP = ns.KauroPool;',
     "persistence imported at run time": 'const m = await import("@kauro/persistence");',
+    "namespace destructured over lines": 'import * as ns from "@kauro/persistence";\nconst {\n  KauroPool: K,\n} = ns;\nconst p = new K(cfg);',
+    "namespace destructured after a ternary colon": 'import * as ns from "@kauro/persistence";\nlet K;\nc ? 0 : ({ KauroPool: K } = ns);',
+    "namespace computed member": 'import * as ns from "@kauro/persistence";\nconst p = new ns["KauroPool"](cfg);',
+    "star re-export of persistence": 'export * from "@kauro/persistence";',
   };
   for (const [name, text] of Object.entries(forms)) assert.ok(isSite(text), `not caught: ${name}`);
   for (const text of ['import type { PoolClient } from "pg";', 'import { type Client } from "pg";', "// new Pool(\nexport const a = 1;", 'export type { Pool } from "pg";', 'import type { KauroPool } from "@kauro/persistence";', 'import { type KauroPool } from "@kauro/persistence";', 'export const superuser = "postgres";', 'function f(): KauroPool {\n  return x;\n}\nconst { a, b } = y;', 'function f({ pool }: { pool: KauroPool } = d) {}']) assert.ok(!isSite(text), text);
