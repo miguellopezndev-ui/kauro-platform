@@ -121,3 +121,11 @@ Narrowing (after the first green run): H1-H6 accepted `500 | 503 | 401`; every c
 connection failure, design K2), so `notServed` now accepts only `code(reply) === "500 INTERNAL_ERROR -"`.
 Also (builder-owned per design §5/§9, not a repair): `runtime-boundary.test.ts` P1 assertions (kauro_app on `web_sessions`) and the
 `migrations.test.ts` list (+0047).
+
+## PV1R-07 r4 (coordinator, 81d2509): accepted B11 test W2 boundary re-ruled under D-AUTH-1a
+RULED CHANGE, not a relaxation of the r4 table above (that table stays RELAXED: 0). `apps/api/test/b11-sessions.test.ts:452` asserted
+`kauro_app` has no privilege on `web_sessions` (D-AUTH-1). 0047 grants the lock-only path (D-AUTH-1a), so `SELECT count(*)` returns 0 rows
+instead of raising. Old: count(*) and UPDATE revoked_at -> permission denied. New (strictly more checks): no presented secret -> 0 rows;
+`SELECT session_id` (non-granted column), UPDATE revoked_at, DELETE -> permission denied; presented hash + own user -> exactly that session
+FOR SHARE; `UPDATE ... SET session_id = gen_random_uuid()` -> IMMUTABLE_COLUMN; presented hash + another user -> 0 rows. Boundary-group
+assertions unchanged. Red on 83a51be at the old first assertion.

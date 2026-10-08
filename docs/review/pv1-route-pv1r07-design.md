@@ -90,10 +90,10 @@ waits. Writers hold no app lock. Invariant (cell LK in H1): no kauro_assurance c
 |---|---|---|---|---|---|---|---|---|
 | F: session fence (FOR SHARE in the app unit) + judgment | C F1, F4 (both orders), S1 | C F5 (fence waits past the unit bound: nothing commits) | C E1 (idle crossed while the fence waits), ADV-1 :2547 | C F2, H1-H6 (holder = effect backend killed; lock and effect die together) | C H7 | C F6 (re-lock in one tx never waits; re-taken after ROLLBACK) | C R1, :2798, F1 | N/A: lock, judgment and effect are one transaction, one checked COMMIT (rule 4); the old hold's separate touch COMMIT no longer exists |
 | I3 read | C :2798 / R1 | C F5 | C E1, :2547 | C H1 (before judgment), H2 (before COMMIT) | N/A: a read; the view answered after COMMIT was judged under the lock before any revocation could commit (caveat K1) | C R1 (next request) | C :2798, R1, H1 | N/A read-only |
-| getBankRoute | C S1 | C F5 | C :2726 | C H5 | N/A read (K1) | N/A no key | C H5, S1 | N/A read-only |
+| getBankRoute | C S1 | C F5 | C :2726 | C H5 (before COMMIT; N/A between lock and judgment: no await between the fence statement and the judgment) | N/A read (K1) | N/A no key | C H5, S1 | N/A read-only |
 | CMD202-205 (x4) | C :2874, S1 | C F5 | C PV1R-03 r2 cells (proof expiry at COMMIT) | C H3 x2 positions | C H7 pattern via replay rows (shared runtime.ts) | C ADV-2 r6 :3007 (shared replay) | C :2874, H3 | N/A here (the commands' own L-ROUTE rows) |
 | CMD028 I1/I2 | C :2893, S1 | C F5 | C :2616 ADV-3, window cells | C H4 x2 positions | C H7 | C :3007, H6 | C :2893, H4 | N/A here (I2 rows, ACH-M-I2-PARTIAL) |
-| shared replay | C :3007 | C F5 | N/A (no deadline judged but the session's, E1 pattern) | C H6 | C H7 | C :3007 | C :3007, H6 | N/A (one read + journal) |
+| shared replay | C :3007 | C F5 | N/A (no deadline judged but the session's, E1 pattern) | C H6 (before COMMIT; N/A between lock and judgment: no await between them) | C H7 | C :3007 | C :3007, H6 | N/A (one read + journal) |
 | writers vs fence (resume touch, revoke, step-up) | C :2726, :2981, A r6 :3077 | C T2 (revoke), T3 (resume) past the 5 s bound | C :2994, :3088 | N/A here (B11 writer rows; the writer's abort leaves the session as it was) | N/A here (B11) | N/A here (B11) | N/A (the writer is the revocation) | N/A here (B11: revoke + fact are B11 rows) |
 Every money/authority cell is C; no GAP remains open in this design. Tier 1: H1-H7, F1-F4, P1.
 
@@ -107,8 +107,8 @@ Pause points: I3 final effect read = first `kauro.effect_now()` statement on `co
 `FROM kauro.bank_routes WHERE route_id = $1 FOR SHARE` (`repositories/bank-routes.ts:181`) -- design-neutral arming that replaces
 `FINAL_I3_RESUME`; "before the final judgment" in commands = `.after` of the last `kauro.effect_now()` of the unit (nth from a control run's
 statement log); "before COMMIT" = `.before` of the `COMMIT` statement on `conn` (fallback: `.after` of that last effect read).
-Expected post-fix answer on holder loss: the unit's connection failure, 500 INTERNAL_ERROR or 503 CAPACITY_UNAVAILABLE (57P01 maps to
-CAPACITY_UNAVAILABLE, `sqlstate.ts:174`); pin the observed one after the first green run. File A = `apps/api/test/ach-route-cells.test.ts`.
+Expected post-fix answer on holder loss: the unit's connection failure; observed and pinned: 500 INTERNAL_ERROR (K2: no SQLSTATE on the
+dead socket, so the 57P01 -> CAPACITY_UNAVAILABLE mapping at `sqlstate.ts:174` is not reached). File A = `apps/api/test/ach-route-cells.test.ts`.
 
 | Id | file :: title | Red on ac9a2ed (expected failing assertion) |
 |---|---|---|
@@ -122,7 +122,7 @@ CAPACITY_UNAVAILABLE, `sqlstate.ts:174`); pin the observed one after the first g
 | S1 | A :: `PV1R-07 r4 OK (surviving session-lock holder, ${path}): held at the same point without a termination, a revocation started during the hold waits (WAITING) until the effect commits, the effect is served or committed, then the revocation commits and the next request is refused 401` (path in I3, getBankRoute, issuance, verify) | green (control) |
 | E1 | A :: `PV1R-02 r4 DENY ACH-M-I3-EXPIRY (idle deadline crossed while the final session fence waits): ...` replaces the :2748 test (holder FOR UPDATE taken when `conn` passes the route lock; `blockedBehind(holder)`; cross; release) | green (repair; `docs/review/pv1-route-test-repairs.md`) |
 | R1 | A :: `PV1R-07 r4 DENY ACH-M-I3-REVOCATION (revocation committed before the final session fence): ...` replaces :2827 (revoke committed at the route-lock step instead of the 3rd assurance acquisition) | green (repair) |
-| F1-F6, T2, T3, P2 | `packages/persistence/test/session-fence.test.ts` (new, temporary Postgres, logins `kauro_app_test`/`kauro_assurance_test`/`postgres`): F1 `RACE PV1R-07 r4 (fence vs revoke started after the lock)`; F2 `RACE PV1R-07 r4 (crash before COMMIT of the fence holder): the effect write and the lock die together; the waiting revoke commits`; F3 `DENY PV1R-07 r4 (lock-only privileges of kauro_app on web_sessions)` (other hash, other user, unbound, UPDATE revoked_at, UPDATE session_id=session_id, SELECT provider, INSERT, DELETE all refused; binding cleared after COMMIT, after ROLLBACK and on pooled reuse); F4 `RACE PV1R-07 r4 (fence waits behind a committing revoke): the row returns revoked`; F5 `RACE PV1R-07 r4 (timeout, fence)`; F6 `RACE PV1R-07 r4 (retry): re-lock in one transaction never waits; re-taken after ROLLBACK`; T2 `RACE PV1R-07 r4 (timeout, revoke behind a fence past 5 s): 57014, session unrevoked, retry revokes`; T3 same for resume | red: `permission denied for table web_sessions` (42501) |
+| F1-F6, T2, T3 (P2: not a cell; listed in error, none written) | `packages/persistence/test/session-fence.test.ts` (new, temporary Postgres, logins `kauro_app_test`/`kauro_assurance_test`/`postgres`): F1 `RACE PV1R-07 r4 (fence vs revoke started after the lock)`; F2 `RACE PV1R-07 r4 (crash before COMMIT of the fence holder): the effect write and the lock die together; the waiting revoke commits`; F3 `DENY PV1R-07 r4 (lock-only privileges of kauro_app on web_sessions)` (other hash, other user, unbound, UPDATE revoked_at, UPDATE session_id=session_id, SELECT provider, INSERT, DELETE all refused; binding cleared after COMMIT, after ROLLBACK and on pooled reuse); F4 `RACE PV1R-07 r4 (fence waits behind a committing revoke): the row returns revoked`; F5 `RACE PV1R-07 r4 (timeout, fence)`; F6 `RACE PV1R-07 r4 (retry): re-lock in one transaction never waits; re-taken after ROLLBACK`; T2 `RACE PV1R-07 r4 (timeout, revoke behind a fence past 5 s): 57014, session unrevoked, retry revokes`; T3 same for resume | red: `permission denied for table web_sessions` (42501) |
 | P1 | `packages/persistence/test/runtime-boundary.test.ts` :: existing N11/B06 title; assertions :53-57 amended to pin kauro_app exactly `{SELECT:[absolute_expires_at, idle_expires_at, revoked_at, secret_sha256, user_id], UPDATE:[session_id]}`, no table privilege, and the two policies | builder-owned (fixture) |
 RULE16-SELF-WAIT (:2917) tests `requestAuthorityOf` caching that no longer exists; replaced by F6 (rule 14 repair, recorded).
 
@@ -143,8 +143,10 @@ RULE16-SELF-WAIT (:2917) tests `requestAuthorityOf` caching that no longer exist
 - K1: a view or effect whose COMMIT succeeded before a revocation could commit is answered even if the logout lands while the bytes are in
   flight: it was decided while the revocation waited (08: access invalidated immediately = no decision after the revocation commits;
   08 does not promise remote erasure of downloaded data). Cells :2798, S1.
-- K2: holder loss answers 500/503, not 401 (the transaction carrying the judgment is gone); the acceptance criterion requires no effect
-  and no successful view, and the next request is 401. Cells H1-H6.
+- K2: holder loss answers 500 INTERNAL_ERROR, not 401 (the transaction carrying the judgment is gone); the acceptance criterion requires no
+  effect and no successful view, and the next request is 401. Cells H1-H6 pin exactly 500: a terminated backend surfaces to the unit as a
+  connection loss with no SQLSTATE reaching `sqlstate.ts` (57P01 is not delivered on the dead socket), so CAPACITY_UNAVAILABLE (503) is not
+  produced. A retry with the same idempotency key settles the outcome: nothing was committed, and after the revocation it is refused (H7).
 - K3: concurrent requests of one session: a resume touch waits behind an effect's fence (bounded by the unit; the fence is the last lock).
   Logout/resume past 5 s fail retryable with nothing changed (B11 D-W3-9: the page keeps the CSRF token to retry). Cells T2, T3.
 - K4: bearer credentials have no row lock (re-verified as they stand), unchanged from r3 and out of PV1R-07's scope.
