@@ -122,3 +122,21 @@ E1 removes these effects with the listed PaymentOrder edge `INTENT_CREATED -> CA
 | B05 | `packages/authorization/src/assurance.ts` | `createAssuranceVerifier` returns `freshUntil` = min(issued + window + 1 ms, expiry); verdicts unchanged. | PV1R-03 r2 cells (6); authorization tests 11/11. |
 | B06 | `docs/design/FAILURE-MATRIX-TEMPLATE.md` | Rule 15 TIME-AFTER-AWAIT. | n/a (doc). |
 | B09 lane files | `instructions.ts`, `route-config.ts`, `bank-route-routes.ts` | Lane-owned. | `docs/review/pv1-route-codex-r2-fix-proof.md`. |
+
+## Codex r3 fix (b56e461, 84befca, c1e2e12 + self-wait follow-up): accepted-package files touched (template rule 16)
+
+Every signature change below is listed for the B06/B11 re-review of the touched part (A6); no assertion was weakened.
+
+| Package | File | Signature / behaviour change | Covering test (red with the change reverted) |
+|---|---|---|---|
+| B06/B11 | `packages/application/src/ports/sessions.ts`, `ports/index.ts` | New REQUIRED `WebSessionStore.hold(secretSha256, now, idleSeconds, touchSeconds): Promise<HeldWebSession \| null>`; new `HeldWebSession { session; release() }`. `resume` contract now: row locked FOR UPDATE first, `now` read after the lock. | PV1R-02 cells (get, I3 final resume); b11-sessions. |
+| B06/B11 | `packages/persistence/src/web-sessions.ts`, `index.ts` | `PgWebSessionStore`: `#boundary` rebuilt on new `#begin`; new `#lockedResume` (SELECT ... FOR UPDATE, THEN `now()`, THEN the same conditional touch UPDATE); `resume` uses it; new `hold` keeps the transaction (and the row lock) open until `release` (idempotent COMMIT). `HeldStoredWebSession` exported. | PV1R-02 cells; PV1R-07 effect-hold cell; persistence tests. |
+| B06/B11 | `packages/application/src/sessions/service.ts`, `index.ts` | New `SessionService.hold(secret): Promise<HeldSession \| null>`; `HeldSession extends ResumedSession { liveAt(nowMs); release() }`. `resume` judgment unchanged. | PV1R-07 cells. |
+| B06 | `packages/application/src/api/authority.ts` (new), `index.ts` | `CredentialHold`, `RequestAuthority`, `credentialEnded()`, `judgedUnderHold(authority, clock, between?)` (hold, THEN between, THEN `liveAt(clock.nowMs())`). | PV1R-07 cells. |
+| B06 | `packages/application/src/api/envelope.ts` | `CommandEnvelope.authority?: RequestAuthority` (optional; not part of the request digest). | PV1R-07 command and issuance cells. |
+| B06/B11 | `apps/api/src/authenticator.ts` | Optional `Authenticator.holdRequest?(request): Promise<HeldCredential \| null>`; new `HeldCredential { userId; liveAt; release }`. | PV1R-07 cells. |
+| B06/B11 | `apps/api/src/sessions.ts` | `createSessionAuthenticator` implements `holdRequest` (NONE -> null; BEARER -> verified as it stands, always live, no-op release; SESSION -> `service.hold`). | PV1R-07 cells. |
+| B06 | `apps/api/src/request-authority.ts` (new) | `requestAuthorityOf(authenticator, request, userId, sink): RequestAuthorityHandle`; one hold per request until `release` (self-wait guard). | PV1R-07 cells; `RULE16-SELF-WAIT` cell. |
+| B06/B11 | `apps/api/src/server.ts` | `RouteKit.requestAuthority(...)` added; the generic command path builds the handle, passes `authority` in the envelope and releases it in `finally` after `execute`. | PV1R-07 issuance cell. |
+| B06 | `docs/design/FAILURE-MATRIX-TEMPLATE.md` | Rule 16 (lock, then clock, then judge, then effect under the same lock). | n/a (doc). |
+| B09 lane files | `route-config.ts` (`judgedAtCommit` gains `authority, clock`; `get` judges under hold and records a denial also on AUTHENTICATION_REQUIRED), `instructions.ts` (I3 final hold; I1/I2 pre-commit under hold), `bank-route-routes.ts` | Lane-owned. | `docs/review/pv1-route-codex-r3-fix-proof.md`. |
