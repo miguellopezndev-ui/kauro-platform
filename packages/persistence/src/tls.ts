@@ -32,7 +32,7 @@ export interface ConnectionSecurityInput {
   readonly passwordFile?: string;
   /** The CA file (KAURO_DB_TLS_CA_FILE); required outside LOCAL (I-2). */
   readonly tlsCaFile?: string;
-  /** The environment to look for PGPASSWORD, PGPASSFILE and PGSSLMODE in (default: process.env). */
+  /** The environment to look for PGPASSWORD, PGPASSFILE, PGSSLMODE, PGHOST and PGHOSTADDR in (default: process.env). */
   readonly processEnv?: Readonly<Record<string, string | undefined>>;
   /** Outside LOCAL a password file is required unless the caller holds the credential itself (the migrator) and requires it explicitly. Default true. */
   readonly passwordRequired?: boolean;
@@ -49,22 +49,26 @@ export class ConnectionSecurityError extends Error {
   }
 }
 
+/** A DNS host name: dot-separated labels of letters, digits and inner hyphens, each at most 63 characters, 253 in all. */
+const DNS_NAME = /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
+
 /**
  * The single rule every composition root that opens a PostgreSQL connection applies before it builds a pool or a client
  * (AWS-DELTA I-2, I-3): outside LOCAL the server certificate is verified against the CA file (no CA, no connection), the host is a
  * DNS name (pg gives the TLS layer no server name for an IP literal, so the name check would be against "localhost"), the password
  * is read from its file and the plain value is refused. In LOCAL, nothing is required. A refusal names the variable, never a value.
  */
-/** A DNS host name: dot-separated labels of letters, digits and inner hyphens, each at most 63 characters, 253 in all. */
-const DNS_NAME = /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
-
 export function connectionSecurityOf(environment: "LOCAL" | "SANDBOX" | "LIVE", input: ConnectionSecurityInput): { readonly password?: string; readonly tls?: DatabaseTls } {
   const local = environment === "LOCAL";
-  // pg takes the password, the pgpass file and the TLS mode from these when the connection settings leave them out: outside LOCAL they are refused (ADV-9)
+  // pg takes the password, the pgpass file, the TLS mode and the host from these when the connection settings leave them out: outside LOCAL they are refused (ADV-9)
   const processEnv = input.processEnv ?? process.env;
   if (!local) {
     for (const variable of ["PGPASSWORD", "PGPASSFILE", "PGSSLMODE", "PGHOST", "PGHOSTADDR"]) {
-      if ((processEnv[variable] ?? "") !== "") throw new ConnectionSecurityError(variable, "must not be set outside LOCAL: pg would take the password or the TLS mode from it instead of the configured file and CA");
+      if ((processEnv[variable] ?? "") !== "") {
+        throw new ConnectionSecurityError(variable, variable.startsWith("PGHOST")
+          ? "must not be set outside LOCAL: pg would dial the host from it instead of the configured DNS name the certificate is verified against"
+          : "must not be set outside LOCAL: pg would take the password or the TLS mode from it instead of the configured file and CA");
+      }
     }
   }
   const names = input.names ?? { password: "KAURO_DB_PASSWORD", passwordFile: "KAURO_DB_PASSWORD_FILE" };

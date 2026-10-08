@@ -82,6 +82,8 @@ test("DB-TLS-R1: outside LOCAL the host must be a DNS name pg dials itself: an e
     }
     for (const variable of ["PGHOST", "PGHOSTADDR"]) {
       assert.throws(() => connectionSecurityOf(environment, { ...ok, host: "db.example.test", processEnv: { [variable]: "192.0.2.10" } }), refusedBy(variable, "192.0.2.10"), `${environment} ${variable}`);
+      // ADV-2 (e692ba2): the refusal names what a host variable does (the host dialled), not the password or TLS mode
+      assert.throws(() => connectionSecurityOf(environment, { ...ok, host: "db.example.test", processEnv: { [variable]: "192.0.2.10" } }), /dial the host from it/, `${environment} ${variable} reason`);
     }
     for (const host of ["db.example.test", "kauro-db-1.cluster-abc.us-east-1.rds.amazonaws.com", "DB.Example.TEST"]) {
       assert.equal(connectionSecurityOf(environment, { ...ok, host }).password, "file-secret", `${environment} ${host}`);

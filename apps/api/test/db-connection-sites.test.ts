@@ -54,6 +54,10 @@ const SITE_FORMS: ReadonlyArray<RegExp> = [
   /\bnew\s+(?:[\w$]+\s*\.\s*)*(?:Pool|Client|KauroPool)\s*\(/,
   // DB-TLS-R2: persistence's exported KauroPool opens connections too: its constructor, a value import or re-export of it (aliased or not)
   /\b(?:import|export)\s+(?!type\b)\{[^}]*(?<!type\s)\bKauroPool\b[^}]*\}\s*from\b/,
+  // ADV-1 (e692ba2): KauroPool taken by destructuring (a dynamic import, a require, a namespace object), as a namespace member, or persistence loaded at run time
+  /\{[^}]*\bKauroPool\b[^}]*\}\s*=(?!=)/,
+  /[\w$)\]]\s*\.\s*KauroPool\b/,
+  /(?:\brequire\(\s*|\bimport\(\s*)["']@kauro\/persistence["']/,
   /\bimport\s+(?!type\b)\{[^}]*(?<!type\s)\b(?:Pool|Client)\b[^}]*\}\s*from\s*["']pg["']/,
   /\bimport\s+(?!type\b)(?:\*\s+as\s+[\w$]+|[\w$]+)\s*(?:,\s*\{[^}]*\})?\s*from\s*["']pg["']/,
   /\brequire\(\s*["']pg["']\s*\)/,
@@ -116,6 +120,11 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
     "aliased KauroPool": 'import { KauroPool as KP } from "@kauro/persistence";\nconst p = new KP(config);',
     "namespace KauroPool": 'import * as persistence from "@kauro/persistence";\nconst p = new persistence.KauroPool(config);',
     "re-exported KauroPool": 'export { KauroPool as Pool2 } from "@kauro/persistence";',
+    "destructured KauroPool from a dynamic import": 'const { KauroPool: KP } = await import("@kauro/persistence");\nconst p = new KP(cfg);',
+    "required KauroPool": 'const { KauroPool } = require("@kauro/persistence");',
+    "KauroPool destructured from a namespace": 'import * as ns from "@kauro/persistence";\nconst { KauroPool: KP } = ns;\nconst p = new KP(cfg);',
+    "KauroPool member taken without new": 'import * as ns from "@kauro/persistence";\nconst KP = ns.KauroPool;',
+    "persistence imported at run time": 'const m = await import("@kauro/persistence");',
   };
   for (const [name, text] of Object.entries(forms)) assert.ok(isSite(text), `not caught: ${name}`);
   for (const text of ['import type { PoolClient } from "pg";', 'import { type Client } from "pg";', "// new Pool(\nexport const a = 1;", 'export type { Pool } from "pg";', 'import type { KauroPool } from "@kauro/persistence";', 'import { type KauroPool } from "@kauro/persistence";', 'export const superuser = "postgres";']) assert.ok(!isSite(text), text);
