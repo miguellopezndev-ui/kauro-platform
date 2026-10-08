@@ -471,6 +471,18 @@
           "updated_at",
           "version"
         ]
+      },
+      "kauro.web_sessions": {
+        "SELECT": [
+          "absolute_expires_at",
+          "idle_expires_at",
+          "revoked_at",
+          "secret_sha256",
+          "user_id"
+        ],
+        "UPDATE": [
+          "session_id"
+        ]
       }
     },
     "kauro_assurance": {
@@ -5332,6 +5344,22 @@
       ],
       "using": "(secret_sha256 = kauro.current_session_sha256())",
       "check": "(secret_sha256 = kauro.current_session_sha256())"
+    },
+    "web_sessions/web_sessions_request_lock": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((secret_sha256 = kauro.current_session_sha256()) AND (user_id = kauro.current_user_id()))",
+      "check": "false"
+    },
+    "web_sessions/web_sessions_request_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((secret_sha256 = kauro.current_session_sha256()) AND (user_id = kauro.current_user_id()))",
+      "check": null
     }
   },
   "tables": {

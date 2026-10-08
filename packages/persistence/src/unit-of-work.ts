@@ -68,6 +68,7 @@ import {
 import type { PoolClient } from "pg";
 import { serverInstantOf } from "./source/rows.js";
 import { PgBankRoutes } from "./repositories/bank-routes.js";
+import { PgSessionFence } from "./session-fence.js";
 import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
 import { PgExecutionDiscovery } from "./execution/discovery.js";
@@ -187,6 +188,8 @@ export class PgUnitOfWork implements UnitOfWork {
    * over the decision artifacts, read through decisionArtifactResolver by the api composition.
    */
   readonly auditReads: PgAuditReads;
+  /** The session fence (migration 0047, PV1R-07 r4): the presented session locked FOR SHARE inside this unit's own transaction, read through sessionFenceOf(uow). */
+  readonly sessionFence: PgSessionFence;
   #adoptedAgencyId: AgencyId | null = null;
   #resolvedMembershipId: MembershipId | null = null;
   #abandoned: Error | null = null;
@@ -200,6 +203,7 @@ export class PgUnitOfWork implements UnitOfWork {
   ) {
     this.context = context;
     this.ids = ids;
+    this.sessionFence = new PgSessionFence(client);
     this.agencies = new PgAgencyRepository(client);
     this.memberships = new PgMembershipRepository(client);
     this.invitations = new PgInvitationRepository(client);
@@ -589,6 +593,12 @@ export function commercialInspectionsOf(uow: UnitOfWork): PgCommercialInspection
 export function purchasedSubjectsOf(uow: UnitOfWork): PgPurchasedSubjects {
   if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the purchased subject is read in a commerce unit of work of @kauro/persistence");
   return uow.purchasedSubjects;
+}
+
+/** The session fence of a unit of work of this package: the presented session locked FOR SHARE in the unit's own transaction (PV1R-07 r4). */
+export function sessionFenceOf(uow: UnitOfWork): PgSessionFence {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the session fence is taken in a unit of work of @kauro/persistence");
+  return uow.sessionFence;
 }
 
 /** The bank-transfer route's tables in a commerce unit of work of this package (lane L-ROUTE). */

@@ -107,6 +107,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0045_bank_transfer_kit.sql",
     // Payments V1 bank-transfer route, lane L-ROUTE (provisional number, renumbered at merge)
     "0046_bank_routes.sql",
+    // PV1 L-ROUTE PV1R-07 r4: the session fence (lock-only privileges of kauro_app on the presented session; provisional number)
+    "0047_session_fence.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

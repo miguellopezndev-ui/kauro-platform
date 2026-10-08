@@ -92,12 +92,6 @@ function sessionOf(r: SessionRow): StoredWebSession {
 /** Statement bound of one boundary transaction: it waits on nobody for long (a session row lock at most). */
 export const WEB_SESSION_STATEMENT_TIMEOUT_MS = 5_000;
 
-/** A session judged under its row lock, held until `release` (the guarded effect is complete by then). */
-export interface HeldStoredWebSession {
-  readonly session: StoredWebSession;
-  release(): Promise<void>;
-}
-
 export class PgWebSessionStore {
   constructor(private readonly pool: KauroPool) {}
 
@@ -215,32 +209,6 @@ export class PgWebSessionStore {
   async resume(secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<StoredWebSession | null> {
     if (!Number.isInteger(idleSeconds) || idleSeconds <= 0 || !Number.isInteger(touchSeconds) || touchSeconds < 0) throw new RangeError("idle and touch windows are whole seconds");
     return this.#boundary({ userId: null, sessionSha256: secretSha256 }, (client) => this.#lockedResume(client, secretSha256, now, idleSeconds, touchSeconds));
-  }
-
-  async hold(secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<HeldStoredWebSession | null> {
-    if (!Number.isInteger(idleSeconds) || idleSeconds <= 0 || !Number.isInteger(touchSeconds) || touchSeconds < 0) throw new RangeError("idle and touch windows are whole seconds");
-    const tx = await this.#begin({ userId: null, sessionSha256: secretSha256 });
-    let session: StoredWebSession | null;
-    try {
-      session = await this.#lockedResume(tx.client, secretSha256, now, idleSeconds, touchSeconds);
-    } catch (e) {
-      await tx.rollback();
-      throw e;
-    }
-    if (session === null) {
-      await tx.commit();
-      return null;
-    }
-    let released = false;
-    return {
-      session,
-      // COMMIT keeps the touch; the row lock ends with the transaction
-      release: async () => {
-        if (released) return;
-        released = true;
-        await tx.commit();
-      },
-    };
   }
 
   /**
