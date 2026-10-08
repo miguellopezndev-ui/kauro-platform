@@ -143,3 +143,9 @@ RULED CHANGE, RELAXED: 0. `apps/api/test/request-validation.test.ts` "exactly th
 the commerce/commercial sets as exactly 22 (actual 27: the five bank-route operations). The five POSTs and the route read GET (plus the
 transfer-instructions GET where the commerce read set does not already own it) are now named exactly (deepEqual on the inventory) and
 excluded from the unchanged 22/16 counts.
+
+## PV1 inventory (coordinator, after full Linux verify on 76c7905 = 36f4f13 + main 9e20ac9): tools/test/openapi.test.mjs
+RULED CHANGE, RELAXED: 0. "the committed document is the generated one ..." pins two exact inventories: the composed api's registered routes
+and `sources.operationalRoutes`. L-ROUTE registers seven operational routes (configureBankRoute, verify/enable/disable/details, getBankRoute,
+getTransferInstructions), so both lists gain exactly those seven entries; the byte-for-byte document check and `check() == []` are unchanged and
+pass (the committed document already documented them). Failing text before: `+ 'POST /api/v1/operations/bank-routes configureBankRoute'` (x7).
