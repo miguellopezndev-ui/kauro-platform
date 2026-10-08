@@ -2245,3 +2245,264 @@ for (const c of AT_COMMIT.filter((x) => x.name === "verify" || x.name === "enabl
     assert.equal(await bw.iw.w.journal(key), null, `${c.name}: no journal entry`);
   });
 }
+
+// === Codex r2 on 5bac4cf (docs/review/pv1-route-codex-r2.json): PV1R-02, PV1R-03, PV1R-06, one family: TIME-AFTER-AWAIT ===========
+// Each cell delays the LAST awaited step before a time judgment (the final authentication's session-store statement, the final step-up
+// proof read, the issuance's COMMIT) across the boundary that judgment guards (FAILURE-MATRIX-TEMPLATE rule 15).
+
+/**
+ * Holds the answer of the `nth` session-resume touch statement (`UPDATE kauro.web_sessions SET last_seen_at ...`) the authentication
+ * boundary's pool runs during `fn`: the statement has run on the server (after the resume's clock sample) and `hook` runs before its answer
+ * reaches the store. The pool is restored after `fn`; `reached` says the hold happened (a vacuous cell fails on it).
+ */
+async function withResumeHeld<T>(nth: number, hook: () => Promise<void>, fn: () => Promise<T>): Promise<{ readonly out: T; readonly reached: boolean }> {
+  type Client = { query: (...a: unknown[]) => Promise<unknown> };
+  const pool = bw.iw.w.db.assurancePool as unknown as { acquire: () => Promise<{ readonly client: Client }> } | null;
+  assert.ok(pool !== null, "a sessions-enabled world binds the authentication boundary's pool");
+  const real = pool.acquire;
+  let seen = 0;
+  let reached = false;
+  pool.acquire = async () => {
+    const acquired = await real.call(pool);
+    const client = new Proxy(acquired.client, {
+      get(target, prop) {
+        if (prop === "query") {
+          return async (...a: unknown[]) => {
+            const text = typeof a[0] === "string" ? a[0] : ((a[0] as { text?: string } | undefined)?.text ?? "");
+            const answer = await target.query(...a);
+            if (/UPDATE kauro\.web_sessions\s+SET last_seen_at/.test(text) && ++seen === nth) {
+              reached = true;
+              await hook();
+            }
+            return answer;
+          };
+        }
+        const value: unknown = Reflect.get(target, prop, target);
+        return typeof value === "function" ? (value as (...x: unknown[]) => unknown).bind(target) : value;
+      },
+    });
+    return { ...acquired, client };
+  };
+  try {
+    return { out: await fn(), reached };
+  } finally {
+    pool.acquire = real;
+  }
+}
+/** The I3 request's resumes, in order: the route's authentication, I3's first re-authentication, I3's FINAL authentication. */
+const FINAL_I3_RESUME = 3;
+
+/**
+ * A sessions-enabled bank world of its own per cell whose process clock the cell moves forward (kept apart from the shared one and from each
+ * other: the owner's step-ups are judged on that clock, so a world whose clock moved hours ahead configures no further route).
+ */
+const movedWorlds = new Map<string, BankWorld>();
+after(async () => {
+  for (const w of movedWorlds.values()) await w.stop();
+});
+async function onMovedSessions<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  const main = bw;
+  let moved = movedWorlds.get(name);
+  if (moved === undefined) {
+    moved = await bankWorld({ sessions: true });
+    movedWorlds.set(name, moved);
+  }
+  bw = moved;
+  try {
+    return await fn();
+  } finally {
+    bw = main;
+  }
+}
+
+test(`PV1R-02 DENY ACH-M-R2-EXPIRY (session expires during the cookie authentication's own store wait): a getBankRoute whose only authentication's session-store statement is held after its clock sample while the session crosses its idle expiry is refused 401 AUTHENTICATION_REQUIRED like the next request (the resume judges liveness at an instant read after the store returned); a session still live at release is served`, async () => {
+  await onMovedSessions("pv1r02-get", async () => {
+    const r = await configured("pv1r02r2-get");
+    for (const ending of ["live", "idle"] as const) {
+      const session = await bw.iw.w.identity().signIn(bw.iw.owner);
+      const get = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.get(r.routeId), origin: null });
+      const advanceMs = ending === "live" ? 1_000 : 1_800_000 + 60_000;
+      const { out: held, reached } = await withResumeHeld(1, async () => bw.iw.w.processClock.advance(advanceMs), get);
+      assert.ok(reached, `${ending}: the authentication's session-store statement was held`);
+      const next = await get();
+      const expected = ending === "live" ? "200 SUCCESS -" : "401 AUTHENTICATION_REQUIRED -";
+      assert.equal(code(next), expected, `${ending}: the next request`);
+      assert.equal(code(held), expected, `${ending}: the held request is answered like the next one`);
+    }
+  });
+});
+
+test(`PV1R-02 DENY ACH-M-I3-EXPIRY (session expires during the final authentication's own store wait): an instructions read whose initial authentication and first re-authentication finish, and whose FINAL authentication's session-store statement is held after its clock sample while the session crosses its idle or its absolute expiry, is refused 401 AUTHENTICATION_REQUIRED like the next request with no account or routing digits and no payment reference; a session still live at release is served`, async () => {
+  await onMovedSessions("pv1r02-i3", async () => {
+    const IDLE_MS = 1_800_000;
+    const endings = ["live", "idle", "absolute"] as const;
+    // every order is issued before the process clock moves (the owner's step-ups are judged on it); each session opens at its own case
+    const orders = new Map<string, Awaited<ReturnType<typeof issuedOrder>>>();
+    for (const ending of endings) orders.set(ending, await issuedOrder(`pv1r02r2-${ending}`));
+    for (const ending of endings) {
+      const x = orders.get(ending)!;
+      const session = await bw.iw.w.identity().signIn(x.b.a.billing);
+      const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
+      if (ending === "absolute") {
+        // the session kept in use (a read every 25 minutes touches it) until its absolute deadline (12 h, immutable) is 10 minutes ahead: its
+        // idle deadline is then bound to the absolute one (min(now + 30 min, absolute))
+        const absolute = (await q<{ at: Date }>("SELECT absolute_expires_at AS at FROM kauro.web_sessions WHERE secret_sha256 = $1", [session.secretSha256]))[0]!.at.getTime();
+        while (absolute - bw.iw.w.processClock.nowMs() > 10 * 60_000 + 1_000) {
+          bw.iw.w.processClock.advance(Math.min(25 * 60_000, absolute - bw.iw.w.processClock.nowMs() - 10 * 60_000));
+          assert.equal(code(await cookieRead()), "200 SUCCESS -", "absolute: the session in use stays live");
+        }
+        const [row] = await q<{ idle: Date; abs: Date }>("SELECT idle_expires_at AS idle, absolute_expires_at AS abs FROM kauro.web_sessions WHERE secret_sha256 = $1", [session.secretSha256]);
+        assert.equal(row!.idle.getTime(), row!.abs.getTime(), "absolute: the idle deadline is bound to the absolute deadline");
+        assert.ok(row!.abs.getTime() - bw.iw.w.processClock.nowMs() <= 10 * 60_000 + 1_000, "absolute: the absolute deadline is about 10 minutes ahead");
+      }
+      assert.equal(code(await cookieRead()), "200 SUCCESS -", `${ending}: served under the live session before the hold`);
+      const advanceMs = ending === "live" ? 1_000 : ending === "idle" ? IDLE_MS + 60_000 : 11 * 60_000;
+      const { out: held, reached } = await withResumeHeld(FINAL_I3_RESUME, async () => bw.iw.w.processClock.advance(advanceMs), cookieRead);
+      assert.ok(reached, `${ending}: the final authentication's session-store statement was held`);
+      const next = await cookieRead();
+      if (ending === "live") {
+        assert.equal(code(held), "200 SUCCESS -", "live: a session still live at release is served");
+        const v = held.json<InstructionsView>().instructions;
+        assert.deepEqual([v.accountNumber, v.routingNumber, v.reference], [ACCOUNT_DIGITS, "026073150", x.reference]);
+        assert.equal(code(next), "200 SUCCESS -");
+        continue;
+      }
+      assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", `${ending}: the next request is unauthenticated`);
+      assert.equal(code(held), code(next), `${ending}: the held read is refused like the next request`);
+      noAccountDigits(held, `${ending} expiry during the final authentication`);
+      assert.ok(!held.text.includes(x.reference), `${ending}: no payment reference in the held read`);
+    }
+  });
+});
+
+/** I3 under a fresh browser session on the cell's step clock from `startMs`; the final authentication's store statement held while the clock moves to `crossMs`. */
+async function readHeldAtFinalAuthentication(ctx: FaultContext, what: string, x: { readonly b: { readonly a: Agent }; readonly orderId: string }, startMs: number, crossMs: number): Promise<Reply> {
+  const session = await bw.iw.w.identity().signIn(x.b.a.billing);
+  const { out, reached } = await ctx.operation(what, async (op) => {
+    bw.iw.faults.clock = op.clock;
+    try {
+      ctx.clock.set(startMs);
+      return await withResumeHeld(FINAL_I3_RESUME, async () => void ctx.clock.set(crossMs), () => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId }));
+    } finally {
+      bw.iw.faults.clock = null;
+    }
+  });
+  assert.ok(reached, `${what}: the final authentication's session-store statement was held`);
+  return out;
+}
+const transferExpiryOf = async (orderId: string): Promise<number> => (await q<{ at: Date }>("SELECT transfer_expires_at AS at FROM kauro.bank_transfer_instructions WHERE order_id::text = $1", [orderId]))[0]!.at.getTime();
+
+cell(`PV1R-06 DENY ACH-M-I3-EXPIRY (instruction deadline crossed during the final authentication): an instructions read under a long-lived session whose route and order guards pass at deadline - 1 ms and whose final authentication is held while the effect clock crosses the instruction deadline is refused 409 INSTRUCTIONS_EXPIRED with no account or routing digits and no reference; the same hold short of the deadline is served`, "expiry", async (ctx) => {
+  await onSessions(async () => {
+    const xc = await issuedOrder("pv1r06-deadline-ok");
+    const ec = await transferExpiryOf(xc.orderId);
+    const control = await readHeldAtFinalAuthentication(ctx, "read held short of the instruction deadline", xc, ec - 3, ec - 1);
+    assert.equal(code(control), "200 SUCCESS -", "control: the instructions are served before the deadline");
+    const x = await issuedOrder("pv1r06-deadline");
+    const boundary = Date.parse(ctx.deadline(await transferExpiryOf(x.orderId), "instruction deadline"));
+    const reply = await readHeldAtFinalAuthentication(ctx, "read held across the instruction deadline", x, boundary - 1, boundary + 1);
+    assert.equal(code(reply), "409 PRECONDITION_FAILED INSTRUCTIONS_EXPIRED", "the deadline crossed during the final authentication hides the instructions");
+    noAccountDigits(reply, "instruction deadline crossed during the final authentication");
+    assert.ok(!reply.text.includes(x.reference), "no payment reference");
+  });
+});
+
+cell(`PV1R-06 DENY ACH-M-I3-EXPIRY (details validity crossed during the final authentication): an instructions read under a long-lived session whose final authentication is held while the effect clock crosses the route version's details validUntil is refused 409 INSTRUCTIONS_NOT_AVAILABLE with no account or routing digits and no reference; the same hold short of the validity is served`, "expiry", async (ctx) => {
+  await onSessions(async () => {
+    const vc = Date.now() + 5 * DAY_MS;
+    const xc = await issuedOrder("pv1r06-details-ok", { validUntil: iso(vc) });
+    const control = await readHeldAtFinalAuthentication(ctx, "read held short of the details validity", xc, vc - 3, vc - 1);
+    assert.equal(code(control), "200 SUCCESS -", "control: the instructions are served while the details are valid");
+    const validUntil = Date.now() + 6 * DAY_MS;
+    const x = await issuedOrder("pv1r06-details", { validUntil: iso(validUntil) });
+    // issuance caps the instruction deadline at the details validity (D-ACH-04): at that boundary I3's details judgment is the one taken first
+    assert.ok((await transferExpiryOf(x.orderId)) <= validUntil, "fixture: the instruction deadline is capped by the details validity");
+    const boundary = Date.parse(ctx.deadline(validUntil, "details validity"));
+    const reply = await readHeldAtFinalAuthentication(ctx, "read held across the details validity", x, boundary - 1, boundary + 1);
+    assert.equal(code(reply), INSTRUCTIONS_NOT_AVAILABLE, "details expired during the final authentication hide the instructions");
+    noAccountDigits(reply, "details validity crossed during the final authentication");
+    assert.ok(!reply.text.includes(x.reference), "no payment reference");
+  });
+});
+
+/**
+ * Runs `command` on the cell's step clock at `startMs`, lets it reach `uow.before-commit` (its handler, journal and security writes done),
+ * then holds the answer of its FINAL step-up proof read (the pre-commit check's own read) while the clock moves to `crossMs`, and releases it.
+ */
+async function heldAtFinalProofRead(ctx: FaultContext, what: string, startMs: number, crossMs: number, command: () => Promise<Reply>): Promise<Reply> {
+  const conn = await open();
+  let armed = false;
+  try {
+    ctx.clock.set(startMs);
+    const atCommit = ctx.points.pause("uow.before-commit");
+    const running = ctx.operation(what, async (op) => {
+      bw.iw.faults.clock = op.clock;
+      try {
+        return await on(ctx, conn, command, [{ label: "final-proof", match: /FROM kauro\.assurance_proofs/, when: () => armed }]);
+      } finally {
+        bw.iw.faults.clock = null;
+      }
+    });
+    const settled = running.then((value) => ({ status: "fulfilled", value }) as const, (reason: unknown) => ({ status: "rejected", reason }) as const);
+    await atCommit.reachedBy(running);
+    armed = true;
+    const atProof = ctx.points.pause("db.final-proof.after");
+    atCommit.release();
+    await atProof.reachedBy(running);
+    ctx.clock.set(crossMs);
+    atProof.release();
+    return ok(await settled);
+  } finally {
+    await conn.end();
+  }
+}
+
+for (const c of AT_COMMIT) {
+  cell(`PV1R-03 DENY ACH-M-R2-EXPIRY (step-up expires during the final proof read, ${c.name}): the ${c.name} command whose pre-commit check reads the step-up proof with the clock at expiry - 1 ms, the read's answer held while the proof crosses its expiry, is refused STEP_UP_STALE, leaving route, version, participant, event and outbox state unchanged and no journal entry; the same hold short of the expiry commits`, "expiry", async (ctx) => {
+    const control = await c.prepare(`pv1r03r2-${c.name}-ok`);
+    const ce = await proofExpiry(control.body);
+    assert.equal(code(await heldAtFinalProofRead(ctx, `${c.name} final proof read held short of the expiry`, ce - 3, ce - 1, () => owner(control.url, control.body))), "200 SUCCESS -", `control: ${c.name} commits with a proof fresh after its final read`);
+    const x = await c.prepare(`pv1r03r2-${c.name}`);
+    const key = freshKey(`pv1r03r2-${c.name}`);
+    const before = await routeFootprint(x.r.routeId);
+    const boundary = Date.parse(ctx.deadline(await proofExpiry(x.body), "step-up proof expiry"));
+    const reply = await heldAtFinalProofRead(ctx, `${c.name} final proof read held across the expiry`, boundary - 1, boundary + 1, () => owner(x.url, x.body, { key }));
+    assert.equal(code(reply), "403 ASSURANCE_REQUIRED STEP_UP_STALE", `${c.name}: a proof expired during its final read refuses the effect`);
+    assert.deepEqual(await routeFootprint(x.r.routeId), before, `${c.name}: route, version, participant, event and outbox state unchanged`);
+    assert.equal(await bw.iw.w.journal(key), null, `${c.name}: no journal entry, COMMITTED or otherwise`);
+  });
+}
+
+for (const c of AT_COMMIT.filter((x) => x.name === "verify" || x.name === "enable")) {
+  cell(`PV1R-03 DENY ACH-M-R1-EXPIRY (details expire during the final proof read, ${c.name}): the ${c.name} command whose pre-commit proof read is held while the details validity passes (the step-up still fresh) is refused DETAILS_EXPIRED with no footprint and no journal entry; the same hold short of the validity commits`, "expiry", async (ctx) => {
+    const control = await c.prepare(`pv1r03r2-d-${c.name}-ok`, { validUntil: detailsSoon() });
+    const cv = await validUntilOf(control.r.routeId);
+    assert.equal(code(await heldAtFinalProofRead(ctx, `${c.name} final proof read held short of the validity`, cv - 3, cv - 1, () => owner(control.url, control.body))), "200 SUCCESS -", `control: ${c.name} commits with details valid after its final read`);
+    const x = await c.prepare(`pv1r03r2-d-${c.name}`, { validUntil: detailsSoon() });
+    const validUntil = await validUntilOf(x.r.routeId);
+    assert.ok(validUntil < (await proofExpiry(x.body)), "details-only case: the step-up outlives the details");
+    const key = freshKey(`pv1r03r2-d-${c.name}`);
+    const before = await routeFootprint(x.r.routeId);
+    const boundary = Date.parse(ctx.deadline(validUntil, "details validity"));
+    const reply = await heldAtFinalProofRead(ctx, `${c.name} final proof read held across the details validity`, boundary - 1, boundary + 1, () => owner(x.url, x.body, { key }));
+    assert.equal(code(reply), "409 PRECONDITION_FAILED DETAILS_EXPIRED", `${c.name}: details expired during the final proof read refuse the effect`);
+    assert.deepEqual(await routeFootprint(x.r.routeId), before, `${c.name}: no footprint`);
+    assert.equal(await bw.iw.w.journal(key), null, `${c.name}: no journal entry`);
+  });
+}
+
+cell(`TAA-SWEEP DENY ACH-M-I2-EXPIRY (transfer window crossed before COMMIT): an issuance judged at window + 1 ms before its details-capped deadline, held immediately before its COMMIT while the effect clock passes the minimum window, is refused TRANSFER_WINDOW_TOO_SHORT with nothing issued; the same hold short of the minimum window issues`, "expiry", async (ctx) => {
+  const windowMs = 2 * DAY_MS;
+  const vc = Date.now() + 5 * DAY_MS;
+  const bc = await buyer("taa-window-ok");
+  const rc = await enabled("taa-window-ok", [bc.a.s.agency.agencyId], { windowMs, validUntil: iso(vc) });
+  const control = await heldBeforeCommit(ctx, "issuance held before COMMIT short of the minimum window", vc - windowMs - 3, vc - windowMs - 1, () => issue(bc, rc));
+  assert.equal(code(control), "201 SUCCESS -", "control: the window still holds at COMMIT");
+  const validUntil = Date.now() + 6 * DAY_MS;
+  const b = await buyer("taa-window");
+  const r = await enabled("taa-window", [b.a.s.agency.agencyId], { windowMs, validUntil: iso(validUntil) });
+  const boundary = Date.parse(ctx.deadline(validUntil - windowMs, "latest issuance instant before the details-capped deadline"));
+  const reply = await heldBeforeCommit(ctx, "issuance held before COMMIT across the minimum window", boundary - 1, boundary + 1, () => issue(b, r));
+  assert.equal(code(reply), "409 PRECONDITION_FAILED TRANSFER_WINDOW_TOO_SHORT", "the window crossed before COMMIT refuses the issuance");
+  assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED, "nothing issued");
+});
