@@ -1,5 +1,14 @@
 # B15 — provider adapters behind the existing ports
 
+> **PayPal: DEFERRED by owner decision 2026-10-07 (Payments V1); parked as contingency; not merged; resumes only by explicit
+> owner decision.** PR #19 closed as DEFERRED by B (2026-10-08); branch `b15/adapters-paypal` kept. Open if resumed: findings
+> F-PP-1..F-PP-4 (this document §2.3) and F-PP-5..F-PP-7 as numbered by B's plan PP-REFUND-RECOVERY (F-PP-6: PayPal-Request-Id
+> retention is documented for Orders create only; §2.1's "6 h (72 h)" must not be relied on for capture or refund); B's requests
+> R-B1..R-B7 (docs/sessions/REQUESTS-FROM-B.md on docs/b-requests), all suspended: R-B1/R-B2 port redesign I-PP-3/I-PP-4 first;
+> R-B3 every PayPal absence `absenceIsProof: false` (order view included); R-B5 record the refund status meanings, the order view's
+> `invoice_id` echo, the refund webhook fields and Transaction Search; R-B6 a money POST sent at most once (the 401 renew-and-repeat
+> of `client.ts` allowed on reads only); R-B7 nothing re-sends a refund POST, recovery only reads. No further work on PayPal.
+
 Lane: the real adapters behind the ports B06–B14 already define, built before B15's live work so that B15 is only the live binding.
 Authority: R2 (`packages/contracts/registry/*.json`, `docs/design/*`) and amendments A2..A9 (A8 payments: PayPal is the secondary route,
 Wise/ACH the preferred one in PENDING_VERIFICATION; A9 cloud: AWS). One PR per provider, branch `b15/adapters-<provider>`, order
