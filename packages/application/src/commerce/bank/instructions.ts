@@ -311,6 +311,9 @@ export async function readTransferInstructions(
       if (effect >= Date.parse(current.transferExpiresAt)) throw new DomainFailure("PRECONDITION_FAILED", "the transfer instructions expired", { reason: "INSTRUCTIONS_EXPIRED" });
       if (evidenceFailure !== null) throw evidenceFailure;
       if (details === null) throw evidenceUnavailable();
+      // PV1R-02: the session judged again after the last blocking wait (the route share lock, the order and deadline guards) and
+      // immediately before the secret-bearing view: a session revoked or expired during those waits gets the authentication refusal
+      if (request.stillAuthenticated !== undefined && !(await request.stillAuthenticated())) return SESSION_ENDED;
       const view: TransferInstructionsView = {
         instructions: {
           beneficiaryName: details.beneficiaryName,
