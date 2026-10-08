@@ -16,21 +16,30 @@ export interface RequestAuthorityHandle {
 
 export function requestAuthorityOf(authenticator: Authenticator, request: AuthenticationRequest, userId: string, sink: (error: unknown) => void): RequestAuthorityHandle {
   const releases: Array<() => Promise<void>> = [];
+  // one hold per request: a second judgment (a unit retried after its first COMMIT attempt, a second effect of the same request) reuses the
+  // row still locked by the first instead of waiting on it from another connection (a self-wait until the statement timeout); the row
+  // cannot have changed while it is locked, and liveAt is judged again at the caller's new instant
+  let first: Promise<CredentialHold | null> | null = null;
   const authority: RequestAuthority = {
-    async hold(): Promise<CredentialHold | null> {
-      if (authenticator.holdRequest !== undefined) {
-        const held = await authenticator.holdRequest(request);
-        if (held === null) return null;
-        releases.push(held.release);
-        return held.userId === userId ? { liveAt: (nowMs) => held.liveAt(nowMs) } : null;
-      }
-      const again = await authenticationOf(authenticator, request);
-      return again.kind === "SUBJECT" && again.subject.identity.userId === userId ? { liveAt: () => true } : null;
+    hold(): Promise<CredentialHold | null> {
+      first ??= holdOnce();
+      return first;
     },
   };
+  async function holdOnce(): Promise<CredentialHold | null> {
+    if (authenticator.holdRequest !== undefined) {
+      const held = await authenticator.holdRequest(request);
+      if (held === null) return null;
+      releases.push(held.release);
+      return held.userId === userId ? { liveAt: (nowMs) => held.liveAt(nowMs) } : null;
+    }
+    const again = await authenticationOf(authenticator, request);
+    return again.kind === "SUBJECT" && again.subject.identity.userId === userId ? { liveAt: () => true } : null;
+  }
   return {
     authority,
     async release() {
+      first = null; // a judgment after the release holds the row again
       for (const release of releases.splice(0)) {
         try {
           await release();

@@ -28,6 +28,7 @@ import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld } from "./bank-support.js"
 import type { SqlStep } from "./fault-support.js";
 import { agentOf, planOf, quoted, type Agent } from "./integration-support.js";
 import { call, completed, freshKey, outcome, rawEvent, routes, sessionPaths, type BrowserSession, type Reply } from "./support.js";
+import { requestAuthorityOf } from "../src/request-authority.js";
 
 let bw: BankWorld;
 before(async () => {
@@ -2908,4 +2909,30 @@ cell(`PV1R-07 DENY ACH-M-I2-REVOCATION (session revoked during the post-authenti
     const next = await nextRefused(ctx, "issuance: next request", () => issueCall());
     assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", "the next issuance is refused");
   });
+});
+
+// rule 16 deadlock check (r3): one request holds its session row at most once. A second judgment of the same request (a unit retried after
+// its first COMMIT attempt, a second effect) reuses the held row instead of locking it again from another connection, which would wait on
+// its own lock until the statement timeout; after the release a judgment holds the row again
+test("RULE16-SELF-WAIT DENY ACH-M-R2-RETRY (second judgment of one request): a request's authority asked twice before its release holds the session once and judges both times at the caller's instant; after the release it holds again", async () => {
+  let holds = 0;
+  let releases = 0;
+  const authenticator = {
+    authenticate: async () => null,
+    holdRequest: async () => {
+      holds += 1;
+      return { userId: "user-1", liveAt: (nowMs: number) => nowMs < 1_000, release: async () => void (releases += 1) };
+    },
+  } as unknown as Parameters<typeof requestAuthorityOf>[0];
+  const handle = requestAuthorityOf(authenticator, { method: "POST", headers: {} }, "user-1", () => undefined);
+  const [one, two] = await Promise.all([handle.authority.hold(), handle.authority.hold()]);
+  assert.equal(holds, 1, "one hold for two judgments of the same request");
+  assert.equal(one?.liveAt(999), true);
+  assert.equal(two?.liveAt(1_000), false, "the reused hold is judged again at the caller's instant");
+  await handle.release();
+  assert.equal(releases, 1);
+  await handle.authority.hold();
+  assert.equal(holds, 2, "a judgment after the release holds the row again");
+  await handle.release();
+  assert.equal(releases, 2);
 });
