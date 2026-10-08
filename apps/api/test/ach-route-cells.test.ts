@@ -23,7 +23,7 @@ import { after, before, test } from "node:test";
 import { BANK_FAKE_FORMAT, BANK_FAKE_PROVIDER } from "@kauro/application/testing";
 import type { CreateQuoteView } from "@kauro/application";
 import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
-import { connectionPid, crashedAt, FaultPoints, openConnection, runCell, SimulatedCrash, type FaultContext, type FaultKind, type HarnessConnection } from "@kauro/persistence/testing";
+import { connectionPid, crashedAt, FaultPoints, INJECTED_STATEMENT_TIMEOUT_MS, LOCK_WAIT_OBSERVATION_MS, openConnection, runCell, SimulatedCrash, type FaultContext, type FaultKind, type HarnessConnection } from "@kauro/persistence/testing";
 import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld } from "./bank-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { agentOf, planOf, quoted, type Agent } from "./integration-support.js";
@@ -518,7 +518,7 @@ cell(`RACE ACH-M-R2-TIMEOUT (time): ${R2}`, "race", async (ctx) => {
   try {
     await holder.query("BEGIN");
     await holder.query("SELECT 1 FROM kauro.bank_routes WHERE route_id = $1 FOR NO KEY UPDATE", [r.routeId]);
-    bw.iw.faults.statementTimeoutMs = 200;
+    bw.iw.faults.statementTimeoutMs = INJECTED_STATEMENT_TIMEOUT_MS;
     const conn = await open();
     try {
       const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: conn, holder: connectionPid(holder) }, () => on(ctx, conn, () => owner(bankRoutes.enable(r.routeId), body, { key })), "enable past its lock timeout");
@@ -768,7 +768,7 @@ cell(`RACE ACH-M-I1-TIMEOUT (time): ${I1}`, "race", async (ctx) => {
   try {
     await holder.query("BEGIN");
     await holder.query("SELECT 1 FROM kauro.quotes WHERE quote_id::text = $1 FOR NO KEY UPDATE", [b.quote.quote.quoteId]);
-    bw.iw.faults.statementTimeoutMs = 200;
+    bw.iw.faults.statementTimeoutMs = INJECTED_STATEMENT_TIMEOUT_MS;
     const conn = await open();
     try {
       const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: conn, holder: connectionPid(holder) }, () => on(ctx, conn, () => issue(b, r)), "issuance whose readiness read times out");
@@ -936,7 +936,7 @@ cell(`RACE ACH-M-I2-TIMEOUT (time): ${I2}`, "race", async (ctx) => {
   try {
     await holder.query("BEGIN");
     await holder.query("SELECT 1 FROM kauro.bank_routes WHERE route_id = $1 FOR NO KEY UPDATE", [r.routeId]);
-    bw.iw.faults.statementTimeoutMs = 200;
+    bw.iw.faults.statementTimeoutMs = INJECTED_STATEMENT_TIMEOUT_MS;
     const conn = await open();
     try {
       const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: conn, holder: connectionPid(holder) }, () => on(ctx, conn, () => issue(b, r, { key })), "issuance past its statement timeout");
@@ -2694,7 +2694,7 @@ async function sessionRowOf(session: BrowserSession): Promise<SessionRowState> {
 }
 const pauseMs = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 /** True once some backend is observed waiting on a lock `pid` holds (pg_blocking_pids), within `timeoutMs`. */
-async function blockedBehind(pid: number, timeoutMs = 4_000): Promise<boolean> {
+async function blockedBehind(pid: number, timeoutMs = LOCK_WAIT_OBSERVATION_MS): Promise<boolean> {
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
     if ((await n("SELECT 1 FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))", [pid])) > 0) return true;
@@ -2826,7 +2826,7 @@ test(`PV1R-02 r4 DENY ACH-M-I3-EXPIRY (idle deadline crossed while the final ses
 });
 
 /** Where a revocation started during a guarded wait stands within `timeoutMs`: COMMITTED (the row is revoked) or WAITING (blocked on a lock). */
-async function revocationStanding(session: BrowserSession, timeoutMs = 3_000): Promise<"COMMITTED" | "WAITING" | "NEITHER"> {
+async function revocationStanding(session: BrowserSession, timeoutMs = LOCK_WAIT_OBSERVATION_MS): Promise<"COMMITTED" | "WAITING" | "NEITHER"> {
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
     if ((await sessionRowOf(session)).revoked) return "COMMITTED";

@@ -149,3 +149,9 @@ RULED CHANGE, RELAXED: 0. "the committed document is the generated one ..." pins
 and `sources.operationalRoutes`. L-ROUTE registers seven operational routes (configureBankRoute, verify/enable/disable/details, getBankRoute,
 getTransferInstructions), so both lists gain exactly those seven entries; the byte-for-byte document check and `check() == []` are unchanged and
 pass (the committed document already documented them). Failing text before: `+ 'POST /api/v1/operations/bank-routes configureBankRoute'` (x7).
+
+## Stress-cells gate (owner 10-07, WIN-TIMING-AFTER-GREEN-PR) on 73e39a9: fixed wait caps in changed timing cells
+RELAXED: 0. The gate refused six literal caps before any run: three injected statement timeouts of 200 ms (ach-route-cells :521/:771/:939),
+blockedBehind 4 s and revocationStanding 3 s (:2697/:2829) and F5's BOUND_MS 1 s with a 3 s upper slack (session-fence :251/:262). They now come
+from the harness bounds: new INJECTED_STATEMENT_TIMEOUT_MS = 1.5 s (persistence testing faults/bounds.ts, the B10 timeout cells' measured value),
+and LOCK_WAIT_OBSERVATION_MS (10 s) for the observation windows and F5's upper slack. Every assertion is unchanged; the polls return early.

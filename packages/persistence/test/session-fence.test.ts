@@ -10,7 +10,7 @@ import type { Client } from "pg";
 import type { Sha256Hex } from "@kauro/contracts";
 import { toUtcInstant, type CorrelationId, type UserId } from "@kauro/domain";
 import { createPool, PgWebSessionStore, WEB_SESSION_STATEMENT_TIMEOUT_MS, type KauroPool } from "../src/index.js";
-import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
+import { INJECTED_STATEMENT_TIMEOUT_MS, LOCK_WAIT_OBSERVATION_MS, startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
 import { bind, ids, person, sha, sqlState } from "./support.js";
 
 let pg: TemporaryPostgres;
@@ -248,7 +248,7 @@ test("F5 RACE PV1R-07 r4 (timeout, fence): a fence that waits on a revoking tran
   const s = await session("f5");
   const before = await verifiedAt(s);
   const holder = await pg.connect("kauro_assurance_test");
-  const BOUND_MS = 1_000;
+  const BOUND_MS = INJECTED_STATEMENT_TIMEOUT_MS;
   const c = await appTx(s, BOUND_MS);
   try {
     await holder.query("BEGIN");
@@ -259,7 +259,7 @@ test("F5 RACE PV1R-07 r4 (timeout, fence): a fence that waits on a revoking tran
     const got = await settle(fence(c, s));
     const waited = Date.now() - started;
     assert.equal(got.status === "rejected" ? sqlState(got.reason) : `fulfilled ${JSON.stringify((got as PromiseFulfilledResult<unknown>).value)}`, "57014", "the fence fails at the unit's statement bound (query_canceled)");
-    assert.ok(waited >= BOUND_MS && waited < BOUND_MS + 3_000, `the bound fired after ${waited} ms (bound ${BOUND_MS} ms)`);
+    assert.ok(waited >= BOUND_MS && waited < BOUND_MS + LOCK_WAIT_OBSERVATION_MS, `the bound fired after ${waited} ms (bound ${BOUND_MS} ms)`);
     await c.query("ROLLBACK");
     assert.equal(await verifiedAt(s), before, "the effect written before the fence is not committed");
     await holder.query("ROLLBACK");
