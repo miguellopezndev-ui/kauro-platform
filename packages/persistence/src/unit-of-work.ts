@@ -190,6 +190,7 @@ export class PgUnitOfWork implements UnitOfWork {
   #adoptedAgencyId: AgencyId | null = null;
   #resolvedMembershipId: MembershipId | null = null;
   #abandoned: Error | null = null;
+  readonly #beforeCommit: Array<() => Promise<void>> = [];
 
   constructor(
     protected readonly client: PoolClient,
@@ -274,6 +275,16 @@ export class PgUnitOfWork implements UnitOfWork {
 
   get abandonedWork(): Error | null {
     return this.#abandoned;
+  }
+
+  /** PreCommitChecks (PV1R-03): `check` runs after the work returned, immediately before COMMIT, in this transaction; a throw rolls it back. */
+  beforeCommit(check: () => Promise<void>): void {
+    this.#beforeCommit.push(check);
+  }
+
+  /** Runs the registered pre-commit checks in registration order (the factory, once the work returned). */
+  async runBeforeCommit(): Promise<void> {
+    for (const check of this.#beforeCommit.splice(0)) await check();
   }
 
   get resolvedMembershipId(): MembershipId | null {
@@ -468,6 +479,8 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
       const uow = open(client, ids);
       unit = uow;
       const out = await work(uow);
+      // the checks a command registered for its committed instant (PV1R-03), after every wait of its work and immediately before COMMIT
+      if (uow.abandonedWork === null) await uow.runBeforeCommit();
       if (uow.abandonedWork !== null) throw new DomainFailure("INTEGRITY_FAILURE", `a unit of work whose work was given up cannot commit; correlation ${context.correlationId}`);
       // COMMIT inside an aborted transaction block does not fail: the server answers with the ROLLBACK tag and a WARNING.
       // A handler that caught a database refusal and carried on would otherwise "succeed" having persisted nothing.
