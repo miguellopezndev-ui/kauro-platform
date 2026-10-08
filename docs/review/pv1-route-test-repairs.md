@@ -137,3 +137,9 @@ RULED CHANGE (new routes/fields of lane ACH-ROUTE), RELAXED: 0. The product was 
 - json-schema.test.ts, counts 9 -> 16, 44 -> 49, request ids +5.
 - response-schemas.test.ts, OPERATIONAL_ROUTES +7.
 packages/application: 190/190 pass on Windows. (pnpm run build fails only in @kauro/web e2e: @axe-core/playwright not installed on this Windows tree; unrelated.)
+
+## PV1 inventory (coordinator, after full Linux verify on ffb3cdd): apps/api request-validation route inventory
+RULED CHANGE, RELAXED: 0. `apps/api/test/request-validation.test.ts` "exactly the fourteen catalogue routes ..." counted every POST outside
+the commerce/commercial sets as exactly 22 (actual 27: the five bank-route operations). The five POSTs and the route read GET (plus the
+transfer-instructions GET where the commerce read set does not already own it) are now named exactly (deepEqual on the inventory) and
+excluded from the unchanged 22/16 counts.
