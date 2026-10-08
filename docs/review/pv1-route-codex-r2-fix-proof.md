@@ -63,3 +63,26 @@ With every fix: 11/11; ach-route-cells 90/90.
 | commerce/core/authorizer.ts:69 `assureOperator` (B09, accepted, not used by the bank commands) | samples clock before verifyStepUp's proof read | GAP, outside lane: report to coordinator (B09 owners) |
 | web-sessions.ts `revoke(at)` (B11) | `at` sampled before acquire | Not changed: logout of a session that expired during the wait reports REVOKED instead of ENDED; no disclosure, no admission |
 | checkout.ts revisionForCheckout / capacityForCheckout (B09 shared) | judge at the caller's instant after their own read | In I2 superseded by the window (which includes the source deadline) judged after all reads and at COMMIT; provider path untouched: GAP listed for B09 |
+
+## Adversary r3 on edccbba: ADV-1 (MAJOR) and ADV-3 (MINOR) closed with tests (no product change)
+
+Cells (apps/api/test/ach-route-cells.test.ts), fails on edccbba-with-the-guard-removed, passes on 164a809 + these tests; Windows 94/94 (90 + 4).
+
+| Finding | Cell title (prefix) | Revert | Failing assertion |
+|---|---|---|---|
+| ADV-1 | `ADV-1 DENY ACH-M-I3-REVOCATION (session idle deadline passes after the effect-clock read)` | delete instructions.ts:342 (`sessionLiveUntil` judgment) | `idle: a session that ended between the effect-clock read and the view gets the authentication refusal` actual `200 SUCCESS -` expected `401 AUTHENTICATION_REQUIRED -` |
+| ADV-1 | `ADV-1 DENY ACH-M-I3-REVOCATION (session absolute deadline passes after the effect-clock read)` | same | `absolute: a session that ended between ...` actual `200 SUCCESS -` expected `401 AUTHENTICATION_REQUIRED -` |
+| ADV-3 | `ADV-3 DENY ACH-M-I1-EXPIRY (price deadline crossed between the probe read and the effect read)` | instructions.ts:132-134 restored to the 5bac4cf order (effect, then facts, then source deadline) | `the price deadline crossed between the probe and the effect read refuses the issuance` actual `409 PRECONDITION_FAILED TRANSFER_WINDOW_TOO_SHORT` expected `409 PRECONDITION_FAILED QUOTE_EXPIRED` |
+| ADV-3 | `ADV-3 DENY ACH-M-I1-EXPIRY (source deadline crossed between the probe read and the effect read)` | same | stays green on the 5bac4cf order: both orders refuse `TRANSFER_WINDOW_TOO_SHORT` (body vs the COMMIT-time re-judgment); documents the code, not a revert proof |
+
+How the ADV-1 hold works: the `kauro.effect_now()` statement of the I3 read is held after the THIRD resume (the final authentication) answered with the session live;
+the process clock moves past the idle deadline (31 min) or the absolute deadline (session kept in use until about 10 min from its absolute deadline, then +11 min);
+released. SessionService.resume cannot refuse it any more (it already answered), so only the `liveUntil` judgment does. Controls (non-zero fixtures): same hold with
++1 s serves 200 with the account digits, routing number and reference; the next request after the deadline is 401.
+
+How the ADV-3 hold works: the first effect-instant read (the probe, step clock) of the issuance is held at source deadline - 5 ms, the clock moves to price expiry + 1 ms
+(source cell: source deadline + 1 ms), released. The design (ACH-ROUTE I1/I2 EXPIRY, I2Δ) names no code for a crossing between two reads: the price expiry is the checkout
+blocker QUOTE_EXPIRED judged at the effect read (probe-time facts would have passed), the source deadline and the window are TRANSFER_WINDOW_TOO_SHORT (I2Δ). The price
+expiry cannot be isolated from the source deadline (the fixture's source precedes the price), hence the probe before the source deadline. Controls: the same hold 10 s short
+of the source deadline issues (201, one order, one instruction snapshot, accepted quote, 2 events). Reverts were made by hand-editing the file and `git checkout -- <file>`,
+the package rebuilt each time; the tree was clean after each.

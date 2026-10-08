@@ -2506,3 +2506,130 @@ cell(`TAA-SWEEP DENY ACH-M-I2-EXPIRY (transfer window crossed before COMMIT): an
   assert.equal(code(reply), "409 PRECONDITION_FAILED TRANSFER_WINDOW_TOO_SHORT", "the window crossed before COMMIT refuses the issuance");
   assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED, "nothing issued");
 });
+
+// === Internal adversary r3 on edccbba (docs/review/pv1-route-adversary-r4.md): ADV-1 (MAJOR), ADV-3 (MINOR) =========================
+// ADV-1: the I3 session `liveUntil` judgment (instructions.ts, the last line before the view) is the ONLY guard of a session that ends
+// BETWEEN the effect-clock read and the view: SessionService.resume already refuses a session dead at the third resume. Each cell holds the
+// `effect_now` statement AFTER the third resume, moves the process clock past the session's deadline, releases it.
+
+/** The refusal ctx.fenced observed: the held read's answer, carried out of the fenced operation. */
+class HeldReadAnswered extends Error {
+  constructor(readonly reply: Reply) {
+    super(`the held read was answered ${reply.status}`);
+  }
+}
+let heldSeq = 0;
+/**
+ * One I3 cookie read under `session` whose answer is held at the first `kauro.effect_now()` statement after the FINAL authentication (the
+ * third resume has answered; nothing awaits the session store after that statement except the view): `during` runs while it is held.
+ */
+async function readHeldAtEffectRead(ctx: FaultContext, what: string, read: () => Promise<Reply>, during: () => Promise<void>): Promise<Reply> {
+  const conn = await open();
+  try {
+    let armed = false;
+    const label = `effect-read-${++heldSeq}`;
+    const atEffect = ctx.points.pause(`db.${label}.after`);
+    const running = on(ctx, conn, () => withResumeHeld(FINAL_I3_RESUME, async () => void (armed = true), read), [{ label, match: /kauro\.effect_now\(\)/, when: () => armed }]);
+    const settled = running.then((value) => ({ status: "fulfilled", value }) as const, (reason: unknown) => ({ status: "rejected", reason }) as const);
+    await atEffect.reachedBy(running);
+    await during();
+    atEffect.release();
+    const { out, reached } = ok(await settled);
+    assert.ok(reached, `${what}: the final authentication's session-store statement was held`);
+    return out;
+  } finally {
+    await conn.end();
+  }
+}
+
+for (const ending of ["idle", "absolute"] as const) {
+  advCell(`ADV-1 DENY ACH-M-I3-REVOCATION (session ${ending} deadline passes after the effect-clock read): an instructions read whose final authentication answered with the session live and whose effect-clock read is held while the process clock passes the session's ${ending} deadline is refused 401 AUTHENTICATION_REQUIRED with no account or routing digits and no payment reference; the same hold with the session still live is served`, "ACH-M-I3-REVOCATION", "revocation", async (ctx) => {
+    await onMovedSessions(`adv1-${ending}`, async () => {
+      const IDLE_MS = 1_800_000;
+      const x = await issuedOrder(`adv1-${ending}`);
+      const session = await bw.iw.w.identity().signIn(x.b.a.billing);
+      const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
+      if (ending === "absolute") {
+        // kept in use (a read every 25 minutes touches it) until the absolute deadline (12 h, immutable) is about 10 minutes ahead: the idle deadline is then bound to it
+        const absolute = (await q<{ at: Date }>("SELECT absolute_expires_at AS at FROM kauro.web_sessions WHERE secret_sha256 = $1", [session.secretSha256]))[0]!.at.getTime();
+        while (absolute - bw.iw.w.processClock.nowMs() > 10 * 60_000 + 1_000) {
+          bw.iw.w.processClock.advance(Math.min(25 * 60_000, absolute - bw.iw.w.processClock.nowMs() - 10 * 60_000));
+          assert.equal(code(await cookieRead()), "200 SUCCESS -", "absolute: the session in use stays live");
+        }
+        const [row] = await q<{ idle: Date; abs: Date }>("SELECT idle_expires_at AS idle, absolute_expires_at AS abs FROM kauro.web_sessions WHERE secret_sha256 = $1", [session.secretSha256]);
+        assert.equal(row!.idle.getTime(), row!.abs.getTime(), "absolute: the idle deadline is bound to the absolute deadline");
+      }
+      // positive control: one second passes while the effect-clock read is held; the session (>= 9 minutes from its deadline) is still live and is served
+      const control = await readHeldAtEffectRead(ctx, `${ending} control`, cookieRead, async () => void bw.iw.w.processClock.advance(1_000));
+      assert.equal(code(control), "200 SUCCESS -", `${ending} control: a session still live at release is served`);
+      const v = control.json<InstructionsView>().instructions;
+      assert.deepEqual([v.accountNumber, v.routingNumber, v.reference], [ACCOUNT_DIGITS, "026073150", x.reference], `${ending} control: the account, the routing number and the reference`);
+      const advanceMs = ending === "idle" ? IDLE_MS + 60_000 : 11 * 60_000;
+      // the revocation is the process clock passing the deadline while the read is held at its effect-clock read; the next request is fenced by it
+      const held = (await ctx.revoked(`session ${ending} deadline passes while a read is held at its effect-clock read`, () => readHeldAtEffectRead(ctx, ending, cookieRead, async () => void bw.iw.w.processClock.advance(advanceMs))))!;
+      assert.equal(code(held), "401 AUTHENTICATION_REQUIRED -", `${ending}: a session that ended between the effect-clock read and the view gets the authentication refusal`);
+      noAccountDigits(held, `${ending} deadline passed after the effect-clock read`);
+      assert.ok(!held.text.includes(x.reference), `${ending}: no payment reference in the held read`);
+      const next = await ctx.fenced(`next request after the ${ending} deadline`, async () => {
+        throw new HeldReadAnswered(await cookieRead());
+      }, (e) => e instanceof HeldReadAnswered);
+      assert.equal(code((next as HeldReadAnswered).reply), "401 AUTHENTICATION_REQUIRED -", `${ending}: the next request is unauthenticated too`);
+    });
+  });
+}
+
+// ADV-3: the I1/I2 read order (instructions.ts, the probe read, the facts and the source deadline, THEN the effect read): a deadline crossed
+// after the probe read and before the effect read is judged at the effect instant. The design (ACH-ROUTE I1/I2 EXPIRY, I2Δ) names no code for
+// a crossing between two reads; the codes are the ones each fact carries: the price expiry QUOTE_EXPIRED (checkout blocker, judged at the
+// effect instant), the source deadline and the transfer window TRANSFER_WINDOW_TOO_SHORT (I2Δ).
+
+/**
+ * One issuance on the step clock: the clock stands at `startMs`, the answer of the issuance's FIRST effect-instant read (the probe) is held, the
+ * clock moves to `crossMs`, the read is released and the issuance goes on (its effect read, then its COMMIT).
+ */
+async function issueHeldAtProbe(ctx: FaultContext, what: string, b: Buyer, r: RouteView, startMs: number, crossMs: number): Promise<Reply> {
+  const conn = await open();
+  try {
+    const label = `probe-${++heldSeq}`;
+    const atProbe = ctx.points.pause(`db.${label}.after`);
+    const running = ctx.operation(what, async (op) => {
+      bw.iw.faults.clock = op.clock;
+      try {
+        ctx.clock.set(startMs);
+        return await on(ctx, conn, () => issue(b, r), [{ label, match: /kauro\.server_now\(\)/, nth: 1 }]);
+      } finally {
+        bw.iw.faults.clock = null;
+      }
+    });
+    const settled = running.then((value) => ({ status: "fulfilled", value }) as const, (reason: unknown) => ({ status: "rejected", reason }) as const);
+    await atProbe.reachedBy(running);
+    ctx.clock.set(crossMs);
+    atProbe.release();
+    return ok(await settled);
+  } finally {
+    await conn.end();
+  }
+}
+
+for (const fact of ["price", "source"] as const) {
+  advCell(`ADV-3 DENY ACH-M-I1-EXPIRY (${fact} deadline crossed between the probe read and the effect read): an issuance whose first effect-instant read is held at source deadline - 5 ms while the clock passes the ${fact} deadline is refused ${fact === "price" ? "QUOTE_EXPIRED (judged at the effect read)" : "TRANSFER_WINDOW_TOO_SHORT"} with nothing issued; the same hold 10 s short of the source deadline issues`, "ACH-M-I1-EXPIRY", "expiry", async (ctx) => {
+    const windowMs = 1;
+    const deadlineOf = (b: Buyer): number => Date.parse(fact === "price" ? b.quote.quote.expiresAt : b.quote.quote.sourceAvailableUntil);
+    // the probe is read just before the source deadline in both cells (the revision is then SEALED at the probe); the price cell moves the clock on past the price expiry
+    const sourceOf = (b: Buyer): number => Date.parse(b.quote.quote.sourceAvailableUntil);
+    const bc = await buyer(`adv3-${fact}-ok`);
+    const rc = await enabled(`adv3-${fact}-ok`, [bc.a.s.agency.agencyId], { windowMs, lifetimeMs: 400 * DAY_MS });
+    assert.ok(sourceOf(bc) < Date.parse(bc.quote.quote.expiresAt), "control fixture: the source deadline precedes the price expiry");
+    const dc = sourceOf(bc);
+    const control = await issueHeldAtProbe(ctx, `${fact} control held 10 s short of the deadline`, bc, rc, dc - 10_005, dc - 10_004);
+    assert.equal(code(control), "201 SUCCESS -", `control: the ${fact} deadline is still ahead at the effect read`);
+    assert.deepEqual(await issuedFootprint(projectOf(bc)), { orders: 1, instructions: 1, accepted: 1, events: ISSUED_EVENTS }, "control: the order and its instructions issued");
+    const b = await buyer(`adv3-${fact}`);
+    const r = await enabled(`adv3-${fact}`, [b.a.s.agency.agencyId], { windowMs, lifetimeMs: 400 * DAY_MS });
+    assert.ok(sourceOf(b) < Date.parse(b.quote.quote.expiresAt), "fixture: the source deadline precedes the price expiry");
+    const boundary = Date.parse(ctx.deadline(deadlineOf(b), `${fact} deadline`));
+    const reply = await issueHeldAtProbe(ctx, `${fact} deadline passes between the probe read and the effect read`, b, r, sourceOf(b) - 5, boundary + 1);
+    assert.equal(code(reply), fact === "price" ? "409 PRECONDITION_FAILED QUOTE_EXPIRED" : "409 PRECONDITION_FAILED TRANSFER_WINDOW_TOO_SHORT", `the ${fact} deadline crossed between the probe and the effect read refuses the issuance`);
+    assert.deepEqual(await issuedFootprint(projectOf(b)), NOTHING_ISSUED, "nothing issued");
+  });
+}
