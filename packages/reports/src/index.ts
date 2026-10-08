@@ -14,3 +14,7 @@ export { buildReportModel, REPORT_MODEL_VERSION } from "./model.js";
 export type { ReportModel, VerifiedReport, PlatformFacts, CountsBinding, Figure, FigureSource, Branding, LegalIssuer, ReportArtifact, ImportStep, ReportInput, ArtifactUse, PrivacyClass } from "./model.js";
 export { ReportModelError, PROBLEM_CODES } from "./problems.js";
 export type { Problem, ProblemCode } from "./problems.js";
+export { renderReportHtml, escapeHtml, LOGO_MAX_BYTES, LOGO_MAX_PIXELS } from "./html.js";
+export type { RenderOptions, RenderedReport, PageSize } from "./html.js";
+export { REPORT_COPY, copyText } from "./copy.js";
+export type { ReportLocale, CopyKey } from "./copy.js";
