@@ -27,7 +27,7 @@ import { connectionPid, crashedAt, openConnection, runCell, SimulatedCrash, type
 import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld } from "./bank-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { agentOf, planOf, quoted, type Agent } from "./integration-support.js";
-import { call, completed, freshKey, outcome, rawEvent, routes, sessionPaths, type Reply } from "./support.js";
+import { call, completed, freshKey, outcome, rawEvent, routes, sessionPaths, type BrowserSession, type Reply } from "./support.js";
 
 let bw: BankWorld;
 before(async () => {
@@ -1894,3 +1894,354 @@ test(`ADV-PV1R-6 DENY ACH-M-I3-REVOCATION (session): a browser session revoked w
     await sessionsWorld.stop();
   }
 });
+
+// === Codex r1 on db5f0e3 (docs/review/pv1-route-codex-r1.json): PV1R-01, PV1R-02, PV1R-03 ========================================
+
+/** One sessions-enabled bank world for the r1 browser cells (KIT opt-in, RR-4), built on first use; the file's helpers run on it while `bw` is swapped. */
+let sessionsBw: BankWorld | null = null;
+after(async () => {
+  await sessionsBw?.stop();
+});
+async function onSessions<T>(fn: () => Promise<T>): Promise<T> {
+  const main = bw;
+  sessionsBw ??= await bankWorld({ sessions: true });
+  bw = sessionsBw;
+  try {
+    return await fn();
+  } finally {
+    bw = main;
+  }
+}
+interface BrowserCall {
+  readonly method?: "GET" | "POST";
+  readonly url: string;
+  readonly body?: unknown;
+  readonly key?: string;
+  readonly agency?: string | null;
+  readonly origin?: string | null;
+  readonly csrf?: string | null;
+  readonly secFetchSite?: string;
+  readonly bearer?: string;
+}
+/** A browser request under session `s`: the cookie, the app Origin and (POST) the session's CSRF token unless withheld; optionally a bearer beside it. */
+function browserCall(s: BrowserSession, c: BrowserCall): Promise<Reply> {
+  const method = c.method ?? "POST";
+  const headers: Record<string, string> = { cookie: s.cookie };
+  const origin = c.origin === undefined ? bw.iw.w.identity().origin : c.origin;
+  if (origin !== null) headers["origin"] = origin;
+  const csrf = c.csrf === undefined ? s.view.csrfToken : c.csrf;
+  if (method === "POST" && csrf !== null) headers["x-kauro-csrf"] = csrf;
+  if (c.secFetchSite !== undefined) headers["sec-fetch-site"] = c.secFetchSite;
+  if (c.bearer !== undefined) headers["authorization"] = `Bearer ${c.bearer}`;
+  return call(bw.iw.w, { method, url: c.url, token: null, agency: c.agency ?? null, key: method === "POST" ? (c.key ?? freshKey("browser")) : null, contentType: method === "POST" ? "application/json" : null, ...(c.body === undefined ? {} : { body: c.body }), headers });
+}
+/** A route's complete command footprint: row (state, rollout, current version), versions, participants, events, outbox records. */
+async function routeFootprint(routeId: string): Promise<Record<string, unknown>> {
+  return {
+    ...(await routeRow(routeId)),
+    participants: await n("SELECT 1 FROM kauro.bank_route_participants WHERE route_id = $1", [routeId]),
+    outbox: await n("SELECT 1 FROM kauro.outbox_records o JOIN kauro.domain_events e ON e.event_id = o.event_id WHERE e.aggregate_id::text = $1", [routeId]),
+  };
+}
+const accountOf = async (routeId: string): Promise<string> => (await q<{ account_ref: string }>("SELECT account_ref FROM kauro.bank_routes WHERE route_id = $1", [routeId]))[0]!.account_ref;
+async function replaceBody(r: RouteView): Promise<{ expectedVersion: number; detailsArtifactRef: string; detailsEvidenceHash: string; authorizationRef: string }> {
+  const d = await detailsArtifact(await accountOf(r.routeId), { accountNumber: "222222222222" });
+  return { expectedVersion: r.routeVersion, detailsArtifactRef: d.artifactRef, detailsEvidenceHash: d.evidenceHash, authorizationRef: await proof() };
+}
+type Footprint = Record<string, unknown>;
+
+/** The five owner POST commands, each prepared with valid state, evidence and a fresh step-up; `after` checks the state a success commits. */
+interface OwnerCommand {
+  readonly name: string;
+  readonly prepare: () => Promise<{ readonly url: string; readonly body: unknown; readonly status: 200 | 201; readonly footprint: () => Promise<Footprint>; readonly after: (fp: Footprint) => void }>;
+}
+const OWNER_COMMANDS: ReadonlyArray<OwnerCommand> = [
+  {
+    name: "CMD201 configure",
+    prepare: async () => {
+      const accountRef = nextAccount("pv1r01-cfg");
+      const footprint = async (): Promise<Footprint> => ({ routes: await routesOf(accountRef), versions: await n("SELECT 1 FROM kauro.bank_route_versions v JOIN kauro.bank_routes r ON r.route_id = v.route_id WHERE r.account_ref = $1", [accountRef]) });
+      return { url: bankRoutes.configure(), body: await configureBody({ accountRef }), status: 201, footprint, after: (fp) => assert.deepEqual(fp, { routes: 1, versions: 1 }) };
+    },
+  },
+  {
+    name: "CMD202 verify",
+    prepare: async () => {
+      const r = await configured("pv1r01-verify");
+      return { url: bankRoutes.verify(r.routeId), body: await verifyBody(r), status: 200, footprint: () => routeFootprint(r.routeId), after: (fp) => assert.equal(fp["state"], "VERIFIED") };
+    },
+  },
+  {
+    name: "CMD203 enable",
+    prepare: async () => {
+      const r = await verified("pv1r01-enable");
+      return { url: bankRoutes.enable(r.routeId), body: await enableBody(r, [bw.iw.w.A.agencyId]), status: 200, footprint: () => routeFootprint(r.routeId), after: (fp) => assert.deepEqual([fp["state"], fp["participants"]], ["ENABLED", 1]) };
+    },
+  },
+  {
+    name: "CMD204 disable",
+    prepare: async () => {
+      const r = await enabled("pv1r01-disable", [bw.iw.w.A.agencyId]);
+      return { url: bankRoutes.disable(r.routeId), body: await disableBody(r), status: 200, footprint: () => routeFootprint(r.routeId), after: (fp) => assert.equal(fp["state"], "VERIFIED") };
+    },
+  },
+  {
+    name: "CMD205 replace-details",
+    prepare: async () => {
+      const r = await configured("pv1r01-details");
+      return { url: bankRoutes.details(r.routeId), body: await replaceBody(r), status: 200, footprint: () => routeFootprint(r.routeId), after: (fp) => assert.deepEqual([fp["state"], fp["current_version"], fp["versions"]], ["PENDING_VERIFICATION", 2, 2]) };
+    },
+  },
+];
+
+for (const command of OWNER_COMMANDS) {
+  test(`PV1R-01 DENY ACH-M-R2-REVOCATION (unsafe cookie request, ${command.name}): without the exact app Origin, with a cross-site or same-site fetch, without or with another session's CSRF token the owner command is refused ORIGIN_REJECTED / CSRF_TOKEN_INVALID, a cookie beside a bearer token AMBIGUOUS_CREDENTIALS, each before any effect or journal reservation; the same key then commits once`, async () => {
+    await onSessions(async () => {
+      const idf = bw.iw.w.identity();
+      const s = await idf.signIn(bw.iw.owner);
+      const other = await idf.signIn(bw.iw.owner);
+      const c = await command.prepare();
+      const key = freshKey("pv1r01");
+      const before = await c.footprint();
+      const refusals: ReadonlyArray<readonly [string, string, BrowserCall]> = [
+        ["no Origin", "403 NOT_AUTHORIZED ORIGIN_REJECTED", { url: c.url, body: c.body, key, origin: null }],
+        ["another origin", "403 NOT_AUTHORIZED ORIGIN_REJECTED", { url: c.url, body: c.body, key, origin: "https://evil.example" }],
+        ["a cross-site fetch", "403 NOT_AUTHORIZED ORIGIN_REJECTED", { url: c.url, body: c.body, key, secFetchSite: "cross-site" }],
+        ["a same-site fetch", "403 NOT_AUTHORIZED ORIGIN_REJECTED", { url: c.url, body: c.body, key, secFetchSite: "same-site" }],
+        ["no CSRF token", "403 NOT_AUTHORIZED CSRF_TOKEN_INVALID", { url: c.url, body: c.body, key, csrf: null }],
+        ["another session's CSRF token", "403 NOT_AUTHORIZED CSRF_TOKEN_INVALID", { url: c.url, body: c.body, key, csrf: other.view.csrfToken }],
+        ["a cookie beside a bearer token", "400 INVALID_REQUEST AMBIGUOUS_CREDENTIALS", { url: c.url, body: c.body, key, bearer: bw.iw.owner.token }],
+      ];
+      for (const [what, expected, request] of refusals) {
+        const reply = await browserCall(s, request);
+        assert.equal(code(reply), expected, `${command.name}: ${what}`);
+        assert.equal(await bw.iw.w.journal(key), null, `${command.name}: ${what} reserves no idempotency key`);
+        assert.deepEqual(await c.footprint(), before, `${command.name}: ${what} leaves the route, version, participant, event and outbox footprint unchanged`);
+      }
+      // positive control: the exact app origin, a same-origin fetch and the session's own token; the same key commits once
+      const accepted = await browserCall(s, { url: c.url, body: c.body, key, secFetchSite: "same-origin" });
+      assert.equal(code(accepted), `${c.status} SUCCESS -`, `${command.name}: the valid browser request is served`);
+      assert.equal((await bw.iw.w.journal(key))?.state, "COMMITTED");
+      c.after(await c.footprint());
+    });
+  });
+}
+
+test(`PV1R-01 DENY ACH-M-I3-REVOCATION (ambiguous credentials on the reads): a session cookie beside a bearer token is AMBIGUOUS_CREDENTIALS on getBankRoute and on the transfer instructions (no account digits, no reference), never an anonymous 401; the cookie alone is served`, async () => {
+  await onSessions(async () => {
+    const idf = bw.iw.w.identity();
+    const x = await issuedOrder("pv1r01-reads");
+    const ownerSession = await idf.signIn(bw.iw.owner);
+    const ambiguousGet = await browserCall(ownerSession, { method: "GET", url: bankRoutes.get(x.r.routeId), bearer: bw.iw.owner.token });
+    assert.equal(code(ambiguousGet), "400 INVALID_REQUEST AMBIGUOUS_CREDENTIALS", "getBankRoute: cookie beside bearer");
+    assert.equal(code(await browserCall(ownerSession, { method: "GET", url: bankRoutes.get(x.r.routeId), origin: null })), "200 SUCCESS -", "getBankRoute: the cookie alone (a safe request needs no Origin)");
+    const member = await idf.signIn(x.b.a.billing);
+    const ambiguousRead = await browserCall(member, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId, bearer: x.b.a.billing.token });
+    assert.equal(code(ambiguousRead), "400 INVALID_REQUEST AMBIGUOUS_CREDENTIALS", "transfer instructions: cookie beside bearer");
+    noAccountDigits(ambiguousRead, "ambiguous credentials");
+    assert.ok(!ambiguousRead.text.includes(x.reference), "ambiguous credentials: no payment reference");
+    const served = await browserCall(member, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
+    assert.equal(code(served), "200 SUCCESS -", "transfer instructions: the cookie alone");
+    assert.equal(served.json<InstructionsView>().instructions.accountNumber, ACCOUNT_DIGITS);
+  });
+});
+
+cell(`PV1R-02 DENY ACH-M-I3-REVOCATION (session ended during the route-lock wait): an instructions read held at the route share lock after its re-authentication, whose session is then revoked through the product or crosses its idle expiry, is refused like the next request with no account or routing digits and no payment reference once the holder releases without changing eligibility; a live session is served`, "race", async (ctx) => {
+  await onSessions(async () => {
+    for (const ending of ["live", "revoked", "expired"] as const) {
+      const x = await issuedOrder(`pv1r02-${ending}`);
+      const idf = bw.iw.w.identity();
+      const session = await idf.signIn(x.b.a.billing);
+      const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
+      assert.equal(code(await cookieRead()), "200 SUCCESS -", `${ending}: served under the live session before the hold`);
+      const holder = await openHolder();
+      const wc = await open();
+      let held: Reply;
+      try {
+        await holder.query("BEGIN");
+        // the route row held FOR NO KEY UPDATE conflicts only with the read's FOR SHARE route guard (repo.lockShare), which the read takes after
+        // its artifact read, its membership decision and its re-authentication (stillAuthenticated): the wait the database shows on this
+        // holder is the post-re-authentication wait
+        await holder.query("SELECT 1 FROM kauro.bank_routes WHERE route_id = $1 FOR NO KEY UPDATE", [x.r.routeId]);
+        const waiting = await ctx.mustWait(bw.iw.h.oracle, { waiter: wc, holder: connectionPid(holder) }, () => on(ctx, wc, cookieRead), `${ending}: the instructions read waits at the route share lock`);
+        if (ending === "revoked") {
+          const revoked = await call(bw.iw.w, { url: sessionPaths.revoke, token: null, agency: null, key: null, headers: { cookie: session.cookie, origin: idf.origin, "x-kauro-csrf": session.view.csrfToken } });
+          assert.equal(revoked.status, 204, `the session is revoked through the product during the wait (${code(revoked)})`);
+        }
+        if (ending === "expired") {
+          const aged = await bw.iw.h.oracle.query("UPDATE kauro.web_sessions SET idle_expires_at = last_seen_at + interval '1 millisecond' WHERE secret_sha256 = $1", [session.secretSha256]);
+          assert.equal(aged.rowCount, 1, "the session row aged through its idle expiry during the wait");
+          await new Promise<void>((resolve) => setTimeout(resolve, 50));
+        }
+        // released without changing the route or the order: only the session changed
+        await holder.query("ROLLBACK");
+        held = ok(await waiting.pending);
+      } finally {
+        await holder.end();
+        await wc.end();
+      }
+      const next = await cookieRead();
+      if (ending === "live") {
+        assert.equal(code(held), "200 SUCCESS -", "live session: the held read is served after the wait");
+        const v = held.json<InstructionsView>().instructions;
+        assert.deepEqual([v.accountNumber, v.routingNumber, v.reference], [ACCOUNT_DIGITS, "026073150", x.reference]);
+        assert.equal(code(next), "200 SUCCESS -");
+        continue;
+      }
+      assert.equal(code(next), "401 AUTHENTICATION_REQUIRED -", `${ending}: the next request is unauthenticated`);
+      assert.equal(code(held), code(next), `${ending}: the held read is refused like the next request`);
+      noAccountDigits(held, `${ending} during the route-lock wait`);
+      assert.ok(!held.text.includes(x.reference), `${ending}: no payment reference in the held read`);
+      assert.equal((await q<{ state: string }>("SELECT state FROM kauro.bank_routes WHERE route_id = $1", [x.r.routeId]))[0]!.state, "ENABLED", `${ending}: eligibility unchanged (route still ENABLED)`);
+    }
+  });
+});
+
+// --- PV1R-03: step-up and details expiry crossed after the command's last freshness decision ---------------------------------------
+
+/** The step-up proof's expiry (assurance_proofs.expires_at) of a body's authorizationRef. */
+const proofExpiry = async (body: { readonly authorizationRef: string }): Promise<number> => (await q<{ at: Date }>("SELECT expires_at AS at FROM kauro.assurance_proofs WHERE proof_id::text = $1", [body.authorizationRef]))[0]!.at.getTime();
+/**
+ * Runs `command` on the cell's step clock at `startMs`, holds it at `uow.before-commit` (its handler returned, immediately before COMMIT),
+ * moves the clock to `crossMs`, releases it and returns its answer.
+ */
+async function heldBeforeCommit(ctx: FaultContext, what: string, startMs: number, crossMs: number, command: () => Promise<Reply>): Promise<Reply> {
+  const conn = await open();
+  try {
+    ctx.clock.set(startMs);
+    const pause = ctx.points.pause("uow.before-commit");
+    const running = ctx.operation(what, async (op) => {
+      bw.iw.faults.clock = op.clock;
+      try {
+        return await on(ctx, conn, command);
+      } finally {
+        bw.iw.faults.clock = null;
+      }
+    });
+    const settled = running.then((value) => ({ status: "fulfilled", value }) as const, (reason: unknown) => ({ status: "rejected", reason }) as const);
+    await pause.reachedBy(running);
+    ctx.clock.set(crossMs);
+    pause.release();
+    return ok(await settled);
+  } finally {
+    await conn.end();
+  }
+}
+/** Runs enable on the step clock at `startMs`; its details evidence read is held while the clock moves to `crossMs` (2 ms, inside the read bound). */
+async function enableHeldAtEvidenceRead(ctx: FaultContext, r: RouteView, body: unknown, startMs: number, crossMs: number): Promise<Reply> {
+  const ref = await detailsRefOf(r.routeId);
+  return ctx.operation("enable whose evidence read is held across the instant", async (op) => {
+    bw.iw.faults.clock = op.clock;
+    try {
+      ctx.clock.set(startMs);
+      return await withStoreHook(ref, async () => void ctx.clock.set(crossMs), () => owner(bankRoutes.enable(r.routeId), body));
+    } finally {
+      bw.iw.faults.clock = null;
+    }
+  });
+}
+const detailsSoon = (): string => new Date(Date.now() + 5 * 60_000).toISOString();
+async function validUntilOf(routeId: string): Promise<number> {
+  const ref = await detailsRefOf(routeId);
+  return Date.parse((JSON.parse(new TextDecoder().decode((await bw.evidence.get(ref))!.bytes)) as { details: { validUntil: string } }).details.validUntil);
+}
+
+cell(`PV1R-03 DENY ACH-M-R2-EXPIRY (step-up expires during the enable evidence read): an enable whose clock and assurance check precede its details read, held at that read while the step-up crosses its expiry and released inside the read bound, is refused STEP_UP_STALE with no enabling footprint; the same hold short of the expiry enables`, "expiry", async (ctx) => {
+  // positive control first (the clock never moves backwards: the case's proof is issued after the control's)
+  const rc = await verified("pv1r03-read-proof-ok");
+  const bc = await enableBody(rc, [bw.iw.w.A.agencyId]);
+  const ec = await proofExpiry(bc);
+  assert.equal(code(await enableHeldAtEvidenceRead(ctx, rc, bc, ec - 3, ec - 1)), "200 SUCCESS -", "control: the proof is still fresh after the held read");
+  const r = await verified("pv1r03-read-proof");
+  const body = await enableBody(r, [bw.iw.w.A.agencyId]);
+  const before = await routeFootprint(r.routeId);
+  const boundary = Date.parse(ctx.deadline(await proofExpiry(body), "step-up proof expiry"));
+  const reply = await enableHeldAtEvidenceRead(ctx, r, body, boundary - 1, boundary + 1);
+  assert.equal(code(reply), "403 ASSURANCE_REQUIRED STEP_UP_STALE", "a proof stale once the evidence read returns refuses the enable");
+  assert.deepEqual(await routeFootprint(r.routeId), before, "no enabling footprint (state VERIFIED, no participants, no enabled event or outbox)");
+});
+
+cell(`PV1R-03 DENY ACH-M-R1-EXPIRY (details expire during the enable evidence read): an enable held at its details read while the details validity passes, released inside the read bound, is refused DETAILS_EXPIRED (not judged at the pre-read instant) with no enabling footprint; the same hold short of the validity enables`, "expiry", async (ctx) => {
+  const rc = await verified("pv1r03-read-details-ok", { validUntil: detailsSoon() });
+  const vc = await validUntilOf(rc.routeId);
+  assert.equal(code(await enableHeldAtEvidenceRead(ctx, rc, await enableBody(rc, [bw.iw.w.A.agencyId]), vc - 3, vc - 1)), "200 SUCCESS -", "control: the details are still valid after the held read");
+  const r = await verified("pv1r03-read-details", { validUntil: detailsSoon() });
+  const body = await enableBody(r, [bw.iw.w.A.agencyId]);
+  const validUntil = await validUntilOf(r.routeId);
+  assert.ok(validUntil < (await proofExpiry(body)), "details-only case: the step-up outlives the details");
+  const before = await routeFootprint(r.routeId);
+  const boundary = Date.parse(ctx.deadline(validUntil, "details validity"));
+  const reply = await enableHeldAtEvidenceRead(ctx, r, body, boundary - 1, boundary + 1);
+  assert.equal(code(reply), "409 PRECONDITION_FAILED DETAILS_EXPIRED", "details expired at the effect refuse the enable");
+  assert.deepEqual(await routeFootprint(r.routeId), before, "no enabling footprint");
+});
+
+/** The four step-up commands at their COMMIT boundary: a prepared route and body. */
+interface AtCommit {
+  readonly name: string;
+  readonly prepare: (label: string, cfg?: Partial<Cfg>) => Promise<{ readonly r: RouteView; readonly body: { readonly authorizationRef: string }; readonly url: string }>;
+}
+const AT_COMMIT: ReadonlyArray<AtCommit> = [
+  {
+    name: "verify",
+    prepare: async (label, cfg = {}) => {
+      const r = await configured(label, cfg);
+      return { r, body: await verifyBody(r), url: bankRoutes.verify(r.routeId) };
+    },
+  },
+  {
+    name: "enable",
+    prepare: async (label, cfg = {}) => {
+      const r = await verified(label, cfg);
+      return { r, body: await enableBody(r, [bw.iw.w.A.agencyId]), url: bankRoutes.enable(r.routeId) };
+    },
+  },
+  {
+    name: "disable",
+    prepare: async (label, cfg = {}) => {
+      const r = await enabled(label, [bw.iw.w.A.agencyId], cfg);
+      return { r, body: await disableBody(r), url: bankRoutes.disable(r.routeId) };
+    },
+  },
+  {
+    name: "replace-details",
+    prepare: async (label, cfg = {}) => {
+      const r = await configured(label, cfg);
+      return { r, body: await replaceBody(r), url: bankRoutes.details(r.routeId) };
+    },
+  },
+];
+
+for (const c of AT_COMMIT) {
+  cell(`PV1R-03 DENY ACH-M-R2-EXPIRY (step-up expires before COMMIT, ${c.name}): the ${c.name} command held immediately before its COMMIT while its step-up crosses its expiry is refused STEP_UP_STALE, leaving route, version, participant, event and outbox state unchanged and no COMMITTED journal; the same hold short of the expiry commits`, "expiry", async (ctx) => {
+    const control = await c.prepare(`pv1r03-commit-${c.name}-ok`);
+    const ce = await proofExpiry(control.body);
+    assert.equal(code(await heldBeforeCommit(ctx, `${c.name} held before COMMIT short of the expiry`, ce - 3, ce - 1, () => owner(control.url, control.body))), "200 SUCCESS -", `control: ${c.name} commits with a proof fresh at COMMIT`);
+    const x = await c.prepare(`pv1r03-commit-${c.name}`);
+    const key = freshKey(`pv1r03-${c.name}`);
+    const before = await routeFootprint(x.r.routeId);
+    const boundary = Date.parse(ctx.deadline(await proofExpiry(x.body), "step-up proof expiry"));
+    const reply = await heldBeforeCommit(ctx, `${c.name} held before COMMIT across the expiry`, boundary - 1, boundary + 1, () => owner(x.url, x.body, { key }));
+    assert.equal(code(reply), "403 ASSURANCE_REQUIRED STEP_UP_STALE", `${c.name}: a proof expired at COMMIT refuses the effect`);
+    assert.deepEqual(await routeFootprint(x.r.routeId), before, `${c.name}: route, version, participant, event and outbox state unchanged`);
+    assert.equal(await bw.iw.w.journal(key), null, `${c.name}: no journal entry, COMMITTED or otherwise`);
+  });
+}
+
+for (const c of AT_COMMIT.filter((x) => x.name === "verify" || x.name === "enable")) {
+  cell(`PV1R-03 DENY ACH-M-R1-EXPIRY (details expire before COMMIT, ${c.name}): the ${c.name} command held immediately before its COMMIT while the details validity passes (the step-up still fresh) is refused DETAILS_EXPIRED with no footprint and no COMMITTED journal; the same hold short of the validity commits`, "expiry", async (ctx) => {
+    const control = await c.prepare(`pv1r03-dcommit-${c.name}-ok`, { validUntil: detailsSoon() });
+    const cv = await validUntilOf(control.r.routeId);
+    assert.equal(code(await heldBeforeCommit(ctx, `${c.name} held before COMMIT short of the validity`, cv - 3, cv - 1, () => owner(control.url, control.body))), "200 SUCCESS -", `control: ${c.name} commits with details valid at COMMIT`);
+    const x = await c.prepare(`pv1r03-dcommit-${c.name}`, { validUntil: detailsSoon() });
+    const validUntil = await validUntilOf(x.r.routeId);
+    assert.ok(validUntil < (await proofExpiry(x.body)), "details-only case: the step-up outlives the details");
+    const key = freshKey(`pv1r03-d-${c.name}`);
+    const before = await routeFootprint(x.r.routeId);
+    const boundary = Date.parse(ctx.deadline(validUntil, "details validity"));
+    const reply = await heldBeforeCommit(ctx, `${c.name} held before COMMIT across the details validity`, boundary - 1, boundary + 1, () => owner(x.url, x.body, { key }));
+    assert.equal(code(reply), "409 PRECONDITION_FAILED DETAILS_EXPIRED", `${c.name}: details expired at COMMIT refuse the effect`);
+    assert.deepEqual(await routeFootprint(x.r.routeId), before, `${c.name}: no footprint`);
+    assert.equal(await bw.iw.w.journal(key), null, `${c.name}: no journal entry`);
+  });
+}

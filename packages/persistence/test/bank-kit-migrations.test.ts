@@ -116,16 +116,134 @@ test("the vocabulary table mirrors every closed domain list exactly (BANK_RAILS 
   assert.deepEqual(rows.rows, expected);
 });
 
-test("the CHECK lists of the tables are the same vocabulary (attempt kinds, states, offer commands, gate outcomes, case kinds, correlations)", async () => {
-  const defs = await oracle.query<{ def: string }>(
-    `SELECT pg_get_constraintdef(c.oid) AS def FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = t.relnamespace
-      WHERE n.nspname = 'kauro' AND t.relname = ANY($1) AND c.contype = 'c'`,
-    [NEW_TABLES],
+// PV1R-04 (Codex r1 on db5f0e3): the conformance is per COLUMN and EXACT. Every single-column enumerated CHECK (`col IN (...)`, rendered
+// by pg_get_constraintdef as `col = ANY (ARRAY[...])`) of the KIT tables is parsed on its own and its permitted set compared with the
+// column's intended set (a domain list, or the explicitly limited subset the design fixes); an enumerated CHECK of a column not mapped
+// here, or a mapped column without exactly one, is a gap too. The mutation self-test proves the comparison sees an added foreign token
+// and a removed legitimate token whose literal still occurs in another table's CHECK (the blindness of the former global token search).
+const ENVIRONMENTS = ["SANDBOX", "LIVE"] as const;
+/** The source-freeze reasons: the two BANK_CASE_KINDS a freeze is opened for (a limited subset, not the whole list). */
+const FREEZE_REASONS = ["UNDECLARED_OUTBOUND", "REFUND_TERMINAL_CONTRADICTED"] as const;
+const ENUM_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>> = {
+  "outbound_execution_attempts.environment": ENVIRONMENTS,
+  "outbound_execution_attempts.kind": EXECUTION_ATTEMPT_KINDS,
+  "outbound_execution_attempts.state": EXECUTION_ATTEMPT_STATES,
+  "outbound_execution_attempts.source_kind": EXECUTION_SOURCE_KINDS,
+  "outbound_execution_attempts.destination_proof": DESTINATION_PROOFS,
+  "outbound_execution_attempts.currency": ["USD"],
+  "refund_destinations.environment": ENVIRONMENTS,
+  "refund_destinations.source_kind": EXECUTION_SOURCE_KINDS,
+  "execution_offers.command": EXECUTION_OFFER_COMMANDS,
+  "execution_offer_outcomes.gate_outcome": EXECUTION_GATE_OUTCOMES,
+  "execution_offer_outcomes.footprint": ["RECORDED", "REVIEW"],
+  "execution_offer_outcomes.review_case_kind": BANK_CASE_KINDS,
+  "statement_imports.environment": ENVIRONMENTS,
+  "statement_coverage.stream": COVERAGE_STREAMS,
+  "statement_lines.environment": ENVIRONMENTS,
+  "statement_lines.line_kind": STATEMENT_LINE_KINDS,
+  "execution_correlations.correlation": DEBIT_CORRELATIONS,
+  "bank_source_freezes.environment": ENVIRONMENTS,
+  "bank_source_freezes.source_kind": EXECUTION_SOURCE_KINDS,
+  "bank_source_freezes.reason": FREEZE_REASONS,
+  "bank_review_cases.kind": BANK_CASE_KINDS,
+  "bank_review_cases.state": ["OPEN", "RESOLVED"],
+  "bank_review_cases.environment": ENVIRONMENTS,
+  "bank_review_cases.source_kind": EXECUTION_SOURCE_KINDS,
+};
+
+interface EnumCheck {
+  readonly table: string;
+  readonly column: string;
+  readonly name: string;
+  readonly values: ReadonlyArray<string>;
+}
+const ENUM_DEF = /^CHECK \(\(\(?([a-z_]+)\)? = ANY \(\(?ARRAY\[(.*)\]\)?(?:::text\[\])?\)\)\)$/;
+/** A one-value enumeration (`col IN ('USD')`) is rendered as an equality. */
+const SINGLE_DEF = /^CHECK \(\(\(?([a-z_]+)\)? = ('(?:[^']|'')*'::text)\)\)$/;
+/** Each single-column enumerated CHECK of `schema`'s KIT tables, parsed on its own (no concatenation across constraints). */
+async function enumChecks(client: Client, schema: string): Promise<EnumCheck[]> {
+  const rows = await client.query<{ table: string; column: string; name: string; def: string }>(
+    `SELECT t.relname AS table, a.attname AS column, c.conname AS name, pg_get_constraintdef(c.oid) AS def
+       FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = t.relnamespace
+       JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = c.conkey[1]
+      WHERE n.nspname = $1 AND t.relname = ANY($2) AND c.contype = 'c' AND cardinality(c.conkey) = 1 ORDER BY 1, 2, 3`,
+    [schema, NEW_TABLES],
   );
-  const text = defs.rows.map((r) => r.def).join("\n");
-  for (const list of [EXECUTION_ATTEMPT_KINDS, EXECUTION_ATTEMPT_STATES, EXECUTION_SOURCE_KINDS, EXECUTION_OFFER_COMMANDS, EXECUTION_GATE_OUTCOMES, DEBIT_CORRELATIONS, BANK_CASE_KINDS, STATEMENT_LINE_KINDS, COVERAGE_STREAMS, DESTINATION_PROOFS]) {
-    // pg_get_constraintdef renders IN (...) as = ANY (ARRAY[...::text]); every member of the list appears in some CHECK, and no CHECK lists a stranger
-    for (const v of list) assert.ok(text.includes(`'${v}'`), `${v} appears in a CHECK`);
+  const out: EnumCheck[] = [];
+  for (const r of rows.rows) {
+    const m = ENUM_DEF.exec(r.def) ?? SINGLE_DEF.exec(r.def);
+    if (m === null) {
+      // a single-column CHECK that is not an enumeration (a pattern, a range) is not vocabulary; an unparsed one naming literals is a gap
+      if (/= ANY|= '/.test(r.def)) out.push({ table: r.table, column: r.column, name: r.name, values: [`UNPARSED:${r.def}`] });
+      continue;
+    }
+    assert.equal(m[1], r.column, `${r.table}.${r.name} constrains its own column`);
+    out.push({ table: r.table, column: r.column, name: r.name, values: [...m[2]!.matchAll(/'((?:[^']|'')*)'::text/g)].map((x) => x[1]!.replace(/''/g, "'")) });
+  }
+  return out;
+}
+/** Every difference between `schema`'s enumerated CHECKs and ENUM_COLUMNS: per column, exact set, duplicates, unmapped and missing columns. */
+async function vocabularyGaps(client: Client, schema: string): Promise<string[]> {
+  const gaps: string[] = [];
+  const seen = new Map<string, number>();
+  for (const c of await enumChecks(client, schema)) {
+    const key = `${c.table}.${c.column}`;
+    seen.set(key, (seen.get(key) ?? 0) + 1);
+    const intended = ENUM_COLUMNS[key];
+    if (intended === undefined) {
+      gaps.push(`${key}: an enumerated CHECK (${c.name}) of a column with no intended set`);
+      continue;
+    }
+    const got = new Set(c.values);
+    const extra = [...got].filter((v) => !intended.includes(v)).sort();
+    const missing = intended.filter((v) => !got.has(v)).sort();
+    if (extra.length > 0) gaps.push(`${key}: permits foreign ${JSON.stringify(extra)}`);
+    if (missing.length > 0) gaps.push(`${key}: omits ${JSON.stringify(missing)}`);
+    if (got.size !== c.values.length) gaps.push(`${key}: lists a value twice`);
+  }
+  for (const key of Object.keys(ENUM_COLUMNS)) if (seen.get(key) !== 1) gaps.push(`${key}: ${seen.get(key) ?? 0} enumerated CHECKs (exactly 1 expected)`);
+  return gaps;
+}
+
+test("PV1R-04 the CHECK lists of the tables are the same vocabulary, column by column and exactly (attempt kinds, states, offer commands, gate outcomes, case kinds, correlations, the freeze-reason subset)", async () => {
+  assert.ok(FREEZE_REASONS.every((r) => (BANK_CASE_KINDS as ReadonlyArray<string>).includes(r)), "the freeze reasons are case kinds");
+  assert.deepEqual(await vocabularyGaps(oracle, "kauro"), [], "every enumerated column permits exactly its intended set");
+});
+
+test("PV1R-04 mutation self-test: an added foreign token or a removed legitimate token in any one enumerated CHECK is detected, even when the removed token still occurs in another table's CHECK", async () => {
+  const scratch = "pv1r04_scratch";
+  await oracle.query(`DROP SCHEMA IF EXISTS ${scratch} CASCADE`);
+  await oracle.query(`CREATE SCHEMA ${scratch}`);
+  try {
+    for (const t of NEW_TABLES) await oracle.query(`CREATE TABLE ${scratch}.${t} (LIKE kauro.${t} INCLUDING CONSTRAINTS)`);
+    assert.deepEqual(await vocabularyGaps(oracle, scratch), [], "the scratch copy conforms before any mutation");
+    const checks = await enumChecks(oracle, scratch);
+    assert.equal(checks.length, Object.keys(ENUM_COLUMNS).length, "every mapped column has its CHECK in the copy");
+    const rewrite = async (c: EnumCheck, values: ReadonlyArray<string>): Promise<string[]> => {
+      await oracle.query("BEGIN");
+      try {
+        await oracle.query(`ALTER TABLE ${scratch}.${c.table} DROP CONSTRAINT ${c.name}`);
+        await oracle.query(`ALTER TABLE ${scratch}.${c.table} ADD CONSTRAINT ${c.name} CHECK (${c.column} IN (${values.map((v) => `'${v}'`).join(", ")}))`);
+        return await vocabularyGaps(oracle, scratch);
+      } finally {
+        await oracle.query("ROLLBACK");
+      }
+    };
+    let maskedRemovals = 0;
+    for (const c of checks) {
+      const key = `${c.table}.${c.column}`;
+      assert.deepEqual(await rewrite(c, [...c.values, "BOGUS"]), [`${key}: permits foreign ["BOGUS"]`], `${key}: an added foreign token is detected`);
+      for (const removed of c.values) {
+        const kept = c.values.filter((v) => v !== removed);
+        if (kept.length === 0) continue;
+        const elsewhere = checks.some((o) => o !== c && o.values.includes(removed));
+        if (elsewhere) maskedRemovals += 1;
+        assert.deepEqual(await rewrite(c, kept), [`${key}: omits ${JSON.stringify([removed])}`], `${key}: removing ${removed} is detected${elsewhere ? " although it still occurs in another CHECK" : ""}`);
+      }
+    }
+    assert.ok(maskedRemovals > 0, "at least one removal was of a token another CHECK still lists (the masked case)");
+  } finally {
+    await oracle.query(`DROP SCHEMA IF EXISTS ${scratch} CASCADE`);
   }
 });
 
