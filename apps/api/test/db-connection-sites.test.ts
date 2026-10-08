@@ -55,7 +55,7 @@ const SITE_FORMS: ReadonlyArray<RegExp> = [
   // DB-TLS-R2: persistence's exported KauroPool opens connections too: its constructor, a value import or re-export of it (aliased or not)
   /\b(?:import|export)\s+(?!type\b)\{[^}]*(?<!type\s)\bKauroPool\b[^}]*\}\s*from\b/,
   // ADV-1 (e692ba2): KauroPool taken by destructuring (a dynamic import, a require, a namespace object), as a namespace member, or persistence loaded at run time
-  /\{[^}]*\bKauroPool\b[^}]*\}\s*=(?!=)/,
+  /(?<!:[ \t]*)\{[^{}\n]*\bKauroPool\b[^{}\n]*\}[ \t]*=(?!=)/,
   /[\w$)\]]\s*\.\s*KauroPool\b/,
   /(?:\brequire\(\s*|\bimport\(\s*)["']@kauro\/persistence["']/,
   /\bimport\s+(?!type\b)\{[^}]*(?<!type\s)\b(?:Pool|Client)\b[^}]*\}\s*from\s*["']pg["']/,
@@ -73,6 +73,16 @@ const SITE_FORMS: ReadonlyArray<RegExp> = [
 
 /** The constructors only: a persistence file that holds one must derive ssl from sslOptionsOf; one without is a re-export. */
 const CONSTRUCTS = /\bnew\s+(?:[\w$]+\s*\.\s*)*(?:Pool|Client)\s*\(/;
+
+/** ADV-3 (a88da2e): KauroPool is constructed in pool.ts (createPool) only; a persistence wrapper elsewhere would hand apps a pool whose callers are not sites. */
+const CONSTRUCTS_KAURO_POOL = /\bnew\s+(?:[\w$]+\s*\.\s*)*KauroPool\s*\(/;
+
+function persistenceProblem(rel: string, text: string): string | undefined {
+  const c = code(text);
+  if (CONSTRUCTS.test(c) && !text.includes("sslOptionsOf(")) return `${rel} derives ssl from sslOptionsOf`;
+  if (CONSTRUCTS_KAURO_POOL.test(c) && rel !== "packages/persistence/src/pool.ts") return `${rel} constructs KauroPool outside pool.ts`;
+  return undefined;
+}
 
 /** TLS settings are written in tls.ts and nowhere else: `ssl:` only as `ssl: sslOptionsOf(`, no identity-check override. */
 const TLS_FORMS: ReadonlyArray<RegExp> = [
@@ -127,7 +137,10 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
     "persistence imported at run time": 'const m = await import("@kauro/persistence");',
   };
   for (const [name, text] of Object.entries(forms)) assert.ok(isSite(text), `not caught: ${name}`);
-  for (const text of ['import type { PoolClient } from "pg";', 'import { type Client } from "pg";', "// new Pool(\nexport const a = 1;", 'export type { Pool } from "pg";', 'import type { KauroPool } from "@kauro/persistence";', 'import { type KauroPool } from "@kauro/persistence";', 'export const superuser = "postgres";']) assert.ok(!isSite(text), text);
+  for (const text of ['import type { PoolClient } from "pg";', 'import { type Client } from "pg";', "// new Pool(\nexport const a = 1;", 'export type { Pool } from "pg";', 'import type { KauroPool } from "@kauro/persistence";', 'import { type KauroPool } from "@kauro/persistence";', 'export const superuser = "postgres";', 'function f(): KauroPool {\n  return x;\n}\nconst { a, b } = y;', 'function f({ pool }: { pool: KauroPool } = d) {}']) assert.ok(!isSite(text), text);
+  // ADV-3 (a88da2e): a persistence file other than pool.ts that constructs KauroPool is refused; pool.ts may
+  assert.equal(persistenceProblem("packages/persistence/src/wrap.ts", 'import { KauroPool } from "./pool.js";\nexport const p = (c) => new KauroPool(c);'), "packages/persistence/src/wrap.ts constructs KauroPool outside pool.ts");
+  assert.equal(persistenceProblem("packages/persistence/src/pool.ts", "export function createPool(config) {\n  return new KauroPool(config);\n}"), undefined);
   const files = Object.fromEntries(["a.ts", "b.js", "c.mjs", "d.cjs"].map((n) => [`apps/x/src/${n}`, forms["new pg.Pool("] ?? ""]));
   const repo = tempRepo(files);
   try {
@@ -207,7 +220,8 @@ test("every connection site of apps/ and packages/*/src is known, and each compo
       assert.ok(!SITE_FORMS.filter((f) => !f.test("createRequire")).some((f) => f.test(code(text))), `${rel} opens no database connection`);
     } else if (rel.startsWith("packages/persistence/src/")) {
       // by content: a file that constructs a Pool or Client derives ssl from sslOptionsOf; a file that does not only re-exports
-      if (CONSTRUCTS.test(code(text))) assert.ok(text.includes("sslOptionsOf("), `${rel} derives ssl from sslOptionsOf`);
+      const problem = persistenceProblem(rel, text);
+      assert.equal(problem, undefined, problem);
     } else {
       assert.ok(text.includes("connectionSecurityOf("), `${rel} applies connectionSecurityOf before it connects`);
     }
