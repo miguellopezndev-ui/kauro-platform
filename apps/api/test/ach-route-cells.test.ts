@@ -2952,17 +2952,19 @@ async function sessionStampsOf(session: BrowserSession): Promise<SessionStamps> 
 }
 
 /** An instructions read holds the session row at its effect-clock read; `during` starts the logout (it must wait on the row) and moves the process clock by `moveMs`. */
-async function logoutBehindHeldRead(ctx: FaultContext, label: string, moveMs: number): Promise<{ readonly held: Reply; readonly standing: string | null; readonly movedTo: number; readonly session: BrowserSession; readonly done: Reply }> {
+async function logoutBehindHeldRead(ctx: FaultContext, label: string, moveMs: number, via: "logout" | "replace" = "logout"): Promise<{ readonly held: Reply; readonly standing: string | null; readonly movedTo: number; readonly session: BrowserSession; readonly done: Reply }> {
   const x = await issuedOrder(label);
   const session = await bw.iw.w.identity().signIn(x.b.a.billing);
   const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
   const clock = bw.iw.w.processClock;
   clock.advance(61_000); // a touch is due: the held read renews the session at its lock
+  const replacement = via === "replace" ? await bw.iw.w.identity().freshToken(x.b.a.billing) : null;
+  const trigger = (): Promise<Reply> => (replacement === null ? revokeThroughProduct(session) : call(bw.iw.w, { url: sessionPaths.open, token: null, key: null, agency: null, body: { idToken: replacement }, headers: { cookie: session.cookie, origin: bw.iw.w.identity().origin } }));
   let revocation: Promise<PromiseSettledResult<Reply>> | null = null;
   let standing: string | null = null;
   let movedTo = 0;
   const held = await readHeldAtEffectRead(ctx, label, cookieRead, async () => {
-    revocation = settle(revokeThroughProduct(session));
+    revocation = settle(trigger());
     standing = await revocationStanding(session);
     clock.advance(moveMs);
     movedTo = clock.nowMs();
@@ -3026,5 +3028,101 @@ cell(`ADV-2 r6 DENY ACH-M-I2-REVOCATION (CMD028 replay judged under the session 
     assert.ok(!replay.text.includes(reference), "no transfer reference in the replay's body");
     assert.equal(code(await nextRefused(ctx, "the next replay", issueCall)), "401 AUTHENTICATION_REQUIRED -", "the next replay is refused too");
     assert.ok(reached, "the replay took a session lock after its authentication");
+  });
+});
+
+// === coordinator items A, B on f50fd41: the step-up and the replaced-session revoke are rule-16 writers of the session too ================
+
+/**
+ * A step-up request of a fresh session whose recording transaction (the request's SECOND session transaction; the first is its authentication)
+ * meets the session row held by another transaction. Once blocked, the process clock moves by `moveMs` and the holder takes effect: it
+ * commits the row unchanged, or revokes the session, before the row is released.
+ */
+async function stepUpBlocked(moveMs: number, effect: "unchanged" | "revoke"): Promise<{ readonly reply: Reply; readonly effectMs: number; readonly proofs: ReadonlyArray<number>; readonly before: number; readonly reached: boolean }> {
+  const clock = bw.iw.w.processClock;
+  const person = bw.iw.owner;
+  const session = await bw.iw.w.identity().signIn(person);
+  const token = await bw.iw.w.identity().freshToken(person);
+  const userId = session.view.userId;
+  const stamps = async (): Promise<number[]> => (await q<{ created_at: Date }>("SELECT created_at FROM kauro.assurance_proofs WHERE user_id = $1 AND kind = 'STEP_UP' ORDER BY created_at", [userId])).map((r) => r.created_at.getTime());
+  const before = (await stamps()).length;
+  let effectMs = 0;
+  let crossing: Promise<Error | null> = Promise.resolve(null);
+  const { out, reached } = await withNthSessionTransaction(
+    2,
+    async () => {
+      const holder = await openHolder();
+      await holder.query("BEGIN");
+      await holder.query("SELECT 1 FROM kauro.web_sessions WHERE secret_sha256 = $1 FOR UPDATE", [session.secretSha256]);
+      crossing = (async (): Promise<Error | null> => {
+        try {
+          assert.ok(await blockedBehind(connectionPid(holder)), "the step-up's session statement is observed blocked on the held session row");
+          clock.advance(moveMs);
+          effectMs = clock.nowMs();
+          if (effect === "revoke") await holder.query("UPDATE kauro.web_sessions SET revoked_at = $2::timestamptz, revoke_reason = 'LOGOUT' WHERE secret_sha256 = $1", [session.secretSha256, new Date(effectMs).toISOString()]);
+          return null;
+        } finally {
+          await holder.query("COMMIT");
+          await holder.end();
+        }
+      })().catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    },
+    () => browserCall(session, { url: sessionPaths.stepUp, body: { idToken: token } }),
+  );
+  const failed = await crossing;
+  if (failed !== null) throw failed;
+  return { reply: out, effectMs, proofs: await stamps(), before, reached };
+}
+
+test("A r6 DENY ACH-M-R2-REVOCATION (step-up recorded at an instant read after the session row lock): a step-up whose recording waits on the session row held by another transaction, the process clock moving on while it waits, records its proof at an instant read after the lock was granted: created_at is not before the instant the row was released", async () => {
+  await onMovedSessions("adv-a-instant", async () => {
+    const r = await stepUpBlocked(5_000, "unchanged");
+    assert.equal(code(r.reply), "201 SUCCESS -", "the step-up of a live session is recorded");
+    assert.ok(r.reached, "the recording took a session transaction after the authentication");
+    assert.equal(r.proofs.length, r.before + 1, "one proof recorded");
+    const at = r.proofs[r.proofs.length - 1]!;
+    assert.ok(at >= r.effectMs, `the proof's created_at (${at}) is read after the wait on the row, not before it (the clock stood at ${r.effectMs} when the row was released)`);
+  });
+});
+
+test("A r6 DENY ACH-M-R2-EXPIRY (idle deadline passes while the step-up waits on the session row): the step-up is refused 401 AUTHENTICATION_REQUIRED and records no proof", async () => {
+  await onMovedSessions("adv-a-idle", async () => {
+    const r = await stepUpBlocked(31 * 60_000, "unchanged");
+    assert.equal(code(r.reply), "401 AUTHENTICATION_REQUIRED -", "a session past its idle deadline at the post-lock instant records no step-up");
+    assert.equal(r.proofs.length, r.before, "no step-up proof recorded");
+    assert.ok(r.reached);
+  });
+});
+
+test("A r6 DENY ACH-M-R2-REVOCATION (revocation commits while the step-up waits on the session row): the step-up is refused 401 AUTHENTICATION_REQUIRED and records no proof", async () => {
+  await onMovedSessions("adv-a-revoke", async () => {
+    const r = await stepUpBlocked(1_000, "revoke");
+    assert.equal(code(r.reply), "401 AUTHENTICATION_REQUIRED -", "a session revoked during the wait records no step-up");
+    assert.equal(r.proofs.length, r.before, "no step-up proof recorded");
+    assert.ok(r.reached);
+  });
+});
+
+cell(`B r6 DENY ACH-M-I3-REVOCATION (replaced session revoked at an instant read after the row lock wait): a sign-in that replaces a session whose row is held by a guarded read, the process clock moving on while it waits, revokes the old session at an instant read after its lock was granted: revoked_at is not before the read's touch nor before the instant the row was released`, "revocation", async (ctx) => {
+  await onMovedSessions("advb-instant", async () => {
+    const r = await logoutBehindHeldRead(ctx, "advb-instant", 5_000, "replace");
+    assert.equal(r.standing, "WAITING", "the replacing sign-in waits on the old session row the read holds");
+    assert.equal(r.done.status, 201, `the sign-in opens its session (${code(r.done)})`);
+    const stamps = await sessionStampsOf(r.session);
+    assert.ok(stamps.revokedAt !== null, "the replaced session is revoked");
+    assert.ok(stamps.revokedAt! >= stamps.lastSeen, `revoked_at (${stamps.revokedAt}) is not before the touch (${stamps.lastSeen})`);
+    assert.ok(stamps.revokedAt! >= r.movedTo, `revoked_at (${stamps.revokedAt}) is read after the wait on the row (the clock stood at ${r.movedTo} when it was released)`);
+  });
+});
+
+cell(`B r6 DENY ACH-M-I3-REVOCATION (idle deadline of the replaced session passes while the sign-in waits on its row): the old session is ENDED, not revoked: no revoked_at, no SESSION_REVOKE fact; the sign-in still opens its session`, "revocation", async (ctx) => {
+  await onMovedSessions("advb-ended", async () => {
+    const r = await logoutBehindHeldRead(ctx, "advb-ended", 31 * 60_000, "replace");
+    assert.equal(r.standing, "WAITING", "the replacing sign-in waits on the old session row the read holds");
+    assert.equal(r.done.status, 201, `the sign-in opens its session (${code(r.done)})`);
+    const stamps = await sessionStampsOf(r.session);
+    assert.equal(stamps.revokedAt, null, "an expired session is ended, not revoked");
+    const facts = await q<{ outcome: string }>("SELECT outcome FROM kauro.security_events WHERE action = 'SESSION_REVOKE' AND actor_id = $1", [r.session.view.userId]);
+    assert.deepEqual(facts, [], "no revocation fact for a session that ended before the revoking instant");
   });
 });
