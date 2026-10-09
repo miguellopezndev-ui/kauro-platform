@@ -440,3 +440,32 @@ test("PR18-9: a snapshot whose commit, path or packages differ from its pin in i
     rmSync(repo, { recursive: true, force: true });
   }
 });
+
+/** Whether a test title is written in a test file: as is, with its quotes escaped, or with its apostrophes escaped. */
+function titleIn(source, title) {
+  return [title, title.replace(/"/g, '\\"'), title.replace(/'/g, "\\'"), title.replace(/`/g, "\\`")].some((t) => source.includes(t));
+}
+
+test("PR18-8: every citation of every platform sidecar names a test file that exists and a title written in it (each part of a nested describe :: it title, escaped quotes included); only a row that names its PLANNED half may cite a test file not written yet", () => {
+  const missing = [];
+  let checked = 0;
+  for (const s of readSidecars(root)) {
+    for (const r of s.rows) {
+      for (const t of r.test) {
+        const [file, ...parts] = t.split(" :: ");
+        let source;
+        try {
+          source = read(file);
+        } catch {
+          // a planned half's test, its title fixed before it is written, is cited by a row that says so; an executed row never
+          if (/^EXECUTED/.test(r.class) || !/PLANNED/.test(r.claimed ?? "")) missing.push(`${s.package} ${r.case}: no file ${file}`);
+          continue;
+        }
+        checked++;
+        for (const part of parts.length ? parts : [""]) if (!titleIn(source, part)) missing.push(`${s.package} ${r.case}: ${file} has no test titled ${part.slice(0, 100)}`);
+      }
+    }
+  }
+  assert.ok(checked > 500, `${checked} citations checked`);
+  assert.deepEqual(missing, []);
+});
