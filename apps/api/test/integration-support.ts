@@ -18,7 +18,7 @@ import { prepareAllocation } from "./sales-support.js";
 import { prepareManifest, prepareTerminationTerms } from "./sellers-support.js";
 import { captureOf, claimsOn, linesOf, oracleRows, poolsOf, quoteFactsOf, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
 import { execute, reconcile, serviceToken, storeQuery } from "./payment-support.js";
-import { bankCash, claimedCents, closePeriod, seller, approvePayout, reconcilePayout, openMonth, proposal, readStatement, scriptEvidence, intentOf, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
+import { bankCash, claimedCents, closePeriod, seller, approvePayout, reconcilePayout, openMonth, closeInstant, proposal, readStatement, scriptEvidence, intentOf, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
 import { approveThroughRoute, call, clock, completed, freshKey, ids, type Person, type PlanFixture } from "./support.js";
 import { createRevision, projectPointer } from "./source-support.js";
 import { paymentRoutes } from "./commerce-support.js";
@@ -78,10 +78,11 @@ const cellProviderTimer: ProviderCallTimer = {
   },
 };
 
-export async function integrationWorld(): Promise<IntegrationWorld> {
+/** `sessions: true` (opt-in, PV1 L-ROUTE r1 RR-4) binds the B11 session boundary; absent, the world is built exactly as before. */
+export async function integrationWorld(options: { readonly sessions?: boolean } = {}): Promise<IntegrationWorld> {
   const buyers = new ContractFakeBuyerTypeReader({ clock });
   const lateFailures: LateFailure[] = [];
-  const sw = await statementsWorld({ commercial: { buyerTypes: buyers, providerTimer: cellProviderTimer, onLateFailure: (late) => void lateFailures.push(late) } });
+  const sw = await statementsWorld({ commercial: { buyerTypes: buyers, providerTimer: cellProviderTimer, onLateFailure: (late) => void lateFailures.push(late) }, ...(options.sessions === true ? { sessions: true } : {}) });
   return Object.assign(sw, { buyers, lateFailures });
 }
 
@@ -349,7 +350,7 @@ export async function madeEligible(iw: IntegrationWorld, agencyId: string, p: Pu
 export async function closedAt(iw: IntegrationWorld, month: string, at: string): Promise<{ readonly periodId: string; readonly view: PeriodCloseView }> {
   const periodId = await openMonth(iw, month);
   const ledgerCutoffHash = await proposal(iw, periodId);
-  iw.standAt(at);
+  iw.standAt(await closeInstant(iw, at));
   try {
     return { periodId, view: completed<PeriodCloseView>(await closePeriod(iw, periodId, { ledgerCutoffHash }), 200).data };
   } finally {

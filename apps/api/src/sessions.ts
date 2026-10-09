@@ -39,9 +39,9 @@ import {
   sessionCookie,
   unauthenticatedProblem,
 } from "@kauro/application";
-import type { CorrelationId, Environment } from "@kauro/domain";
+import type { CorrelationId, Environment, UnitOfWork, UserId } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
-import { authenticationOf, type Authentication, type AuthenticationRequest, type Authenticator } from "./authenticator.js";
+import { authenticationOf, type Authentication, type AuthenticationRequest, type Authenticator, type HeldCredential } from "./authenticator.js";
 import { sendProblem, singleValued } from "./http.js";
 
 /** What GET /api/v1/public/identity-config answers (D-AUTH-2). */
@@ -93,12 +93,39 @@ export function createSessionAuthenticator(bearer: Authenticator, service: Sessi
       case "SESSION": {
         if (credential.secret === null) return { kind: "NONE" };
         const resumed = await service.resume(credential.secret);
-        return resumed === null ? { kind: "NONE" } : { kind: "SUBJECT", subject: resumed.subject, sessionSecret: credential.secret };
+        if (resumed === null) return { kind: "NONE" };
+        const { idleExpiresAt, absoluteExpiresAt } = resumed.session;
+        const liveUntil = Date.parse(idleExpiresAt) <= Date.parse(absoluteExpiresAt) ? idleExpiresAt : absoluteExpiresAt;
+        return { kind: "SUBJECT", subject: resumed.subject, sessionSecret: credential.secret, liveUntil };
+      }
+    }
+  };
+  // rule 16 (PV1R-02, PV1R-07 r4): the credential of a guarded effect, fenced FOR SHARE in the effect's own unit (its COMMIT is the release)
+  const holdRequest = async (request: AuthenticationRequest, uow: UnitOfWork, userId: string): Promise<HeldCredential | null> => {
+    let credential;
+    try {
+      credential = presentedCredential(request, appOrigins);
+    } catch (e) {
+      if (e instanceof DomainFailure) return null;
+      throw e;
+    }
+    switch (credential.kind) {
+      case "NONE":
+        return null;
+      case "BEARER": {
+        const subject = await bearer.authenticate(request.headers);
+        return subject === null ? null : { userId: subject.identity.userId, liveAt: () => true };
+      }
+      case "SESSION": {
+        if (credential.secret === null) return null;
+        const held = await service.holdIn(uow, credential.secret, userId as UserId);
+        return held === null ? null : { userId, liveAt: (nowMs) => held.liveAt(nowMs) };
       }
     }
   };
   return {
     authenticateRequest,
+    holdRequest,
     // B06's form knows no method: it is a safe request's authentication (no CSRF rule); the server uses authenticateRequest
     async authenticate(headers): Promise<AuthenticatedSubject | null> {
       const a = await authenticateRequest({ method: "GET", headers });

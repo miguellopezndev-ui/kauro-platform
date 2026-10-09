@@ -350,7 +350,7 @@ async function replacing(label: string): Promise<{ readonly a: Agent; readonly p
   const paid = await bought(iw, a, `${label}-paid`, { units: 50_000 });
   return { a, plan: await replacementPlanOf(iw, a, paid, { units: 45_000, seed: `${label}-replacement` }), paidQuoteId: paid.purchase.quoteId };
 }
-const replacementsOf = async (paidQuoteId: string): Promise<string[]> => (await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE replaces_quote_id = $1 ORDER BY created_at", [paidQuoteId])).map((q) => q.state);
+const replacementsOf = async (paidQuoteId: string): Promise<string[]> => (await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE replaces_quote_id = $1 ORDER BY state, quote_id", [paidQuoteId])).map((q) => q.state);
 
 /** A replacement whose intent committed and whose answer was lost (a crash right after the intent's COMMIT): the key's entry RESERVED, the replacement ISSUED. */
 async function intentOnly(ctx: FaultContext, x: { readonly a: Agent; readonly plan: PlanFixture; readonly paidQuoteId: string }, key: string): Promise<void> {

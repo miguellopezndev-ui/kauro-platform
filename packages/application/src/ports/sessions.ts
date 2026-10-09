@@ -13,7 +13,7 @@
  *    in one transaction of the same group.
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
-import type { AssuranceProof, CorrelationId, UserId } from "@kauro/domain";
+import type { AssuranceProof, CorrelationId, UnitOfWork, UserId } from "@kauro/domain";
 
 /** The facts a verified ID token establishes (the documented Identity Platform claim shape). */
 export interface VerifiedIdentityToken {
@@ -78,20 +78,61 @@ export interface WebSessionRecord {
 
 export type NewWebSession = Omit<WebSessionRecord, "stepUpProofId" | "stepUpFreshUntil" | "revokedAt" | "revokeReason">;
 
+/** The judged columns of a session row as the fence's locking statement returned them. */
+export interface FencedWebSession {
+  readonly revokedAt: UtcInstant | null;
+  readonly idleExpiresAt: UtcInstant;
+  readonly absoluteExpiresAt: UtcInstant;
+}
+
+/**
+ * The session fence (migration 0047, PV1R-07 r4; FAILURE-MATRIX-TEMPLATE rule 16): the session a unit of work's request presents, locked FOR SHARE
+ * inside THAT unit's own transaction and returned as locked. The lock, the judgment read, the effect and the COMMIT are one transaction on one
+ * backend; every writer of the row (revoke, resume touch, step-up) waits until that transaction ends. No clock is read here: the caller reads its
+ * clock after this returned and judges the row. Null when no session has that hash for that person.
+ */
+export interface SessionFence {
+  lockPresented(uow: UnitOfWork, secretSha256: Sha256Hex, userId: UserId): Promise<FencedWebSession | null>;
+}
+
+/**
+ * A step-up to record. The proof's instants are decided by the store at the instant it reads after the session lock (rule 16, adversary r7
+ * ADV-1): STALE when the re-authentication is more than `maxAgeSeconds` old then (nothing recorded); else issued at the earlier of `authTime`
+ * and that instant and fresh for `freshnessSeconds`.
+ */
+export interface StepUpRequest {
+  readonly proofId: AssuranceProof["proofId"];
+  readonly userId: UserId;
+  readonly kind: AssuranceProof["kind"];
+  readonly method: AssuranceProof["method"];
+  readonly authTime: UtcInstant;
+  readonly maxAgeSeconds: number;
+  readonly freshnessSeconds: number;
+}
+
 export interface WebSessionStore {
   /** Records a new session under the identity it binds; `secretSha256` is the SHA-256 of the secret the cookie carries. */
   open(session: NewWebSession, secretSha256: Sha256Hex, correlationId: CorrelationId): Promise<void>;
   /**
    * The session the secret hash names, as it stands after this call: when it is live at `now` and its last-seen instant is at
    * least `touchSeconds` old, last-seen moves to `now` and the idle deadline to min(now + idleSeconds, the absolute deadline)
-   * first. Null when no session has that hash. Liveness is the caller's decision on the returned record.
+   * first. Null when no session has that hash. Liveness is the caller's decision on the returned record, at an instant it reads
+   * after this call returned. The store locks the session row first (the lock its revocation and every touch conflict with) and
+   * reads `now` only once the lock is granted, immediately before the touch statement (FAILURE-MATRIX-TEMPLATE rule 16, PV1R-02 r3):
+   * neither a wait for the connection nor a wait on the row lock ever touches, or renews, a session that ended meanwhile.
    */
-  resume(secretSha256: Sha256Hex, now: UtcInstant, idleSeconds: number, touchSeconds: number): Promise<WebSessionRecord | null>;
+  resume(secretSha256: Sha256Hex, now: () => UtcInstant, idleSeconds: number, touchSeconds: number): Promise<WebSessionRecord | null>;
   /**
-   * Ends the session the hash names, once: REVOKED (with its person) when it was live at `at`; ENDED when it was already revoked
-   * or past a deadline (nothing changes); UNKNOWN when no session has that hash.
+   * Ends the session the hash names, once: REVOKED (with its person) when it was live at the instant `now` returns; ENDED when it was
+   * already revoked or past a deadline at that instant (nothing changes); UNKNOWN when no session has that hash. The store locks the row
+   * FOR UPDATE first and reads `now` only once the lock is granted (FAILURE-MATRIX-TEMPLATE rule 16, adversary r6 ADV-1): the revocation
+   * is stamped, and a deadline judged, at an instant after any wait on a holder of the row.
    */
-  revoke(secretSha256: Sha256Hex, at: UtcInstant, reason: string): Promise<{ readonly outcome: "REVOKED"; readonly userId: UserId } | { readonly outcome: "ENDED" | "UNKNOWN" }>;
-  /** Records a step-up proof of `proof.userId` and, when `sessionSha256` is given, makes it that session's latest step-up. */
-  recordStepUp(proof: AssuranceProof, correlationId: CorrelationId, recordedAt: UtcInstant, sessionSha256: Sha256Hex | null): Promise<void>;
+  revoke(secretSha256: Sha256Hex, now: () => UtcInstant, reason: string): Promise<{ readonly outcome: "REVOKED"; readonly userId: UserId } | { readonly outcome: "ENDED" | "UNKNOWN" }>;
+  /**
+   * Records a step-up proof of `proof.userId` and, when `sessionSha256` is given, makes it that session's latest step-up. With a session the
+   * store locks its row FOR UPDATE first and reads `now` only once the lock is granted (rule 16, coordinator item A): a session revoked or past a
+   * deadline at that instant records nothing and the answer is ENDED; otherwise the proof is recorded at that instant.
+   */
+  recordStepUp(request: StepUpRequest, correlationId: CorrelationId, now: () => UtcInstant, sessionSha256: Sha256Hex | null): Promise<{ readonly outcome: "RECORDED"; readonly proof: AssuranceProof } | { readonly outcome: "ENDED" | "STALE" }>;
 }

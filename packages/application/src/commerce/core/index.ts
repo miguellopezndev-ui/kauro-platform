@@ -13,6 +13,8 @@ export type { ObservationOrigin, ObservationContent, ObservationFacts, Observati
 export { planObservation } from "./observation.js";
 export type { PostingSource, CaseCorrection, PostingPlan } from "./postings.js";
 export { planPostings } from "./postings.js";
+export { planBankCreditPostings, ownsBankCreditPosting } from "./bank-postings.js";
+export { planReturnPostings, ownsReturnPosting } from "./return-postings.js";
 export type { FiscalInput, FiscalPlan } from "./fiscal.js";
 export { planFiscalDocument } from "./fiscal.js";
 export type { ProtocolState, ProtocolStep } from "./protocol-steps.js";

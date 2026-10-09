@@ -103,6 +103,12 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0043_payout_funds_fence.sql",
     // P0 R2-046: an older ledger waiter retries with a fresh transaction instant.
     "0044_admission_instants.sql",
+    // Payments V1 bank-transfer route, lane KIT (tables and vocabulary only; provisional number, renumbered at merge)
+    "0045_bank_transfer_kit.sql",
+    // Payments V1 bank-transfer route, lane L-ROUTE (provisional number, renumbered at merge)
+    "0046_bank_routes.sql",
+    // PV1 L-ROUTE PV1R-07 r4: the session fence (lock-only privileges of kauro_app on the presented session; provisional number)
+    "0047_session_fence.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
@@ -161,9 +167,11 @@ test("runtime roles are neither owners nor superusers and have no BYPASSRLS; the
       assert.equal(t.relrowsecurity, true, `${t.relname} has no RLS`);
       assert.equal(t.relforcerowsecurity, true, `${t.relname} does not FORCE RLS`);
     }
-    // no SECURITY DEFINER function anywhere in the schema (08: requires specific justification; none is used)
-    const definers = await su.query<{ proname: string }>("SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef");
-    assert.deepEqual(definers.rows, []);
+    // SECURITY DEFINER requires specific justification (08): the one function is the registration of a bank route's payment route
+    // (migration 0046, coordinator decision #2 of lane L-ROUTE: payment_routes stays closed to every runtime role; the function checks the
+    // caller's ACTIVE KAURO_OWNER grant and writes CONFIGURED rows only), with a pinned search_path
+    const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef");
+    assert.deepEqual(definers.rows, [{ proname: "register_bank_payment_route", proconfig: ["search_path=pg_catalog, pg_temp"] }]);
     // request handlers never hold DELETE on any table
     const deletes = await su.query<{ table_name: string }>(
       "SELECT table_name FROM information_schema.role_table_grants WHERE grantee = 'kauro_app' AND privilege_type = 'DELETE' AND table_schema = 'kauro'",

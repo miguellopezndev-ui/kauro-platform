@@ -35,7 +35,8 @@ import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
 import type { ApprovePlanView, AssuranceVerifier, AuthenticatedSubject, B06Collaborators, B07Collaborators, BuyerTypeReader, LateFailureSink, ProviderCallTimer, CommerceRequestCollaborators, CoreServices, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator, QuoteCollaborators, SessionView } from "@kauro/application";
-import { ContractFakeIdentityIssuer, ContractFakeObjectStorage, ContractFakeSessionVault } from "@kauro/application/testing";
+import { ContractFakeIdentityIssuer, ContractFakeObjectStorage, ContractFakeSessionVault, contractFakeBankDetailsClassifier } from "@kauro/application/testing";
+import type { BankEvidenceStore } from "@kauro/application";
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
   AgencyId,
@@ -419,6 +420,8 @@ export interface World {
   readonly storage: ContractFakeObjectStorage;
   readonly vault: ContractFakeSessionVault;
   readonly internalErrors: Array<{ correlationId: string; error: unknown }>;
+  /** The bank-transfer route's restricted evidence store, bound after start-up (bank-support.ts bankWorld binds its CONTRACT_FAKE store). */
+  readonly bank: { evidence: BankEvidenceStore | null };
   /** Agency A (DRAFT) and its people. */
   readonly A: AgencyFixture;
   readonly owner: Person;
@@ -665,8 +668,10 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const { artifacts: _artifacts, patchCompiler: _patchCompiler, disclosures: _disclosures, ...withoutPlanServices } = configured;
   const collaborators: Partial<B06Collaborators> = options.realPlanServices === true ? withoutPlanServices : configured;
 
+  const bank: { evidence: BankEvidenceStore | null } = { evidence: null };
   const app = assembleApi({
     environment: "LOCAL",
+    bank: { evidence: () => bank.evidence, classifier: () => contractFakeBankDetailsClassifier },
     unitOfWork: (options.wrapUnitOfWork ?? ((f) => f))(instrumentedFactory(db.unitOfWork, holds, stats)),
     database: db,
     authenticator: createBearerTokenAuthenticator(tokens),
@@ -757,6 +762,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     storage,
     vault,
     internalErrors,
+    bank,
     A,
     owner,
     admin,

@@ -13,7 +13,7 @@ import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { closeCommissionPeriod, correctCommissionStatement, type CommandResult, type PeriodCloseView, type StatementCorrectionView } from "@kauro/application";
 import type { CorrelationId } from "@kauro/domain";
 import { connectionPid, crashedAt, faultCell, FaultPoints, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
-import { FIXTURE_CALENDAR, closePeriod, correctStatement, drainCommissions, eligibleLines, itemsOf, openMonth, periodRow, proposal, resultOf, rows, seller, statementsOfSeller, statementsWorld, StandingUnits, type StatementsWorld } from "./statements-support.js";
+import { FIXTURE_CALENDAR, closeInstant, closePeriod, correctStatement, drainCommissions, eligibleLines, itemsOf, openMonth, periodRow, proposal, resultOf, rows, seller, statementsOfSeller, statementsWorld, StandingUnits, type StatementsWorld } from "./statements-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { createCommissionService } from "../src/index.js";
 import { statementServiceRuntime } from "../src/commissions/routes.js";
@@ -26,13 +26,16 @@ let sw: StatementsWorld;
 invariantsAfterEach(() => sw.h.oracle);
 before(async () => {
   sw = await statementsWorld();
+  LATER = await closeInstant(sw, LATER_FLOOR);
 });
 after(async () => {
   await sw.stop();
 });
 
 const WHOLE = { firstBps: 10_000, repeatBps: 10_000 } as const;
-const LATER = "2027-01-10T17:00:00Z";
+const LATER_FLOOR = "2027-01-10T17:00:00Z";
+// LATER_FLOOR, or the DATABASE clock + 1 h once real time has overtaken it (set in `before`; a record's created_at is real database time)
+let LATER = LATER_FLOOR;
 const LINE = 10_000n;
 let month = 0;
 const nextMonth = (): string => `2026-${String(++month).padStart(2, "0")}`;

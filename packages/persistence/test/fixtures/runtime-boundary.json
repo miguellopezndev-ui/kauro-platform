@@ -34,6 +34,58 @@
           "version"
         ]
       },
+      "kauro.bank_route_versions": {
+        "SELECT": [
+          "accepted_rails",
+          "created_at",
+          "details_artifact_ref",
+          "details_evidence_hash",
+          "details_valid_until",
+          "fee_policy_version",
+          "instruction_lifetime_ms",
+          "minimum_transfer_window_ms",
+          "payee_digest",
+          "provider_time_tolerance_ms",
+          "route_id",
+          "route_version",
+          "timing_source_accessed_on",
+          "timing_source_url",
+          "verified_at"
+        ],
+        "UPDATE": [
+          "details_valid_until",
+          "verification_evidence_ref",
+          "verified_at",
+          "verified_by"
+        ]
+      },
+      "kauro.bank_routes": {
+        "SELECT": [
+          "account_ref",
+          "agency_id",
+          "created_at",
+          "currency",
+          "current_version",
+          "environment",
+          "integration_class",
+          "participants_version",
+          "payment_route_id",
+          "provider",
+          "rollout",
+          "route_id",
+          "state",
+          "updated_at",
+          "version"
+        ],
+        "UPDATE": [
+          "current_version",
+          "participants_version",
+          "rollout",
+          "state",
+          "updated_at",
+          "version"
+        ]
+      },
       "kauro.cost_grants": {
         "INSERT": [
           "agency_id",
@@ -418,6 +470,18 @@
           "terminal_reason",
           "updated_at",
           "version"
+        ]
+      },
+      "kauro.web_sessions": {
+        "SELECT": [
+          "absolute_expires_at",
+          "idle_expires_at",
+          "revoked_at",
+          "secret_sha256",
+          "user_id"
+        ],
+        "UPDATE": [
+          "session_id"
         ]
       }
     },
@@ -1087,6 +1151,13 @@
           "target_contract_hash",
           "version",
           "withdrawn_at"
+        ]
+      },
+      "kauro.bank_transfer_instructions": {
+        "UPDATE": [
+          "order_state",
+          "updated_at",
+          "version"
         ]
       },
       "kauro.commercial_authorizations": {
@@ -1787,6 +1858,122 @@
       "using": null,
       "check": "((seller_id = kauro.acting_seller_id()) AND (state = 'SUBMITTED'::text))"
     },
+    "bank_machine_edges/bank_machine_edges_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app",
+        "kauro_control",
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": null
+    },
+    "bank_review_cases/bank_review_cases_service": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": "true"
+    },
+    "bank_route_participants/bank_route_participants_owner": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": "kauro.acting_corporate_owner()"
+    },
+    "bank_route_participants/bank_route_participants_tenant_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": null
+    },
+    "bank_route_versions/bank_route_versions_owner": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": "kauro.acting_corporate_owner()"
+    },
+    "bank_route_versions/bank_route_versions_tenant_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((kauro.current_agency_id() IS NOT NULL) AND (EXISTS ( SELECT 1\n   FROM kauro.bank_routes r\n  WHERE (r.route_id = bank_route_versions.route_id))))",
+      "check": null
+    },
+    "bank_routes/bank_routes_owner": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": "kauro.acting_corporate_owner()"
+    },
+    "bank_routes/bank_routes_tenant_lock": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.bank_route_visible_to_tenant(route_id, rollout, participants_version)",
+      "check": "false"
+    },
+    "bank_routes/bank_routes_tenant_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.bank_route_visible_to_tenant(route_id, rollout, participants_version)",
+      "check": null
+    },
+    "bank_source_freezes/bank_source_freezes_service": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": "true"
+    },
+    "bank_transfer_instructions/bank_transfer_instructions_owner_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": null
+    },
+    "bank_transfer_instructions/bank_transfer_instructions_payment": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "bank_transfer_instructions/bank_transfer_instructions_tenant": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "bank_vocabulary/bank_vocabulary_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app",
+        "kauro_control",
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": null
+    },
     "banking_calendars/banking_calendars_commission": {
       "command": "ALL",
       "roles": [
@@ -2381,6 +2568,14 @@
       "using": "true",
       "check": "true"
     },
+    "corporate_roles/corporate_roles_register_bank_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": "true",
+      "check": null
+    },
     "corporate_roles/corporate_roles_self_read": {
       "command": "SELECT",
       "roles": [
@@ -2589,6 +2784,14 @@
       "using": "(kauro.in_finance_scope(agency_id) AND (aggregate_kind = ANY (ARRAY['quote'::text, 'payment_order'::text, 'payment_attempt'::text, 'capture'::text, 'commercial_authorization'::text, 'refund'::text, 'tax_document'::text, 'reconciliation_case'::text])))",
       "check": "(kauro.in_finance_scope(agency_id) AND (aggregate_kind = ANY (ARRAY['quote'::text, 'payment_order'::text, 'payment_attempt'::text, 'capture'::text, 'commercial_authorization'::text, 'refund'::text, 'tax_document'::text, 'reconciliation_case'::text])))"
     },
+    "domain_events/domain_events_owner_route": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((agency_id IS NULL) AND (aggregate_kind = 'bank_route'::text) AND kauro.acting_corporate_owner())",
+      "check": "((agency_id IS NULL) AND (aggregate_kind = 'bank_route'::text) AND (split_part(event_type, '.'::text, 1) = 'bank_route'::text) AND kauro.acting_corporate_owner())"
+    },
     "domain_events/domain_events_payment": {
       "command": "ALL",
       "roles": [
@@ -2678,6 +2881,30 @@
       ],
       "using": "true",
       "check": null
+    },
+    "execution_correlations/execution_correlations_service": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": "true"
+    },
+    "execution_offer_outcomes/execution_offer_outcomes_service": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": "true"
+    },
+    "execution_offers/execution_offers_service": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": "true"
     },
     "fiscal_issuers/fiscal_issuers_control": {
       "command": "ALL",
@@ -3161,6 +3388,14 @@
       "using": null,
       "check": "(placed_by_user_id = kauro.current_user_id())"
     },
+    "outbound_execution_attempts/outbound_execution_attempts_service": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": "true"
+    },
     "outbox_records/outbox_records_commerce_subscribers": {
       "command": "INSERT",
       "roles": [
@@ -3201,6 +3436,14 @@
       ],
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND kauro.in_finance_scope(e.agency_id))))",
       "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND kauro.in_finance_scope(e.agency_id))))"
+    },
+    "outbox_records/outbox_records_owner_route": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'bank_route'::text) AND kauro.acting_corporate_owner())))",
+      "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'bank_route'::text) AND kauro.acting_corporate_owner())))"
     },
     "outbox_records/outbox_records_payment": {
       "command": "ALL",
@@ -3394,6 +3637,14 @@
       ],
       "using": "true",
       "check": null
+    },
+    "payment_routes/payment_routes_register_bank": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": null,
+      "check": "((state = 'CONFIGURED'::text) AND (integration_class = ANY (ARRAY['CONTRACT_FAKE'::text, 'PROVIDER'::text])) AND (qualification_evidence_hashes = '[]'::jsonb) AND (valid_from IS NULL))"
     },
     "plan_validations/plan_validations_control_draft": {
       "command": "INSERT",
@@ -3987,6 +4238,14 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())",
       "check": null
+    },
+    "refund_destinations/refund_destinations_service": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": "true"
     },
     "refund_policies/refund_policies_control": {
       "command": "ALL",
@@ -4750,6 +5009,22 @@
       "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))",
       "check": null
     },
+    "statement_coverage/statement_coverage_service": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": "true"
+    },
+    "statement_imports/statement_imports_service": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": "true"
+    },
     "statement_items/statement_items_commission": {
       "command": "ALL",
       "roles": [
@@ -4773,6 +5048,14 @@
       ],
       "using": "(seller_id = kauro.current_seller_id())",
       "check": null
+    },
+    "statement_lines/statement_lines_service": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": "true"
     },
     "storage_location_policies/storage_location_policies_control": {
       "command": "ALL",
@@ -5061,6 +5344,22 @@
       ],
       "using": "(secret_sha256 = kauro.current_session_sha256())",
       "check": "(secret_sha256 = kauro.current_session_sha256())"
+    },
+    "web_sessions/web_sessions_request_lock": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((secret_sha256 = kauro.current_session_sha256()) AND (user_id = kauro.current_user_id()))",
+      "check": "false"
+    },
+    "web_sessions/web_sessions_request_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((secret_sha256 = kauro.current_session_sha256()) AND (user_id = kauro.current_user_id()))",
+      "check": null
     }
   },
   "tables": {
@@ -5120,6 +5419,26 @@
       ],
       "kauro.attribution_claims": [
         "INSERT",
+        "SELECT"
+      ],
+      "kauro.bank_machine_edges": [
+        "SELECT"
+      ],
+      "kauro.bank_route_participants": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.bank_route_versions": [
+        "INSERT"
+      ],
+      "kauro.bank_routes": [
+        "INSERT"
+      ],
+      "kauro.bank_transfer_instructions": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.bank_vocabulary": [
         "SELECT"
       ],
       "kauro.banking_calendars": [
@@ -5689,6 +6008,12 @@
       "kauro.audits": [
         "SELECT"
       ],
+      "kauro.bank_machine_edges": [
+        "SELECT"
+      ],
+      "kauro.bank_vocabulary": [
+        "SELECT"
+      ],
       "kauro.capabilities": [
         "INSERT",
         "SELECT",
@@ -5920,6 +6245,24 @@
       "kauro.aggregate_kinds": [
         "SELECT"
       ],
+      "kauro.bank_machine_edges": [
+        "SELECT"
+      ],
+      "kauro.bank_review_cases": [
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "kauro.bank_source_freezes": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.bank_transfer_instructions": [
+        "SELECT"
+      ],
+      "kauro.bank_vocabulary": [
+        "SELECT"
+      ],
       "kauro.capabilities": [
         "SELECT"
       ],
@@ -5960,6 +6303,18 @@
       "kauro.event_types": [
         "SELECT"
       ],
+      "kauro.execution_correlations": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.execution_offer_outcomes": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.execution_offers": [
+        "INSERT",
+        "SELECT"
+      ],
       "kauro.fiscal_issuers": [
         "SELECT"
       ],
@@ -5972,6 +6327,11 @@
       "kauro.ledger_entries": [
         "INSERT",
         "SELECT"
+      ],
+      "kauro.outbound_execution_attempts": [
+        "INSERT",
+        "SELECT",
+        "UPDATE"
       ],
       "kauro.outbox_records": [
         "INSERT",
@@ -6017,6 +6377,10 @@
         "INSERT",
         "SELECT"
       ],
+      "kauro.refund_destinations": [
+        "INSERT",
+        "SELECT"
+      ],
       "kauro.refund_policies": [
         "SELECT"
       ],
@@ -6036,6 +6400,19 @@
       ],
       "kauro.state_transitions": [
         "SELECT"
+      ],
+      "kauro.statement_coverage": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.statement_imports": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.statement_lines": [
+        "INSERT",
+        "SELECT",
+        "UPDATE"
       ],
       "kauro.tax_documents": [
         "INSERT",

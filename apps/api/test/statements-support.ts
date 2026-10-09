@@ -136,7 +136,7 @@ export interface StatementsWorld extends CommissionWorld {
   periods(seconds?: number): ReturnType<typeof createPeriodsSweep>;
 }
 
-export async function statementsWorld(options: { readonly commercial?: WorldOptions["commercial"] } = {}): Promise<StatementsWorld> {
+export async function statementsWorld(options: { readonly commercial?: WorldOptions["commercial"]; readonly sessions?: boolean } = {}): Promise<StatementsWorld> {
   const calendar = new ContractFakeBankingCalendar({ clock });
   const now = clock.now();
   calendar.serve({ calendarVersion: FIXTURE_CALENDAR.calendarVersion, jurisdiction: "CO", source: "TEST_FIXTURE", nonbankingDates: [...BANKING_CALENDAR_FIXTURE_NONBANKING], coversFrom: FIXTURE_CALENDAR.coversFrom, coversTo: FIXTURE_CALENDAR.coversTo, recordedAt: new Date(Date.parse(now) - 3_600_000).toISOString() as UtcInstant, evidenceHash: sha("fixture") as Sha256Hex });
@@ -150,6 +150,8 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
     wrapUnitOfWork: (inner) => faults.wrap(inner),
     wrapCommerce: (inner) => faults.wrapCommerce(inner),
     ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
+    // opt-in (PV1 L-ROUTE r1, RR-4): the B11 session boundary; absent, unchanged
+    ...(options.sessions === true ? { sessions: true } : {}),
     commissions: async (h) => {
       const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database } as const;
       const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs() });
@@ -268,6 +270,17 @@ export async function openMonth(sw: StatementsWorld, month: string): Promise<str
   return periodIdOf(sw, month);
 }
 
+/**
+ * The instant a close stands at on the TEST CLOCK: `floor` (the calendar instant a cell means: every month it closes is due by then), or, once
+ * the DATABASE clock has overtaken it, the database clock plus an hour. The product refuses a close while a record created before the close is
+ * undelivered, and `created_at` is the real database time, so a literal calendar instant is a time bomb (2026-10-07T17:00Z overtook it).
+ * The later instant keeps the banking-day semantics: a month due at `floor` is due later too.
+ */
+export async function closeInstant(world: { readonly h: { readonly oracle: { query<R>(sql: string): Promise<{ rows: R[] }> } } }, floor: string): Promise<string> {
+  const dbNow = (await world.h.oracle.query<{ at: Date }>("SELECT clock_timestamp() AS at")).rows[0]!.at.getTime();
+  return new Date(Math.max(Date.parse(floor), dbNow + 3_600_000)).toISOString().replace(/.d{3}Z$/, "Z");
+}
+
 export async function periodIdOf(sw: StatementsWorld, month: string): Promise<string> {
   const r = await sw.h.oracle.query<{ period_id: string }>("SELECT period_id FROM kauro.commission_periods WHERE period_month = ($1 || '-01')::date", [month]);
   if (r.rows[0] === undefined) throw new Error(`no period of ${month}`);
@@ -283,7 +296,7 @@ export async function closeMonth(sw: StatementsWorld, month: string): Promise<{ 
   const periodId = await openMonth(sw, month);
   await drainCommissions(sw);
   const ledgerCutoffHash = await proposal(sw, periodId);
-  sw.standAt("2026-10-07T17:00:00Z");
+  sw.standAt(await closeInstant(sw, "2026-10-07T17:00:00Z"));
   try {
     return { periodId, reply: await closePeriod(sw, periodId, { ledgerCutoffHash }) };
   } finally {

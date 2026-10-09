@@ -9,6 +9,7 @@
  */
 import type { CommandId, Sha256Hex } from "@kauro/contracts";
 import type { AgencyId, CorrelationId, Environment, IdentityFacts, UserId } from "@kauro/domain";
+import type { RequestAuthority } from "./authority.js";
 import type { Problem } from "./problems.js";
 
 export const HEADERS = Object.freeze({
@@ -85,6 +86,11 @@ export interface CommandEnvelope<Body> {
   /** The body after structural validation against the closed request schema; never a raw parse result. */
   readonly body: Body;
   readonly receivedAt: string;
+  /**
+   * The request's credential as the transport holds it (FAILURE-MATRIX-TEMPLATE rule 16): an effect that must not outlive its session's
+   * revocation judges it under the session row's lock at its COMMIT. Absent for an in-process caller; never part of the request digest.
+   */
+  readonly authority?: RequestAuthority;
 }
 
 export type CommandResult<View> =

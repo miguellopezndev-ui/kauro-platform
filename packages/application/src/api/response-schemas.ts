@@ -861,6 +861,108 @@ export const INQUIRY_RECEIVED_RESPONSE_SCHEMA: JsonSchema = Object.freeze({
  * its `config.responses`, so the send guard validates their replies like any command's, the validator compiles each declared
  * reply and request body, and the OpenAPI document and its checker cover them (R23).
  */
+// --- the bank-transfer route's operational routes (Payments V1, lane L-ROUTE; ACH-ROUTE r12 §7.1-§7.3) ------------------------------
+// The corporate owner's configuration and qualification commands (journaled under the owner's identity; COMPLETED envelope like a command)
+// and the buyer's sensitive-instructions read (bare `{ instructions }`, Cache-Control: no-store, never an ETag). Documented under `paths`.
+const BANK_UUID = { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" } as const;
+const BANK_REF = { type: "string", minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" } as const;
+const BANK_HASH = { type: "string", pattern: "^[0-9a-f]{64}$" } as const;
+const BANK_VERSION = { type: "integer", minimum: 1, maximum: 2147483647 } as const;
+const BANK_MS = (min: number): JsonSchema => ({ type: "integer", minimum: min, maximum: 34560000000 });
+const BANK_UTC = { type: "string", pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$" } as const;
+const closedObject = (required: ReadonlyArray<string>, properties: Readonly<Record<string, JsonSchema>>): JsonSchema => ({ type: "object", additionalProperties: false, required: [...required], properties });
+const BANK_ROUTE_VIEW_SCHEMA: JsonSchema = closedObject(["routeId", "routeVersion", "version", "state", "rollout", "environment", "accountRef", "detailsEvidenceHash", "verified"], {
+  routeId: BANK_UUID,
+  routeVersion: BANK_VERSION,
+  version: { type: "integer", minimum: 1 },
+  state: { type: "string", enum: ["PENDING_VERIFICATION", "VERIFIED", "ENABLED", "DISABLED"] },
+  rollout: { type: ["string", "null"], enum: ["CONTROLLED", "GENERAL", null] },
+  environment: { type: "string", enum: ["SANDBOX", "LIVE"] },
+  accountRef: BANK_REF,
+  detailsEvidenceHash: BANK_HASH,
+  verified: { type: "boolean" },
+});
+/** The COMPLETED envelope of an owner route command: `{ kind, version, replayed, data: { route } }`. */
+export const BANK_ROUTE_COMMAND_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1 },
+  replayed: { type: "boolean" },
+  data: closedObject(["route"], { route: BANK_ROUTE_VIEW_SCHEMA }),
+});
+export const BANK_ROUTE_READ_RESPONSE_SCHEMA: JsonSchema = closedObject(["route"], { route: BANK_ROUTE_VIEW_SCHEMA });
+export const TRANSFER_INSTRUCTIONS_RESPONSE_SCHEMA: JsonSchema = closedObject(["instructions"], {
+  instructions: closedObject(["beneficiaryName", "bankName", "routingNumber", "accountNumber", "accountType", "amountCents", "currency", "reference", "sendBy", "transferExpiresAt", "routeVersion"], {
+    beneficiaryName: { type: "string", minLength: 1, maxLength: 200 },
+    bankName: { type: "string", minLength: 1, maxLength: 200 },
+    routingNumber: { type: "string", pattern: "^[0-9]{9}$" },
+    accountNumber: { type: "string", pattern: "^[0-9]{4,17}$" },
+    accountType: { type: "string", enum: ["CHECKING", "SAVINGS"] },
+    amountCents: { type: "string", pattern: "^(0|[1-9][0-9]{0,15})$" },
+    currency: { type: "string", enum: ["USD"] },
+    reference: { type: "string", pattern: "^K[0-9A-HJKMNP-TV-Z]{22}$" },
+    sendBy: BANK_UTC,
+    transferExpiresAt: BANK_UTC,
+    routeVersion: BANK_VERSION,
+  }),
+});
+const bankCommand = (operationId: string, path: string, summary: string, status: "200" | "201", request: JsonSchema): OperationalRoute =>
+  Object.freeze({
+    operationId,
+    method: "POST" as const,
+    path,
+    summary,
+    authority: "ACH-ROUTE r12 §7.1 (R1, R2), §7.29; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+    request: Object.freeze({ contentType: "application/json" as const, schema: request }),
+    responses: Object.freeze({ [status]: Object.freeze({ description: "The route after the command (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: BANK_ROUTE_COMMAND_RESPONSE_SCHEMA }) }),
+  });
+export const BANK_ROUTE_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
+  bankCommand("configureBankRoute", "/api/v1/operations/bank-routes", "Configure a bank-transfer route: the account, its owner-supplied details evidence and the instruction policy (PENDING_VERIFICATION)", "201",
+    closedObject(["provider", "environment", "accountRef", "currency", "acceptedRails", "detailsArtifactRef", "detailsEvidenceHash", "minimumTransferWindowMs", "instructionLifetimeMs", "providerTimeToleranceMs", "feePolicyVersion", "timingSource"], {
+      provider: { type: "string", pattern: "^[a-z][a-z0-9_-]{1,63}$" },
+      environment: { type: "string", enum: ["SANDBOX", "LIVE"] },
+      accountRef: BANK_REF,
+      currency: { type: "string", enum: ["USD"] },
+      acceptedRails: { type: "array", minItems: 1, maxItems: 2, items: { type: "string", enum: ["ACH", "DOMESTIC_WIRE"] } },
+      detailsArtifactRef: BANK_REF,
+      detailsEvidenceHash: BANK_HASH,
+      minimumTransferWindowMs: BANK_MS(1),
+      instructionLifetimeMs: BANK_MS(1),
+      providerTimeToleranceMs: BANK_MS(0),
+      feePolicyVersion: { type: "string", pattern: "^[A-Za-z0-9._-]{1,64}$" },
+      timingSource: closedObject(["url", "accessedOn"], { url: { type: "string", maxLength: 2048, pattern: "^https://[A-Za-z0-9.-]+(/[!-~]*)?$" }, accessedOn: { type: "string", pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" } }),
+    })),
+  bankCommand("verifyBankRoute", "/api/v1/operations/bank-routes/{routeId}/verify", "Qualify a route: its current details evidence read, classified and still valid; the owner verification evidence (VERIFIED)", "200",
+    closedObject(["expectedVersion", "verificationEvidenceRef", "authorizationRef"], { expectedVersion: BANK_VERSION, verificationEvidenceRef: BANK_REF, authorizationRef: BANK_UUID })),
+  bankCommand("enableBankRoute", "/api/v1/operations/bank-routes/{routeId}/enable", "Enable a verified route for a CONTROLLED allowlist, or GENERAL once its enable condition holds (ENABLED)", "200",
+    closedObject(["expectedVersion", "rollout", "participants", "authorizationRef"], {
+      expectedVersion: BANK_VERSION,
+      rollout: { type: "string", enum: ["CONTROLLED", "GENERAL"] },
+      participants: { type: "array", maxItems: 1000, items: BANK_UUID },
+      authorizationRef: BANK_UUID,
+      qualificationOrderId: BANK_UUID,
+    })),
+  bankCommand("disableBankRoute", "/api/v1/operations/bank-routes/{routeId}/disable", "Disable an enabled route (VERIFIED): no new instructions, no sensitive details served", "200",
+    closedObject(["expectedVersion", "authorizationRef"], { expectedVersion: BANK_VERSION, authorizationRef: BANK_UUID })),
+  bankCommand("replaceBankRouteDetails", "/api/v1/operations/bank-routes/{routeId}/details", "Replace the details evidence of a route: a new version, unqualified (PENDING_VERIFICATION); issued orders keep their snapshot", "200",
+    closedObject(["expectedVersion", "detailsArtifactRef", "detailsEvidenceHash", "authorizationRef"], { expectedVersion: BANK_VERSION, detailsArtifactRef: BANK_REF, detailsEvidenceHash: BANK_HASH, authorizationRef: BANK_UUID })),
+  Object.freeze({
+    operationId: "getBankRoute",
+    method: "GET" as const,
+    path: "/api/v1/operations/bank-routes/{routeId}",
+    summary: "A bank-transfer route as the corporate owner sees it",
+    authority: "ACH-ROUTE r12 §7.1; KAURO_OWNER",
+    responses: Object.freeze({ "200": Object.freeze({ description: "The route.", contentType: JSON_CONTENT_TYPE, schema: BANK_ROUTE_READ_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "getTransferInstructions",
+    method: "GET" as const,
+    path: "/api/v1/payment-orders/{orderId}/transfer-instructions",
+    summary: "The bank-transfer instructions of an order, served only while its route is enabled at the snapshot version and before its deadline",
+    authority: "ACH-ROUTE r12 §7.3 (I3), D-ACH-16; an agency member (X-Kauro-Agency); never cached",
+    responses: Object.freeze({ "200": Object.freeze({ description: "The account details of the route version the order was issued on, with the exact amount, reference and send-by instant of the order.", contentType: JSON_CONTENT_TYPE, schema: TRANSFER_INSTRUCTIONS_RESPONSE_SCHEMA }) }),
+  }),
+] satisfies ReadonlyArray<OperationalRoute>);
+
 export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
   Object.freeze({
     operationId: "getLiveness",
@@ -905,6 +1007,7 @@ export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze
       "201": Object.freeze({ description: "The inquiry was received, or it repeats one received within the last 24 hours and answers the same identity and instant.", contentType: JSON_CONTENT_TYPE, schema: INQUIRY_RECEIVED_RESPONSE_SCHEMA }),
     }),
   }),
+  ...BANK_ROUTE_OPERATIONAL_ROUTES,
 ] satisfies ReadonlyArray<OperationalRoute>);
 
 export function operationalResponseSchemaId(operationId: string, status: string): OperationalResponseSchemaId {

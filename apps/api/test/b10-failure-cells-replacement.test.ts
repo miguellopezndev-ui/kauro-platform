@@ -8,16 +8,19 @@
 // reader (LINEAGE_MISSING), swapped in on the payment service's own re-binder for the cell only. PostgreSQL 17 through the runtime login roles;
 // the superuser only reads. Nothing sleeps, except the bounded real-time wait of a timeout cell for an answer that must come.
 import assert from "node:assert/strict";
-import { after, before } from "node:test";
+import { after, before, test } from "node:test";
 import type { CreateQuoteView, PurchaseRebinder } from "@kauro/application";
-import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
+import { PROVIDER_CALL_TIMEOUT_MS, StaleVersionFailure } from "@kauro/domain";
 import { admitJob, faultCell, queueJob, simulatedCrashOf, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { createPurchaseRebinder } from "../src/index.js";
 import { agentOf, bought, integrationWorld, oracleRows, refundedThrough, replacementPlanOf, type Agent, type IntegrationWorld, type Paid } from "./integration-support.js";
 import { bindCells, contend, open } from "./b10-cells-support.js";
 import { blockedBy } from "./b10-cells-6a-support.js";
 import type { SqlStep } from "./fault-support.js";
-import { call, completed, freshKey, ids, outcome, replayTextOf, type PlanFixture, type Reply } from "./support.js";
+import { paymentRoutes } from "./commerce-support.js";
+import { execute } from "./payment-support.js";
+import { sellingAgency } from "./commission-support.js";
+import { asProblem, call, completed, freshKey, ids, outcome, replayTextOf, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
 before(async () => {
@@ -68,7 +71,8 @@ async function stateOf(x: Fixture, key: string): Promise<ReplacementState> {
   const rebindings = await oracleRows<{ from_quote_id: string; to_quote_id: string; allowance_ordinal: number }>(iw, "SELECT from_quote_id, to_quote_id, allowance_ordinal FROM kauro.purchase_rebindings WHERE capture_id = $1 ORDER BY created_at", [p.captureId]);
   const authorizations = await oracleRows<{ quote_id: string; state: string; revocation_code: string | null }>(iw, "SELECT quote_id, state, revocation_code FROM kauro.commercial_authorizations WHERE capture_id = $1 ORDER BY created_at", [p.captureId]);
   const paidQuote = (await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE quote_id = $1", [p.quoteId]))[0]!.state;
-  const replacements = await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE replaces_quote_id = $1 ORDER BY created_at", [p.quoteId]);
+  // states in state order, never created_at order (a host clock can step back, ADV-17): the lists compared hold at most one replacement
+  const replacements = await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE replaces_quote_id = $1 ORDER BY state, quote_id", [p.quoteId]);
   return {
     rebindings: rebindings.map((r) => [r.from_quote_id, r.to_quote_id, r.allowance_ordinal] as const),
     authorizations: authorizations.map((a) => [a.quote_id, a.state, a.revocation_code] as const),
@@ -95,7 +99,12 @@ function reboundOnce(x: Fixture, s: ReplacementState, replacementQuoteId: string
   assert.equal(s.paidQuote, "SUPERSEDED");
 }
 
-const replacementOf = async (x: Fixture): Promise<string> => (await oracleRows<{ quote_id: string }>(iw, "SELECT quote_id FROM kauro.quotes WHERE replaces_quote_id = $1 ORDER BY created_at DESC LIMIT 1", [x.paid.purchase.quoteId]))[0]!.quote_id;
+/** The paid quote's one replacement (every caller has exactly one; never "the latest by created_at", a host clock can step back, ADV-17). */
+const replacementOf = async (x: Fixture): Promise<string> => {
+  const rows = await oracleRows<{ quote_id: string }>(iw, "SELECT quote_id FROM kauro.quotes WHERE replaces_quote_id = $1", [x.paid.purchase.quoteId]);
+  assert.equal(rows.length, 1, "the paid quote has exactly one replacement");
+  return rows[0]!.quote_id;
+};
 const withdrawnEvents = async (quoteId: string): Promise<number> => (await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.domain_events WHERE aggregate_id = $1 AND event_type = 'quote.withdrawn.v1'", [quoteId]))[0]!.n;
 
 /** The view of a replacement answered 201. */
@@ -126,6 +135,8 @@ async function withRebinder<T>(rebind: PurchaseRebinder["rebind"], fn: () => Pro
 }
 const refusing = <T>(fn: () => Promise<T>): Promise<T> => withRebinder((uow, input) => withoutLineage.rebind(uow, input), fn);
 
+/** The project's live-quote read of CreateQuote (a plain read; the FOR UPDATE of the quote it names follows in the next statement). */
+const LIVE_READ: SqlStep = { label: "live_read", match: /^SELECT quote_id FROM kauro\.quotes\s+WHERE agency_id = \$1 AND project_id = \$2\s+AND \(\(replaces_quote_id IS NULL AND state IN/ };
 const JOURNAL_COMMIT: SqlStep = { label: "journal_commit", match: /UPDATE kauro\.command_journal SET state = 'COMMITTED'/ };
 const QUOTE_INSERT: SqlStep = { label: "quote_insert", match: /INSERT INTO kauro\.quotes \(/ };
 const ISSUANCE: SqlStep = { label: "issuance", match: /INSERT INTO kauro\.quote_issuances/ };
@@ -140,7 +151,7 @@ faultCell(
     step: "CMD027 included-replacement protocol / RACE: S1 intent, two keys contending for the one paid allowance",
     fault: "race",
     expect:
-      "RACE (replacement): hold one replacement before its settlement and start another key on the same paid purchase, in both orders: exactly one re-binding and one allowance ordinal, the other refused with nothing written and, retried, REPLACEMENT_ALLOWANCE_SPENT",
+      "RACE (replacement): hold one replacement before its settlement and start another key on the same paid purchase, in both orders: exactly one re-binding and one allowance ordinal, the other refused with nothing written (OPERATION_PENDING retryable, or REPLACEMENT_ALLOWANCE_SPENT) and, retried, REPLACEMENT_ALLOWANCE_SPENT; and with the other key's live-quote read before the first key's re-binding and its lock after it, in both orders, the late key is refused REPLACEMENT_ALLOWANCE_SPENT on the quote live at its lock, never 422 INTEGRITY_FAILURE, and a retry under the same or a fresh key writes nothing",
   },
   async (ctx) => {
     // one corrected revision is current at a time, so both keys replace with the one approved plan; each order is its own paid purchase
@@ -166,6 +177,8 @@ faultCell(
         ["409 PRECONDITION_FAILED OPERATION_PENDING", "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT"].includes(outcome(iw.w, waited)),
         `the waiter is refused, never a second replacement: ${outcome(iw.w, waited)}`,
       );
+      // a replacement still pending is retryable: the same key retries once the pending one settles (and then reads the allowance spent)
+      if (outcome(iw.w, waited) === "409 PRECONDITION_FAILED OPERATION_PENDING") assert.equal(asProblem(iw.w, waited).retryable, true, "OPERATION_PENDING is retryable");
       const s = await stateOf(x, waiterKey);
       reboundOnce(x, s, held.quote.quoteId);
       assert.deepEqual(s.replacements, ["ACCEPTED_FOR_CHECKOUT"], "one replacement quote: the waiter wrote none");
@@ -173,6 +186,51 @@ faultCell(
       // the same key again, the race over: the allowance is spent and nothing is written
       assert.equal(outcome(iw.w, await quoteCall(x.a, waiterPlan, waiterKey)), "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT");
       reboundOnce(x, await stateOf(x, waiterKey), held.quote.quoteId);
+    }
+    // the same contention where the other key read the project's live quote before the first key's re-binding committed and locks it after
+    // (main run 37557133856, Windows: the live-quote read is not a lock, and the re-binding may update the paid quote's row before a waiter
+    // woken by the intent's COMMIT takes it): the late key must conclude from the quote that is live once its lock is held, never from the
+    // superseded paid quote it read before, so it is refused REPLACEMENT_ALLOWANCE_SPENT with nothing written, never a second quote
+    for (const order of ["key A late", "key B late"] as const) {
+      const x = await fixture(`repl-race-late-${order === "key A late" ? "a" : "b"}`);
+      const keyA = freshKey("repl-race-late-a");
+      const keyB = freshKey("repl-race-late-b");
+      const [lateKey, firstKey] = order === "key A late" ? [keyA, keyB] : [keyB, keyA];
+      const lateConn = await open("kauro_app_test");
+      try {
+        const read = ctx.points.pause("db.live_read.after");
+        const late = ctx.operation(`the replacement of ${order}, held after its live-quote read`, () => quoteOn(ctx, lateConn, x, lateKey, [LIVE_READ])).then(
+          (v): PromiseSettledResult<Reply> => ({ status: "fulfilled", value: v }),
+          (reason: unknown): PromiseSettledResult<Reply> => ({ status: "rejected", reason }),
+        );
+        await read.reachedBy(late);
+        // the first key's whole replacement runs meanwhile: intent, re-binding (the paid quote SUPERSEDED) and completion
+        const first = await ctx.operation("the first key's replacement, run to its answer", () => quoteCall(x.a, x.plan, firstKey));
+        const done = view(first);
+        assert.equal(done.replacement?.outcome, "REBOUND", "the first key re-binds the purchase while the late key holds its live-quote read");
+        assert.equal((await stateOf(x, firstKey)).paidQuote, "SUPERSEDED", "the paid quote the late key read is superseded before it locks it");
+        read.release();
+        const answered = await late;
+        assert.equal(answered.status, "fulfilled");
+        const refused = answered.status === "fulfilled" ? answered.value : (undefined as never);
+        assert.equal(outcome(iw.w, refused), "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT", `the late key is refused on the quote live at its lock, never a second replacement: ${outcome(iw.w, refused)}`);
+        const s = await stateOf(x, lateKey);
+        reboundOnce(x, s, done.quote.quoteId);
+        assert.deepEqual(s.replacements, ["ACCEPTED_FOR_CHECKOUT"], "one replacement quote: the late key wrote none");
+        assert.equal(s.journal, null, "the refused key journaled nothing");
+        assert.equal((await stateOf(x, firstKey)).journal, "COMMITTED");
+        // retried with the same key and with a fresh key, the race over: the same refusal, nothing written
+        assert.equal(outcome(iw.w, await quoteCall(x.a, x.plan, lateKey)), "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT");
+        const fresh = freshKey("repl-race-late-fresh");
+        assert.equal(outcome(iw.w, await quoteCall(x.a, x.plan, fresh)), "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT");
+        const after = await stateOf(x, fresh);
+        reboundOnce(x, after, done.quote.quoteId);
+        assert.deepEqual(after.replacements, ["ACCEPTED_FOR_CHECKOUT"]);
+        assert.equal(after.journal, null);
+        assert.equal((await stateOf(x, lateKey)).journal, null);
+      } finally {
+        await lateConn.end();
+      }
     }
   },
 );
@@ -810,5 +868,173 @@ faultCell(
       assert.equal(late.length, 1, "one late failure, the abandoned unit's");
       assert.equal(simulatedCrashOf(late[0]!.error)?.point, "pay.rebindings.record.after", "the reported failure is the one that ended the abandoned unit");
     }
+  },
+);
+
+// --- REPL_REFUND_SUPERSEDE, REPL_CRB corrupt entry (D10-GAP-25, adversary ADV-6, ADV-8) -------------------------------------------
+
+/** Every money and entitlement row of this file's database: what an ordinary issuance over a refunded replacement must leave as it is. */
+const moneyRows = async (): Promise<Record<string, unknown>> =>
+  (
+    await oracleRows(
+      iw,
+      `SELECT (SELECT count(*) FROM kauro.payment_orders)::int AS orders, (SELECT count(*) FROM kauro.capture_facts)::int AS captures,
+              (SELECT string_agg(state, ',' ORDER BY created_at) FROM kauro.refunds) AS refunds, (SELECT count(*) FROM kauro.ledger_entries)::int AS ledger,
+              (SELECT string_agg(state || ':' || coalesce(revocation_code, '-'), ',' ORDER BY created_at) FROM kauro.commercial_authorizations) AS authorizations,
+              (SELECT count(*) FROM kauro.purchase_rebindings)::int AS rebindings`,
+    )
+  )[0]!;
+
+test(
+  "REPL_REVOKE (sequence, no fault injected) CMD027 included-replacement protocol / REVOCATION: an ordinary CreateQuote over a re-bound replacement whose entitlement a full refund revoked -> RACE (replacement): after the re-binding, a full service refund of the purchase approved and not yet executed leaves the re-bound entitlement ACTIVE (B09 design CommercialAuthorization: authority_revoked on a full service refund, at its completion; 0016 quotes_release_guard reads COMPLETED refunds), so CreateQuote of the project is the replacement protocol's 409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT with nothing written; once the refund completed (the entitlement REVOKED) it issues 201 superseding the replacement exactly once; no capture, refund, ledger, entitlement or re-binding row changes in either phase and the allowance stays spent",
+  async () => {
+    const x = await fixture("repl-refund-supersede");
+    const rebound = view(await quoteCall(x.a, x.plan, freshKey("repl-refund-rebind")));
+    assert.equal(rebound.replacement?.outcome, "REBOUND");
+    const replacementId = rebound.quote.quoteId;
+    const p = x.paid.purchase;
+    // a full service refund of the purchase, approved and not executed
+    const requested = completed<{ refund: { refundId: string } }>(
+      await call(iw.w, { url: paymentRoutes.requestRefund(p.projectId), token: x.a.billing.token, agency: x.a.s.agency.agencyId, key: freshKey("repl-refund-request"), body: { reasonCode: "The client cancelled before execution", evidenceRef: ids.next() } }),
+      201,
+    );
+    const refundId = requested.data.refund.refundId;
+    const approved = await call(iw.w, {
+      url: paymentRoutes.approveRefund(refundId),
+      token: iw.owner.token,
+      agency: null,
+      key: freshKey("repl-refund-approve"),
+      body: { expectedVersion: 1, serviceCents: x.paid.quote.quote.serviceCents, taxCents: "0", authorizationRef: await iw.w.stepUp(iw.owner) },
+    });
+    assert.equal(approved.status, 200, approved.text);
+    const live = (await oracleRows<{ authorization_id: string; state: string }>(iw, "SELECT authorization_id, state FROM kauro.commercial_authorizations WHERE quote_id = $1", [replacementId]))[0]!;
+    assert.equal(live.state, "ACTIVE", "an approved refund not yet executed leaves the re-bound entitlement ACTIVE (B09 CommercialAuthorization: revoked at the full refund's completion)");
+    // (a) the refund not executed: the paid purchase stands and its one included replacement is spent
+    const before = await moneyRows();
+    const refusedKey = freshKey("repl-refund-before");
+    const refused = await quoteCall(x.a, x.plan, refusedKey);
+    assert.equal(outcome(iw.w, refused), "409 PRECONDITION_FAILED REPLACEMENT_ALLOWANCE_SPENT", `the paid purchase stands: ${refused.status >= 400 ? "" : refused.text}`);
+    assert.equal((await iw.w.journal(refusedKey))?.state ?? null, null, "nothing journaled");
+    assert.deepEqual((await oracleRows<{ state: string }>(iw, "SELECT state FROM kauro.quotes WHERE quote_id = $1", [replacementId])).map((r) => r.state), ["ACCEPTED_FOR_CHECKOUT"]);
+    assert.deepEqual(await stateOf(x, refusedKey).then((s) => s.replacements), ["ACCEPTED_FOR_CHECKOUT"], "no quote written");
+    assert.deepEqual(await moneyRows(), before, "no money or entitlement row changed");
+    // (b) the refund completed: the ordinary issuance supersedes the refunded replacement, money untouched, the allowance still spent
+    const executed = await execute(iw.pw, refundId, { expectedVersion: 2 });
+    assert.equal(executed.status, 200, executed.text);
+    assert.equal(await authorizationState(live.authorization_id), "REVOKED", "the completed full refund revoked the re-bound entitlement");
+    const afterRefund = await moneyRows();
+    const issuedKey = freshKey("repl-refund-after");
+    const issued = view(await quoteCall(x.a, x.plan, issuedKey));
+    assert.equal(issued.supersededQuoteId, replacementId, "the refunded replacement is superseded");
+    assert.equal(issued.replacement, undefined, "an ordinary quote, not a replacement");
+    assert.deepEqual(await moneyRows(), afterRefund, "no capture, refund, ledger, entitlement or re-binding row changed");
+    const s = await stateOf(x, issuedKey);
+    assert.deepEqual(s.rebindings, [[p.quoteId, replacementId, 1]], "the allowance stays spent: one re-binding, ordinal 1");
+    assert.deepEqual(s.replacements, ["SUPERSEDED"]);
+    assert.equal(s.journal, "COMMITTED");
+    const issuances = await oracleRows<{ n: number }>(iw, "SELECT count(*)::int AS n FROM kauro.quote_issuances WHERE quote_id = $1", [issued.quote.quoteId]);
+    assert.equal(issuances[0]!.n, 1, "one issuance of the new quote");
+    assert.equal(view(await quoteCall(x.a, x.plan, issuedKey)).quote.quoteId, issued.quote.quoteId, "the same key replays its one quote: superseded exactly once");
+  },
+);
+
+
+test("ADV-9/ADV-11: a STALE_VERSION of the payment service's re-binder (the real shape: the version and state of the authorization it lost on) that is not a re-binding observed by identity is answered as the retryable STALE_VERSION of CMD027 with the project's live quote as current, never the authorization's version and state; the same key then re-binds once", async () => {
+  const x = await fixture("repl-rebinder-stale");
+  const key = freshKey("repl-rebinder-stale");
+  // the re-binder's revoke lost its CAS on the paid authorization (an execution admission CONSUMED it meanwhile): StaleVersionFailure of that row
+  const reply = await withRebinder(async () => {
+    throw new StaleVersionFailure(7, "CONSUMED");
+  }, () => quoteCall(x.a, x.plan, key));
+  assert.equal(reply.status >= 400 ? outcome(iw.w, reply) : `${reply.status} ${reply.text}`, "409 STALE_VERSION -");
+  const problem = asProblem(iw.w, reply);
+  assert.equal(problem.retryable, true);
+  const paid = (await oracleRows<{ version: number; state: string }>(iw, "SELECT version::int AS version, state FROM kauro.quotes WHERE quote_id = $1", [x.paid.purchase.quoteId]))[0]!;
+  assert.deepEqual(problem.current, { version: paid.version, state: paid.state }, "current is the project's live quote (the paid quote), never the authorization's {7, CONSUMED}");
+  const s = await stateOf(x, key);
+  untouched(x, s);
+  assert.deepEqual([s.replacements, s.journal], [["ISSUED"], "RESERVED"], "the intent stays open, nothing re-bound");
+  const resumed = view(await quoteCall(x.a, x.plan, key));
+  assert.equal(resumed.replacement?.outcome, "REBOUND");
+  reboundOnce(x, await stateOf(x, key), resumed.quote.quoteId);
+});
+
+
+test("REPL_REVOKE (sequence, taxed purchase, ADV-10): after the re-binding, a single full SERVICE refund of a taxed purchase that returns no tax is refused at approval 409 PRECONDITION_FAILED REFUND_TAX_INCONSISTENT (0016 refunds_commitment_ceiling, KP012: the tax follows the service cumulatively, a refund leaving no service basis returns the whole remaining tax) and the entitlement stays ACTIVE (not covered here, GAP lane B09-TAX-ROUNDING: the KP012 remainder after a failed booked refund and the chargeback path); the full refund with its tax, once completed, lets CreateQuote supersede the replacement exactly once (201) with no money or entitlement row changed", async () => {
+  const s0 = await sellingAgency(iw as never, "repl-refund-taxed", { treatment: "DOMESTIC_TAXABLE", rule: "RATE_HALF_UP", rateBps: 1900 });
+  iw.buyers.set(s0.agency.agencyId, "AGENCY");
+  const billing = await iw.w.person("repl-refund-taxed-billing");
+  await iw.h.addMember(s0.agency, billing.userId, "BILLING");
+  const a = { s: s0, billing } as Agent;
+  const paid = await bought(iw, a, "repl-refund-taxed-paid", { units: 50_000 });
+  assert.ok(BigInt(paid.quote.quote.taxCents) > 0n, `the purchase is taxed: ${paid.quote.quote.taxCents}`);
+  const plan = await replacementPlanOf(iw, a, paid, { units: 45_000, seed: "repl-refund-taxed-replacement" });
+  const x: Fixture = { a, paid, plan };
+  const rebound = view(await quoteCall(a, plan, freshKey("repl-refund-taxed-rebind")));
+  assert.equal(rebound.replacement?.outcome, "REBOUND");
+  const replacementId = rebound.quote.quoteId;
+  const p = paid.purchase;
+  const requested = completed<{ refund: { refundId: string } }>(
+    await call(iw.w, { url: paymentRoutes.requestRefund(p.projectId), token: billing.token, agency: s0.agency.agencyId, key: freshKey("repl-refund-taxed-request"), body: { reasonCode: "The client cancelled before execution", evidenceRef: ids.next() } }),
+    201,
+  );
+  const refundId = requested.data.refund.refundId;
+  const approve = async (taxCents: string): Promise<Reply> =>
+    call(iw.w, { url: paymentRoutes.approveRefund(refundId), token: iw.owner.token, agency: null, key: freshKey("repl-refund-taxed-approve"), body: { expectedVersion: 1, serviceCents: paid.quote.quote.serviceCents, taxCents, authorizationRef: await iw.w.stepUp(iw.owner) } });
+  const before = await moneyRows();
+  const serviceOnly = await approve("0");
+  assert.equal(serviceOnly.status >= 400 ? outcome(iw.w, serviceOnly) : `${serviceOnly.status}`, "409 PRECONDITION_FAILED REFUND_TAX_INCONSISTENT", "a full service refund that returns no tax is refused at approval");
+  assert.deepEqual(await moneyRows(), before, "nothing committed");
+  const live = (await oracleRows<{ authorization_id: string; state: string }>(iw, "SELECT authorization_id, state FROM kauro.commercial_authorizations WHERE quote_id = $1", [replacementId]))[0]!;
+  assert.equal(live.state, "ACTIVE", "the re-bound entitlement stands");
+  const withTax = await approve(paid.quote.quote.taxCents);
+  assert.equal(withTax.status, 200, withTax.text);
+  const executed = await execute(iw.pw, refundId, { expectedVersion: 2 });
+  assert.equal(executed.status, 200, executed.text);
+  assert.equal(await authorizationState(live.authorization_id), "REVOKED");
+  const afterRefund = await moneyRows();
+  const issuedKey = freshKey("repl-refund-taxed-after");
+  const issued = view(await quoteCall(a, plan, issuedKey));
+  assert.equal(issued.supersededQuoteId, replacementId, "the wholly refunded replacement is superseded");
+  assert.deepEqual(await moneyRows(), afterRefund, "no capture, refund, ledger, entitlement or re-binding row changed");
+  const s = await stateOf(x, issuedKey);
+  assert.deepEqual(s.rebindings, [[p.quoteId, replacementId, 1]], "the allowance stays spent");
+  assert.deepEqual(s.replacements, ["SUPERSEDED"]);
+  assert.equal(view(await quoteCall(a, plan, issuedKey)).quote.quoteId, issued.quote.quoteId, "superseded exactly once: the same key replays");
+});
+
+faultCell(
+  {
+    id: "REPL_CRB",
+    step: "CMD027 included-replacement protocol / CRASH-BEFORE: S2 settle, the open journal entry found without its issuance",
+    fault: "crash-before-commit",
+    at: "uow",
+    expect:
+      "DEFENCE (forced state after a crash before COMMIT): a replacement left open by a crash before its SERVICE COMMIT whose journal entry then has no issuance (an invariant breach, injected) is answered 422 INTEGRITY_FAILURE, not retryable, never a retryable OPERATION_PENDING a client would retry forever; nothing is written",
+  },
+  async (ctx) => {
+    const x = await fixture("repl-corrupt-entry");
+    const key = freshKey("repl-corrupt-entry");
+    ctx.points.crash("uow.before-commit");
+    const crashed = await ctx.operation("the replacement whose re-binding dies before its SERVICE COMMIT", () => iw.faults.onPayment(ctx.points, () => quoteCall(x.a, x.plan, key)));
+    assert.equal(outcome(iw.w, crashed), "500 INTERNAL_ERROR -");
+    assert.equal((await stateOf(x, key)).journal, "RESERVED", "the intent's journal entry stays open");
+    const replacementId = await replacementOf(x);
+    // the injected breach: the entry's issuance gone (the database owner, triggers off; never a product step)
+    const owner = await iw.h.pg.connect("postgres");
+    try {
+      await owner.query("BEGIN");
+      await owner.query("SET LOCAL session_replication_role = replica");
+      await owner.query("DELETE FROM kauro.quote_issuances WHERE quote_id = $1", [replacementId]);
+      await owner.query("COMMIT");
+    } finally {
+      await owner.end();
+    }
+    const before = await moneyRows();
+    const reply = await quoteCall(x.a, x.plan, key);
+    assert.equal(outcome(iw.w, reply), "422 INTEGRITY_FAILURE -", `an open entry without its issuance is an integrity failure: ${reply.text}`);
+    assert.equal(asProblem(iw.w, reply).retryable, false, "not retryable: the state never clears by itself");
+    assert.equal((await stateOf(x, key)).journal, "RESERVED");
+    assert.deepEqual(await moneyRows(), before);
   },
 );

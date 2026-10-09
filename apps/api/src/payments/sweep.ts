@@ -85,6 +85,32 @@ export async function cancelUnclaimed(rt: PaymentRuntime, orderId: PaymentOrderI
   });
 }
 
+// --- Payments V1 registration seam (lane KIT; docs/design/ACH-ROUTE.md §7.12, §7.21) --------------------------------------------------
+
+/** The sweeps of the bank-transfer route: E1 the transfer-deadline expiry and X2 the manual execution window. */
+export const BANK_SWEEP_NAMES = ["TRANSFER_EXPIRY", "EXECUTION_WINDOW"] as const;
+export type BankSweepName = (typeof BANK_SWEEP_NAMES)[number];
+/** One bounded pass of a bank sweep under the payment service's identity and fenced lease; it takes its own locks (ACH-ROUTE §7.28). */
+export type BankSweep = (rt: PaymentRuntime) => Promise<void>;
+
+const bankSweeps = new Map<BankSweepName, BankSweep>();
+
+/** Registers the one pass of a bank sweep; a second registration of a name is refused. With nothing registered runSweepPass is unchanged. */
+export function registerBankSweep(name: BankSweepName, sweep: BankSweep): void {
+  if (bankSweeps.has(name)) throw new Error(`the bank sweep ${name} is already registered`);
+  bankSweeps.set(name, sweep);
+}
+
+async function runBankSweeps(rt: PaymentRuntime): Promise<void> {
+  for (const sweep of bankSweeps.values()) {
+    try {
+      await sweep(rt);
+    } catch (e) {
+      rt.onBackgroundFailure(rt.ids.next(), e);
+    }
+  }
+}
+
 /** One bounded pass over up to `agencies` agencies holding stored payment operations, up to `limit` attempts of each. */
 export async function runSweepPass(rt: PaymentRuntime, options: { readonly agencies?: number; readonly limit?: number; readonly after?: AgencyId } = {}): Promise<SweepPass> {
   const now = rt.clock.now();
@@ -118,5 +144,6 @@ export async function runSweepPass(rt: PaymentRuntime, options: { readonly agenc
       }
     }
   }
+  await runBankSweeps(rt);
   return { agencies: agencies.length, cancelled, watched };
 }

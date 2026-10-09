@@ -83,6 +83,13 @@ const COMMAND_SPECIFIC: Readonly<Record<CommerceCommandId, ReadonlyArray<Problem
     outcome("COMMAND", "PRECONDITION_FAILED", "FISCAL_TREATMENT_UNREVIEWED", "the agency's current fiscal profile carries no reviewed treatment (R2-082): the sale path is blocked"),
     outcome("COMMAND", "PRECONDITION_FAILED", "FISCAL_TREATMENT_CHANGED", "the reviewed treatment is no longer the one the quote was priced with: a new quote is required"),
     PROVIDER_SERVICES,
+    // Payments V1 bank-transfer route (routeKind BANK_TRANSFER; lane L-ROUTE, ACH-ROUTE §7.2, §7.24)
+    outcome("COMMAND", "PRECONDITION_FAILED", "ROUTE_NOT_ENABLED", "the named bank route is not ENABLED at a verified version for this agency (CONTROLLED allowlist or GENERAL): no order and no instructions"),
+    outcome("COMMAND", "PAYMENT_PENDING", "OPEN_ORDER_EXISTS", "the project already has an open order (of any route): no second checkout"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "PLAN_WITHDRAWN", "the quoted plan's approval was withdrawn"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "TRANSFER_WINDOW_TOO_SHORT", "the time left before the instruction deadline is shorter than the route's minimum transfer window"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "DETAILS_EXPIRED", "the validity of the route version's verified account details passed at the effect instant: no order and no instructions"),
+    outcome("COMMAND", "CAPACITY_UNAVAILABLE", "EVIDENCE_UNAVAILABLE", "no bank route integration is bound in this deployment; retry later"),
   ],
   CMD029: [
     NOT_VISIBLE("the payment order"),

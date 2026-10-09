@@ -449,14 +449,32 @@ test("W2 step-up: a re-authentication of the session's own person with its secon
   assert.deepEqual(facts.rows.map((f) => `${f.outcome} ${f.reason_code} ${f.assurance_class}`).sort(), ["ALLOW STEP_UP_ISSUED STEP_UP", "DENY STEP_UP_MISSING STEP_UP", "DENY STEP_UP_NOT_OWNED STEP_UP", "DENY STEP_UP_STALE STEP_UP"]);
 });
 
-test("W2 boundary: web_sessions belongs to the authentication boundary — the request-handler role can neither read nor write it, and the boundary group reads and updates only the session whose secret hash it presents", async () => {
+test("W2 boundary: web_sessions belongs to the authentication boundary — the request-handler role only locks and reads the liveness of the session its own transaction presents and never writes it (D-AUTH-1a), and the boundary group reads and updates only the session whose secret hash it presents", async () => {
   const id = w.identity();
   const s = await id.signIn(w.operator);
   const other = await id.signIn(w.operator);
+  // D-AUTH-1a (PV1R-07 r4, migration 0047): the request-handler role may lock and read the liveness columns of the one session its own
+  // transaction presents for the identity it binds, and nothing else; it never writes a session.
   const app = await w.h.appPool.raw.connect();
   try {
-    await assert.rejects(app.query("SELECT count(*) FROM kauro.web_sessions"), /permission denied/);
+    assert.equal((await app.query("SELECT count(*)::int AS n FROM kauro.web_sessions")).rows[0].n, 0, "request role: no presented secret, no row");
+    await assert.rejects(app.query("SELECT session_id FROM kauro.web_sessions"), /permission denied/);
     await assert.rejects(app.query("UPDATE kauro.web_sessions SET revoked_at = now(), revoke_reason = 'LOGOUT'"), /permission denied/);
+    await assert.rejects(app.query("DELETE FROM kauro.web_sessions"), /permission denied/);
+    const present = "SELECT set_config('kauro.session_sha256', $1, true), set_config('kauro.user_id', $2, true)";
+    await app.query("BEGIN");
+    await app.query(present, [s.secretSha256, w.operator.userId]);
+    const seen = await app.query<{ secret_sha256: string }>("SELECT secret_sha256 FROM kauro.web_sessions FOR SHARE");
+    assert.deepEqual(seen.rows.map((r) => r.secret_sha256), [s.secretSha256], "request role: the presented session only");
+    await app.query("ROLLBACK");
+    await app.query("BEGIN");
+    await app.query(present, [s.secretSha256, w.operator.userId]);
+    await assert.rejects(app.query("UPDATE kauro.web_sessions SET session_id = gen_random_uuid()"), /row-level security|IMMUTABLE_COLUMN/);
+    await app.query("ROLLBACK");
+    await app.query("BEGIN");
+    await app.query(present, [s.secretSha256, w.owner.userId]);
+    assert.equal((await app.query("SELECT count(*)::int AS n FROM kauro.web_sessions")).rows[0].n, 0, "request role: a session presented for another identity is not visible");
+    await app.query("ROLLBACK");
   } finally {
     app.release();
   }
