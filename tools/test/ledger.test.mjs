@@ -314,3 +314,19 @@ test("a PARTIAL remainder kept by the package itself for a later lane names its 
   const sidecar = JSON.parse(read("docs/acceptance/case-maps/B10.json"));
   assert.deepEqual(sidecar.rows.find((r) => r.case === "R2-104").inheritedTo, ["B10"], "B10's R2-104 as main states it");
 });
+
+test("PR18-5: a gate is DEMONSTRATED only when every case's demonstrated class is EXECUTED_LOCAL or EXECUTED_PROVIDER; a reviewed PARTIAL or SIMULATED case leaves it PARTIAL; an undemonstrated case leaves it OPEN", () => {
+  const all = computeLedger(clean());
+  assert.equal(all.gates.find((g) => g.gate === "G-B01").status, "DEMONSTRATED");
+  for (const klass of ["PARTIAL", "SIMULATED"]) {
+    const f = clean();
+    f.sidecars[1].rows[0] = { ...f.sidecars[1].rows[0], class: klass, inheritedTo: ["B02"] };
+    f.reviews[1].cases[0].claimed_status = klass;
+    const ledger = computeLedger(f);
+    assert.equal(ledger.cases.find((c) => c.case === "S003").demonstrated, klass, `${klass}: reviewed`);
+    assert.equal(ledger.gates.find((g) => g.gate === "G-B01").status, "PARTIAL", `${klass} keeps the gate from DEMONSTRATED`);
+  }
+  const g = clean();
+  g.sidecars[1].rows[0].reviewId = null;
+  assert.equal(computeLedger(g).gates.find((x) => x.gate === "G-B01").status, "OPEN");
+});

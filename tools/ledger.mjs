@@ -542,11 +542,21 @@ export function computeLedger({ registry, sidecars, externals = [], missingInput
       cases: g.caseIds.map((id) => cases.find((c) => c.case === id) ?? { case: id, claimed: null }).map(({ case: id, package: p, claimed, demonstrated, reviewId, commit }) => ({ case: id, package: p, claimed, demonstrated, reviewId, commit })),
       casePackages: owners,
       acceptedSubjects: owners.map((p) => ({ package: p, ...(packages.find((x) => x.package === p)?.acceptedSubject ?? { commit: null, reviewId: null }) })),
-      status: g.caseIds.every((id) => cases.find((c) => c.case === id)?.demonstrated) ? "DEMONSTRATED" : "OPEN",
+      status: gateStatus(g.caseIds.map((id) => cases.find((c) => c.case === id)?.demonstrated ?? null)),
     };
   });
 
   return { cases, packages, gates, violations, registry: registry.provenance.files };
+}
+
+/**
+ * A gate's status from its cases' demonstrated classes (A7 §2: a gate closes when every case has its required final class):
+ * DEMONSTRATED only when every case is EXECUTED_LOCAL or EXECUTED_PROVIDER; PARTIAL when every case is demonstrated but some only
+ * PARTIAL or SIMULATED; OPEN while a case has no reviewed class.
+ */
+export function gateStatus(demonstrated) {
+  if (demonstrated.some((d) => !d)) return "OPEN";
+  return demonstrated.every((d) => EXECUTED.has(d)) ? "DEMONSTRATED" : "PARTIAL";
 }
 
 export function readmeTable(ledger) {
