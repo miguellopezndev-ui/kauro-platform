@@ -206,3 +206,23 @@ test("PR18-2: every tracked non-doc file of this repository is attributed to a p
     assert.ok(b06.some((r) => r.test(f)), `${f} touches B06`);
   }
 });
+
+test("an inherited row in another package's sidecar touches the case's owner but is not its own row; a changed record and a changed own row each touch their package; an unchanged row does not (the pre-PR18 test, on the fixture)", () => {
+  const f = fixture();
+  try {
+    f.write(`${f.reg}/cases.json`, [{ id: "S001", gate: "G-X", expected: "two" }, { id: "S002", gate: "G-X", expected: "one" }, { id: "S003", gate: "G-X", expected: "one" }]);
+    f.write("docs/acceptance/case-maps/B01.json", {
+      package: "B01",
+      rows: [
+        { case: "S003", class: "PARTIAL", test: [], commit: null, reviewId: null, inheritedTo: ["B00"] },
+        { case: "S002", class: "EXECUTED_PROVIDER", test: ["test/a.test.ts :: a"], commit: null, reviewId: null, inheritedTo: ["B00"] },
+      ],
+    });
+    f.commit("record S001 changed, B01's own row S003 changed, B01 inherits a row for B00's S002");
+    const { changedCases, changedOwnRows } = changedCaseRows(f.dir, f.Y, "HEAD", loadRegistry(f.dir));
+    assert.deepEqual(changedCases.map((c) => `${c.package} ${c.case}`).sort(), ["B00 S001", "B00 S002", "B01 S003"]);
+    assert.deepEqual(changedOwnRows, [{ case: "S003", package: "B01" }]);
+  } finally {
+    f.done();
+  }
+});
