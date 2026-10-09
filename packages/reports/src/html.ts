@@ -2,8 +2,8 @@
  * The report as one self-contained HTML document (design docs/design/B13-report-html.md). The worker prints this document to
  * PDF; this module renders nothing else and fetches nothing.
  *
- * - Inert (S069): no script, no event handler, no inline style attribute, no URL; one <style> element and a CSP meta that forbids
- *   everything but that style and a data: image. Every string is escaped for text or attribute context; free text (the agency's
+ * - Inert (S069): no script, no event handler, no inline style attribute, and no URL other than the logo's own embedded
+ *   `data:` image; one <style> element and a CSP meta that forbids everything but that style and a data: image. Every string is escaped for text or attribute context; free text (the agency's
  *   file names) is isolated in <bdi>. The logo is embedded only when its bytes are the stored logo the branding names (SHA-256,
  *   PNG/JPEG signature, size and pixel limits), never fetched.
  * - Printed, not recounted (R2-065, R2-071): every number is a model figure; exception tables are listed with their complete totals
@@ -12,7 +12,7 @@
  * - Deterministic: the same model, page size, locale and logo give the same bytes; no clock, no randomness.
  */
 import { createHash } from "node:crypto";
-import { copyText } from "./copy.js";
+import { copyText, resolveLocale } from "./copy.js";
 import type { CopyKey } from "./copy.js";
 import { isVerifiedReport } from "./model.js";
 import type { Figure, ReportArtifact, VerifiedReport } from "./model.js";
@@ -112,7 +112,7 @@ export function renderReportHtml(report: VerifiedReport, options: RenderOptions)
   const logo = checkedLogo(report, options.logo);
   const out: string[] = [];
 
-  out.push("<!DOCTYPE html>", '<html lang="en-US">', "<head>", '<meta charset="utf-8">');
+  out.push("<!DOCTYPE html>", `<html lang="${escapeHtml(resolveLocale(locale))}">`, "<head>", '<meta charset="utf-8">');
   out.push(`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">`);
   out.push(`<title>${t("doc.title")}</title>`, `<style>\n${STYLE(options.pageSize === "A4" ? "A4" : "letter")}\n</style>`, "</head>", "<body>");
 

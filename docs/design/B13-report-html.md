@@ -13,7 +13,8 @@ renderer version, so a printed report identifies its exact inputs.
 
 ## 2. Safety (S069)
 
-- No `<script>`, no event-handler attribute, no inline `style=` attribute, no URL of any kind. One `<style>` element and a CSP
+- No `<script>`, no event-handler attribute, no inline `style=` attribute, and no URL other than the logo's own embedded
+  `data:` image (review PR21-6: the doc now says what the code does). One `<style>` element and a CSP
   meta: `default-src 'none'; style-src 'unsafe-inline'; img-src data:` (the worker's PDF engine must also run with scripts
   and network off; requested of B).
 - Every string is escaped for text and double-quoted attribute context (`& < > " '`). Model strings are from closed vocabularies
@@ -43,7 +44,8 @@ selectable and readable by assistive technology in the PDF. Whether the PDF engi
 ## 5. Copy (A3, R-E3)
 
 All visible text comes from `REPORT_COPY`, keyed by locale; English (en-US) is the default and the fallback for an unknown
-locale or a missing key. Tests: the English catalog holds no Spanish text, no character HTML would escape, and none of A3's
+locale or a missing key. `<html lang>` names the catalog the document was written from (`resolveLocale`), so an unknown locale
+is written and labelled in English. A placeholder without a value throws (review PR21-3). Tests: the English catalog holds no Spanish text, no character HTML would escape, and none of A3's
 forbidden claims (AI, "imported", compatibility, deleting duplicates, savings, "audit"/"diagnosis"); every text node of a
 rendered document is a catalog text or a model value.
 
@@ -51,7 +53,7 @@ rendered document is a catalog text or a model value.
 
 | case | here | evidence | remaining |
 |---|---|---|---|
-| S069 | escaping, `<bdi>`, inert document, logo bytes checked (hash, signature, size, pixels) | EXECUTED_LOCAL (HTML) | the PDF engine's own sandbox: worker (B) |
+| S069 | only a report `buildReportModel` produced is rendered; every value escaped; `<bdi>`; inert document; logo bytes checked (hash, signature, size, pixels), each rule with its own test (review PR21-1, PR21-2) | EXECUTED_LOCAL (HTML), pending B's re-review | the PDF engine's own sandbox: worker (B) |
 | S070 | Letter/A4 page rules, repeating headers, unsplit rows, exact counts | PARTIAL | the printed PDF in Letter and A4: worker (B) |
 | R2-065 | three denominators with definitions | EXECUTED_LOCAL (HTML) | — |
 | R2-069 | guide lists only import files, by order and part; every other file marked not for import | EXECUTED_LOCAL (HTML) | — |

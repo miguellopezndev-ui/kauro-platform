@@ -72,6 +72,11 @@ export type CopyKey = keyof (typeof REPORT_COPY)["en-US"];
 
 const DEFAULT_LOCALE: ReportLocale = "en-US";
 
+/** The catalog a document in `locale` is written from: `locale` itself when the catalog has it, else English. */
+export function resolveLocale(locale: string): ReportLocale {
+  return Object.hasOwn(REPORT_COPY, locale) ? (locale as ReportLocale) : DEFAULT_LOCALE;
+}
+
 /** The text for `key` in `locale`, falling back to English for an unknown locale or a missing key. */
 export function copyText(locale: string, key: CopyKey, values: Readonly<Record<string, string>> = {}): string {
   const catalog = (REPORT_COPY as Record<string, Partial<Record<CopyKey, string>>>)[locale];

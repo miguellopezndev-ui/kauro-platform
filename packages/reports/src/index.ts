@@ -16,5 +16,5 @@ export { ReportModelError, PROBLEM_CODES } from "./problems.js";
 export type { Problem, ProblemCode } from "./problems.js";
 export { renderReportHtml, escapeHtml, LOGO_MAX_BYTES, LOGO_MAX_PIXELS } from "./html.js";
 export type { RenderOptions, RenderedReport, PageSize } from "./html.js";
-export { REPORT_COPY, copyText } from "./copy.js";
+export { REPORT_COPY, copyText, resolveLocale } from "./copy.js";
 export type { ReportLocale, CopyKey } from "./copy.js";

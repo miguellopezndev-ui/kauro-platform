@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { describe, it } from "node:test";
-import { buildReportModel, copyText, readMigrationPackage, renderReportHtml, REPORT_COPY, ReportModelError } from "../src/index.js";
+import { buildReportModel, copyText, resolveLocale, readMigrationPackage, renderReportHtml, REPORT_COPY, ReportModelError } from "../src/index.js";
 import type { ProblemCode, VerifiedReport } from "../src/index.js";
 import { facts, fileText, forge, loadPackage, manifestOf, writeManifest } from "./support/fixtures.js";
 import type { CaseName } from "./support/fixtures.js";
@@ -303,5 +303,21 @@ describe("PR21-3: a copy text never renders with a missing value", () => {
   it("a template whose placeholder has no value throws instead of printing an empty string", () => {
     assert.throws(() => copyText("en-US", "doc.preparedFor", {}), /no value for \{brand\}/);
     assert.equal(copyText("en-US", "doc.preparedFor", { brand: "N" }), "Prepared by N");
+  });
+});
+
+describe("PR21-6: the document language is the catalog it is written from; the only URL is the logo's data: image", () => {
+  it("lang names the catalog actually used (an unknown locale is written, and labelled, in English)", () => {
+    assert.equal(resolveLocale("en-US"), "en-US");
+    assert.equal(resolveLocale("es-CO"), "en-US");
+    assert.equal(resolveLocale("__proto__"), "en-US");
+    const { html } = renderReportHtml(report("B-dirty-multinational"), { pageSize: "LETTER", locale: "es-CO", logo: null });
+    assert.match(html, new RegExp(`<html lang="${resolveLocale("es-CO")}">`));
+  });
+  it("with a logo, every URL in the document is that logo's data: image", () => {
+    const logo = { sha256: sha(PNG_1x1), mediaType: "image/png" } as const;
+    const { html } = renderReportHtml(report("D-hubspot", { branding: { version: "b-6", displayName: "N", logo } }), { pageSize: "LETTER", locale: "en-US", logo: PNG_1x1 });
+    const urls = [...html.matchAll(/\b(?:src|href)="([^"]*)"/g)].map((m) => m[1]);
+    assert.deepEqual(urls, [`data:image/png;base64,${PNG_1x1.toString("base64")}`]);
   });
 });
