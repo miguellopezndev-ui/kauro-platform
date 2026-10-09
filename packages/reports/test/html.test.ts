@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { describe, it } from "node:test";
-import { buildReportModel, readMigrationPackage, renderReportHtml, REPORT_COPY, ReportModelError } from "../src/index.js";
+import { buildReportModel, copyText, readMigrationPackage, renderReportHtml, REPORT_COPY, ReportModelError } from "../src/index.js";
 import type { ProblemCode, VerifiedReport } from "../src/index.js";
 import { facts, fileText, forge, loadPackage, manifestOf, writeManifest } from "./support/fixtures.js";
 import type { CaseName } from "./support/fixtures.js";
@@ -266,5 +266,12 @@ describe("PR21-2: the renderer prints only a report buildReportModel produced, a
       return;
     }
     assert.ok(!html.includes("<img src=x"), "markup from a hand-made report reached the document");
+  });
+});
+
+describe("PR21-3: a copy text never renders with a missing value", () => {
+  it("a template whose placeholder has no value throws instead of printing an empty string", () => {
+    assert.throws(() => copyText("en-US", "doc.preparedFor", {}), /no value for \{brand\}/);
+    assert.equal(copyText("en-US", "doc.preparedFor", { brand: "N" }), "Prepared by N");
   });
 });

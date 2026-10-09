@@ -76,5 +76,9 @@ const DEFAULT_LOCALE: ReportLocale = "en-US";
 export function copyText(locale: string, key: CopyKey, values: Readonly<Record<string, string>> = {}): string {
   const catalog = (REPORT_COPY as Record<string, Partial<Record<CopyKey, string>>>)[locale];
   const template = catalog?.[key] ?? REPORT_COPY[DEFAULT_LOCALE][key];
-  return template.replace(/\{([a-zA-Z]+)\}/g, (_, name: string) => values[name] ?? "");
+  return template.replace(/\{([a-zA-Z]+)\}/g, (_, name: string) => {
+    const value = values[name];
+    if (value === undefined) throw new TypeError(`copy ${key}: no value for {${name}}`);
+    return value;
+  });
 }
