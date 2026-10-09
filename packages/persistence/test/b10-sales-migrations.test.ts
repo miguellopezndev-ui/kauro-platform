@@ -84,7 +84,8 @@ const notActivatable = (fact: string) => (e: unknown): boolean => refusedWith("K
 async function acquiredAt(name: string, seller: Seller, acceptedAt: string, confirmedAt: string) {
   const ag = await agencyWith(w, name);
   const prospect = await registerProspect(w, seller, `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.example`);
-  const claimId = await submitClaim(w, seller, prospect);
+  // submitted at the acceptance instant: the claim is accepted inside its review window (KC021 judges the deadline at COMMIT, 0048)
+  const claimId = await submitClaim(w, seller, prospect, { at: acceptedAt });
   const allocationId = await prepareAllocation(w, ag, prospect, [{ seller, claimId, shareBps: 10000 }]);
   const order = await orderOf(w, ag, await quoteOf(w, ag, await subjectOf(w, ag, `${name}-first`)));
   await acceptAttribution(w, ag, allocationId, [claimId], { at: acceptedAt });
