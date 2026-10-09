@@ -84,10 +84,12 @@ const notActivatable = (fact: string) => (e: unknown): boolean => refusedWith("K
 async function acquiredAt(name: string, seller: Seller, acceptedAt: string, confirmedAt: string) {
   const ag = await agencyWith(w, name);
   const prospect = await registerProspect(w, seller, `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.example`);
-  // submitted at the acceptance instant: the claim is accepted inside its review window (KC021 judges the deadline at COMMIT, 0048)
-  const claimId = await submitClaim(w, seller, prospect, { at: acceptedAt });
+  // the whole acquisition sits at test-clock instants in order: claim submitted < order created < accepted < confirmed (KC021 judges the
+  // review deadline at COMMIT, 0048; the conversion needs the claim submitted before the first purchase's order, 0029)
+  const before = (hours: number) => new Date(Date.parse(acceptedAt) - hours * 3_600_000).toISOString();
+  const claimId = await submitClaim(w, seller, prospect, { at: before(24) });
   const allocationId = await prepareAllocation(w, ag, prospect, [{ seller, claimId, shareBps: 10000 }]);
-  const order = await orderOf(w, ag, await quoteOf(w, ag, await subjectOf(w, ag, `${name}-first`)));
+  const order = await orderOf(w, ag, await quoteOf(w, ag, await subjectOf(w, ag, `${name}-first`)), { at: before(12) });
   await acceptAttribution(w, ag, allocationId, [claimId], { at: acceptedAt });
   const first = await settle(w, ag, order, { confirmedAt });
   return { ag, prospect, claimId, allocationId, first };
