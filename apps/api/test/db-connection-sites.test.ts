@@ -14,7 +14,7 @@ import { openCommissionPools, openPaymentPools } from "../src/index.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 
-const EXTENSIONS = [".ts", ".tsx", ".js", ".mjs", ".cjs"];
+const EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
 
 /**
  * Only TRACKED source is scanned (git ls-files): build output (.next, dist, coverage, ...) is untracked, so it is excluded because it
@@ -26,7 +26,7 @@ function trackedSources(repo: string): string[] {
   assert.equal(listed.status, 0, `git ls-files failed: ${listed.stderr}`);
   return listed.stdout
     .split("\0")
-    .filter((f) => f !== "" && EXTENSIONS.some((e) => f.endsWith(e)) && !f.endsWith(".d.ts") && !/^(?:apps|packages)\/[^/]+\/test\//.test(f))
+    .filter((f) => f !== "" && EXTENSIONS.some((e) => f.endsWith(e)) && !/\.d\.[cm]?ts$/.test(f) && !/^(?:apps|packages)\/[^/]+\/test\//.test(f))
     .sort();
 }
 
@@ -55,7 +55,7 @@ const printer = ts.createPrinter({ removeComments: true });
 function scriptKindOf(rel: string): ts.ScriptKind {
   if (rel.endsWith(".tsx")) return ts.ScriptKind.TSX;
   if (rel.endsWith(".jsx")) return ts.ScriptKind.JSX;
-  return /.[cm]?js$/.test(rel) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
+  return /\.[cm]?js$/.test(rel) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
 }
 function withoutComments(text: string, rel: string): string {
   return printer.printFile(ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, false, scriptKindOf(rel)));
@@ -145,7 +145,7 @@ function tlsViolations(text: string, rel?: string): string[] {
   return TLS_FORMS.filter((f) => f.test(c)).map(String);
 }
 
-test("scan self-test: each connection form is caught, in .ts, .js and .mjs files", () => {
+test("scan self-test: each connection form is caught, in .ts, .js and .mjs files; .mts, .cts and .jsx are listed", () => {
   const forms: Record<string, string> = {
     "new pg.Pool(": 'import pg from "pg";\nexport const p = new pg.Pool({});',
     "namespace import": 'import * as db from "pg";\nexport const c = new db.Client({});',
@@ -203,7 +203,7 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
     ["packages/persistence/src/inquiries.ts", 'import { type KauroPool } from "./pool.js";'],
     ["packages/persistence/src/index.ts", 'export { createPool, KauroPool } from "./pool.js";'],
   ] as const) assert.equal(persistenceProblem(rel, text), undefined, text);
-  const files = Object.fromEntries(["a.ts", "b.js", "c.mjs", "d.cjs"].map((n) => [`apps/x/src/${n}`, forms["new pg.Pool("] ?? ""]));
+  const files = Object.fromEntries(["a.ts", "b.js", "c.mjs", "d.cjs", "e.mts", "f.cts", "g.jsx"].map((n) => [`apps/x/src/${n}`, forms["new pg.Pool("] ?? ""]));
   const repo = tempRepo(files);
   try {
     assert.deepEqual(trackedSources(repo.dir), Object.keys(files));
@@ -223,6 +223,8 @@ test("scan self-test: only tracked source is scanned: src/build/db.ts, src/out/d
       "apps/web/src/test/db.ts": looks,
       "apps/web/test/db.test.ts": looks,
       "apps/web/src/types.d.ts": looks,
+      "apps/web/src/types.d.mts": looks,
+      "apps/web/src/types.d.cts": looks,
     },
     { "apps/web/.next/standalone/apps/web/server.js": looks, "apps/web/dist/db.js": looks },
   );
