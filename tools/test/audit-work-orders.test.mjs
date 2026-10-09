@@ -331,7 +331,7 @@ test("DENY every edge outside the state table, including from CLOSED and VOIDED 
     deny(wo1, "CLOSED", COORD, { toolRule: NOT_GENERIC }, "s3 FIXED->CLOSED");
     deny(wo1, "OPEN", COORD, {}, "FIXED->OPEN");
 
-    const wo2 = d.imp(2);
+    const wo2 = d.imp(2, { family: "time" }); // another family: a FIXED same-family sibling would make VERIFIED need the permanent check (ADV-6)
     const { F: F2 } = d.toFixed(wo2, 2);
     d.goodDelta(wo2, F2);
     d.go(wo2, "VERIFIED", VERIFIER);
