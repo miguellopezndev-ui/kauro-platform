@@ -236,3 +236,35 @@ describe("PR21-1: every logo rule has its own test (S069)", () => {
     assert.deepEqual(refusal(() => renderReportHtml(report("D-hubspot"), { pageSize: "LETTER", locale: "en-US", logo: PNG_1x1 })), ["BRANDING_UNSAFE"]);
   });
 });
+
+describe("PR21-2: the renderer prints only a report buildReportModel produced, and escapes every value", () => {
+  it("a report object that buildReportModel did not produce is refused", () => {
+    const real = report("D-hubspot");
+    assert.deepEqual(refusal(() => renderReportHtml({ ...real } as VerifiedReport, { pageSize: "LETTER", locale: "en-US", logo: null })), ["REPORT_UNVERIFIED"]);
+  });
+  it("a hand-made report with markup in every raw field renders none of it", () => {
+    const real = report("D-salesforce");
+    const evil = "<img src=x onerror=alert(1)>";
+    const m = real.model;
+    const forged = {
+      ...real,
+      modelHash: evil,
+      model: {
+        ...m,
+        lineage: { ...m.lineage, inputs: m.lineage.inputs.map((i) => ({ ...i, fileId: evil, sha256: evil })) },
+        importGuide: m.importGuide.map((s) => ({ ...s, order: evil, object: evil, sha256: evil })),
+        exceptions: m.exceptions.map((a) => ({ ...a, sha256: evil })),
+        artifacts: m.artifacts.map((a) => ({ ...a, sha256: evil })),
+      },
+    } as unknown as VerifiedReport;
+    let html = "";
+    try {
+      html = renderReportHtml(forged, { pageSize: "LETTER", locale: "en-US", logo: null }).html;
+    } catch (error) {
+      assert.ok(error instanceof ReportModelError);
+      assert.deepEqual(error.problems.map((p) => p.code), ["REPORT_UNVERIFIED"]);
+      return;
+    }
+    assert.ok(!html.includes("<img src=x"), "markup from a hand-made report reached the document");
+  });
+});

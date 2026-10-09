@@ -249,6 +249,12 @@ function importGuide(pkg: VerifiedPackage): ImportStep[] {
   }));
 }
 
+/** The reports this module built. `renderReportHtml` refuses any other object, however well it is shaped (review PR21-2). */
+const VERIFIED_REPORTS = new WeakSet<object>();
+export function isVerifiedReport(value: unknown): value is VerifiedReport {
+  return typeof value === "object" && value !== null && VERIFIED_REPORTS.has(value);
+}
+
 function deepFreeze<T>(value: T): T {
   if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
     for (const v of Object.values(value)) deepFreeze(v);
@@ -366,5 +372,7 @@ export function buildReportModel(pkg: VerifiedPackage, facts: unknown): Verified
     rendererVersion: f.rendererVersion,
     privacyClass: f.privacyClass,
   });
-  return Object.freeze({ model, modelHash, snapshot, countsBinding });
+  const verified: VerifiedReport = Object.freeze({ model, modelHash, snapshot, countsBinding });
+  VERIFIED_REPORTS.add(verified);
+  return verified;
 }

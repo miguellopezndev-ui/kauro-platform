@@ -10,7 +10,7 @@
  */
 export { readMigrationPackage, isVerifiedPackage, isSafePackagePath, SUPPORTED_CORE_VERSION, SUPPORTED_PACKAGE_FORMAT, OBJECT_ORDER, AREAS, ARTIFACT_KINDS, TARGET_MODES, IMPORT_MODES } from "./package.js";
 export type { VerifiedPackage, PackageArtifact, PackageInput, PackageFiles, Reconciliation, ImportFile, UntrustedText, Area, ArtifactKind, CoreObject } from "./package.js";
-export { buildReportModel, REPORT_MODEL_VERSION } from "./model.js";
+export { buildReportModel, isVerifiedReport, REPORT_MODEL_VERSION } from "./model.js";
 export type { ReportModel, VerifiedReport, PlatformFacts, CountsBinding, Figure, FigureSource, Branding, LegalIssuer, ReportArtifact, ImportStep, ReportInput, ArtifactUse, PrivacyClass } from "./model.js";
 export { ReportModelError, PROBLEM_CODES } from "./problems.js";
 export type { Problem, ProblemCode } from "./problems.js";

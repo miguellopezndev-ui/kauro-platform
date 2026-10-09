@@ -14,6 +14,7 @@
 import { createHash } from "node:crypto";
 import { copyText } from "./copy.js";
 import type { CopyKey } from "./copy.js";
+import { isVerifiedReport } from "./model.js";
 import type { Figure, ImportStep, ReportArtifact, VerifiedReport } from "./model.js";
 import { OBJECT_ORDER } from "./package.js";
 import { ReportModelError } from "./problems.js";
@@ -102,10 +103,12 @@ const STYLE = (page: string): string =>
   ].join("\n");
 
 export function renderReportHtml(report: VerifiedReport, options: RenderOptions): RenderedReport {
+  if (!isVerifiedReport(report)) throw new ReportModelError([{ code: "REPORT_UNVERIFIED", subject: "report", detail: "the report was not produced by buildReportModel" }]);
   const m = report.model;
   const locale = options.locale;
   const t = (key: CopyKey, values: Readonly<Record<string, string>> = {}): string => escapeHtml(copyText(locale, key, values));
-  const n = (f: Figure): string => f.value.toLocaleString("en-US");
+  const n = (f: Figure): string => escapeHtml(f.value.toLocaleString("en-US"));
+  const e = (v: string | number): string => escapeHtml(String(v));
   const logo = checkedLogo(report, options.logo);
   const out: string[] = [];
 
@@ -126,10 +129,10 @@ export function renderReportHtml(report: VerifiedReport, options: RenderOptions)
   out.push(`<table><thead><tr><th>${t("table.measure")}</th><th>${t("table.count")}</th><th>${t("table.definition")}</th></tr></thead><tbody>`);
   const order = ["physicalSourceRows", "billableSourceUnits", "emittedArtifactRows", "logicalSourceRecords", "emittedRepresentatives", "mergedNonSurvivors", "withheld", "rejected", "unresolved", "associationEdges"] as const;
   for (const key of order)
-    out.push(`<tr><td>${t(`counts.${key}`)}</td><td class="n" data-figure="${key}">${n(m.counts[key])}</td><td>${t(`counts.${key}.definition`)}</td></tr>`);
+    out.push(`<tr><td>${t(`counts.${key}`)}</td><td class="n" data-figure="${e(key)}">${n(m.counts[key])}</td><td>${t(`counts.${key}.definition`)}</td></tr>`);
   out.push("</tbody></table>");
   out.push(`<h2>${t("objects.heading")}</h2>`, `<table><thead><tr><th>${t("table.object")}</th><th>${t("table.records")}</th></tr></thead><tbody>`);
-  for (const object of OBJECT_ORDER) out.push(`<tr><td>${object}</td><td class="n" data-figure="deliveredByObject.${object}">${n(m.deliveredByObject[object])}</td></tr>`);
+  for (const object of OBJECT_ORDER) out.push(`<tr><td>${e(object)}</td><td class="n" data-figure="deliveredByObject.${e(object)}">${n(m.deliveredByObject[object])}</td></tr>`);
   out.push("</tbody></table>");
   out.push(`<h2>${t("relationships.heading")}</h2>`, `<table><thead><tr><th>${t("table.measure")}</th><th>${t("table.count")}</th></tr></thead><tbody>`);
   for (const key of ["delivered", "leftover", "unresolved", "deduplicated"] as const)
@@ -141,7 +144,7 @@ export function renderReportHtml(report: VerifiedReport, options: RenderOptions)
   out.push("<section>", `<h2>${t("guide.heading")}</h2>`, `<p>${t("guide.onlyImport")}</p>`, '<ol class="guide">');
   for (const s of m.importGuide) {
     const parts = m.importGuide.filter((x) => familyOf(x) === familyOf(s)).length;
-    out.push(`<li data-step="${s.order}" data-path="${escapeHtml(s.path)}">`);
+    out.push(`<li data-step="${e(s.order)}" data-path="${escapeHtml(s.path)}">`);
     out.push(`<div class="p">${escapeHtml(s.path)}</div>`);
     if (s.object !== null) out.push(`<div>${t("guide.object", { object: s.object })}</div>`);
     if (s.association !== null) out.push(`<div>${t("guide.association", { from: s.association.from, to: s.association.to })}</div>`);
@@ -156,7 +159,7 @@ export function renderReportHtml(report: VerifiedReport, options: RenderOptions)
     out.push(`<table><thead><tr><th>${t("table.file")}</th><th>${t("table.use")}</th><th>${t("table.records")}</th><th>${t("table.sha256")}</th></tr></thead><tbody>`);
     for (const a of list)
       out.push(
-        `<tr data-artifact="${escapeHtml(a.path)}" data-use="${a.use}"><td class="p">${escapeHtml(a.path)}</td><td>${t(`artifacts.use.${a.use}`)}</td><td class="n" data-records="${escapeHtml(a.path)}">${a.records === null ? "" : n(a.records)}</td><td class="h">${a.sha256}</td></tr>`,
+        `<tr data-artifact="${escapeHtml(a.path)}" data-use="${e(a.use)}"><td class="p">${escapeHtml(a.path)}</td><td>${t(`artifacts.use.${a.use}`)}</td><td class="n" data-records="${escapeHtml(a.path)}">${a.records === null ? "" : n(a.records)}</td><td class="h">${e(a.sha256)}</td></tr>`,
       );
     out.push("</tbody></table>");
   };
@@ -169,7 +172,7 @@ export function renderReportHtml(report: VerifiedReport, options: RenderOptions)
   // lineage: source files; the agency's file names only where the privacy class allows, as isolated text
   out.push("<section>", `<h2>${t("lineage.heading")}</h2>`, `<table><thead><tr><th>${t("table.file")}</th><th>${t("lineage.rows")}</th><th>${t("table.sha256")}</th></tr></thead><tbody>`);
   for (const i of m.lineage.inputs)
-    out.push(`<tr><td class="p">${i.fileId}${i.fileName === null ? "" : ` <bdi>${escapeHtml(i.fileName.untrusted)}</bdi>`}</td><td class="n">${n(i.dataRows)}</td><td class="h">${i.sha256}</td></tr>`);
+    out.push(`<tr><td class="p">${e(i.fileId)}${i.fileName === null ? "" : ` <bdi>${escapeHtml(i.fileName.untrusted)}</bdi>`}</td><td class="n">${n(i.dataRows)}</td><td class="h">${e(i.sha256)}</td></tr>`);
   out.push("</tbody></table>", "</section>");
 
   out.push(`<footer>${t("footer.identity", { packageDigest: m.package.packageDigest, manifestSha256: m.package.manifestSha256, coreVersion: m.package.coreVersion, modelHash: report.modelHash, rendererVersion: m.rendererVersion })}</footer>`);
