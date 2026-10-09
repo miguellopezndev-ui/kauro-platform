@@ -22,14 +22,14 @@
 //   status}]}, newest = highest n; built here by the test.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { test } from "node:test";
 import { MANIFEST_NAME, verifyManifest, writeManifest } from "../audit/lib/manifest.mjs";
-import { sha256Hex } from "../audit/lib/record.mjs";
-import { openLedger } from "../audit/work-orders.mjs";
+import { canonical, sha256Hex } from "../audit/lib/record.mjs";
+import { main, openLedger } from "../audit/work-orders.mjs";
 import { makeFixture } from "./audit-fixture.mjs";
 
 const CLI = fileURLToPath(new URL("../audit/work-orders.mjs", import.meta.url));
@@ -56,6 +56,22 @@ function refuses(fn, code, label) {
     assert.equal(e.code, code, `${label}: ${e.message}`);
     return true;
   });
+}
+
+function refusesKind(fn, code, kind, label) {
+  assert.throws(fn, (e) => {
+    assert.equal(e.code, code, `${label}: ${e.message}`);
+    assert.equal(e.kind, kind, `${label}: kind of ${e.message}`);
+    return true;
+  });
+}
+
+/** The CLI in process: {status, stdout, stderr}. */
+function cli(args) {
+  const out = [];
+  const err = [];
+  const status = main(args, { log: (s) => out.push(String(s)), error: (s) => err.push(String(s)) });
+  return { status, stdout: out.join("\n"), stderr: err.join("\n") };
 }
 
 function baseRecord(subject, rawPath, bytes) {
@@ -100,13 +116,19 @@ function world() {
   const roots = [];
   let rawN = 0;
   let fixN = 0;
+  // ADV-12: repos.json names the Kauro root; a tier-1 review receipt must resolve under <kauroRoot>/tools/review/out.
+  const kauroRoot = join(fx.dir, "kauro");
+  const reviewOut = join(kauroRoot, "tools", "review", "out");
+  mkdirSync(reviewOut, { recursive: true });
   const w = {
     fx,
     audited,
+    kauroRoot,
+    reviewOut,
     newRoot() {
       const root = mkdtempSync(join(tmpdir(), "audit-wo-"));
       roots.push(root);
-      writeFileSync(join(root, "repos.json"), `${JSON.stringify({ "kauro-platform": fx.work })}\n`);
+      writeFileSync(join(root, "repos.json"), `${JSON.stringify({ "kauro-platform": fx.work, kauroRoot })}\n`);
       return root;
     },
     finding(k, o = {}) {
@@ -161,9 +183,9 @@ function world() {
         green: { sha: F, record: { ...baseRecord(subject(F), greenPath, greenXml), exit: 0, result: "PASSED" } },
       };
     },
-    /** A review receipt dir `<label>-<sha12>` outside git with review.json, codex.log and prompt.md (minus `omit`). */
-    receipt(label, sha, { verdict = "ACCEPT", omit = [] } = {}) {
-      const dir = join(fx.dir, "review-out", `${label}-${sha.slice(0, 12)}`);
+    /** A review receipt dir `<parent>/<label>-<sha12>` (parent = <kauroRoot>/tools/review/out) with review.json, codex.log and prompt.md (minus `omit`). */
+    receipt(label, sha, { verdict = "ACCEPT", omit = [], parent = reviewOut } = {}) {
+      const dir = join(parent, `${label}-${sha.slice(0, 12)}`);
       mkdirSync(dir, { recursive: true });
       const files = { "review.json": `${JSON.stringify({ verdict, label, sha })}\n`, "codex.log": `codex reviewed ${sha}\n`, "prompt.md": `# review ${label}\n` };
       for (const [name, text] of Object.entries(files)) if (!omit.includes(name)) writeFileSync(join(dir, name), text);
@@ -834,6 +856,410 @@ test("OK summary counts by family, state, tier and kind, blocked capabilities, L
 `);
     refuses(() => d.ledger.fold("WO-5"), "E_LOST_NO_ANCHOR", "a LOST event without its anchor citation");
   } finally {
+    w.cleanup();
+  }
+});
+
+// ---------------------------------------------------------------- fix round 1 (adversary FAIL 8c7d810; coordinator rulings 20:23Z)
+
+test("ADV-1: LOST records the runs it supersedes (fields.supersedes); it recovers whichever max-seq anchor run is cited, and a run outside that list is never exempt by run-id order (E_LEDGER_CORRUPT)", () => {
+  const w = world();
+  try {
+    for (const cite of ["transition", "summary"]) {
+      const d = desk(w);
+      const wo = d.imp(1);
+      d.assign(wo, 1);
+      const runA = d.go(wo, "ASSIGNED", COORD, d.assignFields(wo, 1, "fixer-2")).anchorRun;
+      const runS = d.ledger.summary().runId;
+      const h3 = d.eventHash(wo, 3);
+      assert.deepEqual(d.anchorsOf(runA)[wo], { seq: 3, hash: h3 }, "the transition run anchors seq 3");
+      assert.deepEqual(d.anchorsOf(runS)[wo], { seq: 3, hash: h3 }, "the later summary run anchors the same seq 3");
+      unlinkSync(d.eventPath(wo, 3));
+      refuses(() => d.ledger.fold(wo), "E_LEDGER_CORRUPT", `${cite}: the truncated tail freezes the WO`);
+
+      const anchorRun = cite === "transition" ? runA : runS;
+      let lost;
+      try {
+        lost = d.ledger.lost(wo, { anchorRun, actor: COORD, requestId: `lost-${cite}` });
+      } catch (e) {
+        assert.fail(`${cite}: LOST citing the max-seq run ${anchorRun} was refused with ${e.code}: ${e.message}`);
+      }
+      assert.equal(lost.event.seq, 3, `${cite}: LOST takes the lost seq`);
+      assert.equal(lost.event.to, "LOST");
+      assert.deepEqual(
+        { anchorRun: lost.event.fields.anchorRun, anchorSeq: lost.event.fields.anchorSeq, anchorHash: lost.event.fields.anchorHash, lastSurvivingSeq: lost.event.fields.lastSurvivingSeq },
+        { anchorRun, anchorSeq: 3, anchorHash: h3, lastSurvivingSeq: 2 },
+      );
+      assert.deepEqual([...(lost.event.fields.supersedes ?? [])].sort(), [runA, runS].sort(), `${cite}: supersedes lists every verified run anchoring seq 3, the cited one and the other`);
+      const recovered = d.ledger.fold(wo);
+      assert.equal(recovered.state, "ASSIGNED", `${cite}: the state is the last surviving event's`);
+      assert.equal(recovered.seq, 3);
+      assert.deepEqual(d.ledger.lost(wo, { anchorRun, actor: COORD, requestId: `lost-${cite}` }).event, lost.event, `${cite}: the same LOST request replays its event`);
+
+      // A complete, verifying copy of a superseded run under a LOWER run id (a clock step-back between processes): not in supersedes,
+      // so its seq-3 anchor (the lost bytes) must still freeze the WO.
+      const lowId = `${String(Number.parseInt(runA.slice(0, 13), 10) - 1).padStart(13, "0")}-000000`;
+      cpSync(join(d.root, "runs", runS), join(d.root, "runs", lowId), { recursive: true });
+      assert.doesNotThrow(() => verifyManifest(join(d.root, "runs", lowId)), "the lower-id run verifies");
+      refuses(() => d.ledger.fold(wo), "E_LEDGER_CORRUPT", `${cite}: a run outside supersedes is not exempt even with a run id below the cited run`);
+    }
+  } finally {
+    w.cleanup();
+  }
+});
+
+test("ADV-2: a work order present in an anchor but missing on disk (its folder or its binding) is frozen in the summary and keeps its capability blocked; import writes an anchor run (E_LEDGER_CORRUPT kind missing)", () => {
+  const w = world();
+  try {
+    const d = desk(w);
+    const wo1 = d.imp(1);
+    const wo2 = d.imp(2, { family: "money", tier: 1, materialClass: "false payment authority", capability: "payments-ach" });
+    d.assign(wo2, 2);
+    const first = d.ledger.summary().summary;
+    assert.deepEqual(first.blockedCapabilities, ["payments-ach"], "WO-2 blocks payments-ach while it is on disk");
+    assert.deepEqual(first.frozen, []);
+    const wo3 = d.imp(3);
+    const importAnchored = d.validRuns().some((id) => d.anchorsOf(id)[wo3]?.seq === 1 && d.anchorsOf(id)[wo3]?.hash === d.eventHash(wo3, 1));
+
+    rmSync(join(d.root, "wo", wo2), { recursive: true, force: true });
+    const fp1 = JSON.parse(readFileSync(d.eventPath(wo1, 1), "utf8")).fields.fingerprint;
+    unlinkSync(join(d.root, "fp", `${fp1}.wo.json`));
+    rmSync(join(d.root, "wo", wo3), { recursive: true, force: true });
+
+    const { summary } = d.ledger.summary();
+    assert.deepEqual(summary.frozen, [wo1, wo2, wo3], "P5/P5b: a deleted folder (WO-2, WO-3) or binding (WO-1) of an anchored WO is frozen, never dropped");
+    assert.deepEqual(summary.blockedCapabilities, ["payments-ach"], "P5: the deleted material WO-2 keeps payments-ach blocked");
+    refusesKind(() => d.ledger.fold(wo2), "E_LEDGER_CORRUPT", "missing", "the folder of the anchored WO-2 is missing");
+    assert.equal(importAnchored, true, "import wrote an anchor run naming WO-3 at seq 1 before any summary");
+  } finally {
+    w.cleanup();
+  }
+});
+
+test("ADV-3: the CLI requires an explicit --role for import, transitions and LOST; without it exit 1 E_USAGE and nothing is written", () => {
+  const w = world();
+  try {
+    const d = desk(w);
+    const wo = d.imp(1);
+    const runId = d.ledger.summary().runId;
+    const v = cli(["void", wo, "--root", d.root, "--actor", "fixer-1", "--rev", "1", "--fields", JSON.stringify({ r2: R2_VOID })]);
+    assert.equal(v.status, 1, `P2 void without --role exits 1 (got ${v.status}, stdout ${v.stdout})`);
+    assert.match(v.stderr, /^E_USAGE/);
+    assert.equal(d.ledger.fold(wo).state, "OPEN", "P2 the WO stays OPEN");
+    assert.equal(d.ledger.fold(wo).seq, 1, "P2 no event written");
+
+    const l = cli(["lost", wo, "--root", d.root, "--actor", "coordinator-1", "--anchor", runId]);
+    assert.equal(l.status, 1, "lost without --role exits 1");
+    assert.match(l.stderr, /^E_USAGE/);
+    assert.equal(d.ledger.fold(wo).seq, 1, "no LOST written");
+
+    const i = cli(["import", JSON.stringify(w.finding(2)), "--root", d.root, "--actor", "auditor-1"]);
+    assert.equal(i.status, 1, "import without --role exits 1");
+    assert.match(i.stderr, /^E_USAGE/);
+    assert.deepEqual(d.ledger.list(), [wo], "nothing imported");
+
+    const ok = cli(["void", wo, "--root", d.root, "--actor", "coordinator-1", "--role", "coordinator", "--rev", "1", "--fields", JSON.stringify({ r2: R2_VOID })]);
+    assert.equal(ok.status, 0, `an explicit coordinator role voids: ${ok.stderr}`);
+    assert.deepEqual(JSON.parse(ok.stdout).event.actor, { id: "coordinator-1", role: "coordinator" }, "the recorded role is the declared one");
+    assert.equal(d.ledger.fold(wo).state, "VOIDED");
+  } finally {
+    w.cleanup();
+  }
+});
+
+test("ADV-4: the CLI requires --rev and its default request id covers the revision: a second verify after a reopen commits a new VERIFIED, a retry at the same revision replays, no --rev is E_USAGE", () => {
+  const w = world();
+  try {
+    const d = desk(w);
+    const wo = d.imp(1);
+    const { R, F } = d.toFixed(wo, 1);
+    d.goodDelta(wo, F);
+    const asVerifier = ["--actor", VERIFIER.id, "--role", VERIFIER.role];
+    const asCoord = ["--actor", COORD.id, "--role", COORD.role];
+    const v1 = cli(["verify", wo, "--root", d.root, ...asVerifier, "--rev", "3"]);
+    assert.equal(v1.status, 0, v1.stderr);
+    const e4 = JSON.parse(v1.stdout).event;
+    assert.equal(e4.seq, 4);
+    const r1 = cli(["reopen", wo, "--root", d.root, ...asCoord, "--rev", "4", "--fields", JSON.stringify({ reason: "flaky" })]);
+    assert.equal(r1.status, 0, r1.stderr);
+    assert.equal(JSON.parse(r1.stdout).event.seq, 5);
+    const F2 = w.fix(wo);
+    assert.equal(d.go(wo, "FIXED", FIXER, w.proof(1, R, F2)).event.seq, 6);
+    d.goodDelta(wo, F2);
+
+    const v2 = cli(["verify", wo, "--root", d.root, ...asVerifier, "--rev", "6"]);
+    assert.equal(v2.status, 0, v2.stderr);
+    const e7 = JSON.parse(v2.stdout).event;
+    assert.equal(e7.seq, 7, "P3 the second verify of a new cycle commits event 7, not the seq-4 event of the first cycle");
+    assert.equal(d.ledger.fold(wo).state, "VERIFIED", "P3 the WO is VERIFIED again");
+    assert.equal(d.ledger.fold(wo).seq, 7);
+
+    const again = cli(["verify", wo, "--root", d.root, ...asVerifier, "--rev", "6"]);
+    assert.equal(again.status, 0, again.stderr);
+    assert.deepEqual(JSON.parse(again.stdout).event, e7, "RETRY the identical call at the same revision replays event 7");
+    assert.equal(d.ledger.fold(wo).seq, 7, "RETRY no new event");
+
+    const noRev = cli(["reopen", wo, "--root", d.root, ...asCoord, "--fields", JSON.stringify({ reason: "flaky" })]);
+    assert.equal(noRev.status, 1, "a transition without --rev exits 1");
+    assert.match(noRev.stderr, /^E_USAGE/);
+    assert.equal(d.ledger.fold(wo).seq, 7, "no event without --rev");
+
+    assert.equal(e4.requestId, sha256Hex(canonical({ woId: wo, to: "VERIFIED", actor: VERIFIER, rev: 3, fields: {} })), "default request id = sha256(canonical{woId, to, actor, rev, fields})");
+    assert.equal(e7.requestId, sha256Hex(canonical({ woId: wo, to: "VERIFIED", actor: VERIFIER, rev: 6, fields: {} })));
+  } finally {
+    w.cleanup();
+  }
+});
+
+test("ADV-5: RETRY of an import: identical replay and identical redelivery return the WO; the same fingerprint (bound or claimed by the same request id) with another finding body is E_IMPORT_CONFLICT", () => {
+  const w = world();
+  try {
+    const d = desk(w);
+    const f = w.finding(1);
+    const wo = d.ledger.importFinding(f, { actor: AUDITOR, requestId: "imp-1" }).woId;
+    assert.equal(d.ledger.importFinding(f, { actor: AUDITOR, requestId: "imp-1" }).woId, wo, "identical replay");
+    assert.equal(d.ledger.importFinding(f, { actor: AUDITOR, requestId: "imp-redelivered" }).woId, wo, "identical redelivery under another request id");
+    const material = w.finding(1, { family: "money", tier: 1, materialClass: "false payment authority", capability: "payments-ach" });
+    refuses(() => d.ledger.importFinding(material, { actor: AUDITOR, requestId: "imp-1" }), "E_IMPORT_CONFLICT", "P6 same key, another body (bound)");
+    refuses(() => d.ledger.importFinding(material, { actor: AUDITOR, requestId: "imp-other" }), "E_IMPORT_CONFLICT", "P6 same fingerprint, another body, another request id (bound)");
+    assert.deepEqual(d.ledger.list(), [wo]);
+    assert.deepEqual(d.events(wo), ["0001.json"], "no event written");
+    assert.equal(d.ledger.fold(wo).history[0].fields.finding.tier, 2, "the bound finding is unchanged");
+
+    const g = w.finding(2);
+    refuses(() => d.open({ crashAt: { point: "afterLink", match: CLAIM } }).importFinding(g, { actor: AUDITOR, requestId: "imp-2" }), "E_SIMULATED_CRASH", "crash after the claim");
+    refuses(() => d.open().importFinding(w.finding(2, { tier: 1, family: "money", materialClass: "false payment authority", capability: "payments-ach" }), { actor: AUDITOR, requestId: "imp-2" }), "E_IMPORT_CONFLICT", "same request id on the pending claim with another body");
+    assert.deepEqual(d.ledger.list(), [wo], "the conflicting body made no WO");
+    const resumed = d.open().importFinding(g, { actor: AUDITOR, requestId: "imp-2" });
+    assert.deepEqual(d.ledger.list(), [wo, resumed.woId], "the identical body resumes the claim");
+  } finally {
+    w.cleanup();
+  }
+});
+
+test("ADV-6: the root-cause rule counts every non-VOIDED WO of the family in any state: two FIXED siblings, and a sibling already CLOSED, need the permanent check (E_ROOT_CAUSE)", () => {
+  const w = world();
+  try {
+    const d = desk(w);
+    const PERM = "packages/x/test/permanent-retry.test.ts";
+    const PERM_TITLE = "the retry family keeps a at 2";
+    const wo1 = d.imp(1);
+    const wo2 = d.imp(2);
+    const { F: F1 } = d.toFixed(wo1, 1, { [PERM]: withTitle(PERM_TITLE) });
+    const { F: F2 } = d.toFixed(wo2, 2);
+    assert.deepEqual([d.ledger.fold(wo1).state, d.ledger.fold(wo2).state], ["FIXED", "FIXED"]);
+    d.goodDelta(wo1, F1);
+    d.goodDelta(wo2, F2);
+    refuses(() => d.go(wo1, "VERIFIED", VERIFIER), "E_ROOT_CAUSE", "P4 the sibling WO-2 is FIXED");
+    assert.equal(d.seq(wo1), 3, "no VERIFIED written");
+    assert.equal(d.go(wo1, "VERIFIED", VERIFIER, { permanentCheck: { file: PERM, title: PERM_TITLE } }).event.to, "VERIFIED");
+    refuses(() => d.go(wo2, "VERIFIED", VERIFIER), "E_ROOT_CAUSE", "P4 the sibling WO-1 is VERIFIED");
+    assert.equal(d.seq(wo2), 3);
+
+    // first-CLOSED order: WO-3 closes alone, then WO-4 of the same family arrives.
+    const wo3 = d.imp(3, { family: "time" });
+    const { F: F3 } = d.toFixed(wo3, 3);
+    d.goodDelta(wo3, F3);
+    d.go(wo3, "VERIFIED", VERIFIER);
+    w.setMain(F3);
+    d.go(wo3, "CLOSED", COORD, { toolRule: NOT_GENERIC });
+    assert.equal(d.ledger.fold(wo3).state, "CLOSED");
+    const wo4 = d.imp(4, { family: "time" });
+    const { F: F4 } = d.toFixed(wo4, 4);
+    d.goodDelta(wo4, F4);
+    refuses(() => d.go(wo4, "VERIFIED", VERIFIER), "E_ROOT_CAUSE", "the sibling WO-3 is CLOSED");
+    assert.equal(d.ledger.fold(wo4).state, "FIXED");
+  } finally {
+    w.cleanup();
+  }
+});
+
+test("ADV-8: the verifier is none of the fixers ever ASSIGNED on the WO: an earlier fixer after reassignment is refused (E_INDEPENDENCE_VERIFIER)", () => {
+  const w = world();
+  try {
+    const d = desk(w);
+    const wo = d.imp(1);
+    const { R } = d.toFixed(wo, 1);
+    d.go(wo, "ASSIGNED", COORD, { reason: "the delta run failed" });
+    d.go(wo, "ASSIGNED", COORD, d.assignFields(wo, 1, FIXER2.id));
+    const F2 = w.fix(wo);
+    d.go(wo, "FIXED", FIXER2, w.proof(1, R, F2));
+    d.goodDelta(wo, F2);
+    refuses(() => d.go(wo, "VERIFIED", { id: FIXER.id, role: "verifier" }), "E_INDEPENDENCE_VERIFIER", "P7 fixer-1 (an earlier fixer whose commits are in F2) verifies");
+    refuses(() => d.go(wo, "VERIFIED", { id: FIXER2.id, role: "verifier" }), "E_INDEPENDENCE_VERIFIER", "the current fixer verifies");
+    assert.equal(d.ledger.fold(wo).state, "FIXED");
+    assert.equal(d.seq(wo), 6, "no VERIFIED written");
+    assert.equal(d.go(wo, "VERIFIED", VERIFIER).event.to, "VERIFIED", "an independent verifier is accepted");
+  } finally {
+    w.cleanup();
+  }
+});
+
+test("ADV-9: a run whose manifest does not verify (a changed, an extra or a missing file, or an anchors.json that is not JSON) freezes the WO (E_LEDGER_CORRUPT kind run); only a run without a manifest is ignored", () => {
+  const w = world();
+  try {
+    const setup = () => {
+      const d = desk(w);
+      const wo = d.imp(1);
+      d.assign(wo, 1);
+      const run3 = d.go(wo, "ASSIGNED", COORD, d.assignFields(wo, 1, "fixer-2")).anchorRun;
+      return { d, wo, dir: join(d.root, "runs", run3) };
+    };
+    {
+      const { d, wo } = setup();
+      const crashed = join(d.root, "runs", "0000000000001-abcdef");
+      mkdirSync(crashed);
+      writeFileSync(join(crashed, "anchors.json"), `${JSON.stringify({ [wo]: { seq: 9, hash: "0".repeat(64) } })}\n`);
+      assert.equal(d.ledger.fold(wo).seq, 3, "a run without a manifest (crash before the manifest) is ignored");
+    }
+    const cases = [
+      ["P8 anchors.json changed after its manifest", (c) => writeFileSync(join(c.dir, "anchors.json"), `${JSON.stringify({ [c.wo]: { seq: 2, hash: c.d.eventHash(c.wo, 2) } })}\n`)],
+      ["an extra file in the run", (c) => writeFileSync(join(c.dir, "extra.json"), "{}\n")],
+      ["anchors.json missing from the run", (c) => unlinkSync(join(c.dir, "anchors.json"))],
+      [
+        "anchors.json not JSON under a regenerated manifest",
+        (c) => {
+          writeFileSync(join(c.dir, "anchors.json"), "{not json\n");
+          unlinkSync(join(c.dir, MANIFEST_NAME));
+          writeManifest(c.dir);
+        },
+      ],
+    ];
+    for (const [label, mutate] of cases) {
+      const c = setup();
+      mutate(c);
+      refusesKind(() => c.d.ledger.fold(c.wo), "E_LEDGER_CORRUPT", "run", label);
+    }
+  } finally {
+    w.cleanup();
+  }
+});
+
+test("W-08b: CLOSED is refused when origin/main is the red commit (title present, fix absent) and when the fetch fails with the tracking ref forged to F (E_CLOSE_NOT_ON_MAIN, E_CLOSE_MAIN_UNRESOLVED)", () => {
+  const w = world();
+  try {
+    const d = desk(w);
+    const { fx } = w;
+    const wo = d.imp(1);
+    const { R, F } = d.toFixed(wo, 1);
+    d.goodDelta(wo, F);
+    d.go(wo, "VERIFIED", VERIFIER);
+    const deny = (code, label, l) => {
+      refuses(() => d.go(wo, "CLOSED", COORD, { toolRule: NOT_GENERIC }, l), code, label);
+      assert.equal(d.ledger.fold(wo).state, "VERIFIED", `${label}: still VERIFIED`);
+      assert.equal(d.seq(wo), 4, `${label}: no event`);
+    };
+    w.setMain(R);
+    assert.equal(spawnSync("git", ["show", `${R}:${testFile(1)}`], { cwd: fx.work, encoding: "utf8" }).stdout.includes(JSON.stringify(titleOf(1))), true, "the acceptance title is at origin/main = R");
+    deny("E_CLOSE_NOT_ON_MAIN", "s1 origin/main = R: the title is there, the fix is not");
+
+    w.setMain(w.audited);
+    fx.git(["update-ref", "refs/remotes/origin/main", F]);
+    assert.equal(fx.git(["rev-parse", "refs/remotes/origin/main"]), F, "the stale tracking ref names F right before the failing fetch");
+    const failFetch = (cmd, args, opts) => (args.includes("fetch") ? { status: 128, stdout: "", stderr: "fatal: unable to access origin\n" } : spawnSync(cmd, args, opts));
+    deny("E_CLOSE_MAIN_UNRESOLVED", "s4 fetch fails and the tracking ref is forged to F: fail closed", d.open({ runner: failFetch }));
+
+    w.setMain(F);
+    assert.equal(d.go(wo, "CLOSED", COORD, { toolRule: NOT_GENERIC }).event.to, "CLOSED", "positive control: F on origin/main closes");
+  } finally {
+    w.cleanup();
+  }
+});
+
+test("ADV-12: a tier-1 review receipt must resolve (realpath) under <kauroRoot>/tools/review/out, kauroRoot from repos.json; a correctly named receipt elsewhere, through .., through a junction, or without kauroRoot is E_REVIEW_RECEIPT", () => {
+  const w = world();
+  try {
+    const d = desk(w);
+    const wo = d.imp(1, { family: "money", tier: 1 });
+    const { F } = d.toFixed(wo, 1);
+    d.goodDelta(wo, F);
+    d.go(wo, "VERIFIED", VERIFIER);
+    w.setMain(F);
+    const close = (reviewReceipt) => d.go(wo, "CLOSED", COORD, { toolRule: NOT_GENERIC, reviewReceipt });
+    const deny = (receipt, label) => {
+      refuses(() => close(receipt), "E_REVIEW_RECEIPT", label);
+      assert.equal(d.ledger.fold(wo).state, "VERIFIED", `${label}: still VERIFIED`);
+      assert.equal(d.seq(wo), 4, `${label}: no event`);
+    };
+    const elsewhere = join(w.fx.dir, "elsewhere");
+    deny(w.receipt("wo-1-lane-review", F, { parent: elsewhere }), "a correctly named ACCEPT receipt outside review/out");
+    const evil = join(w.reviewOut, "..", "out-evil");
+    w.receipt("wo-1-lane-review", F, { parent: evil });
+    deny(join(w.reviewOut, "..", "out-evil", `wo-1-lane-review-${F.slice(0, 12)}`), "a path that leaves review/out through ..");
+    const outside = w.receipt("wo-1-pkg-review", F, { parent: elsewhere });
+    const junction = join(w.reviewOut, `wo-1-pkg-review-${F.slice(0, 12)}`);
+    symlinkSync(outside, junction, "junction");
+    deny(junction, "a junction inside review/out whose realpath is outside");
+
+    const good = w.receipt("wo-1-lane-review-r2", F);
+    const reposPath = join(d.root, "repos.json");
+    const repos = readFileSync(reposPath, "utf8");
+    writeFileSync(reposPath, `${JSON.stringify({ "kauro-platform": w.fx.work })}\n`);
+    deny(good, "repos.json names no kauroRoot");
+    writeFileSync(reposPath, repos);
+    assert.equal(close(good).event.to, "CLOSED", "positive control: a receipt under <kauroRoot>/tools/review/out closes");
+  } finally {
+    w.cleanup();
+  }
+});
+
+/** ADV-13 preload: injects a fault into the CLI child process at an exact point after the event link (node:module syncBuiltinESMExports). */
+const PRELOAD = String.raw`import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+const mode = process.env.ADV13_MODE;
+const EVENT = /[\\/]wo[\\/]WO-\d+[\\/]\d{4}\.json$/;
+const EVENT_DIR = /[\\/]wo[\\/]WO-\d+$/;
+const RUN = /[\\/]runs[\\/][^\\/]+$/;
+const { openSync, fsyncSync, closeSync, mkdirSync } = fs;
+const marked = new Set();
+if (mode === "durability") {
+  fs.openSync = function (p, flags, ...rest) {
+    const fd = openSync.call(fs, p, flags, ...rest);
+    if ((flags === "r+" && EVENT.test(String(p))) || (flags === "r" && EVENT_DIR.test(String(p)))) marked.add(fd);
+    return fd;
+  };
+  fs.fsyncSync = function (fd) {
+    if (marked.has(fd)) throw Object.assign(new Error("EIO: i/o error, fsync (injected after the event link)"), { code: "EIO" });
+    return fsyncSync.call(fs, fd);
+  };
+  fs.closeSync = function (fd) {
+    marked.delete(fd);
+    return closeSync.call(fs, fd);
+  };
+}
+if (mode === "unexpected") {
+  fs.mkdirSync = function (p, ...rest) {
+    if (RUN.test(String(p))) throw new Error("injected: the anchor run directory cannot be created");
+    return mkdirSync.call(fs, p, ...rest);
+  };
+}
+syncBuiltinESMExports();
+`;
+
+test("ADV-13: the CLI exits 2 when the outcome is unknown (E_IO after the event link, an unexpected error after the commit, E_GIT), never 1", () => {
+  const w = world();
+  const preloadDir = mkdtempSync(join(tmpdir(), "audit-wo-preload-"));
+  try {
+    const preload = join(preloadDir, "fault.mjs");
+    writeFileSync(preload, PRELOAD);
+    for (const mode of ["durability", "unexpected"]) {
+      const d = desk(w);
+      const wo = d.imp(1);
+      const args = ["--import", pathToFileURL(preload).href, CLI, "void", wo, "--root", d.root, "--actor", COORD.id, "--role", COORD.role, "--rev", "1", "--fields", JSON.stringify({ r2: R2_VOID })];
+      const r = spawnSync(process.execPath, args, { encoding: "utf8", env: { ...process.env, ADV13_MODE: mode } });
+      assert.equal(existsSync(d.eventPath(wo, 2)), true, `${mode}: the fault hit after the event was linked (the effect happened): ${r.stderr}`);
+      assert.equal(JSON.parse(readFileSync(d.eventPath(wo, 2), "utf8")).to, "VOIDED", `${mode}: the committed event is the VOID`);
+      if (mode === "durability") assert.match(r.stderr, /E_IO/, "the durability failure surfaces as E_IO");
+      assert.equal(r.status, 2, `${mode}: the CLI exits 2 (outcome unknown), got ${r.status}: ${r.stderr.trim()}`);
+    }
+    const d = desk(w);
+    writeFileSync(join(d.root, "repos.json"), `${JSON.stringify({ "kauro-platform": join(d.root, "no-such-worktree"), kauroRoot: w.kauroRoot })}\n`);
+    const g = cli(["import", JSON.stringify(w.finding(1)), "--root", d.root, "--actor", AUDITOR.id, "--role", AUDITOR.role]);
+    assert.match(g.stderr, /^E_GIT/, "git could not run in the worktree");
+    assert.equal(g.status, 2, `E_GIT exits 2, got ${g.status}`);
+    assert.equal(existsSync(join(d.root, "wo")), false, "nothing imported");
+  } finally {
+    rmSync(preloadDir, { recursive: true, force: true });
     w.cleanup();
   }
 });

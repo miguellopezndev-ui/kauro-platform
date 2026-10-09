@@ -454,3 +454,62 @@ test("DENY a red proof that is not a test-only red on the audited sha failing fo
     fx.cleanup();
   }
 });
+
+// ---------------------------------------------------------------- fix round 1 (adversary FAIL 8c7d810; coordinator rulings 20:23Z)
+
+test("ADV-7: a red proof whose fix head is the red commit or adds no change (F == R, or an empty diff R..F) is refused (E_RED_PROOF_NO_FIX)", () => {
+  const fx = makeFixture("kauro-platform");
+  try {
+    const compiled = `${fx.work.replaceAll("\\", "/")}/packages/x/dist/test/a.test.js`;
+    fx.commit("base", { [SRC]: "export const a = 1;\n", "docs/readme.md": "r\n" });
+    const audited = fx.commit("audited", { "docs/readme.md": "r2\n" });
+    let n = 0;
+    const build = (makeF) => {
+      n++;
+      fx.branch(`adv7-${n}`, audited);
+      const R = fx.commit(`red ${n}`, { [TFILE]: WITH_TITLE });
+      const F = makeF(R, n);
+      const rawDir = join(fx.dir, "raw", String(n));
+      mkdirSync(rawDir, { recursive: true });
+      const redXml = junitXml([{ name: TITLE, file: compiled, outcome: "FAILED", type: "testCodeFailure", message: FAIL_MSG }]);
+      const greenXml = junitXml([{ name: TITLE, file: compiled, outcome: "PASSED" }]);
+      writeFileSync(join(rawDir, "red.xml"), redXml);
+      writeFileSync(join(rawDir, "green.xml"), greenXml);
+      const record = (sha, path, bytes) => ({ ...baseRecord(), subject: { repo: "kauro-platform", commit: sha, tree: fx.tree(sha) }, rawRef: { path, sha256: sha256Hex(bytes) } });
+      return {
+        cwd: fx.work,
+        auditedSha: audited,
+        acceptanceTest: { file: TFILE, title: TITLE, expectedFailure: "expected 2 but got 1" },
+        red: { sha: R, record: record(R, join(rawDir, "red.xml"), redXml) },
+        green: { sha: F, record: record(F, join(rawDir, "green.xml"), greenXml) },
+      };
+    };
+    const ok = validateRedProof(build((_R, k) => fx.commit(`fix ${k}`, { [SRC]: `export const a = 2; // ${k}\n` })));
+    assert.equal(ok.green.outcome, "PASSED", "positive control: a production change R..F is a fix");
+    const refusesNoFix = (input, label) =>
+      assert.throws(() => validateRedProof(input), (e) => {
+        assert.equal(e.code, "E_RED_PROOF_NO_FIX", `${label}: ${e.message}`);
+        return true;
+      });
+    refusesNoFix(build((R) => R), "P1 F == R (a flaky acceptance test passes with zero product change)");
+    refusesNoFix(build((_R, k) => fx.commit(`empty fix ${k}`, {})), "an empty commit on R: diff R..F is empty");
+  } finally {
+    fx.cleanup();
+  }
+});
+
+// The sha256 of the nine `| <id> |` rows of tools/review/families.md (LF-joined, CR stripped), pinned on 2026-10-09.
+const FAMILIES_ROWS_SHA256 = "e2ac440df58b7c95b8b447a2e2a02c2be1dcd516f0784174e392fa4973b5e4ff";
+
+test("ADV-11: the families.md id rows are pinned by sha256; when the source is present it must match and name exactly FAMILIES, and the output states whether the source check ran", (t) => {
+  const doc = process.env.KAURO_FAMILIES_MD ?? "C:/Projects/Kauro/tools/review/families.md";
+  assert.match(FAMILIES_ROWS_SHA256, /^[0-9a-f]{64}$/);
+  if (!existsSync(doc)) {
+    t.diagnostic(`families.md source check: SKIPPED (${doc} absent); the binding run is the ci-local Windows leg`);
+    return;
+  }
+  const rows = readFileSync(doc, "utf8").split(/\r?\n/).filter((line) => /^\| [a-z]+ \|/.test(line));
+  assert.deepEqual(rows.map((r) => r.split("|")[1].trim()), [...FAMILIES], "the id column of families.md is FAMILIES, in order");
+  assert.equal(sha256Hex(rows.join("\n")), FAMILIES_ROWS_SHA256, "the families.md rows are the pinned rows");
+  t.diagnostic(`families.md source check: RAN against ${doc} (${rows.length} rows, sha256 ${FAMILIES_ROWS_SHA256})`);
+});
