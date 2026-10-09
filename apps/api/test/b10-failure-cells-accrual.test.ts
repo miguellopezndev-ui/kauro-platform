@@ -11,7 +11,7 @@ import { after, before } from "node:test";
 import { assignedThrough, integrationWorld, oracleRows, providerReports, terminationBody, type IntegrationWorld } from "./integration-support.js";
 import { faultCell, recordServiceAssignment, type FaultContext } from "@kauro/persistence/testing";
 import { bindCells, eventsOf, fundsReport, ledgerOfPurchase, stateOf, type LedgerView, consumeOn, contend, failures, nothingFor, observeBlocked, convertedFor, converting, deliveryOfCapture, itemOf, mustHaveSettled, open, rightsOf, runConsumer, runSweepPass, settled, sweepOn, type Actor, type Converting, type Delivery } from "./b10-cells-support.js";
-import { acceptAttribution, approvedRefund, claimsOn, sellingAgency, deliveredByTheExecutionPackage, deliveryOf, linesOf, poolsOf, purchase, type Purchase } from "./commission-support.js";
+import { acceptAttribution, acquisitionInstants, approvedRefund, claimsOn, sellingAgency, deliveredByTheExecutionPackage, deliveryOf, linesOf, poolsOf, purchase, type Purchase } from "./commission-support.js";
 import type { ExecuteRefundView, SellerTerminationView, WebhookAck } from "@kauro/application";
 import type { SweepReport } from "../src/commissions/sweeps.js";
 import { call, completed, freshKey, type Reply } from "./support.js";
@@ -953,9 +953,10 @@ const AFTER_WINDOW = "2028-09-13T15:00:00Z";
 /** An agency whose single claimant's claim was accepted 2027-09-01 and whose first purchase (confirmed 2027-09-12) is accrued: ACTIVE entitlement ending at WINDOW_END. */
 async function windowed(label: string): Promise<Converting> {
   const s = await sellingAgency(iw, label);
-  const att = await claimsOn(iw, label, 1);
+  const instants = acquisitionInstants("2027-09-01T12:00:00Z");
+  const att = await claimsOn(iw, label, 1, instants.submittedAt);
   const allocationId = await acceptAttribution(iw, s.agency.agencyId, att, [10_000], "2027-09-01T12:00:00Z");
-  const first = await purchase(iw, s, `${label}-first`, { confirmedAt: "2027-09-12T14:00:00Z", providerCompletedAt: "2027-09-12T13:55:00Z" });
+  const first = await purchase(iw, s, `${label}-first`, { orderAt: instants.orderAt, confirmedAt: "2027-09-12T14:00:00Z", providerCompletedAt: "2027-09-12T13:55:00Z" });
   const c = { s, att, allocationId, agencyId: s.agency.agencyId, first, delivery: await deliveryOfCapture(first) };
   assert.equal(await runConsumer(c.delivery), "APPLIED", `${label}: the first purchase converts and accrues`);
   const [window] = await oracleRows<{ ends: string }>(iw, "SELECT to_char(window_ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS ends FROM kauro.commission_entitlements WHERE agency_id = $1", [c.agencyId]);
