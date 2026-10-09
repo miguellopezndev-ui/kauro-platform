@@ -1,0 +1,38 @@
+{
+ "note": "Attribution of every tracked non-doc file for tools/acceptance-touch.mjs (A6 §2, review PR18-2). A changed file matching a package's globs touches that package; a changed file matching `shared` touches every accepted package; a changed non-doc file matching neither fails the touch run. Conservative by design: an area two packages build on is listed under both. The cited test files of a package's sidecar and the src tree beside them are added by the tool.",
+ "shared": [
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "tsconfig.base.json",
+  "architecture.rules.json",
+  ".npmrc",
+  ".gitattributes",
+  ".gitignore",
+  ".github/**",
+  "tools/**",
+  "packages/*/package.json",
+  "packages/*/tsconfig.json",
+  "apps/*/package.json",
+  "apps/*/tsconfig*.json",
+  "packages/contracts/**",
+  "packages/*/test/**",
+  "apps/*/test/**",
+  "apps/api/openapi.json",
+  "apps/api/src/*",
+  "packages/application/src/*",
+  "packages/application/src/api/**",
+  "packages/application/src/ports/**",
+  "packages/application/src/testing/**",
+  "packages/persistence/src/*",
+  "packages/persistence/src/testing/**"
+ ],
+ "packages": {
+  "B06": ["packages/domain/**", "packages/authorization/**", "packages/persistence/**", "packages/application/src/commands/**", "packages/application/src/queries/**", "apps/api/src/**"],
+  "B07": ["packages/data-plane/**", "packages/persistence/**", "packages/application/src/sources/**", "apps/control/src/**", "apps/api/src/**", "packages/domain/**"],
+  "B08": ["apps/control/**", "packages/data-plane/**", "packages/persistence/**", "packages/application/src/execution/**", "packages/application/src/audit/**", "apps/api/src/**", "packages/domain/**"],
+  "B09": ["packages/persistence/**", "packages/application/src/commerce/**", "apps/api/src/payments/**", "apps/api/src/**", "packages/domain/**"],
+  "B10": ["packages/persistence/**", "packages/application/src/commercial/**", "apps/api/src/commissions/**", "packages/domain/**"],
+  "B11": ["apps/web/**", "packages/ui/**", "packages/application/src/support/**", "packages/application/src/sessions/**", "packages/application/src/public/**", "apps/api/src/**"]
+ }
+}
