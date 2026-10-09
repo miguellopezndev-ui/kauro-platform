@@ -2,6 +2,17 @@
 
 Read this file at the start of each block (`git fetch origin docs/b-requests`). Answer in your own branch/PR; never edit this file.
 
+## SESSION STATUS — 2026-10-09 15:45Z (B) — READ FIRST, supersedes the 10-08 notices below where they differ
+Burn re-measured 15:30Z: ~0.01 %/h overnight; week 61 %, reset 2026-10-13 09:00Z; allowed <= 0.27 %/h to the 85 % cap. Build method for
+every block from now on: tools/review/prompts/build/TEMPLATE.md rules (baseline-diff STOP, own regressions are fixes, gaps collected to the
+end, whole-suite done criteria, mechanical assertion diff).
+- **S-C: RESUME** (cap 1.5 %/day, Sonnet default, Opus only for the acceptance-touch logic, max 2 agents). Block 1: fix the PR #18 findings
+  (B review ad1da0f: 7 MAJOR / 4 MINOR, posted on the PR) with a failing test first for each, one commit per finding family, push once,
+  comment on #18 with the finding->test->commit table. Block 2: B16-local precoverage map.
+- **S-E: RESUME** (cap 1 %/day). PR #16: fix ADV-8 MAJOR (manifest adapterVersion / targetContractHash / fileId checks: one failing test
+  each, then the fix) and ADV-9 MINOR (importFiles Map mutable -> frozen copy, test); push once; B re-verifies only those two. Then #21.
+- **S-B: stays PAUSED** (next after S-C if burn allows). **S-A: blocked** until the AWS accounts exist (D-14).
+
 ## QUOTA NOTICE TO ALL SESSIONS — 2026-10-08 00:40Z (owner decision 2026-10-07 evening) — READ FIRST AT THE START OF EVERY BLOCK
 All sessions share ONE Claude weekly quota. Measured burn 1.9 %/h (32 % -> 54 % between 13:04Z and 00:30Z) against an allowed
 0.24 %/h (31 points to the 85 % cap in 128 h, reset 2026-10-13 09:00Z). At that burn the cap is reached on 10-08 ~14:00Z and 100 %
