@@ -51,12 +51,18 @@ function tempRepo(tracked: Record<string, string>, untracked: Record<string, str
  * expressions ("a//b" is not a comment); a bare scanner loses its place at template tails and regex literals.
  */
 const printer = ts.createPrinter({ removeComments: true });
-function withoutComments(text: string): string {
-  return printer.printFile(ts.createSourceFile("scan.ts", text, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS));
+/** The parse mode follows the file name: parsed as plain TS, `<A>{new Pool(c)}</A>` in a .tsx file prints as `{ new: Pool(c) }`. */
+function scriptKindOf(rel: string): ts.ScriptKind {
+  if (rel.endsWith(".tsx")) return ts.ScriptKind.TSX;
+  if (rel.endsWith(".jsx")) return ts.ScriptKind.JSX;
+  return /.[cm]?js$/.test(rel) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
+}
+function withoutComments(text: string, rel: string): string {
+  return printer.printFile(ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, false, scriptKindOf(rel)));
 }
 
-function code(text: string): string {
-  return withoutComments(text)
+function code(text: string, rel = "scan.ts"): string {
+  return withoutComments(text, rel)
     // ADV-8 (56673d9): one spelling per form before matching: `import (`/`require (` -> `import(`, a template literal without
     // substitutions -> a quoted string, so the patterns need not enumerate spacing and quoting variants
     .replace(/\b(import|require)\s+\(/g, "$1(")
@@ -108,7 +114,7 @@ const POOL_VALUE_IMPORTS: ReadonlyArray<RegExp> = [
 const POOL_VALUE_HOLDERS = new Set(["packages/persistence/src/pool.ts", "packages/persistence/src/index.ts"]);
 
 function persistenceProblem(rel: string, text: string): string | undefined {
-  const c = code(text);
+  const c = code(text, rel);
   if (CONSTRUCTS.test(c) && !text.includes("sslOptionsOf(")) return `${rel} derives ssl from sslOptionsOf`;
   if (CONSTRUCTS_KAURO_POOL.test(c) && rel !== "packages/persistence/src/pool.ts") return `${rel} constructs KauroPool outside pool.ts`;
   // ADV-9 (1896dea): createPool is not even mentioned elsewhere, so no import route (index namespace, run-time import) can wrap it
@@ -129,13 +135,13 @@ const TLS_FORMS: ReadonlyArray<RegExp> = [
   /\bPG(?:SSLMODE|SSLROOTCERT|SSLCERT|SSLKEY|PASSWORD|PASSFILE|SERVICE)\b/,
 ];
 
-function isSite(text: string): boolean {
-  const c = code(text);
+function isSite(text: string, rel?: string): boolean {
+  const c = code(text, rel);
   return SITE_FORMS.some((f) => f.test(c));
 }
 
-function tlsViolations(text: string): string[] {
-  const c = code(text);
+function tlsViolations(text: string, rel?: string): string[] {
+  const c = code(text, rel);
   return TLS_FORMS.filter((f) => f.test(c)).map(String);
 }
 
@@ -176,6 +182,8 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
     "a site after a string holding //": 'const u = "a//b"; const p = new (await import("pg")).Pool({});',
   };
   for (const [name, text] of Object.entries(forms)) assert.ok(isSite(text), `not caught: ${name}`);
+  // a JSX expression that starts with `new` in a .tsx file (adversary note on 244b276: parsed as plain TS it printed as an object literal)
+  assert.ok(isSite("export const V = (c: object) => <A>{new Pool(c)}</A>;", "apps/web/src/v.tsx"), "not caught: new Pool inside JSX in a .tsx file");
   for (const text of ['import type { PoolClient } from "pg";', 'import { type Client } from "pg";', "// new Pool(\nexport const a = 1;", 'export type { Pool } from "pg";', 'import type { KauroPool } from "@kauro/persistence";', 'import { type KauroPool } from "@kauro/persistence";', 'export const superuser = "postgres";', 'function f(): KauroPool {\n  return x;\n}\nconst { a, b } = y;', 'function f({ pool }: { pool: KauroPool } = d) {}']) assert.ok(!isSite(text), text);
   // ADV-3 (a88da2e): a persistence file other than pool.ts that constructs KauroPool is refused; pool.ts may
   assert.equal(persistenceProblem("packages/persistence/src/wrap.ts", 'import { KauroPool } from "./pool.js";\nexport const p = (c) => new KauroPool(c);'), "packages/persistence/src/wrap.ts constructs KauroPool outside pool.ts");
@@ -250,13 +258,13 @@ test("every connection site of apps/ and packages/*/src is known, and each compo
     const rel = relative(root, file).replaceAll("\\", "/");
     if (rel.startsWith("packages/persistence/src/testing/")) continue; // the test-only subpath (the architecture gate keeps it out of production)
     const text = readFileSync(file, "utf8");
-    if (isSite(text)) found.set(rel, text);
+    if (isSite(text, rel)) found.set(rel, text);
     // DB-TLS-R3: every persistence source, listed site or not, takes KauroPool as a type only (pool.ts and index.ts excepted)
     if (rel.startsWith("packages/persistence/src/")) {
       const problem = persistenceProblem(rel, text);
       assert.equal(problem, undefined, problem);
     }
-    if (rel !== "packages/persistence/src/tls.ts") assert.deepEqual(tlsViolations(text), [], `${rel}: TLS settings belong in tls.ts`);
+    if (rel !== "packages/persistence/src/tls.ts") assert.deepEqual(tlsViolations(text, rel), [], `${rel}: TLS settings belong in tls.ts`);
   }
   assert.deepEqual(
     [...found.keys()].sort(),
@@ -276,7 +284,7 @@ test("every connection site of apps/ and packages/*/src is known, and each compo
   for (const [rel, text] of found) {
     if (rel === "apps/web/scripts/next.mjs") {
       // createRequire there only resolves the `next` binary; nothing in it may open a database connection
-      assert.ok(!SITE_FORMS.filter((f) => !f.test("createRequire")).some((f) => f.test(code(text))), `${rel} opens no database connection`);
+      assert.ok(!SITE_FORMS.filter((f) => !f.test("createRequire")).some((f) => f.test(code(text, rel))), `${rel} opens no database connection`);
     } else if (rel.startsWith("packages/persistence/src/")) {
       // by content: a file that constructs a Pool or Client derives ssl from sslOptionsOf; a file that does not only re-exports
       const problem = persistenceProblem(rel, text);
