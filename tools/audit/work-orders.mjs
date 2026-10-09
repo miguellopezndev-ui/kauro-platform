@@ -624,10 +624,11 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
       } catch (error) {
         if (!FROZEN_CODES.has(error.code)) throw error;
         frozen.push(id);
-        if (error.kind === "missing") {
-          const latest = [...(index.get(id) ?? [])].sort((a, b) => a.seq - b.seq || (a.run < b.run ? -1 : 1)).at(-1);
-          if (latest?.blocks) blocked.add(latest.blocks);
-        }
+        // ADV-16: a frozen WO is never read as CLOSED: its capability stays blocked whatever froze it, taken from the latest
+        // anchor that recorded one and from its first event's finding when that is still readable and material.
+        const latest = [...(index.get(id) ?? [])].sort((a, b) => a.seq - b.seq || (a.run < b.run ? -1 : 1)).at(-1);
+        if (latest?.blocks) blocked.add(latest.blocks);
+        if (finding.materialClass !== undefined && isText(finding.capability)) blocked.add(finding.capability);
         if (error.kind === "truncation") {
           const candidate = { seq: error.view.seq, hash: error.view.lastHash };
           try {
