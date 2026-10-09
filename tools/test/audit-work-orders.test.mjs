@@ -1292,3 +1292,24 @@ test("ADV-16: a frozen material WO keeps its capability blocked in the summary w
     w.cleanup();
   }
 });
+
+test("ADV-18: an event 1 that is not JSON freezes only that WO (E_LEDGER_CORRUPT) and keeps its capability blocked from the latest anchor; the summary still lists the other WOs", () => {
+  const w = world();
+  try {
+    const material = { family: "money", tier: 1, materialClass: "false payment authority", capability: "payments-ach" };
+    const d = desk(w);
+    const wo = d.imp(1, material);
+    d.assign(wo, 1);
+    d.go(wo, "ASSIGNED", COORD, d.assignFields(wo, 1, "fixer-2"));
+    const other = d.imp(2, { family: "time", tier: 2 });
+    writeFileSync(d.eventPath(wo, 1), "{ not json\n");
+    const { summary } = d.ledger.summary();
+    assert.deepEqual(summary.frozen, [wo], "only the WO with the unreadable event 1 is frozen");
+    assert.deepEqual(summary.blockedCapabilities, ["payments-ach"], "its capability stays blocked, taken from the latest anchor");
+    assert.notEqual(summary.workOrders.find((x) => x.id === wo)?.state, "CLOSED", "never CLOSED");
+    assert.ok(summary.workOrders.some((x) => x.id === other), "the other WO is still listed");
+    assert.throws(() => d.ledger.fold(wo), (e) => e.code === "E_LEDGER_CORRUPT", "reading the WO itself fails with E_LEDGER_CORRUPT, not a raw SyntaxError");
+  } finally {
+    w.cleanup();
+  }
+});
