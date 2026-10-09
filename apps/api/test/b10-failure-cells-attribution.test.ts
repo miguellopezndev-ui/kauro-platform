@@ -542,7 +542,9 @@ faultCell(
     const a = await agentOf(iw, `${label}-agency`);
     const named = await seller(iw, `${label}-named`);
     // the shares are locked in seller order (allocation_shares ORDER BY seller_id): X, whose deadline is near, before Y
-    const [sx, sy] = [await seller(iw, `${label}-a`), await seller(iw, `${label}-b`)].sort((p, q) => (p.sellerId < q.sellerId ? -1 : 1)) as [RecordedSeller, RecordedSeller];
+    const ordered = [await seller(iw, `${label}-a`), await seller(iw, `${label}-b`)].sort((p, q) => (p.sellerId < q.sellerId ? -1 : 1));
+    const [sx, sy] = ordered;
+    if (sx === undefined || sy === undefined) throw new Error("two sellers were recorded");
     const prospect = await recordProspect(iw.h, { by: named, domain: `${label}.example` });
     const m = await claimDueIn(named, prospect.prospectId, HOUR_S);
     const x = await claimDueIn(sx, prospect.prospectId, 60);
