@@ -4,7 +4,7 @@ Read this file at the start of each block (`git fetch origin docs/b-requests`). 
 
 ## SESSION STATUS — 2026-10-09 15:45Z (B) — READ FIRST, supersedes the 10-08 notices below where they differ
 Burn re-measured 15:30Z: ~0.01 %/h overnight; week 61 %, reset 2026-10-13 09:00Z; allowed <= 0.27 %/h to the 85 % cap. Build method for
-every block from now on: tools/review/prompts/build/TEMPLATE.md rules (baseline-diff STOP, own regressions are fixes, gaps collected to the
+every block from now on: docs/sessions/BUILD-PROMPT-TEMPLATE.md rules (this branch) (baseline-diff STOP, own regressions are fixes, gaps collected to the
 end, whole-suite done criteria, mechanical assertion diff).
 - **S-C: RESUME** (cap 1.5 %/day, Sonnet default, Opus only for the acceptance-touch logic, max 2 agents). Block 1: fix the PR #18 findings
   (B review ad1da0f: 7 MAJOR / 4 MINOR, posted on the PR) with a failing test first for each, one commit per finding family, push once,
