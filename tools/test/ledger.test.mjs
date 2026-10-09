@@ -5,9 +5,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { readCaseMap } from "../evidence.mjs";
 import {
@@ -329,4 +329,25 @@ test("PR18-5: a gate is DEMONSTRATED only when every case's demonstrated class i
   const g = clean();
   g.sidecars[1].rows[0].reviewId = null;
   assert.equal(computeLedger(g).gates.find((x) => x.gate === "G-B01").status, "OPEN");
+});
+
+test("PR18-7: readPinned reads a pinned file through a non-canonical path (an 8.3 short name on Windows, a symlink here): git's toplevel and the file are compared as real paths", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ledger-real-"));
+  const alias = join(mkdtempSync(join(tmpdir(), "ledger-alias-")), "repo");
+  try {
+    const git = (...a) => execFileSync("git", ["-C", dir, ...a], { encoding: "utf8" }).trim();
+    git("init", "-q");
+    git("config", "user.email", "t@example.invalid");
+    git("config", "user.name", "t");
+    mkdirSync(join(dir, "docs"));
+    writeFileSync(join(dir, "docs", "map.md"), "pinned bytes\n");
+    git("add", ".");
+    git("commit", "-qm", "one");
+    symlinkSync(dir, alias, "junction");
+    const pinned = readPinned(`${join(alias, "docs", "map.md")}@HEAD`);
+    assert.deepEqual([pinned.path, pinned.text], ["docs/map.md", "pinned bytes\n"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(dirname(alias), { recursive: true, force: true });
+  }
 });

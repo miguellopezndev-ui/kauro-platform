@@ -22,7 +22,7 @@
 //   node tools/ledger.mjs sidecars [--write]
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -352,9 +352,11 @@ export const snapshotPath = (input, commit = input.commit) => join(LEDGER_DIR, "
 export function readPinned(spec) {
   const at = spec.lastIndexOf("@");
   if (at < 0) throw new Error(`${spec}: expected <file>@<sha>`);
-  const file = resolve(spec.slice(0, at));
+  // real paths on both sides: git prints its toplevel resolved, while the given path may be an 8.3 short name (Windows runners'
+  // C:\Users\RUNNER~1) or go through a symlink, and relative() between the two forms leaves the repository
+  const file = realpathSync.native(resolve(spec.slice(0, at)));
   const sha = spec.slice(at + 1);
-  const top = execFileSync("git", ["-C", dirname(file), "rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+  const top = realpathSync.native(execFileSync("git", ["-C", dirname(file), "rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim());
   const path = relative(top, file).split("\\").join("/");
   const commit = execFileSync("git", ["-C", top, "rev-parse", `${sha}^{commit}`], { encoding: "utf8" }).trim();
   const text = execFileSync("git", ["-C", top, "show", `${commit}:${path}`], { encoding: "utf8", maxBuffer: 64 << 20 });
