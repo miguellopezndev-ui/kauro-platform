@@ -52,7 +52,6 @@ export function buildBrief(pkgId) {
   const gateIds = new Set(caseIds.map((id) => cases.get(id)?.gate).filter(Boolean));
   const triads = new Set(caseIds.map((id) => /^(CMD\d{3})-(OK|DENY|RACE)$/.exec(id)?.[1]).filter(Boolean));
   return {
-  package: pkg,
     package: pkg,
     gates: allGates.filter((g) => gateIds.has(g.id)).map((g) => ({ id: g.id, owner: g.owner, evidenceRule: g.evidenceRule, cases: g.caseIds })),
     cases: caseIds.map((id) => cases.get(id) ?? { id, missing: true }),

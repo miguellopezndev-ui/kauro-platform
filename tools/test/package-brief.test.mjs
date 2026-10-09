@@ -42,3 +42,20 @@ test("the packages whose cases fall outside pkg.gates: B16 carries G-TENANT with
   assert.deepEqual(cli.gates.map((g) => g.id), b16.gates.map((g) => g.id));
   assert.equal(buildBrief("B99"), null);
 });
+
+test("PR18-11: literal briefs for the seven packages whose cases fall outside their registry gates (audit authority-process-02): each brief names exactly these gates and commands", () => {
+  const expected = {
+    B02: [["G-MC-RELEASE", "G-CAPACITY"], []],
+    B06: [["G-DOMAIN"], ["CMD001", "CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026"]],
+    B08: [["G-DOMAIN", "G-JOB"], ["CMD036", "CMD037"]],
+    B11: [["G-UX", "G-UX_AGENCY"], ["CMD044"]],
+    B15: [["G-PAYMENT", "G-FISCAL", "G-INTEGRATION"], ["CMD035"]],
+    B16: [["G-TENANT", "G-DELETE", "G-RECOVERY", "G-SECURITY"], ["CMD003", "CMD004", "CMD005", "CMD006", "CMD007", "CMD038", "CMD042", "CMD054", "CMD055", "CMD056", "CMD057", "CMD060"]],
+    B20: [["G-COMMERCIAL", "G-OPERATING-MATURITY"], []],
+  };
+  for (const [id, [gates, commands]] of Object.entries(expected)) {
+    const brief = buildBrief(id);
+    assert.deepEqual([brief.gates.map((g) => g.id).sort(), brief.commands.map((c) => c.id)], [[...gates].sort(), commands], id);
+    assert.equal(brief.package.id, id);
+  }
+});
