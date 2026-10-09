@@ -4657,6 +4657,21 @@
    "kind": "OWNER_DATE_MISSING",
    "subject": "R2-122",
    "detail": "B21: PLANNED_POST_B19 without the owner's date"
+  },
+  {
+   "kind": "README_CLAIM_WITHOUT_REVIEW",
+   "subject": "B06",
+   "detail": "README names commit 4b33e26; the accepted subject is d9bbfd0 (B06-round3-d9bbfd0)"
+  },
+  {
+   "kind": "README_CLAIM_WITHOUT_REVIEW",
+   "subject": "B07",
+   "detail": "README names commit 4b33e26; the accepted subject is d9bbfd0 (B07-round7-d9bbfd0)"
+  },
+  {
+   "kind": "README_CLAIM_WITHOUT_REVIEW",
+   "subject": "B09",
+   "detail": "README names commit 4b33e26; the accepted subject is d9bbfd0 (B09-round5-d9bbfd0)"
   }
  ]
 }

@@ -56,7 +56,11 @@ test("R2-117: a claim is never acceptance — the README's statuses are observat
   // the observed README agrees with the computed ledger
   const honest = computeLedger({ registry, sidecars, reviews, readme });
   assert.ok(readmeClaims(readme).length >= 4);
-  assert.deepEqual(honest.violations.filter((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW"), []);
+  // no README status is claimed without its review; the hand table still names the commit merged to main (4b33e26) where the
+  // accepted subject is the latest accepting round (d9bbfd0) for B06, B07 and B09 (PR18-3 (c)) until B regenerates it
+  const readmeClaimed = honest.violations.filter((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW");
+  assert.deepEqual(readmeClaimed.filter((v) => !/^README names commit/.test(v.detail)), []);
+  assert.deepEqual(readmeClaimed.map((v) => v.subject), ["B06", "B07", "B09"]);
   // a new main claiming B10 accepted (no review record) is refused
   const claimed = `${readme}\n| Package | Cases | Status | Commit on main |\n|---|---|---|---|\n| B10 Agency recurrence | 64 | REVIEW_ACCEPTED | \`f42dba6\` |\n`;
   assert.ok(computeLedger({ registry, sidecars, reviews, readme: claimed }).violations.some((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW" && v.subject === "B10"));

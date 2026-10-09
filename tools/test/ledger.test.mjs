@@ -24,6 +24,7 @@ import {
   readInputs,
   readPinned,
   readSidecars,
+  reviewCommitViolations,
   reviewIndex,
 } from "../ledger.mjs";
 
@@ -280,7 +281,11 @@ test("the ledger lists the 441 registry cases; the only missing ones belong to a
   assert.deepEqual(missing.map((v) => v.subject).sort(), ledger.cases.filter((c) => unpinned.has(c.package)).map((c) => c.case).sort());
   for (const [path, content] of Object.entries(ledgerFiles(ledger))) assert.equal(read(path), content, `${path} is stale — run node tools/ledger.mjs --write`);
   // the README's hand table claims no acceptance the ledger does not compute
-  assert.deepEqual(ledger.violations.filter((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW"), []);
+  // no README status is claimed without its review; the hand table still names the commit merged to main (4b33e26) where the
+  // accepted subject is the latest accepting round (d9bbfd0) for B06, B07 and B09 (PR18-3 (c)) until B regenerates it
+  const readmeClaimed = ledger.violations.filter((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW");
+  assert.deepEqual(readmeClaimed.filter((v) => !/^README names commit/.test(v.detail)), []);
+  assert.deepEqual(readmeClaimed.map((v) => v.subject), ["B06", "B07", "B09"]);
 });
 
 // A platform case map in the table format converts with the review that accepts it; a row that lost its review agreement is a claim.
@@ -349,5 +354,89 @@ test("PR18-7: readPinned reads a pinned file through a non-canonical path (an 8.
   } finally {
     rmSync(dir, { recursive: true, force: true });
     rmSync(dirname(alias), { recursive: true, force: true });
+  }
+});
+
+test("PR18-6 (M5): reviewOf binds a row only while the package's latest round accepts — a later REJECT withdraws every case", () => {
+  const f = clean();
+  assert.equal(reviewIndex(f.reviews).reviewOf("B01", "S003", "EXECUTED_LOCAL")?.id, "B01-round1-cB011");
+  f.reviews.push(review("B01", 2, "REJECT", [{ id: "S004", claimed_status: "EXECUTED_LOCAL", agree: false }]));
+  assert.equal(reviewIndex(f.reviews).reviewOf("B01", "S003", "EXECUTED_LOCAL"), null, "S003 agreed in round 1, but round 2 rejects the package");
+});
+
+test("PR18-3 (c): a README row whose commit is not the package's accepted subject is a claim without review", () => {
+  const f = clean();
+  const readme = (commit) => `| Package | Cases | Status | Commit on main |\n|---|---|---|---|\n| B01 one | 2 | ACCEPTED | \`${commit}\` |\n`;
+  assert.deepEqual(kinds(computeLedger({ ...f, readme: readme("cB011") })), []);
+  const ledger = computeLedger({ ...f, readme: readme("deadbee") });
+  assert.deepEqual(kinds(ledger), ["README_CLAIM_WITHOUT_REVIEW B01"]);
+  assert.match(ledger.violations[0].detail, /deadbee.*cB011/);
+});
+
+test("PR18-9: an external map's rows are bound by its package's accepting review only when the review's commit is the pinned commit of the snapshot", () => {
+  const external = (commit) => {
+    const f = clean();
+    const rows = f.sidecars[1].rows.map((r) => ({ ...r, reviewId: null, commit: "ed09809" }));
+    f.sidecars = f.sidecars.filter((s) => s.package !== "B01");
+    f.reviews[1] = review("B01", 1, "ACCEPT", rows.map((r) => ({ id: r.case, claimed_status: "EXECUTED_LOCAL", agree: true })), "3b4b0ae");
+    return computeLedger({ ...f, externals: [{ id: "MC", commit, packages: ["B01"], rows }] });
+  };
+  const bound = external("3b4b0aea4f1879ffb4189a55a16f22f4520787d4");
+  assert.deepEqual(kinds(bound), []);
+  assert.equal(bound.packages.find((p) => p.package === "B01").status, "ACCEPTED");
+  assert.deepEqual(bound.cases.filter((c) => c.package === "B01").map((c) => [c.demonstrated, c.reviewId]), [["EXECUTED_LOCAL", "B01-round1-3b4b0ae"], ["EXECUTED_LOCAL", "B01-round1-3b4b0ae"]]);
+  const other = external("1111111aea4f1879ffb4189a55a16f22f4520787d");
+  assert.ok(other.violations.some((v) => v.kind === "EXTERNAL_REVIEW_COMMIT_MISMATCH" && v.subject === "B01"));
+  assert.equal(other.packages.find((p) => p.package === "B01").status, "IN_PROGRESS");
+});
+
+test("PR18-3 (b): every review's commit resolves in the repository and an accepting subject is an ancestor of HEAD; an external package's subject is its pinned commit", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ledger-reviews-"));
+  try {
+    const git = (...a) => execFileSync("git", ["-C", dir, ...a], { encoding: "utf8" }).trim();
+    git("init", "-q");
+    git("config", "user.email", "t@example.invalid");
+    git("config", "user.name", "t");
+    writeFileSync(join(dir, "a.txt"), "a");
+    git("add", ".");
+    git("commit", "-qm", "accepted");
+    const onMain = git("rev-parse", "HEAD");
+    git("checkout", "-qb", "side");
+    writeFileSync(join(dir, "b.txt"), "b");
+    git("add", ".");
+    git("commit", "-qm", "side");
+    const onSide = git("rev-parse", "HEAD");
+    git("checkout", "-q", "-");
+    const reviews = [
+      review("B06", 1, "ACCEPT", [], onMain.slice(0, 7)),
+      review("B07", 1, "ACCEPT", [], onSide.slice(0, 7)),
+      review("B08", 1, "ACCEPT", [], "deadbee"),
+      review("B09", 1, "REJECT", [], "badc0de"),
+      review("B01", 1, "ACCEPT", [], "3b4b0ae"),
+    ];
+    const v = reviewCommitViolations(dir, reviews, { B01: "3b4b0aea4f1879ffb4189a55a16f22f4520787d4" });
+    assert.deepEqual(v.map((x) => `${x.kind} ${x.subject}`).sort(), ["REVIEW_COMMIT_UNBOUND B07-round1-" + onSide.slice(0, 7), "REVIEW_COMMIT_UNBOUND B08-round1-deadbee", "REVIEW_COMMIT_UNBOUND B09-round1-badc0de"].sort());
+    assert.match(v.find((x) => x.subject.startsWith("B07")).detail, /not an ancestor of HEAD/);
+    assert.match(v.find((x) => x.subject.startsWith("B08")).detail, /does not resolve/);
+    assert.deepEqual(reviewCommitViolations(dir, [review("B01", 1, "ACCEPT", [], "1111111")], { B01: "3b4b0aea4f18" }).map((x) => x.kind), ["REVIEW_COMMIT_UNBOUND"], "an external review must name the pinned commit");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("PR18-9: a snapshot whose commit, path or packages differ from its pin in inputs.json is refused even without a checkout", () => {
+  const repo = mkdtempSync(join(tmpdir(), "ledger-snap-"));
+  try {
+    for (const p of ["packages/contracts/registry", "docs/acceptance/case-maps", "docs/acceptance/reviews", "docs/acceptance/ledger/inputs.json", "docs/acceptance/ledger/external"]) cpSync(join(root, p), join(repo, p), { recursive: true });
+    assert.deepEqual(ledgerOfRepo(repo).ledger.violations.filter((v) => v.kind === "EXTERNAL_SNAPSHOT_DRIFT"), []);
+    const input = readInputs(repo).external.find((i) => i.id === "MC");
+    const file = join(repo, "docs/acceptance/ledger/external", `MC-${input.commit.slice(0, 12)}.json`);
+    const snap = JSON.parse(readFileSync(file, "utf8"));
+    writeFileSync(file, JSON.stringify({ ...snap, commit: "1111111aea4f1879ffb4189a55a16f22f4520787d" }));
+    assert.ok(ledgerOfRepo(repo).ledger.violations.some((v) => v.kind === "EXTERNAL_SNAPSHOT_DRIFT" && /commit/.test(v.detail)));
+    writeFileSync(file, JSON.stringify({ ...snap, packages: ["B01"] }));
+    assert.ok(ledgerOfRepo(repo).ledger.violations.some((v) => v.kind === "EXTERNAL_SNAPSHOT_DRIFT" && /packages/.test(v.detail)));
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
   }
 });

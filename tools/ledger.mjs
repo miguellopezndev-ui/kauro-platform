@@ -297,6 +297,36 @@ export function reviewIndex(reviews) {
   };
 }
 
+/**
+ * The reviews whose commit is not bound to this repository's history (A4: the accepted subject is the commit and the review id).
+ * Every review's commit must resolve; an accepting latest round must be an ancestor of HEAD — or, for a package whose map is
+ * external (`externalPins`: package → pinned commit), the pinned commit itself. It needs the history: the CLI runs it, the
+ * committed outputs do not carry it (a shallow CI checkout has no review commits).
+ */
+export function reviewCommitViolations(root, reviews, externalPins = {}) {
+  const out = [];
+  const gitOk = (...args) => {
+    try {
+      execFileSync("git", ["-C", root, ...args], { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const { latest } = reviewIndex(reviews);
+  for (const r of reviews) {
+    const subject = latest.get(r.package) === r && ACCEPTING.has(r.verdict);
+    const pin = externalPins[r.package];
+    if (pin) {
+      if (subject && !pin.startsWith(r.commit)) out.push({ kind: "REVIEW_COMMIT_UNBOUND", subject: r.id, detail: `${r.commit} is not the pinned commit ${pin.slice(0, 12)} of ${r.package}'s map` });
+      continue;
+    }
+    if (!gitOk("cat-file", "-e", `${r.commit}^{commit}`)) out.push({ kind: "REVIEW_COMMIT_UNBOUND", subject: r.id, detail: `${r.commit} does not resolve in this repository` });
+    else if (subject && !gitOk("merge-base", "--is-ancestor", r.commit, "HEAD")) out.push({ kind: "REVIEW_COMMIT_UNBOUND", subject: r.id, detail: `${r.commit} is not an ancestor of HEAD` });
+  }
+  return out;
+}
+
 // --- sidecars ----------------------------------------------------------------------------------------------------------------------
 
 /** The sidecar of every platform package: converted from its case map when it has one, else derived from the registry. */
@@ -397,17 +427,33 @@ export function readmeClaims(text) {
 export function computeLedger({ registry, sidecars, externals = [], missingInputs = [], reviews = [], readme = "" }) {
   const violations = [];
   const flag = (kind, subject, detail) => violations.push({ kind, subject, detail });
-  const { latest, entryOf } = reviewIndex(reviews);
+  const { latest, entryOf, reviewOf } = reviewIndex(reviews);
   const reviewById = new Map(reviews.map((r) => [r.id, r]));
 
   for (const [file, hash] of Object.entries(registry.provenance.files)) {
     if (registry.hashes[file] !== hash) flag("REGISTRY_HASH_MISMATCH", file, `PROVENANCE.json ${hash.slice(0, 12)}, vendored ${registry.hashes[file]?.slice(0, 12)}`);
   }
 
+  // An external map's rows carry no review id (the review lives here, not in the core's repository): its package's accepting
+  // review binds them, but only when the review's commit is the commit the snapshot is pinned to.
+  const mismatched = new Set();
+  const bindExternal = (e) =>
+    e.rows.map((row) => {
+      const pkg = registry.owner.get(row.case);
+      const r = row.reviewId ? null : reviewOf(pkg, row.case, row.class);
+      if (!r) return row;
+      if (!e.commit.startsWith(r.commit)) {
+        if (!mismatched.has(pkg)) flag("EXTERNAL_REVIEW_COMMIT_MISMATCH", pkg, `${r.id} reviewed ${r.commit}; ${e.id} is pinned at ${e.commit.slice(0, 12)}`);
+        mismatched.add(pkg);
+        return row;
+      }
+      return { ...row, reviewId: r.id, commit: r.commit };
+    });
+
   // every row, with the package whose map holds it
   const sources = [
     ...sidecars.map((s) => ({ name: `${SIDECAR_DIR}/${s.package}.json`, packages: [s.package], rows: s.rows, obligations: s.obligations ?? [] })),
-    ...externals.map((e) => ({ name: `${e.id}@${e.commit.slice(0, 12)}`, packages: e.packages, rows: e.rows, obligations: [] })),
+    ...externals.map((e) => ({ name: `${e.id}@${e.commit.slice(0, 12)}`, packages: e.packages, rows: bindExternal(e), obligations: [] })),
   ];
   const own = new Map();
   const inherited = new Map();
@@ -531,6 +577,8 @@ export function computeLedger({ registry, sidecars, externals = [], missingInput
       flag("README_CLAIM_WITHOUT_REVIEW", claim.package, `README says ${claim.status}; computed ${p?.status ?? "unknown package"}`);
     } else if (p && claim.status !== p.status) {
       flag("README_CLAIM_WITHOUT_REVIEW", claim.package, `README says ${claim.status}; computed ${p.status}`);
+    } else if (p?.acceptedSubject && claim.commit && !(claim.commit.startsWith(p.acceptedSubject.commit) || p.acceptedSubject.commit.startsWith(claim.commit))) {
+      flag("README_CLAIM_WITHOUT_REVIEW", claim.package, `README names commit ${claim.commit}; the accepted subject is ${p.acceptedSubject.commit} (${p.acceptedSubject.reviewId})`);
     }
   }
 
@@ -587,6 +635,11 @@ function loadExternals(root, registry, args) {
     const snap = snapFile && existsSync(snapFile) ? JSON.parse(readFileSync(snapFile, "utf8")) : null;
     if (fresh && snap && stable(snap) !== stable(fresh)) drift.push(`${input.id}: the snapshot ${snapshotPath(input, commit)} differs from the conversion of ${fresh.path}@${commit}`);
     if (fresh && input.commit && commit !== input.commit) drift.push(`${input.id}: given ${commit.slice(0, 12)}, pinned ${String(input.commit).slice(0, 12)} in ${LEDGER_DIR}/inputs.json`);
+    if (snap) {
+      for (const [field, want] of [["id", input.id], ["path", input.path], ["commit", commit], ["packages", input.packages]]) {
+        if (stable(snap[field]) !== stable(want)) drift.push(`${input.id}: the snapshot's ${field} ${JSON.stringify(snap[field])} is not the pin's ${JSON.stringify(want)}`);
+      }
+    }
     const use = fresh ?? snap;
     if (use) externals.push(use);
     else missingInputs.push({ id: input.id, packages: input.packages, reason: input.commit ? `no snapshot ${snapshotPath(input)} and no --${input.flag} <checkout>/${input.path}@<sha>` : `not pinned in ${LEDGER_DIR}/inputs.json; pass --${input.flag} <checkout>/${input.path}@<sha>` });
@@ -668,6 +721,9 @@ export function main(argv, root = ROOT, log = console.log) {
     writeFileSync(readmeFile, `${text.slice(0, text.indexOf(start) + start.length)}\n${readmeTable(ledger)}${text.slice(text.indexOf(end))}`);
   }
 
+  // bound to the history after the committed outputs are written: they hold no git-dependent result
+  const pins = Object.fromEntries(externals.flatMap((e) => e.packages.map((p) => [p, e.commit])));
+  ledger.violations.push(...reviewCommitViolations(root, loadReviews(root), pins));
   const missing = ledger.violations.filter((v) => v.kind === "MISSING_CASE");
   if (args["--json"]) log(JSON.stringify(ledger, null, 1));
   else {
