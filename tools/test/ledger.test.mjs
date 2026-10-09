@@ -469,3 +469,18 @@ test("PR18-8: every citation of every platform sidecar names a test file that ex
   assert.ok(checked > 500, `${checked} citations checked`);
   assert.deepEqual(missing, []);
 });
+
+test("PR18-10: obligations entered in B16's sidecar at B10 close survive `sidecars --write` and keep B16 from acceptance until each is COVERED or an owner-signed NOT_APPLICABLE", () => {
+  const repo = mkdtempSync(join(tmpdir(), "ledger-obligations-"));
+  try {
+    for (const p of ["packages/contracts/registry", "docs/acceptance/case-maps", "docs/acceptance/reviews", "docs/acceptance/ledger/inputs.json", "docs/acceptance/ledger/external", "docs/design"]) cpSync(join(root, p), join(repo, p), { recursive: true });
+    const file = join(repo, "docs/acceptance/case-maps/B16.json");
+    const obligations = [{ id: "B10-CELL-X", from: "B10", status: "OPEN" }];
+    writeFileSync(file, `${JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), obligations }, null, 1)}\n`);
+    main(["sidecars", "--write"], repo, () => {});
+    assert.deepEqual(JSON.parse(readFileSync(file, "utf8")).obligations, obligations, "regenerating the sidecars keeps them");
+    assert.ok(read("docs/acceptance/A7-draft.md").includes("They are added at B10 close"), "the draft says when they enter");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});

@@ -111,9 +111,11 @@ real. Cells that depend on command-specific state keep dedicated tests, and tier
 
 *Correction to the audit text:* the verifiers found that the template already allows parametrized suites, so §6 records that
 reading instead of creating a new rule. The B10 level-2 and level-3 cells that touch no money, tax, payment, refund or
-commission are deferred to B16 by the owner's R-GAP resolution (D-05). B16's case map lists each of them as an inherited
-obligation. The ledger blocks B16's closure while any of them is unresolved: it must be covered, or N/A with a reason the owner
-signs.
+commission are deferred to B16 by the owner's R-GAP resolution (D-05). The cells are not listed yet: B10's matrix is still
+being worked. They are added at B10 close: B names each deferred cell id, and they enter B16's sidecar
+(`docs/acceptance/case-maps/B16.json`) as `obligations` ({id, from: "B10", status}), which regenerating the sidecars keeps.
+From then on the ledger blocks B16's closure while any of them is unresolved: each must be COVERED, or NOT_APPLICABLE with a
+reason the owner signs. Until B10 closes, no B16 obligation exists and the ledger blocks nothing on them.
 
 ## §7 Standing delegation
 
@@ -192,7 +194,7 @@ the list is `cases.json` R2-070 `scenario`. There is no re-vendoring.
 | §1 | R2-115 and R2-116 NOT_APPLICABLE | R2-116 EXECUTED_LOCAL (transition record); R2-115 NOT_APPLICABLE only if the owner signs | INFORME §5.6 authority-process-01; owner instruction |
 | §1 | R2-118 by the sheet | the same, NOT_EXECUTED until the sheet exists and its test passes | `OWNER_ACTIONS.md` (sheet due 2026-10-07) |
 | §4a | any runner; local Windows when CI Windows did not run | the same, under D-03 (Windows only on the final candidate and `main`) | D-03 |
-| §6 | new shared-mechanism rule | records that the template already allows it; D-05 deferral of B10 non-money cells to B16 with the ledger blocking B16 | INFORME §4 |
+| §6 | new shared-mechanism rule | records that the template already allows it; D-05 deferral of B10 non-money cells to B16, entered as B16 obligations at B10 close, with the ledger blocking B16 | INFORME §4; review PR18-10 |
 | §8 | grants 25 / 98→196; GCP cloud grant; Claude publishes | A9 §4 / D-04 grants on Bedrock; AWS per A9, no spend before the account; D-07; A8 collection; D-03; D-08a | A8, A9, D-03..D-08 |
 | §10 | supersession of 01, 23, 30, protocol, prompts | adds the GCP texts (A9) and PayPal-primary texts (A8) | A8, A9 |
 
