@@ -826,6 +826,13 @@ test("OK summary counts by family, state, tier and kind, blocked capabilities, L
       assert.deepEqual(anchors[id], { seq: Number.parseInt(last, 10), hash: sha256Hex(readFileSync(join(d.root, "wo", id, last))) }, `s3 anchor of ${id}`);
     }
     assert.deepEqual(summary.anchors, anchors);
+
+    // LOST-citation row (coordinator ruling 19:52Z): a LOST event that does not cite its anchor (run id, seq, hash) is refused by the fold.
+    const e1 = readFileSync(d.eventPath("WO-5", 1));
+    const forged = { seq: 2, prev: sha256Hex(e1), at: "2026-10-09T12:00:00.000Z", actor: COORD, requestId: "lost-forged", from: "OPEN", to: "LOST", fields: { lastSurvivingSeq: 1 } };
+    writeFileSync(d.eventPath("WO-5", 2), `${JSON.stringify(forged)}
+`);
+    refuses(() => d.ledger.fold("WO-5"), "E_LOST_NO_ANCHOR", "a LOST event without its anchor citation");
   } finally {
     w.cleanup();
   }
