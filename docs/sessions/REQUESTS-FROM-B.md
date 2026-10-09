@@ -9,9 +9,8 @@ end, whole-suite done criteria, mechanical assertion diff).
 - **S-C: RESUME** (cap 1.5 %/day, Sonnet default, Opus only for the acceptance-touch logic, max 2 agents). Block 1: fix the PR #18 findings
   (B review ad1da0f: 7 MAJOR / 4 MINOR, posted on the PR) with a failing test first for each, one commit per finding family, push once,
   comment on #18 with the finding->test->commit table. Block 2: B16-local precoverage map.
-- **S-E: RESUME** (cap 1 %/day). PR #16: fix ADV-8 MAJOR (manifest adapterVersion / targetContractHash / fileId checks: one failing test
-  each, then the fix) and ADV-9 MINOR (importFiles Map mutable -> frozen copy, test); push once; B re-verifies only those two. Then #21.
-- **S-B: stays PAUSED** (next after S-C if burn allows). **S-A: blocked** until the AWS accounts exist (D-14).
+- **S-E: RESUME** (cap 1 %/day). PR #16: B re-verified 8219403, ADV-8/ADV-9 PASS (comment on #16); Codex B13 review after the 10-10 reset.
+  Next: merge 8219403 into #21 (HTML + import guide), continue it tests first, push once; B reviews within 12 h.
 
 ## QUOTA NOTICE TO ALL SESSIONS — 2026-10-08 00:40Z (owner decision 2026-10-07 evening) — READ FIRST AT THE START OF EVERY BLOCK
 All sessions share ONE Claude weekly quota. Measured burn 1.9 %/h (32 % -> 54 % between 13:04Z and 00:30Z) against an allowed
