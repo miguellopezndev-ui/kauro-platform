@@ -50,12 +50,20 @@ const clean = (v) => JSON.parse(JSON.stringify(v));
 const numeric = (a, b) => Number.parseInt(a.replace(/\D/g, ""), 10) - Number.parseInt(b.replace(/\D/g, ""), 10);
 const jsonText = (v) => `${JSON.stringify(v)}\n`;
 
-function readJsonIf(path) {
+// ADV-18: a ledger file that is not JSON is ledger corruption (a coded, freezable error), never a raw SyntaxError.
+// `bad` builds the error for files that are not ledger files (repos.json).
+function readJsonIf(path, bad = (p) => corrupt(`${p} is not JSON`)) {
+  let text;
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    text = readFileSync(path, "utf8");
   } catch (error) {
     if (error.code === "ENOENT") return null;
     throw error;
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw bad(path);
   }
 }
 
@@ -91,7 +99,7 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
 
   /** W-1: the worktree of `repo` from repos.json; its origin must be that repository. */
   function worktree(repo) {
-    const path = readJsonIf(join(root, "repos.json"))?.[repo];
+    const path = readJsonIf(join(root, "repos.json"), (p) => fail("E_REPO_UNKNOWN", `${p} is not JSON`))?.[repo];
     if (!isText(path)) throw fail("E_REPO_UNKNOWN", `repos.json has no worktree for ${repo}`);
     const origin = gitIn(path)(["remote", "get-url", "origin"]).stdout.trim();
     if (repoNameOf(origin) !== repo) throw fail("E_REPO_MISMATCH", `the worktree ${path} has origin ${origin}, not repository ${repo}`);
@@ -436,7 +444,7 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
 
   /** ADV-12: the receipt dir must resolve (realpath) under <kauroRoot>/tools/review/out, kauroRoot from repos.json. */
   function receiptUnderReviewOut(dir) {
-    const kauroRoot = readJsonIf(join(root, "repos.json"))?.kauroRoot;
+    const kauroRoot = readJsonIf(join(root, "repos.json"), (p) => fail("E_REVIEW_RECEIPT", `${p} is not JSON`))?.kauroRoot;
     if (!isText(kauroRoot)) throw fail("E_REVIEW_RECEIPT", "repos.json names no kauroRoot: a review receipt cannot be located");
     let real;
     let out;
@@ -586,7 +594,17 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
 
   // ---------------------------------------------------------------- reads
   const fold = (woId) => publicFold(inspect(woId));
-  const list = () => slotIds().filter(isBound);
+  // ADV-18: a slot whose binding cannot be read (event 1 not JSON) counts as bound for listing, so summary() freezes it
+  // instead of hiding it among the unbound slots.
+  const listedAsBound = (slot) => {
+    try {
+      return isBound(slot);
+    } catch (error) {
+      if (!FROZEN_CODES.has(error.code)) throw error;
+      return true;
+    }
+  };
+  const list = () => slotIds().filter(listedAsBound);
 
   function summary() {
     const index = anchorIndex();
@@ -604,9 +622,10 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
     const ids = [...new Set([...list(), ...index.keys()])].sort(numeric);
     for (const id of ids) {
       let state = "FROZEN";
-      let finding = readJsonIf(eventPath(id, 1))?.fields?.finding ?? {};
+      let finding = {};
       const attempts = [];
       try {
+        finding = readJsonIf(eventPath(id, 1))?.fields?.finding ?? {};
         const view = inspect(id, index);
         const history = view.events.map((e) => e.event);
         state = view.state;
@@ -645,7 +664,7 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
       bump("byTier", finding.tier ?? "unknown");
       bump("byKind", finding.kind ?? "unknown");
     }
-    const unboundSlots = slotIds().filter((s) => !isBound(s) && !index.has(s));
+    const unboundSlots = slotIds().filter((s) => !listedAsBound(s) && !index.has(s));
     const body = clean({ workOrders, counts, blockedCapabilities: [...blocked].sort(), lost: lostEvents, anchors, unboundSlots, frozen });
     const runId = writeRun({ "anchors.json": jsonText(anchors), "blocks.json": jsonText(blocks), "summary.json": `${JSON.stringify(body, null, 2)}\n` });
     return { runId, summary: body };
