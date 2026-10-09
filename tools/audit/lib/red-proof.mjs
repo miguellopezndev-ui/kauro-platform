@@ -2,7 +2,7 @@
 // intended reason; harness errors do not count). validateRedProof({cwd, auditedSha, acceptanceTest{file, title, expectedFailure},
 // red{sha: R, record}, green{sha: F, record}}, {runner, timeoutMs, readFile}) proves, reading git first:
 //   (a) R descends from auditedSha (E_RED_PROOF_ANCESTRY) and diff(auditedSha, R) is test-only (E_RED_PROOF_NOT_TEST_ONLY);
-//   (d) F descends from R (E_RED_PROOF_ANCESTRY), no merge in R..F (E_RED_PROOF_MERGE), diff(R, F) has no test-only path
+//   (d) F != R and a non-empty R..F diff (E_RED_PROOF_NO_FIX); F descends from R (E_RED_PROOF_ANCESTRY), no merge in R..F (E_RED_PROOF_MERGE), diff(R, F) has no test-only path
 //       (E_RED_PROOF_TEST_CHANGED): the acceptance test and every updated test live in R, a later update-branch merge is never F;
 //   (f) each record validates, names R / F as subject.commit (E_RECORD_SUBJECT) and its rawRef sha256 is the file bytes (E_RAW_HASH);
 //   (c) the title is present in the file at R and at F (E_RED_PROOF_TITLE);
@@ -38,6 +38,7 @@ export function validateRedProof(input, { runner, timeoutMs, readFile = readFile
   const redPaths = changed(auditedSha, red.sha);
   const production = redPaths.filter((p) => !isTestOnly(p));
   if (production.length > 0) throw fail("E_RED_PROOF_NOT_TEST_ONLY", `audited..red changes production paths: ${production.join(", ")}`, { paths: production });
+  if (red.sha === green.sha) throw fail("E_RED_PROOF_NO_FIX", `the fix head ${green.sha} is the red commit: no fix`);
   if (!descends(red.sha, green.sha)) throw fail("E_RED_PROOF_ANCESTRY", `the fix head ${green.sha} does not descend from the red commit ${red.sha}`);
   const merges = g(["rev-list", "--merges", `${red.sha}..${green.sha}`]).stdout.split("\n").filter(Boolean);
   if (merges.length > 0) throw fail("E_RED_PROOF_MERGE", `red..fix has merge commits (${merges.join(", ")}): the fix head is the head before any merge of origin/main`, { merges });
@@ -52,6 +53,7 @@ export function validateRedProof(input, { runner, timeoutMs, readFile = readFile
   titleAt(green.sha);
   const fixTests = changed(red.sha, green.sha).filter(isTestOnly);
   if (fixTests.length > 0) throw fail("E_RED_PROOF_TEST_CHANGED", `red..fix changes test-only paths: ${fixTests.join(", ")}`, { paths: fixTests });
+  if (changed(red.sha, green.sha).length === 0) throw fail("E_RED_PROOF_NO_FIX", `red..fix changes no path: the fix head ${green.sha} adds nothing to ${red.sha}`);
 
   // records and raw bytes
   const raw = {};

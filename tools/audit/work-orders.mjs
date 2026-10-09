@@ -17,8 +17,8 @@
 //   exit 0 ok, 1 refused (code printed), 2 blocked or frozen.
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { isTempName, probeLinks, readableFiles, writeOnce } from "./lib/atomic.mjs";
 import { validateFinding } from "./lib/finding.mjs";
@@ -99,32 +99,50 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
   }
 
   // ---------------------------------------------------------------- anchors (W-2a)
-  /** Anchors of every run whose MANIFEST verifies: Map WO -> [{run, seq, hash}]. anchors.json only, never summary.json. */
+  /**
+   * Anchors of every run whose MANIFEST verifies: Map WO -> [{run, seq, hash, blocks}]. anchors.json only, never summary.json.
+   * A run without a manifest (crash before the manifest) is ignored; a run whose manifest or anchors.json does not verify is listed in
+   * `index.bad` and freezes every fold (ADV-9, E_LEDGER_CORRUPT kind run): it can no longer be known which WOs it anchored.
+   * `blocks` is the capability the WO blocked at that anchor (blocks.json, ADV-2), null when none.
+   */
   function anchorIndex() {
     const index = new Map();
+    index.bad = [];
     const runs = join(root, "runs");
     if (!existsSync(runs)) return index;
     for (const id of readableFiles(runs)) {
       const dir = join(runs, id);
+      if (!existsSync(join(dir, MANIFEST_NAME))) continue;
       let anchors;
+      let blocks = {};
       try {
         verifyManifest(dir);
         anchors = JSON.parse(readFileSync(join(dir, "anchors.json"), "utf8"));
-      } catch {
+        if (existsSync(join(dir, "blocks.json"))) blocks = JSON.parse(readFileSync(join(dir, "blocks.json"), "utf8"));
+        if (anchors === null || typeof anchors !== "object" || Array.isArray(anchors)) throw new Error("anchors.json is not an object");
+        for (const a of Object.values(anchors)) if (!Number.isInteger(a?.seq) || !isText(a?.hash)) throw new Error("anchors.json has a malformed anchor");
+      } catch (error) {
+        index.bad.push({ run: id, message: error.message });
         continue;
       }
       for (const [wo, a] of Object.entries(anchors)) {
         if (!index.has(wo)) index.set(wo, []);
-        index.get(wo).push({ run: id, seq: a.seq, hash: a.hash });
+        index.get(wo).push({ run: id, seq: a.seq, hash: a.hash, blocks: isText(blocks?.[wo]) ? blocks[wo] : null });
       }
     }
     return index;
   }
 
-  /** An anchor is superseded by a LOST event that names a run at or after it and covers its seq (W-2a x LOST ruling). */
+  /** The capability a WO blocks in this view: a material finding that is neither CLOSED nor VOIDED. */
+  function blockOf(view) {
+    const finding = view.events[0].event.fields.finding;
+    return finding.materialClass !== undefined && view.state !== "CLOSED" && view.state !== "VOIDED" && isText(finding.capability) ? finding.capability : null;
+  }
+
+  /** An anchor is superseded only by a LOST event whose supersedes lists its run and whose range covers its seq (ADV-1: never by run-id order). */
   const exemptBy = (events) => {
     const losts = events.filter((e) => e.event.to === "LOST").map((e) => e.event.fields);
-    return (a) => losts.some((l) => l.lastSurvivingSeq < a.seq && a.seq <= l.anchorSeq && a.run <= l.anchorRun);
+    return (a) => losts.some((l) => Array.isArray(l.supersedes) && l.supersedes.includes(a.run) && l.lastSurvivingSeq < a.seq && a.seq <= l.anchorSeq);
   };
 
   /** A new anchor never has a lower seq or another hash than an earlier valid, not superseded, anchor of the WO. */
@@ -153,7 +171,7 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
     const candidate = { seq: view.seq, hash: view.lastHash };
     guardAnchor(woId, candidate, view.events, index);
     const anchors = { [woId]: candidate };
-    return writeRun({ "anchors.json": jsonText(anchors), "summary.json": jsonText({ trigger: "transition", woId, anchors }) });
+    return writeRun({ "anchors.json": jsonText(anchors), "blocks.json": jsonText({ [woId]: blockOf(view) }), "summary.json": jsonText({ trigger: "transition", woId, anchors }) });
   }
 
   function anchorRunOf(woId, view, index) {
@@ -165,7 +183,12 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
   /** Reads and verifies one WO; throws E_LEDGER_CORRUPT (kind tamper|truncation), E_LOST_NO_ANCHOR or E_LOST_AUTHORITY. */
   function inspect(woId, index = anchorIndex()) {
     const dir = woDir(woId);
-    if (!existsSync(dir)) throw fail("E_NO_WO", `${woId} does not exist`);
+    if (index.bad.length > 0) throw corrupt(`${woId}: run ${index.bad[0].run} does not verify (${index.bad[0].message})`, { kind: "run" });
+    if (!existsSync(dir)) {
+      if (index.has(woId)) throw corrupt(`${woId} is anchored by a verified run but its folder is missing`, { kind: "missing" });
+      throw fail("E_NO_WO", `${woId} does not exist`);
+    }
+    if (index.has(woId) && !isBound(woId)) throw corrupt(`${woId} is anchored by a verified run but its binding is missing`, { kind: "missing" });
     const files = readdirSync(dir).filter((n) => EVENT_FILE.test(n)).sort(numeric);
     if (files.length === 0) throw corrupt(`${woId} has no events`);
     const events = files.map((f) => {
@@ -203,6 +226,7 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
         if (!isText(f.anchorRun) || !Number.isInteger(f.anchorSeq) || !isText(f.anchorHash) || f.lastSurvivingSeq !== ev.seq - 1 || !cited) {
           throw fail("E_LOST_NO_ANCHOR", `${woId}: LOST event ${ev.seq} does not cite an anchor (run, seq, hash) of a verified run`);
         }
+        if (!Array.isArray(f.supersedes) || !f.supersedes.includes(f.anchorRun)) throw fail("E_LOST_NO_ANCHOR", `${woId}: LOST event ${ev.seq} does not list the runs it supersedes`);
         if (ev.from !== state) throw corrupt(`${woId}: LOST event ${ev.seq} records the wrong state`);
         return;
       }
@@ -243,23 +267,33 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
     worktree(finding.subject.repo);
     const fp = sha256Hex(canonical({ requirement: finding.requirement, repo: finding.subject.repo, location: finding.location, checkId: finding.checkId, observed: finding.observed.text }));
     const rid = requestId ?? sha256Hex(`import:${fp}`);
+    const body = sha256Hex(canonical(clean(finding)));
 
+    // ADV-5: a known fingerprint with another canonical body is a conflict, never a silent replay of the first body.
+    const boundReturn = () => {
+      const woId = readJsonIf(bindPath(fp)).woId;
+      const first = readJsonIf(eventPath(woId, 1));
+      if (first && sha256Hex(canonical(first.fields?.finding)) !== body) throw fail("E_IMPORT_CONFLICT", `${woId} was imported from this fingerprint with another finding body`);
+      anchorRunOf(woId, inspect(woId), anchorIndex());
+      return { woId };
+    };
     const boundNow = () => readJsonIf(bindPath(fp));
-    if (boundNow()) return { woId: boundNow().woId };
+    if (boundNow()) return boundReturn();
     let claim = readJsonIf(claimPath(fp));
     if (!claim) {
       mkdirSync(join(root, "fp"), { recursive: true });
       try {
-        writeOnce(claimPath(fp), jsonText({ requestId: rid, fingerprint: fp }), wopts(claimPath(fp)));
-        claim = { requestId: rid };
+        writeOnce(claimPath(fp), jsonText({ requestId: rid, fingerprint: fp, body }), wopts(claimPath(fp)));
+        claim = { requestId: rid, body };
       } catch (error) {
         if (error.code !== "E_EXISTS") throw error;
-        if (boundNow()) return { woId: boundNow().woId };
+        if (boundNow()) return boundReturn();
         claim = readJsonIf(claimPath(fp));
       }
     } else if (boundNow()) {
-      return { woId: boundNow().woId };
+      return boundReturn();
     }
+    if (claim.requestId === rid && claim.body !== undefined && claim.body !== body) throw fail("E_IMPORT_CONFLICT", `request ${rid} claimed this fingerprint with another finding body`);
     if (claim.requestId !== rid) throw fail("E_IMPORT_PENDING", `another import (request ${claim.requestId}) of this finding has claimed it and is not bound yet`);
 
     mkdirSync(join(root, "wo"), { recursive: true });
@@ -280,8 +314,9 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
       writeOnce(bindPath(fp), jsonText({ woId }), wopts(bindPath(fp)));
     } catch (error) {
       if (error.code !== "E_EXISTS") throw error;
-      return { woId: boundNow().woId };
+      return boundReturn();
     }
+    anchorRunFor(woId);
     return { woId };
   }
 
@@ -359,14 +394,14 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
     return readdirSync(dir).filter((n) => EVENT_FILE.test(n) && !isTempName(n)).sort(numeric).map((n) => JSON.parse(readFileSync(join(dir, n), "utf8")));
   }
 
-  /** The WOs of `family` other than `self` that are live: bound and still OPEN or ASSIGNED (a frozen WO counts: fail closed). */
-  function liveSiblings(family, self, index) {
+  /** The bound WOs of `family` other than `self` that are not VOIDED, in any state (a frozen WO counts: fail closed). */
+  function familySiblings(family, self, index) {
     let live = 0;
     for (const slot of slotIds()) {
       if (slot === self || !isBound(slot)) continue;
       try {
         const v = inspect(slot, index);
-        if (v.events[0].event.fields.finding.family === family && (v.state === "OPEN" || v.state === "ASSIGNED")) live += 1;
+        if (v.events[0].event.fields.finding.family === family && v.state !== "VOIDED") live += 1;
       } catch (error) {
         if (!FROZEN_CODES.has(error.code)) throw error;
         if (readJsonIf(eventPath(slot, 1))?.fields?.finding?.family === family) live += 1;
@@ -376,7 +411,7 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
   }
 
   function checkVerified(woId, f, actor, fields, index) {
-    if (actor.id === f.fixer) throw fail("E_INDEPENDENCE_VERIFIER", `the verifier ${actor.id} is the fixer of ${woId}`);
+    if (f.events.some((e) => e.to === "ASSIGNED" && e.fields?.fixer === actor.id)) throw fail("E_INDEPENDENCE_VERIFIER", `the verifier ${actor.id} was assigned as a fixer of ${woId}`);
     const F = f.lastFixed.fields.green.sha;
     const R = f.lastFixed.fields.red.sha;
     const deltas = deltasOf(woId);
@@ -391,12 +426,28 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
     const failedBefore = new Set(deltas.slice(0, -1).filter((d) => d.plan?.head === F).flatMap((d) => (d.results ?? []).filter((r) => r.status === "FAIL").map((r) => r.id)));
     const flipped = must.filter((id) => failedBefore.has(id));
     if (flipped.length > 0) throw fail("E_NONDETERMINISTIC", `${flipped.join(", ")} failed on the same fix ${F} earlier and passes now`);
-    if (1 + liveSiblings(f.finding.family, woId, index) >= 2) {
+    if (1 + familySiblings(f.finding.family, woId, index) >= 2) {
       const check = fields.permanentCheck;
-      if (!check || !isText(check.file) || !isText(check.title) || !isTestOnly(check.file)) throw fail("E_ROOT_CAUSE", `the family ${f.finding.family} has two live WOs: VERIFIED needs a permanent test-only check {file, title}`);
+      if (!check || !isText(check.file) || !isText(check.title) || !isTestOnly(check.file)) throw fail("E_ROOT_CAUSE", `the family ${f.finding.family} has two non-VOIDED WOs: VERIFIED needs a permanent test-only check {file, title}`);
       const g = gitIn(worktree(f.subject.repo));
       if (!titleAt(g, R, check.file, check.title) || !titleAt(g, F, check.file, check.title)) throw fail("E_ROOT_CAUSE_ABSENT", `the permanent check ${check.file} :: ${JSON.stringify(check.title)} is absent at the red or the fix commit`);
     }
+  }
+
+  /** ADV-12: the receipt dir must resolve (realpath) under <kauroRoot>/tools/review/out, kauroRoot from repos.json. */
+  function receiptUnderReviewOut(dir) {
+    const kauroRoot = readJsonIf(join(root, "repos.json"))?.kauroRoot;
+    if (!isText(kauroRoot)) throw fail("E_REVIEW_RECEIPT", "repos.json names no kauroRoot: a review receipt cannot be located");
+    let real;
+    let out;
+    try {
+      real = realpathSync.native(dir);
+      out = realpathSync.native(join(kauroRoot, "tools", "review", "out"));
+    } catch (error) {
+      throw fail("E_REVIEW_RECEIPT", `the review receipt ${dir} or ${kauroRoot}/tools/review/out cannot be resolved: ${error.code ?? error.message}`);
+    }
+    const rel = relative(out, real);
+    if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) throw fail("E_REVIEW_RECEIPT", `the review receipt ${real} is not under ${out}`);
   }
 
   function checkClosed(woId, f, fields) {
@@ -430,6 +481,7 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
     if (f.finding.tier === 1) {
       if (!isText(fields.reviewReceipt)) throw fail("E_CLOSE_REVIEW", `${woId} is tier 1: CLOSED needs the lane or package review receipt of the fix`);
       const dir = resolve(fields.reviewReceipt);
+      receiptUnderReviewOut(dir);
       const m = RECEIPT.exec(basename(dir));
       if (!m || Number.parseInt(m[2], 10) !== Number.parseInt(woId.slice(3), 10)) throw fail("E_CLOSE_REVIEW_LABEL", `the receipt ${basename(dir)} is not labelled wo-${woId.slice(3)}-(lane|pkg)-review`);
       const resolved = gitStatus(["rev-parse", "--verify", `${m[4]}^{commit}`], { cwd, runner });
@@ -517,6 +569,7 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
     if (truncation.kind !== "truncation") throw fail("E_LOST_NOT_TRUNCATION", `${woId} is tampered, not truncated: ${truncation.message}`);
     if (cited.seq !== truncation.anchor.seq || cited.hash !== truncation.anchor.hash) throw fail("E_LOST_NOT_TRUNCATION", `run ${anchorRun} is not the highest anchor of ${woId}`);
     const v = truncation.view;
+    const supersedes = [...new Set((index.get(woId) ?? []).filter((a) => a.seq > v.seq && a.seq <= cited.seq).map((a) => a.run))].sort();
     const event = {
       seq: v.seq + 1,
       prev: v.lastHash,
@@ -525,7 +578,7 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
       requestId: rid,
       from: v.state,
       to: "LOST",
-      fields: { anchorRun, anchorSeq: cited.seq, anchorHash: cited.hash, lastSurvivingSeq: v.seq },
+      fields: { anchorRun, anchorSeq: cited.seq, anchorHash: cited.hash, lastSurvivingSeq: v.seq, supersedes },
     };
     const committed = commit(woId, event);
     return { event: committed, anchorRun: anchorRunFor(woId) };
@@ -541,12 +594,15 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
     const frozen = [];
     const anchors = {};
     const lostEvents = [];
+    const blocks = {};
     const counts = { byFamily: {}, byState: {}, byTier: {}, byKind: {} };
     const blocked = new Set();
     const bump = (bucket, key) => {
       counts[bucket][key] = (counts[bucket][key] ?? 0) + 1;
     };
-    for (const id of list()) {
+    // ADV-2: every WO any verified run anchors is listed, whether or not its folder and binding are still on disk.
+    const ids = [...new Set([...list(), ...index.keys()])].sort(numeric);
+    for (const id of ids) {
       let state = "FROZEN";
       let finding = readJsonIf(eventPath(id, 1))?.fields?.finding ?? {};
       const attempts = [];
@@ -563,10 +619,15 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
         const candidate = { seq: view.seq, hash: view.lastHash };
         guardAnchor(id, candidate, view.events, index);
         anchors[id] = candidate;
-        if (finding.materialClass !== undefined && state !== "CLOSED" && state !== "VOIDED" && isText(finding.capability)) blocked.add(finding.capability);
+        if (blockOf(view)) blocked.add(blockOf(view));
+        blocks[id] = blockOf(view);
       } catch (error) {
         if (!FROZEN_CODES.has(error.code)) throw error;
         frozen.push(id);
+        if (error.kind === "missing") {
+          const latest = [...(index.get(id) ?? [])].sort((a, b) => a.seq - b.seq || (a.run < b.run ? -1 : 1)).at(-1);
+          if (latest?.blocks) blocked.add(latest.blocks);
+        }
         if (error.kind === "truncation") {
           const candidate = { seq: error.view.seq, hash: error.view.lastHash };
           try {
@@ -583,9 +644,9 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
       bump("byTier", finding.tier ?? "unknown");
       bump("byKind", finding.kind ?? "unknown");
     }
-    const unboundSlots = slotIds().filter((s) => !isBound(s));
+    const unboundSlots = slotIds().filter((s) => !isBound(s) && !index.has(s));
     const body = clean({ workOrders, counts, blockedCapabilities: [...blocked].sort(), lost: lostEvents, anchors, unboundSlots, frozen });
-    const runId = writeRun({ "anchors.json": jsonText(anchors), "summary.json": `${JSON.stringify(body, null, 2)}\n` });
+    const runId = writeRun({ "anchors.json": jsonText(anchors), "blocks.json": jsonText(blocks), "summary.json": `${JSON.stringify(body, null, 2)}\n` });
     return { runId, summary: body };
   }
 
@@ -595,6 +656,8 @@ export function openLedger({ root: rootArg, runner, beforeLink, crashAt, fs, pla
 // ------------------------------------------------------------------- CLI
 const COMMAND_TO = { assign: "ASSIGNED", reopen: "ASSIGNED", fix: "FIXED", verify: "VERIFIED", close: "CLOSED", void: "VOIDED" };
 const BLOCKED_CODES = new Set(["E_LEDGER_CORRUPT", "E_LOST_NO_ANCHOR", "E_IMPORT_PENDING", "E_CLOSE_MAIN_UNRESOLVED", "E_VERIFY_BINDING", "E_GIT_TIMEOUT"]);
+
+const UNKNOWN_OUTCOME = new Set(["E_IO", "E_GIT", "E_SIMULATED_CRASH"]);
 
 function parseArgs(argv) {
   const positional = [];
@@ -613,8 +676,10 @@ export function main(argv = process.argv.slice(2), out = { log: console.log, err
   const [command, target] = positional;
   try {
     const ledger = openLedger({ root: flags.root });
-    const [id, role = "coordinator"] = (flags.actor ?? "").split(":");
-    const actor = { id: id || undefined, role };
+    // ADV-3: the actor is explicit (--actor <id> --role <role>); there is no default role. show and summary need neither.
+    const needsActor = command === "import" || command === "lost" || command in COMMAND_TO;
+    if (needsActor && (!isText(flags.actor) || !isText(flags.role))) throw fail("E_USAGE", "--actor <id> and --role <role> are required");
+    const actor = { id: flags.actor, role: flags.role };
     if (command === "import") out.log(JSON.stringify(ledger.importFinding(jsonArg(target), { actor, requestId: flags["request-id"] })));
     else if (command === "show") out.log(JSON.stringify(ledger.fold(target), null, 2));
     else if (command === "summary") out.log(JSON.stringify(ledger.summary(), null, 2));
@@ -622,14 +687,17 @@ export function main(argv = process.argv.slice(2), out = { log: console.log, err
     else if (COMMAND_TO[command]) {
       const to = COMMAND_TO[command];
       const fields = flags.fields ? jsonArg(flags.fields) : {};
-      const rev = flags.rev === undefined ? ledger.fold(target).seq : Number.parseInt(flags.rev, 10);
-      const requestId = flags["request-id"] ?? sha256Hex(canonical({ woId: target, to, actor, fields }));
+      // ADV-4: the expected revision is explicit and part of the default request id.
+      if (!/^\d+$/.test(flags.rev ?? "")) throw fail("E_USAGE", "--rev <expected revision> is required");
+      const rev = Number.parseInt(flags.rev, 10);
+      const requestId = flags["request-id"] ?? sha256Hex(canonical({ woId: target, to, actor, rev, fields }));
       out.log(JSON.stringify(ledger.transition(target, { to, rev, requestId, actor, ...fields })));
-    } else throw fail("E_USAGE", "usage: work-orders.mjs <import|assign|fix|verify|close|void|reopen|lost|show|summary> --root <dir> [--actor id:role] [--rev n] [--request-id id] [--fields json|file] [--anchor run]");
+    } else throw fail("E_USAGE", "usage: work-orders.mjs <import|assign|fix|verify|close|void|reopen|lost|show|summary> --root <dir> [--actor id --role role] [--rev n] [--request-id id] [--fields json|file] [--anchor run]");
     return 0;
   } catch (error) {
-    out.error(`${error.code ?? "E_UNEXPECTED"}: ${error.message}`);
-    return BLOCKED_CODES.has(error.code) ? 2 : 1;
+    out.error(`${/^E_/.test(error.code ?? "") ? error.code : "E_UNEXPECTED"}: ${error.message}`);
+    // ADV-13: exit 1 only for a refusal that happened before any write; an unknown outcome (E_IO, E_GIT, a codeless or system error) is 2.
+    return BLOCKED_CODES.has(error.code) || UNKNOWN_OUTCOME.has(error.code) || !/^E_/.test(error.code ?? "") ? 2 : 1;
   }
 }
 
