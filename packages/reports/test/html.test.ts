@@ -210,3 +210,29 @@ describe("R-E3: English by default from a catalog keyed by locale", () => {
     }
   });
 });
+
+describe("PR21-1: every logo rule has its own test (S069)", () => {
+  const withLogo = (bytes: Uint8Array, mediaType: "image/png" | "image/jpeg"): VerifiedReport => report("D-hubspot", { branding: { version: "b-9", displayName: "N", logo: { sha256: sha(bytes), mediaType } } });
+  // A minimal baseline JPEG: SOI, one SOF0 segment naming the dimensions, EOI.
+  const jpeg = (width: number, height: number): Buffer => Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, height >> 8, height & 0xff, width >> 8, width & 0xff, 0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01, 0xff, 0xd9]);
+  it("a PNG over 512 KiB is refused although its hash matches", () => {
+    const big = Buffer.concat([PNG_1x1, Buffer.alloc(512 * 1024)]);
+    assert.deepEqual(refusal(() => renderReportHtml(withLogo(big, "image/png"), { pageSize: "LETTER", locale: "en-US", logo: big })), ["BRANDING_UNSAFE"]);
+  });
+  it("a valid JPEG renders as its exact data: image", () => {
+    const small = jpeg(120, 40);
+    const { html } = renderReportHtml(withLogo(small, "image/jpeg"), { pageSize: "LETTER", locale: "en-US", logo: small });
+    assert.ok(html.includes(`<img class="logo" alt="N" src="data:image/jpeg;base64,${small.toString("base64")}">`));
+  });
+  it("a JPEG that claims 60000x60000 pixels is refused", () => {
+    const bomb = jpeg(60000, 60000);
+    assert.deepEqual(refusal(() => renderReportHtml(withLogo(bomb, "image/jpeg"), { pageSize: "LETTER", locale: "en-US", logo: bomb })), ["BRANDING_UNSAFE"]);
+  });
+  it("a JPEG with no start-of-frame marker is refused", () => {
+    const noFrame = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xd9]);
+    assert.deepEqual(refusal(() => renderReportHtml(withLogo(noFrame, "image/jpeg"), { pageSize: "LETTER", locale: "en-US", logo: noFrame })), ["BRANDING_UNSAFE"]);
+  });
+  it("logo bytes are refused when the branding names no logo", () => {
+    assert.deepEqual(refusal(() => renderReportHtml(report("D-hubspot"), { pageSize: "LETTER", locale: "en-US", logo: PNG_1x1 })), ["BRANDING_UNSAFE"]);
+  });
+});
