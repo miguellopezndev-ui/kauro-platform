@@ -315,7 +315,7 @@ test("RACE (crash before link, crash after link, second writer): writeOnce never
     assert.ok(win.indexOf("unlink") > wSync, "win32: temp unlink after the durability step");
     // the ledger root must support hard links
     assert.doesNotThrow(() => probeLinks(dir));
-    assert.deepEqual(readableFiles(dir).filter((n) => n.includes("probe")), [], "the probe leaves nothing behind");
+    assert.deepEqual(readdirSync(dir).filter((n) => n.includes("probe")), [], "the probe leaves nothing behind");
     const noLink = { ...spyFs([]), linkSync: undefined };
     assert.throws(() => probeLinks(dir, { fs: noLink }), { code: "E_ROOT_FS" });
     assert.throws(() => probeLinks(dir, { fs: spyFs([], { linkError: "EPERM" }) }), { code: "E_ROOT_FS" });
@@ -413,7 +413,9 @@ test("DENY a red proof that is not a test-only red on the audited sha failing fo
     refuses(build({ redCase: { ...redCase, type: "testTimeoutFailure" } }), "E_RED_PROOF_HARNESS", "s4 timeout");
     refuses(build({ redCase: { ...redCase, message: "AssertionError: something unrelated" } }), "E_RED_PROOF_REASON", "s5 message does not match the declared reason");
     refuses(build({ redCase: { ...redCase, message: `SyntaxError: Unexpected token, ${FAIL_MSG}` } }), "E_RED_PROOF_HARNESS", "s6 harness sample in the message");
-    refuses(build({ rFiles: { [TFILE]: 'import { test } from "node:test";\ntest("something else", () => {});\n' } }), "E_RED_PROOF_TITLE", "s7 title absent at R");
+    const NO_TITLE = 'import { test } from "node:test";\ntest("something else", () => {});\n';
+    refuses(build({ rFiles: { [TFILE]: NO_TITLE }, fFiles: { [SRC]: "export const a = 4;\n", [TFILE]: WITH_TITLE } }), "E_RED_PROOF_TITLE", "s7 title absent at R");
+    refuses(build({ fFiles: { [SRC]: "export const a = 5;\n", [TFILE]: NO_TITLE } }), "E_RED_PROOF_TITLE", "s7 title absent at F");
     refuses(build({ fFiles: { [SRC]: "export const a = 3;\n", [OTHER]: "// other 3\n" } }), "E_RED_PROOF_TEST_CHANGED", "s8 test-only path in R..F");
     refuses(
       build({
