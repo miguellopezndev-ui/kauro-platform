@@ -1263,3 +1263,32 @@ test("ADV-13: the CLI exits 2 when the outcome is unknown (E_IO after the event 
     w.cleanup();
   }
 });
+
+test("ADV-16: a frozen material WO keeps its capability blocked in the summary whatever froze it (a changed run, a truncated tail, a tampered event); never read as CLOSED", () => {
+  const w = world();
+  try {
+    const material = { family: "money", tier: 1, materialClass: "false payment authority", capability: "payments-ach" };
+    const setup = () => {
+      const d = desk(w);
+      const wo = d.imp(1, material);
+      d.assign(wo, 1);
+      const run3 = d.go(wo, "ASSIGNED", COORD, d.assignFields(wo, 1, "fixer-2")).anchorRun;
+      return { d, wo, dir: join(d.root, "runs", run3) };
+    };
+    const cases = [
+      ["a run changed after its manifest", (c) => writeFileSync(join(c.dir, "anchors.json"), `${JSON.stringify({ [c.wo]: { seq: 2, hash: c.d.eventHash(c.wo, 2) } })}\n`)],
+      ["a truncated tail", (c) => unlinkSync(c.d.eventPath(c.wo, 3))],
+      ["a tampered event", (c) => writeFileSync(c.d.eventPath(c.wo, 2), readFileSync(c.d.eventPath(c.wo, 2), "utf8").replace("fixer", "fixer-x"))],
+    ];
+    for (const [label, mutate] of cases) {
+      const c = setup();
+      mutate(c);
+      const { summary } = c.d.ledger.summary();
+      assert.deepEqual(summary.frozen, [c.wo], `${label}: the WO is frozen`);
+      assert.deepEqual(summary.blockedCapabilities, ["payments-ach"], `${label}: its capability stays blocked`);
+      assert.notEqual(summary.workOrders.find((x) => x.id === c.wo)?.state, "CLOSED", `${label}: never CLOSED`);
+    }
+  } finally {
+    w.cleanup();
+  }
+});
