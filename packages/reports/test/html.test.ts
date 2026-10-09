@@ -78,13 +78,29 @@ describe("every figure is printed from the model, never recounted (R2-065, R2-07
     assert.deepEqual(figures(html, "emittedArtifactRows"), ["23"]);
     for (const key of ["counts.physicalSourceRows.definition", "counts.billableSourceUnits.definition", "counts.emittedArtifactRows.definition"] as const) assert.ok(html.includes(REPORT_COPY["en-US"][key]));
   });
-  it("every RowCounts figure, every exception table and every import step appears with its exact value", () => {
-    for (const name of ["C-identity-adversarial", "D-salesforce"] as const) {
-      const r = report(name);
-      const { html } = renderReportHtml(r, { pageSize: "A4", locale: "en-US", logo: null });
-      for (const [key, figure] of Object.entries(r.model.counts)) assert.deepEqual(figures(html, key), [figure.value.toLocaleString("en-US")], key);
-      for (const e of r.model.exceptions) assert.ok(html.includes(`data-records="${e.path}">${e.records?.value.toLocaleString("en-US")}<`), e.path);
-      for (const s of r.model.importGuide) assert.ok(html.includes(s.sha256) && html.includes(`data-records="${s.path}">${s.records.value.toLocaleString("en-US")}<`), s.path);
+  it("PR21-5: every RowCounts figure, exception total and import step prints a fixed expected value (the core's manifest, not the model)", () => {
+    // Expected values from the core's own manifest.json and acceptance README (oracle independent of the model); 17 is the quote.
+    const expected = {
+      "D-salesforce": {
+        counts: { physicalSourceRows: 19, logicalSourceRecords: 15, billableSourceUnits: 17, associationEdges: 12, emittedRepresentatives: 15, mergedNonSurvivors: 0, rejected: 0, withheld: 4, unresolved: 0, emittedArtifactRows: 23 },
+        exceptions: { "destination-conflicts.csv": 0, "duplicate-candidates.csv": 0, "formula-risk.csv": 8, "isolated.csv": 0, "leftovers.csv": 4, "rejected-input.csv": 0, "unmapped-fields.csv": 7, "unresolved-associations.csv": 4 },
+        steps: [["Account.csv", 4], ["Contact.csv", 5], ["Opportunity.csv", 3], ["Lead.csv", 3], ["associations/company_to_deal.csv", 3], ["associations/contact_to_company.csv", 5], ["associations/contact_to_deal.csv", 0]],
+        dir: "01_IMPORT/salesforce/",
+      },
+      "C-identity-adversarial": {
+        counts: { physicalSourceRows: 10, logicalSourceRecords: 10, billableSourceUnits: 17, associationEdges: 0, emittedRepresentatives: 3, mergedNonSurvivors: 2, rejected: 0, withheld: 5, unresolved: 0, emittedArtifactRows: 3 },
+        exceptions: { "destination-conflicts.csv": 2, "duplicate-candidates.csv": 8, "formula-risk.csv": 0, "isolated.csv": 5, "leftovers.csv": 0, "rejected-input.csv": 0, "unmapped-fields.csv": 0, "unresolved-associations.csv": 0 },
+        steps: [["contacts.csv", 3]],
+        dir: "01_IMPORT/hubspot/",
+      },
+    } as const;
+    for (const [name, want] of Object.entries(expected) as [CaseName, (typeof expected)[keyof typeof expected]][]) {
+      const { html } = renderReportHtml(report(name), { pageSize: "A4", locale: "en-US", logo: null });
+      for (const [key, value] of Object.entries(want.counts)) assert.deepEqual(figures(html, key), [String(value)], `${name} ${key}`);
+      for (const [file, value] of Object.entries(want.exceptions)) assert.ok(html.includes(`data-records="02_EXCEPTIONS/${file}">${value}<`), `${name} ${file}`);
+      const steps = [...html.matchAll(/<li data-step="(\d+)" data-path="([^"]+)"/g)].map((m) => m[2]);
+      assert.deepEqual(steps, want.steps.map(([f]) => `${want.dir}${f}`), name);
+      for (const [f, value] of want.steps) assert.ok(html.includes(`<span data-records="${want.dir}${f}">${value}<`), `${name} ${f}`);
     }
   });
   it("UNBOUND counts are disclosed on the first page; BOUND counts are not flagged", () => {
