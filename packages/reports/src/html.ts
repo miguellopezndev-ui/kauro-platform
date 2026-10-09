@@ -15,7 +15,7 @@ import { createHash } from "node:crypto";
 import { copyText } from "./copy.js";
 import type { CopyKey } from "./copy.js";
 import { isVerifiedReport } from "./model.js";
-import type { Figure, ImportStep, ReportArtifact, VerifiedReport } from "./model.js";
+import type { Figure, ReportArtifact, VerifiedReport } from "./model.js";
 import { OBJECT_ORDER } from "./package.js";
 import { ReportModelError } from "./problems.js";
 
@@ -140,15 +140,13 @@ export function renderReportHtml(report: VerifiedReport, options: RenderOptions)
   out.push("</tbody></table>", "</section>");
 
   // import guide (R2-069)
-  const familyOf = (s: ImportStep): string => s.path.replace(/-[0-9]{3}\.csv$/, ".csv");
   out.push("<section>", `<h2>${t("guide.heading")}</h2>`, `<p>${t("guide.onlyImport")}</p>`, '<ol class="guide">');
   for (const s of m.importGuide) {
-    const parts = m.importGuide.filter((x) => familyOf(x) === familyOf(s)).length;
     out.push(`<li data-step="${e(s.order)}" data-path="${escapeHtml(s.path)}">`);
     out.push(`<div class="p">${escapeHtml(s.path)}</div>`);
     if (s.object !== null) out.push(`<div>${t("guide.object", { object: s.object })}</div>`);
     if (s.association !== null) out.push(`<div>${t("guide.association", { from: s.association.from, to: s.association.to })}</div>`);
-    if (s.part !== null) out.push(`<div>${t("guide.part", { part: String(s.part), parts: String(parts) })}</div>`);
+    if (s.part !== null && s.parts !== null) out.push(`<div>${t("guide.part", { part: String(s.part), parts: String(s.parts) })}</div>`);
     out.push(`<div>${t("guide.records")} <span data-records="${escapeHtml(s.path)}">${n(s.records)}</span></div>`);
     out.push(`<div class="h">${t("guide.sha256", { sha256: s.sha256 })}</div>`, "</li>");
   }

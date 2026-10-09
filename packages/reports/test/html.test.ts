@@ -95,6 +95,32 @@ describe("every figure is printed from the model, never recounted (R2-065, R2-07
   });
 });
 
+/** B-dirty-multinational with its one contacts import file cut into two files with the given names (4 records each), the
+ * manifest and crosswalk re-pointed the way the core writes a cut table (its data view dropped, being a copy of the whole). */
+function cutContacts(names: readonly [string, string] | string[]): Map<string, Uint8Array> {
+  const files = loadPackage("B-dirty-multinational");
+  const dir = "01_IMPORT/clean-only/";
+  const path = `${dir}contacts.csv`;
+  const lines = fileText(files, path).split("\n").filter((l) => l.length > 0);
+  const header = lines[0] as string;
+  const parts = [`${header}\n${lines.slice(1, 5).join("\n")}\n`, `${header}\n${lines.slice(5).join("\n")}\n`];
+  const manifest = manifestOf(files);
+  const entry = manifest.artifacts.find((a) => a["path"] === path) as Record<string, unknown>;
+  manifest.artifacts = manifest.artifacts.filter((a) => a["path"] !== path && a["path"] !== "04_DOCUMENTATION/data-view/clean-only/contacts.csv");
+  files.delete("04_DOCUMENTATION/data-view/clean-only/contacts.csv");
+  files.delete(path);
+  names.forEach((name) => {
+    manifest.artifacts.push({ ...entry, path: `${dir}${name}` });
+    files.set(`${dir}${name}`, new Uint8Array());
+  });
+  writeManifest(files, manifest);
+  names.forEach((name, i) => forge(files, `${dir}${name}`, parts[i] as string));
+  const X = "03_TRACEABILITY/import-crosswalk.csv";
+  const xw = fileText(files, X).split("\n");
+  forge(files, X, xw.map((l, i) => (i === 0 || l === "" ? l : l.replace(`${path},${i},`, i <= 4 ? `${dir}${names[0]},${i},` : `${dir}${names[1]},${i - 4},`))).join("\n"));
+  return files;
+}
+
 describe("the import guide names only the files to import, in order, by part (R2-069)", () => {
   it("D-salesforce: seven steps in the model's order, the instruction to import 01_IMPORT only, every evidence file marked not for import", () => {
     const r = report("D-salesforce");
@@ -105,38 +131,26 @@ describe("the import guide names only the files to import, in order, by part (R2
     for (const a of r.model.artifacts.filter((x) => x.use !== "IMPORT")) assert.ok(html.includes(`data-artifact="${a.path}" data-use="${a.use}"`), a.path);
   });
   it("a cut table is listed part by part", () => {
-    const files = loadPackage("B-dirty-multinational");
-    const path = "01_IMPORT/clean-only/contacts.csv";
-    const lines = fileText(files, path).split("\n").filter((l) => l.length > 0);
-    const header = lines[0] as string;
-    // split the one file into two numbered parts, the way the core names them, and re-point the crosswalk
-    const parts = [`${header}\n${lines.slice(1, 5).join("\n")}\n`, `${header}\n${lines.slice(5).join("\n")}\n`];
-    const manifest = manifestOf(files);
-    const entry = manifest.artifacts.find((a) => a["path"] === path) as Record<string, unknown>;
-    manifest.artifacts = manifest.artifacts.filter((a) => a["path"] !== path);
-    const view = manifest.artifacts.find((a) => a["path"] === "04_DOCUMENTATION/data-view/clean-only/contacts.csv");
-    if (view !== undefined) manifest.artifacts = manifest.artifacts.filter((a) => a !== view);
-    files.delete("04_DOCUMENTATION/data-view/clean-only/contacts.csv");
-    files.delete(path);
-    parts.forEach((content, i) => {
-      const p = `01_IMPORT/clean-only/contacts-00${i + 1}.csv`;
-      manifest.artifacts.push({ ...entry, path: p });
-      files.set(p, new TextEncoder().encode(content));
-    });
-    writeManifest(files, manifest);
-    parts.forEach((content, i) => forge(files, `01_IMPORT/clean-only/contacts-00${i + 1}.csv`, content));
-    const X = "03_TRACEABILITY/import-crosswalk.csv";
-    const xw = fileText(files, X).split("\n");
-    forge(
-      files,
-      X,
-      xw.map((l, i) => (i === 0 || l === "" ? l : l.replace(`${path},${i},`, i <= 4 ? `01_IMPORT/clean-only/contacts-001.csv,${i},` : `01_IMPORT/clean-only/contacts-002.csv,${i - 4},`))).join("\n"),
-    );
+    const files = cutContacts(["contacts-001.csv", "contacts-002.csv"]);
     const pkg = readMigrationPackage(files);
     const r = buildReportModel(pkg, facts("B-dirty-multinational", { expectedManifestSha256: pkg.manifestSha256 }));
     const { html } = renderReportHtml(r, { pageSize: "LETTER", locale: "en-US", logo: null });
-    assert.deepEqual(r.model.importGuide.map((s) => [s.part, s.records.value]), [[1, 4], [2, 4]]);
+    assert.deepEqual(r.model.importGuide.map((s) => [s.part, s.parts, s.records.value]), [[1, 2, 4], [2, 2, 4]]);
     assert.ok(html.includes("Part 1 of 2") && html.includes("Part 2 of 2"));
+  });
+  it("PR21-4: a cut table whose parts are not exactly 1..m is refused (a gap, or an unnumbered sibling)", () => {
+    for (const names of [["contacts-001.csv", "contacts-003.csv"], ["contacts.csv", "contacts-001.csv"], ["contacts-002.csv", "contacts-003.csv"]]) {
+      const found = (() => {
+        try {
+          readMigrationPackage(cutContacts(names));
+        } catch (error) {
+          assert.ok(error instanceof ReportModelError, String(error));
+          return error.problems.map((p) => p.code);
+        }
+        return [] as ProblemCode[];
+      })();
+      assert.deepEqual(found, ["IMPORT_PARTS_INVALID"], names.join(" + "));
+    }
   });
 });
 

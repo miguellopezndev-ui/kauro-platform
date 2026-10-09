@@ -93,6 +93,8 @@ export interface ImportStep {
   readonly association: { readonly from: CoreObject; readonly to: CoreObject } | null;
   /** 1-based part number when the core cut the table into numbered parts, else null. */
   readonly part: number | null;
+  /** How many parts that cut table has (the reader proved they are exactly 1..parts); null for an uncut table. */
+  readonly parts: number | null;
   readonly records: Figure;
 }
 
@@ -222,29 +224,30 @@ function useOf(artifact: PackageArtifact): ArtifactUse {
   }
 }
 
-const NUMBERED_PART = /-([0-9]{3})\.csv$/;
-
 function importGuide(pkg: VerifiedPackage): ImportStep[] {
   const imports = pkg.artifacts.filter((a) => a.kind === "MACHINE_IMPORT_CSV");
-  const partOf = (path: string): number | null => {
-    const m = NUMBERED_PART.exec(path);
-    return m === null ? null : Number(m[1]);
-  };
+  const fileOf = (path: string) => (Object.hasOwn(pkg.importFiles, path) ? pkg.importFiles[path] : undefined);
+  const familyOf = (path: string): string => path.replace(/-[0-9]{3}\.csv$/, ".csv");
   const objectOf = (path: string): CoreObject | null => (Object.hasOwn(pkg.importFiles, path) ? pkg.importFiles[path]?.object : null) ?? null;
   const records = imports
     .filter((a) => objectOf(a.path) !== null)
     .sort((a, b) => {
       const byObject = OBJECT_ORDER.indexOf(objectOf(a.path) as CoreObject) - OBJECT_ORDER.indexOf(objectOf(b.path) as CoreObject);
-      return byObject !== 0 ? byObject : (partOf(a.path) ?? 0) - (partOf(b.path) ?? 0) || (a.path < b.path ? -1 : 1);
+      if (byObject !== 0) return byObject;
+      if (familyOf(a.path) !== familyOf(b.path)) return familyOf(a.path) < familyOf(b.path) ? -1 : 1;
+      return (fileOf(a.path)?.part?.part ?? 0) - (fileOf(b.path)?.part?.part ?? 0);
     });
-  const edges = imports.filter((a) => objectOf(a.path) === null).sort((a, b) => (a.path < b.path ? -1 : 1));
+  const edges = imports
+    .filter((a) => objectOf(a.path) === null)
+    .sort((a, b) => (familyOf(a.path) !== familyOf(b.path) ? (familyOf(a.path) < familyOf(b.path) ? -1 : 1) : (fileOf(a.path)?.part?.part ?? 0) - (fileOf(b.path)?.part?.part ?? 0)));
   return [...records, ...edges].map((a, index) => ({
     order: index + 1,
     path: a.path,
     sha256: a.sha256,
     object: objectOf(a.path),
     association: (Object.hasOwn(pkg.importFiles, a.path) ? pkg.importFiles[a.path]?.association : null) ?? null,
-    part: partOf(a.path),
+    part: fileOf(a.path)?.part?.part ?? null,
+    parts: fileOf(a.path)?.part?.of ?? null,
     records: fig(a.rowCount ?? 0, a.path, "records excluding the header"),
   }));
 }
