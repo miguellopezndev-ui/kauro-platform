@@ -102,7 +102,7 @@ export function acceptAttributionHandler(runtime: CommerceRequestRuntime, co: Pr
             beneficiaries.set(shareClaim.claimId, shareClaim);
           }
           // judged again after the last lock taken before the writes (the share claims): a deadline crossed while this unit waited refuses it;
-          // the database judges every acceptance once more at COMMIT (0045 attribution_claims_accepted_in_window, KC021)
+          // the database judges every acceptance once more at COMMIT (0048 attribution_claims_accepted_in_window, KC021)
           await refuseLapsed(claim, true);
           const competing = (await attribution.claimsOfProspect(claim.prospectId)).filter((c) => !beneficiaries.has(c.claimId) && REVIEWABLE.has(c.state));
           await attribution.freezeAllocation(allocation.allocationId, now);

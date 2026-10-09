@@ -1,4 +1,4 @@
--- Migration 0045: sales and attribution changes ordered with the commands that rest on them (package B10, failure-matrix lane 6c).
+-- Migration 0048: sales and attribution changes ordered with the commands that rest on them (package B10, failure-matrix lane 6c).
 --
 -- Each part closes one RED cell of docs/design/B10-matrix-status/6c.md with a lock the racing command already takes (design §10, D10-TX-1):
 --   * TAIL_PURCHASE_RACE: a termination's tail entry (KC011) reads the agency's purchases under the shared half of the agency's recurrence

@@ -484,7 +484,7 @@ faultCell(
 
 // =====================================================================================================================================
 // CLAIM_DEADLINE (ADV-7): the review deadline passing after every statement judged it, refused only by the COMMIT judge
-// (0045 attribution_claims_accepted_in_window, KC021, mapped to 409 PRECONDITION_FAILED CLAIM_EXPIRED by sqlstate.ts)
+// (0048 attribution_claims_accepted_in_window, KC021, mapped to 409 PRECONDITION_FAILED CLAIM_EXPIRED by sqlstate.ts)
 // =====================================================================================================================================
 
 faultCell(

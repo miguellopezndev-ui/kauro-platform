@@ -418,7 +418,7 @@ faultCell(
 
 
 // CLAIM_LAPSE_TAIL (X, ADV-1, ADV-7): the listed claim's acceptance window ending after the termination's KC011 judgement began, during its
-// wait on the agency's recurrence lock, or between its tail entry and its COMMIT (0045 termination_tail_entries_in_window)
+// wait on the agency's recurrence lock, or between its tail entry and its COMMIT (0048 termination_tail_entries_in_window)
 faultCell(
   {
     id: "CLAIM_LAPSE_TAIL",
