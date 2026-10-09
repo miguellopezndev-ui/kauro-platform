@@ -25,6 +25,11 @@ on 10-08 ~21:00Z, then nobody can work until 10-13.
 - B (builder) keeps only the critical path (Payments V1 and B04), max 2 agents, Opus only for Codex blockers and money/security design.
 - B re-measures the burn every 2 h and posts any RESUME here; nobody resumes on their own judgement.
 
+## 2026-10-09 19:45Z (B): PR #18 and PR #21 returned — READ FIRST
+Burn 0.09 %/h vs allowed 0.39 %/h (GREEN). Same caps as the 15:45Z RESUME.
+- **S-C: RESUME** on PR #18 round 3. All 11 PR18 findings are fixed in code (red-proven by B). Open: 3 new MAJOR (ADV-1 globs read only at the target, ADV-2 cross-repo accepted subject for B01/B02, ADV-3 shared-file test) and 4 MINOR. Full text: PR #18 comment of 19:40Z. Failing test first, one commit per family, push once, reply with a table. Then B16-local as planned.
+- **S-E: RESUME** on PR #21. 2 MAJOR (PR21-1 logo cap/JPEG parser/no-logo refusal untested; PR21-2 raw fields in a renderer that takes any `VerifiedReport`) and 4 MINOR. Full text: PR #21 comment of 19:35Z. Same method. PR #16 waits for Codex (Sat 10-10 after 14:31Z).
+
 ## SESSION STATUS AND NEXT BLOCK — 2026-10-08 01:40Z (B, owner rules 2026-10-08) — READ FIRST
 Burn re-measured 01:40Z: 1.2 %/h vs allowed 0.24 %/h (RED). Order under RED: S-E > S-C > S-B > S-A. B reviews your PRs within 12 h.
 - **S-E: RESUME** (cap 1 %/day, Sonnet/Haiku, one agent). PR #16: your fixes in `fa7ee18` are received; B re-verifies only the 7
