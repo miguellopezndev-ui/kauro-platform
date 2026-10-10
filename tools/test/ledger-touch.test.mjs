@@ -296,3 +296,37 @@ test("family evidence: every scope path acceptance-touch can see is loud (an acc
   assert.ok(Array.isArray(touch.SCOPE_INPUTS) && touch.SCOPE_INPUTS.length > 0, "acceptance-touch.mjs exports SCOPE_INPUTS, the repository inputs it reads");
   for (const input of touch.SCOPE_INPUTS) assert.ok(FAMILY.some((r) => r.path.startsWith(input) || input.startsWith(r.path)), `no family row for the input ${input}`);
 });
+
+test("ADV-1: a re-attribution in package-globs.json never hides a change — the globs at the package's subject and at the target are united, a package whose globs (or the shared list) changed is touched, and a package accepted before the file existed is compared with the file's first version", () => {
+  const f = fixture();
+  try {
+    f.write(GLOBS, { ...f.globs, packages: { B00: [], B01: ["lib/**", "src/**"] } });
+    f.write("src/a.ts", "export const a = 2;\n");
+    f.commit("move src/** to B01 and edit src/a.ts");
+    const r = f.run();
+    assert.deepEqual([r.code, r.out.touched.map((t) => [t.package, t.files])], [0, [["B00", [GLOBS, "src/a.ts"]]]]);
+  } finally {
+    f.done();
+  }
+  const g = fixture();
+  try {
+    g.write(GLOBS, { ...g.globs, packages: { B00: [], B01: ["lib/**", "src/**"] } });
+    g.commit("move src/** to B01");
+    g.write("src/a.ts", "export const a = 2;\n");
+    g.commit("edit src/a.ts later");
+    assert.deepEqual(g.run(`${g.git("rev-parse", "HEAD~1")}..HEAD`).out.touched.map((t) => [t.package, t.files]), [["B00", [GLOBS, "src/a.ts"]]], "the left bound never narrows B00's range");
+  } finally {
+    g.done();
+  }
+  const h = fixture({ globsLater: true });
+  try {
+    assert.deepEqual(h.run().out.touched, [], "adding the attribution file is not a change of B00's globs");
+    h.write(GLOBS, { ...h.globs, packages: { B00: [], B01: ["lib/**", "src/**"] } });
+    h.write("src/a.ts", "export const a = 2;\n");
+    h.commit("move src/** to B01 and edit src/a.ts");
+    assert.deepEqual(h.run().out.touched.map((t) => [t.package, t.files]), [["B00", [GLOBS, "src/a.ts"]]]);
+  } finally {
+    h.done();
+  }
+});
+
