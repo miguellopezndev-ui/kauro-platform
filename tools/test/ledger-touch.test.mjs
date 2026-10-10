@@ -3,7 +3,7 @@
 // with the changes that reopen a package (a cited test or an own row) reported apart.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -356,6 +356,26 @@ test("ADV-3: a changed shared file (package.json) touches every accepted package
     f.commit("manifest");
     const r = f.run();
     assert.deepEqual([r.code, r.out.touched.map((t) => [t.package, t.files])], [0, [["B00", ["package.json"]]]]);
+  } finally {
+    f.done();
+  }
+});
+
+test("ADV-7: a file at a revision is null only when the revision's tree has no such path — an unknown revision or a corrupt object is an error, never an absent file", async () => {
+  const { fileAt } = await import("../acceptance-touch.mjs");
+  assert.equal(typeof fileAt, "function", "acceptance-touch.mjs exports fileAt");
+  const f = fixture();
+  try {
+    assert.equal(fileAt(f.dir, "HEAD", "no/such/file.json"), null);
+    assert.match(fileAt(f.dir, "HEAD", "src/a.ts"), /export const a = 1/);
+    assert.throws(() => fileAt(f.dir, "no-such-revision", "src/a.ts"));
+    // corrupt B00's sidecar blob at HEAD: the tree still lists it, reading it fails
+    const blob = f.git("rev-parse", "HEAD:docs/acceptance/case-maps/B00.json");
+    const object = join(f.dir, ".git", "objects", blob.slice(0, 2), blob.slice(2));
+    chmodSync(object, 0o644);
+    writeFileSync(object, "not a zlib stream");
+    assert.throws(() => fileAt(f.dir, "HEAD", "docs/acceptance/case-maps/B00.json"));
+    assert.throws(() => changedCaseRows(f.dir, f.X, "HEAD", loadRegistry(f.dir)), "a corrupt sidecar is an error, not a deleted map");
   } finally {
     f.done();
   }
