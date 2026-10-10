@@ -280,12 +280,9 @@ test("the ledger lists the 441 registry cases; the only missing ones belong to a
   const missing = ledger.violations.filter((v) => v.kind === "MISSING_CASE");
   assert.deepEqual(missing.map((v) => v.subject).sort(), ledger.cases.filter((c) => unpinned.has(c.package)).map((c) => c.case).sort());
   for (const [path, content] of Object.entries(ledgerFiles(ledger))) assert.equal(read(path), content, `${path} is stale — run node tools/ledger.mjs --write`);
-  // the README's hand table claims no acceptance the ledger does not compute
-  // no README status is claimed without its review; the hand table still names the commit merged to main (4b33e26) where the
-  // accepted subject is the latest accepting round (d9bbfd0) for B06, B07 and B09 (PR18-3 (c)) until B regenerates it
-  const readmeClaimed = ledger.violations.filter((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW");
-  assert.deepEqual(readmeClaimed.filter((v) => !/^README names commit/.test(v.detail)), []);
-  assert.deepEqual(readmeClaimed.map((v) => v.subject), ["B06", "B07", "B09"]);
+  // the README's generated table claims no status or commit the ledger does not compute (B06, B07 and B09 name the accepted
+  // subject d9bbfd0, PR18-3 (c))
+  assert.deepEqual(ledger.violations.filter((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW"), []);
 });
 
 // A platform case map in the table format converts with the review that accepts it; a row that lost its review agreement is a claim.

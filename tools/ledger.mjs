@@ -412,11 +412,15 @@ export function convertExternal(input, pinned, registry) {
 const rank = (klass) => (CLASSES.indexOf(klass) < 0 ? CLASSES.length : CLASSES.indexOf(klass));
 const strongest = (rows) => rows.reduce((best, r) => (best === null || rank(r.class) < rank(best.class) ? r : best), null);
 
-/** The README table's rows: package id, status and the commit it names. */
+/**
+ * The README table's rows: package id, status and the commit it names, from the hand table's "commit on main" column or the
+ * generated table's "accepted subject (commit · review)" column (a renamed column must not silence the commit check).
+ */
 export function readmeClaims(text) {
+  const commitColumn = (header) => header.findIndex((h) => h === "commit on main" || h.startsWith("accepted subject"));
   return tablesOf(text)
     .filter((t) => t.header[0] === "package" && t.header.includes("status"))
-    .flatMap((t) => t.rows.map(({ cells }) => ({ package: /^(B\d\d)\b/.exec(cells[0])?.[1], status: cells[t.header.indexOf("status")], commit: shasIn(cells[t.header.indexOf("commit on main")] ?? "")[0] ?? null })))
+    .flatMap((t) => t.rows.map(({ cells }) => ({ package: /^(B\d\d)\b/.exec(cells[0])?.[1], status: cells[t.header.indexOf("status")], commit: shasIn(cells[commitColumn(t.header)] ?? "")[0] ?? null })))
     .filter((r) => r.package);
 }
 
