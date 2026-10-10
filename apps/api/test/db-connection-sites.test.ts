@@ -93,14 +93,32 @@ const LOADER_NAMES: ReadonlySet<string> = new Set(["createRequire", "getBuiltinM
  * - packages/data-plane/src/sandbox/preload.ts imports node:module (syncBuiltinESMExports, to publish its network hooks) and
  *   node:worker_threads (to observe the permission model's refusals); it loads nothing by name.
  */
-const LOADER_ALLOWLIST: ReadonlyArray<{ readonly file: string; readonly line: number; readonly text: string }> = [
+const EXACT_ALLOWLIST: ReadonlyArray<{ readonly file: string; readonly line: number; readonly text: string }> = [
   { file: "apps/web/scripts/next.mjs", line: 7, text: 'import { createRequire } from "node:module";' },
   { file: "apps/web/scripts/next.mjs", line: 10, text: "const require = createRequire(import.meta.url);" },
   { file: "apps/web/e2e/support/serve.mjs", line: 41, text: "const { createEdgeFake, mountOnEdge } = await import(pathToFileURL(fakeModule).href);" },
   { file: "packages/data-plane/src/sandbox/child.ts", line: 30, text: "const task = (await import(pathToFileURL(job.task).href)) as { run?: (payload: unknown, context: { readonly workDir: string }) => Promise<unknown> };" },
   { file: "packages/data-plane/src/sandbox/preload.ts", line: 26, text: 'import { syncBuiltinESMExports } from "node:module";' },
   { file: "packages/data-plane/src/sandbox/preload.ts", line: 29, text: 'import workerThreads from "node:worker_threads";' },
+  // DB-TLS gap 2: the "LOCAL" values that are not an environment handed to a connection: the two lists of the three environments, the
+  // origin policy kind of the web host, and the browser suite's default for its own local stack
+  { file: "packages/domain/src/model/idempotency.ts", line: 17, text: 'export const ENVIRONMENTS: ReadonlyArray<Environment> = ["LOCAL", "SANDBOX", "LIVE"];' },
+  { file: "packages/persistence/src/pool.ts", line: 29, text: 'const DATABASE_ENVIRONMENTS: ReadonlyArray<string> = Object.freeze(["LOCAL", "SANDBOX", "LIVE"]);' },
+  { file: "apps/web/src/server/host-config.ts", line: 44, text: 'if (blank(publicOrigin) && blank(appOrigin)) return local ? { ok: true, policy: { kind: "LOCAL" } } : { ok: false, problem: "ORIGINS_MISSING" };' },
+  { file: "apps/web/playwright.config.ts", line: 39, text: 'KAURO_ENV: process.env["KAURO_ENV"] ?? "LOCAL",' },
 ];
+
+/**
+ * DB-TLS gap 2 (6de1436): the environment of a connection comes from the validated runtime configuration only (apps/api/src/config.ts
+ * environmentOf, KAURO_ENVIRONMENT, read by loadConfig and loadMigrationJobConfig), never from a literal. Fail closed: a "LOCAL" string in a
+ * value position is a finding wherever it is not compared (===, !==, ==, !=, a case label), outside test code and the exact allowlist.
+ */
+const TEST_CODE = /(?:^|\/)(?:e2e|testing)\/|\.(?:test|spec)\.[cm]?[jt]sx?$/;
+function isComparedOnly(node: ts.Node): boolean {
+  const p = node.parent;
+  if (ts.isCaseClause(p) && p.expression === node) return true;
+  return ts.isBinaryExpression(p) && [ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken, ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken].includes(p.operatorToken.kind);
+}
 
 interface Finding {
   readonly file: string;
@@ -127,7 +145,7 @@ function isDeclarationName(node: ts.Identifier): boolean {
 /** Every finding of one file: driver loads outside DRIVER_FILES, non-literal loads, and loader primitives (memoized: the tree mutations rescan it). */
 const memo = new Map<string, Finding[]>();
 function findingsOf(file: string, text: string): Finding[] {
-  const key = `${file} ${text}`;
+  const key = `${file}\u0000${text}`;
   const known = memo.get(key);
   if (known !== undefined) return known;
   const found = findingsOfUncached(file, text);
@@ -141,7 +159,7 @@ function findingsOfUncached(file: string, text: string): Finding[] {
   const report = (node: ts.Node, problem: string): void => {
     const line = lineOf(node);
     const lineText = (text.split(/\r?\n/)[line - 1] ?? "").trim();
-    if (LOADER_ALLOWLIST.some((a) => a.file === file && a.line === line && a.text === lineText)) return;
+    if (EXACT_ALLOWLIST.some((a) => a.file === file && a.line === line && a.text === lineText)) return;
     findings.push({ file, line, problem });
   };
   const load = (node: ts.Node, specifier: string | undefined, form: string): void => {
@@ -185,6 +203,9 @@ function findingsOfUncached(file: string, text: string): Finding[] {
         }
       } else if (node.text === "Function" && !member && (ts.isCallExpression(p) || ts.isNewExpression(p)) && p.expression === node) report(node, "the Function constructor evaluates code");
     }
+    if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && node.text === "LOCAL" && !TEST_CODE.test(file) && !isComparedOnly(node)) {
+      report(node, '"LOCAL" as a value outside test code: the environment of a connection comes from the validated configuration (KAURO_ENVIRONMENT), never from a literal');
+    }
     if (ts.isElementAccessExpression(node)) {
       const key = literalOf(node.argumentExpression);
       if (key !== undefined && (LOADER_NAMES.has(key) || key === "require")) report(node, `a [${JSON.stringify(key)}] member loads modules or evaluates code`);
@@ -213,7 +234,7 @@ const printer = ts.createPrinter({ removeComments: true });
 
 const tlsMemo = new Map<string, string[]>();
 function tlsViolations(text: string, rel = "scan.ts"): string[] {
-  const key = `${rel} ${text}`;
+  const key = `${rel}\u0000${text}`;
   const known = tlsMemo.get(key);
   if (known !== undefined) return known;
   const c = printer.printFile(ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, false, scriptKindOf(rel)));
@@ -230,7 +251,7 @@ function scanTree(sources: ReadonlyMap<string, string>): string[] {
     if (!TLS_FILES.has(rel)) for (const v of tlsViolations(text, rel)) problems.push(`${rel}: TLS settings belong in tls.ts (${v})`);
   }
   // an allowlisted loader line that no longer exists is stale: the list stays exact
-  for (const a of LOADER_ALLOWLIST) {
+  for (const a of EXACT_ALLOWLIST) {
     const lines = (sources.get(a.file) ?? "").split(/\r?\n/);
     if ((lines[a.line - 1] ?? "").trim() !== a.text) problems.push(`${a.file}:${a.line} is allowlisted as ${JSON.stringify(a.text)} but holds something else`);
   }
@@ -329,6 +350,28 @@ test("scan self-test: fail closed: a load whose specifier is not a literal and e
   assert.ok(scanTree(new Map([["apps/web/scripts/next.mjs", `// moved\n${next}`]])).some((p) => p.includes("is allowlisted as")), "a stale allowlist entry");
 });
 
+test("scan self-test: DB-TLS gap 2: a literal \"LOCAL\" environment in production code is caught; comparisons, types and test code are not", () => {
+  for (const text of [
+    'createPool({ environment: "LOCAL", host, port, database, user, max: 1, applicationName: "a" });',
+    'const environment = "LOCAL";',
+    'await applyMigrationsWith("LOCAL", migrator, password);',
+    'connectionSecurityOf("LOCAL", { host });',
+    'const e = process.env["KAURO_ENVIRONMENT"] ?? "LOCAL";',
+    'config.environment = "LOCAL";',
+    'createPool({ ...c, environment: live ? "LIVE" : "LOCAL" });',
+    "createPool({ ...c, environment: `LOCAL` });",
+    'createPool({ ...c, environment: "LOCAL" as const });',
+  ]) assert.ok(problemsOf(APP, text).some((p) => p.includes('"LOCAL" as a value')), `not caught: ${text}`);
+  for (const text of [
+    'if (environment === "LOCAL") x();',
+    'const remote = "LOCAL" !== environment;',
+    'switch (environment) {\n  case "LOCAL":\n    break;\n}',
+    'type E = "LOCAL" | "LIVE";',
+    'function f(e: "LOCAL" | "SANDBOX"): void {}',
+  ]) assert.deepEqual(problemsOf(APP, text), [], text);
+  for (const rel of ["packages/persistence/src/testing/harness.ts", "apps/web/e2e/support/serve.mjs", "apps/api/src/a.test.ts"]) assert.deepEqual(problemsOf(rel, 'createPool({ environment: "LOCAL" });'), [], rel);
+});
+
 test("scan self-test: DB-TLS-R5 / ADV-2: type-only references load nothing and are never findings", () => {
   for (const [rel, text] of [
     ["packages/persistence/src/evidence.ts", 'export const f = (pool: import("./pool.js").KauroPool) => pool;'],
@@ -417,6 +460,11 @@ test("DB-TLS-R4 / ADV-1 / ADV-2 on the complete tree: a direct driver load anywh
     ["packages/persistence/src/migrations/runner.ts", 'import { createRequire } from "node:module";\nexport const open = (c: never) => createRequire(import.meta.url)("../").createPool(c);'],
     ["apps/api/src/main.ts", 'export const open = async (m: string) => (await import(m)).Pool;'],
   ] as const) assert.ok(mutated([rel, text]).some((p) => p.startsWith(`${rel}:`)), `${rel}: ${text}`);
+  // DB-TLS gap 2: a production root that hands a connection a literal LOCAL environment
+  for (const [rel, text] of [
+    ["apps/api/src/main.ts", 'import { createPool } from "@kauro/persistence";\nexport const p =(c: never) => createPool({ ...(c as object), environment: "LOCAL" } as never);'],
+    ["apps/control/src/composition.ts", 'export const localEnvironment = "LOCAL";'],
+  ] as const) assert.ok(mutated([rel, text]).some((p) => p.startsWith(`${rel}:`) && p.includes('"LOCAL" as a value')), `${rel}: ${text}`);
   // ADV-1 P1/P2/P3b of d515f18 (an aliased re-export with an app caller, the index by another specifier, at run time): no finding, because
   // the pool they reach is built under connectionSecurityOf; pool-enforcement.test.ts runs each route and proves the refusal and the TLS
   assert.deepEqual(mutated(["packages/persistence/src/index.ts", 'export { createPool as openPool } from "./pool.js";'], ["apps/api/src/main.ts", 'import { openPool } from "@kauro/persistence";\nexport const o = (c: never) => openPool(c);']), []);
