@@ -741,9 +741,21 @@ export function main(argv, root = ROOT, log = console.log) {
     return stale.length ? 1 : 0;
   }
 
-  const { inputs, externals, ledger } = ledgerOfRepo(root, args, registry);
+  let { inputs, externals, ledger } = ledgerOfRepo(root, args, registry);
   const readmeFile = join(root, "docs", "acceptance", "README.md");
 
+  // ADV-3 (r4): the README first, then the ledger computed against the regenerated README, so one pass is a fixed point (the
+  // table depends only on the packages, which no README claim changes; a table that moves on the recomputation is an error)
+  if (args["--readme"]) {
+    const text = readFileSync(readmeFile, "utf8");
+    const [start, end] = README_MARKERS;
+    if (readmeSection(text) === null) throw new Error(`docs/acceptance/README.md has no ${start} … ${end} markers`);
+    const table = readmeTable(ledger);
+    writeFileSync(readmeFile, `${text.slice(0, text.indexOf(start) + start.length)}
+${table}${text.slice(text.indexOf(end))}`);
+    ({ inputs, externals, ledger } = ledgerOfRepo(root, args, registry));
+    if (readmeTable(ledger) !== table) throw new Error("the README table changed when the ledger was recomputed against it");
+  }
   if (args["--write"]) {
     for (const e of externals) {
       const input = inputs.find((i) => i.id === e.id);
@@ -752,12 +764,6 @@ export function main(argv, root = ROOT, log = console.log) {
     }
     mkdirSync(join(root, LEDGER_DIR, "gates"), { recursive: true });
     for (const [path, content] of Object.entries(ledgerFiles(ledger))) writeFileSync(join(root, path), content);
-  }
-  if (args["--readme"]) {
-    const text = readFileSync(readmeFile, "utf8");
-    const [start, end] = README_MARKERS;
-    if (readmeSection(text) === null) throw new Error(`docs/acceptance/README.md has no ${start} … ${end} markers`);
-    writeFileSync(readmeFile, `${text.slice(0, text.indexOf(start) + start.length)}\n${readmeTable(ledger)}${text.slice(text.indexOf(end))}`);
   }
 
   // bound to the history after the committed outputs are written: they hold no git-dependent result

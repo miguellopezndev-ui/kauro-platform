@@ -519,6 +519,25 @@ test("ADV-5: the command line binds every review to the history (reviewCommitVio
   }
 });
 
+test("ADV-3 (r4): one `--write --readme` pass from a stale README converges — the written ledger, gate records, README table and README equal a fresh computation", () => {
+  const repo = mkdtempSync(join(tmpdir(), "ledger-converge-"));
+  try {
+    for (const p of ["packages/contracts/registry", "docs/acceptance"]) cpSync(join(root, p), join(repo, p), { recursive: true });
+    const readmeFile = join(repo, "docs/acceptance/README.md");
+    const honest = readFileSync(readmeFile, "utf8");
+    const stale = honest.replace("`d9bbfd0` · B06-round3-d9bbfd0", "`4b33e26` · B06-round3-d9bbfd0");
+    assert.notEqual(stale, honest);
+    writeFileSync(readmeFile, stale);
+    assert.ok(ledgerOfRepo(repo).ledger.violations.some((v) => v.subject === "B06" && v.kind === "README_CLAIM_WITHOUT_REVIEW"), "the README starts stale");
+    main(["--write", "--readme"], repo, () => {});
+    const { ledger } = ledgerOfRepo(repo);
+    for (const [path, content] of Object.entries(ledgerFiles(ledger))) assert.equal(readFileSync(join(repo, path), "utf8"), content, `${path} is stale after one pass`);
+    assert.equal(readFileSync(readmeFile, "utf8"), honest, "the README is the generated one after one pass");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
 test("ADV-6: a cited title is written only as the title of a test, it or describe call — a comment, a longer title or another string does not satisfy it; escaped quotes and every quote kind do", () => {
   const source = [
     "// refuses a stale lease (a comment)",
