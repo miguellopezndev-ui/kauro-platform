@@ -495,8 +495,8 @@ test("DB-TLS-R4 / ADV-1 / ADV-2 on the complete tree: a direct driver load anywh
   // ADV-1 P1/P2/P3b of d515f18 (an aliased re-export with an app caller, the index by another specifier, at run time): no finding, because
   // the pool they reach is built under connectionSecurityOf; pool-enforcement.test.ts runs each route and proves the refusal and the TLS
   assert.deepEqual(mutated(["packages/persistence/src/index.ts", 'export { createPool as openPool } from "./pool.js";'], ["apps/api/src/main.ts", 'import { openPool } from "@kauro/persistence";\nexport const o = (c: never) => openPool(c);']), []);
-  assert.deepEqual(mutated(["packages/persistence/src/migrations/runner.ts", 'import * as I from "../../src/index.js";\nexport const open = (c: never) => (I as never as Record<string, (c: never) => unknown>)["create" + "Pool"]!(c);']), []);
-  assert.deepEqual(mutated(["packages/persistence/src/migrations/runner.ts", 'export const open = async (c: never) => ((await import("../../src/index.js")) as never as Record<string, (c: never) => unknown>)["createPool"]!(c);']), []);
+  assert.deepEqual(mutated(["packages/persistence/src/migrations/runner.ts", 'import * as I from "../index.js";\nexport const open = (c: never) => (I as never as Record<string, (c: never) => unknown>)["create" + "Pool"]!(c);']), []);
+  assert.deepEqual(mutated(["packages/persistence/src/migrations/runner.ts", 'export const open = async (c: never) => ((await import("../index.js")) as never as Record<string, (c: never) => unknown>)["createPool"]!(c);']), []);
   // ADV-2 / DB-TLS-R5: type references in a persistence file and an app file are not findings
   assert.deepEqual(mutated(["packages/persistence/src/evidence.ts", 'export const f = (pool: import("./pool.js").KauroPool) => pool;\nexport type O = ReturnType<typeof import("./pool.js").createPool>;'], ["apps/api/src/main.ts", 'export type P = import("@kauro/persistence").KauroPool;']), []);
 });

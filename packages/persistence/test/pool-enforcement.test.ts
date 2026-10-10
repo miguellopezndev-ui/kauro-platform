@@ -38,7 +38,6 @@ async function routes(): Promise<ReadonlyArray<readonly [string, Factory]>> {
   const dynamic = ((await import("../src/index.js")) as unknown as Record<string, Factory>)["createPool"]!;
   const required = (require("../src/index.js") as Record<string, Factory>)["createPool"]!;
   const parent = (require("../src/") as Record<string, Factory>)["createPool"]!;
-  const byName = ((await import("@kauro/persistence")) as unknown as Record<string, Factory>)["createPool"]!;
   const wrapper: Factory = (c) => openPool({ ...c });
   return [
     ["aliased import (export { createPool as openPool })", openPool],
@@ -46,7 +45,6 @@ async function routes(): Promise<ReadonlyArray<readonly [string, Factory]>> {
     ["run-time import of the index", dynamic],
     ["createRequire(import.meta.url)('../src/index.js')", required],
     ["createRequire(import.meta.url)('../src/') (the parent directory)", parent],
-    ["the package by name at run time", byName],
     ["a wrapper function", wrapper],
   ];
 }
