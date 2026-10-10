@@ -677,8 +677,8 @@ test("ADV-6 (r5, control): a review naming a commit that does not exist, B06-rou
   }
 });
 
-test("ADV-10: the pinned README lines (one array element per line) hold no package-id status table — a lint on reviewed text, so a hand table is never re-pinned by accident", () => {
+test("ADV-10: the pinned README lines (one array element per line) hold no package-id token anywhere — a lint on reviewed text, so a hand table is never re-pinned by accident", () => {
   assert.ok(README_OUTSIDE_LINES.length > 5 && README_OUTSIDE_LINES.join("\n") === README_OUTSIDE_TEXT);
-  const tableLines = README_OUTSIDE_LINES.filter((l) => l.trimStart().startsWith("|") && /\bB(?:0?\d|1\d|2[01])\b/i.test(l));
-  assert.deepEqual(tableLines, [], "the pin must not contain a package status table line");
+  const idLines = README_OUTSIDE_LINES.filter((l) => /\bB(?:0?\d|1\d|2[01])\b/i.test(l));
+  assert.deepEqual(idLines, [], "the pin must not contain a package-id token (case-insensitive B00-B21) on any line");
 });
