@@ -441,9 +441,14 @@ test("PR18-9: a snapshot whose commit, path or packages differ from its pin in i
   }
 });
 
-/** Whether a test title is written in a test file: as is, with its quotes escaped, or with its apostrophes escaped. */
+/**
+ * Whether a test title is written in a test file: as the literal title (any quote kind, escapes undone) of a test, it, describe,
+ * suite or context call, modifiers such as .skip or .only included. A comment, another string or a longer title is not it (ADV-6).
+ */
 function titleIn(source, title) {
-  return [title, title.replace(/"/g, '\\"'), title.replace(/'/g, "\\'"), title.replace(/`/g, "\\`")].some((t) => source.includes(t));
+  const call = /(?<![\w.$])(?:test|it|describe|suite|context)(?:\.\w+)*\s*\(\s*(["'`])((?:\\[\s\S]|(?!\1)[^\\])*)\1/g;
+  for (const m of source.matchAll(call)) if (m[2].replace(/\\([\s\S])/g, "$1") === title) return true;
+  return false;
 }
 
 test("PR18-8: every citation of every platform sidecar names a test file that exists and a title written in it (each part of a nested describe :: it title, escaped quotes included); only a row that names its PLANNED half may cite a test file not written yet", () => {
@@ -517,7 +522,7 @@ test("ADV-6: a cited title is written only as the title of a test, it or describ
     "describe('outer', () => {",
     '  it("says \\"no\\"", () => {});',
     "  it.skip(`uses a backtick`, () => {});",
-    "  test('it\'s fine', async () => {});",
+    "  test('it\\'s fine', async () => {});",
     "});",
   ].join("\n");
   assert.equal(titleIn(source, "refuses a stale lease"), false);
