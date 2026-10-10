@@ -1,9 +1,9 @@
-# B10 lane 6c, round 2 plan, rev 3.1 (Codex lane REJECT on 5e37366: 6C-R1..R4 BLOCKING, R5 MAJOR, R6 MINOR)
+# B10 lane 6c, round 2 plan, rev 3.2 (Codex lane REJECT on 5e37366: 6C-R1..R4 BLOCKING, R5 MAJOR, R6 MINOR)
 
-Plan only: no product code. Base `b10/gaps-6c@5e37366` (PR #24). Findings: `tools/review/out/b10-6c-lane-5e373664171a/review.json`. Rev 2 (5dab987) answered plan adversary r1 (ADV-1..7); rev 3 (ae9c546) answered
-r2 (ADV-8..15): ONE clock for P1, the cutoff table, its agency grant and the CMD028 refusal removed, KC023-KC026 for 6c. Rev 3.1 folds in r3 (`.kauro/reviews/b10-6c-ae9c546-plan-adversary.json`, PASS, minors
-ADV-16..19) and the coordinator's rulings: the order instant lives in a table the agency cannot read; one test-clock offset per P1 cell; a census cell for the claim-stamp premise; one KC check owned by lane K.
-Matrix: `docs/design/B10-failure-matrix.md`. Ledger: `6c.md` (Round 2). Test-designer packet: `.kauro/mandates/B10-6c-r2-T.md`.
+Plan only: no product code. Base `b10/gaps-6c@5e37366` (PR #24). Findings: `tools/review/out/b10-6c-lane-5e373664171a/review.json`. Revs: 2 5dab987 (adversary r1, ADV-1..7); 3 ae9c546 (r2, ADV-8..15: one clock,
+no cutoff table, KC023-KC026); 3.1 1f47260 (r3, ADV-16..19 + rulings: instant table unreadable by the agency, one offset per P1 cell, census cell, one KC check by K); 3.2 (r4, ADV-20..22: fail-closed readers,
+cell 30, census widened, KC022/KC027 RESERVED). Adversary verdicts `.kauro/reviews/b10-6c-<sha>-plan-adversary.json`. Matrix: `docs/design/B10-failure-matrix.md`. Ledger: `6c.md` (Round 2). Packets:
+`.kauro/mandates/B10-6c-r2-K.md` (kit), `.kauro/mandates/B10-6c-r2-T.md` (tests).
 
 ## 1. Authority first (R2 lines, then the input-only predicate and its census)
 
@@ -19,10 +19,11 @@ Predicate P1 (input-only): a beneficiary claim c and a payment order o of the al
 (strict, microseconds), both stamped by the database (D10-6C-3). Census of every comparison of a claim submission with an order instant (grep `submitted_at`, `order_created_at`, `created_at` in `packages/**/src`,
 `apps/api/src`, migrations) on 5e37366, with the change:
 1. `packages/persistence/src/commercial-prospect-access.ts:17-19` (CMD047 via `accept-attribution.ts:91`, `po.created_at < submitted_at`, NAMED claim only): **violates P1** (process clock; equality admitted;
-   other shares unchecked) -> joins the instant, `i.db_created_at <= c.submitted_at` refuses, for EVERY share's claim.
+   other shares unchecked) -> LEFT JOINs the instant: `i.db_created_at <= c.submitted_at` refuses, for EVERY share's claim; an order of the agency with no instant row refuses INTEGRITY_FAILURE
+   ORDER_INSTANT_MISSING (ADV-20).
 2. `0029:1093` conversion guard (`OLD.submitted_at >= first.order_created_at` refuses) and 3. `commercial-attribution.ts:269-270` (`c.submitted_at < q.order_created_at`): operators conform; the operand was the
-   process clock (`kauro.designate_qualifying_purchase`, 0028:488-530, copies `o.created_at` at :502) -> 0049 replaces the function to copy the instant.
-4. NEW freeze COMMIT backstop (2.1 d), `db_created_at <= max(submitted_at)` refuses: conforms.
+   process clock (`kauro.designate_qualifying_purchase`, 0028:488-530, copies `o.created_at` at :502) -> 0049 replaces the function to copy the instant (no row -> `ordered IS NULL` -> KA006, 0028:504-505).
+4. NEW freeze COMMIT backstop (2.1 d), `db_created_at <= max(submitted_at)` refuses, a missing instant row refuses KC023: conforms.
 No other P1 comparison exists. Same column, same family, now one clock too: 0030:333, `commercial-ledger.ts:693` and `commercial-sales.ts:745-753` (`assistanceAgreementsFor`: `q.order_created_at` against
 `a.signed_at`, a server instant 0029:817; R2 17 line 75; cell 27), `domain/src/commercial/time.ts:45-48` (plausibility), `ledger-effects.ts:221,238`, `commercial-recurrence.ts:60-80` (reads).
 
@@ -38,20 +39,17 @@ transaction_timestamp())` (0038:12-14): in deployment `server_now()` is `transac
 (0029:756) is DROPPED for `attribution_claims_submission_instant`: `submitted_at := kauro.effect_now()`, `review_deadline_at := submitted_at + interval '2160 hours'` (CHECK 0029:457); it sorts after
 `..._claimant` (0029:1035) and `..._claims_lock` (0029:1018), so it runs after the claims-lock wait; CMD046 inserts after `lockProspect` (claim-prospect.ts:57), its last application wait. The INSERT at
 `commercial-attribution.ts:226` stops passing the instants. `payment_orders.created_at` stays the process instant for B09; no P1 comparison reads it. Residual (decided): an instant is the row's write after every
-wait, not its COMMIT. Invariant, enforced by census cell 29: after the claim's stamp nothing in CMD046 can wait (no lock call after `submitClaim` in claim-prospect.ts:79-end or in `submitClaim` :219-238; the
-triggers firing after the stamp take no lock except `attribution_claims_claims_lock` on the DISPUTED update, the claims(P) key CMD046 holds since :57; the FK parents prospects, sellers, seller_agreements,
-claim_evidence are never locked FOR UPDATE or deleted, so the KEY SHARE checks do not wait; measured: only FOR NO KEY UPDATE at commercial-sales.ts:369, commercial-agency-lifecycle.ts:271). An order stamped
-inside the gap is after the claim (cell 26 pins it). Rejected: re-stamping the claim at COMMIT (re-fires the version/immutability triggers; the journaled 201 would differ from the stored row).
+wait, not its COMMIT. Invariant, enforced by census cell 29: after the claim's stamp nothing in CMD046 can wait (FK parents: only FOR NO KEY UPDATE, commercial-sales.ts:369, commercial-agency-lifecycle.ts:271, so
+the KEY SHARE checks do not wait). An order stamped inside the gap is after the claim (cell 26 pins it). Rejected: a COMMIT re-stamp (re-fires version/immutability triggers; the journaled 201 would differ).
 
-D10-6C-4 (ADV-8/9/16, R2 08 quoted): the agency reads nothing derived from seller records and cannot read the order instant. Grant analysis: agency and owner sessions are both `kauro_app`
-(`payment_orders_tenant_read` 0015:829 and `payment_orders_finance_read` 0015:841 are both TO kauro_app; table grant 0015:904), and the owner must read the instant (CMD047 :91, the freeze check), so no column
-grant can separate them and a 42501 for the agency alone is unreachable without a new role. Chosen: the instant is not a `payment_orders` column; it lives in `kauro.payment_order_instants`, FORCE RLS with NO
-tenant read policy: SELECT policies only mirror the non-tenant reads of payment_orders (finance 0015:841, payment 0015:842, commission 0028:1005). An agency session reads zero rows (cell 24). What the agency can
-still notice: its checkout's latency (waiting for at most one acceptance transaction, bounded by statement_timeout). `created_at` is sampled before the wait (provider `provider-effects.ts:434`, bank
-`commerce/request/runtime.ts:314`); later stamps of its order (other units' `updated_at`) follow its COMMIT and carry the same latency it measures on its own request; no seller identity, value or instant is
-stored where it reads. Census: no migration stores `effect_now()`/`clock_timestamp()` in a row (0038, 0040, 0048 only compare); 0049 stores it only in `payment_order_instants` and `attribution_claims`.
+D10-6C-4 (ADV-8/9/16, R2 08 quoted): the agency reads nothing derived from seller records and cannot read the order instant. Agency and owner sessions are both `kauro_app` (0015:829, :841; grant 0015:904) and the
+owner must read the instant (CMD047 :91, the freeze check), so no grant separates them (a 42501 for the agency alone needs a new role). Chosen: the instant lives in `kauro.payment_order_instants`, FORCE RLS with
+NO tenant read policy; SELECT policies mirror only the non-tenant reads of payment_orders (finance 0015:841, payment 0015:842, commission 0028:1005); an agency session reads zero rows (cell 24). Residual: its
+checkout's latency (at most one acceptance transaction, bounded by statement_timeout); `created_at` is sampled before the wait (`provider-effects.ts:434`, `commerce/request/runtime.ts:314`) and later stamps of
+its order follow its COMMIT; no seller identity, value or instant is stored where it reads. Census: no migration stores `effect_now()`/`clock_timestamp()` in a row (0038/0040/0048 compare); 0049 only in
+`payment_order_instants`, `attribution_claims`.
 
-D10-6C-5: no CMD028 outcome is added; `commerce/outcomes.ts:70`, :84-86 and ACH-ROUTE §7.2/§7.24 (pv1/docs) are unchanged. An order inserted after an acceptance is stamped after every share's submission: P1 never refuses it.
+D10-6C-5: no CMD028 outcome is added (`commerce/outcomes.ts:70`, :84-86, ACH-ROUTE §7.2/§7.24 unchanged); an order inserted after an acceptance is stamped after every share's submission: P1 never refuses it.
 
 ## 2. Lock and commit-instant design (acquisitions verified by Read on 5e37366)
 
@@ -59,19 +57,21 @@ Shared `kauro.await_transition` (0001:271-273); exclusive `take_transition_lock`
 fresh READ COMMITTED snapshot (0028:888-890).
 
 ### 2.1 R1 + R2: subject `kauro.agency_orders`, database instants, freeze backstop
-- Order side (0049): `kauro.payment_order_instants (agency_id, order_id PK, db_created_at timestamptz NOT NULL, FK (agency_id, order_id) -> payment_orders UNIQUE (agency_id, order_id) 0015:60)`. Backfill `INSERT
-  ... SELECT agency_id, order_id, created_at FROM kauro.payment_orders` before the triggers exist (one transaction per file, runner.ts:122-127; no production order exists before go-live). BEFORE INSERT on
-  payment_orders `payment_orders_agency_orders_lock`: `PERFORM kauro.await_transition('kauro.agency_orders', NEW.agency_id::text)` (SHARED). AFTER INSERT on payment_orders `payment_orders_order_instant`: inserts
-  the instant row. BEFORE INSERT on the instants `payment_order_instants_stamp`: `NEW.db_created_at := kauro.effect_now()` (a supplied value is overwritten), after the lock (same statement). Grants: kauro_app
-  SELECT, INSERT; kauro_payment, kauro_commission SELECT; no UPDATE/DELETE grant; `kauro.forbid_change()` BEFORE UPDATE OR DELETE and BEFORE TRUNCATE (as 0029:815-816). INSERT policy TO kauro_app WITH CHECK
-  `agency_id = kauro.current_agency_id()` (as 0015:832): the trigger's row; a direct insert meets the PK (the trigger already wrote it in the order's statement) or the FK. Insert sites: `commerce-orders.ts:185`
-  (only product writer; callers `create-payment-order.ts:124`, `bank/instructions.ts:180`), test `b09-migrations.test.ts:220`. No read, no refusal.
+- Order side (0049): `kauro.payment_order_instants (agency_id, order_id PK, db_created_at timestamptz NOT NULL, FK (agency_id, order_id) -> payment_orders UNIQUE (agency_id, order_id) 0015:60)`. 0049 first takes
+  `LOCK TABLE kauro.payment_orders IN SHARE ROW EXCLUSIVE MODE` (held to COMMIT, runner.ts:122-127), then backfills `INSERT ... SELECT agency_id, order_id, created_at FROM kauro.payment_orders`, then creates the
+  triggers: no order commits between the backfill snapshot and the triggers (ADV-20). BEFORE INSERT on payment_orders `payment_orders_agency_orders_lock`: `PERFORM kauro.await_transition('kauro.agency_orders',
+  NEW.agency_id::text)` (SHARED). AFTER INSERT on payment_orders `payment_orders_order_instant`: inserts the instant row. BEFORE INSERT on the instants `payment_order_instants_stamp`: `NEW.db_created_at :=
+  kauro.effect_now()` (a supplied value is overwritten), after the lock (same statement). Grants: kauro_app SELECT, INSERT; kauro_payment, kauro_commission SELECT; no UPDATE/DELETE grant; `kauro.forbid_change()`
+  BEFORE UPDATE OR DELETE and BEFORE TRUNCATE (as 0029:815-816). INSERT policy TO kauro_app WITH CHECK `agency_id = kauro.current_agency_id()` (as 0015:832): the trigger's row; a direct insert meets the PK (the
+  trigger already wrote it in the order's statement) or the FK. Insert sites: `commerce-orders.ts:185` (only product writer; callers `create-payment-order.ts:124`, `bank/instructions.ts:180`), test
+  `b09-migrations.test.ts:220`.
 - CMD047 (`accept-attribution.ts:64`): after `lockAgencies` (`kauro.agency_commissions` exclusive, commercial-attribution.ts:248) NEW `attribution.lockAgencyOrders(agencyId)` = EXCLUSIVE `kauro.agency_orders`;
   then census item 1 at :91 for EVERY share. Refusal before any write: 409 CLAIM_AFTER_FIRST_ORDER.
 - Freeze backstop (0049): one function, two constraint triggers DEFERRABLE INITIALLY DEFERRED, `attribution_allocations_order_instant` AFTER UPDATE OF frozen_at WHEN (OLD.frozen_at IS NULL AND NEW.frozen_at IS
   NOT NULL) and `..._order_instant_born` AFTER INSERT WHEN (NEW.frozen_at IS NOT NULL) (a later shift of frozen_at, cmd048 test :199, fires neither): (a) EXCLUSIVE `kauro.agency_orders` (re-entrant for CMD047);
   (b) an RLS-subject session (`pg_roles` rolsuper, rolbypassrls false) with `NOT kauro.in_finance_scope(NEW.agency_id)` (0013:541) -> KC026 (fail closed); (c) m = max `submitted_at` of the share claims (NULL ->
-  KC003); (d) any instant of the agency with `db_created_at <= m` -> KC024. Reads by the owner policies and the finance-scope policy, in the scope CMD047 adopts at :90 (`unit-of-work.ts:741`). No new grant.
+  KC003); (d) any order of the agency (LEFT JOIN its instant) with `db_created_at <= m` -> KC024, or with no instant row -> KC023 (fail closed, ADV-20). Reads by the owner policies and the finance-scope policy,
+  in the scope CMD047 adopts at :90 (`unit-of-work.ts:741`). No new grant.
 - Both orders: order first -> it holds the shared half from its stamp to COMMIT; CMD047 waits at lockAgencyOrders, then :91 reads the committed instant -> 409 if at/before a share. CMD047 first -> the order's
   lock trigger waits; its stamp follows CMD047's COMMIT, hence every share's `submitted_at` -> 201, and the capture converts. A raw freeze bypassing :91 meets (d) under (a).
 - Lock order: CMD028 (both routes): identity/membership/agency shared -> journal row -> [bank: project FOR NO KEY UPDATE] -> quote (`create-payment-order.ts:100`) -> **agency_orders SHARED (lock trigger)** ->
@@ -98,16 +98,17 @@ fresh READ COMMITTED snapshot (0028:888-890).
   frozen_at is a label: KC003/KC021 judge at `effect_now()`, and a withdrawal committing later waits on the seller half (KC025 compares it with that label; the deferred withdrawal command stamps ends_at after the
   wait). accepted_at: the deadline is judged at effect_now at COMMIT (0048:107). expires_at: the 2160 h window starts earlier by at most the wait (it never extends a right).
 - Migration `0049_b10g6c_r2_ordering.sql` (provisional; `tools/renumber-migration.mjs` renumbers FILES, never SQLSTATEs). Codes (census on 5e37366: KC001-KC021, gaps 004/008/012/013, 42 raises, one message token
-  per code, no token on two codes, 17 MAP keys, 17 SQLSTATE values): KC023 RESERVED for 6c, never raised; KC024 CLAIM_AFTER_FIRST_ORDER -> PRECONDITION_FAILED CLAIM_AFTER_FIRST_ORDER; KC025
-  AGREEMENT_ENDS_BEFORE_ACCEPTANCE -> PRECONDITION_FAILED (new reason); KC026 FREEZE_OUTSIDE_FINANCE_SCOPE -> INTEGRITY_FAILURE (new reason; every MAP entry names its own, sqlstate.ts:96-120). 6c's KC021
-  CLAIM_EXPIRED is code in PR #24 (sqlstate.ts:72,157; 0048:109).
-- ONE KC check (coordinator ruling; ADV-19), owned by lane K: `tools/test/kc-codes.test.mjs` (no database; both verify legs) + `docs/design/KC-CODES.md` (code, message prefix, MAP code and reason, SQLSTATE name,
-  lane, status; the uniqueness test judges the PREFIX, the reason is carried beside it). Status RAISED (must be raised), PLANNED (may be raised; its meaning is fixed: KC024-KC026 lane 6c B; KC022 prefix
-  `COMMISSION_LINE_NOT_FOUND:` -> NOT_FOUND COMMISSION_LINE_NOT_FOUND and KC027 prefix `COMMISSION_LOCK_ORDER:` -> CAPACITY_UNAVAILABLE LOCK_ORDER_CONTENTION, lane B10-OFFSET r10 e464047; 6c rows: KC024
-  `CLAIM_AFTER_FIRST_ORDER:`, KC025 `AGREEMENT_ENDS_BEFORE_ACCEPTANCE:`, KC026 `FREEZE_OUTSIDE_FINANCE_SCOPE:`), RESERVED (never raised: KC023). Assertions (absorbing OFFSET's CK01, which OFFSET r10 drops;
-  coordinator routes): one `TOKEN:` message prefix per code, judged on the last `CREATE OR REPLACE` of each function in migration order; no token on two codes; each raised code a MAP key and a SQLSTATE value
-  exactly once (source-text parse) with distinct SQLSTATE names; each raised code has its row with that token. Self-tests on synthetic sources: a second prefix for KC021 (`COMMISSION_LOCK_ORDER:` beside
-  `CLAIM_EXPIRED:`) fails; a raised prefix differing from its row fails; a superseded body with an old prefix passes; a RESERVED code raised fails. So neither B nor OFFSET edits a K file.
+  per code, no token on two codes, 17 MAP keys, 17 SQLSTATE values): KC023 ORDER_INSTANT_MISSING -> INTEGRITY_FAILURE ORDER_INSTANT_MISSING (new reason; 6c's own code, never raised; grep of every worktree 10-10:
+  named only here and B10-OFFSET.md:926, as 6c's); KC024 CLAIM_AFTER_FIRST_ORDER -> PRECONDITION_FAILED CLAIM_AFTER_FIRST_ORDER; KC025 AGREEMENT_ENDS_BEFORE_ACCEPTANCE -> PRECONDITION_FAILED (new reason); KC026
+  FREEZE_OUTSIDE_FINANCE_SCOPE -> INTEGRITY_FAILURE (new reason; every MAP entry names its own, sqlstate.ts:96-120). 6c's KC021 CLAIM_EXPIRED is code in PR #24 (sqlstate.ts:72,157; 0048:109).
+- ONE KC check (coordinator ruling; ADV-19), lane K: `tools/test/kc-codes.test.mjs` (no database; both verify legs) + `docs/design/KC-CODES.md` (code, message prefix, MAP code and reason, SQLSTATE name, lane,
+  status; uniqueness judged on the PREFIX). Statuses: RAISED (must be raised); PLANNED (may be raised, meaning fixed; lane 6c B: KC023 `ORDER_INSTANT_MISSING:`, KC024 `CLAIM_AFTER_FIRST_ORDER:`, KC025
+  `AGREEMENT_ENDS_BEFORE_ACCEPTANCE:`, KC026 `FREEZE_OUTSIDE_FINANCE_SCOPE:`); RESERVED (must not be raised yet, meaning fixed: KC022 `COMMISSION_LINE_NOT_FOUND:` -> NOT_FOUND COMMISSION_LINE_NOT_FOUND, KC027
+  `COMMISSION_LOCK_ORDER:` -> CAPACITY_UNAVAILABLE LOCK_ORDER_CONTENTION, B10-OFFSET r10 e464047, B10-OFFSET.md:120). ADV-22 (coordinator ruling): OFFSET builds only after 6c is on main and flips KC022/KC027
+  RESERVED -> RAISED as an ordinary edit of KC-CODES.md on main, in its own lane, in the commit adding the raises; B never edits a K file. Assertions (absorbing OFFSET's CK01, dropped in OFFSET r10): one `TOKEN:`
+  prefix per code, judged on the last `CREATE OR REPLACE` of each function in migration order; no token on two codes; each raised code a MAP key and a SQLSTATE value exactly once (source-text parse), distinct
+  SQLSTATE names, and its row with that token. Self-tests (synthetic sources): a second prefix for KC021 (`COMMISSION_LOCK_ORDER:` beside `CLAIM_EXPIRED:`) fails; a raised prefix differing from its row fails; a
+  superseded body with an old prefix passes; a RESERVED code raised fails.
 
 ## 3. Failure-mode rows (summary; full rows in B10-failure-matrix.md)
 
@@ -115,9 +116,9 @@ fresh READ COMMITTED snapshot (0028:888-890).
 |---|---|---|---|---|---|---|---|---|
 | CMD046 W | C a46race; GAP CLAIM_INSTANT (t1) | GAP CMD_TMO (t3) | GAP AGREEMENT_END46 (t1) | C | GAP CMD_CRA | C | C actrace46 | GAP PROS_DISP (t1) |
 | CMD047 W | C a47race; GAP ORDER_ACCEPT (t1) | GAP CMD_TMO | GAP AGREEMENT_END47 (t1) | C | GAP CMD_CRA | C | GAP AGREE_WD47 (t1) | C attrpar47 |
-| CMD047 R-order | GAP CLAIM_ORDER (t1) | N/A read | N/A stored instants | N/A | N/A | N/A | N/A | N/A; GAP FREEZE_SCOPE |
+| CMD047 R-order | GAP CLAIM_ORDER (t1) | N/A read | N/A stored instants | N/A | N/A | N/A | N/A | N/A; GAP FREEZE_SCOPE, INSTANT_MISSING |
 | CMD049 W | C a49race | GAP CMD_TMO | GAP AGREEMENT_END49 (t1) | C | GAP CMD_CRA | C | C corprev49 | N/A one row |
-| CMD028 order insert | GAP ORDER_ACCEPT (t1) | B09 | GAP ORDER_CLOCK, ORDER_INSTANT, AGENCY_BLIND (t1) | B09 | B09 | B09 | N/A | B09 |
+| CMD028 order insert | GAP ORDER_ACCEPT (t1) | B09 | GAP ORDER_CLOCK, ORDER_INSTANT, AGENCY_BLIND (t1) | GAP ORDER_INSTANT (same statement, cell 21) | GAP ORDER_INSTANT (cell 21) | B09 | N/A | GAP INSTANT_MISSING (t1, cell 30) |
 | Agreement withdrawal | GAP AGREE_WD47 (t1) | N/A owner SQL | N/A | N/A | N/A | N/A | itself | N/A one row |
 
 Not written: CMD046 vs a withdrawal committed first (old code refuses too: not red-provable; cell 11 is the red-provable form).
@@ -127,14 +128,10 @@ Not written: CMD046 vs a withdrawal committed first (old code refuses too: not r
 EXECUTED_LOCAL (PG17 WSL). Cases: CMD047-DENY/RACE, R2-097, R2-099, CMD046-DENY/RACE, CMD049-DENY/RACE, CMD028-DENY (B10 edge). faultCell title `ID [fault] step -> expect` (matrix.ts:53-56); sequential DENYs
 plain `it`. SqlSteps in the file (as sales test :374): ORDER_INSERT /INSERT INTO kauro\.payment_orders/, FREEZE /UPDATE kauro\.attribution_allocations SET frozen_at/, CLAIM_INSERT /INSERT INTO
 kauro\.attribution_claims/. Actors: O=CMD028, A=CMD047, C=CMD046, V=CMD049, W=withdrawal, H=raw holder. One offset (ADV-17): every P1 cell (1-8, 20, 25-27) stamps all orders, claims and assistance agreements at
-test-clock offset 0, through the API or K's `oneClockCheckout(cw, s, quote)` and `oneClockClaims(cw, label, sellers)` (checkoutOf/claimsOn without an instant; each asserts
-`current_setting('kauro_test.clock_offset_seconds', true)` unset or 0 inside its transaction) and `assistanceFor` (asOperatorAt with a null instant); never `orderAt`, `submittedAt` or `acquisitionInstants`. Equal
-instants (cells 2, 3, 20): oracle UPDATE of the claim `submitted_at := db_created_at` under `SET LOCAL session_replication_role = replica` (precedent `b10-failure-cells-quote.test.ts:363`). API clock (ADV-15):
-`shiftingClock()` (`commerce-support.ts:47`, signed offsetMs) passed by K through `paymentWorld({ clock })` (payment-support.ts:137 into `assembleApi` :193, which passes the support.ts:90 constant today) and
-`commissionWorld({ clock })` (commission-support.ts:153-154); the app takes it as `ApiAssembly.clock` (composition.ts:253, read at :335; :51 is only the default), the seam of `WorldOptions.clock` (support.ts:549,
-:621). Ledger ids (6c.md, g6c-r2-): 1 order-split, 2 order-equal, 3 order-sole, 4 orderacc-prov, 5 orderacc-bank, 6 orderacc-early, 7 orderacc-first, 8 orderclock, 9 wd-sole, 10 wd-split, 11 end46-wait, 12
-end46-commit, 13 end49-wait, 14 end49-stmt, 15 end49-commit, 16 end47-wait, 17 end47-commit, 18 prosdisp, 19 fixture, 20 order-db, 21 order-instant, 22 end49-switch, 23 freeze-scope, 24 agency-blind, 25
-claim-instant, 26 claim-gap, 27 assist-clock, 28 kc-codes, 29 claim-census.
+test-clock offset 0, through the API or K's `oneClockCheckout(cw, s, quote)` / `oneClockClaims(cw, label, sellers)` (each asserts `current_setting('kauro_test.clock_offset_seconds', true)` unset or 0 in its
+transaction) and `assistanceFor` (null instant); never `orderAt`, `submittedAt` or `acquisitionInstants`. Equal instants (cells 2, 3, 20): oracle UPDATE of the claim `submitted_at := db_created_at` under `SET
+LOCAL session_replication_role = replica` (precedent `b10-failure-cells-quote.test.ts:363`). API clock (ADV-15): `shiftingClock()` (`commerce-support.ts:47`, signed offsetMs) through K's `paymentWorld({ clock })`
+(payment-support.ts:137 into :193) and `commissionWorld({ clock })` (commission-support.ts:153-154) into `ApiAssembly.clock` (composition.ts:253, read at :335). Ledger ids: 6c.md Round 2, T packet.
 
 1. (`it`) "CLAIM_ORDER CMD047 AcceptAttribution / R-order: DENY: a 6000/4000 split accepted through X (submitted before the agency's order) whose share Y was submitted after that order is 409 PRECONDITION_FAILED
    CLAIM_AFTER_FIRST_ORDER: both claims unchanged, the allocation unfrozen, no COMMITTED journal". Red on 5e37366: 200 (only X checked).
@@ -174,12 +171,12 @@ claim-instant, 26 claim-gap, 27 assist-clock, 28 kc-codes, 29 claim-census.
 17. AGREEMENT_END47 [expiry] "... share Y's agreement end passing between the writes and COMMIT" -> "DENY: 409 SHARES_NOT_WHOLE (KC003 at COMMIT)". Red: whole trigger on frozen_at.
 18. PROS_DISP [partial] "CMD046 ClaimProspect / PARTIAL: W claim insert + separate DISPUTED update (one COMMIT)" -> "RACE (partial): failures after the claim insert and after the DISPUTED update each roll back
     totally; the retry is DISPUTED at version 2 with its conflict reason and the replay answers the journaled 201". Steps CLAIM_INSERT, CLAIM_DISPUTED (commercial-attribution.ts:232-236). Red: UPDATE omitted.
-19. (`it`) "FIXTURE_DEADLINE acceptAttribution fixture refuses an acceptance exactly at a claim's review deadline before any write". Red: guard `>` (commission-support.ts:298).
+19. (`it`) "FIXTURE_DEADLINE acceptAttribution fixture refuses an acceptance exactly at a claim's review deadline before any write". Red: guard `>` (commission-support.ts:298; fixed by K).
 20. (`it`) "CLAIM_ORDER AcceptAttribution freeze / COMMIT backstop: DENY: an owner freeze in the finance scope whose share was submitted at the agency's order database instant, made with the application read
     bypassed (raw owner SQL), is refused at COMMIT with KC024 mapped to 409 CLAIM_AFTER_FIRST_ORDER; nothing frozen". Red: deferred (d) removed.
 21. (`it`) "ORDER_INSTANT payment_order_instants / insert: each order has exactly one instant row, stamped by the database whatever the caller supplies (provider and bank, API clock 1 h behind), and it never
-    changes: kauro_app UPDATE 42501, an owner or superuser UPDATE or DELETE refused by forbid_change, a second insert for the order refused". Red (mutation): the stamp trigger keeps a supplied value, or
-    forbid_change removed.
+    changes: kauro_app UPDATE 42501, an owner or superuser UPDATE or DELETE refused by forbid_change, a second insert for the order refused, and an order insert failed after its statement (throw at
+    ORDER_INSERT.after) leaves neither row (same-statement atomicity: CRASH-BEFORE/AFTER)". Red (mutation): the stamp trigger keeps a supplied value, or forbid_change removed.
 22. (`it`) "AGREEMENT_END49 sellers / COMMIT: the deferred agreement trigger has exactly KC005's WHEN, and an ACTIVE seller's switch to an agreement whose end passes before COMMIT is refused KC005 at COMMIT".
     Red: WHEN CANDIDATE->ACTIVE only.
 23. (`it`) "FREEZE_SCOPE attribution freeze / COMMIT: an owner freeze outside the finance scope is refused at COMMIT with KC026 INTEGRITY_FAILURE (fail closed), nothing frozen". Red: guard (b) removed.
@@ -198,52 +195,56 @@ claim-instant, 26 claim-gap, 27 assist-clock, 28 kc-codes, 29 claim-census.
     process `order_created_at` <= `signed_at` -> no pool (0030:333, commercial-ledger.ts:693, commercial-sales.ts:752).
 28. `tools/test/kc-codes.test.mjs` :: "KC codes: each code raised in migrations has one message prefix, one MAP key, one SQLSTATE name and its KC-CODES.md row (prefix and reason); reserved codes are never raised"
     + the three self-tests of 2.3. Red: the checker's token comparison removed.
-29. (`it`) "CLAIM_INSTANT census CMD046 / after the stamp: nothing can wait between the claim's submission instant and its COMMIT": (i) pg_trigger of attribution_claims firing after
-    `attribution_claims_submission_instant` on INSERT (later-named BEFORE INSERT, every AFTER INSERT and deferred trigger) or on the DISPUTED UPDATE: `pg_get_functiondef` matches none of
-    /await_transition|take_transition_lock|pg_advisory|FOR (NO KEY )?UPDATE|FOR (KEY )?SHARE|LOCK TABLE/, allow-list `attribution_claims_claims_lock` (claims(P), held since claim-prospect.ts:57); (ii) source
-    `claim-prospect.ts` from `attribution.submitClaim(` (:79) to the body's end and `commercial-attribution.ts:219-238` contain no `.lock*(`/`.hold*(` call or row-lock clause; (iii) no `FOR UPDATE` (not NO KEY)
-    and no `DELETE FROM` on prospects, sellers, seller_agreements, claim_evidence in `packages/**/src`, `apps/api/src`, migrations. Red: a mutation adding `await sales.lockProspect(prospectId)` after submitClaim,
-    or `PERFORM kauro.await_transition(...)` in attribution_claims_agreement_in_force.
+29. (`it`) "CLAIM_INSTANT census CMD046 / after the stamp: nothing can wait between the claim's submission instant and its COMMIT". R = /await_transition|take_transition_lock|pg_advisory|FOR (NO KEY )?UPDATE|FOR
+    (KEY )?SHARE|LOCK TABLE/. (i) triggers of attribution_claims firing after `attribution_claims_submission_instant` on INSERT or on the DISPUTED UPDATE: no `pg_get_functiondef` matches R except
+    `attribution_claims_claims_lock` (claims(P), held since claim-prospect.ts:57); (ii) `claim-prospect.ts` from `submitClaim(` (:79) to the end, `commercial-attribution.ts:219-238`,
+    `commerce/request/runtime.ts:316-332` (ALLOW event, `journal.commit`) and `unit-of-work.ts:486-491`: no `.lock*(`/`.hold*(` call or row-lock clause; `beforeCommitOf(` callers exactly
+    `bank/instructions.ts:163`, `bank/route-config.ts:230` (census 10-10; not reachable from CMD046); (iii) no `FOR UPDATE` (not NO KEY), no `DELETE FROM`, and no UPDATE assigning a PK or non-partial unique
+    column (pg_index) of prospects, sellers, seller_agreements, claim_evidence in `packages/**/src`, `apps/api/src`, migrations; (iv) triggers of command_journal (0006:48, :49, :65) and security_events match none
+    of R; the deferred trigger functions matching R are exactly {package_versions_publication_guard (census 5e37366: 89 constraint triggers, one lock-taking), 0049's attribution_allocations_order_instant(_born)},
+    and no trigger function of attribution_claims or command_journal writes package_versions or attribution_allocations. Red (mutations, each): `await sales.lockProspect(prospectId)` after submitClaim; `PERFORM
+    kauro.await_transition(...)` in attribution_claims_agreement_in_force; `holdSalesTransition` in runCommerceCommand after the body; `UPDATE kauro.sellers SET user_id` in a repository.
+30. (`it`) "INSTANT_MISSING payment_order_instants / readers: an order of the agency without its instant row is a refusal, never skipped: the acceptance is INTEGRITY_FAILURE ORDER_INSTANT_MISSING before any write
+    (FREEZE never sent), a raw owner freeze is refused at COMMIT with KC023, and its capture's designation raises KA006". Setup (test-only): order via the API, then the oracle (superuser) deletes its instant row
+    under `SET LOCAL session_replication_role = replica` (precedent quote test :363). Red on 5e37366+K: no table; mutation: an inner JOIN in census item 1 and (d).
 
 ## 5. Lanes (file ownership; K first, then T, then B)
 
 - K (kauro-builder, Sonnet; kit): owns `apps/api/test/payment-support.ts` (`clock?` :137 into :193), `apps/api/test/commission-support.ts` (`commissionWorld(options)` :153-154; `oneClockCheckout`,
-  `oneClockClaims`; freeze fixture :317), `apps/api/test/statements-support.ts:376`, `packages/persistence/src/testing/agency-fixtures.ts:236`, `packages/persistence/src/testing/sales-fixtures.ts:209`,
-  `packages/persistence/test/b10-commission-support.ts:511` (each freeze adopts `set_config('kauro.finance_agency_id', agency, true)`, as `unit-of-work.ts:741`), `docs/design/KC-CODES.md` (KC024-KC026 PLANNED for
-  6c B, KC022/KC027 PLANNED for OFFSET with the prefixes and reasons of 2.3, KC023 RESERVED), `tools/test/kc-codes.test.mjs`. 80k tokens, 50 min. Done: cell 28 green, self-tests red-proven; fixture-clock-lint
-  green; the fixture suites (B list) unchanged on 5e37366+K.
-- T (kauro-test-designer, Opus): owns `apps/api/test/b10-failure-cells-6c-r2.test.ts`. Cells 1-27 and 29 RED on 5e37366+K (26 a pin; 21, 24, 29 by named mutation), each failing assertion recorded. 180k/95 min.
+  `oneClockClaims`; freeze fixture :317; cell 19's guard :298 `>` -> `>=`), `apps/api/test/statements-support.ts:376`, `packages/persistence/src/testing/agency-fixtures.ts:236`,
+  `packages/persistence/src/testing/sales-fixtures.ts:209`, `packages/persistence/test/b10-commission-support.ts:511` (each freeze adopts `set_config('kauro.finance_agency_id', agency, true)`, as
+  `unit-of-work.ts:741`), `docs/design/KC-CODES.md` (KC023-KC026 PLANNED for 6c B, KC022/KC027 RESERVED for OFFSET, prefixes and reasons of 2.3), `tools/test/kc-codes.test.mjs`. 80k tokens, 50 min. Done: cell 28
+  green, self-tests red-proven; fixture-clock-lint green; the fixture suites (B list) unchanged on 5e37366+K.
+- T (kauro-test-designer, Opus): owns `apps/api/test/b10-failure-cells-6c-r2.test.ts`. Cells 1-27, 29, 30 RED on 5e37366+K (26 a pin; 21, 24, 29, 30 by named mutation; 19 green on base+K, its red proof reverts
+  K's :298 hunk). 190k/100 min.
 - B (kauro-builder, Sonnet): owns 0049 (new), `accept-attribution.ts`, `packages/persistence/src/commercial-prospect-access.ts`, `claim-prospect.ts`, `activate-seller.ts`, `commercial-sales.ts`,
-  `commercial-attribution.ts`, `packages/domain/src/ports/commercial.ts`, `sqlstate.ts`, `packages/domain/src/commercial/failure-reasons.ts` (+AGREEMENT_ENDS_BEFORE_ACCEPTANCE, FREEZE_OUTSIDE_FINANCE_SCOPE),
-  `packages/domain/test/commercial-rules.test.ts` (:186 list), `commercial/outcomes.ts`, docs (6c.md, B10 design §10 lock order, §12 reasons, D10-6C-1..5). Regenerated only: `apps/api/openapi.json`,
-  `apps/web/src/api/generated.ts`, `docs/design/B06-state-command-event-matrix.md`. No commerce/outcomes.ts, commerce/failure-reasons.ts or composition.ts edit. A fixture repair B finds goes to the coordinator,
-  who routes it to K (K re-opens); B never edits a K file. 190k tokens, 100 min.
-- B done: cells 1-29 green; red proof per fix (revert one, run its cell, record the assertion); baseline (5e37366+K) then candidate: the five 6c cell files; cmd045-cmd053; apps/api/test b10-commission-service,
+  `commercial-attribution.ts`, `packages/domain/src/ports/commercial.ts`, `sqlstate.ts`, `packages/domain/src/commercial/failure-reasons.ts` (+AGREEMENT_ENDS_BEFORE_ACCEPTANCE, FREEZE_OUTSIDE_FINANCE_SCOPE,
+  ORDER_INSTANT_MISSING), `packages/domain/test/commercial-rules.test.ts` (:186 list), `commercial/outcomes.ts`, docs (6c.md, B10 design §10 lock order, §12 reasons, D10-6C-1..5). Regenerated only:
+  `apps/api/openapi.json`, `apps/web/src/api/generated.ts`, `docs/design/B06-state-command-event-matrix.md`. No commerce/outcomes.ts, commerce/failure-reasons.ts or composition.ts edit. A fixture repair B finds
+  goes to the coordinator, who routes it to K (K re-opens); B never edits a K file. 190k tokens, 100 min.
+- B done: cells 1-30 green; red proof per fix (revert one, run its cell, record the assertion); baseline (5e37366+K) then candidate: the five 6c cell files; cmd045-cmd053; apps/api/test b10-commission-service,
   b10-correction-reported-items, b10-correction-unnamed-balance, b10-failure-cells-{accrual,close,close2,conversion,correct,funds-fence,pay,quote,replacement}, b10-family-templates, b10-fixture-clock-skew,
   b10-scenarios, commission-statement-reads, cmd027, cmd028/bank/statement suites, ach-route-cells; packages/persistence/test b10-agency-adapters, b10-ledger-adapters, b10-ledger-migrations, b10-offset-bounds,
   b10-recurrence-adapters, b10-recurrence-migrations, b10-sales-adapters, b10-sales-migrations, invariants, b09-migrations; packages/application/test commerce-contracts, response-schemas; packages/domain/test
-  commercial-rules, commercial-time; tools/test openapi, matrix, web-client, kc-codes, b10-case-map, fixture-clock-lint. Stop and report if > 5 suites change.
+  commercial-rules, commercial-time; tools/test openapi, matrix, web-client, kc-codes, b10-case-map, fixture-clock-lint. Stop and report if > 5 suites change. Then kauro-adversary on the candidate; Codex
+  re-checks delta, R1..R6, touch.
 - Touch inventory (by hand; Deferred). B09 (REVIEW_ACCEPTED 4b33e26): `kauro.payment_orders` (0015) gains two triggers and the FK child `payment_order_instants`; no CMD028 outcome, reason or column changes
   (`commerce/outcomes.ts:70`, :84-86, ACH-ROUTE §7.2/§7.24 unchanged); re-run the B09-case-map cases citing `b09-migrations.test.ts` (17) and `cmd028-create-payment-order.test.ts` (4). B10-SCHEMA-RECURRENCE lane
   (b85ee64): `kauro.designate_qualifying_purchase` (0028:488-530) replaced in 0049 (its order instant source only); its B10-case-map rows R2-086 (:125), R2-089 (:147), R2-090 (:155), R2-137 (:308), R2-141 (:336),
-  CMD027 triads (:345, :354, :365) and :459 re-run (`b10-recurrence-migrations.test.ts`). B07: `sqlstate.ts` MAP +KC024-KC026, re-run `source-adapters.test.ts` :461. B06 (B06-case-map.md:186-187): openapi.json,
-  web client (generated.ts:904) and matrix gain the two reasons -> re-run `response-schemas.test.ts` (7), `matrix.test.mjs` (3), `openapi.test.mjs` (8), `web-client.test.mjs`. Codex scope: all four.
+  CMD027 triads (:345, :354, :365) and :459 re-run (`b10-recurrence-migrations.test.ts`). B07: `sqlstate.ts` MAP +KC023-KC026, re-run `source-adapters.test.ts` :461. B06 (B06-case-map.md:186-187): openapi.json,
+  web client (generated.ts:904) and matrix gain the three reasons -> re-run `response-schemas.test.ts` (7), `matrix.test.mjs` (3), `openapi.test.mjs` (8), `web-client.test.mjs`. Codex scope: all four.
 - Moved lock traces (ADV-7; base and candidate; trace text in 6c.md): sales test :198, :240, :554, :631, :689, :780, :866; attribution :723, :350, :441, :490, :532, :660; `cmd047-accept-attribution.test.ts:217`,
   `cmd046-claim-prospect.test.ts:156`, `cmd049-activate-seller.test.ts:135`; and any assertion of a claim's `submitted_at` equal to a fixture instant (now + elapsed microseconds), measured in the baseline.
-- Then kauro-adversary on the candidate; Codex re-check on the delta + R1..R6 + this touch.
 
 ## 6. Context packets (each <= 3k tokens)
 
-T: `.kauro/mandates/B10-6c-r2-T.md`. K: lane K files and lines; pattern `tools/fixture-clock-lint.mjs` + its test; 2.3 code rules; 80k / 50 min; report sha and fixture suites before/after. B: sections 1
-(D10-6C-3..5), 2, 4 red column, 5; 190k / 100 min.
+T: `.kauro/mandates/B10-6c-r2-T.md`. K: `.kauro/mandates/B10-6c-r2-K.md`. B: sections 1 (D10-6C-3..5), 2, 4 red column, 5; 190k / 100 min.
 
 ## 7. Deferred and caveats
 
-- Deferred (agreement-lifecycle package, binding): the product withdrawal command stamps `ends_at` at its own `kauro.effect_now()` after the seller's exclusive half and answers KC025 as 409
-  AGREEMENT_ENDS_BEFORE_ACCEPTANCE (cells 9-10 unchanged); the assistance-agreement writer (today only fixtures write `assistance_agreements`, 0029:817 server instant = transaction start) stamps `signed_at` at
-  `kauro.effect_now()` after its waits, planned cell `[gal-assist-instant]` in that package.
+- Deferred (agreement-lifecycle package, binding): the withdrawal command stamps `ends_at` at its own `kauro.effect_now()` after the seller's exclusive half and answers KC025 as 409
+  AGREEMENT_ENDS_BEFORE_ACCEPTANCE (cells 9-10 unchanged); the assistance-agreement writer (today only fixtures, 0029:817 transaction start) stamps `signed_at` at `kauro.effect_now()` after its waits, cell
+  `[gal-assist-instant]`.
 - Deferred (PR #18 open, rule 7): `tools/acceptance-touch.mjs` unused; the touch inventory is by hand until #18 merges.
-- Routed (coordinator): OFFSET r10 drops CK01 and uses KC022/KC027 as pre-listed in KC-CODES.md.
-- Caveat (decided, D10-6C-3): one wall clock (the database host's); a backward step is outside P1 (managed PostgreSQL slews). The claim gap is pinned (cell 26) on an enforced premise (cell 29).
-- Caveat (decided, D10-6C-4): the agency can notice only its checkout's latency (one acceptance transaction at most); cell 24 guards the instants table and every agency-readable relation.
-- No owner act.
+- Caveat (decided, ADV-20): an order without an instant row is unreachable in product (same statement) and in the migration (table lock before the backfill); every reader refuses it (cell 30).
+- Caveat (decided, D10-6C-3): one wall clock (the database host's); a backward step is outside P1 (managed PostgreSQL slews). The claim gap is pinned (cell 26) on an enforced premise (cell 29). No owner act.
