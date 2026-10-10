@@ -111,7 +111,7 @@ export async function appUnitsAhead(env: ControlEnv, offsetSeconds: number): Pro
 }
 
 async function unitsAhead(env: ControlEnv, user: string, applicationName: string, offsetSeconds: number): Promise<{ readonly units: PgUnitOfWorkFactory; serverNow(): Promise<string>; close(): Promise<void> }> {
-  const pool = createPool({ host: "127.0.0.1", port: env.h.pg.port, database: ROLES.database, user, max: 1, applicationName, idleTimeoutMs: 600_000 });
+  const pool = createPool({ environment: "LOCAL", host: "127.0.0.1", port: env.h.pg.port, database: ROLES.database, user, max: 1, applicationName, idleTimeoutMs: 600_000 });
   const c = await pool.raw.connect();
   try {
     await c.query("SELECT set_config($1, $2, false)", [TEST_CLOCK_OFFSET_SETTING, String(offsetSeconds)]);

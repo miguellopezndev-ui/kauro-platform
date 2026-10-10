@@ -18,9 +18,10 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Client } from "pg";
-import type { KauroPool } from "../pool.js";
-import { sslOptionsOf, type DatabaseTls } from "../tls.js";
+import type { Client } from "pg";
+import { migratorClientOf, type KauroPool, type MigratorConnection } from "../pool.js";
+
+export type { MigratorConnection } from "../pool.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -268,19 +269,6 @@ export async function appliedMigrations(client: Client): Promise<ReadonlyArray<A
   return r.rows.map((x) => ({ version: x.version, name: x.name, checksum: x.checksum, appliedAt: x.applied_at.toISOString(), appliedBy: x.applied_by }));
 }
 
-/** Where the migrator connects (07 "Restoration and migration": migration roles are separate from runtime). */
-export interface MigratorConnection {
-  readonly host: string;
-  readonly port: number;
-  readonly database: string;
-  /** The owner role of the kauro objects (LOGIN, not SUPERUSER, not BYPASSRLS); never a runtime login role. */
-  readonly user: string;
-  readonly password?: string;
-  /** Verified TLS (I-2): the CA that signed the server certificate; rejectUnauthorized is always true. Absent only in LOCAL. */
-  readonly tls?: DatabaseTls;
-  readonly applicationName?: string;
-}
-
 export class MigratorRoleError extends Error {
   constructor(role: string, what: string) {
     super(`migrator role ${role} is ${what}; migrations run as the owner role only (07 Restoration and migration, 08 Database isolation)`);
@@ -299,14 +287,8 @@ export interface ApplyAsOptions extends ApplyOptions {
 }
 
 export async function applyMigrationsAs(connection: MigratorConnection, options: ApplyAsOptions = {}): Promise<ApplyResult> {
-  const client = new Client({
-    host: connection.host,
-    port: connection.port,
-    database: connection.database,
-    user: connection.user,
-    ...(connection.password === undefined ? {} : { password: connection.password }),
-    ...(connection.tls === undefined ? {} : { ssl: sslOptionsOf(connection.tls) }),
-    application_name: connection.applicationName ?? "kauro-migrator",
+  // DB-TLS-R4: the connection is built by the pool module, which applies connectionSecurityOf to it (TLS, DNS host, explicit credential)
+  const client = migratorClientOf(connection, {
     connectionTimeoutMillis: millis(options.connectTimeoutMs, DEFAULT_MIGRATOR_CONNECT_TIMEOUT_MS),
     // session defaults for the statements outside the runner's own transactions (the role check below)
     statement_timeout: millis(options.statementTimeoutMs, DEFAULT_MIGRATOR_STATEMENT_TIMEOUT_MS),

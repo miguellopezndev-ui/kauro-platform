@@ -12,7 +12,7 @@
 import type { PreparationCompletionSource } from "@kauro/application";
 import type { Clock, CommissionPolicy, Environment, RandomBytes } from "@kauro/domain";
 import type { KauroPool, PgCommercialUnitOfWorkFactory, PoolErrorSink, RuntimeRole } from "@kauro/persistence";
-import { connectionSecurityOf, createCommercialUnitOfWorkFactory, createPool } from "@kauro/persistence";
+import { createCommercialUnitOfWorkFactory, createPool } from "@kauro/persistence";
 import type { DatabaseConnectionConfig } from "../config.js";
 
 /** Where an interleaving is fixed or a crash injected (tests only, like B09's hold points): after an effect, before its settlement. */
@@ -60,8 +60,8 @@ async function verified(pool: KauroPool, role: RuntimeRole): Promise<void> {
 export async function openCommissionPools(databases: CommissionDatabases, deps: { readonly clock: Clock; readonly random: RandomBytes; readonly statementTimeoutMs?: number; readonly onPoolError?: PoolErrorSink; readonly environment: Environment }): Promise<CommissionPools> {
   const open = (config: CommissionDatabases["commission"], suffix: string): KauroPool => {
     const { poolMax, password, passwordFile, tlsCaFile, ...connection } = config;
-    const security = connectionSecurityOf(deps.environment, { host: connection.host, ...(password === undefined ? {} : { password }), ...(passwordFile === undefined ? {} : { passwordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }) });
-    return createPool({ ...connection, ...security, max: poolMax, applicationName: `${COMMISSION_APPLICATION_NAME}-${suffix}`, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+    // createPool applies connectionSecurityOf itself (DB-TLS-R4): TLS, DNS host and the password file outside LOCAL
+    return createPool({ ...connection, environment: deps.environment, ...(password === undefined ? {} : { password }), ...(passwordFile === undefined ? {} : { passwordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), max: poolMax, applicationName: `${COMMISSION_APPLICATION_NAME}-${suffix}`, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
   };
   const commission = open(databases.commission, "service");
   const control = open(databases.control, "dispatcher");

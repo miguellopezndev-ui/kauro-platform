@@ -19,23 +19,68 @@
  * classification — pool name, the connection's state, error class, SQLSTATE or errno code, never the message or a connection
  * parameter — to the configured sink, by default one line on stderr.
  */
-import { Pool, type PoolClient } from "pg";
-import { sslOptionsOf, type DatabaseTls } from "./tls.js";
+import { Client, Pool, type PoolClient } from "pg";
+import { ConnectionSecurityError, connectionSecurityOf, sslOptionsOf, type ConnectionSecurityInput } from "./tls.js";
+
+// The driver's error class, for the SQLSTATE classification of sql.ts: this module is the only one that imports the driver (DB-TLS-R4 allowlist)
+export { DatabaseError } from "pg";
+
+export type DatabaseEnvironment = "LOCAL" | "SANDBOX" | "LIVE";
+const DATABASE_ENVIRONMENTS: ReadonlyArray<string> = Object.freeze(["LOCAL", "SANDBOX", "LIVE"]);
+
+/**
+ * What every connection this module opens is given about its security, as the deployment names it (AWS-DELTA I-2, I-3). The pool and the
+ * migrator apply connectionSecurityOf to it themselves, at construction: no caller, alias or wrapper can hand the driver a configuration
+ * that skipped the rule (DB-TLS-R4 root cause: the rule is enforced at the single construction point, not looked for in the callers).
+ */
+export interface ConnectionSecurityConfig {
+  /** The deployment environment; outside LOCAL: verified TLS, a DNS host, the password from its file, no PG* fallbacks. Required. */
+  readonly environment: DatabaseEnvironment;
+  /** LOCAL only (refused outside LOCAL). */
+  readonly password?: string;
+  /** The mounted-secret password file; required outside LOCAL. */
+  readonly passwordFile?: string;
+  /** The CA bundle file (KAURO_DB_TLS_CA_FILE); required outside LOCAL. */
+  readonly tlsCaFile?: string;
+  /** The variables the deployment names the password inputs by, for the refusal text. */
+  readonly passwordNames?: ConnectionSecurityInput["names"];
+  /** Where PGPASSWORD, PGPASSFILE, PGSSLMODE, PGHOST and PGHOSTADDR are looked for (default process.env). */
+  readonly processEnv?: ConnectionSecurityInput["processEnv"];
+}
+
+function environmentOf(config: { readonly environment?: unknown }): DatabaseEnvironment {
+  const environment = config.environment;
+  if (typeof environment !== "string" || !DATABASE_ENVIRONMENTS.includes(environment)) {
+    throw new TypeError("a database connection names its environment (LOCAL, SANDBOX or LIVE): the pool applies the connection security rule itself (DB-TLS-R4)");
+  }
+  return environment as DatabaseEnvironment;
+}
+
+/** The driver's `password` and `ssl` settings of one connection, from connectionSecurityOf and nothing else. */
+function securedSettingsOf(config: ConnectionSecurityConfig & { readonly host: string }, passwordRequired = true): { password?: string; ssl?: ReturnType<typeof sslOptionsOf> } {
+  const security = connectionSecurityOf(environmentOf(config), {
+    host: config.host,
+    ...(config.password === undefined ? {} : { password: config.password }),
+    ...(config.passwordFile === undefined ? {} : { passwordFile: config.passwordFile }),
+    ...(config.tlsCaFile === undefined ? {} : { tlsCaFile: config.tlsCaFile }),
+    ...(config.passwordNames === undefined ? {} : { names: config.passwordNames }),
+    ...(config.processEnv === undefined ? {} : { processEnv: config.processEnv }),
+    passwordRequired,
+  });
+  return { ...(security.password === undefined ? {} : { password: security.password }), ...(security.tls === undefined ? {} : { ssl: sslOptionsOf(security.tls) }) };
+}
 
 export type RuntimeRole = "kauro_app" | "kauro_control" | "kauro_assurance" | "kauro_validator" | "kauro_ingress" | "kauro_payment" | "kauro_commission";
 
 /** The runtime groups: B06's five, package B09's payment service (0013) and package B10's commission service (0028; D10-CTX-1). */
 export const RUNTIME_ROLES: ReadonlyArray<RuntimeRole> = Object.freeze(["kauro_app", "kauro_control", "kauro_assurance", "kauro_validator", "kauro_ingress", "kauro_payment", "kauro_commission"]);
 
-export interface PoolConfig {
+export interface PoolConfig extends ConnectionSecurityConfig {
   readonly host: string;
   readonly port: number;
   readonly database: string;
   /** The LOGIN role; must be a member of exactly one runtime group role (RUNTIME_ROLES). */
   readonly user: string;
-  readonly password?: string;
-  /** Verified TLS (I-2): the CA that signed the server certificate; rejectUnauthorized is always true. Absent only in LOCAL. */
-  readonly tls?: DatabaseTls;
   /** Connection ceiling of this instance (07 connection budget). Required: the budget is a decision, not a default. */
   readonly max: number;
   readonly applicationName: string;
@@ -123,7 +168,8 @@ function isRuntimeRole(value: string): value is RuntimeRole {
 
 /**
  * DB-TLS-R3: the only way to a KauroPool is createPool. The token is module-private, so no import route (an alias, a namespace or
- * computed member, the index re-export, a run-time import) can construct one elsewhere; the connection-site scan stays a tripwire.
+ * computed member, the index re-export, a run-time import) can construct one elsewhere. DB-TLS-R4: the constructor applies
+ * connectionSecurityOf itself, so whatever reaches createPool (an aliased re-export, a wrapper, a run-time import) builds a secure pool.
  */
 const CREATE: unique symbol = Symbol("KauroPool.create");
 
@@ -139,6 +185,8 @@ export class KauroPool {
     if (!Number.isInteger(config.max) || config.max < 1 || config.max > 24) {
       throw new RangeError("pool max must be an integer between 1 and 24 (07 connection budget: the application ceiling is twenty-four)");
     }
+    // DB-TLS-R4: the security rule is applied here, before the driver sees the configuration (it reads the password and CA files)
+    const secured = securedSettingsOf(config);
     this.config = config;
     const idleTx = Math.max(1, Math.floor(config.idleInTransactionTimeoutMs ?? 30_000));
     this.#pool = new Pool({
@@ -146,8 +194,7 @@ export class KauroPool {
       port: config.port,
       database: config.database,
       user: config.user,
-      ...(config.password === undefined ? {} : { password: config.password }),
-      ...(config.tls === undefined ? {} : { ssl: sslOptionsOf(config.tls) }),
+      ...secured,
       max: config.max,
       application_name: config.applicationName,
       idleTimeoutMillis: config.idleTimeoutMs ?? 30_000,
@@ -245,4 +292,47 @@ export class KauroPool {
 
 export function createPool(config: PoolConfig): KauroPool {
   return new KauroPool(config, CREATE);
+}
+
+/** Where the migrator connects (07 "Restoration and migration": migration roles are separate from runtime). */
+export interface MigratorConnection extends Omit<ConnectionSecurityConfig, "password" | "passwordFile" | "passwordNames"> {
+  readonly host: string;
+  readonly port: number;
+  readonly database: string;
+  /** The owner role of the kauro objects (LOGIN, not SUPERUSER, not BYPASSRLS); never a runtime login role. */
+  readonly user: string;
+  /** The migrator's own credential (N7), read by its entrypoint; required outside LOCAL, so pg never falls back to PGPASSWORD or a pgpass file (ADV-9). */
+  readonly password?: string;
+  readonly applicationName?: string;
+}
+
+/** The migrator connection's driver timeouts, in milliseconds. */
+export interface MigratorClientTimeouts {
+  readonly connectionTimeoutMillis: number;
+  readonly statement_timeout: number;
+  readonly lock_timeout: number;
+}
+
+/**
+ * The migrator's one dedicated connection (not yet connected), under the same rule as every pool: connectionSecurityOf at construction
+ * (DB-TLS-R4). The migrator holds its credential itself, so outside LOCAL the password is required explicitly, never from a file.
+ */
+export function migratorClientOf(connection: MigratorConnection, timeouts: MigratorClientTimeouts): Client {
+  const { ssl } = securedSettingsOf({ environment: connection.environment, host: connection.host, ...(connection.tlsCaFile === undefined ? {} : { tlsCaFile: connection.tlsCaFile }), ...(connection.processEnv === undefined ? {} : { processEnv: connection.processEnv }) }, false);
+  if (environmentOf(connection) !== "LOCAL" && connection.password === undefined) {
+    throw new ConnectionSecurityError("KAURO_DB_MIGRATOR_PASSWORD", "is required outside LOCAL (or KAURO_DB_MIGRATOR_PASSWORD_FILE): the migration connection is always given its password explicitly");
+  }
+  return new Client({
+    host: connection.host,
+    port: connection.port,
+    database: connection.database,
+    user: connection.user,
+    ...(connection.password === undefined ? {} : { password: connection.password }),
+    ...(ssl === undefined ? {} : { ssl }),
+    application_name: connection.applicationName ?? "kauro-migrator",
+    // picked one by one: nothing a caller passes can reach the driver beside the secured settings
+    connectionTimeoutMillis: timeouts.connectionTimeoutMillis,
+    statement_timeout: timeouts.statement_timeout,
+    lock_timeout: timeouts.lock_timeout,
+  });
 }

@@ -22,7 +22,7 @@ before(async () => {
   pg = await startTemporaryPostgres();
   oracle = await pg.connect("postgres");
   app = await pg.connect("kauro_app_test");
-  assurancePool = createPool({ host: "127.0.0.1", port: pg.port, database: "kauro", user: "kauro_assurance_test", max: 4, applicationName: "session-fence-test-assurance" });
+  assurancePool = createPool({ environment: "LOCAL", host: "127.0.0.1", port: pg.port, database: "kauro", user: "kauro_assurance_test", max: 4, applicationName: "session-fence-test-assurance" });
   store = new PgWebSessionStore(assurancePool);
 });
 after(async () => {

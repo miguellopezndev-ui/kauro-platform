@@ -388,7 +388,7 @@ test("R14/R30: a verifier or validator login is its own runtime group — it run
     await assert.rejects(uow.run(h.system(), async () => undefined), (e: unknown) => isDomainFailure(e) && e.code === "INTEGRITY_FAILURE");
   }
   await h.oracle.query(`CREATE ROLE kauro_dual_test LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.app}, ${ROLES.assurance}`);
-  const dual = createPool({ host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: "kauro_dual_test", max: 1, applicationName: "kauro-test-dual" });
+  const dual = createPool({ environment: "LOCAL", host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: "kauro_dual_test", max: 1, applicationName: "kauro-test-dual" });
   try {
     await assert.rejects(dual.acquire(), (e: unknown) => e instanceof PrivilegedRoleError && /more than one runtime group/.test(e.message));
     assert.equal(dual.totalCount, 0, "the connection was destroyed, not pooled");

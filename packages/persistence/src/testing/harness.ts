@@ -212,7 +212,7 @@ const EDGE_EVIDENCE: Readonly<Partial<Record<CapabilityPublicationState, string>
 
 export async function start(): Promise<Harness> {
   const pg = await startTemporaryPostgres();
-  const base = { host: "127.0.0.1", port: pg.port, database: ROLES.database, max: 4 } as const;
+  const base = { environment: "LOCAL", host: "127.0.0.1", port: pg.port, database: ROLES.database, max: 4 } as const;
   const appPool = createPool({ ...base, user: ROLES.appLogin, applicationName: "kauro-test-api" });
   const controlPool = createPool({ ...base, user: ROLES.controlLogin, applicationName: "kauro-test-control" });
   const assurancePool = createPool({ ...base, max: 2, user: ROLES.assuranceLogin, applicationName: "kauro-test-assurance" });

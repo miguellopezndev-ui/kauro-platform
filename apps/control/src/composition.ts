@@ -48,7 +48,7 @@ import type {
 import { SOURCE_SWEEPERS, type ExecutionSweeperName } from "@kauro/application";
 import { createIdGenerator, toUtcInstant, type Clock, type Environment, type IdGenerator, type LeaseOwnerId, type SourceUnitOfWorkFactory } from "@kauro/domain";
 import { IsolatedContainerInspector, IsolatedSelectionEvaluator } from "@kauro/data-plane";
-import { connectionSecurityOf, createPool, createUnitOfWorkFactory, type KauroPool, type PoolErrorSink } from "@kauro/persistence";
+import { createPool, createUnitOfWorkFactory, type KauroPool, type PoolErrorSink } from "@kauro/persistence";
 import { AuthorityJournal } from "./consumers/authority-journal.js";
 import { SelectionEvaluation } from "./consumers/selection-evaluation.js";
 import { StorageLifecycle } from "./consumers/storage-lifecycle.js";
@@ -241,7 +241,11 @@ export async function openControlDatabase(config: ControlDatabaseConfig): Promis
     port: config.port,
     database: config.database,
     user: config.user,
-    ...connectionSecurityOf(config.environment, { host: config.host, ...(config.password === undefined ? {} : { password: config.password }), ...(config.passwordFile === undefined ? {} : { passwordFile: config.passwordFile }), ...(config.tlsCaFile === undefined ? {} : { tlsCaFile: config.tlsCaFile }) }),
+    // createPool applies connectionSecurityOf itself (DB-TLS-R4): TLS, DNS host and the password file outside LOCAL
+    environment: config.environment,
+    ...(config.password === undefined ? {} : { password: config.password }),
+    ...(config.passwordFile === undefined ? {} : { passwordFile: config.passwordFile }),
+    ...(config.tlsCaFile === undefined ? {} : { tlsCaFile: config.tlsCaFile }),
     max: config.poolMax,
     applicationName: CONTROL_APPLICATION_NAME,
     ...(config.onPoolError === undefined ? {} : { onError: config.onPoolError }),

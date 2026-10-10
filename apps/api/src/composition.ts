@@ -28,9 +28,8 @@ import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } fro
 import type { UtcInstant } from "@kauro/contracts";
 import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
-import { ConnectionSecurityError } from "@kauro/persistence";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, connectionSecurityOf, createPool, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
+import { bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import { commercialPrincipalReader } from "./commercial-principals.js";
 import type { ApiConfig, IdentityConfig, MigratorConfig } from "./config.js";
@@ -107,11 +106,9 @@ export interface DatabaseDependencies {
  */
 export function applyMigrationsWith(environment: Environment, migrator: MigratorConfig, password: string | undefined): Promise<ApplyResult> {
   const { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs, passwordFile: _passwordFile, tlsCaFile, ...connection } = migrator;
-  const { tls } = connectionSecurityOf(environment, { host: connection.host, passwordRequired: false, ...(tlsCaFile === undefined ? {} : { tlsCaFile }) });
-  // the migrator's credential is its own (N7); outside LOCAL it is explicit, so pg never falls back to PGPASSWORD or a pgpass file (ADV-9)
-  if (environment !== "LOCAL" && password === undefined) throw new ConnectionSecurityError("KAURO_DB_MIGRATOR_PASSWORD", "is required outside LOCAL (or KAURO_DB_MIGRATOR_PASSWORD_FILE): the migration connection is always given its password explicitly");
+  // the migrator's credential is its own (N7): applyMigrationsAs applies connectionSecurityOf and requires it explicitly outside LOCAL (DB-TLS-R4, ADV-9)
   return applyMigrationsAs(
-    { ...connection, ...(password === undefined ? {} : { password }), ...(tls === undefined ? {} : { tls }), applicationName: `${API_APPLICATION_NAME}-migrator` },
+    { ...connection, environment, ...(password === undefined ? {} : { password }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), applicationName: `${API_APPLICATION_NAME}-migrator` },
     { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs },
   );
 }
@@ -133,8 +130,8 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   let migrations: ApplyResult | null = null;
   if (config.migrateOnStart !== null) migrations = await applyMigrationsWith(config.environment, config.migrateOnStart, deps.migratorPassword);
   const { poolMax, statementTimeoutMs, tlsCaFile, password, passwordFile, ...connection } = config.database;
-  const security = connectionSecurityOf(config.environment, { host: connection.host, ...(password === undefined ? {} : { password }), ...(passwordFile === undefined ? {} : { passwordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }) });
-  const pool = createPool({ ...connection, ...security, max: poolMax, applicationName: API_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+  // createPool applies connectionSecurityOf itself (DB-TLS-R4): TLS, DNS host and the password file outside LOCAL
+  const pool = createPool({ ...connection, environment: config.environment, ...(password === undefined ? {} : { password }), ...(passwordFile === undefined ? {} : { passwordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), max: poolMax, applicationName: API_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
   try {
     const { client, connection: verified } = await pool.acquire();
     client.release();
@@ -151,8 +148,7 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
     const { poolMax: boundaryMax, user: boundaryUser, password: boundaryPassword, passwordFile: boundaryPasswordFile } = boundary;
     try {
       // the password file is read inside the try: a failure closes the runtime pool opened above, never leaks it (ADV-7)
-      const boundarySecurity = connectionSecurityOf(config.environment, { host: connection.host, ...(boundaryPassword === undefined ? {} : { password: boundaryPassword }), ...(boundaryPasswordFile === undefined ? {} : { passwordFile: boundaryPasswordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), names: { password: "KAURO_DB_ASSURANCE_PASSWORD", passwordFile: "KAURO_DB_ASSURANCE_PASSWORD_FILE" } });
-      assurancePool = createPool({ host: connection.host, port: connection.port, database: connection.database, user: boundaryUser, ...boundarySecurity, max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+      assurancePool = createPool({ environment: config.environment, host: connection.host, port: connection.port, database: connection.database, user: boundaryUser, ...(boundaryPassword === undefined ? {} : { password: boundaryPassword }), ...(boundaryPasswordFile === undefined ? {} : { passwordFile: boundaryPasswordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), passwordNames: { password: "KAURO_DB_ASSURANCE_PASSWORD", passwordFile: "KAURO_DB_ASSURANCE_PASSWORD_FILE" }, max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
       const { client, connection: verified } = await assurancePool.acquire();
       client.release();
       if (verified.role !== "kauro_assurance") {

@@ -688,8 +688,8 @@ export function serialize(document) {
 export async function registeredRoutes() {
   const [api, persistence] = await Promise.all([load("apps/api/dist/src/index.js"), load("packages/persistence/dist/src/index.js")]);
   // the real pg adapter, never connected: route registration opens no transaction, and the assertion below proves it
-  const pool = persistence.createPool({ host: "127.0.0.1", port: 1, database: "kauro", user: "kauro_route_inventory", max: 1, applicationName: "kauro-openapi-inventory" });
-  const boundaryPool = persistence.createPool({ host: "127.0.0.1", port: 1, database: "kauro", user: "kauro_route_inventory_sessions", max: 1, applicationName: "kauro-openapi-inventory-sessions" });
+  const pool = persistence.createPool({ environment: "LOCAL", host: "127.0.0.1", port: 1, database: "kauro", user: "kauro_route_inventory", max: 1, applicationName: "kauro-openapi-inventory" });
+  const boundaryPool = persistence.createPool({ environment: "LOCAL", host: "127.0.0.1", port: 1, database: "kauro", user: "kauro_route_inventory_sessions", max: 1, applicationName: "kauro-openapi-inventory-sessions" });
   try {
     // the composition root's own factory: the commerce unit of work over the app pool (the request side's reads bind to it)
     const unitOfWork = persistence.createCommerceUnitOfWorkFactory({ app: pool }, { clock: api.systemClock });

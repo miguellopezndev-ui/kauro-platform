@@ -52,6 +52,7 @@ test("R38: an idle connection the server terminates reaches the pool's error sin
   });
   const events: PoolErrorEvent[] = [];
   const pool = createPool({
+    environment: "LOCAL",
     host: "127.0.0.1",
     port: pg.port,
     database: ROLES.database,
@@ -96,7 +97,7 @@ test("R38: without a configured sink the classification is written to stderr, on
     }
     return (original as (c: string | Uint8Array, ...r: unknown[]) => boolean)(chunk, ...rest);
   }) as typeof process.stderr.write;
-  const pool = createPool({ host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.appLogin, password: PASSWORD, max: 1, applicationName: "kauro-pool-default" });
+  const pool = createPool({ environment: "LOCAL", host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.appLogin, password: PASSWORD, max: 1, applicationName: "kauro-pool-default" });
   try {
     await terminateIdleConnection(pool, "kauro-pool-default");
     await within(written, 10_000, "the default pool error line");
@@ -120,6 +121,7 @@ test("R38: a connection the server terminates while a unit of work holds it fail
   });
   const events: PoolErrorEvent[] = [];
   const pool = createPool({
+    environment: "LOCAL",
     host: "127.0.0.1",
     port: pg.port,
     database: ROLES.database,

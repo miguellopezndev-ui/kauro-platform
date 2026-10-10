@@ -94,7 +94,7 @@ test("DB-TLS-R1: outside LOCAL the host must be a DNS name pg dials itself: an e
 });
 
 test("DB-TLS-R3: a KauroPool is constructed by createPool only: the class taken by any import route refuses construction before a pg pool exists", async () => {
-  const config = { host: "db.example.test", port: 1, database: "kauro", user: "u", max: 1, applicationName: "db-tls-r3" };
+  const config = { environment: "LOCAL", host: "db.example.test", port: 1, database: "kauro", user: "u", max: 1, applicationName: "db-tls-r3" } as const;
   const Constructor = KauroPool as unknown as new (...args: unknown[]) => unknown;
   const Member = (persistence as unknown as Record<string, new (...args: unknown[]) => unknown>)["KauroPool"]!;
   const RunTime = ((await import("../src/index.js")) as unknown as Record<string, new (...args: unknown[]) => unknown>)["KauroPool"]!;

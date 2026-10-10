@@ -1082,7 +1082,7 @@ test("RACE (replacement): a crash before the replacement's intent commits leaves
  */
 async function standAhead(s: Selling, seconds: number) {
   const { w } = pw;
-  const pool = createPool({ host: "127.0.0.1", port: w.h.pg.port, database: ROLES.database, user: ROLES.appLogin, max: 1, applicationName: "kauro-test-api-ahead", idleTimeoutMs: 600_000 });
+  const pool = createPool({ environment: "LOCAL", host: "127.0.0.1", port: w.h.pg.port, database: ROLES.database, user: ROLES.appLogin, max: 1, applicationName: "kauro-test-api-ahead", idleTimeoutMs: 600_000 });
   const c = await pool.raw.connect();
   let serverNow: string;
   try {

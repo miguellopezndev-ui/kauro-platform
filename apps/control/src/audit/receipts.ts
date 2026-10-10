@@ -17,7 +17,7 @@ import type { CancellationChannel, CoreEvidenceClass, ExecutionLimits, ValidateP
 import { DOMAINS, canonicalBytes, isSha256Hex, rawDigest, structuredDigest, type RowCounts, type Sha256Hex, type UtcInstant } from "@kauro/contracts";
 import { AttemptScratchStore } from "@kauro/data-plane";
 import type { AgencyId, Environment, PlanBody, PlanId, ValidationReceiptId, ValidationReceiptRecord } from "@kauro/domain";
-import { PgValidationReceiptRecorder, connectionSecurityOf, createPool, type PoolErrorSink } from "@kauro/persistence";
+import { PgValidationReceiptRecorder, createPool, type PoolErrorSink } from "@kauro/persistence";
 
 /** The validator's write path: one append-only receipt, recorded by kauro_validator (persistence's PgValidationReceiptRecorder). */
 export interface ValidationReceipts {
@@ -235,7 +235,11 @@ export async function openValidatorReceipts(config: ValidatorDatabaseConfig, app
     port: config.port,
     database: config.database,
     user: config.user,
-    ...connectionSecurityOf(config.environment, { host: config.host, ...(config.password === undefined ? {} : { password: config.password }), ...(config.passwordFile === undefined ? {} : { passwordFile: config.passwordFile }), ...(config.tlsCaFile === undefined ? {} : { tlsCaFile: config.tlsCaFile }) }),
+    // createPool applies connectionSecurityOf itself (DB-TLS-R4): TLS, DNS host and the password file outside LOCAL
+    environment: config.environment,
+    ...(config.password === undefined ? {} : { password: config.password }),
+    ...(config.passwordFile === undefined ? {} : { passwordFile: config.passwordFile }),
+    ...(config.tlsCaFile === undefined ? {} : { tlsCaFile: config.tlsCaFile }),
     max: config.poolMax,
     applicationName,
     ...(config.onPoolError === undefined ? {} : { onError: config.onPoolError }),
