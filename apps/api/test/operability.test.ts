@@ -14,7 +14,7 @@ import { compileSchemaBundle } from "@kauro/application";
 import { DomainFailure } from "@kauro/domain";
 import type { PoolErrorEvent } from "@kauro/persistence";
 import { classifyError, listMigrations } from "@kauro/persistence";
-import { ROLES, raceStatementTimeoutMs, startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "@kauro/persistence/testing";
+import { ROLES, databaseEnvironmentNameOf, raceStatementTimeoutMs, testDatabaseEnvironment, startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "@kauro/persistence/testing";
 import {
   API_APPLICATION_NAME,
   ConfigError,
@@ -245,8 +245,12 @@ test("configuration of the operating limits: the api pool stays inside the four-
   }
   assert.throws(() => loadConfig({ ...base, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"), "a password file without migrations on start");
   // the job's own configuration: the password in its environment or as a file, never both, and never configuration
-  assert.deepEqual(loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "db.example.test", KAURO_DB_NAME: "kauro", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_TLS_CA_FILE: "ca.pem" }), {
+  const job = loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "db.example.test", KAURO_DB_NAME: "kauro", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_TLS_CA_FILE: "ca.pem" });
+  // the connection environment is the branded value minted from KAURO_ENVIRONMENT (DB-TLS gap 2): a plain object or another name fails here
+  assert.equal(databaseEnvironmentNameOf(job.databaseEnvironment), "LIVE");
+  assert.deepEqual(job, {
     environment: "LIVE",
+    databaseEnvironment: testDatabaseEnvironment("LIVE"),
     migrator: { host: "db.example.test", port: 5432, database: "kauro", user: ROLES.owner, tlsCaFile: "ca.pem", connectTimeoutMs: 5_000, statementTimeoutMs: 120_000, lockTimeoutMs: 5_000, passwordFile: null },
   });
   assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "localhost", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"));

@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { MigratorRoleError, PrivilegedRoleError, listMigrations } from "@kauro/persistence";
-import { ROLES, startTemporaryPostgres, type TemporaryPostgres, testDatabaseEnvironment } from "@kauro/persistence/testing";
+import { ROLES, databaseEnvironmentNameOf, startTemporaryPostgres, type TemporaryPostgres, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import { BearerTokenFileError, ConfigError, authenticatorOf, bootstrap, loadConfig, parseBearerTokenFile } from "../src/index.js";
 import { statementTimeoutOf } from "../src/config.js";
 import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
@@ -112,6 +112,8 @@ test("configuration: every variable is validated and a missing or malformed one 
   assert.throws(() => loadConfig(envOf({ KAURO_DB_PASSWORD: "hunter2-secret", KAURO_DB_POOL_MAX: "99" })), (e: unknown) => configError("KAURO_DB_POOL_MAX")(e) && !(e as Error).message.includes("hunter2"));
   // a complete LOCAL environment with its defaults
   const config = loadConfig(envOf({ KAURO_DB_HOST: undefined, KAURO_DB_NAME: undefined, KAURO_HTTP_HOST: undefined, KAURO_HTTP_PORT: undefined }));
+  // the connection environment is the branded value minted from KAURO_ENVIRONMENT (DB-TLS gap 2): a plain object or another name fails here
+  assert.equal(databaseEnvironmentNameOf(config.databaseEnvironment), "LOCAL");
   assert.deepEqual(config, {
     environment: "LOCAL",
     databaseEnvironment: testDatabaseEnvironment("LOCAL"),
