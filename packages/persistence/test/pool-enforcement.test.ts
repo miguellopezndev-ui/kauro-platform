@@ -114,7 +114,7 @@ test("DB-TLS-R4: the migrator connection is built under the same rule (CA, DNS h
   }
   assert.throws(() => migratorClientOf({ ...migrator } as never, timeouts), /never a string/);
   assert.throws(() => migratorClientOf({ ...migrator, environment: "LOC" + "AL" } as never, timeouts), /never a string/);
-  const local = migratorClientOf({ ...migrator, environment: testDatabaseEnvironment("LOCAL") }, timeouts);
+  const local = migratorClientOf({ ...migrator, host: "localhost", environment: testDatabaseEnvironment("LOCAL") }, timeouts);
   assert.equal((local as unknown as { connectionParameters: { ssl?: unknown } }).connectionParameters.ssl, false, "LOCAL unchanged: no TLS, no password required");
 });
 
@@ -163,4 +163,22 @@ test("DB-TLS gap 2: a plain string is a compile-time error too (the brand is a u
     migratorClientOf({ host: "h", port: 1, database: "d", user: "u", environment: "LOC" + "AL" }, { connectionTimeoutMillis: 1, statement_timeout: 1, lock_timeout: 1 });
   };
   assert.equal(typeof compileOnly, "function");
+});
+
+test("DB-TLS ADV-1 (3ecd979): LOCAL is pinned to loopback inside createPool and the migrator connection: a LOCAL environment dials this machine only (no PG, any route to the minter)", () => {
+  const timeouts = { connectionTimeoutMillis: 1000, statement_timeout: 1000, lock_timeout: 1000 };
+  const local = testDatabaseEnvironment("LOCAL");
+  const pool = (host: string | undefined): PoolConfig => ({ ...login, environment: local, host: host as string, processEnv: {} });
+  const migrator = (host: string | undefined) => ({ host: host as string, port: 1, database: "kauro", user: "kauro_owner", environment: local, processEnv: {} });
+  for (const host of ["127.0.0.1", "127.255.255.254", "::1", "localhost", "LocalHost", "/var/run/postgresql"]) {
+    index.createPool(pool(host)).end().catch(() => undefined);
+    assert.doesNotThrow(() => migratorClientOf(migrator(host), timeouts), `loopback ${host} is accepted`);
+  }
+  const remote = ["db.example.test", "10.0.0.1", "192.0.2.10", "126.255.255.255", "128.0.0.1", "::2", "2001:db8::1", "localhost.example.test", "127.0.0.1.example.test", "0.0.0.0", "", "relative/socket"];
+  for (const host of [...remote, undefined]) {
+    assert.throws(() => index.createPool(pool(host)), refusedBy("KAURO_DB_HOST"), `createPool refuses LOCAL to ${String(host)}`);
+    assert.throws(() => migratorClientOf(migrator(host), timeouts), refusedBy("KAURO_DB_HOST"), `migrator refuses LOCAL to ${String(host)}`);
+  }
+  // an empty host with PGHOST set is the pg fallback route: still refused
+  assert.throws(() => index.createPool({ ...pool(""), processEnv: { PGHOST: "db.example.test" } }), refusedBy("KAURO_DB_HOST"));
 });

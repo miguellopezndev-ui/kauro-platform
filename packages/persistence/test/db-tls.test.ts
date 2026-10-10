@@ -40,7 +40,7 @@ test("I-2: sslOptionsOf carries the CA bytes and rejectUnauthorized true, and no
 
 test("I-2: the pool's ssl options carry rejectUnauthorized true and the CA bytes; without tls the pool has no ssl (LOCAL unchanged)", async () => {
   const ca = "-----BEGIN CERTIFICATE-----\nBBBB\n-----END CERTIFICATE-----\n";
-  const base = { environment: testDatabaseEnvironment("LOCAL"), host: "db.example.test", port: 5432, database: "kauro", user: "kauro_app_test", max: 1, applicationName: "t" } as const;
+  const base = { environment: testDatabaseEnvironment("LOCAL"), host: "localhost", port: 5432, database: "kauro", user: "kauro_app_test", max: 1, applicationName: "t" } as const;
   const dir = mkdtempSync(join(tmpdir(), "kauro-pool-ca-"));
   writeFileSync(join(dir, "ca.pem"), ca);
   const withTls = createPool({ ...base, tlsCaFile: join(dir, "ca.pem") });

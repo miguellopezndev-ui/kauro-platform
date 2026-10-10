@@ -19,6 +19,7 @@
  * classification — pool name, the connection's state, error class, SQLSTATE or errno code, never the message or a connection
  * parameter — to the configured sink, by default one line on stderr.
  */
+import { BlockList, isIP } from "node:net";
 import { Client, Pool, type PoolClient, type QueryResult, type QueryResultRow } from "pg";
 import { nameOfDatabaseEnvironment, type DatabaseEnvironment, type DatabaseEnvironmentName } from "./environment.js";
 import { ConnectionSecurityError, connectionSecurityOf, sslOptionsOf, type ConnectionSecurityInput } from "./tls.js";
@@ -55,8 +56,31 @@ function environmentOf(config: { readonly environment?: unknown }): DatabaseEnvi
   return nameOfDatabaseEnvironment(config.environment);
 }
 
+const LOOPBACK = new BlockList();
+LOOPBACK.addSubnet("127.0.0.0", 8, "ipv4");
+LOOPBACK.addAddress("::1", "ipv6");
+
+/**
+ * Loopback host (ADV-1): 127.0.0.0/8, ::1, `localhost`, or a unix socket directory (starts with "/"). An empty or missing host is NOT
+ * loopback: pg would fall back to PGHOST, so a LOCAL connection must name its host.
+ */
+export function isLoopbackHost(host: unknown): boolean {
+  if (typeof host !== "string" || host.length === 0) return false;
+  if (host.startsWith("/")) return true;
+  if (host.toLowerCase() === "localhost") return true;
+  const family = isIP(host);
+  if (family === 4) return LOOPBACK.check(host, "ipv4");
+  if (family === 6) return LOOPBACK.check(host, "ipv6");
+  return false;
+}
+
 /** The driver's `password` and `ssl` settings of one connection, from connectionSecurityOf and nothing else. */
 function securedSettingsOf(config: ConnectionSecurityConfig & { readonly host: string }, passwordRequired = true): { password?: string; ssl?: ReturnType<typeof sslOptionsOf> } {
+  // ADV-1, by construction: LOCAL means no TLS, so it may only ever dial this machine. Whatever route minted a LOCAL environment
+  // (the test-only minter included), it cannot reach a remote host: the refusal is here, in the one function every connection passes.
+  if (environmentOf(config) === "LOCAL" && !isLoopbackHost(config.host)) {
+    throw new ConnectionSecurityError("KAURO_DB_HOST", "must be a loopback address (127.0.0.0/8, ::1, localhost) or a unix socket path in the LOCAL environment: LOCAL connects without TLS");
+  }
   const security = connectionSecurityOf(environmentOf(config), {
     host: config.host,
     ...(config.password === undefined ? {} : { password: config.password }),
