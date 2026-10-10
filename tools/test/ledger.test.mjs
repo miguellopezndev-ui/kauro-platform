@@ -20,6 +20,7 @@ import {
   ledgerFiles,
   ledgerOfRepo,
   loadRegistry,
+  loadReviews,
   main,
   readInputs,
   readPinned,
@@ -536,6 +537,36 @@ test("ADV-3 (r4): one `--write --readme` pass from a stale README converges — 
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
+});
+
+// ADV-4 (r4): the residual violations of this repository, by kind and subject, each with its reason. They are true data; anything
+// else (a new kind, or one more or one fewer of a pinned kind) fails the suite, since the ledger CLI's exit is not part of CI.
+const RESIDUAL = {
+  // PLANNED rows outside B20/B21: MC B01 R2-009, MC B02 S034 and R2-017, B11 S068, S070 and R2-063
+  PLANNED_OUTSIDE_B20_B21: ["R2-009", "R2-017", "R2-063", "S034", "S068", "S070"],
+  // IC-B03 SIMULATED rows: the IC map at 2d01430 names no later package (live usefulness is B04 qualification; an IC-side map
+  // decision), plus the B03 rows that cite no carrier
+  REMAINDER_WITHOUT_OWNER: ["CAP01", "CAP02", "CAP03", "CAP04", "CAP05", "CAP06", "CAP07", "CAP08", "CAP09", "CAP10", "CAP11", "CAP12", "IC-04", "IC-06", "IC-07", "IC-08", "R2-029", "R2-030", "R2-037", "R2-038", "S039", "S095"],
+};
+const countsOf = (violations) => Object.fromEntries(Object.entries(Object.groupBy(violations, (v) => v.kind)).map(([k, vs]) => [k, vs.length]).sort(([a], [b]) => a.localeCompare(b)));
+const subjectsOf = (violations) => Object.fromEntries(Object.entries(Object.groupBy(violations, (v) => v.kind)).map(([k, vs]) => [k, vs.map((v) => v.subject).sort()]).sort(([a], [b]) => a.localeCompare(b)));
+
+test("ADV-4 (r4): the repository's violations are exactly the pinned residual set (22 REMAINDER_WITHOUT_OWNER, 6 PLANNED_OUTSIDE_B20_B21), in the computation and in the committed ledger.json; a new violation of any kind, or one more of a pinned kind, changes the counts", () => {
+  const { ledger, externals, missingInputs } = ledgerOfRepo(root);
+  assert.deepEqual(countsOf(ledger.violations), { PLANNED_OUTSIDE_B20_B21: 6, REMAINDER_WITHOUT_OWNER: 22 });
+  assert.deepEqual(subjectsOf(ledger.violations), RESIDUAL);
+  assert.deepEqual(subjectsOf(JSON.parse(read("docs/acceptance/ledger/ledger.json")).violations), RESIDUAL, "the committed ledger.json carries the same set");
+  // a count must be able to fail: the same inputs mutated, one violation each
+  const reviews = loadReviews(root);
+  const sidecars = readSidecars(root);
+  const base = (s) => computeLedger({ registry, sidecars: s, externals, missingInputs, reviews });
+  assert.deepEqual(countsOf(base(sidecars).violations), { PLANNED_OUTSIDE_B20_B21: 6, REMAINDER_WITHOUT_OWNER: 22 }, "the README-free computation is the same set");
+  const mutate = (pkg, pick, change) => sidecars.map((s) => (s.package === pkg ? { ...s, rows: s.rows.map((r) => (r === s.rows.find(pick) ? { ...r, ...change } : r)) } : s));
+  // a new kind: a B20 row loses the owner's date
+  assert.deepEqual(countsOf(base(mutate("B20", (r) => r.ownerDate, { ownerDate: null })).violations), { OWNER_DATE_MISSING: 1, PLANNED_OUTSIDE_B20_B21: 6, REMAINDER_WITHOUT_OWNER: 22 });
+  // one more of a pinned kind: a B10 row claimed PLANNED; a B10 PARTIAL row that names no carrier
+  assert.deepEqual(countsOf(base(mutate("B10", (r) => r.class === "EXECUTED_LOCAL", { class: "PLANNED" })).violations), { PLANNED_OUTSIDE_B20_B21: 7, REMAINDER_WITHOUT_OWNER: 22 });
+  assert.deepEqual(countsOf(base(mutate("B10", (r) => r.class === "PARTIAL", { inheritedTo: [], claimed: "PARTIAL" })).violations), { PLANNED_OUTSIDE_B20_B21: 6, REMAINDER_WITHOUT_OWNER: 23 });
 });
 
 test("ADV-6: a cited title is written only as the title of a test, it or describe call — a comment, a longer title or another string does not satisfy it; escaped quotes and every quote kind do", () => {
