@@ -131,11 +131,15 @@ test("PR18-1: a renamed cited test is seen under both names and reopens the pack
   try {
     f.git("mv", "test/a.test.ts", "test/z.test.ts");
     f.write("src/ñandú.ts", "export const n = 1;\n");
-    f.commit("rename and non-ASCII");
-    const [b00] = f.run().out.touched;
+    f.write("test/zz.ts", "export const after = 1;\n");
+    f.commit("rename and non-ASCII, and a path sorted after the rename");
+    const r = f.run();
+    const [b00] = r.out.touched;
     assert.equal(b00.package, "B00");
     assert.deepEqual(b00.reopen.citedTests, ["test/a.test.ts"]);
     assert.ok(b00.files.includes("src/ñandú.ts"), `files: ${b00.files.join(", ")}`);
+    // ADV-4: the new name and the path after the rename are seen too (neither has an owner in the fixture, so the run fails)
+    assert.deepEqual([r.code, r.out.unattributed], [1, ["test/z.test.ts", "test/zz.ts"]]);
   } finally {
     f.done();
   }
