@@ -439,7 +439,23 @@ export class ReadmeHeaderError extends Error {
  * markers without changing this constant in the same commit, where review sees it. To edit the README prose on purpose, change
  * README_OUTSIDE_TEXT with it.
  */
-export const README_OUTSIDE_TEXT = "# Package acceptance records\n\nAmendment A4 of the authority (edition KAURO-2026.09-R2, `C:\\Projects\\Kauro\\authority\\r2\\amendments\\A4_OPERATING_MODEL.md`)\ndefines package acceptance: (a) the case map gives every registry case its evidence class and test; (b) the full verify is\ngreen on the exact commit on Windows, Linux and in CI; (c) an independent reviewer from another model provider (Codex) reviews\nthat exact commit against the registry cases and answers ACCEPT or ACCEPT_WITH_MINOR, the re-check covering only its findings;\n(d) the commit is on `main`. Formal acceptance follows `registry/program.json` dependencies: a package whose conditions hold\nbut whose dependencies are not yet accepted is **REVIEW_ACCEPTED**.\n\nRaw reviewer answers are in `reviews/` (`<package>-round<n>-<commit>.json`, schema `tools/review/review-schema.json` on the\noperator host).\n\n\n";
+export const README_OUTSIDE_LINES = [
+  "# Package acceptance records",
+  "",
+  "Amendment A4 of the authority (edition KAURO-2026.09-R2, `C:\\Projects\\Kauro\\authority\\r2\\amendments\\A4_OPERATING_MODEL.md`)",
+  "defines package acceptance: (a) the case map gives every registry case its evidence class and test; (b) the full verify is",
+  "green on the exact commit on Windows, Linux and in CI; (c) an independent reviewer from another model provider (Codex) reviews",
+  "that exact commit against the registry cases and answers ACCEPT or ACCEPT_WITH_MINOR, the re-check covering only its findings;",
+  "(d) the commit is on `main`. Formal acceptance follows `registry/program.json` dependencies: a package whose conditions hold",
+  "but whose dependencies are not yet accepted is **REVIEW_ACCEPTED**.",
+  "",
+  "Raw reviewer answers are in `reviews/` (`<package>-round<n>-<commit>.json`, schema `tools/review/review-schema.json` on the",
+  "operator host).",
+  "",
+  "",
+  "",
+];
+export const README_OUTSIDE_TEXT = README_OUTSIDE_LINES.join("\n");
 /** The README text with the marker region (both markers and what is between) removed and LF line endings; null without markers. */
 export function readmeOutside(text) {
   const [start, end] = README_MARKERS;

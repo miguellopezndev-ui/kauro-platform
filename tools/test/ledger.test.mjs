@@ -18,6 +18,8 @@ import {
   convertStatusBlocks,
   convertTableMap,
   ledgerFiles,
+  README_OUTSIDE_LINES,
+  README_OUTSIDE_TEXT,
   ledgerOfRepo,
   loadRegistry,
   loadReviews,
@@ -673,4 +675,10 @@ test("ADV-6 (r5, control): a review naming a commit that does not exist, B06-rou
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
+});
+
+test("ADV-10: the pinned README lines (one array element per line) hold no package-id status table — a lint on reviewed text, so a hand table is never re-pinned by accident", () => {
+  assert.ok(README_OUTSIDE_LINES.length > 5 && README_OUTSIDE_LINES.join("\n") === README_OUTSIDE_TEXT);
+  const tableLines = README_OUTSIDE_LINES.filter((l) => l.trimStart().startsWith("|") && /\bB(?:0?\d|1\d|2[01])\b/i.test(l));
+  assert.deepEqual(tableLines, [], "the pin must not contain a package status table line");
 });
