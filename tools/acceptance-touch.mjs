@@ -18,7 +18,9 @@
 //     non-doc file to a package or to the shared list; shared files touch every accepted package).
 // Its cases are touched when a registry record of one of them is added, changed or deleted, when one is added to, removed from or
 // moved between packages (old and new owner), or when a case-map row for one of them changes (its own sidecar's or another
-// package's inherited row; the acceptance bookkeeping `reviewId` and `commit` excepted). Paths are read with
+// package's inherited row; the acceptance bookkeeping `reviewId` and `commit` excepted only when they record a review the range
+// adds), or when its own sidecar's obligations change. A review record of the package edited or deleted after it was added (the
+// accepting round included; an external package's too) touches and reopens it; only a newly added round file is inert. Paths are read with
 // `--name-status -z --no-renames` and `core.quotepath=off`: a rename is its deletion and its addition, a non-ASCII path is
 // itself. A changed cited test (either name of a rename) or a changed own row is reported apart: under the draft A7 §3 (b)
 // only those reopen the package. A changed non-doc file that no package and no shared glob owns fails the run (exit 1); an
@@ -87,18 +89,20 @@ export function packageGlobs(pkg, sidecar, extra = {}) {
 }
 
 /** The touched accepted packages, from the changed files and the changed case rows of each package's own range. */
-export function touched({ accepted, changedFiles, changedCases, changedOwnRows, globsOf, shared = [], controlOf = () => [] }) {
+export function touched({ accepted, changedFiles, changedCases, changedOwnRows, globsOf, shared = [], controlOf = () => [], reviewsOf = () => [] }) {
   const out = [];
   const sharedRes = shared.map(globToRegExp);
   for (const p of accepted) {
     const { globs, tests } = globsOf(p.package);
     const res = [...globs.map(globToRegExp), ...sharedRes];
     // a control file (the attribution or a pin) that changed what the package is counts as one of its files
-    const files = [...new Set([...changedFiles.filter((f) => res.some((r) => r.test(f))), ...controlOf(p.package)])].sort();
+    // an edited or deleted review record of the package (ADV-1 r4) is one of its files too, and reopens it
+    const reviews = [...new Set(reviewsOf(p.package))].sort();
+    const files = [...new Set([...changedFiles.filter((f) => res.some((r) => r.test(f))), ...controlOf(p.package), ...reviews])].sort();
     const citedTests = changedFiles.filter((f) => tests.includes(f));
     const cases = [...new Set(changedCases.filter((c) => c.package === p.package).map((c) => c.case))].sort();
     const ownRows = [...new Set(changedOwnRows.filter((c) => c.package === p.package).map((c) => c.case))].sort();
-    if (files.length || cases.length) out.push({ package: p.package, status: p.status, acceptedSubject: p.acceptedSubject, files, cases, reopen: { citedTests, ownRows } });
+    if (files.length || cases.length) out.push({ package: p.package, status: p.status, acceptedSubject: p.acceptedSubject, files, cases, reopen: { citedTests, ownRows, reviews } });
   }
   return out;
 }
@@ -129,6 +133,29 @@ export function changedPaths(root, from, to, ...pathspec) {
   return [...new Set(out)];
 }
 
+/**
+ * The review records a range of commits adds, and the ones it edits or deletes: every commit of `from..to` (a merge by its
+ * first-parent diff), so a record added and then edited inside the range is edited, not added. Only an added record is inert
+ * (it is an acceptance itself); an edit or a deletion of one that existed is a change of the acceptance it records (ADV-1 r4).
+ */
+export function reviewChanges(root, from, to) {
+  const tokens = git(root, ["log", "--no-renames", "--diff-merges=first-parent", "--format=", "--name-status", "-z", `${from}..${to}`, "--", REVIEW_DIR]).split("\0");
+  const added = new Set();
+  const edited = new Set();
+  for (let i = 0; i < tokens.length; i++) {
+    const status = tokens[i].trim();
+    if (!/^[ACDMTUXB]\d*$/.test(status)) continue;
+    const path = tokens[++i];
+    (status === "A" ? added : edited).add(path);
+  }
+  return { added, edited };
+}
+/** The package and commit a review record's file name binds (`<package>-round<n>-<commit>.json`), or null. */
+const reviewName = (path) => {
+  const m = /(?:^|\/)((B\d\d)-round\d+-([0-9a-f]{7,40}))\.json$/.exec(path);
+  return m ? { id: m[1], package: m[2], commit: m[3] } : null;
+};
+
 /** The rows of a package's case map at a revision: its sidecar, or the conversion of its .md map when it had no sidecar yet. */
 function rowsAt(root, rev, sidecarPath, registry) {
   const json = show(root, rev, sidecarPath);
@@ -139,13 +166,25 @@ function rowsAt(root, rev, sidecarPath, registry) {
 }
 /** A row without the acceptance bookkeeping: recording the review that accepted it is not a change of the row. */
 const rowKey = ({ reviewId: _r, commit: _c, ...rest }) => JSON.stringify(rest);
+/**
+ * Whether two versions of a row differ by more than the recording of a review the range adds: the bookkeeping may only move to a
+ * review record added in the range, with that record's commit (ADV-1 r4 sweep); any other change of reviewId or commit is a change.
+ */
+const rowChanged = (a, b, addedIds) => {
+  if (a === undefined || b === undefined) return a !== b;
+  if (rowKey(a) !== rowKey(b)) return true;
+  if (a.reviewId === b.reviewId && a.commit === b.commit) return false;
+  const r = b.reviewId ? reviewName(`${b.reviewId}.json`) : null;
+  return !(r && addedIds.has(r.id) && typeof b.commit === "string" && (b.commit.startsWith(r.commit) || r.commit.startsWith(b.commit)));
+};
 
 /**
  * The registry cases a range touches — a record added, changed or deleted, a case added to, removed from or moved between
  * packages (old and new owner) — and the case-map rows that differ, by their owner (an own row when the sidecar is the owner's).
  * A registry file that cannot be read at either revision is an error.
  */
-export function changedCaseRows(root, from, to, registry = loadRegistry(root)) {
+export function changedCaseRows(root, from, to, registry = loadRegistry(root), addedReviews = reviewChanges(root, from, to).added) {
+  const addedIds = new Set([...addedReviews].map((p) => reviewName(p)?.id).filter(Boolean));
   const changedCases = [];
   const changedOwnRows = [];
   const reg = (rev, f) => {
@@ -168,12 +207,12 @@ export function changedCaseRows(root, from, to, registry = loadRegistry(root)) {
   const sidecars = new Set(changedPaths(root, from, to, SIDECAR_DIR).filter((p) => /\/B\d\d\.json$/.test(p)));
   for (const md of changedPaths(root, from, to, "docs/design").filter((p) => /\/B\d\d-case-map\.md$/.test(p))) sidecars.add(`${SIDECAR_DIR}/${/(B\d\d)-case-map/.exec(md)[1]}.json`);
   for (const path of sidecars) {
-    const index = (rows) => new Map(rows.map((r) => [r.case, rowKey(r)]));
+    const index = (rows) => new Map(rows.map((r) => [r.case, r]));
     const a = index(rowsAt(root, from, path, registry));
     const b = index(rowsAt(root, to, path, registry));
     const sidecarPkg = /(B\d\d)\.json$/.exec(path)[1];
     for (const id of new Set([...a.keys(), ...b.keys()])) {
-      if (a.get(id) === b.get(id)) continue;
+      if (!rowChanged(a.get(id), b.get(id), addedIds)) continue;
       touch(id, `row in ${path}`);
       for (const pkg of new Set([owner.from.get(id), owner.to.get(id)])) if (pkg === sidecarPkg) changedOwnRows.push({ case: id, package: pkg });
     }
@@ -219,6 +258,20 @@ export function main(argv, root = ROOT, log = console.log) {
       return r && /^ACCEPT/.test(r.verdict) ? { ...p, acceptedSubject: { commit: r.commit, reviewId: r.id } } : null;
     })
     .filter(Boolean);
+  // a review record edited or deleted after it was added (ADV-1 r4): when its first version accepted, its package is scanned from
+  // the commit that record names, even when the edit (a verdict flipped, the record deleted) makes it stop computing as accepted
+  const everEdited = git(root, ["log", "--no-renames", "--diff-merges=first-parent", "--diff-filter=MDT", "--format=", "--name-only", "-z", target, "--", REVIEW_DIR]).split("\0").map((t) => t.trim()).filter(Boolean);
+  for (const path of [...new Set(everEdited)].sort()) {
+    const name = reviewName(path);
+    if (!name || accepted.some((p) => p.package === name.package)) continue;
+    const firstAdd = git(root, ["log", "--diff-filter=A", "--format=%H", target, "--", path]).trim().split("\n").filter(Boolean).at(-1);
+    const text = firstAdd ? fileAt(root, firstAdd, path) : null;
+    if (text !== null && /^ACCEPT/.test(JSON.parse(text).verdict ?? "")) {
+      const p = ledger.packages.find((x) => x.package === name.package);
+      accepted.push({ ...(p ?? { package: name.package }), acceptedSubject: { commit: name.commit, reviewId: name.id } });
+    }
+  }
+  accepted.sort((a, b) => a.package.localeCompare(b.package));
   const externalOf = new Map(inputs.flatMap((i) => i.packages.map((p) => [p, i])));
   const globsTarget = parsePackageGlobs(fileAt(root, target, PACKAGE_GLOBS), ` at ${target.slice(0, 12)}`);
   // the attribution at a range's start: the file at that commit, or its first version when the package was accepted before it
@@ -266,7 +319,8 @@ export function main(argv, root = ROOT, log = console.log) {
   for (const [from, pkgs] of byFrom) {
     const files = changedPaths(root, from, target);
     files.forEach((f) => allChanged.add(f));
-    const { changedCases, changedOwnRows } = changedCaseRows(root, from, target, registry);
+    const reviews = reviewChanges(root, from, target);
+    const { changedCases, changedOwnRows } = changedCaseRows(root, from, target, registry, reviews.added);
     // every attribution input read at both ends of the range: a package owns what it owned at its subject and what it owns now
     const before = globsFrom(from);
     const globsOf = (pkg) => {
@@ -281,13 +335,20 @@ export function main(argv, root = ROOT, log = console.log) {
       return JSON.stringify(a ?? null) === JSON.stringify(b ?? null) ? [] : [...(a?.packages ?? []), ...(b?.packages ?? [])];
     });
     const snapshots = files.filter((f) => f.startsWith(`${EXTERNAL_DIR}/`)).map((f) => ({ f, packages: [...snapshotPackages(from, f), ...snapshotPackages(target, f)] }));
+    // the package's own sidecar beyond its rows: an inherited obligation entered, changed or released (ADV-1 r4 sweep)
+    const obligationsAt = (rev, pkg) => {
+      const text = fileAt(root, rev, `${SIDECAR_DIR}/${pkg}.json`);
+      return JSON.stringify(text === null ? [] : JSON.parse(text).obligations ?? []);
+    };
     const controlOf = (pkg) => [
+      ...(obligationsAt(from, pkg) !== obligationsAt(target, pkg) ? [`${SIDECAR_DIR}/${pkg}.json`] : []),
       ...(!sameSet(before.packages[pkg], globsTarget.packages[pkg]) || !sameSet(before.shared, globsTarget.shared) ? [PACKAGE_GLOBS] : []),
       ...(changedPins.includes(pkg) ? [INPUTS] : []),
       ...snapshots.filter((s) => s.packages.includes(pkg)).map((s) => s.f),
     ];
     const shared = [...new Set([...before.shared, ...globsTarget.shared])];
-    result.push(...touched({ accepted: pkgs, changedFiles: files, changedCases, changedOwnRows, globsOf, shared, controlOf }).map((r) => ({ ...r, range: `${from.slice(0, 7)}..${target.slice(0, 7)}`, ...(externalOf.has(r.package) ? { subjectRepository: externalOf.get(r.package).repository } : {}) })));
+    const reviewsOf = (pkg) => [...reviews.edited].filter((f) => reviewName(f)?.package === pkg);
+    result.push(...touched({ accepted: pkgs, changedFiles: files, changedCases, changedOwnRows, globsOf, shared, controlOf, reviewsOf }).map((r) => ({ ...r, range: `${from.slice(0, 7)}..${target.slice(0, 7)}`, ...(externalOf.has(r.package) ? { subjectRepository: externalOf.get(r.package).repository } : {}) })));
   }
   result.sort((a, b) => a.package.localeCompare(b.package));
   // ownership at the target: a changed non-doc file that the target's attribution gives to nobody fails the run
@@ -301,7 +362,7 @@ export function main(argv, root = ROOT, log = console.log) {
       log(`\n## ${r.package} (${r.status}; accepted ${r.acceptedSubject.commit} · ${r.acceptedSubject.reviewId}; range ${r.range})`);
       log(`files (${r.files.length}):${r.files.slice(0, 50).map((f) => `\n- ${f}`).join("")}${r.files.length > 50 ? `\n- … ${r.files.length - 50} more` : ""}`);
       log(`cases (${r.cases.length}): ${r.cases.join(", ") || "none"}`);
-      log(`reopens it (cited test changed or own row changed): ${[...r.reopen.citedTests, ...r.reopen.ownRows].join(", ") || "none"}`);
+      log(`reopens it (cited test, own row or review record changed): ${[...r.reopen.citedTests, ...r.reopen.ownRows, ...r.reopen.reviews].join(", ") || "none"}`);
     }
     if (orphans.length) log(`\nchanged files owned by no package and not shared (${PACKAGE_GLOBS}):${orphans.map((f) => `\n- ${f}`).join("")}`);
   }

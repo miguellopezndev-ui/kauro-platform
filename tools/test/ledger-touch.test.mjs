@@ -43,8 +43,8 @@ test("touched: a file in a package's globs or a changed case touches it; a cited
     globsOf,
   });
   assert.deepEqual(result.map((r) => [r.package, r.files, r.cases, r.reopen]), [
-    ["B08", ["apps/control/src/x.ts", "apps/control/test/a.test.ts"], [], { citedTests: ["apps/control/test/a.test.ts"], ownRows: [] }],
-    ["B09", [], ["S057"], { citedTests: [], ownRows: ["S057"] }],
+    ["B08", ["apps/control/src/x.ts", "apps/control/test/a.test.ts"], [], { citedTests: ["apps/control/test/a.test.ts"], ownRows: [], reviews: [] }],
+    ["B09", [], ["S057"], { citedTests: [], ownRows: ["S057"], reviews: [] }],
   ]);
 });
 
@@ -267,7 +267,16 @@ const FAMILY = [
   { path: "packages/contracts/registry/gates.json", why: "an unowned non-doc file fails the run", change: (f) => f.write(`${f.reg}/gates.json`, [{ id: "G-X", owner: "21", package: "B00", caseIds: ["S001", "S002", "S003"], evidenceRule: "r2" }]), code: 1, touched: [] },
   { path: "packages/contracts/registry/PROVENANCE.json", why: "an unowned non-doc file fails the run", change: (f) => f.write(`${f.reg}/PROVENANCE.json`, { files: {}, note: "x" }), code: 1, touched: [] },
   { path: "infra/main.tf", why: "a new non-doc file no glob owns fails the run", change: (f) => f.write("infra/main.tf", "# x\n"), code: 1, touched: [] },
-  { path: "docs/acceptance/reviews/", why: "INERT: a review is the acceptance itself (it moves the subject, it is not a change after it)", change: (f) => f.write(`docs/acceptance/reviews/${f.reviewId}.json`, { verdict: "ACCEPT", note: "x", cases: ["S001", "S002"].map((id) => ({ id, claimed_status: "EXECUTED_LOCAL", agree: true })) }), code: 0, touched: [] },
+  { path: "docs/acceptance/reviews/", why: "INERT only when ADDED: a new round file is an acceptance itself (it moves the subject, it is not a change after it)", change: (f) => f.write(`docs/acceptance/reviews/B00-round2-${f.X.slice(0, 7)}.json`, { verdict: "ACCEPT", note: "x", cases: ["S001", "S002"].map((id) => ({ id, claimed_status: "EXECUTED_LOCAL", agree: true })) }), code: 0, touched: [] },
+  { path: "docs/acceptance/reviews/", why: "ADV-1 (r4): the accepting review edited in place (a case's claimed class)", change: (f) => f.write(`docs/acceptance/reviews/${f.reviewId}.json`, { verdict: "ACCEPT", cases: [{ id: "S001", claimed_status: "EXECUTED_PROVIDER", agree: true }, { id: "S002", claimed_status: "EXECUTED_LOCAL", agree: true }] }), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/reviews/", why: "ADV-1 (r4): the accepting review's verdict flipped in place (the package stops computing as accepted; it is still listed)", change: (f) => f.write(`docs/acceptance/reviews/${f.reviewId}.json`, { verdict: "REJECT", cases: ["S001", "S002"].map((id) => ({ id, claimed_status: "EXECUTED_LOCAL", agree: true })) }), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/reviews/", why: "ADV-1 (r4): the accepting review deleted", change: (f) => f.git("rm", "-q", `docs/acceptance/reviews/${f.reviewId}.json`), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/reviews/", why: "ADV-1 (r4): the external package's accepting review edited in place", change: (f) => f.write(`docs/acceptance/reviews/B01-round1-${PIN.slice(0, 7)}.json`, { verdict: "ACCEPT", cases: [{ id: "S003", claimed_status: "EXECUTED_PROVIDER", agree: true }] }), code: 0, touched: ["B01"] },
+  { path: "docs/acceptance/reviews/", why: "ADV-1 (r4): the external package's accepting review deleted", change: (f) => f.git("rm", "-q", `docs/acceptance/reviews/B01-round1-${PIN.slice(0, 7)}.json`), code: 0, touched: ["B01"] },
+  { path: "docs/acceptance/case-maps/B00.json", why: "ADV-1 (r4) sweep: a row's review bookkeeping pointed at a review the range does not add", change: (f) => f.write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: f.ownRows({ reviewId: "B00-round1-0000000" }) }), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/case-maps/B00.json", why: "ADV-1 (r4) sweep: a row's review commit changed alone", change: (f) => f.write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: f.ownRows({ commit: "1234567" }) }), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/case-maps/B00.json", why: "ADV-1 (r4) sweep: an inherited obligation entered in the package's own sidecar", change: (f) => f.write("docs/acceptance/case-maps/B00.json", { package: "B00", obligations: [{ from: "B01", case: "S003", status: "NOT_APPLICABLE", ownerSigned: true }], rows: f.ownRows() }), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/README.md", why: "INERT: the README is a claim the ledger recomputes; a table that is not the generated one is a ledger violation (README_TABLE_NOT_GENERATED, tools/test/ledger.test.mjs)", change: (f) => f.write("docs/acceptance/README.md", "| Package | Status |\n|---|---|\n| B00 zero | ACCEPTED |\n"), code: 0, touched: [] },
   { path: "docs/other.md", why: "INERT: a document of no package", change: (f) => f.write("docs/other.md", "x\n"), code: 0, touched: [] },
 ];
 
@@ -378,5 +387,54 @@ test("ADV-7: a file at a revision is null only when the revision's tree has no s
     assert.throws(() => changedCaseRows(f.dir, f.X, "HEAD", loadRegistry(f.dir)), "a corrupt sidecar is an error, not a deleted map");
   } finally {
     f.done();
+  }
+});
+
+test("ADV-1 (r4): a review record that exists at the start of a package's range and is edited in place or deleted touches and reopens that package (the accepting round, an older round, an external package's review); only a newly added round file is inert", () => {
+  const path = (f) => `docs/acceptance/reviews/${f.reviewId}.json`;
+  const local = ["S001", "S002"].map((id) => ({ id, claimed_status: "EXECUTED_LOCAL", agree: true }));
+  const only = (r) => {
+    assert.equal(r.code, 0, JSON.stringify(r.out));
+    assert.equal(r.out.touched.length, 1, JSON.stringify(r.out.touched));
+    const [t] = r.out.touched;
+    return [t.package, t.files, t.reopen.reviews];
+  };
+  const f = fixture();
+  try {
+    f.write(path(f), { verdict: "ACCEPT", cases: [{ ...local[0], claimed_status: "EXECUTED_PROVIDER" }, local[1]] });
+    f.commit("edit the accepting review in place");
+    assert.deepEqual(only(f.run()), ["B00", [path(f)], [path(f)]]);
+  } finally {
+    f.done();
+  }
+  const g = fixture();
+  try {
+    g.git("rm", "-q", path(g));
+    g.commit("delete the accepting review");
+    assert.deepEqual(only(g.run()), ["B00", [path(g)], [path(g)]]);
+  } finally {
+    g.done();
+  }
+  const h = fixture();
+  try {
+    const round2 = `docs/acceptance/reviews/B00-round2-${h.X.slice(0, 7)}.json`;
+    h.write(round2, { verdict: "ACCEPT", cases: local });
+    h.commit("a new round file: inert");
+    assert.deepEqual(h.run().out.touched, [], "only a newly added round file is inert");
+    h.write(path(h), { verdict: "ACCEPT", cases: [{ ...local[0], agree: false }, local[1]] });
+    h.commit("an older round's agreement flipped in place");
+    assert.deepEqual(only(h.run()), ["B00", [path(h)], [path(h)]]);
+  } finally {
+    h.done();
+  }
+  const e = fixture({ external: true });
+  try {
+    const review = `docs/acceptance/reviews/B01-round1-${PIN.slice(0, 7)}.json`;
+    e.write(review, { verdict: "ACCEPT", cases: [{ id: "S003", claimed_status: "EXECUTED_PROVIDER", agree: true }] });
+    e.commit("edit the external package's review in place");
+    const r = e.run();
+    assert.deepEqual(r.out.touched.map((t) => [t.package, t.files, t.reopen.reviews]), [["B01", [review], [review]]]);
+  } finally {
+    e.done();
   }
 });
