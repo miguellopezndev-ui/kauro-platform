@@ -410,7 +410,7 @@ test("R35: shutdown drains — the in-flight command is answered with Connection
     assert.equal(answered.headers.get("connection"), "close", "and closes its keep-alive connection");
     await answered.arrayBuffer();
     assert.deepEqual(await within(shutdown, 15_000, "shutdown"), { kind: "CLOSED" }, "the drain finished well inside the deadline");
-    assert.equal(api.database.pool.raw.ended, true);
+    assert.equal(api.database.pool.ended, true);
     await assert.rejects(fetch(`${api.address}/livez`), "no new connection is accepted");
   } finally {
     for (const socket of partial) socket.destroy();
@@ -441,7 +441,7 @@ test("R35: the shutdown deadline is kept — a command blocked past it has its c
     await oracle.query("ROLLBACK");
     locked = false;
     if (outcome.kind === "DEADLINE_EXCEEDED") await within(outcome.closing, 15_000, "the close after the deadline");
-    assert.equal(api.database.pool.raw.ended, true);
+    assert.equal(api.database.pool.ended, true);
   } finally {
     if (locked) await oracle.query("ROLLBACK");
     await oracle.end();

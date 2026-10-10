@@ -46,10 +46,10 @@ test("I-2: the pool's ssl options carry rejectUnauthorized true and the CA bytes
   const without = createPool(base);
   rmSync(dir, { recursive: true, force: true });
   try {
-    const ssl = (withTls.raw as unknown as { options: { ssl?: { ca?: string; rejectUnauthorized?: boolean } } }).options.ssl;
+    const ssl = withTls.connectionSecurity.ssl;
     assert.equal(ssl?.rejectUnauthorized, true);
     assert.equal(ssl?.ca, ca);
-    assert.equal((without.raw as unknown as { options: { ssl?: unknown } }).options.ssl, undefined);
+    assert.equal(without.connectionSecurity.ssl, undefined);
   } finally {
     await withTls.end();
     await without.end();

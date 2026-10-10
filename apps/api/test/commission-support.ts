@@ -564,7 +564,7 @@ export interface CaptureOptions {
  * before the order's own creation (also the database clock), which the domain requires too (providerTimePlausible).
  */
 async function defaultProviderCompletedAt(cw: CommissionWorld, orderId: PaymentOrderId): Promise<UtcInstant> {
-  const behind = Date.parse(await serverNow(cw.h.paymentPool.raw)) - 1000;
+  const behind = Date.parse(await serverNow(cw.h.paymentPool)) - 1000;
   const order = await cw.h.oracle.query<{ created_at: Date }>("SELECT created_at FROM kauro.payment_orders WHERE order_id = $1", [orderId]);
   const created = order.rows[0]?.created_at.getTime() ?? behind;
   return toUtcInstant(Math.max(behind, created));

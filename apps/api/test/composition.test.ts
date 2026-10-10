@@ -180,7 +180,7 @@ test("bootstrap on a real cluster: migrations on start as the owner (idempotent)
     }
     await api.close();
     closed = true;
-    assert.equal(api.database.pool.raw.ended, true, "close() ends the pool");
+    assert.equal(api.database.pool.ended, true, "close() ends the pool");
     await assert.rejects(fetch(`${api.address}/api/v1/agencies`, { method: "POST" }), "the socket is closed");
   } finally {
     if (!closed) await api.close();

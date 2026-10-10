@@ -19,7 +19,7 @@
  * classification — pool name, the connection's state, error class, SQLSTATE or errno code, never the message or a connection
  * parameter — to the configured sink, by default one line on stderr.
  */
-import { Client, Pool, type PoolClient } from "pg";
+import { Client, Pool, type PoolClient, type QueryResult, type QueryResultRow } from "pg";
 import { ConnectionSecurityError, connectionSecurityOf, sslOptionsOf, type ConnectionSecurityInput } from "./tls.js";
 
 // The driver's error class, for the SQLSTATE classification of sql.ts: this module is the only one that imports the driver (DB-TLS-R4 allowlist)
@@ -179,6 +179,8 @@ export class KauroPool {
   readonly #verified = new WeakMap<PoolClient, VerifiedConnection>();
   readonly #sink: PoolErrorSink;
   readonly config: PoolConfig;
+  /** What the driver was given about security, copied at construction (the TLS options, whether a password was given; never the password). */
+  readonly connectionSecurity: { readonly ssl?: { readonly ca: string; readonly rejectUnauthorized: true }; readonly passwordGiven: boolean };
 
   constructor(config: PoolConfig, token: typeof CREATE) {
     if (token !== CREATE) throw new TypeError("KauroPool is constructed by createPool only (DB-TLS-R3)");
@@ -187,6 +189,7 @@ export class KauroPool {
     }
     // DB-TLS-R4: the security rule is applied here, before the driver sees the configuration (it reads the password and CA files)
     const secured = securedSettingsOf(config);
+    this.connectionSecurity = Object.freeze({ ...(secured.ssl === undefined ? {} : { ssl: Object.freeze({ ...secured.ssl }) }), passwordGiven: secured.password !== undefined });
     this.config = config;
     const idleTx = Math.max(1, Math.floor(config.idleInTransactionTimeoutMs ?? 30_000));
     this.#pool = new Pool({
@@ -209,12 +212,25 @@ export class KauroPool {
   }
 
   /**
-   * The underlying pg pool. Units of work go through `acquire`; the one production use of `raw` is the side connection that ends an abandoned
-   * unit's backend (endAbandonedBackend, ADV-8/ADV-13), which runs a signalling statement only and so needs no role verification. Otherwise
-   * tests and diagnostics only: `raw` skips acquire's verification and the in-use error listener.
+   * DB-TLS gap 1 (6de1436): the driver pool is never handed out (no `raw`): its Client class and its options (ssl, host, password) would let
+   * a holder build or re-point a connection that skipped connectionSecurityOf. What callers need is narrow:
+   *
+   * A pooled connection WITHOUT the role verification of `acquire` and without its in-use error listener. Its one production use is the side
+   * connection that ends an abandoned unit's backend (endAbandonedBackend, ADV-8/ADV-13), which runs a signalling statement only; otherwise
+   * test fixtures and diagnostics.
    */
-  get raw(): Pool {
-    return this.#pool;
+  connectUnverified(): Promise<PoolClient> {
+    return this.#pool.connect();
+  }
+
+  /** One statement on a pooled connection, without role verification: test fixtures and diagnostics only (units of work use `acquire`). */
+  query<R extends QueryResultRow = QueryResultRow>(text: string, values?: ReadonlyArray<unknown>): Promise<QueryResult<R>> {
+    return this.#pool.query<R>(text, values === undefined ? undefined : [...values]);
+  }
+
+  /** Whether `end` was called. */
+  get ended(): boolean {
+    return this.#pool.ended;
   }
 
   /**

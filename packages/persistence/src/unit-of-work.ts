@@ -531,13 +531,13 @@ export const END_BACKEND_WAIT_MS = 1_000;
  * Best effort: the backend ends by itself at the latest when its statement does, so a failure here is never the unit's failure.
  */
 export async function endAbandonedBackend(pool: KauroPool, backend: BackendIdentity): Promise<void> {
-  // a pool that does not expose its pg pool does not own the connections it hands out (a test harness routes its own connection through a
+  // a pool that cannot open a side connection does not own the connections it hands out (a test harness routes its own connection through a
   // stand-in pool): the unit never ends a backend it does not own
-  const raw = (pool as { readonly raw?: KauroPool["raw"] }).raw;
-  if (raw === undefined) return;
+  const connectUnverified = (pool as { readonly connectUnverified?: KauroPool["connectUnverified"] }).connectUnverified;
+  if (typeof connectUnverified !== "function") return;
   let expired = false;
   const ended = Promise.resolve()
-    .then(() => raw.connect())
+    .then(() => connectUnverified.call(pool))
     .then(
       async (side) => {
         if (expired) {

@@ -235,7 +235,7 @@ export async function start(): Promise<Harness> {
 
   /** Raw statements as the request-handler role under a tenant context, for aggregates whose transitions have no adapter yet. */
   const asTenant = async <T>(agencyId: AgencyId, userId: UserId, fn: (c: PoolClient, events: PgEventPublisher) => Promise<T>): Promise<T> => {
-    const c = await appPool.raw.connect();
+    const c = await appPool.connectUnverified();
     let destroy: Error | undefined;
     try {
       await c.query("BEGIN");
@@ -257,7 +257,7 @@ export async function start(): Promise<Harness> {
 
   /** Raw statements as the control plane bound to one agency (design B07 D-CTRL-1), for the source-lifecycle fixture. */
   const asControlFor = async <T>(agencyId: AgencyId, fn: (c: PoolClient) => Promise<T>): Promise<T> => {
-    const c = await controlPool.raw.connect();
+    const c = await controlPool.connectUnverified();
     let destroy: Error | undefined;
     try {
       await c.query("BEGIN");
@@ -361,7 +361,7 @@ export async function start(): Promise<Harness> {
 
     async recordStepUp(userId, options = {}) {
       const proofId = ids.next() as AssuranceProofId;
-      const issuedAt = options.issuedAt ?? toUtcInstant(Date.parse(await serverNow(assurancePool.raw)) - 1000);
+      const issuedAt = options.issuedAt ?? toUtcInstant(Date.parse(await serverNow(assurancePool)) - 1000);
       const expiresAt = toUtcInstant(Date.parse(issuedAt) + 15 * 60_000);
       await proofs.record({ proofId, userId, kind: "STEP_UP", method: options.method ?? "TOTP", issuedAt, expiresAt }, correlation(), clock.now());
       return proofId;

@@ -455,7 +455,7 @@ test("W2 boundary: web_sessions belongs to the authentication boundary — the r
   const other = await id.signIn(w.operator);
   // D-AUTH-1a (PV1R-07 r4, migration 0047): the request-handler role may lock and read the liveness columns of the one session its own
   // transaction presents for the identity it binds, and nothing else; it never writes a session.
-  const app = await w.h.appPool.raw.connect();
+  const app = await w.h.appPool.connectUnverified();
   try {
     assert.equal((await app.query("SELECT count(*)::int AS n FROM kauro.web_sessions")).rows[0].n, 0, "request role: no presented secret, no row");
     await assert.rejects(app.query("SELECT session_id FROM kauro.web_sessions"), /permission denied/);
@@ -478,7 +478,7 @@ test("W2 boundary: web_sessions belongs to the authentication boundary — the r
   } finally {
     app.release();
   }
-  const boundary = await w.h.assurancePool.raw.connect();
+  const boundary = await w.h.assurancePool.connectUnverified();
   try {
     await boundary.query("BEGIN");
     assert.equal((await boundary.query("SELECT count(*)::int AS n FROM kauro.web_sessions")).rows[0].n, 0, "no presented secret, no row");

@@ -906,12 +906,12 @@ export async function world(options: WorldOptions = {}): Promise<World> {
 
     async stepUp(person, freshness = "FRESH") {
       // recorded by the step-up verifier (kauro_assurance), never by the request-handler role whose gate the proof satisfies
-      const issuedMs = Date.parse(await serverNow(h.assurancePool.raw)) - 1000 - (freshness === "FRESH" ? 0 : 20 * 60_000);
+      const issuedMs = Date.parse(await serverNow(h.assurancePool)) - 1000 - (freshness === "FRESH" ? 0 : 20 * 60_000);
       return h.recordStepUp(person.userId, { issuedAt: toUtcInstant(issuedMs) });
     },
 
     async asTenant(agency, fn) {
-      const c = await h.appPool.raw.connect();
+      const c = await h.appPool.connectUnverified();
       try {
         await c.query("BEGIN");
         await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [agency.agencyId, agency.ownerUserId]);

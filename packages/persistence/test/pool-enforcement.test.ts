@@ -11,6 +11,7 @@ import { after, before, test } from "node:test";
 import { ConnectionSecurityError, createPool as openPool, type KauroPool, type PoolConfig } from "../src/index.js";
 import * as index from "../src/index.js";
 import { migratorClientOf } from "../src/pool.js";
+import pg from "pg";
 
 let dir: string;
 let ca: string;
@@ -27,7 +28,7 @@ after(() => rmSync(dir, { recursive: true, force: true }));
 
 type Factory = (config: PoolConfig) => KauroPool;
 const refusedBy = (variable: string) => (e: unknown) => e instanceof ConnectionSecurityError && e.message.startsWith(`${variable}:`);
-const optionsOf = (pool: KauroPool) => (pool.raw as unknown as { options: { ssl?: { ca?: string; rejectUnauthorized?: boolean }; password?: string; host?: string } }).options;
+const optionsOf = (pool: KauroPool) => pool.connectionSecurity;
 
 /** The routes the adversary used to reach an unchecked createPool on d515f18, each taken at run time from the built package. */
 async function routes(): Promise<ReadonlyArray<readonly [string, Factory]>> {
@@ -77,8 +78,7 @@ test("DB-TLS-R4 / ADV-1: every route to createPool yields a verified-TLS pool wi
       const options = optionsOf(pool);
       assert.equal(options.ssl?.rejectUnauthorized, true, route);
       assert.equal(options.ssl?.ca, CA_TEXT, route);
-      assert.equal(options.password, "file-secret", route);
-      assert.equal(options.host, "db.example.test", route);
+      assert.equal(options.passwordGiven, true, route);
     } finally {
       await pool.end();
     }
@@ -89,7 +89,7 @@ test("DB-TLS-R4: LOCAL is unchanged: no CA needed, a plain password accepted, no
   const pool = openPool({ ...login, host: "127.0.0.1", environment: "LOCAL", password: "p", processEnv: { PGHOST: "127.0.0.1" } });
   try {
     assert.equal(optionsOf(pool).ssl, undefined);
-    assert.equal(optionsOf(pool).password, "p");
+    assert.equal(optionsOf(pool).passwordGiven, true);
   } finally {
     await pool.end();
   }
@@ -111,4 +111,33 @@ test("DB-TLS-R4: the migrator connection is built under the same rule (CA, DNS h
   assert.throws(() => migratorClientOf({ ...migrator } as never, timeouts), /names its environment/);
   const local = migratorClientOf({ ...migrator, environment: "LOCAL" }, timeouts);
   assert.equal((local as unknown as { connectionParameters: { ssl?: unknown } }).connectionParameters.ssl, false, "LOCAL unchanged: no TLS, no password required");
+});
+
+test("DB-TLS gap 1 (6de1436): the driver pool is unreachable from a KauroPool: no raw, no property holds a pg Pool, its Client class or its options; the security record is frozen", async () => {
+  const pool = openPool({ ...login, environment: "LIVE", tlsCaFile: ca, passwordFile: pw, processEnv: {} });
+  try {
+    const loose = pool as unknown as Record<string, unknown>;
+    assert.equal("raw" in pool, false, "no raw property at run time");
+    assert.throws(() => new ((loose["raw"] as { Client: new (c: object) => unknown }).Client)({ host: "10.0.0.1", ssl: false }), TypeError, "new pool.raw.Client(...) is impossible");
+    // every property reachable by name on the instance and its prototype chain, getters included
+    const names = new Set<string>();
+    for (let o: object | null = pool; o !== null && o !== Object.prototype; o = Object.getPrototypeOf(o)) for (const n of Object.getOwnPropertyNames(o)) names.add(n);
+    for (const name of names) {
+      const value = loose[name];
+      assert.ok(!(value instanceof pg.Pool), `${name} is not the driver pool`);
+      assert.ok(!(value instanceof pg.Client), `${name} is not a driver client`);
+      if (typeof value === "object" && value !== null) {
+        assert.equal(typeof (value as { Client?: unknown }).Client, "undefined", `${name} exposes no Client class`);
+        assert.equal((value as { options?: unknown }).options, undefined, `${name} exposes no driver options`);
+      }
+    }
+    // an options mutation through what the pool does expose is refused (strict mode) and changes nothing
+    const record = pool.connectionSecurity as { ssl?: { rejectUnauthorized: boolean } | undefined; passwordGiven: boolean };
+    assert.throws(() => { record.ssl = undefined; }, TypeError);
+    assert.throws(() => { record.ssl!.rejectUnauthorized = false; }, TypeError);
+    assert.equal(pool.connectionSecurity.ssl?.rejectUnauthorized, true);
+  } finally {
+    await pool.end();
+  }
+  assert.equal(pool.ended, true);
 });

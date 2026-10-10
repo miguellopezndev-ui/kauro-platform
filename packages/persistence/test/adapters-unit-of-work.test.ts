@@ -405,7 +405,7 @@ test("the explicit end is skipped when the side connection is not in hand within
   const statements: string[] = [];
   let releases = 0;
   const side = { query: async (sql: string) => void statements.push(sql), release: () => void releases++, on: () => side, off: () => side };
-  const stand = { raw: { connect: () => new Promise((resolve) => setTimeout(() => resolve(side), END_BACKEND_WAIT_MS + 500)) } };
+  const stand = { connectUnverified: () => new Promise((resolve) => setTimeout(() => resolve(side), END_BACKEND_WAIT_MS + 500)) };
   const began = Date.now();
   await endAbandonedBackend(stand as never, { pid: 1, startedAt: "1.0" });
   assert.ok(Date.now() - began < END_BACKEND_WAIT_MS + 400, "the answer does not wait for the side connection beyond the wait");

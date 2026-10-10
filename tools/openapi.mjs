@@ -719,7 +719,7 @@ export async function registeredRoutes() {
     await app.ready();
     const inventory = api.routeInventoryOf(app);
     await app.close();
-    if (pool.raw.totalCount !== 0 || boundaryPool.raw.totalCount !== 0) throw new Error("building the route inventory opened a database connection");
+    if (pool.totalCount !== 0 || boundaryPool.totalCount !== 0) throw new Error("building the route inventory opened a database connection");
     return inventory;
   } finally {
     await pool.end();
