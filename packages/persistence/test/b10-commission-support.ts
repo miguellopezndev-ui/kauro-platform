@@ -508,6 +508,7 @@ export async function prepareAllocation(w: World, ag: AgencyFixture, prospect: P
 
 /** CMD047's writes in the owner's transaction `c`: the allocation frozen and every claim it names ACCEPTED at that instant. */
 export async function freezeAndAccept(c: Client, w: World, ag: AgencyFixture, allocationId: string, claimIds: ReadonlyArray<string>): Promise<void> {
+  await c.query("SELECT set_config('kauro.finance_agency_id', $1, true)", [ag.agencyId]);
   await c.query("UPDATE kauro.attribution_allocations SET frozen_at = kauro.server_now(), frozen_by_user_id = $2, version = version + 1 WHERE allocation_id = $1", [allocationId, w.kora]);
   for (const claimId of claimIds) {
     await c.query(

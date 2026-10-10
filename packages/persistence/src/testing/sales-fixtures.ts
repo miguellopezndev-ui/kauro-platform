@@ -206,6 +206,7 @@ export async function recordFrozenAllocation(
         [allocationId, s.seller.sellerId, s.claimId, options.prospectId, s.seller.agreementId, s.seller.agreementVersion, s.shareBps],
       );
     }
+    await c.query("SELECT set_config('kauro.finance_agency_id', $1, true)", [options.agencyId]);
     await c.query("UPDATE kauro.attribution_allocations SET frozen_at = kauro.server_now(), frozen_by_user_id = $2, version = version + 1 WHERE allocation_id = $1", [allocationId, owner]);
     for (const s of options.shares) {
       await c.query(

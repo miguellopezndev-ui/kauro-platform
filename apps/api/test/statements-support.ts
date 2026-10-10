@@ -373,6 +373,7 @@ export async function acquired(sw: StatementsWorld, label: string, s: RecordedSe
        VALUES ($1, $2, $3, $4, $5, $6, 10000, $7, $8, 12, now())`,
       [allocationId, s.sellerId, claimId, prospect.prospectId, s.agreementId, s.agreementVersion, rates.firstBps, rates.repeatBps],
     );
+    await c.query("SELECT set_config('kauro.finance_agency_id', $1, true)", [selling.agency.agencyId]);
     await c.query("UPDATE kauro.attribution_allocations SET frozen_at = kauro.server_now(), frozen_by_user_id = $2, version = version + 1 WHERE allocation_id = $1", [allocationId, sw.owner.userId]);
     await c.query(
       `UPDATE kauro.attribution_claims SET state = 'ACCEPTED', agency_id = $2, allocation_id = $3, accepted_at = kauro.server_now(), expires_at = kauro.server_now() + interval '2160 hours', decided_by_user_id = $4, version = version + 1 WHERE claim_id = $1`,

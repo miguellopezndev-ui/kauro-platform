@@ -24,6 +24,7 @@ import type {
   ApprovalId,
   CaptureId,
   ClientId,
+  Clock,
   CommercialAuthorizationId,
   CorrelationId,
   EligibilitySnapshotId,
@@ -150,8 +151,8 @@ export interface CommissionWorld {
   stop(): Promise<void>;
 }
 
-export async function commissionWorld(): Promise<CommissionWorld> {
-  const pw = await paymentWorld();
+export async function commissionWorld(options: { readonly clock?: Clock } = {}): Promise<CommissionWorld> {
+  const pw = await paymentWorld(options.clock !== undefined ? { clock: options.clock } : {});
   const h = pw.w.h;
   const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database } as const;
   const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs() });
@@ -272,13 +273,30 @@ export interface Attribution {
  * ACTIVE sellers with every activation fact recorded by the owner, one prospect registered by the first, and each seller's SUBMITTED
  * claim on it (CMD045, CMD046 as their writes): what precedes an agency's first purchase.
  */
-export async function claimsOn(cw: CommissionWorld, label: string, sellers = 1, submittedAt?: string): Promise<Attribution> {
+export async function claimsOn(cw: CommissionWorld, label: string, sellers = 1, submittedAt?: string, oneClock = false): Promise<Attribution> {
+  if (oneClock) {
+    if (submittedAt !== undefined) throw new Error("fixture error: a one-clock claim has no submittedAt");
+    await asOperatorAt(cw.h, cw.kora, null, (c) => assertNoClockOffset(c, "claimsOn"));
+  }
   const recorded: RecordedSeller[] = [];
   for (let i = 0; i < sellers; i++) recorded.push(await recordActiveSeller(cw.h, { ownerUserId: cw.kora, subject: `${label}-seller-${i + 1}` }));
   const prospect = await recordProspect(cw.h, { by: recorded[0]!, domain: `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.example` });
   const claimIds: string[] = [];
   for (const seller of recorded) claimIds.push((await recordClaim(cw.h, { seller, prospectId: prospect.prospectId, ...(submittedAt !== undefined ? { at: submittedAt } : {}) })).claimId);
+  if (oneClock) await asOperatorAt(cw.h, cw.kora, null, (c) => assertNoClockOffset(c, "claimsOn"));
   return { sellers: recorded, prospectId: prospect.prospectId, claimIds };
+}
+
+/** A fixture error unless the unit of work runs on the one database clock: the test clock offset is NULL, '' or '0'. */
+async function assertNoClockOffset(client: Client, where: string): Promise<void> {
+  const row = await client.query<{ offset: string | null }>("SELECT current_setting($1, true) AS \"offset\"", [TEST_CLOCK_OFFSET_SETTING]);
+  const value = row.rows[0]?.offset ?? null;
+  if (value !== null && value !== "" && value !== "0") throw new Error(`fixture error: ${where} must run on the one clock but ${TEST_CLOCK_OFFSET_SETTING} is ${value}`);
+}
+
+/** claimsOn on the one clock: no submittedAt, and the unit of work asserts that no test clock offset is set. */
+export function oneClockClaims(cw: CommissionWorld, label: string, sellers = 1): Promise<Attribution> {
+  return claimsOn(cw, label, sellers, undefined, true);
 }
 
 /**
@@ -295,7 +313,7 @@ export async function acceptAttribution(cw: CommissionWorld, agencyId: string, a
   if (at !== null) {
     const due = await cw.h.oracle.query<{ claim_id: string; review_deadline_at: Date }>("SELECT claim_id, review_deadline_at FROM kauro.attribution_claims WHERE claim_id = ANY($1::uuid[])", [a.claimIds]);
     for (const row of due.rows) {
-      if (Date.parse(at) > row.review_deadline_at.getTime()) {
+      if (Date.parse(at) >= row.review_deadline_at.getTime()) {
         throw new Error(`fixture error: claim ${row.claim_id} is accepted at ${at}, past its review deadline ${row.review_deadline_at.toISOString()}; submit it at a test instant first (claimsOn(..., submittedAt) with acquisitionInstants(acceptedAt)) and create the first order at orderAt`);
       }
     }
@@ -314,6 +332,7 @@ export async function acceptAttribution(cw: CommissionWorld, agencyId: string, a
         [allocationId, seller.sellerId, a.claimIds[i], a.prospectId, seller.agreementId, seller.agreementVersion, shares[i]],
       );
     }
+    await c.query("SELECT set_config('kauro.finance_agency_id', $1, true)", [agencyId]);
     await c.query("UPDATE kauro.attribution_allocations SET frozen_at = kauro.server_now(), frozen_by_user_id = $2, version = version + 1 WHERE allocation_id = $1", [allocationId, cw.kora]);
     for (const claimId of a.claimIds) {
       await c.query(
@@ -486,11 +505,13 @@ export interface Checkout {
  * flight — then, unless `inFlight`, T3: the payment service records the provider's authenticated creation of the order at the provider
  * fake (nothing in flight, nothing captured).
  */
-export async function checkoutOf(cw: CommissionWorld, s: Selling, quote: QuoteFacts, options: { readonly inFlight?: boolean; readonly at?: string } = {}): Promise<Checkout> {
+export async function checkoutOf(cw: CommissionWorld, s: Selling, quote: QuoteFacts, options: { readonly inFlight?: boolean; readonly at?: string; readonly oneClock?: boolean } = {}): Promise<Checkout> {
   const { h } = cw;
+  if (options.oneClock === true && options.at !== undefined) throw new Error("fixture error: a one-clock checkout has no at");
   const route = cw.pw.route;
   const created = await h.commerce.run(h.tenant(s.agency.agencyId, s.agency.ownerUserId), async (uow) => {
     const now = options.at ?? clock.now();
+    if (options.oneClock === true) await assertNoClockOffset((uow as unknown as { readonly client: Client }).client, "checkoutOf");
     if (options.at !== undefined) await (uow as unknown as { readonly client: Client }).client.query(`SELECT set_config('${TEST_CLOCK_OFFSET_SETTING}', extract(epoch FROM ($1::timestamptz - transaction_timestamp()))::text, true)`, [options.at]);
     const reservation = await uow.journal.reserve(
       { environment: "LOCAL", actor: { kind: "USER", userId: s.agency.ownerUserId }, agencyId: s.agency.agencyId, operation: "CMD028", key: `fixture_${uow.ids.next().replace(/-/g, "")}` },
@@ -530,6 +551,11 @@ export async function checkoutOf(cw: CommissionWorld, s: Selling, quote: QuoteFa
   });
   const checkout: Checkout = { agencyId: s.agency.agencyId, quote, orderId: created.orderId, attemptId: created.attemptId, providerOrderId: "", ...(options.at !== undefined ? { at: options.at } : {}) };
   return options.inFlight === true ? checkout : providerCreated(cw, checkout);
+}
+
+/** checkoutOf on the one clock: no `at`, and its first unit of work asserts that no test clock offset is set. */
+export function oneClockCheckout(cw: CommissionWorld, s: Selling, quote: QuoteFacts): Promise<Checkout> {
+  return checkoutOf(cw, s, quote, { oneClock: true });
 }
 
 /** T3 of a checkout in flight: the provider fake creates the order and the payment service records its authenticated creation. */

@@ -233,6 +233,7 @@ export async function recordAcquisition(h: Harness, input: { readonly agency: Ag
          VALUES ($1, $2, $3, $4, $5, $6, 10000, 1000, 400, 12, now())`,
         [allocationId, sellerId, claimId, prospectId, agreementId, agreementVersion],
       );
+      await c.query("SELECT set_config('kauro.finance_agency_id', $1, true)", [agency.agencyId]);
       await c.query("UPDATE kauro.attribution_allocations SET frozen_at = kauro.server_now(), frozen_by_user_id = $2, version = version + 1 WHERE allocation_id = $1", [allocationId, ownerUserId]);
       await c.query(
         `UPDATE kauro.attribution_claims SET state = 'ACCEPTED', agency_id = $2, allocation_id = $3, accepted_at = kauro.server_now(), expires_at = kauro.server_now() + interval '2160 hours',
