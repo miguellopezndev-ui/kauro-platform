@@ -484,3 +484,27 @@ test("PR18-10: obligations entered in B16's sidecar at B10 close survive `sideca
     rmSync(repo, { recursive: true, force: true });
   }
 });
+
+test("ADV-5: the command line binds every review to the history (reviewCommitViolations is wired into main), which ledgerOfRepo and the committed outputs leave out", () => {
+  const repo = mkdtempSync(join(tmpdir(), "ledger-wired-"));
+  try {
+    for (const p of ["packages/contracts/registry", "docs/acceptance/case-maps", "docs/acceptance/reviews", "docs/acceptance/ledger/inputs.json", "docs/acceptance/ledger/external", "docs/acceptance/README.md"]) cpSync(join(root, p), join(repo, p), { recursive: true });
+    const git = (...a) => execFileSync("git", ["-C", repo, ...a], { encoding: "utf8" }).trim();
+    git("init", "-q");
+    git("config", "user.email", "t@example.invalid");
+    git("config", "user.name", "t");
+    git("add", "-A");
+    git("commit", "-qm", "inputs only: no reviewed commit is in this history");
+    const unbound = (violations) => violations.filter((v) => v.kind === "REVIEW_COMMIT_UNBOUND").map((v) => v.subject).sort();
+    assert.deepEqual(unbound(ledgerOfRepo(repo).ledger.violations), [], "the committed outputs carry no git-dependent result");
+    const lines = [];
+    const code = main(["--json"], repo, (l) => lines.push(l));
+    const external = new Set(readInputs(repo).external.flatMap((i) => i.packages));
+    const platformReviews = execFileSync("git", ["-C", root, "ls-files", "docs/acceptance/reviews"], { encoding: "utf8" }).split("\n").filter((f) => /\/B\d\d-round\d+-[0-9a-f]+\.json$/.test(f));
+    assert.ok(platformReviews.length > 0);
+    assert.equal(code, 1);
+    assert.deepEqual(unbound(JSON.parse(lines.join("\n")).violations), platformReviews.map((f) => f.split("/").pop().replace(/\.json$/, "")).filter((id) => !external.has(id.slice(0, 3))).sort(), "every review of a platform package (an external one is bound to its pin instead)");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
