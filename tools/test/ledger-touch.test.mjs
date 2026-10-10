@@ -330,3 +330,18 @@ test("ADV-1: a re-attribution in package-globs.json never hides a change — the
   }
 });
 
+test("ADV-2: an external package (its map pinned in inputs.json, its review bound to the core's commit) is diffed from the platform commit that recorded its accepting review; its pin, its snapshot and its cases touch it", () => {
+  const f = fixture({ external: true });
+  try {
+    const atY = f.run();
+    assert.deepEqual([atY.code, atY.out.touched], [0, []], typeof atY.out === "string" ? atY.out : "");
+    f.write("docs/acceptance/ledger/inputs.json", { external: [{ ...MC, commit: "1111111aea4f1879ffb4189a55a16f22f4520787d" }] });
+    f.commit("pin moved");
+    const [b01, ...rest] = f.run().out.touched;
+    assert.deepEqual(rest, []);
+    assert.deepEqual([b01.package, b01.acceptedSubject.commit, b01.files, b01.range], ["B01", PIN.slice(0, 7), ["docs/acceptance/ledger/inputs.json"], `${f.Y.slice(0, 7)}..${f.git("rev-parse", "HEAD").slice(0, 7)}`]);
+  } finally {
+    f.done();
+  }
+});
+
