@@ -23,6 +23,7 @@ import {
   main,
   readInputs,
   readPinned,
+  readmeTable,
   readSidecars,
   reviewCommitViolations,
   reviewIndex,
@@ -283,6 +284,13 @@ test("the ledger lists the 441 registry cases; the only missing ones belong to a
   // the README's generated table claims no status or commit the ledger does not compute (B06, B07 and B09 name the accepted
   // subject d9bbfd0, PR18-3 (c))
   assert.deepEqual(ledger.violations.filter((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW"), []);
+  // ADV-2 (r4): the table between the ledger markers of docs/acceptance/README.md is the generated table byte for byte, every
+  // column (cases, status, accepted subject, rounds, waiting for), not only status and commit
+  const readme = read("docs/acceptance/README.md");
+  const [start, end] = ["<!-- ledger:table:start -->", "<!-- ledger:table:end -->"];
+  assert.ok(readme.includes(start) && readme.includes(end), "docs/acceptance/README.md carries the ledger markers");
+  assert.equal(readme.slice(readme.indexOf(start) + start.length, readme.indexOf(end)), `\n${readmeTable(ledger)}`, "the README table is stale — run node tools/ledger.mjs --write --readme");
+  assert.deepEqual(ledger.violations.filter((v) => /^README_/.test(v.kind)), []);
 });
 
 // A platform case map in the table format converts with the review that accepts it; a row that lost its review agreement is a claim.

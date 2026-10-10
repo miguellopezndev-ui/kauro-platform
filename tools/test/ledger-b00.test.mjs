@@ -65,6 +65,22 @@ test("R2-117: a claim is never acceptance — the README's statuses are observat
   const staleCommit = readme.replace("`d9bbfd0` · B06-round3-d9bbfd0", "`4b33e26` · B06-round3-d9bbfd0");
   assert.notEqual(staleCommit, readme);
   assert.ok(computeLedger({ registry, sidecars, externals, missingInputs, reviews, readme: staleCommit }).violations.some((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW" && v.subject === "B06" && /^README names commit 4b33e26/.test(v.detail)));
+  // ADV-2 (r4): every column of the generated table is a claim — a forged cases cell (B00 claiming 4 EXECUTED_LOCAL of 4) is refused
+  const forgedCases = readme.replace("| 4: 2 EXECUTED_LOCAL, 2 NOT_EXECUTED |", "| 4: 4 EXECUTED_LOCAL |");
+  assert.notEqual(forgedCases, readme);
+  assert.deepEqual(computeLedger({ registry, sidecars, externals, missingInputs, reviews, readme: forgedCases }).violations.filter((v) => /^README_/.test(v.kind)).map((v) => v.kind), ["README_TABLE_NOT_GENERATED"]);
+  // ADV-2 (r4): a status table whose commit column is not recognised (renamed "Subject") is refused with a named error, never left
+  // unchecked — inside the markers, in a hand table after them, and with its first column renamed
+  const renamed = readme.replace("| Accepted subject (commit · review) |", "| Subject |");
+  assert.notEqual(renamed, readme);
+  assert.throws(() => readmeClaims(renamed), { name: "ReadmeHeaderError", message: /subject/ });
+  const handRenamed = `${readme}\n| Package | Status | Subject |\n|---|---|---|\n| B10 Agency recurrence | REVIEW_ACCEPTED | \`f42dba6\` |\n`;
+  assert.throws(() => readmeClaims(handRenamed), { name: "ReadmeHeaderError" });
+  const firstRenamed = `${readme}\n| Pkg | Status | Commit on main |\n|---|---|---|\n| B10 Agency recurrence | REVIEW_ACCEPTED | \`f42dba6\` |\n`;
+  assert.throws(() => readmeClaims(firstRenamed), { name: "ReadmeHeaderError" });
+  for (const text of [renamed, handRenamed, firstRenamed]) {
+    assert.ok(computeLedger({ registry, sidecars, externals, missingInputs, reviews, readme: text }).violations.some((v) => v.kind === "README_TABLE_UNRECOGNISED"), "a refused header is a violation of the ledger");
+  }
   // a new main claiming B10 accepted (no review record) is refused
   const claimed = `${readme}\n| Package | Cases | Status | Commit on main |\n|---|---|---|---|\n| B10 Agency recurrence | 64 | REVIEW_ACCEPTED | \`f42dba6\` |\n`;
   assert.ok(computeLedger({ registry, sidecars, reviews, readme: claimed }).violations.some((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW" && v.subject === "B10"));

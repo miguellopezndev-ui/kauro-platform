@@ -14,7 +14,8 @@
 //
 // It fails (exit 1) when a case is missing, a cross citation has no inherited mark, a PARTIAL or SIMULATED row names nobody who
 // carries the rest, a row claims a review that does not accept it
-// or a README row claims acceptance without one, a case is PLANNED outside B20/B21 (whose only class is PLANNED_POST_B19 with the
+// or a README row claims acceptance without one (the README table between the ledger markers must be the generated table, every
+// column; a status table with an unrecognised header is refused), a case is PLANNED outside B20/B21 (whose only class is PLANNED_POST_B19 with the
 // owner's date), or the vendored registry no longer matches PROVENANCE.json. A claim is never acceptance: a row's class counts as
 // demonstrated only through its accepting review. Usage:
 //
@@ -412,15 +413,39 @@ export function convertExternal(input, pinned, registry) {
 const rank = (klass) => (CLASSES.indexOf(klass) < 0 ? CLASSES.length : CLASSES.indexOf(klass));
 const strongest = (rows) => rows.reduce((best, r) => (best === null || rank(r.class) < rank(best.class) ? r : best), null);
 
+/** The README's markers around the generated table (`node tools/ledger.mjs --readme` writes between them). */
+export const README_MARKERS = ["<!-- ledger:table:start -->", "<!-- ledger:table:end -->"];
+/** The text between the README's markers, or null when either marker is missing. */
+export function readmeSection(text) {
+  const [start, end] = README_MARKERS;
+  const a = text.indexOf(start);
+  const b = text.indexOf(end);
+  return a < 0 || b < a ? null : text.slice(a + start.length, b);
+}
+
+/** A README status table whose columns are not the ones the ledger checks: refused, never read as an unchecked claim. */
+export class ReadmeHeaderError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ReadmeHeaderError";
+  }
+}
+
 /**
  * The README table's rows: package id, status and the commit it names, from the hand table's "commit on main" column or the
- * generated table's "accepted subject (commit · review)" column (a renamed column must not silence the commit check).
+ * generated table's "accepted subject (commit · review)" column. A status table — one with a status column, a first column
+ * "package" or a row naming a package — must have all three columns: a renamed one throws ReadmeHeaderError (ADV-2 r4), so a
+ * rename can never silence the commit check.
  */
 export function readmeClaims(text) {
   const commitColumn = (header) => header.findIndex((h) => h === "commit on main" || h.startsWith("accepted subject"));
   return tablesOf(text)
-    .filter((t) => t.header[0] === "package" && t.header.includes("status"))
-    .flatMap((t) => t.rows.map(({ cells }) => ({ package: /^(B\d\d)\b/.exec(cells[0])?.[1], status: cells[t.header.indexOf("status")], commit: shasIn(cells[commitColumn(t.header)] ?? "")[0] ?? null })))
+    .filter((t) => t.header[0] === "package" || t.header.includes("status") || t.rows.some(({ cells }) => /^B\d\d\b/.test(cells[0] ?? "")))
+    .flatMap((t) => {
+      const missing = [t.header[0] === "package" ? null : 'a first column "package"', t.header.includes("status") ? null : 'a "status" column', commitColumn(t.header) >= 0 ? null : 'a "commit on main" or "accepted subject (commit · review)" column'].filter(Boolean);
+      if (missing.length) throw new ReadmeHeaderError(`README table at line ${t.line} (${t.header.join(" | ")}): a status table needs ${missing.join(", ")}`);
+      return t.rows.map(({ cells }) => ({ package: /^(B\d\d)\b/.exec(cells[0])?.[1], status: cells[t.header.indexOf("status")], commit: shasIn(cells[commitColumn(t.header)] ?? "")[0] ?? null }));
+    })
     .filter((r) => r.package);
 }
 
@@ -574,8 +599,18 @@ export function computeLedger({ registry, sidecars, externals = [], missingInput
     };
   });
 
-  // a README row is a claim; acceptance is the computed status
-  for (const claim of readmeClaims(readme)) {
+  // a README row is a claim; acceptance is the computed status. A status table the ledger cannot read is a violation (ADV-2 r4);
+  // the table between the markers must be the generated table, every column (cases, status, subject, rounds, waiting for)
+  let claims = [];
+  try {
+    claims = readmeClaims(readme);
+  } catch (error) {
+    if (!(error instanceof ReadmeHeaderError)) throw error;
+    flag("README_TABLE_UNRECOGNISED", "README", error.message);
+  }
+  const section = readmeSection(readme);
+  if (section !== null && section !== `\n${readmeTable({ packages })}`) flag("README_TABLE_NOT_GENERATED", "README", "the table between the ledger markers is not the generated table — run node tools/ledger.mjs --write --readme");
+  for (const claim of claims) {
     const p = packages.find((x) => x.package === claim.package);
     if (/ACCEPTED/.test(claim.status) && !(p && (p.status === "REVIEW_ACCEPTED" || p.status === "ACCEPTED"))) {
       flag("README_CLAIM_WITHOUT_REVIEW", claim.package, `README says ${claim.status}; computed ${p?.status ?? "unknown package"}`);
@@ -676,6 +711,7 @@ export function ledgerOfRepo(root = ROOT, args = { _: [] }, registry = loadRegis
     readme: existsSync(readmeFile) ? readFileSync(readmeFile, "utf8") : "",
   });
   for (const d of drift) ledger.violations.push({ kind: "EXTERNAL_SNAPSHOT_DRIFT", subject: "inputs", detail: d });
+  if (!existsSync(readmeFile) || readmeSection(readFileSync(readmeFile, "utf8")) === null) ledger.violations.push({ kind: "README_TABLE_NOT_GENERATED", subject: "README", detail: `docs/acceptance/README.md is missing or has no ${README_MARKERS.join(" … ")} markers` });
   return { inputs, externals, missingInputs, ledger };
 }
 
@@ -719,9 +755,8 @@ export function main(argv, root = ROOT, log = console.log) {
   }
   if (args["--readme"]) {
     const text = readFileSync(readmeFile, "utf8");
-    const start = "<!-- ledger:table:start -->";
-    const end = "<!-- ledger:table:end -->";
-    if (!text.includes(start) || !text.includes(end)) throw new Error(`docs/acceptance/README.md has no ${start} … ${end} markers`);
+    const [start, end] = README_MARKERS;
+    if (readmeSection(text) === null) throw new Error(`docs/acceptance/README.md has no ${start} … ${end} markers`);
     writeFileSync(readmeFile, `${text.slice(0, text.indexOf(start) + start.length)}\n${readmeTable(ledger)}${text.slice(text.indexOf(end))}`);
   }
 
