@@ -345,3 +345,14 @@ test("ADV-2: an external package (its map pinned in inputs.json, its review boun
   }
 });
 
+test("ADV-3: a changed shared file (package.json) touches every accepted package through main()", () => {
+  const f = fixture();
+  try {
+    f.write("package.json", "{ \"x\": 1 }\n");
+    f.commit("manifest");
+    const r = f.run();
+    assert.deepEqual([r.code, r.out.touched.map((t) => [t.package, t.files])], [0, [["B00", ["package.json"]]]]);
+  } finally {
+    f.done();
+  }
+});
