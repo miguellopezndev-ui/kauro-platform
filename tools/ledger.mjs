@@ -431,6 +431,22 @@ export class ReadmeHeaderError extends Error {
   }
 }
 
+/** A cell's text without backtick, bold or italic markup. */
+const plainCell = (cell) => (cell ?? "").replace(/[`*_]/g, "").trim();
+const README_PACKAGE_ID = /^(B(?:0\d|1\d|2[01]))\b/;
+
+/**
+ * The status tables outside the ledger markers (ADV-5 r5): a table whose first cell names a package id B00-B21, with or without
+ * backtick or bold markup. Outside the generated section the README holds no package status or evidence claim.
+ */
+export function readmeTablesOutsideMarkers(text) {
+  const [start, end] = README_MARKERS;
+  const a = text.indexOf(start);
+  const b = text.indexOf(end);
+  const outside = a >= 0 && b >= a ? `${text.slice(0, a)}\n${text.slice(b + end.length)}` : text;
+  return tablesOf(outside).filter((t) => t.rows.some(({ cells }) => README_PACKAGE_ID.test(plainCell(cells[0]))) || README_PACKAGE_ID.test(plainCell(t.header[0])));
+}
+
 /**
  * The README table's rows: package id, status and the commit it names, from the hand table's "commit on main" column or the
  * generated table's "accepted subject (commit · review)" column. A status table — one with a status column, a first column
@@ -440,11 +456,11 @@ export class ReadmeHeaderError extends Error {
 export function readmeClaims(text) {
   const commitColumn = (header) => header.findIndex((h) => h === "commit on main" || h.startsWith("accepted subject"));
   return tablesOf(text)
-    .filter((t) => t.header[0] === "package" || t.header.includes("status") || t.rows.some(({ cells }) => /^B\d\d\b/.test(cells[0] ?? "")))
+    .filter((t) => t.header[0] === "package" || t.header.includes("status") || t.rows.some(({ cells }) => README_PACKAGE_ID.test(plainCell(cells[0]))))
     .flatMap((t) => {
       const missing = [t.header[0] === "package" ? null : 'a first column "package"', t.header.includes("status") ? null : 'a "status" column', commitColumn(t.header) >= 0 ? null : 'a "commit on main" or "accepted subject (commit · review)" column'].filter(Boolean);
       if (missing.length) throw new ReadmeHeaderError(`README table at line ${t.line} (${t.header.join(" | ")}): a status table needs ${missing.join(", ")}`);
-      return t.rows.map(({ cells }) => ({ package: /^(B\d\d)\b/.exec(cells[0])?.[1], status: cells[t.header.indexOf("status")], commit: shasIn(cells[commitColumn(t.header)] ?? "")[0] ?? null }));
+      return t.rows.map(({ cells }) => ({ package: README_PACKAGE_ID.exec(plainCell(cells[0]))?.[1], status: cells[t.header.indexOf("status")], commit: shasIn(cells[commitColumn(t.header)] ?? "")[0] ?? null }));
     })
     .filter((r) => r.package);
 }
@@ -610,6 +626,7 @@ export function computeLedger({ registry, sidecars, externals = [], missingInput
   }
   const section = readmeSection(readme);
   if (section !== null && section !== `\n${readmeTable({ packages })}`) flag("README_TABLE_NOT_GENERATED", "README", "the table between the ledger markers is not the generated table — run node tools/ledger.mjs --write --readme");
+  for (const t of readmeTablesOutsideMarkers(readme)) flag("README_TABLE_NOT_GENERATED", "README", `a package status table at line ${t.line} sits outside the ledger markers (${t.header.join(" | ")}): the README holds no status or evidence claim but the generated table`);
   for (const claim of claims) {
     const p = packages.find((x) => x.package === claim.package);
     if (/ACCEPTED/.test(claim.status) && !(p && (p.status === "REVIEW_ACCEPTED" || p.status === "ACCEPTED"))) {

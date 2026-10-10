@@ -373,10 +373,12 @@ test("PR18-6 (M5): reviewOf binds a row only while the package's latest round ac
 test("PR18-3 (c): a README row whose commit is not the package's accepted subject is a claim without review", () => {
   const f = clean();
   const readme = (commit) => `| Package | Cases | Status | Commit on main |\n|---|---|---|---|\n| B01 one | 2 | ACCEPTED | \`${commit}\` |\n`;
-  assert.deepEqual(kinds(computeLedger({ ...f, readme: readme("cB011") })), []);
+  // ADV-5 (r5): a hand table is itself outside the markers (README_TABLE_NOT_GENERATED); this test is about the commit claim
+  const claimKinds = (l) => kinds(l).filter((k) => k !== "README_TABLE_NOT_GENERATED README");
+  assert.deepEqual(claimKinds(computeLedger({ ...f, readme: readme("cB011") })), []);
   const ledger = computeLedger({ ...f, readme: readme("deadbee") });
-  assert.deepEqual(kinds(ledger), ["README_CLAIM_WITHOUT_REVIEW B01"]);
-  assert.match(ledger.violations[0].detail, /deadbee.*cB011/);
+  assert.deepEqual(claimKinds(ledger), ["README_CLAIM_WITHOUT_REVIEW B01"]);
+  assert.match(ledger.violations.find((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW").detail, /deadbee.*cB011/);
 });
 
 test("PR18-9: an external map's rows are bound by its package's accepting review only when the review's commit is the pinned commit of the snapshot", () => {
@@ -587,4 +589,58 @@ test("ADV-6: a cited title is written only as the title of a test, it or describ
   assert.equal(titleIn(source, "uses a backtick"), true);
   assert.equal(titleIn(source, "it's fine"), true);
   assert.equal(titleIn(source, "fine"), false);
+});
+
+test("ADV-5 (r5): a package status table outside the ledger markers is a README_TABLE_NOT_GENERATED violation — a hand table after the end marker, a first cell `B06` in backticks, **B06** in bold; a glossary table is not", () => {
+  const readme = read("docs/acceptance/README.md");
+  const { externals, missingInputs } = ledgerOfRepo(root);
+  const readmeKinds = (text) => computeLedger({ registry, sidecars: readSidecars(root), externals, missingInputs, reviews: loadReviews(root), readme: text }).violations.filter((v) => /^README_/.test(v.kind));
+  assert.deepEqual(readmeKinds(readme), [], "control: the committed README has no README_ violation");
+  const forged = "| Package | Cases | Status | Commit on main |\n|---|---|---|---|\n| B06 Domain | 29: 29 EXECUTED_PROVIDER | REVIEW_ACCEPTED | d9bbfd0 |\n";
+  const outside = (table) => readmeKinds(`${readme}\n${table}`).filter((v) => v.kind === "README_TABLE_NOT_GENERATED" && /outside the ledger markers/.test(v.detail));
+  assert.equal(outside(forged).length, 1, "a hand table after the end marker");
+  assert.equal(outside(forged.replace("| B06 Domain |", "| `B06` Domain |")).length, 1, "B06 in backticks");
+  assert.equal(outside(forged.replace("| B06 Domain |", "| **B06** Domain |")).length, 1, "B06 in bold");
+  assert.deepEqual(outside("| Term | Meaning |\n|---|---|\n| Ledger | the computed record |\n"), [], "a glossary is not a status table");
+});
+
+test("ADV-7 (r5): a README with no ledger markers, or with the end marker before the start, yields README_TABLE_NOT_GENERATED from ledgerOfRepo", () => {
+  const readme = read("docs/acceptance/README.md");
+  const [start, end] = ["<!-- ledger:table:start -->", "<!-- ledger:table:end -->"];
+  const variants = { "no markers": readme.replace(start, "").replace(end, ""), "end before start": readme.replace(start, "@@S@@").replace(end, start).replace("@@S@@", end) };
+  for (const [name, text] of Object.entries(variants)) {
+    assert.notEqual(text, readme, name);
+    const repo = mkdtempSync(join(tmpdir(), "ledger-markers-"));
+    try {
+      for (const p of ["packages/contracts/registry", "docs/acceptance"]) cpSync(join(root, p), join(repo, p), { recursive: true });
+      writeFileSync(join(repo, "docs/acceptance/README.md"), text);
+      assert.ok(ledgerOfRepo(repo).ledger.violations.some((v) => v.kind === "README_TABLE_NOT_GENERATED" && /has no .* markers/.test(v.detail)), name);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  }
+});
+
+test("ADV-6 (r5): every review record of this repository is bound to its history (REVIEW_COMMIT_UNBOUND: each commit resolves; an accepting latest round is an ancestor of HEAD, or the external pin) — a shallow clone fails, never skips", () => {
+  const shallow = execFileSync("git", ["-C", root, "rev-parse", "--is-shallow-repository"], { encoding: "utf8" }).trim();
+  assert.equal(shallow, "false", "shallow clone: review-commit check needs full history (fetch-depth 0)");
+  const { externals } = ledgerOfRepo(root);
+  const pins = Object.fromEntries(externals.flatMap((e) => e.packages.map((p) => [p, e.commit])));
+  assert.deepEqual(reviewCommitViolations(root, loadReviews(root), pins), []);
+});
+
+test("ADV-6 (r5, control): a review naming a commit that does not exist, B06-round1-deadbee, fails the review-commit check", () => {
+  const repo = mkdtempSync(join(tmpdir(), "ledger-unbound-"));
+  try {
+    const git = (...a) => execFileSync("git", ["-C", repo, ...a], { stdio: "ignore" });
+    git("init", "-q");
+    git("config", "user.email", "t@example.invalid");
+    git("config", "user.name", "t");
+    git("commit", "-q", "--allow-empty", "-m", "base");
+    const review = { id: "B06-round1-deadbee", package: "B06", round: 1, commit: "deadbee", verdict: "ACCEPT", cases: [] };
+    const out = reviewCommitViolations(repo, [review], {});
+    assert.deepEqual(out.map((v) => [v.kind, v.subject]), [["REVIEW_COMMIT_UNBOUND", "B06-round1-deadbee"]]);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 });
