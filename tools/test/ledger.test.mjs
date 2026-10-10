@@ -508,3 +508,23 @@ test("ADV-5: the command line binds every review to the history (reviewCommitVio
     rmSync(repo, { recursive: true, force: true });
   }
 });
+
+test("ADV-6: a cited title is written only as the title of a test, it or describe call — a comment, a longer title or another string does not satisfy it; escaped quotes and every quote kind do", () => {
+  const source = [
+    "// refuses a stale lease (a comment)",
+    'const note = "refuses a stale lease";',
+    'test("refuses a stale lease twice", () => {});',
+    "describe('outer', () => {",
+    '  it("says \\"no\\"", () => {});',
+    "  it.skip(`uses a backtick`, () => {});",
+    "  test('it\'s fine', async () => {});",
+    "});",
+  ].join("\n");
+  assert.equal(titleIn(source, "refuses a stale lease"), false);
+  assert.equal(titleIn(source, "refuses a stale lease twice"), true);
+  assert.equal(titleIn(source, "outer"), true);
+  assert.equal(titleIn(source, 'says "no"'), true);
+  assert.equal(titleIn(source, "uses a backtick"), true);
+  assert.equal(titleIn(source, "it's fine"), true);
+  assert.equal(titleIn(source, "fine"), false);
+});
