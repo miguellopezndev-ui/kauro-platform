@@ -231,6 +231,7 @@ describe("ADV-2, ADV-6: strings from the package are from the core's closed voca
       ["adapterVersion", (m) => (m["target"].adapterVersion = "<b>1.0.0</b>")],
       ["targetContractHash", (m) => (m["target"].targetContractHash = "tc_<svg onload=x>")],
       ["fileId", (m) => (m["inputs"][0].fileId = 'F-"><img src=x>')],
+      ["inputs sha256 (ADV-10)", (m) => (m["inputs"][0].sha256 = "<svg onload=alert(1)>")],
     ];
     for (const [field, edit] of edits) {
       const files = loadPackage("D-salesforce");
@@ -239,6 +240,18 @@ describe("ADV-2, ADV-6: strings from the package are from the core's closed voca
       writeManifest(files, manifest);
       assert.deepEqual(codes(files), ["MANIFEST_MALFORMED"], field);
     }
+  });
+
+  it("ADV-10: a configHash outside the core's vocabulary is refused, forged in both the manifest and the reconciliation", () => {
+    const files = loadPackage("D-salesforce");
+    const forgedHash = "<b>" + "a".repeat(61);
+    const manifest = manifestOf(files);
+    manifest["configHash"] = forgedHash;
+    writeManifest(files, manifest);
+    editJson(files, R, (r) => {
+      r.configHash = forgedHash;
+    });
+    assert.deepEqual(codes(files), ["MANIFEST_MALFORMED"]);
   });
 
   it("R5: an artifact path with markup is refused, and the refusal does not quote it", () => {
