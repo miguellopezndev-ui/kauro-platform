@@ -373,11 +373,10 @@ test("PR18-6 (M5): reviewOf binds a row only while the package's latest round ac
 test("PR18-3 (c): a README row whose commit is not the package's accepted subject is a claim without review", () => {
   const f = clean();
   const readme = (commit) => `| Package | Cases | Status | Commit on main |\n|---|---|---|---|\n| B01 one | 2 | ACCEPTED | \`${commit}\` |\n`;
-  // ADV-5 (r5): a hand table is itself outside the markers (README_TABLE_NOT_GENERATED); this test is about the commit claim
-  const claimKinds = (l) => kinds(l).filter((k) => k !== "README_TABLE_NOT_GENERATED README");
-  assert.deepEqual(claimKinds(computeLedger({ ...f, readme: readme("cB011") })), []);
+  // a hand table is itself outside the markers: its id token is a README_OUTSIDE_MARKERS violation (ADV-5 r5); the exact list is pinned (ADV-9)
+  assert.deepEqual(kinds(computeLedger({ ...f, readme: readme("cB011") })), ["README_OUTSIDE_MARKERS README"]);
   const ledger = computeLedger({ ...f, readme: readme("deadbee") });
-  assert.deepEqual(claimKinds(ledger), ["README_CLAIM_WITHOUT_REVIEW B01"]);
+  assert.deepEqual(kinds(ledger), ["README_CLAIM_WITHOUT_REVIEW B01", "README_OUTSIDE_MARKERS README"]);
   assert.match(ledger.violations.find((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW").detail, /deadbee.*cB011/);
 });
 
@@ -591,17 +590,32 @@ test("ADV-6: a cited title is written only as the title of a test, it or describ
   assert.equal(titleIn(source, "fine"), false);
 });
 
-test("ADV-5 (r5): a package status table outside the ledger markers is a README_TABLE_NOT_GENERATED violation — a hand table after the end marker, a first cell `B06` in backticks, **B06** in bold; a glossary table is not", () => {
+test("ADV-5 (r5): outside the ledger markers the README names no package id in any spelling and holds no table — every evasion is a README_OUTSIDE_MARKERS violation; the real README is the false-positive control", () => {
   const readme = read("docs/acceptance/README.md");
   const { externals, missingInputs } = ledgerOfRepo(root);
   const readmeKinds = (text) => computeLedger({ registry, sidecars: readSidecars(root), externals, missingInputs, reviews: loadReviews(root), readme: text }).violations.filter((v) => /^README_/.test(v.kind));
-  assert.deepEqual(readmeKinds(readme), [], "control: the committed README has no README_ violation");
-  const forged = "| Package | Cases | Status | Commit on main |\n|---|---|---|---|\n| B06 Domain | 29: 29 EXECUTED_PROVIDER | REVIEW_ACCEPTED | d9bbfd0 |\n";
-  const outside = (table) => readmeKinds(`${readme}\n${table}`).filter((v) => v.kind === "README_TABLE_NOT_GENERATED" && /outside the ledger markers/.test(v.detail));
-  assert.equal(outside(forged).length, 1, "a hand table after the end marker");
-  assert.equal(outside(forged.replace("| B06 Domain |", "| `B06` Domain |")).length, 1, "B06 in backticks");
-  assert.equal(outside(forged.replace("| B06 Domain |", "| **B06** Domain |")).length, 1, "B06 in bold");
-  assert.deepEqual(outside("| Term | Meaning |\n|---|---|\n| Ledger | the computed record |\n"), [], "a glossary is not a status table");
+  assert.deepEqual(readmeKinds(readme), [], "control: the committed README has no README_ violation (its lines outside the markers name no id)");
+  const outside = (extra) => readmeKinds(`${readme}\n${extra}\n`).filter((v) => v.kind === "README_OUTSIDE_MARKERS");
+  const forged = "| Package | Cases | Status | Commit on main |\n|---|---|---|---|\n| B06 Domain | 29: 29 EXECUTED_PROVIDER | REVIEW_ACCEPTED | d9bbfd0 |";
+  const evasions = {
+    "pipe table after the end marker": forged,
+    "first cell in backticks": forged.replace("| B06 Domain |", "| `B06` Domain |"),
+    "first cell in bold": forged.replace("| B06 Domain |", "| **B06** Domain |"),
+    "table without leading pipes": "Package | Status\n--- | ---\nB06 | REVIEW_ACCEPTED",
+    "indented table": "    | Package | Status |\n    |---|---|\n    | B06 | REVIEW_ACCEPTED |",
+    "HTML table": "<table><tr><td>Domain</td><td>accepted</td></tr></table>",
+    "lowercase id": "| b06 | REVIEW_ACCEPTED |",
+    "id without the zero": "| B6 | REVIEW_ACCEPTED |",
+    "id in a sentence": "Domain (B06) is accepted.",
+    "id in a link": "[B06](x) is accepted.",
+    "id in an html tag": "<b>B06</b> is accepted.",
+    "id in a quote": "> B06 is accepted.",
+    "id in a list": "- B06: accepted",
+    "id in a code fence": "```\nB06 REVIEW_ACCEPTED\n```",
+    "id in an HTML comment": "<!-- B06 accepted -->",
+  };
+  for (const [name, extra] of Object.entries(evasions)) assert.ok(outside(extra).length >= 1, name);
+  assert.deepEqual(outside("| Term | Meaning |\n|---|---|\n| Ledger | the computed record |"), [], "a glossary names no package");
 });
 
 test("ADV-7 (r5): a README with no ledger markers, or with the end marker before the start, yields README_TABLE_NOT_GENERATED from ledgerOfRepo", () => {
@@ -626,7 +640,7 @@ test("ADV-6 (r5): every review record of this repository is bound to its history
   assert.equal(shallow, "false", "shallow clone: review-commit check needs full history (fetch-depth 0)");
   const { externals } = ledgerOfRepo(root);
   const pins = Object.fromEntries(externals.flatMap((e) => e.packages.map((p) => [p, e.commit])));
-  assert.deepEqual(reviewCommitViolations(root, loadReviews(root), pins), []);
+  assert.deepEqual(reviewCommitViolations(root, loadReviews(root), pins), [], "a rebased reviewed lane breaks the reviewed commit's ancestry: update the review record to the rebased sha with a range-diff EquivalenceReceipt in .kauro/reviews");
 });
 
 test("ADV-6 (r5, control): a review naming a commit that does not exist, B06-round1-deadbee, fails the review-commit check", () => {

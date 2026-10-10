@@ -15,9 +15,11 @@
 // It fails (exit 1) when a case is missing, a cross citation has no inherited mark, a PARTIAL or SIMULATED row names nobody who
 // carries the rest, a row claims a review that does not accept it
 // or a README row claims acceptance without one (the README table between the ledger markers must be the generated table, every
-// column; a status table with an unrecognised header is refused), a case is PLANNED outside B20/B21 (whose only class is PLANNED_POST_B19 with the
+// column; a status table with an unrecognised header is refused; outside the markers no package id or table at all — README_OUTSIDE_MARKERS), a case is PLANNED outside B20/B21 (whose only class is PLANNED_POST_B19 with the
 // owner's date), or the vendored registry no longer matches PROVENANCE.json. A claim is never acceptance: a row's class counts as
-// demonstrated only through its accepting review. Usage:
+// demonstrated only through its accepting review.
+// Rebase note: a reviewed lane that is rebased changes the reviewed commit's ancestry (REVIEW_COMMIT_UNBOUND): update the review record to
+// the rebased sha with a range-diff EquivalenceReceipt in .kauro/reviews. Usage:
 //
 //   node tools/ledger.mjs [--json] [--mc <file>@<sha>] [--ic <file>@<sha> ...] [--write] [--readme]
 //   node tools/ledger.mjs sidecars [--write]
@@ -431,21 +433,24 @@ export class ReadmeHeaderError extends Error {
   }
 }
 
-/** A cell's text without backtick, bold or italic markup. */
-const plainCell = (cell) => (cell ?? "").replace(/[`*_]/g, "").trim();
-const README_PACKAGE_ID = /^(B(?:0\d|1\d|2[01]))\b/;
-
 /**
- * The status tables outside the ledger markers (ADV-5 r5): a table whose first cell names a package id B00-B21, with or without
- * backtick or bold markup. Outside the generated section the README holds no package status or evidence claim.
+ * Outside the generated section the README names no package and holds no table (ADV-5 r5, an allowlist, not a list of table
+ * spellings): every package-id token (case-insensitive B0-B21 in any spelling: B6, b06, [B06](x), <b>B06</b>, in a fence, a quote,
+ * a list or a comment) and every `<table` is a violation, with its line. The markers' own lines are not scanned.
  */
-export function readmeTablesOutsideMarkers(text) {
+export const README_OUTSIDE_ID = /\bB(?:0?\d|1\d|2[01])\b|<table/gi;
+export function readmeOutsideTokens(text) {
   const [start, end] = README_MARKERS;
   const a = text.indexOf(start);
   const b = text.indexOf(end);
-  const outside = a >= 0 && b >= a ? `${text.slice(0, a)}\n${text.slice(b + end.length)}` : text;
-  return tablesOf(outside).filter((t) => t.rows.some(({ cells }) => README_PACKAGE_ID.test(plainCell(cells[0]))) || README_PACKAGE_ID.test(plainCell(t.header[0])));
+  const blank = (t) => t.replace(/[^\n]/g, " ");
+  const outside = a >= 0 && b >= a ? text.slice(0, a) + blank(text.slice(a, b + end.length)) + text.slice(b + end.length) : text;
+  return outside.split(/\r?\n/).flatMap((line, n) => [...line.matchAll(README_OUTSIDE_ID)].map((m) => ({ line: n + 1, token: m[0] })));
 }
+
+/** A cell's text without backtick, bold or italic markup. */
+const plainCell = (cell) => (cell ?? "").replace(/[`*_]/g, "").trim();
+const README_PACKAGE_ID = /^(B(?:0\d|1\d|2[01]))\b/;
 
 /**
  * The README table's rows: package id, status and the commit it names, from the hand table's "commit on main" column or the
@@ -626,7 +631,7 @@ export function computeLedger({ registry, sidecars, externals = [], missingInput
   }
   const section = readmeSection(readme);
   if (section !== null && section !== `\n${readmeTable({ packages })}`) flag("README_TABLE_NOT_GENERATED", "README", "the table between the ledger markers is not the generated table — run node tools/ledger.mjs --write --readme");
-  for (const t of readmeTablesOutsideMarkers(readme)) flag("README_TABLE_NOT_GENERATED", "README", `a package status table at line ${t.line} sits outside the ledger markers (${t.header.join(" | ")}): the README holds no status or evidence claim but the generated table`);
+  for (const t of readmeOutsideTokens(readme)) flag("README_OUTSIDE_MARKERS", "README", `line ${t.line} names "${t.token}" outside the ledger markers: the README holds no package id or table but the generated one`);
   for (const claim of claims) {
     const p = packages.find((x) => x.package === claim.package);
     if (/ACCEPTED/.test(claim.status) && !(p && (p.status === "REVIEW_ACCEPTED" || p.status === "ACCEPTED"))) {
