@@ -57,12 +57,24 @@ function scriptKindOf(rel: string): ts.ScriptKind {
   if (rel.endsWith(".jsx")) return ts.ScriptKind.JSX;
   return /\.[cm]?js$/.test(rel) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
 }
-function withoutComments(text: string, rel: string): string {
-  return printer.printFile(ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, false, scriptKindOf(rel)));
+function withoutComments(text: string, rel: string, eraseTypes = false): string {
+  const source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, false, scriptKindOf(rel));
+  if (!eraseTypes) return printer.printFile(source);
+  // DB-TLS-R5: `import("./pool.js").T` and `typeof import("./pool.js")` in a type position are erased by the compiler (no run-time access to the module): each becomes `unknown`
+  const erase: ts.TransformerFactory<ts.SourceFile> = (context) => {
+    const visit = (node: ts.Node): ts.Node => (ts.isImportTypeNode(node) ? ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword) : ts.visitEachChild(node, visit, context));
+    return (file) => ts.visitNode(file, visit) as ts.SourceFile;
+  };
+  const result = ts.transform(source, [erase]);
+  try {
+    return printer.printFile(result.transformed[0]!);
+  } finally {
+    result.dispose();
+  }
 }
 
-function code(text: string, rel = "scan.ts"): string {
-  return withoutComments(text, rel)
+function code(text: string, rel = "scan.ts", eraseTypes = false): string {
+  return withoutComments(text, rel, eraseTypes)
     // ADV-8 (56673d9): one spelling per form before matching: `import (`/`require (` -> `import(`, a template literal without
     // substitutions -> a quoted string, so the patterns need not enumerate spacing and quoting variants
     .replace(/\b(import|require)\s+\(/g, "$1(")
@@ -115,10 +127,11 @@ const POOL_VALUE_HOLDERS = new Set(["packages/persistence/src/pool.ts", "package
 
 function persistenceProblem(rel: string, text: string): string | undefined {
   const c = code(text, rel);
+  const runtime = code(text, rel, true);
   if (CONSTRUCTS.test(c) && !text.includes("sslOptionsOf(")) return `${rel} derives ssl from sslOptionsOf`;
   if (CONSTRUCTS_KAURO_POOL.test(c) && rel !== "packages/persistence/src/pool.ts") return `${rel} constructs KauroPool outside pool.ts`;
   // ADV-9 (1896dea): createPool is not even mentioned elsewhere, so no import route (index namespace, run-time import) can wrap it
-  if (!POOL_VALUE_HOLDERS.has(rel) && (POOL_VALUE_IMPORTS.some((f) => f.test(c)) || /\bcreatePool\b/.test(c))) return `${rel} takes KauroPool or createPool as a value outside pool.ts and index.ts`;
+  if (!POOL_VALUE_HOLDERS.has(rel) && (POOL_VALUE_IMPORTS.some((f) => f.test(runtime)) || /\bcreatePool\b/.test(runtime))) return `${rel} takes KauroPool or createPool as a value outside pool.ts and index.ts`;
   return undefined;
 }
 
@@ -210,6 +223,28 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
   } finally {
     repo.done();
   }
+});
+
+test("scan self-test: DB-TLS-R5: type-only references to the pool module (erased, no run-time access) are accepted outside pool.ts and index.ts", () => {
+  for (const [rel, text] of [
+    ["packages/persistence/src/types.ts", 'export type Config = import("./pool.js").PoolConfig;'],
+    ["packages/persistence/src/types.ts", 'export const f = (pool: import("./pool.js").KauroPool) => pool;'],
+    ["packages/persistence/src/types.ts", 'export type Open = typeof import("./pool.js");'],
+    ["packages/persistence/src/types.ts", 'export type Opened = ReturnType<typeof import("./pool.js").createPool>;'],
+    ["packages/persistence/src/evidence.ts", 'export type Config = import("../pool.js").PoolConfig;'],
+    ["packages/persistence/src/migrations/runner.ts", 'export const g = (pool: import("../pool.js").KauroPool) => pool;'],
+    ["packages/persistence/src/types.ts", 'import type { KauroPool, PoolConfig } from "./pool.js";'],
+    ["packages/persistence/src/types.ts", 'import { type KauroPool, type PoolConfig } from "./pool.js";'],
+    ["packages/persistence/src/types.ts", 'import type * as P from "./pool.js";\nexport type K = P.KauroPool;'],
+    ["packages/persistence/src/types.ts", 'export type { KauroPool } from "./pool.js";'],
+  ] as const) assert.equal(persistenceProblem(rel, text), undefined, `${rel}: ${text}`);
+  // the run-time forms stay refused, also when an erased import type sits next to them
+  const refusal = (rel: string): string => `${rel} takes KauroPool or createPool as a value outside pool.ts and index.ts`;
+  for (const text of [
+    'export type C = import("./pool.js").PoolConfig;\nexport const m = async () => (await import("./pool.js")).KauroPool;',
+    'export type C = import("./pool.js").PoolConfig;\nimport { createPool } from "./pool.js";',
+    'export type C = import("./pool.js").PoolConfig;\nimport { type A, KauroPool } from "./pool.js";',
+  ]) assert.equal(persistenceProblem("packages/persistence/src/types.ts", text), refusal("packages/persistence/src/types.ts"), text);
 });
 
 test("scan self-test: only tracked source is scanned: src/build/db.ts, src/out/db.ts and src/vendor/db.ts are caught, an untracked .next/ file and a package-root test/ are not", () => {
