@@ -1,10 +1,11 @@
-# B10-OFFSET: offsets are claims that yield; seller credit and noncash settlement are durable (design r5, D10-NEG-4..7)
+# B10-OFFSET: offsets are claims that yield; seller credit and noncash settlement are durable (design r6, D10-NEG-4..7)
 
 Lane `B10-OFFSET` (branch `b10/offset`, builds after kit PR1 merges). r1 = 97839bd; r2 answers Codex design review r1
 (`tools/review/out/b10-offset-design-97839bdc0b32`, REJECT, OFF-R1..R8); r3 answers design r2 on 18ca05b
 (`tools/review/out/b10-offset-design-r2-18ca05bdf51e`, REJECT: OFF-R1..R3, R5, R7, R8 FIXED; OFF-R4, OFF-R6 PARTIAL; OFF-R2-01..04 new); r4 answers design r3 on af1ff58
 (`tools/review/out/b10-offset-design-r3-af1ff58c9899`, REJECT, converging: r2 defects and release guards FIXED; OFF-R3-01, OFF-R3-02 new; OFF-R6 PARTIAL); r5 answers the internal design-closure adversary on 744dd25
-(`.kauro/reviews/b05-r3-offset-r4-design-adversary.md`, NOT_READY: ADV-OFF-1 MAJOR, ADV-OFF-2..4 MINOR; §0.1). Supersedes D10-NEG-3 and the provisional
+(`.kauro/reviews/b05-r3-offset-r4-design-adversary.md`, NOT_READY: ADV-OFF-1 MAJOR, ADV-OFF-2..4 MINOR; §0.1); r6 answers Codex design r4 on e7b8a92
+(`tools/review/out/b10-offset-design-r4-e7b8a92e657b`, REJECT: OFF-R1..R8 and ADV-OFF-1..4 FIXED; OFF-R4-01, OFF-R4-02 MAJOR, OFF-R4-03, OFF-R4-04 MINOR new; §0.2). Supersedes D10-NEG-3 and the provisional
 `0045_offset_capacity_holds.sql` (843bf01; reverted on the kit by f78af7b). Inputs: adversary ADV-3, ADV-9, ADV-10, ADV-14, ADV-15,
 ADV-17, ADV-18. Governing text: 17 "Refunds after payout and negative balances" (the statement shows original accrual, payout,
 adjustment and current balance), 17 "Accrual, eligibility and payout" (approved undisputed payable amounts; no minimum payout), 17
@@ -50,6 +51,15 @@ r3 (design r2 findings):
 | ADV-OFF-2 MINOR FK audit incomplete | §4 FK audit :194: all FKs of the five guarded INSERTs with their parent's lock position (offsets -> seller_agreements 0030:245; statement_items -> adjustment, hold, offset, project 0031:203-206) | S74 (projects, the only parent with an explicit FOR UPDATE holder); the others are proofs (append-only or no FOR UPDATE holder) |
 | ADV-OFF-3 MINOR S60/S61 inconsistent | §2.8 :140 (the proposal's read position named); S61 retitled :417 | S60, S61 |
 | ADV-OFF-4 MINOR noncash guard shared subjects | §4 noncash guard :189 takes **exclusive** subjects; §5 noncash sweep :266; §5.1 | S73 |
+
+### 0.2 Revision r6: Codex design r4 findings (e7b8a92)
+
+| finding | closed in (section) | tests (exact titles in §6) |
+|---|---|---|
+| OFF-R4-01 MAJOR M15 RETRY claimed without a refusal or a recovery | §5 G-ORD-2 (KC021 is a transient refusal with one contract: complete rollback, bounded in-transaction retry by the unit of work, then a retryable CAPACITY_UNAVAILABLE / LOCK_ORDER_CONTENTION answered per caller family: API command, outbox consumer, PERIODS); §7 M15 RETRY now cites K00-K10; §8 sqlstate + unit-of-work rows | K00-K10 (F7: one per affected caller, each with an actual KC021, full rollback incl. the journal reservation, recovery after contention ends, exactly one economic result) |
+| OFF-R4-02 MAJOR C20 unreachable (ISSUED statement refuses the first item KA004) | C20 retitled onto the issuance lifecycle: items into a DRAFT statement before its DRAFT -> ISSUED edge (commercial-statements.ts:780/816) | C20 |
+| OFF-R4-03 MINOR session-settable flag | §5 G-ORD-1: the custom setting `kauro.commission_lines_locked` is removed; "this transaction holds a B10 lock" is a transaction-scoped shared advisory marker read from pg_locks; an xact advisory lock has no explicit unlock, so no SET, local reset or session value can turn a later acquisition blocking; a session-level marker only makes a first acquisition non-blocking (more KC021, never a wait) | S75 |
+| OFF-R4-04 MINOR FK census misses agencies and sellers | §4 FK audit: statement_items.agency_id -> agencies (0031:184; FOR UPDATE by `agencies.lock`, tenancy.ts:192, callers CMD002 activate-agency.ts:50 and CMD043 close-agency.ts:69, which take no commission row, subject or statement and whose triggers touch no commission table) and commission_offsets.seller_id / commission_statements.seller_id -> sellers (0030:235, 0031:121; only FOR NO KEY UPDATE, commercial-sales.ts:369, never conflicts with KEY SHARE); OFF-C10 corrected: two parents have an explicit FOR UPDATE holder, projects and agencies, and neither holder takes a B10 lock | S74, S76 |
 
 ## 1. What is wrong on 0030 today (latent: `recordOffset` has no production caller, OQ-1)
 
@@ -209,6 +219,16 @@ Database guards (named, each its own DENY test, rule 12):
     only by create-support-case.ts:51, execute-project.ts:56, create-revision.ts:49; none of those units takes a commission row,
     subject or statement (census: no commission port in the three handlers). An item insert may wait there; its holder waits on
     nothing B10 holds: no cycle (S74).
+  - agencies (statement_items.agency_id, 0031:184, inline REFERENCES; r6, OFF-R4-04): explicit FOR UPDATE by `agencies.lock`
+    (tenancy.ts:192), called only by CMD002 activate-agency.ts:50 and CMD043 close-agency.ts:69 (every other agency reader uses
+    `lockShared`, FOR SHARE, which does not conflict with KEY SHARE). Neither unit takes a commission row, subject or statement: their
+    repository (commercial-agency-lifecycle.ts) touches no commission table and no trigger on agencies, quotes, founding slots, closures or
+    acceptances writes one. An item insert may wait at the agency row; its holder waits on nothing B10 holds: no cycle (S76).
+  - sellers (commission_offsets.seller_id 0030:235 and commission_statements.seller_id 0031:121, inline REFERENCES): no FOR UPDATE in src
+    or migrations; the only explicit lock is FOR NO KEY UPDATE (commercial-sales.ts:369), which does not conflict with KEY SHARE; no
+    DELETE path: never waits.
+  Census method (r6): every `REFERENCES` in the CREATE TABLE bodies of the guarded tables (0030, 0031, 0045, 0046), both
+  `CONSTRAINT ... FOREIGN KEY` clauses and inline column references, each listed above.
 - Grants: INSERT on releases and credit entries to `kauro_commission` (and to the owner on `kauro_app` only for cause HOLD_OPENED /
   HOLD_CHANGED, the triggers of an owner-opened hold); the helper functions are EXECUTE for both; every path passes the guards above.
 
@@ -235,8 +255,12 @@ transaction requests a row or subject of (1)/(2) after taking any subject. Each 
 **G-ORD-1 (r5, ADV-OFF-1): one blocking acquisition per transaction, then pre-locked or non-blocking.** A per-row BEFORE guard cannot
 order rows across a multi-row INSERT, several guarded INSERTs or a multi-statement sweep in one transaction. Every B10 line row lock and
 line subject is taken through two functions (0045): `kauro.commission_lock_line_rows(lines uuid[], mode)` (sorted ascending, one
-statement) and `kauro.take_commission_line_subject(line uuid, mode)`; both set the transaction-local flag `kauro.commission_lines_locked`
-(`set_config(..., true)`). The 0036 hold fence (`take_commission_line_lock`), the line state fence (`commission_lines_line_fence`) and
+statement) and `kauro.take_commission_line_subject(line uuid, mode)`; both first take the transaction-scoped shared advisory marker
+`pg_advisory_xact_lock_shared(<B10 lock-order class>, 0)` (r6, OFF-R4-03; replaces the r5 custom setting, which any session could SET or
+reset). "Flag on" is `kauro.commission_lines_locked()`: this backend holds that marker (pg_locks: pid = pg_backend_pid(), locktype
+advisory, the marker key, granted). A transaction-level advisory lock has no explicit unlock (pg_advisory_unlock* releases only
+session-level locks) and ends only at COMMIT or ROLLBACK, so once any B10 lock is taken no statement of the transaction can turn the flag
+off, and no custom setting is read. The 0036 hold fence (`take_commission_line_lock`), the line state fence (`commission_lines_line_fence`) and
 `payout_lines_unpayable` are re-issued over them; holds get a BEFORE INSERT step `commission_holds_lock_order` with the same flag-on
 non-blocking acquisition of the line row and subject, so the FK KEY SHARE that follows is re-entrant (Y26 reversed order: S72). A line
 UPDATE takes its row implicitly, so only the writers listed below update lines, each after pre-locking them. Each of the five guards (offsets, releases, credit entries, CREDIT items, noncash
@@ -248,9 +272,27 @@ free KC code at merge) without waiting. So after its first subject no transactio
 statements. In-product multi-row writers (close, correction, CMD053, yields, reconcile, the OQ-1 close-time writer) pre-lock their
 complete set through the two functions before the first guarded INSERT; a direct multi-row INSERT gets its first row blocking and every
 other row only if free or already held (fail closed). Census (S72): a pg_proc scan of live function bodies and a src grep find no
-commission line row lock or line subject outside the two functions. A forged flag value only turns the first acquisition of a direct
-INSERT non-blocking (more refusals) or a later one blocking (at worst a 40P01 that rolls the transaction back; no money effect); direct
-INSERT is granted to kauro_commission only (§4 Grants). Lock sets:
+commission line row lock or line subject outside the two functions. The only forgeable input is a session-level marker taken before the
+transaction (pg_advisory_lock_shared on the marker key): it makes the first acquisition non-blocking (more KC021 refusals, then the
+G-ORD-2 recovery), never a later acquisition blocking; the r5 setting `kauro.commission_lines_locked` no longer exists, so SET, SET LOCAL
+and set_config of it change nothing (S75). Direct INSERT is granted to kauro_commission only (§4 Grants).
+
+**G-ORD-2 (r6, OFF-R4-01): KC021 outcome and recovery, one contract for every caller.** KC021 is raised only before any wait, by a
+guard, a hold INSERT, `take_commission_line_subject` or a re-issued fence, and the error aborts the whole transaction: every write of the
+attempt rolls back, including the command journal reservation, outbox rows and the advisory marker. (a) Unit of work
+(`unit-of-work.ts`): `transientSqlState` adds KC021, and a KC021 retry has its own budget (`LOCK_ORDER_RETRIES = 3`, jittered backoff
+5-40 ms on the injected clock) at every isolation level, independent of `maxRetries` (READ_COMMITTED keeps 0 retries for 40001/40P01);
+the work function re-runs whole, with the same logical identity (idempotency key, event id, statement id). (b) Exhausted:
+`sqlstate.ts` MAP `KC021: { code: "CAPACITY_UNAVAILABLE", reason: "LOCK_ORDER_CONTENTION", retryable: true }` (as 55P03 today), never
+INTERNAL_ERROR. (c) Per caller family: API commands (CMD051 correction, CMD052, CMD053 through `statements/service.ts:100` and
+`approve-payout.ts:89`) answer the retryable failure with no journal row, and the client's retry with the same idempotency key executes
+once; outbox consumers (`ledger-effects.ts` refund and reversal basis :271, funds observation :342, hold open and resolution :381 and
+`commercial-ledger.ts:625/701`) settle the delivery FAILED with the existing backoff (`dispatcher.ts:101`: retryable -> retryAt;
+DEAD_LETTER only after MAX_DELIVERY_ATTEMPTS, the existing alerting path) and the redelivery applies the event once (inbox dedup);
+PERIODS (`periods.ts:59`: the close and the per-statement noncash sweep) leave the period or statement unclosed or unsettled and the
+next tick closes or settles it once (UNIQUE statement_id, period close identity). Cells K00-K10 (F7) hold the contested subject with a
+second session until the KC021 is observed, assert full rollback, release the holder and assert exactly one economic result; each fails
+with its recovery step removed. Lock sets:
 - offset insert: N and R rows (KEY SHARE) ascending, both subjects ascending, then reads.
 - hold insert / hold resolution: the line's row (FK KEY SHARE; resolution: `lockLine` FOR UPDATE first), its subject (0036 fence), then
   yield or credit reconcile. B12 (X-B12-1): UPHELD and its correction in one transaction after the capture's line rows and subjects.
@@ -279,7 +321,7 @@ INSERT is granted to kauro_commission only (§4 Grants). Lock sets:
 | cutoff V2 (every hashed input, funds included) | the close's lines FOR UPDATE and subjects (all input lines) | every writer above, and `observeFunds`, needs one of them | S09, S38, S47, S57, S58, S60, S61 |
 | lock order across rows of one transaction (G-ORD-1) | the flag; non-blocking after the first acquisition | every guard above, the pre-lock functions, the re-issued fences | T31, T32, T33, Y26, C19, C20, C21, S70, S71, S72 |
 
-## 6. Tests (exact titles). Counts: F1 33, F2 26, F3 6, F4 74, F5 11, F6 21 = 171 (r5: +12)
+## 6. Tests (exact titles). Counts: F1 33, F2 26, F3 6, F4 76, F5 11, F6 21, F7 11 = 184 (r5: +12; r6: +13: S75, S76, K00-K10)
 
 F1 `packages/persistence/test/b10-offset-bounds.test.ts` (recreated). T01-T04, T06-T12, T16 kept verbatim from 843bf01:
 - T01 "DENY: an offset of 101 cents against an unpaid 100-cent line with a 1000-cent negative position is refused commission_offsets_amount and writes nothing"
@@ -427,6 +469,8 @@ F4 `apps/api/test/b10-offset-statements.test.ts` (new; CMD051, correction, CMD05
 - S71 "OK (ADV-OFF-1): a writer that pre-locks lines given in any order through commission_lock_line_rows and take_commission_line_subject takes them ascending (rows, then subjects) and then inserts releases, credit entries and CREDIT items for them in any order with no refusal and no wait"
 - S72 "DENY (ADV-OFF-1): after a line subject is taken, a guard or a hold INSERT needing a row or subject another transaction holds refuses commission_lock_order without waiting; a pg_proc census of live function bodies and a src census find no commission line row lock or line subject outside the two lock functions"
 - S73 "DENY (ADV-OFF-4): a direct noncash-settlement INSERT holds each item line's subject in exclusive mode before its credit reconcile reads (the session's pg_locks: ExclusiveLock and no ShareLock on every item line's subject); no shared-to-exclusive upgrade"
+- S75 "DENY (OFF-R4-03): a transaction that took L5's subject and then runs SET LOCAL kauro.commission_lines_locked = false (and, separately, a fresh transaction under a session-level SET of it) still gets KC021 commission_lock_order without waiting at L2's held row; a session-level marker taken before the transaction makes even its first acquisition refuse KC021 instead of waiting; both roll back completely"
+- S76 "RACE (OFF-R4-04): CMD043 close-agency holding its agency row FOR UPDATE and a period close inserting statement items naming that agency, both orders: the item's FK waits at the agency row and completes after it; no deadlock; the close's items are unchanged"
 - S74 "RACE (ADV-OFF-2): CreateRevision holding its project row FOR UPDATE and a period close inserting statement items naming that project, both orders: the item's FK waits at the project row and completes after it; no deadlock; the close's items are unchanged"
 
 F5 `packages/persistence/test/invariants.test.ts` (forged controls; positive controls stay silent):
@@ -462,12 +506,27 @@ F6 `packages/persistence/test/b10-seller-credit.test.ts` (new):
 - C17 "RACE: a hold opened and an INCREASE on one PAID line, both orders: the second waits on the line's subject; the same credit in either order"
 - C18 "RACE: two holds RELEASED on one PAID line, both orders: the second waits on the line's subject; credit equals both withheld amounts"
 - C19 "RACE (ADV-OFF-1): a direct two-row credit-entry INSERT (L5, then L2) while a period close holds L2's row and waits for L5's: the L2 row is refused commission_lock_order without waiting; no credit entry, the close commits, no deadlock"
-- C20 "RACE (ADV-OFF-1): two CREDIT items inserted in one transaction into an ISSUED statement for L5 then L2 while a correction holds L2's row: the L2 item is refused commission_lock_order without waiting; no item, no deadlock"
+- C20 "RACE (ADV-OFF-1, OFF-R4-02): two CREDIT items inserted in one transaction into a DRAFT statement (the issuance lifecycle: items before the DRAFT -> ISSUED edge) for L5 then L2, both with recognized credit, while a correction holds L2's row: the L5 item succeeds and holds L5's row and subject, the L2 item is refused KC021 commission_lock_order (not KA004) without waiting; both items roll back, no deadlock; with the cross-row protection removed the L2 item waits and the test fails"
 - C21 "RACE (partial, ADV-OFF-1): a multi-row credit-entry INSERT whose first row passed its guard and whose second row is refused commission_lock_order leaves neither row and the line's recognized credit unchanged"
 
 Family suites (kit `apps/api/test/b10-cells-support.ts`): CONS_TMO/CRB/CRA (refund, reversal), CMD_CRB/CRA of CMD051, the correction,
 CMD053 and the PERIODS sweep (SWEEP_*) cover the new writes once each member's footprint includes `commission_offset_releases`,
 `seller_credit_entries`, `commission_noncash_settlements` (FOOT-REL: an implementation obligation, closed by lane FOOT, not coverage until then).
+
+F7 `apps/api/test/b10-lock-order-recovery.test.ts` (new, r6, OFF-R4-01; each cell: a second session holds the contested later subject
+until the caller's KC021 is observed, then releases it; asserts complete rollback of the refused attempt and exactly one economic result:
+no duplicate hold, adjustment, release, credit entry, item, settlement or journal row; each fails with its recovery step removed):
+- K00 "RETRY (OFF-R4-01): the unit of work retries KC021 at READ_COMMITTED with maxRetries 0 up to LOCK_ORDER_RETRIES and, exhausted, raises CAPACITY_UNAVAILABLE LOCK_ORDER_CONTENTION retryable, never INTERNAL_ERROR"
+- K01 "RETRY (OFF-R4-01): CMD052 fencing L2 then L5 while another approval holds L5's shared subject and a writer waits for its exclusive one: the first attempt is refused KC021 and rolls back with its journal reservation; the in-transaction retry after the holder ends approves once"
+- K02 "RETRY (OFF-R4-01): CMD052 under contention past LOCK_ORDER_RETRIES answers CAPACITY_UNAVAILABLE with no journal row; the client's retry with the same idempotency key after contention ends approves exactly one intent"
+- K03 "RETRY (OFF-R4-01): CMD053 FAILED refused KC021 at a later line subject leaves intent, lines, claims and predecessor unchanged; the retry with the same key applies the correction once"
+- K04 "RETRY (OFF-R4-01): a correction (CMD051) refused KC021 at a release's line leaves the predecessor live; the retry corrects once with one successor"
+- K05 "RETRY (OFF-R4-01): a refund basis change consumer refused KC021 settles the delivery FAILED with a retryAt; the redelivery after contention applies one adjustment and one yield"
+- K06 "RETRY (OFF-R4-01): a reversal basis change consumer refused KC021 is redelivered and applied once"
+- K07 "RETRY (OFF-R4-01): a funds observation refused KC021 at a capture line's subject is redelivered and records one observation"
+- K08 "RETRY (OFF-R4-01): a hold opened and a hold RELEASED on a PAID line, each refused KC021 at the credit reconcile, are redelivered and leave one hold transition and one credit entry each"
+- K09 "RETRY (OFF-R4-01): a period close refused KC021 leaves the period open with no statement; the next PERIODS tick closes it once"
+- K10 "RETRY (OFF-R4-01): a noncash settlement sweep refused KC021 for one statement settles the others; the next tick settles it once (UNIQUE statement_id)"
 
 ## 7. Failure-mode matrix (C = test above, written first; all money cells tier 1)
 
@@ -487,7 +546,7 @@ CMD053 and the PERIODS sweep (SWEEP_*) cover the new writes once each member's f
 | M12 credit entry INSERT / CREDIT item INSERT (guarded) | **C** C06, C08, C13, C14, C15; multi-row C19, C20 | **C** C09, C10 | N/A | N/A: single INSERT | N/A | **C** C07 | N/A | **C** C21 (second row refused, neither row stays); its guards are DENY C05, C07 |
 | M13 CMD052 with CREDIT items (shared subjects, holds, funds) | **C** S55, S56 | **C** CMD052 TIMEOUT cell (existing; CREDIT lines join its subject loop) | **C** CMD052 step-up EXPIRY cells (existing) | **C** CMD052 CRASH-BEFORE (existing) | **C** CMD052 CRASH-AFTER (existing) | **C** CMD052 RETRY (existing) | **C** CMD052 REVOCATION (existing: destination, step-up) | N/A: one intent INSERT; its KC018 trigger is the guard (S55) |
 | M14 cutoff V2 (proposal vs close) | **C** S09, S47, S61 | N/A: hash comparison, no wait | N/A | N/A: read-only | N/A | **C** S57, S58, S60 (stale proposal refused) | N/A | N/A: read-only |
-| M15 lock order across the rows of one transaction (G-ORD-1, r5) | **C** T31, T32, T33, Y26, C19, C20, S70 | N/A: after the first acquisition nothing waits (non-blocking); the first acquisition's waits are T27, C09, C10 | N/A: no deadline | N/A: locks only; the transaction's writes roll back with it (C21) | N/A: locks end at COMMIT, nothing durable | **C** S71 (the caller retries through the pre-lock functions and succeeds) | N/A: no authority read; the flag is transaction-local (forged values: §5) | **C** C21, T31 |
+| M15 lock order across the rows of one transaction (G-ORD-1, r5; G-ORD-2, r6) | **C** T31, T32, T33, Y26, C19, C20, S70, S75 | N/A: after the first acquisition nothing waits (non-blocking); the first acquisition's waits are T27, C09, C10 | N/A: no deadline | N/A: locks only; the transaction's writes roll back with it (C21) | N/A: locks end at COMMIT, nothing durable | **C** K00-K10 (G-ORD-2: an actual KC021 per caller, complete rollback, recovery after contention, one result); S71 is the uncontended OK path | N/A: no authority read; the marker is a transaction-scoped advisory lock with no explicit unlock (forged settings and session markers: S75) | **C** C21, T31 |
 
 Writer pairs on one line. Writers: O offset, H hold opened, HR hold RELEASED, U UPHELD + its correction (X-B12-1 protocol, built here,
 called by B12), D entitlement change (refund, reversal), I entitlement change of a settled source, C close, K correction, F CMD053
@@ -517,9 +576,10 @@ instant, guard, deferred applied check, RLS FORCE, grants §4); `kauro.commissio
 (§2.5, close and correction only); re-issued `commission_offsets_authorized` (settled source, live amounts, pos with A_in and C_paid);
 triggers `commission_holds_offsets_yield` (AFTER INSERT, after line_fence) and `commission_lines_offsets_yield` (AFTER UPDATE OF
 cumulative_entitlement_cents, state). No `commission_holds_offset_room`. G-ORD-1 (r5): `kauro.commission_lock_line_rows`,
-`kauro.take_commission_line_subject` and the flag `kauro.commission_lines_locked`; `take_commission_line_lock` (0036) and the
+`kauro.take_commission_line_subject` and the marker function `kauro.commission_lines_locked()` (r6: transaction-scoped shared advisory marker, no custom setting); `take_commission_line_lock` (0036) and the
 `commission_lines_line_fence` trigger re-issued over them; `commission_holds_lock_order` (BEFORE INSERT on holds); each guard's flag-on non-blocking branch with SQLSTATE KC021
-`commission_lock_order` (provisional); the noncash guard's exclusive subjects.
+`commission_lock_order` (provisional); the noncash guard's exclusive subjects. Application (r6, G-ORD-2): `sqlstate.ts` KC021 ->
+CAPACITY_UNAVAILABLE LOCK_ORDER_CONTENTION retryable; `unit-of-work.ts` `transientSqlState` adds KC021 with its own LOCK_ORDER_RETRIES budget.
 `0046_seller_credit.sql`: `payout_lines_unpayable` re-issued with the CREDIT branch (OFF-R2-02), its shared subjects through
 `take_commission_line_subject`; `statement_items_credit_guard`; `seller_credit_entries` (append-only, reconciled guard, RLS FORCE, seller read own); `kauro.seller_credit_reconcile`;
 credit triggers on commission_lines (E, state) and commission_holds (INSERT, state) for settled lines; `statement_items` ALTER: item_kind
@@ -551,8 +611,9 @@ close lock sets §5; PERIODS sweep noncash step; `commissionCutoffHash` V2 (§2.
 - OFF-C9 (r5, ADV-OFF-1, G-ORD-1): a guard waits only for the first acquisition of its transaction; every later acquisition is
   pre-locked (re-entrant) or non-blocking and refused `commission_lock_order`; in-product writers pre-lock; the PERIODS sweep settles one
   statement per transaction. 07 "Transaction discipline": "Multi-row invariants use explicit locking or bounded serializable retries. The
-  implementation documents why the chosen isolation prevents the relevant interleaving." T31-T33, Y26, C19-C21, S70-S72.
-- OFF-C10 (r5, ADV-OFF-2): FK parents audited (§4); the only parent with an explicit FOR UPDATE holder is projects, whose holders take no
-  B10 lock (S74).
+  implementation documents why the chosen isolation prevents the relevant interleaving." T31-T33, Y26, C19-C21, S70-S72, S75; the
+  refusal's bounded retry and per-caller recovery (G-ORD-2): K00-K10.
+- OFF-C10 (r5, ADV-OFF-2; r6, OFF-R4-04): FK parents audited (§4), constraint and inline references; two parents have an explicit FOR
+  UPDATE holder, projects (S74) and agencies (S76), and neither holder takes a B10 lock.
 - No registry amendment is needed: noncash settlement adds no state or edge. An optional later amendment (PAYABLE to PAID on noncash
   evidence) would only rename the frozen state; not requested.
