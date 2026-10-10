@@ -1,11 +1,12 @@
-# B10-OFFSET: offsets are claims that yield; seller credit and noncash settlement are durable (design r6, D10-NEG-4..7)
+# B10-OFFSET: offsets are claims that yield; seller credit and noncash settlement are durable (design r7, D10-NEG-4..7)
 
 Lane `B10-OFFSET` (branch `b10/offset`, builds after kit PR1 merges). r1 = 97839bd; r2 answers Codex design review r1
 (`tools/review/out/b10-offset-design-97839bdc0b32`, REJECT, OFF-R1..R8); r3 answers design r2 on 18ca05b
 (`tools/review/out/b10-offset-design-r2-18ca05bdf51e`, REJECT: OFF-R1..R3, R5, R7, R8 FIXED; OFF-R4, OFF-R6 PARTIAL; OFF-R2-01..04 new); r4 answers design r3 on af1ff58
 (`tools/review/out/b10-offset-design-r3-af1ff58c9899`, REJECT, converging: r2 defects and release guards FIXED; OFF-R3-01, OFF-R3-02 new; OFF-R6 PARTIAL); r5 answers the internal design-closure adversary on 744dd25
 (`.kauro/reviews/b05-r3-offset-r4-design-adversary.md`, NOT_READY: ADV-OFF-1 MAJOR, ADV-OFF-2..4 MINOR; §0.1); r6 answers Codex design r4 on e7b8a92
-(`tools/review/out/b10-offset-design-r4-e7b8a92e657b`, REJECT: OFF-R1..R8 and ADV-OFF-1..4 FIXED; OFF-R4-01, OFF-R4-02 MAJOR, OFF-R4-03, OFF-R4-04 MINOR new; §0.2). Supersedes D10-NEG-3 and the provisional
+(`tools/review/out/b10-offset-design-r4-e7b8a92e657b`, REJECT: OFF-R1..R8 and ADV-OFF-1..4 FIXED; OFF-R4-01, OFF-R4-02 MAJOR, OFF-R4-03, OFF-R4-04 MINOR new; §0.2); r7 answers Codex design r5 on 2a64de6
+(`tools/review/out/b10-offset-design-r5-2a64de6*`, REJECT: OFF-R4-02, OFF-R4-03 FIXED; OFF-R4-01, OFF-R4-04 PARTIAL; OFF-R5-01 new; §0.3). Supersedes D10-NEG-3 and the provisional
 `0045_offset_capacity_holds.sql` (843bf01; reverted on the kit by f78af7b). Inputs: adversary ADV-3, ADV-9, ADV-10, ADV-14, ADV-15,
 ADV-17, ADV-18. Governing text: 17 "Refunds after payout and negative balances" (the statement shows original accrual, payout,
 adjustment and current balance), 17 "Accrual, eligibility and payout" (approved undisputed payable amounts; no minimum payout), 17
@@ -48,7 +49,7 @@ r3 (design r2 findings):
 | finding | closed in (section) | tests (exact titles in §6) |
 |---|---|---|
 | ADV-OFF-1 MAJOR multi-row lock order (credit entries, offsets, releases, CREDIT items, multi-statement sweeps) | §5 G-ORD-1 :235 (one blocking acquisition per transaction, then pre-locked or non-blocking; refusal `commission_lock_order`); §5 noncash sweep :266; §5.1 :280; §7 M15 :490; §8 :519; §9 OFF-C9 :551 | T31, T32, T33, Y26, C19, C20, C21, S70, S71, S72 |
-| ADV-OFF-2 MINOR FK audit incomplete | §4 FK audit :194: all FKs of the five guarded INSERTs with their parent's lock position (offsets -> seller_agreements 0030:245; statement_items -> adjustment, hold, offset, project 0031:203-206) | S74 (projects, the only parent with an explicit FOR UPDATE holder); the others are proofs (append-only or no FOR UPDATE holder) |
+| ADV-OFF-2 MINOR FK audit incomplete | §4 FK audit :194: all FKs of the five guarded INSERTs with their parent's lock position (offsets -> seller_agreements 0030:245; statement_items -> adjustment, hold, offset, project 0031:203-206) | S74 (projects) and, since r6, S76 (agencies): the two parents with an explicit FOR UPDATE holder; the others are proofs (append-only or no FOR UPDATE holder) |
 | ADV-OFF-3 MINOR S60/S61 inconsistent | §2.8 :140 (the proposal's read position named); S61 retitled :417 | S60, S61 |
 | ADV-OFF-4 MINOR noncash guard shared subjects | §4 noncash guard :189 takes **exclusive** subjects; §5 noncash sweep :266; §5.1 | S73 |
 
@@ -60,6 +61,14 @@ r3 (design r2 findings):
 | OFF-R4-02 MAJOR C20 unreachable (ISSUED statement refuses the first item KA004) | C20 retitled onto the issuance lifecycle: items into a DRAFT statement before its DRAFT -> ISSUED edge (commercial-statements.ts:780/816) | C20 |
 | OFF-R4-03 MINOR session-settable flag | §5 G-ORD-1: the custom setting `kauro.commission_lines_locked` is removed; "this transaction holds a B10 lock" is a transaction-scoped shared advisory marker read from pg_locks; an xact advisory lock has no explicit unlock, so no SET, local reset or session value can turn a later acquisition blocking; a session-level marker only makes a first acquisition non-blocking (more KC021, never a wait) | S75 |
 | OFF-R4-04 MINOR FK census misses agencies and sellers | §4 FK audit: statement_items.agency_id -> agencies (0031:184; FOR UPDATE by `agencies.lock`, tenancy.ts:192, callers CMD002 activate-agency.ts:50 and CMD043 close-agency.ts:69, which take no commission row, subject or statement and whose triggers touch no commission table) and commission_offsets.seller_id / commission_statements.seller_id -> sellers (0030:235, 0031:121; only FOR NO KEY UPDATE, commercial-sales.ts:369, never conflicts with KEY SHARE); OFF-C10 corrected: two parents have an explicit FOR UPDATE holder, projects and agencies, and neither holder takes a B10 lock | S74, S76 |
+
+### 0.3 Revision r7: Codex design r5 findings (2a64de6)
+
+| finding | closed in (section) | tests |
+|---|---|---|
+| OFF-R4-01 PARTIAL hold paths grouped under redelivery | §5 G-ORD-2 (c) now names each caller by its real invocation boundary: funds-hold release is the ELIGIBILITY sweep item (sweeps.ts:197, failure reported and left for the next pass, sweeps.ts:48-53), not an outbox delivery; hold opening is the funds-observation consumer (K07) or an owner command (API family). (d) single-line paths: `take_commission_line_subject` takes the line's row FOR KEY SHARE before the subject (re-entrant when held), so every subject holder holds the row; a single-line writer whose first acquisition is the line row FOR UPDATE therefore waits there (its one allowed wait) and its later subject is re-entrant or free: KC021 is unreachable on that path. K08 split: K08 proves the wait (no KC021, one release); K08b proves the sweep recovery with the KC021 injected at the subject call by the kit fault harness (the only way to reach a refusal the lock order makes unreachable) | K08, K08b |
+| OFF-R5-01 MAJOR K01 unreachable (CMD052 holds the global payout-cash lock) | K01/K02 holder is no longer a CMD052: a second session calls the production `kauro.take_commission_line_subject(L5, exclusive)` (row KEY SHARE + exclusive subject, no cash lock), so the approval takes its cash lock, statement and line rows (KEY SHARE vs KEY SHARE: granted), its L2 subject, and is refused KC021 at L5's shared subject; the holder commits only after the observation | K01, K02 |
+| OFF-R4-04 PARTIAL lockShared described as FOR SHARE; §0.1 "only projects" | §4: `lockShared` is `awaitTransition` + a plain SELECT (tenancy.ts:200-203), no row lock; §0.1 row corrected (projects and agencies) | S76 |
 
 ## 1. What is wrong on 0030 today (latent: `recordOffset` has no production caller, OQ-1)
 
@@ -221,7 +230,7 @@ Database guards (named, each its own DENY test, rule 12):
     nothing B10 holds: no cycle (S74).
   - agencies (statement_items.agency_id, 0031:184, inline REFERENCES; r6, OFF-R4-04): explicit FOR UPDATE by `agencies.lock`
     (tenancy.ts:192), called only by CMD002 activate-agency.ts:50 and CMD043 close-agency.ts:69 (every other agency reader uses
-    `lockShared`, FOR SHARE, which does not conflict with KEY SHARE). Neither unit takes a commission row, subject or statement: their
+    `lockShared`: `awaitTransition` then a plain SELECT, tenancy.ts:200-203, no row lock, so no FK wait). Neither unit takes a commission row, subject or statement: their
     repository (commercial-agency-lifecycle.ts) touches no commission table and no trigger on agencies, quotes, founding slots, closures or
     acceptances writes one. An item insert may wait at the agency row; its holder waits on nothing B10 holds: no cycle (S76).
   - sellers (commission_offsets.seller_id 0030:235 and commission_statements.seller_id 0031:121, inline REFERENCES): no FOR UPDATE in src
@@ -255,7 +264,8 @@ transaction requests a row or subject of (1)/(2) after taking any subject. Each 
 **G-ORD-1 (r5, ADV-OFF-1): one blocking acquisition per transaction, then pre-locked or non-blocking.** A per-row BEFORE guard cannot
 order rows across a multi-row INSERT, several guarded INSERTs or a multi-statement sweep in one transaction. Every B10 line row lock and
 line subject is taken through two functions (0045): `kauro.commission_lock_line_rows(lines uuid[], mode)` (sorted ascending, one
-statement) and `kauro.take_commission_line_subject(line uuid, mode)`; both first take the transaction-scoped shared advisory marker
+statement) and `kauro.take_commission_line_subject(line uuid, mode)` (r7: takes the line's row FOR KEY SHARE first, re-entrant when this
+transaction holds it, so every holder of a line subject holds that line's row); both first take the transaction-scoped shared advisory marker
 `pg_advisory_xact_lock_shared(<B10 lock-order class>, 0)` (r6, OFF-R4-03; replaces the r5 custom setting, which any session could SET or
 reset). "Flag on" is `kauro.commission_lines_locked()`: this backend holds that marker (pg_locks: pid = pg_backend_pid(), locktype
 advisory, the marker key, granted). A transaction-level advisory lock has no explicit unlock (pg_advisory_unlock* releases only
@@ -286,9 +296,14 @@ the work function re-runs whole, with the same logical identity (idempotency key
 `sqlstate.ts` MAP `KC021: { code: "CAPACITY_UNAVAILABLE", reason: "LOCK_ORDER_CONTENTION", retryable: true }` (as 55P03 today), never
 INTERNAL_ERROR. (c) Per caller family: API commands (CMD051 correction, CMD052, CMD053 through `statements/service.ts:100` and
 `approve-payout.ts:89`) answer the retryable failure with no journal row, and the client's retry with the same idempotency key executes
-once; outbox consumers (`ledger-effects.ts` refund and reversal basis :271, funds observation :342, hold open and resolution :381 and
-`commercial-ledger.ts:625/701`) settle the delivery FAILED with the existing backoff (`dispatcher.ts:101`: retryable -> retryAt;
+once; outbox consumers (consumer.ts: `ledger-effects.ts` refund and reversal basis :271, funds observation :342 with the hold it opens
+through `commercial-ledger.ts:625`) settle the delivery FAILED with the existing backoff (`dispatcher.ts:101`: retryable -> retryAt;
 DEAD_LETTER only after MAX_DELIVERY_ATTEMPTS, the existing alerting path) and the redelivery applies the event once (inbox dedup);
+the ELIGIBILITY sweep (`sweeps.ts:197`, `releaseFundsHold` ledger-effects.ts:381) reports the item FAILED and leaves the hold for the
+next pass (`sweeps.ts:48-53`); owner hold commands (dispute hold open, RELEASED, UPHELD, and the direct offset insertion
+`commercial-ledger.ts:701`) are API commands of the first family. (d) Single-line writers (hold release, hold resolution, one-line
+credit reconcile): their first acquisition is the line row FOR UPDATE and every holder of that line's subject holds its row (r7), so
+they wait at the row and never reach KC021 (K08); their recovery for an injected KC021 is still specified and tested (K08b);
 PERIODS (`periods.ts:59`: the close and the per-statement noncash sweep) leave the period or statement unclosed or unsettled and the
 next tick closes or settles it once (UNIQUE statement_id, period close identity). Cells K00-K10 (F7) hold the contested subject with a
 second session until the KC021 is observed, assert full rollback, release the holder and assert exactly one economic result; each fails
@@ -321,7 +336,7 @@ with its recovery step removed. Lock sets:
 | cutoff V2 (every hashed input, funds included) | the close's lines FOR UPDATE and subjects (all input lines) | every writer above, and `observeFunds`, needs one of them | S09, S38, S47, S57, S58, S60, S61 |
 | lock order across rows of one transaction (G-ORD-1) | the flag; non-blocking after the first acquisition | every guard above, the pre-lock functions, the re-issued fences | T31, T32, T33, Y26, C19, C20, C21, S70, S71, S72 |
 
-## 6. Tests (exact titles). Counts: F1 33, F2 26, F3 6, F4 76, F5 11, F6 21, F7 11 = 184 (r5: +12; r6: +13: S75, S76, K00-K10)
+## 6. Tests (exact titles). Counts: F1 33, F2 26, F3 6, F4 76, F5 11, F6 21, F7 12 = 185 (r5: +12; r6: +13: S75, S76, K00-K10; r7: +1 K08b)
 
 F1 `packages/persistence/test/b10-offset-bounds.test.ts` (recreated). T01-T04, T06-T12, T16 kept verbatim from 843bf01:
 - T01 "DENY: an offset of 101 cents against an unpaid 100-cent line with a 1000-cent negative position is refused commission_offsets_amount and writes nothing"
@@ -517,14 +532,15 @@ F7 `apps/api/test/b10-lock-order-recovery.test.ts` (new, r6, OFF-R4-01; each cel
 until the caller's KC021 is observed, then releases it; asserts complete rollback of the refused attempt and exactly one economic result:
 no duplicate hold, adjustment, release, credit entry, item, settlement or journal row; each fails with its recovery step removed):
 - K00 "RETRY (OFF-R4-01): the unit of work retries KC021 at READ_COMMITTED with maxRetries 0 up to LOCK_ORDER_RETRIES and, exhausted, raises CAPACITY_UNAVAILABLE LOCK_ORDER_CONTENTION retryable, never INTERNAL_ERROR"
-- K01 "RETRY (OFF-R4-01): CMD052 fencing L2 then L5 while another approval holds L5's shared subject and a writer waits for its exclusive one: the first attempt is refused KC021 and rolls back with its journal reservation; the in-transaction retry after the holder ends approves once"
-- K02 "RETRY (OFF-R4-01): CMD052 under contention past LOCK_ORDER_RETRIES answers CAPACITY_UNAVAILABLE with no journal row; the client's retry with the same idempotency key after contention ends approves exactly one intent"
+- K01 "RETRY (OFF-R4-01, OFF-R5-01): CMD052 for a statement with L2 and L5 while a second session holds L5's row FOR KEY SHARE and its exclusive subject through kauro.take_commission_line_subject (no payout-cash lock): the approval takes its cash lock, statement and both line rows, its L2 subject, and is refused KC021 at L5's shared subject; the attempt rolls back with its journal reservation and cash lock; the holder commits after the KC021 is observed and the unit of work's retry approves once"
+- K02 "RETRY (OFF-R4-01, OFF-R5-01): CMD052 with the K01 holder kept past LOCK_ORDER_RETRIES answers CAPACITY_UNAVAILABLE with no journal row; the client's retry with the same idempotency key after contention ends approves exactly one intent"
 - K03 "RETRY (OFF-R4-01): CMD053 FAILED refused KC021 at a later line subject leaves intent, lines, claims and predecessor unchanged; the retry with the same key applies the correction once"
 - K04 "RETRY (OFF-R4-01): a correction (CMD051) refused KC021 at a release's line leaves the predecessor live; the retry corrects once with one successor"
 - K05 "RETRY (OFF-R4-01): a refund basis change consumer refused KC021 settles the delivery FAILED with a retryAt; the redelivery after contention applies one adjustment and one yield"
 - K06 "RETRY (OFF-R4-01): a reversal basis change consumer refused KC021 is redelivered and applied once"
 - K07 "RETRY (OFF-R4-01): a funds observation refused KC021 at a capture line's subject is redelivered and records one observation"
-- K08 "RETRY (OFF-R4-01): a hold opened and a hold RELEASED on a PAID line, each refused KC021 at the credit reconcile, are redelivered and leave one hold transition and one credit entry each"
+- K08 "RACE (OFF-R4-01, r7): the ELIGIBILITY sweep releasing a funds hold on a PAID line while CMD052 holds that line's row and shared subject: the release waits at the line row (its first acquisition) and completes after the approval; no KC021, one release and one credit entry"
+- K08b "RETRY (OFF-R4-01, r7): an ELIGIBILITY sweep item whose releaseFundsHold is refused KC021 (injected by the kit fault harness at the subject call) is reported FAILED CAPACITY_UNAVAILABLE with the hold and credit unchanged; the next pass releases it once with one credit entry"
 - K09 "RETRY (OFF-R4-01): a period close refused KC021 leaves the period open with no statement; the next PERIODS tick closes it once"
 - K10 "RETRY (OFF-R4-01): a noncash settlement sweep refused KC021 for one statement settles the others; the next tick settles it once (UNIQUE statement_id)"
 
@@ -546,7 +562,7 @@ no duplicate hold, adjustment, release, credit entry, item, settlement or journa
 | M12 credit entry INSERT / CREDIT item INSERT (guarded) | **C** C06, C08, C13, C14, C15; multi-row C19, C20 | **C** C09, C10 | N/A | N/A: single INSERT | N/A | **C** C07 | N/A | **C** C21 (second row refused, neither row stays); its guards are DENY C05, C07 |
 | M13 CMD052 with CREDIT items (shared subjects, holds, funds) | **C** S55, S56 | **C** CMD052 TIMEOUT cell (existing; CREDIT lines join its subject loop) | **C** CMD052 step-up EXPIRY cells (existing) | **C** CMD052 CRASH-BEFORE (existing) | **C** CMD052 CRASH-AFTER (existing) | **C** CMD052 RETRY (existing) | **C** CMD052 REVOCATION (existing: destination, step-up) | N/A: one intent INSERT; its KC018 trigger is the guard (S55) |
 | M14 cutoff V2 (proposal vs close) | **C** S09, S47, S61 | N/A: hash comparison, no wait | N/A | N/A: read-only | N/A | **C** S57, S58, S60 (stale proposal refused) | N/A | N/A: read-only |
-| M15 lock order across the rows of one transaction (G-ORD-1, r5; G-ORD-2, r6) | **C** T31, T32, T33, Y26, C19, C20, S70, S75 | N/A: after the first acquisition nothing waits (non-blocking); the first acquisition's waits are T27, C09, C10 | N/A: no deadline | N/A: locks only; the transaction's writes roll back with it (C21) | N/A: locks end at COMMIT, nothing durable | **C** K00-K10 (G-ORD-2: an actual KC021 per caller, complete rollback, recovery after contention, one result); S71 is the uncontended OK path | N/A: no authority read; the marker is a transaction-scoped advisory lock with no explicit unlock (forged settings and session markers: S75) | **C** C21, T31 |
+| M15 lock order across the rows of one transaction (G-ORD-1, r5; G-ORD-2, r6) | **C** T31, T32, T33, Y26, C19, C20, S70, S75 | N/A: after the first acquisition nothing waits (non-blocking); the first acquisition's waits are T27, C09, C10 | N/A: no deadline | N/A: locks only; the transaction's writes roll back with it (C21) | N/A: locks end at COMMIT, nothing durable | **C** K00-K10, K08b (G-ORD-2: an actual KC021 per caller, complete rollback, recovery after contention, one result); S71 is the uncontended OK path | N/A: no authority read; the marker is a transaction-scoped advisory lock with no explicit unlock (forged settings and session markers: S75) | **C** C21, T31 |
 
 Writer pairs on one line. Writers: O offset, H hold opened, HR hold RELEASED, U UPHELD + its correction (X-B12-1 protocol, built here,
 called by B12), D entitlement change (refund, reversal), I entitlement change of a settled source, C close, K correction, F CMD053
