@@ -1,11 +1,21 @@
-// I-2 / I-3: no composition root can open a PostgreSQL connection outside LOCAL without verified TLS. The structural scan lists
-// every site that builds a pool or a client in apps/ and packages/*/src; each non-persistence site must call connectionSecurityOf
-// (the one rule), and the persistence sites must derive ssl only from sslOptionsOf (rejectUnauthorized: true).
+// I-2 / I-3: no process can open a PostgreSQL connection outside LOCAL without verified TLS.
+//
+// DB-TLS-R4/R5 root cause (adversary ADV-1/ADV-2 on d515f18): the earlier scan listed the spellings of an unchecked connection (a denylist:
+// aliases, index specifiers, require forms) and each round found a spelling it missed. The design is now an allowlist plus enforcement at
+// the single construction point:
+//   1. packages/persistence/src/pool.ts builds every connection (KauroPool through createPool, the migrator's client) and applies
+//      connectionSecurityOf there itself (pool-enforcement.test.ts proves it for every import route). Calling, aliasing, re-exporting or
+//      wrapping createPool therefore cannot produce an insecure pool, and none of those is a scan finding.
+//   2. This scan proves nothing else can reach the driver: through the TypeScript AST, every module a file loads (import, export-from,
+//      import-equals, dynamic import, require, createRequire()()) is resolved by its literal specifier, and only DRIVER_FILES may load a
+//      PostgreSQL driver. A load whose specifier is not a literal, and every other module-loading primitive (createRequire, the module and
+//      vm modules, getBuiltinModule, module.require, _load, eval), is a finding unless allowlisted at its exact file and line: fail closed.
+//   3. Type-only references (`import type`, `import { type X }`, `import("x").T` in a type position) load nothing and are never findings.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -46,113 +56,146 @@ function tempRepo(tracked: Record<string, string>, untracked: Record<string, str
   return { dir, done: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
-/**
- * ADV-10 (1896dea): comments removed by the TypeScript parser and printer, which know strings, templates and regular
- * expressions ("a//b" is not a comment); a bare scanner loses its place at template tails and regex literals.
- */
-const printer = ts.createPrinter({ removeComments: true });
-/** The parse mode follows the file name: parsed as plain TS, `<A>{new Pool(c)}</A>` in a .tsx file prints as `{ new: Pool(c) }`. */
+/** The parse mode follows the file name: parsed as plain TS, `<A>{new Pool(c)}</A>` in a .tsx file is an object literal. */
 function scriptKindOf(rel: string): ts.ScriptKind {
   if (rel.endsWith(".tsx")) return ts.ScriptKind.TSX;
   if (rel.endsWith(".jsx")) return ts.ScriptKind.JSX;
   return /\.[cm]?js$/.test(rel) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
 }
-function withoutComments(text: string, rel: string, eraseTypes = false): string {
-  const source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, false, scriptKindOf(rel));
-  if (!eraseTypes) return printer.printFile(source);
-  // DB-TLS-R5: `import("./pool.js").T` and `typeof import("./pool.js")` in a type position are erased by the compiler (no run-time access to the module): each becomes `unknown`
-  const erase: ts.TransformerFactory<ts.SourceFile> = (context) => {
-    const visit = (node: ts.Node): ts.Node => (ts.isImportTypeNode(node) ? ts.factory.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword) : ts.visitEachChild(node, visit, context));
-    return (file) => ts.visitNode(file, visit) as ts.SourceFile;
-  };
-  const result = ts.transform(source, [erase]);
-  try {
-    return printer.printFile(result.transformed[0]!);
-  } finally {
-    result.dispose();
-  }
-}
 
-function code(text: string, rel = "scan.ts", eraseTypes = false): string {
-  return withoutComments(text, rel, eraseTypes)
-    // ADV-8 (56673d9): one spelling per form before matching: `import (`/`require (` -> `import(`, a template literal without
-    // substitutions -> a quoted string, so the patterns need not enumerate spacing and quoting variants
-    .replace(/\b(import|require)\s+\(/g, "$1(")
-    .replace(/`([^`$\\]*)`/g, '"$1"');
-}
-
-/** The ways a file opens (or can open) a PostgreSQL connection: a constructor, an aliased or namespace import of pg's classes, createPool, applyMigrationsAs, a connection string. */
-const SITE_FORMS: ReadonlyArray<RegExp> = [
-  /\bnew\s+(?:[\w$]+\s*\.\s*)*(?:Pool|Client|KauroPool)\s*\(/,
-  // DB-TLS-R2: persistence's exported KauroPool opens connections too: its constructor, a value import or re-export of it (aliased or not)
-  /\b(?:import|export)\s+(?!type\b)\{[^}]*(?<!type\s)\bKauroPool\b[^}]*\}\s*from\b/,
-  // ADV-1 (e692ba2): KauroPool taken by destructuring (a dynamic import, a require, a namespace object), as a namespace member, or persistence loaded at run time
-  /(?<!:[ \t]*)\{[^{}\n]*\bKauroPool\b[^{}\n]*\}[ \t]*=(?!=)/,
-  /[\w$)\]]\s*\.\s*KauroPool\b/,
-  /(?:\brequire\(\s*|\bimport\(\s*)["']@kauro\/persistence["']/,
-  // ADV-5 (1b9e8fa): every value path to KauroPool starts at an import; a namespace import or star re-export of persistence is a site
-  // whatever is done with the namespace afterwards (multi-line or nested destructuring, defaults, computed members)
-  /\b(?:import|export)\s+(?!type\b)\*(?:\s+as\s+[\w$]+)?\s+from\s*["']@kauro\/persistence["']/,
-  /\bimport\s+(?!type\b)\{[^}]*(?<!type\s)\b(?:Pool|Client)\b[^}]*\}\s*from\s*["']pg["']/,
-  /\bimport\s+(?!type\b)(?:\*\s+as\s+[\w$]+|[\w$]+)\s*(?:,\s*\{[^}]*\})?\s*from\s*["']pg["']/,
-  /\brequire\(\s*["']pg["']\s*\)/,
-  /\bimport\(\s*["']pg["']\s*\)/,
-  /\bcreatePool\b/,
-  /\bapplyMigrationsAs\b/,
-  /\bconnectionString\b/,
-  // a re-export of the driver's classes, a CommonJS require made inside an ES module, any other PostgreSQL driver or data layer
-  /\bexport\s+(?!type\b)(?:\{[^}]*(?<!type\s)\b(?:Pool|Client)\b[^}]*\}|\*(?:\s+as\s+[\w$]+)?)\s*from\s*["']pg["']/,
-  /\bcreateRequire\b/,
-  /(?:\bfrom\s*|\brequire\(\s*|\bimport\(\s*)["'](?:postgres|pg-promise|pg-native|pg-pool|pg-cursor|@neondatabase\/[\w-]+|@vercel\/postgres|@databases\/pg[\w-]*|slonik|knex|kysely|typeorm|sequelize|drizzle-orm[\w/-]*|@prisma\/client|@supabase\/[\w-]+)["']/,
-];
-
-/** The constructors only: a persistence file that holds one must derive ssl from sslOptionsOf; one without is a re-export. */
-const CONSTRUCTS = /\bnew\s+(?:[\w$]+\s*\.\s*)*(?:Pool|Client)\s*\(/;
-
-/** ADV-3 (a88da2e): KauroPool is constructed in pool.ts (createPool) only; a persistence wrapper elsewhere would hand apps a pool whose callers are not sites. */
-const CONSTRUCTS_KAURO_POOL = /\bnew\s+(?:[\w$]+\s*\.\s*)*KauroPool\s*\(/;
+/** Every PostgreSQL driver or data layer, by package name (a subpath such as pg/lib/client included). */
+const DRIVER = /^(?:pg|pg-[\w.-]+|postgres|@neondatabase\/[\w.-]+|@vercel\/postgres|@databases\/pg[\w.-]*|slonik|knex|kysely|typeorm|sequelize|drizzle-orm|@prisma\/client|@supabase\/[\w.-]+)(?:\/.*)?$/s;
 
 /**
- * DB-TLS-R3 (fdf3360): inside persistence every value path to KauroPool starts at an import of the pool module, so only pool.ts
- * (defines it) and index.ts (the package's re-export) may take it as a value; elsewhere it is a type only, which closes aliases,
- * parenthesized constructors, destructuring and computed members at their source.
+ * The files that may load a driver. pool.ts builds every production connection under connectionSecurityOf. The others are the test-only
+ * subpath @kauro/persistence/testing (temporary clusters, the harness and the fault/fixture helpers connect as the superuser of a throw-away
+ * cluster); the architecture gate (tools/test/architecture-gate.test.mjs) keeps that subpath out of every production import graph.
  */
-const POOL_VALUE_IMPORTS: ReadonlyArray<RegExp> = [
-  // ADV-7 (56673d9): createPool too, so a persistence wrapper cannot hand apps a pool through a file they import without being a site
-  /\b(?:import|export)\s+(?!type\b)\{[^}]*(?<!type\s)\b(?:KauroPool|createPool)\b[^}]*\}\s*from\b/,
-  /\b(?:import|export)\s+(?!type\b)\*(?:\s+as\s+[\w$]+)?\s+from\s*["'][^"']*\/pool(?:\.js)?["']/,
-  /(?:\brequire\(\s*|\bimport\(\s*)["'][^"']*\/pool(?:\.js)?["']/,
-];
-const POOL_VALUE_HOLDERS = new Set(["packages/persistence/src/pool.ts", "packages/persistence/src/index.ts"]);
+const DRIVER_FILES: ReadonlySet<string> = new Set([
+  "packages/persistence/src/pool.ts",
+  "packages/persistence/src/testing/faults/interleave.ts",
+  "packages/persistence/src/testing/faults/scope.ts",
+  "packages/persistence/src/testing/harness.ts",
+  "packages/persistence/src/testing/temporary-postgres.ts",
+]);
 
-function persistenceProblem(rel: string, text: string): string | undefined {
-  const c = code(text, rel);
-  const runtime = code(text, rel, true);
-  if (CONSTRUCTS.test(c) && !text.includes("sslOptionsOf(")) return `${rel} derives ssl from sslOptionsOf`;
-  if (CONSTRUCTS_KAURO_POOL.test(c) && rel !== "packages/persistence/src/pool.ts") return `${rel} constructs KauroPool outside pool.ts`;
-  // ADV-9 (1896dea): createPool is not even mentioned elsewhere, so no import route (index namespace, run-time import) can wrap it
-  if (!POOL_VALUE_HOLDERS.has(rel) && (POOL_VALUE_IMPORTS.some((f) => f.test(runtime)) || /\bcreatePool\b/.test(runtime))) return `${rel} takes KauroPool or createPool as a value outside pool.ts and index.ts`;
-  // DB-TLS-R4: index.ts only RE-EXPORTS the pool module (`export { createPool, KauroPool } from "./pool.js"` binds nothing locally); a local
-  // binding of createPool or KauroPool there (an aliased import, then a wrapper) would hand apps a pool through a function that is not a site
-  if (rel === "packages/persistence/src/index.ts") {
-    const residual = runtime.replace(POOL_RE_EXPORT, "");
-    if (POOL_VALUE_IMPORTS.some((f) => f.test(residual)) || /\bcreatePool\b/.test(residual)) return `${rel} may only re-export createPool and KauroPool from the pool module, never bind them`;
-  }
-  // DB-TLS-R4: nothing else in persistence reaches the package index (or the package by name) as a namespace, a default or at run time:
-  // `I["create" + "Pool"](c)` rebuilds the factory without ever spelling it
-  if (!POOL_VALUE_HOLDERS.has(rel) && PACKAGE_INDEX_VALUE.some((f) => f.test(runtime))) return `${rel} reaches the package index as a namespace or at run time`;
-  return undefined;
+/** Modules that load other modules from computed names or evaluate code: loading them is itself a finding outside the allowlist. */
+const LOADER_MODULE = /^(?:node:)?(?:module|vm|worker_threads)$/;
+/** Node's module-loading and code-evaluation entry points, as a referenced name or a member name. */
+const LOADER_NAMES: ReadonlySet<string> = new Set(["createRequire", "getBuiltinModule", "mainModule", "_load", "_compile", "_resolveFilename", "eval"]);
+
+/**
+ * The exact loader uses that are allowed, by file, line and text (each one reviewed; any other line, or this text on another line, is a finding):
+ * - apps/web/scripts/next.mjs resolves the `next` binary's path with require.resolve; it loads no module through that require;
+ * - apps/web/e2e/support/serve.mjs (browser-suite support, never shipped) loads the compiled contract fake of the edge by its built path;
+ * - packages/data-plane/src/sandbox/child.ts runs the task module of a sandbox job inside the isolated child, whose preload refuses every
+ *   network entry point (D-ISO-1), so no module it loads can reach a database;
+ * - packages/data-plane/src/sandbox/preload.ts imports node:module (syncBuiltinESMExports, to publish its network hooks) and
+ *   node:worker_threads (to observe the permission model's refusals); it loads nothing by name.
+ */
+const LOADER_ALLOWLIST: ReadonlyArray<{ readonly file: string; readonly line: number; readonly text: string }> = [
+  { file: "apps/web/scripts/next.mjs", line: 7, text: 'import { createRequire } from "node:module";' },
+  { file: "apps/web/scripts/next.mjs", line: 10, text: "const require = createRequire(import.meta.url);" },
+  { file: "apps/web/e2e/support/serve.mjs", line: 41, text: "const { createEdgeFake, mountOnEdge } = await import(pathToFileURL(fakeModule).href);" },
+  { file: "packages/data-plane/src/sandbox/child.ts", line: 30, text: "const task = (await import(pathToFileURL(job.task).href)) as { run?: (payload: unknown, context: { readonly workDir: string }) => Promise<unknown> };" },
+  { file: "packages/data-plane/src/sandbox/preload.ts", line: 26, text: 'import { syncBuiltinESMExports } from "node:module";' },
+  { file: "packages/data-plane/src/sandbox/preload.ts", line: 29, text: 'import workerThreads from "node:worker_threads";' },
+];
+
+interface Finding {
+  readonly file: string;
+  readonly line: number;
+  readonly problem: string;
 }
 
-/** `export { a, type B } from "./pool.js"` and `export type { ... } from "./pool.js"`: a re-export binds nothing in the file. */
-const POOL_RE_EXPORT = /\bexport\s+(?:type\s+)?\{[^}]*\}\s*from\s*["']\.\/pool(?:\.js)?["']\s*;?/g;
-const INDEX_MODULE = String.raw`(?:(?:\.{1,2}\/)+index(?:\.js)?|\.{1,2}|@kauro\/persistence)`;
-const PACKAGE_INDEX_VALUE: ReadonlyArray<RegExp> = [
-  new RegExp(String.raw`\b(?:import|export)\s+(?!type\b)(?:\*(?:\s+as\s+[\w$]+)?|[\w$]+)\s*(?:,\s*\{[^}]*\})?\s*from\s*["']${INDEX_MODULE}["']`),
-  new RegExp(String.raw`(?:\brequire\(\s*|\bimport\(\s*)["']${INDEX_MODULE}["']`),
-];
+const literalOf = (node: ts.Node | undefined): string | undefined => (node !== undefined && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) ? node.text : undefined);
 
-/** TLS settings are written in tls.ts and nowhere else: `ssl:` only as `ssl: sslOptionsOf(`, no identity-check override. */
+/** `import { type A, type B } from "x"` and `export { type A } from "x"` bind types only (an empty brace list loads the module). */
+function onlyTypes(elements: ts.NodeArray<ts.ImportSpecifier | ts.ExportSpecifier>): boolean {
+  return elements.length > 0 && elements.every((e) => e.isTypeOnly);
+}
+
+/** The name position of a declaration or an object key: `{ eval: 1 }`, `class { require() {} }`, `const require = ...`, an import specifier. */
+function isDeclarationName(node: ts.Identifier): boolean {
+  const p = node.parent;
+  return (
+    ((ts.isPropertyAssignment(p) || ts.isMethodDeclaration(p) || ts.isPropertyDeclaration(p) || ts.isPropertySignature(p) || ts.isMethodSignature(p) || ts.isGetAccessor(p) || ts.isSetAccessor(p) || ts.isVariableDeclaration(p) || ts.isParameter(p) || ts.isFunctionDeclaration(p) || ts.isClassDeclaration(p) || ts.isBindingElement(p) || ts.isEnumMember(p)) && p.name === node) ||
+    ts.isImportSpecifier(p) || ts.isExportSpecifier(p) || ts.isImportClause(p) || ts.isNamespaceImport(p) || ts.isImportEqualsDeclaration(p)
+  );
+}
+
+/** Every finding of one file: driver loads outside DRIVER_FILES, non-literal loads, and loader primitives (memoized: the tree mutations rescan it). */
+const memo = new Map<string, Finding[]>();
+function findingsOf(file: string, text: string): Finding[] {
+  const key = `${file} ${text}`;
+  const known = memo.get(key);
+  if (known !== undefined) return known;
+  const found = findingsOfUncached(file, text);
+  memo.set(key, found);
+  return found;
+}
+function findingsOfUncached(file: string, text: string): Finding[] {
+  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, scriptKindOf(file));
+  const findings: Finding[] = [];
+  const lineOf = (node: ts.Node): number => source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+  const report = (node: ts.Node, problem: string): void => {
+    const line = lineOf(node);
+    const lineText = (text.split(/\r?\n/)[line - 1] ?? "").trim();
+    if (LOADER_ALLOWLIST.some((a) => a.file === file && a.line === line && a.text === lineText)) return;
+    findings.push({ file, line, problem });
+  };
+  const load = (node: ts.Node, specifier: string | undefined, form: string): void => {
+    if (specifier === undefined) return report(node, `${form} with a specifier that is not a string literal (the loaded module cannot be checked)`);
+    if (DRIVER.test(specifier) && !DRIVER_FILES.has(file)) report(node, `${form} loads the PostgreSQL driver ${JSON.stringify(specifier)}: only ${[...DRIVER_FILES][0]} connects (it applies connectionSecurityOf)`);
+    if (LOADER_MODULE.test(specifier)) report(node, `${form} loads ${JSON.stringify(specifier)}, a module loader or code evaluator`);
+  };
+  const visit = (node: ts.Node): void => {
+    // a type position loads nothing (DB-TLS-R5): `import("./pool.js").KauroPool`, `typeof require`, ... are erased by the compiler
+    if (ts.isTypeNode(node) && !ts.isExpressionWithTypeArguments(node)) return;
+    if (ts.isImportDeclaration(node)) {
+      const clause = node.importClause;
+      const typeOnly = clause !== undefined && (clause.isTypeOnly || (clause.name === undefined && clause.namedBindings !== undefined && ts.isNamedImports(clause.namedBindings) && onlyTypes(clause.namedBindings.elements)));
+      if (!typeOnly) load(node, literalOf(node.moduleSpecifier), "import");
+      return;
+    }
+    if (ts.isExportDeclaration(node)) {
+      if (node.moduleSpecifier !== undefined && !node.isTypeOnly && !(node.exportClause !== undefined && ts.isNamedExports(node.exportClause) && onlyTypes(node.exportClause.elements))) load(node, literalOf(node.moduleSpecifier), "export-from");
+      return;
+    }
+    if (ts.isImportEqualsDeclaration(node)) {
+      if (!node.isTypeOnly && ts.isExternalModuleReference(node.moduleReference)) load(node, literalOf(node.moduleReference.expression), "import = require");
+      return;
+    }
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      if (callee.kind === ts.SyntaxKind.ImportKeyword) load(node, literalOf(node.arguments[0]), "dynamic import");
+      else if (ts.isIdentifier(callee) && callee.text === "require") load(node, literalOf(node.arguments[0]), "require");
+      else if (ts.isCallExpression(callee) && /(?:^|\.)createRequire$/.test(callee.expression.getText())) load(node, literalOf(node.arguments[0]), "createRequire(...)(...)");
+    }
+    if (ts.isIdentifier(node) && !isDeclarationName(node)) {
+      const p = node.parent;
+      const member = ts.isPropertyAccessExpression(p) && p.name === node;
+      if (LOADER_NAMES.has(node.text)) report(node, `${node.text} loads modules or evaluates code`);
+      else if (node.text === "require") {
+        if (member) report(node, "a .require member loads modules");
+        else {
+          const called = ts.isCallExpression(p) && p.expression === node;
+          const resolved = ts.isPropertyAccessExpression(p) && p.expression === node && p.name.text === "resolve" && ts.isCallExpression(p.parent) && p.parent.expression === p && literalOf(p.parent.arguments[0]) !== undefined;
+          if (!called && !resolved) report(node, "require is used other than as a call with a literal specifier (an alias of the loader)");
+        }
+      } else if (node.text === "Function" && !member && (ts.isCallExpression(p) || ts.isNewExpression(p)) && p.expression === node) report(node, "the Function constructor evaluates code");
+    }
+    if (ts.isElementAccessExpression(node)) {
+      const key = literalOf(node.argumentExpression);
+      if (key !== undefined && (LOADER_NAMES.has(key) || key === "require")) report(node, `a [${JSON.stringify(key)}] member loads modules or evaluates code`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return findings;
+}
+
+/** TLS settings are written in tls.ts and pool.ts (the construction point) and nowhere else: process-wide or per-socket overrides of verification. */
 const TLS_FORMS: ReadonlyArray<RegExp> = [
   /\bssl\s*:(?!\s*sslOptionsOf\()/,
   /["']ssl["']\s*:/,
@@ -164,76 +207,77 @@ const TLS_FORMS: ReadonlyArray<RegExp> = [
   /NODE_TLS_REJECT_UNAUTHORIZED/,
   /\bPG(?:SSLMODE|SSLROOTCERT|SSLCERT|SSLKEY|PASSWORD|PASSFILE|SERVICE)\b/,
 ];
+/** tls.ts and pool.ts are the construction point; temporary-postgres.ts (test-only subpath) writes the throw-away cluster's server TLS settings. */
+const TLS_FILES: ReadonlySet<string> = new Set(["packages/persistence/src/tls.ts", "packages/persistence/src/pool.ts", "packages/persistence/src/testing/temporary-postgres.ts"]);
+const printer = ts.createPrinter({ removeComments: true });
 
-function isSite(text: string, rel?: string): boolean {
-  const c = code(text, rel);
-  return SITE_FORMS.some((f) => f.test(c));
+const tlsMemo = new Map<string, string[]>();
+function tlsViolations(text: string, rel = "scan.ts"): string[] {
+  const key = `${rel} ${text}`;
+  const known = tlsMemo.get(key);
+  if (known !== undefined) return known;
+  const c = printer.printFile(ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, false, scriptKindOf(rel)));
+  const found = TLS_FORMS.filter((f) => f.test(c)).map(String);
+  tlsMemo.set(key, found);
+  return found;
 }
 
-function tlsViolations(text: string, rel?: string): string[] {
-  const c = code(text, rel);
-  return TLS_FORMS.filter((f) => f.test(c)).map(String);
+/** The whole structural scan over {tracked relative path -> text}: every problem found, empty when the tree conforms. */
+function scanTree(sources: ReadonlyMap<string, string>): string[] {
+  const problems: string[] = [];
+  for (const [rel, text] of sources) {
+    for (const f of findingsOf(rel, text)) problems.push(`${f.file}:${f.line} ${f.problem}`);
+    if (!TLS_FILES.has(rel)) for (const v of tlsViolations(text, rel)) problems.push(`${rel}: TLS settings belong in tls.ts (${v})`);
+  }
+  // an allowlisted loader line that no longer exists is stale: the list stays exact
+  for (const a of LOADER_ALLOWLIST) {
+    const lines = (sources.get(a.file) ?? "").split(/\r?\n/);
+    if ((lines[a.line - 1] ?? "").trim() !== a.text) problems.push(`${a.file}:${a.line} is allowlisted as ${JSON.stringify(a.text)} but holds something else`);
+  }
+  return problems.sort();
 }
 
-test("scan self-test: each connection form is caught, in .ts, .js and .mjs files; .mts, .cts and .jsx are listed", () => {
+const problemsOf = (file: string, text: string): string[] => findingsOf(file, text).map((f) => f.problem);
+const APP = "apps/api/src/x.ts";
+
+test("scan self-test: every way to load a PostgreSQL driver outside pool.ts is caught, in every source kind", () => {
   const forms: Record<string, string> = {
-    "new pg.Pool(": 'import pg from "pg";\nexport const p = new pg.Pool({});',
+    "default import": 'import pg from "pg";\nexport const p = new pg.Pool({});',
     "namespace import": 'import * as db from "pg";\nexport const c = new db.Client({});',
     "aliased Pool": 'import { Pool as P } from "pg";\nexport const p = new P({});',
-    "aliased Client with a type": 'import { type PoolClient, Client as C } from "pg";\nexport const c = new C();',
-    "require": 'const { Pool } = require("pg");',
+    "aliased Client beside a type": 'import { type PoolClient, Client as C } from "pg";\nexport const c = new C();',
+    "side-effect import": 'import "pg";',
+    "empty brace import (loads the module)": 'import {} from "pg";',
+    "subpath": 'import Client from "pg/lib/client.js";',
+    require: 'const { Pool } = require("pg");',
+    "import = require": 'import pg = require("pg");',
     "dynamic import": 'const m = await import("pg");',
-    "createPool alias": 'import { createPool as mk } from "@kauro/persistence";',
-    "applyMigrationsAs alias": 'import { applyMigrationsAs as run } from "@kauro/persistence";',
-    "connectionString": 'export const x = { connectionString: process.env.DATABASE_URL };',
+    "spaced dynamic import": 'const m = await import ("pg");\nconst p = new m["Pool"](cfg);',
+    "template-literal import": "const m = await import(`pg`);",
     "export { Pool } from pg": 'export { Pool } from "pg";',
     "export { Client as X } from pg": 'export { Client as Db } from "pg";',
     "export * from pg": 'export * from "pg";',
-    "createRequire": 'import { createRequire } from "node:module";\nconst pg = createRequire(import.meta.url)("pg");',
+    "export * as ns from pg": 'export * as ns from "pg";',
+    "createRequire()()": 'import { createRequire } from "node:module";\nconst pg = createRequire(import.meta.url)("pg");',
     "postgres driver": 'import postgres from "postgres";',
+    "pg-pool": 'import Pool from "pg-pool";',
     "pg-promise": 'const pgp = require("pg-promise")();',
     "neon driver": 'import { Pool } from "@neondatabase/serverless";',
-    "knex": 'import knex from "knex";',
-    "new KauroPool(": 'import { KauroPool } from "@kauro/persistence";\nconst p = new KauroPool(config);\nawait p.acquire();',
-    "aliased KauroPool": 'import { KauroPool as KP } from "@kauro/persistence";\nconst p = new KP(config);',
-    "namespace KauroPool": 'import * as persistence from "@kauro/persistence";\nconst p = new persistence.KauroPool(config);',
-    "re-exported KauroPool": 'export { KauroPool as Pool2 } from "@kauro/persistence";',
-    "destructured KauroPool from a dynamic import": 'const { KauroPool: KP } = await import("@kauro/persistence");\nconst p = new KP(cfg);',
-    "required KauroPool": 'const { KauroPool } = require("@kauro/persistence");',
-    "KauroPool destructured from a namespace": 'import * as ns from "@kauro/persistence";\nconst { KauroPool: KP } = ns;\nconst p = new KP(cfg);',
-    "KauroPool member taken without new": 'import * as ns from "@kauro/persistence";\nconst KP = ns.KauroPool;',
-    "persistence imported at run time": 'const m = await import("@kauro/persistence");',
-    "namespace destructured over lines": 'import * as ns from "@kauro/persistence";\nconst {\n  KauroPool: K,\n} = ns;\nconst p = new K(cfg);',
-    "namespace destructured after a ternary colon": 'import * as ns from "@kauro/persistence";\nlet K;\nc ? 0 : ({ KauroPool: K } = ns);',
-    "namespace computed member": 'import * as ns from "@kauro/persistence";\nconst p = new ns["KauroPool"](cfg);',
-    "star re-export of persistence": 'export * from "@kauro/persistence";',
-    "spaced dynamic import of pg": 'const m = await import ("pg");\nconst p = new m["Pool"](cfg);',
-    "template-literal import of pg": "const m = await import(`pg`);",
-    "a site after a string holding //": 'const u = "a//b"; const p = new (await import("pg")).Pool({});',
+    knex: 'import knex from "knex";',
+    "a load after a string holding //": 'const u = "a//b"; const p = new (await import("pg")).Pool({});',
   };
-  for (const [name, text] of Object.entries(forms)) assert.ok(isSite(text), `not caught: ${name}`);
-  // a JSX expression that starts with `new` in a .tsx file (adversary note on 244b276: parsed as plain TS it printed as an object literal)
-  assert.ok(isSite("export const V = (c: object) => <A>{new Pool(c)}</A>;", "apps/web/src/v.tsx"), "not caught: new Pool inside JSX in a .tsx file");
-  for (const text of ['import type { PoolClient } from "pg";', 'import { type Client } from "pg";', "// new Pool(\nexport const a = 1;", 'export type { Pool } from "pg";', 'import type { KauroPool } from "@kauro/persistence";', 'import { type KauroPool } from "@kauro/persistence";', 'export const superuser = "postgres";', 'function f(): KauroPool {\n  return x;\n}\nconst { a, b } = y;', 'function f({ pool }: { pool: KauroPool } = d) {}']) assert.ok(!isSite(text), text);
-  // ADV-3 (a88da2e): a persistence file other than pool.ts that constructs KauroPool is refused; pool.ts may
-  assert.equal(persistenceProblem("packages/persistence/src/wrap.ts", 'import { KauroPool } from "./pool.js";\nexport const p = (c) => new KauroPool(c);'), "packages/persistence/src/wrap.ts constructs KauroPool outside pool.ts");
-  assert.equal(persistenceProblem("packages/persistence/src/pool.ts", "export function createPool(config) {\n  return new KauroPool(config);\n}"), undefined);
-  // DB-TLS-R3 (fdf3360): aliased, parenthesized, destructured, computed and run-time forms, also in an already-listed site (runner.ts)
-  for (const [rel, text] of [
-    ["packages/persistence/src/migrations/runner.ts", 'import { KauroPool as K } from "../pool.js";\nexport const p = (c) => new (K)(c);'],
-    ["packages/persistence/src/wrap.ts", 'import * as P from "./pool.js";\nexport const p = (c) => new P["KauroPool"](c);'],
-    ["packages/persistence/src/wrap.ts", 'import * as P from "./pool.js";\nconst { KauroPool: K } = P;\nexport const p = (c) => new K(c);'],
-    ["packages/persistence/src/wrap.ts", 'export const p = async (c) => new (await import("./pool.js")).KauroPool(c);'],
-    ["packages/persistence/src/migrations/runner.ts", 'import { createPool as mk } from "../pool.js";\nexport const open = (c) => mk(c);'],
-    ["packages/persistence/src/wrap.ts", "export const p = async (c) => (await import (`./pool.js`)).createPool(c);"],
-    ["packages/persistence/src/migrations/runner.ts", 'import * as I from "../index.js";\nexport const open = (c) => I.createPool(c);'],
-  ] as const) assert.equal(persistenceProblem(rel, text), `${rel} takes KauroPool or createPool as a value outside pool.ts and index.ts`, text);
-  for (const [rel, text] of [
-    ["packages/persistence/src/evidence.ts", 'import type { KauroPool, RuntimeRole } from "./pool.js";\nexport const f = (pool: KauroPool) => pool;'],
-    ["packages/persistence/src/inquiries.ts", 'import { type KauroPool } from "./pool.js";'],
-    ["packages/persistence/src/index.ts", 'export { createPool, KauroPool } from "./pool.js";'],
-  ] as const) assert.equal(persistenceProblem(rel, text), undefined, text);
-  const files = Object.fromEntries(["a.ts", "b.js", "c.mjs", "d.cjs", "e.mts", "f.cts", "g.jsx"].map((n) => [`apps/x/src/${n}`, forms["new pg.Pool("] ?? ""]));
+  for (const [name, text] of Object.entries(forms)) assert.ok(problemsOf(APP, text).some((p) => p.includes("loads the PostgreSQL driver")), `not caught: ${name}`);
+  // the same in persistence outside pool.ts (the old R3 site runner.ts included): only pool.ts connects
+  for (const rel of ["packages/persistence/src/migrations/runner.ts", "packages/persistence/src/sql.ts", "packages/persistence/src/index.ts"]) {
+    assert.ok(problemsOf(rel, 'import { Client } from "pg";').length > 0, rel);
+    assert.ok(problemsOf(rel, 'export { Pool } from "pg";').length > 0, rel);
+  }
+  assert.deepEqual(problemsOf("packages/persistence/src/pool.ts", 'import { Client, Pool, type PoolClient } from "pg";\nexport { DatabaseError } from "pg";'), []);
+  // the parse mode follows the extension: a JSX expression in a .tsx/.jsx file, a load in a .mjs/.cjs file
+  assert.ok(problemsOf("apps/web/src/v.tsx", 'export const V = async (c: object) => <A>{new (await import("pg")).Pool(c)}</A>;').length > 0, ".tsx");
+  assert.ok(problemsOf("apps/web/src/v.jsx", 'export const V = async (c) => <A>{new (await import("pg")).Pool(c)}</A>;').length > 0, ".jsx");
+  for (const ext of [".js", ".mjs", ".cjs", ".mts", ".cts"]) assert.ok(problemsOf(`apps/x/src/a${ext}`, 'const pg = require("pg");').length > 0, ext);
+  const files = Object.fromEntries(["a.ts", "b.js", "c.mjs", "d.cjs", "e.mts", "f.cts", "g.jsx"].map((n) => [`apps/x/src/${n}`, forms["default import"] ?? ""]));
   const repo = tempRepo(files);
   try {
     assert.deepEqual(trackedSources(repo.dir), Object.keys(files));
@@ -242,26 +286,65 @@ test("scan self-test: each connection form is caught, in .ts, .js and .mjs files
   }
 });
 
-test("scan self-test: DB-TLS-R5: type-only references to the pool module (erased, no run-time access) are accepted outside pool.ts and index.ts", () => {
+test("scan self-test: fail closed: a load whose specifier is not a literal and every module-loading primitive are caught; the exact allowlist is honoured", () => {
+  for (const text of [
+    "const m = await import(name);",
+    "const m = await import(`p${'g'}`);",
+    'const m = require("p" + "g");',
+    "const m = require(name);",
+    'import { createRequire } from "node:module";\nconst r = createRequire(import.meta.url);\nconst m = r("../");',
+    'import { createRequire } from "module";',
+    'import * as M from "node:module";\nconst r = M["create" + "Require"](import.meta.url);',
+    'const M = await import("node:module");',
+    'import vm from "node:vm";',
+    'import { Worker } from "node:worker_threads";',
+    "const r = require;\nr(x);",
+    "const m = module.require(x);",
+    'const m = module["require"](x);',
+    "const m = process.mainModule.require(x);",
+    'const M = process.getBuiltinModule("module");',
+    "const m = Module._load(x);",
+    'eval("import(\'pg\')");',
+    "globalThis.eval(code);",
+    'const f = new Function("return import(\'pg\')");',
+    'const f = Function("return 1");',
+    "const s = require.cache;",
+  ]) assert.ok(problemsOf(APP, text).length > 0, `not caught: ${text}`);
+  // allowed: a literal require/import of anything that is not a driver or a loader, require.resolve of a literal, keys and declarations named like a primitive
+  for (const text of [
+    'const fs = require("node:fs");',
+    'const { join } = await import("node:path");',
+    'const p = require.resolve("next/dist/bin/next");',
+    "const o = { eval: 1, require: 2, createRequire: 3 };",
+    "class C { require(): void {} }",
+    'export const superuser = "postgres";',
+    "if (x instanceof Function) y();",
+  ]) assert.deepEqual(problemsOf(APP, text), [], text);
+  // the allowlist is by exact file, line and text
+  const next = readFileSync(join(root, "apps/web/scripts/next.mjs"), "utf8");
+  assert.deepEqual(findingsOf("apps/web/scripts/next.mjs", next), []);
+  assert.ok(findingsOf("apps/web/scripts/next.mjs", `${next}\nconst db = require(process.env.X);\n`).length > 0, "a new loader line in an allowlisted file");
+  assert.ok(findingsOf("apps/web/scripts/next.mjs", `${next}\nconst db = require("pg");\n`).length > 0, "a driver load in an allowlisted file");
+  assert.ok(findingsOf("apps/web/scripts/other.mjs", next).length > 0, "the same lines in another file");
+  assert.ok(scanTree(new Map([["apps/web/scripts/next.mjs", `// moved\n${next}`]])).some((p) => p.includes("is allowlisted as")), "a stale allowlist entry");
+});
+
+test("scan self-test: DB-TLS-R5 / ADV-2: type-only references load nothing and are never findings", () => {
   for (const [rel, text] of [
+    ["packages/persistence/src/evidence.ts", 'export const f = (pool: import("./pool.js").KauroPool) => pool;'],
     ["packages/persistence/src/types.ts", 'export type Config = import("./pool.js").PoolConfig;'],
-    ["packages/persistence/src/types.ts", 'export const f = (pool: import("./pool.js").KauroPool) => pool;'],
     ["packages/persistence/src/types.ts", 'export type Open = typeof import("./pool.js");'],
     ["packages/persistence/src/types.ts", 'export type Opened = ReturnType<typeof import("./pool.js").createPool>;'],
-    ["packages/persistence/src/evidence.ts", 'export type Config = import("../pool.js").PoolConfig;'],
-    ["packages/persistence/src/migrations/runner.ts", 'export const g = (pool: import("../pool.js").KauroPool) => pool;'],
-    ["packages/persistence/src/types.ts", 'import type { KauroPool, PoolConfig } from "./pool.js";'],
-    ["packages/persistence/src/types.ts", 'import { type KauroPool, type PoolConfig } from "./pool.js";'],
-    ["packages/persistence/src/types.ts", 'import type * as P from "./pool.js";\nexport type K = P.KauroPool;'],
-    ["packages/persistence/src/types.ts", 'export type { KauroPool } from "./pool.js";'],
-  ] as const) assert.equal(persistenceProblem(rel, text), undefined, `${rel}: ${text}`);
-  // the run-time forms stay refused, also when an erased import type sits next to them
-  const refusal = (rel: string): string => `${rel} takes KauroPool or createPool as a value outside pool.ts and index.ts`;
-  for (const text of [
-    'export type C = import("./pool.js").PoolConfig;\nexport const m = async () => (await import("./pool.js")).KauroPool;',
-    'export type C = import("./pool.js").PoolConfig;\nimport { createPool } from "./pool.js";',
-    'export type C = import("./pool.js").PoolConfig;\nimport { type A, KauroPool } from "./pool.js";',
-  ]) assert.equal(persistenceProblem("packages/persistence/src/types.ts", text), refusal("packages/persistence/src/types.ts"), text);
+    ["apps/api/src/main.ts", 'export type P = import("@kauro/persistence").KauroPool;'],
+    ["apps/api/src/main.ts", 'export type C = import("pg").PoolClient;'],
+    ["apps/api/src/main.ts", 'export type R = typeof require;'],
+    ["packages/persistence/src/evidence.ts", 'import type { PoolClient } from "pg";'],
+    ["packages/persistence/src/evidence.ts", 'import { type PoolClient, type QueryResult } from "pg";'],
+    ["packages/persistence/src/evidence.ts", 'import type * as P from "pg";\nexport type K = P.Pool;'],
+    ["packages/persistence/src/evidence.ts", 'export type { Pool } from "pg";'],
+    ["packages/persistence/src/evidence.ts", 'export { type Pool } from "pg";'],
+    ["packages/persistence/src/evidence.ts", 'import type pg = require("pg");'],
+  ] as const) assert.deepEqual(problemsOf(rel, text), [], `${rel}: ${text}`);
 });
 
 test("scan self-test: only tracked source is scanned: src/build/db.ts, src/out/db.ts and src/vendor/db.ts are caught, an untracked .next/ file and a package-root test/ are not", () => {
@@ -287,7 +370,7 @@ test("scan self-test: only tracked source is scanned: src/build/db.ts, src/out/d
   }
 });
 
-test("scan self-test: a TLS setting outside tls.ts is caught in every form", () => {
+test("scan self-test: a TLS setting outside tls.ts and pool.ts is caught in every form", () => {
   const bad = [
     "const o = { ssl: { rejectUnauthorized: false } };",
     "const o = { ssl: true };",
@@ -303,55 +386,16 @@ test("scan self-test: a TLS setting outside tls.ts is caught in every form", () 
   ];
   for (const text of bad) assert.ok(tlsViolations(text).length > 0, text);
   assert.deepEqual(tlsViolations("const o = { ...(tls === undefined ? {} : { ssl: sslOptionsOf(tls) }) };"), []);
+  assert.deepEqual(tlsViolations("// ssl: false\nexport const a = 1;"), [], "comments are not code");
 });
-
-/** The listed connection sites: a new one must be added here and covered by connectionSecurityOf (or, in persistence, by the pool rules). */
-const KNOWN_SITES = [
-  "apps/api/src/commissions/assembly.ts",
-  "apps/api/src/composition.ts",
-  "apps/api/src/payments/assembly.ts",
-  "apps/control/src/audit/receipts.ts",
-  "apps/control/src/composition.ts",
-  "apps/web/scripts/next.mjs",
-  "packages/persistence/src/index.ts",
-  "packages/persistence/src/migrations/runner.ts",
-  "packages/persistence/src/pool.ts",
-];
-
-/** The whole structural scan over {tracked relative path -> text}: every problem found, empty when the tree conforms. */
-function scanTree(sources: ReadonlyMap<string, string>): string[] {
-  const problems: string[] = [];
-  const found = new Map<string, string>();
-  for (const [rel, text] of sources) {
-    if (rel.startsWith("packages/persistence/src/testing/")) continue; // the test-only subpath (the architecture gate keeps it out of production)
-    if (isSite(text, rel)) found.set(rel, text);
-    // DB-TLS-R3: every persistence source, listed site or not, takes KauroPool as a type only (pool.ts and index.ts excepted)
-    if (rel.startsWith("packages/persistence/src/")) {
-      const problem = persistenceProblem(rel, text);
-      if (problem !== undefined) problems.push(problem);
-    }
-    if (rel !== "packages/persistence/src/tls.ts") for (const v of tlsViolations(text, rel)) problems.push(`${rel}: TLS settings belong in tls.ts (${v})`);
-  }
-  for (const rel of found.keys()) if (!KNOWN_SITES.includes(rel)) problems.push(`${rel} is a connection site that is not listed: a new connection site must be listed here and covered by connectionSecurityOf`);
-  for (const rel of KNOWN_SITES) if (!found.has(rel)) problems.push(`${rel} is listed as a connection site but the scan no longer finds it`);
-  for (const [rel, text] of found) {
-    if (rel === "apps/web/scripts/next.mjs") {
-      // createRequire there only resolves the `next` binary; nothing in it may open a database connection
-      if (SITE_FORMS.filter((f) => !f.test("createRequire")).some((f) => f.test(code(text, rel)))) problems.push(`${rel} opens no database connection`);
-    } else if (!rel.startsWith("packages/persistence/src/") && !text.includes("connectionSecurityOf(")) {
-      problems.push(`${rel} applies connectionSecurityOf before it connects`);
-    }
-  }
-  return problems.sort();
-}
 
 const treeSources = (): Map<string, string> => new Map(trackedSources(root).map((f) => [f, readFileSync(join(root, f), "utf8")]));
 
-test("every connection site of apps/ and packages/*/src is known, and each composition root applies connectionSecurityOf", () => {
+test("the tree conforms: only pool.ts (and the test-only subpath) loads a driver, every load is literal, no loader primitive outside the allowlist, TLS only in tls.ts/pool.ts", () => {
   assert.deepEqual(scanTree(treeSources()), []);
 });
 
-test("DB-TLS-R4 / DB-TLS-R5: a factory wrapper in persistence or a caller outside the listed sites fails the complete scan; an erased import type does not", () => {
+test("DB-TLS-R4 / ADV-1 / ADV-2 on the complete tree: a direct driver load anywhere is caught; createPool aliases, wrappers and index routes are not findings (createPool enforces, pool-enforcement.test.ts); type references are not findings", () => {
   const base = treeSources();
   const mutated = (...edits: ReadonlyArray<readonly [string, string]>): string[] => {
     const tree = new Map(base);
@@ -361,24 +405,25 @@ test("DB-TLS-R4 / DB-TLS-R5: a factory wrapper in persistence or a caller outsid
     }
     return scanTree(tree);
   };
-  const wrapper = 'import { createPool as mk } from "./pool.js";\nexport const uncheckedPool = (c: import("./pool.js").PoolConfig) => mk(c);';
-  const caller = 'import { uncheckedPool } from "@kauro/persistence";\nexport const openUnchecked = (c: never) => uncheckedPool(c);';
-  // the ordinary aliased wrapper in the package index (a listed site, exempt from the pool import rule as a re-export module)
-  assert.ok(mutated(["packages/persistence/src/index.ts", wrapper]).some((p) => p.startsWith("packages/persistence/src/index.ts ")), "index.ts wrapper");
-  // the same wrapper, now with an application caller that never applies connectionSecurityOf: still refused (at the wrapper, which makes the caller unreachable)
-  assert.ok(mutated(["packages/persistence/src/index.ts", wrapper], ["apps/api/src/main.ts", caller]).some((p) => p.startsWith("packages/persistence/src/index.ts ")), "wrapper plus caller");
-  // the computed index-factory wrapper in the listed runner
-  for (const text of [
-    'import * as I from "../index.js";\nexport const open = (c: never) => (I as never as Record<string, (c: never) => unknown>)["create" + "Pool"]!(c);',
-    'export const open = async (c: never) => ((await import("../index.js")) as never as Record<string, (c: never) => unknown>)["create" + "Pool"]!(c);',
-    'import * as P from "@kauro/persistence";\nexport const open = (c: never) => (P as never as Record<string, (c: never) => unknown>)["create" + "Pool"]!(c);',
-    'export * from "../index.js";',
-  ]) assert.ok(mutated(["packages/persistence/src/migrations/runner.ts", text]).some((p) => p.startsWith("packages/persistence/src/migrations/runner.ts ")), text);
-  // a caller of the factory itself in a tracked application file that does not apply connectionSecurityOf
-  const direct = mutated(["apps/api/src/main.ts", 'import { createPool } from "@kauro/persistence";\nexport const openDirect = (c: never) => createPool(c);']);
-  assert.ok(direct.some((p) => p.startsWith("apps/api/src/main.ts ")), "direct caller");
-  // DB-TLS-R5: an erased import-type alias in a non-site persistence file is not a problem
-  assert.deepEqual(mutated(["packages/persistence/src/evidence.ts", 'export type ErasedPoolConfig = import("./pool.js").PoolConfig;']), []);
+  // every direct-driver form, in an app root and in persistence outside pool.ts
+  for (const [rel, text] of [
+    ["apps/api/src/main.ts", 'import { Pool } from "pg";\nexport const p = new Pool({ host: "10.0.0.1" });'],
+    ["apps/api/src/main.ts", 'export const p = async () => new (await import("pg")).default.Pool({});'],
+    ["apps/control/src/composition.ts", 'import { createRequire } from "node:module";\nexport const P = createRequire(import.meta.url)("pg").Pool;'],
+    ["packages/persistence/src/migrations/runner.ts", 'import { Client as C } from "pg";\nexport const c = new C({});'],
+    ["packages/persistence/src/index.ts", 'export { Pool } from "pg";'],
+    ["packages/persistence/src/sql.ts", 'export * from "pg";'],
+    // ADV-1 P3 of d515f18: require of the parent directory through createRequire, now a loader finding wherever it appears
+    ["packages/persistence/src/migrations/runner.ts", 'import { createRequire } from "node:module";\nexport const open = (c: never) => createRequire(import.meta.url)("../").createPool(c);'],
+    ["apps/api/src/main.ts", 'export const open = async (m: string) => (await import(m)).Pool;'],
+  ] as const) assert.ok(mutated([rel, text]).some((p) => p.startsWith(`${rel}:`)), `${rel}: ${text}`);
+  // ADV-1 P1/P2/P3b of d515f18 (an aliased re-export with an app caller, the index by another specifier, at run time): no finding, because
+  // the pool they reach is built under connectionSecurityOf; pool-enforcement.test.ts runs each route and proves the refusal and the TLS
+  assert.deepEqual(mutated(["packages/persistence/src/index.ts", 'export { createPool as openPool } from "./pool.js";'], ["apps/api/src/main.ts", 'import { openPool } from "@kauro/persistence";\nexport const o = (c: never) => openPool(c);']), []);
+  assert.deepEqual(mutated(["packages/persistence/src/migrations/runner.ts", 'import * as I from "../../src/index.js";\nexport const open = (c: never) => (I as never as Record<string, (c: never) => unknown>)["create" + "Pool"]!(c);']), []);
+  assert.deepEqual(mutated(["packages/persistence/src/migrations/runner.ts", 'export const open = async (c: never) => ((await import("../../src/index.js")) as never as Record<string, (c: never) => unknown>)["createPool"]!(c);']), []);
+  // ADV-2 / DB-TLS-R5: type references in a persistence file and an app file are not findings
+  assert.deepEqual(mutated(["packages/persistence/src/evidence.ts", 'export const f = (pool: import("./pool.js").KauroPool) => pool;\nexport type O = ReturnType<typeof import("./pool.js").createPool>;'], ["apps/api/src/main.ts", 'export type P = import("@kauro/persistence").KauroPool;']), []);
 });
 
 const login = { host: "db.example.test", port: 1, database: "kauro", user: "u", poolMax: 1, passwordFile: "pw" };

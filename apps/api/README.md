@@ -110,9 +110,12 @@ over a real socket) — see `docs/design/B06-case-map.md`.
 
 ## Database credentials and TLS: operating notes (AWS-DELTA I-2, I-3)
 
-- One rule, `connectionSecurityOf` (`@kauro/persistence`), applies at every site that opens a PostgreSQL connection (api, commission,
-  payment, control, validator, migration job). Outside LOCAL: `KAURO_DB_TLS_CA_FILE` required, `rejectUnauthorized: true`, the host a DNS
-  name, the password only as a file. `apps/api/test/db-connection-sites.test.ts` fails when a connection site or a TLS setting appears outside it.
+- One rule, `connectionSecurityOf` (`@kauro/persistence`), applies to every PostgreSQL connection (api, commission, payment, control,
+  validator, migration job): `createPool` and the migrator connection apply it themselves at construction (`packages/persistence/src/pool.ts`,
+  the only production module that loads the driver), so a caller names its environment and its secret files and cannot skip the rule.
+  Outside LOCAL: `KAURO_DB_TLS_CA_FILE` required, `rejectUnauthorized: true`, the host a DNS name, the password only as a file.
+  `apps/api/test/db-connection-sites.test.ts` fails when any other file loads a PostgreSQL driver, loads a module by a non-literal name or
+  through a module-loading primitive outside its exact allowlist, or writes a TLS setting.
 - Password files are read once, when the connection is opened at start. **B14 obligation:** a secret rotation (database password or CA
   bundle) triggers a rolling restart of every instance; nothing re-reads the file while the process runs.
 - Known and unchanged (N7): the one-shot migration job still accepts the owner's password as the plain `KAURO_DB_MIGRATOR_PASSWORD` in
