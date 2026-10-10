@@ -15,7 +15,7 @@
 // It fails (exit 1) when a case is missing, a cross citation has no inherited mark, a PARTIAL or SIMULATED row names nobody who
 // carries the rest, a row claims a review that does not accept it
 // or a README row claims acceptance without one (the README table between the ledger markers must be the generated table, every
-// column; a status table with an unrecognised header is refused; outside the markers no package id or table at all — README_OUTSIDE_MARKERS), a case is PLANNED outside B20/B21 (whose only class is PLANNED_POST_B19 with the
+// column; a status table with an unrecognised header is refused; outside the markers the README must equal the pinned text README_OUTSIDE_TEXT — README_OUTSIDE_MARKERS), a case is PLANNED outside B20/B21 (whose only class is PLANNED_POST_B19 with the
 // owner's date), or the vendored registry no longer matches PROVENANCE.json. A claim is never acceptance: a row's class counts as
 // demonstrated only through its accepting review.
 // Rebase note: a reviewed lane that is rebased changes the reviewed commit's ancestry (REVIEW_COMMIT_UNBOUND): update the review record to
@@ -434,18 +434,29 @@ export class ReadmeHeaderError extends Error {
 }
 
 /**
- * Outside the generated section the README names no package and holds no table (ADV-5 r5, an allowlist, not a list of table
- * spellings): every package-id token (case-insensitive B0-B21 in any spelling: B6, b06, [B06](x), <b>B06</b>, in a fence, a quote,
- * a list or a comment) and every `<table` is a violation, with its line. The markers' own lines are not scanned.
+ * The README text outside the generated section is pinned (ADV-5 r5, a true allowlist): it must byte-equal README_OUTSIDE_TEXT
+ * (line endings normalised to LF), so no table, package id, lookalike character or claim of any kind can be added outside the
+ * markers without changing this constant in the same commit, where review sees it. To edit the README prose on purpose, change
+ * README_OUTSIDE_TEXT with it.
  */
-export const README_OUTSIDE_ID = /\bB(?:0?\d|1\d|2[01])\b|<table/gi;
-export function readmeOutsideTokens(text) {
+export const README_OUTSIDE_TEXT = "# Package acceptance records\n\nAmendment A4 of the authority (edition KAURO-2026.09-R2, `C:\\Projects\\Kauro\\authority\\r2\\amendments\\A4_OPERATING_MODEL.md`)\ndefines package acceptance: (a) the case map gives every registry case its evidence class and test; (b) the full verify is\ngreen on the exact commit on Windows, Linux and in CI; (c) an independent reviewer from another model provider (Codex) reviews\nthat exact commit against the registry cases and answers ACCEPT or ACCEPT_WITH_MINOR, the re-check covering only its findings;\n(d) the commit is on `main`. Formal acceptance follows `registry/program.json` dependencies: a package whose conditions hold\nbut whose dependencies are not yet accepted is **REVIEW_ACCEPTED**.\n\nRaw reviewer answers are in `reviews/` (`<package>-round<n>-<commit>.json`, schema `tools/review/review-schema.json` on the\noperator host).\n\n\n";
+/** The README text with the marker region (both markers and what is between) removed and LF line endings; null without markers. */
+export function readmeOutside(text) {
   const [start, end] = README_MARKERS;
   const a = text.indexOf(start);
   const b = text.indexOf(end);
-  const blank = (t) => t.replace(/[^\n]/g, " ");
-  const outside = a >= 0 && b >= a ? text.slice(0, a) + blank(text.slice(a, b + end.length)) + text.slice(b + end.length) : text;
-  return outside.split(/\r?\n/).flatMap((line, n) => [...line.matchAll(README_OUTSIDE_ID)].map((m) => ({ line: n + 1, token: m[0] })));
+  if (a < 0 || b < a) return null;
+  return (text.slice(0, a) + text.slice(b + end.length)).replace(/\r\n/g, "\n");
+}
+/** The first line where the README's outside text differs from the pinned text, or null when it equals it. */
+export function readmeOutsideDiff(text) {
+  const got = readmeOutside(text) ?? text.replace(/\r\n/g, "\n");
+  if (got === README_OUTSIDE_TEXT) return null;
+  const a = got.split("\n");
+  const b = README_OUTSIDE_TEXT.split("\n");
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return { line: i + 1, got: a[i] ?? "(end of text)", pinned: b[i] ?? "(end of text)" };
 }
 
 /** A cell's text without backtick, bold or italic markup. */
@@ -475,6 +486,7 @@ export function readmeClaims(text) {
  * external maps that could not be read.
  */
 export function computeLedger({ registry, sidecars, externals = [], missingInputs = [], reviews = [], readme = "" }) {
+  readme = readme.replace(/\r\n/g, "\n"); // line endings are not content (the Windows leg checks out CRLF)
   const violations = [];
   const flag = (kind, subject, detail) => violations.push({ kind, subject, detail });
   const { latest, entryOf, reviewOf } = reviewIndex(reviews);
@@ -631,7 +643,8 @@ export function computeLedger({ registry, sidecars, externals = [], missingInput
   }
   const section = readmeSection(readme);
   if (section !== null && section !== `\n${readmeTable({ packages })}`) flag("README_TABLE_NOT_GENERATED", "README", "the table between the ledger markers is not the generated table — run node tools/ledger.mjs --write --readme");
-  for (const t of readmeOutsideTokens(readme)) flag("README_OUTSIDE_MARKERS", "README", `line ${t.line} names "${t.token}" outside the ledger markers: the README holds no package id or table but the generated one`);
+  const outsideDiff = readme === "" ? null : readmeOutsideDiff(readme);
+  if (outsideDiff) flag("README_OUTSIDE_MARKERS", "README", `outside the ledger markers the README differs from the pinned text (README_OUTSIDE_TEXT) at line ${outsideDiff.line}: "${outsideDiff.got.slice(0, 80)}" instead of "${outsideDiff.pinned.slice(0, 80)}"`);
   for (const claim of claims) {
     const p = packages.find((x) => x.package === claim.package);
     if (/ACCEPTED/.test(claim.status) && !(p && (p.status === "REVIEW_ACCEPTED" || p.status === "ACCEPTED"))) {

@@ -590,15 +590,16 @@ test("ADV-6: a cited title is written only as the title of a test, it or describ
   assert.equal(titleIn(source, "fine"), false);
 });
 
-test("ADV-5 (r5): outside the ledger markers the README names no package id in any spelling and holds no table — every evasion is a README_OUTSIDE_MARKERS violation; the real README is the false-positive control", () => {
+test("ADV-5 (r5): the README text outside the ledger markers byte-equals the pinned text — every evasion (tables, lookalike characters, entities, split ids, claims without an id) is exactly one README_OUTSIDE_MARKERS violation; the real README and a CRLF copy are clean", () => {
   const readme = read("docs/acceptance/README.md");
   const { externals, missingInputs } = ledgerOfRepo(root);
   const readmeKinds = (text) => computeLedger({ registry, sidecars: readSidecars(root), externals, missingInputs, reviews: loadReviews(root), readme: text }).violations.filter((v) => /^README_/.test(v.kind));
-  assert.deepEqual(readmeKinds(readme), [], "control: the committed README has no README_ violation (its lines outside the markers name no id)");
+  assert.deepEqual(readmeKinds(readme), [], "control: the committed README has no README_ violation");
+  assert.deepEqual(readmeKinds(readme.replace(/\r?\n/g, "\r\n")), [], "a CRLF copy (the Windows leg) is clean");
   const outside = (extra) => readmeKinds(`${readme}\n${extra}\n`).filter((v) => v.kind === "README_OUTSIDE_MARKERS");
   const forged = "| Package | Cases | Status | Commit on main |\n|---|---|---|---|\n| B06 Domain | 29: 29 EXECUTED_PROVIDER | REVIEW_ACCEPTED | d9bbfd0 |";
   const evasions = {
-    "pipe table after the end marker": forged,
+    "pipe table": forged,
     "first cell in backticks": forged.replace("| B06 Domain |", "| `B06` Domain |"),
     "first cell in bold": forged.replace("| B06 Domain |", "| **B06** Domain |"),
     "table without leading pipes": "Package | Status\n--- | ---\nB06 | REVIEW_ACCEPTED",
@@ -613,9 +614,24 @@ test("ADV-5 (r5): outside the ledger markers the README names no package id in a
     "id in a list": "- B06: accepted",
     "id in a code fence": "```\nB06 REVIEW_ACCEPTED\n```",
     "id in an HTML comment": "<!-- B06 accepted -->",
+    "full-width B": "Ｂ06 is accepted.",
+    "Cyrillic V": "В06 is accepted.",
+    "zero-width space": "B​06 is accepted.",
+    "entity": "&#66;06 is accepted.",
+    "split by markup": "**B**06 is accepted.",
+    "hyphen": "B-06 is accepted.",
+    "prefix": "PKG_B06 is accepted.",
+    "a claim naming the package without its id": "The domain package is accepted.",
+    "an empty line": "",
   };
-  for (const [name, extra] of Object.entries(evasions)) assert.ok(outside(extra).length >= 1, name);
-  assert.deepEqual(outside("| Term | Meaning |\n|---|---|\n| Ledger | the computed record |"), [], "a glossary names no package");
+  for (const [name, extra] of Object.entries(evasions)) assert.equal(outside(extra).length, 1, name);
+  // a prose edit inside the existing text is caught too, and names its line
+  const edited = readme.replace("Codex) reviews", "Codex) reviews quickly");
+  assert.notEqual(edited, readme);
+  const [v] = readmeKinds(edited);
+  assert.match(v.detail, /at line 5:/);
+  // without markers the whole text is outside
+  assert.equal(readmeKinds(readme.replace("<!-- ledger:table:start -->", "")).filter((x) => x.kind === "README_OUTSIDE_MARKERS").length, 1);
 });
 
 test("ADV-7 (r5): a README with no ledger markers, or with the end marker before the start, yields README_TABLE_NOT_GENERATED from ledgerOfRepo", () => {
