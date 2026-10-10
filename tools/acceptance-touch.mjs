@@ -3,9 +3,14 @@
 //
 //   node tools/acceptance-touch.mjs [[<sha>..]<target>] [--json]        (target defaults to HEAD)
 //
-// Each accepted package (REVIEW_ACCEPTED or ACCEPTED in tools/ledger.mjs) is diffed from its own accepted subject — the commit of
-// its accepting review — to the target, never from a later commit: a `<sha>..` left bound only widens a package's range when it
-// is an ancestor of that package's subject. A package's files are:
+// Each accepted package (REVIEW_ACCEPTED or ACCEPTED in tools/ledger.mjs, or any package whose latest review round accepts) is
+// diffed from its own accepted subject — the commit of its accepting review — to the target, never from a later commit: a
+// `<sha>..` left bound only widens a package's range when it is an ancestor of that package's subject. An external package (its
+// map pinned in docs/acceptance/ledger/inputs.json, its subject a commit of the core's repository) is diffed from the platform
+// commit that recorded its accepting review; a change of its pin or of its snapshot touches it. Every input that says what a
+// package is (package-globs.json, its sidecar rows, inputs.json, the snapshots) is read at both ends of the range (SCOPE_INPUTS):
+// a package owns what it owned at its subject and what it owns at the target, and a change of its globs or of the shared list
+// touches it. A package's files are:
 //   - its case map docs/design/<package>-case-map.md and its design documents docs/design/<package>-* (its sidecar is compared
 //     row by row, below);
 //   - every test file its rows cite, and the source tree `<dir>/src/**` beside each cited `<dir>/test/**` file;
@@ -22,9 +27,17 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { LEDGER_DIR, ROOT, SIDECAR_DIR, convertTableMap, ledgerOfRepo, loadRegistry } from "./ledger.mjs";
+import { LEDGER_DIR, REVIEW_DIR, ROOT, SIDECAR_DIR, convertTableMap, ledgerOfRepo, loadRegistry, loadReviews, reviewIndex } from "./ledger.mjs";
 
 export const PACKAGE_GLOBS = `${LEDGER_DIR}/package-globs.json`;
+export const INPUTS = `${LEDGER_DIR}/inputs.json`;
+export const EXTERNAL_DIR = `${LEDGER_DIR}/external`;
+const REGISTRY_DIR = "packages/contracts/registry";
+/**
+ * Every repository input this tool reads, a file or a directory prefix. Each is read at both ends of a package's range, never
+ * only in the working tree: the family test (tools/test/ledger-touch.test.mjs) has a row for each, so a new input needs one.
+ */
+export const SCOPE_INPUTS = [PACKAGE_GLOBS, INPUTS, `${EXTERNAL_DIR}/`, `${SIDECAR_DIR}/`, `${REVIEW_DIR}/`, "docs/design/", `${REGISTRY_DIR}/`];
 
 /** A glob (`**` any path, `*` within a segment) as a regular expression over a repository path. */
 export function globToRegExp(glob) {
@@ -44,8 +57,11 @@ export const isDoc = (path) => path.startsWith("docs/") || /\.md$/i.test(path);
 /** The attribution file: every package's globs and the shared list. Missing or malformed is an error, never "no globs". */
 export function readPackageGlobs(root = ROOT) {
   const file = join(root, PACKAGE_GLOBS);
-  if (!existsSync(file)) throw new Error(`${PACKAGE_GLOBS} is missing: every tracked non-doc file must be attributed`);
-  const value = JSON.parse(readFileSync(file, "utf8"));
+  return parsePackageGlobs(existsSync(file) ? readFileSync(file, "utf8") : null);
+}
+function parsePackageGlobs(text, at = "") {
+  if (text === null) throw new Error(`${PACKAGE_GLOBS} is missing${at}: every tracked non-doc file must be attributed`);
+  const value = JSON.parse(text);
   if (!Array.isArray(value.shared) || typeof value.packages !== "object" || value.packages === null) throw new Error(`${PACKAGE_GLOBS}: expected {shared: [...], packages: {...}}`);
   return value;
 }
@@ -71,13 +87,14 @@ export function packageGlobs(pkg, sidecar, extra = {}) {
 }
 
 /** The touched accepted packages, from the changed files and the changed case rows of each package's own range. */
-export function touched({ accepted, changedFiles, changedCases, changedOwnRows, globsOf, shared = [] }) {
+export function touched({ accepted, changedFiles, changedCases, changedOwnRows, globsOf, shared = [], controlOf = () => [] }) {
   const out = [];
   const sharedRes = shared.map(globToRegExp);
   for (const p of accepted) {
     const { globs, tests } = globsOf(p.package);
     const res = [...globs.map(globToRegExp), ...sharedRes];
-    const files = changedFiles.filter((f) => res.some((r) => r.test(f)));
+    // a control file (the attribution or a pin) that changed what the package is counts as one of its files
+    const files = [...new Set([...changedFiles.filter((f) => res.some((r) => r.test(f))), ...controlOf(p.package)])].sort();
     const citedTests = changedFiles.filter((f) => tests.includes(f));
     const cases = [...new Set(changedCases.filter((c) => c.package === p.package).map((c) => c.case))].sort();
     const ownRows = [...new Set(changedOwnRows.filter((c) => c.package === p.package).map((c) => c.case))].sort();
@@ -93,16 +110,15 @@ export function unattributed(changedFiles, globSets, shared) {
 }
 
 const git = (root, args) => execFileSync("git", ["-C", root, "-c", "core.quotepath=off", ...args], { encoding: "utf8", maxBuffer: 256 << 20, stdio: ["ignore", "pipe", "pipe"] });
-const exists = (root, rev, path) => {
-  try {
-    git(root, ["cat-file", "-e", `${rev}:${path}`]);
-    return true;
-  } catch {
-    return false;
-  }
-};
-/** A file at a revision; null only when the path does not exist there (any other git failure throws). */
-const show = (root, rev, path) => (exists(root, rev, path) ? git(root, ["show", `${rev}:${path}`]) : null);
+/**
+ * A file at a revision; null only when the revision's tree has no such path. Any git failure throws: an unknown revision, a
+ * corrupt object (`ls-tree` lists the path from the tree, `show` must then read its blob).
+ */
+export function fileAt(root, rev, path) {
+  const listed = git(root, ["ls-tree", "-z", "--name-only", rev, "--", path]).split("\0");
+  return listed.includes(path) ? git(root, ["show", `${rev}:${path}`]) : null;
+}
+const show = fileAt;
 const list = (v) => (Array.isArray(v) ? v : Object.values(v).find(Array.isArray) ?? []);
 
 /** Every path a range adds, deletes or modifies — both names of a rename, non-ASCII paths verbatim. */
@@ -191,40 +207,92 @@ export function main(argv, root = ROOT, log = console.log) {
     log(`${spec}: does not resolve to commits`);
     return 2;
   }
-  const { ledger } = ledgerOfRepo(root);
+  const { ledger, inputs } = ledgerOfRepo(root);
   const registry = loadRegistry(root);
-  const accepted = ledger.packages.filter((p) => p.status === "REVIEW_ACCEPTED" || p.status === "ACCEPTED");
-  const globsFile = readPackageGlobs(root);
-  const sidecarOf = (pkg) => {
-    const f = join(root, SIDECAR_DIR, `${pkg}.json`);
-    return existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : null;
+  // the packages to scan: every accepted package, and every package whose latest review round accepts (a later change that makes
+  // a package stop computing as accepted — a row its review no longer agrees with, a moved pin — must not hide it)
+  const { latest } = reviewIndex(loadReviews(root));
+  const accepted = ledger.packages
+    .map((p) => {
+      const r = latest.get(p.package);
+      if (p.status === "REVIEW_ACCEPTED" || p.status === "ACCEPTED") return p;
+      return r && /^ACCEPT/.test(r.verdict) ? { ...p, acceptedSubject: { commit: r.commit, reviewId: r.id } } : null;
+    })
+    .filter(Boolean);
+  const externalOf = new Map(inputs.flatMap((i) => i.packages.map((p) => [p, i])));
+  const globsTarget = parsePackageGlobs(fileAt(root, target, PACKAGE_GLOBS), ` at ${target.slice(0, 12)}`);
+  // the attribution at a range's start: the file at that commit, or its first version when the package was accepted before it
+  const first = git(root, ["log", "--diff-filter=A", "--format=%H", target, "--", PACKAGE_GLOBS]).trim().split("\n").filter(Boolean).at(-1);
+  const globsFrom = (from) => {
+    const text = fileAt(root, from, PACKAGE_GLOBS) ?? (first ? fileAt(root, first, PACKAGE_GLOBS) : null);
+    return text === null ? globsTarget : parsePackageGlobs(text);
   };
-  const globsOf = (p) => packageGlobs(p, sidecarOf(p), globsFile.packages);
+  const rowsOf = (rev, pkg) => ({ rows: rowsAt(root, rev, `${SIDECAR_DIR}/${pkg}.json`, registry) });
+  const inputsAt = (rev) => {
+    const text = fileAt(root, rev, INPUTS);
+    return text === null ? [] : JSON.parse(text).external ?? [];
+  };
+  const snapshotPackages = (rev, path) => {
+    const text = fileAt(root, rev, path);
+    return text === null ? [] : JSON.parse(text).packages ?? [];
+  };
 
-  // each package from its own accepted subject (or an older left bound) to the target
+  // each package from its own accepted subject (or an older left bound) to the target; an external package (its map pinned in
+  // inputs.json, its subject a commit of the core's repository) from the platform commit that recorded its accepting review
   const result = [];
   const allChanged = new Set();
   const byFrom = new Map();
   for (const p of accepted) {
     let subject;
-    try {
-      subject = resolveCommit(root, p.acceptedSubject.commit);
-    } catch {
-      log(`${p.package}: its accepted subject ${p.acceptedSubject.commit} does not resolve in this repository`);
-      return 2;
+    if (externalOf.has(p.package)) {
+      const review = `${REVIEW_DIR}/${p.acceptedSubject.reviewId}.json`;
+      subject = git(root, ["log", "--diff-filter=A", "--format=%H", target, "--", review]).trim().split("\n").filter(Boolean).at(-1);
+      if (!subject) {
+        log(`${p.package}: its accepting review ${review} is not committed in the history of ${target.slice(0, 12)}`);
+        return 2;
+      }
+    } else {
+      try {
+        subject = resolveCommit(root, p.acceptedSubject.commit);
+      } catch {
+        log(`${p.package}: its accepted subject ${p.acceptedSubject.commit} does not resolve in this repository`);
+        return 2;
+      }
     }
     const from = left && left !== subject && isAncestor(root, left, subject) ? left : subject;
     byFrom.set(from, [...(byFrom.get(from) ?? []), p]);
   }
+  const sameSet = (a = [], b = []) => JSON.stringify([...new Set(a)].sort()) === JSON.stringify([...new Set(b)].sort());
   for (const [from, pkgs] of byFrom) {
     const files = changedPaths(root, from, target);
     files.forEach((f) => allChanged.add(f));
     const { changedCases, changedOwnRows } = changedCaseRows(root, from, target, registry);
-    result.push(...touched({ accepted: pkgs, changedFiles: files, changedCases, changedOwnRows, globsOf, shared: globsFile.shared }).map((r) => ({ ...r, range: `${from.slice(0, 7)}..${target.slice(0, 7)}` })));
+    // every attribution input read at both ends of the range: a package owns what it owned at its subject and what it owns now
+    const before = globsFrom(from);
+    const globsOf = (pkg) => {
+      const a = packageGlobs(pkg, rowsOf(from, pkg), before.packages);
+      const b = packageGlobs(pkg, rowsOf(target, pkg), globsTarget.packages);
+      return { globs: [...new Set([...a.globs, ...b.globs])].sort(), tests: [...new Set([...a.tests, ...b.tests])].sort() };
+    };
+    const pinsBefore = inputsAt(from);
+    const pinsAfter = inputsAt(target);
+    const changedPins = [...new Set([...pinsBefore, ...pinsAfter].map((i) => i.id))].flatMap((id) => {
+      const [a, b] = [pinsBefore.find((i) => i.id === id), pinsAfter.find((i) => i.id === id)];
+      return JSON.stringify(a ?? null) === JSON.stringify(b ?? null) ? [] : [...(a?.packages ?? []), ...(b?.packages ?? [])];
+    });
+    const snapshots = files.filter((f) => f.startsWith(`${EXTERNAL_DIR}/`)).map((f) => ({ f, packages: [...snapshotPackages(from, f), ...snapshotPackages(target, f)] }));
+    const controlOf = (pkg) => [
+      ...(!sameSet(before.packages[pkg], globsTarget.packages[pkg]) || !sameSet(before.shared, globsTarget.shared) ? [PACKAGE_GLOBS] : []),
+      ...(changedPins.includes(pkg) ? [INPUTS] : []),
+      ...snapshots.filter((s) => s.packages.includes(pkg)).map((s) => s.f),
+    ];
+    const shared = [...new Set([...before.shared, ...globsTarget.shared])];
+    result.push(...touched({ accepted: pkgs, changedFiles: files, changedCases, changedOwnRows, globsOf, shared, controlOf }).map((r) => ({ ...r, range: `${from.slice(0, 7)}..${target.slice(0, 7)}`, ...(externalOf.has(r.package) ? { subjectRepository: externalOf.get(r.package).repository } : {}) })));
   }
   result.sort((a, b) => a.package.localeCompare(b.package));
-  const allPackages = [...new Set([...Object.keys(globsFile.packages), ...ledger.packages.map((p) => p.package)])];
-  const orphans = unattributed([...allChanged].sort(), allPackages.map((p) => globsOf(p).globs), globsFile.shared);
+  // ownership at the target: a changed non-doc file that the target's attribution gives to nobody fails the run
+  const allPackages = [...new Set([...Object.keys(globsTarget.packages), ...ledger.packages.map((p) => p.package)])];
+  const orphans = unattributed([...allChanged].sort(), allPackages.map((p) => packageGlobs(p, rowsOf(target, p), globsTarget.packages).globs), globsTarget.shared);
 
   if (argv.includes("--json")) log(JSON.stringify({ target, touched: result, unattributed: orphans }, null, 1));
   else {
