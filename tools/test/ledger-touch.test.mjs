@@ -49,8 +49,16 @@ test("touched: a file in a package's globs or a changed case touches it; a cited
 });
 
 // --- a repository with a synthetic program: B00 accepted at X (its review recorded at Y), B01 not accepted ------------------------
+// `external`: B01's map is external (MC, pinned at PIN, no sidecar) and its accepting review, bound to PIN, is recorded at Y too.
+// `globsLater`: the attribution file does not exist at X yet; Y adds it.
 
-function fixture() {
+const PIN = "3b4b0aea4f1879ffb4189a55a16f22f4520787d4";
+const MC = { id: "MC", flag: "mc", repository: "kauro-migration-core", path: "docs/design/B01-B02-case-map.md", commit: PIN, format: "table", packages: ["B01"] };
+const SNAP = `docs/acceptance/ledger/external/MC-${PIN.slice(0, 12)}.json`;
+const snapshot = (test = ["test/mc.test.ts :: refuses"]) => ({ id: "MC", repository: MC.repository, path: MC.path, commit: PIN, packages: ["B01"], rows: [{ case: "S003", class: "EXECUTED_LOCAL", test, commit: PIN.slice(0, 7), reviewId: null, inheritedTo: [] }] });
+const GLOBS = "docs/acceptance/ledger/package-globs.json";
+
+function fixture({ external = false, globsLater = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "touch-"));
   const git = (...a) => execFileSync("git", ["-C", dir, "-c", "core.quotepath=off", ...a], { encoding: "utf8" }).trim();
   const write = (path, value) => {
@@ -75,26 +83,31 @@ function fixture() {
   write(`${reg}/additional_scenarios.json`, []);
   write(`${reg}/gates.json`, [{ id: "G-X", owner: "21", package: "B00", caseIds: ["S001", "S002", "S003"], evidenceRule: "r" }]);
   write(`${reg}/PROVENANCE.json`, { files: {} });
-  write("docs/acceptance/ledger/inputs.json", { external: [] });
-  write("docs/acceptance/ledger/package-globs.json", { shared: ["package.json"], packages: { B00: ["src/**"], B01: ["lib/**"] } });
+  write("docs/acceptance/ledger/inputs.json", { external: external ? [MC] : [] });
+  const globs = { shared: ["package.json"], packages: { B00: ["src/**"], B01: ["lib/**"] } };
+  if (!globsLater) write(GLOBS, globs);
+  if (external) write(SNAP, snapshot());
   write("package.json", "{}\n");
   write("src/a.ts", "export const a = 1;\n");
   write("lib/b.ts", "export const b = 1;\n");
   write("test/a.test.ts", "test('a', () => {});\n");
   const row = (id, extra = {}) => ({ case: id, class: "EXECUTED_LOCAL", test: ["test/a.test.ts :: a"], commit: null, reviewId: null, inheritedTo: [], ...extra });
   write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: [row("S001"), row("S002")] });
-  write("docs/acceptance/case-maps/B01.json", { package: "B01", rows: [{ case: "S003", class: "NOT_EXECUTED", test: [], commit: null, reviewId: null, inheritedTo: [] }] });
+  if (!external) write("docs/acceptance/case-maps/B01.json", { package: "B01", rows: [{ case: "S003", class: "NOT_EXECUTED", test: [], commit: null, reviewId: null, inheritedTo: [] }] });
   const X = commit("accepted subject");
   const reviewId = `B00-round1-${X.slice(0, 7)}`;
   write(`docs/acceptance/reviews/${reviewId}.json`, { verdict: "ACCEPT", cases: ["S001", "S002"].map((id) => ({ id, claimed_status: "EXECUTED_LOCAL", agree: true })) });
-  write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: [row("S001", { reviewId, commit: X.slice(0, 7) }), row("S002", { reviewId, commit: X.slice(0, 7) })] });
+  const ownRows = (extra = {}) => [row("S001", { reviewId, commit: X.slice(0, 7), ...extra }), row("S002", { reviewId, commit: X.slice(0, 7) })];
+  write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: ownRows() });
+  if (globsLater) write(GLOBS, globs);
+  if (external) write(`docs/acceptance/reviews/B01-round1-${PIN.slice(0, 7)}.json`, { verdict: "ACCEPT", cases: [{ id: "S003", claimed_status: "EXECUTED_LOCAL", agree: true }] });
   const Y = commit("review recorded");
   const run = (...argv) => {
     const lines = [];
     const code = main([...argv, "--json"], dir, (l) => lines.push(l));
     return { code, out: code === 2 ? lines.join("\n") : JSON.parse(lines.join("\n")) };
   };
-  return { dir, git, write, commit, X, Y, run, reg, program, done: () => rmSync(dir, { recursive: true, force: true }) };
+  return { dir, git, write, commit, X, Y, run, reg, program, globs, ownRows, reviewId, done: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
 test("PR18-6 (T6): main end to end — the ACCEPTED package (not only REVIEW_ACCEPTED) is diffed; recording its review touches nothing; a later change to its files touches it; an unresolvable target is exit 2", () => {
@@ -225,4 +238,61 @@ test("an inherited row in another package's sidecar touches the case's owner but
   } finally {
     f.done();
   }
+});
+
+// --- the family "evidence" (a false not-touched verdict): every scope path the tool can see -----------------------------------------
+// One row per path: the change made in a commit after Y and the outcome it must have. A path is either loud (an accepted package it
+// belongs to is listed, or the run fails) or listed here as inert with its reason. Every tracked file of the fixture and every
+// repository input the tool reads (SCOPE_INPUTS) must have a row, so a new path or a new input without a row fails this test.
+const FAMILY = [
+  { path: "src/a.ts", why: "B00's package glob", change: (f) => f.write("src/a.ts", "export const a = 2;\n"), code: 0, touched: ["B00"] },
+  { path: "test/a.test.ts", why: "B00's cited test", change: (f) => f.write("test/a.test.ts", "test('a', () => { /* changed */ });\n"), code: 0, touched: ["B00"] },
+  { path: "lib/b.ts", why: "the package glob of B01, an accepted external package", change: (f) => f.write("lib/b.ts", "export const b = 2;\n"), code: 0, touched: ["B01"] },
+  { path: "package.json", why: "a shared glob touches every accepted package (ADV-3)", change: (f) => f.write("package.json", "{ \"x\": 1 }\n"), code: 0, touched: ["B00", "B01"] },
+  { path: GLOBS, why: "re-attribution: src/** moved from B00 to B01 in the commit that edits src/a.ts (ADV-1)", change: (f) => { f.write(GLOBS, { ...f.globs, packages: { B00: [], B01: ["lib/**", "src/**"] } }); f.write("src/a.ts", "export const a = 2;\n"); }, code: 0, touched: ["B00", "B01"] },
+  { path: GLOBS, why: "a package's globs changed alone (ADV-1)", change: (f) => f.write(GLOBS, { ...f.globs, packages: { ...f.globs.packages, B00: ["src/**", "tools/**"] } }), code: 0, touched: ["B00"] },
+  { path: GLOBS, why: "the shared list changed alone (ADV-1)", change: (f) => f.write(GLOBS, { ...f.globs, shared: [] }), code: 0, touched: ["B00", "B01"] },
+  { path: "docs/acceptance/ledger/inputs.json", why: "the pin of B01's external map moved (ADV-2)", change: (f) => f.write("docs/acceptance/ledger/inputs.json", { external: [{ ...MC, commit: "1111111aea4f1879ffb4189a55a16f22f4520787d" }] }), code: 0, touched: ["B01"] },
+  { path: SNAP, why: "B01's external snapshot (ADV-2)", change: (f) => f.write(SNAP, snapshot(["test/mc.test.ts :: refuses twice"])), code: 0, touched: ["B01"] },
+  { path: "docs/acceptance/case-maps/B00.json", why: "B00's own row: a citation added", change: (f) => f.write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: f.ownRows({ test: ["test/a.test.ts :: a", "test/a.test.ts :: b"] }) }), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/case-maps/B00.json", why: "B00's own row: a class its review does not accept (the package stops computing as accepted; it is still listed)", change: (f) => f.write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: f.ownRows({ class: "PARTIAL", inheritedTo: ["B01"] }) }), code: 0, touched: ["B00"] },
+  { path: "docs/design/B00-notes.md", why: "B00's design documents", change: (f) => f.write("docs/design/B00-notes.md", "a note\n"), code: 0, touched: ["B00"] },
+  { path: "packages/contracts/registry/program.json", why: "a case moved between packages (old and new owner); the registry file has no owner in the fixture", change: (f) => f.write(`${f.reg}/program.json`, [{ ...f.program[0], caseIds: ["S001"] }, { ...f.program[1], caseIds: ["S002", "S003"] }]), code: 1, touched: ["B00", "B01"] },
+  { path: "packages/contracts/registry/cases.json", why: "a case record changed", change: (f) => f.write(`${f.reg}/cases.json`, [{ id: "S001", gate: "G-X", expected: "two" }, { id: "S002", gate: "G-X", expected: "one" }, { id: "S003", gate: "G-X", expected: "one" }]), code: 1, touched: ["B00"] },
+  { path: "packages/contracts/registry/additional_scenarios.json", why: "a scenario record added for a case", change: (f) => f.write(`${f.reg}/additional_scenarios.json`, [{ id: "S003", note: "x" }]), code: 1, touched: ["B01"] },
+  { path: "packages/contracts/registry/gates.json", why: "an unowned non-doc file fails the run", change: (f) => f.write(`${f.reg}/gates.json`, [{ id: "G-X", owner: "21", package: "B00", caseIds: ["S001", "S002", "S003"], evidenceRule: "r2" }]), code: 1, touched: [] },
+  { path: "packages/contracts/registry/PROVENANCE.json", why: "an unowned non-doc file fails the run", change: (f) => f.write(`${f.reg}/PROVENANCE.json`, { files: {}, note: "x" }), code: 1, touched: [] },
+  { path: "infra/main.tf", why: "a new non-doc file no glob owns fails the run", change: (f) => f.write("infra/main.tf", "# x\n"), code: 1, touched: [] },
+  { path: "docs/acceptance/reviews/", why: "INERT: a review is the acceptance itself (it moves the subject, it is not a change after it)", change: (f) => f.write(`docs/acceptance/reviews/${f.reviewId}.json`, { verdict: "ACCEPT", note: "x", cases: ["S001", "S002"].map((id) => ({ id, claimed_status: "EXECUTED_LOCAL", agree: true })) }), code: 0, touched: [] },
+  { path: "docs/other.md", why: "INERT: a document of no package", change: (f) => f.write("docs/other.md", "x\n"), code: 0, touched: [] },
+];
+
+test("family evidence: every scope path acceptance-touch can see is loud (an accepted package it belongs to is listed, or the run fails) or inert by a stated reason, and every tracked file and every input the tool reads has a row", async () => {
+  const touch = await import("../acceptance-touch.mjs");
+  const covered = (p) => FAMILY.some((r) => r.path === p || (r.path.endsWith("/") && p.startsWith(r.path)));
+  const base = fixture({ external: true });
+  try {
+    const tracked = base.git("ls-files", "-z").split("\0").filter(Boolean);
+    assert.deepEqual(tracked.filter((p) => !covered(p)), [], "every tracked file has a family row");
+    const atY = base.run();
+    assert.deepEqual([atY.code, atY.out.touched], [0, []], `the fixture at Y is clean: ${JSON.stringify(atY.out)}`);
+  } finally {
+    base.done();
+  }
+  const wrong = [];
+  for (const r of FAMILY) {
+    const f = fixture({ external: true });
+    try {
+      r.change(f);
+      f.commit(r.why);
+      const { code, out } = f.run();
+      const got = code === 2 ? `exit 2: ${out}` : JSON.stringify([code, out.touched.map((t) => t.package)]);
+      if (got !== JSON.stringify([r.code, r.touched])) wrong.push(`${r.path} (${r.why}): expected ${JSON.stringify([r.code, r.touched])}, got ${got}`);
+    } finally {
+      f.done();
+    }
+  }
+  assert.deepEqual(wrong, []);
+  assert.ok(Array.isArray(touch.SCOPE_INPUTS) && touch.SCOPE_INPUTS.length > 0, "acceptance-touch.mjs exports SCOPE_INPUTS, the repository inputs it reads");
+  for (const input of touch.SCOPE_INPUTS) assert.ok(FAMILY.some((r) => r.path.startsWith(input) || input.startsWith(r.path)), `no family row for the input ${input}`);
 });
