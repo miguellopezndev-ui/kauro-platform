@@ -132,8 +132,25 @@ function persistenceProblem(rel: string, text: string): string | undefined {
   if (CONSTRUCTS_KAURO_POOL.test(c) && rel !== "packages/persistence/src/pool.ts") return `${rel} constructs KauroPool outside pool.ts`;
   // ADV-9 (1896dea): createPool is not even mentioned elsewhere, so no import route (index namespace, run-time import) can wrap it
   if (!POOL_VALUE_HOLDERS.has(rel) && (POOL_VALUE_IMPORTS.some((f) => f.test(runtime)) || /\bcreatePool\b/.test(runtime))) return `${rel} takes KauroPool or createPool as a value outside pool.ts and index.ts`;
+  // DB-TLS-R4: index.ts only RE-EXPORTS the pool module (`export { createPool, KauroPool } from "./pool.js"` binds nothing locally); a local
+  // binding of createPool or KauroPool there (an aliased import, then a wrapper) would hand apps a pool through a function that is not a site
+  if (rel === "packages/persistence/src/index.ts") {
+    const residual = runtime.replace(POOL_RE_EXPORT, "");
+    if (POOL_VALUE_IMPORTS.some((f) => f.test(residual)) || /\bcreatePool\b/.test(residual)) return `${rel} may only re-export createPool and KauroPool from the pool module, never bind them`;
+  }
+  // DB-TLS-R4: nothing else in persistence reaches the package index (or the package by name) as a namespace, a default or at run time:
+  // `I["create" + "Pool"](c)` rebuilds the factory without ever spelling it
+  if (!POOL_VALUE_HOLDERS.has(rel) && PACKAGE_INDEX_VALUE.some((f) => f.test(runtime))) return `${rel} reaches the package index as a namespace or at run time`;
   return undefined;
 }
+
+/** `export { a, type B } from "./pool.js"` and `export type { ... } from "./pool.js"`: a re-export binds nothing in the file. */
+const POOL_RE_EXPORT = /\bexport\s+(?:type\s+)?\{[^}]*\}\s*from\s*["']\.\/pool(?:\.js)?["']\s*;?/g;
+const INDEX_MODULE = String.raw`(?:(?:\.{1,2}\/)+index(?:\.js)?|\.{1,2}|@kauro\/persistence)`;
+const PACKAGE_INDEX_VALUE: ReadonlyArray<RegExp> = [
+  new RegExp(String.raw`\b(?:import|export)\s+(?!type\b)(?:\*(?:\s+as\s+[\w$]+)?|[\w$]+)\s*(?:,\s*\{[^}]*\})?\s*from\s*["']${INDEX_MODULE}["']`),
+  new RegExp(String.raw`(?:\brequire\(\s*|\bimport\(\s*)["']${INDEX_MODULE}["']`),
+];
 
 /** TLS settings are written in tls.ts and nowhere else: `ssl:` only as `ssl: sslOptionsOf(`, no identity-check override. */
 const TLS_FORMS: ReadonlyArray<RegExp> = [
@@ -288,48 +305,80 @@ test("scan self-test: a TLS setting outside tls.ts is caught in every form", () 
   assert.deepEqual(tlsViolations("const o = { ...(tls === undefined ? {} : { ssl: sslOptionsOf(tls) }) };"), []);
 });
 
-test("every connection site of apps/ and packages/*/src is known, and each composition root applies connectionSecurityOf", () => {
-  const files = trackedSources(root).map((f) => join(root, f));
+/** The listed connection sites: a new one must be added here and covered by connectionSecurityOf (or, in persistence, by the pool rules). */
+const KNOWN_SITES = [
+  "apps/api/src/commissions/assembly.ts",
+  "apps/api/src/composition.ts",
+  "apps/api/src/payments/assembly.ts",
+  "apps/control/src/audit/receipts.ts",
+  "apps/control/src/composition.ts",
+  "apps/web/scripts/next.mjs",
+  "packages/persistence/src/index.ts",
+  "packages/persistence/src/migrations/runner.ts",
+  "packages/persistence/src/pool.ts",
+];
+
+/** The whole structural scan over {tracked relative path -> text}: every problem found, empty when the tree conforms. */
+function scanTree(sources: ReadonlyMap<string, string>): string[] {
+  const problems: string[] = [];
   const found = new Map<string, string>();
-  for (const file of files) {
-    const rel = relative(root, file).replaceAll("\\", "/");
+  for (const [rel, text] of sources) {
     if (rel.startsWith("packages/persistence/src/testing/")) continue; // the test-only subpath (the architecture gate keeps it out of production)
-    const text = readFileSync(file, "utf8");
     if (isSite(text, rel)) found.set(rel, text);
     // DB-TLS-R3: every persistence source, listed site or not, takes KauroPool as a type only (pool.ts and index.ts excepted)
     if (rel.startsWith("packages/persistence/src/")) {
       const problem = persistenceProblem(rel, text);
-      assert.equal(problem, undefined, problem);
+      if (problem !== undefined) problems.push(problem);
     }
-    if (rel !== "packages/persistence/src/tls.ts") assert.deepEqual(tlsViolations(text, rel), [], `${rel}: TLS settings belong in tls.ts`);
+    if (rel !== "packages/persistence/src/tls.ts") for (const v of tlsViolations(text, rel)) problems.push(`${rel}: TLS settings belong in tls.ts (${v})`);
   }
-  assert.deepEqual(
-    [...found.keys()].sort(),
-    [
-      "apps/api/src/commissions/assembly.ts",
-      "apps/api/src/composition.ts",
-      "apps/api/src/payments/assembly.ts",
-      "apps/control/src/audit/receipts.ts",
-      "apps/control/src/composition.ts",
-      "apps/web/scripts/next.mjs",
-      "packages/persistence/src/index.ts",
-      "packages/persistence/src/migrations/runner.ts",
-      "packages/persistence/src/pool.ts",
-    ],
-    "a new connection site must be listed here and covered by connectionSecurityOf",
-  );
+  for (const rel of found.keys()) if (!KNOWN_SITES.includes(rel)) problems.push(`${rel} is a connection site that is not listed: a new connection site must be listed here and covered by connectionSecurityOf`);
+  for (const rel of KNOWN_SITES) if (!found.has(rel)) problems.push(`${rel} is listed as a connection site but the scan no longer finds it`);
   for (const [rel, text] of found) {
     if (rel === "apps/web/scripts/next.mjs") {
       // createRequire there only resolves the `next` binary; nothing in it may open a database connection
-      assert.ok(!SITE_FORMS.filter((f) => !f.test("createRequire")).some((f) => f.test(code(text, rel))), `${rel} opens no database connection`);
-    } else if (rel.startsWith("packages/persistence/src/")) {
-      // by content: a file that constructs a Pool or Client derives ssl from sslOptionsOf; a file that does not only re-exports
-      const problem = persistenceProblem(rel, text);
-      assert.equal(problem, undefined, problem);
-    } else {
-      assert.ok(text.includes("connectionSecurityOf("), `${rel} applies connectionSecurityOf before it connects`);
+      if (SITE_FORMS.filter((f) => !f.test("createRequire")).some((f) => f.test(code(text, rel)))) problems.push(`${rel} opens no database connection`);
+    } else if (!rel.startsWith("packages/persistence/src/") && !text.includes("connectionSecurityOf(")) {
+      problems.push(`${rel} applies connectionSecurityOf before it connects`);
     }
   }
+  return problems.sort();
+}
+
+const treeSources = (): Map<string, string> => new Map(trackedSources(root).map((f) => [f, readFileSync(join(root, f), "utf8")]));
+
+test("every connection site of apps/ and packages/*/src is known, and each composition root applies connectionSecurityOf", () => {
+  assert.deepEqual(scanTree(treeSources()), []);
+});
+
+test("DB-TLS-R4 / DB-TLS-R5: a factory wrapper in persistence or a caller outside the listed sites fails the complete scan; an erased import type does not", () => {
+  const base = treeSources();
+  const mutated = (...edits: ReadonlyArray<readonly [string, string]>): string[] => {
+    const tree = new Map(base);
+    for (const [rel, append] of edits) {
+      assert.ok(tree.has(rel), `${rel} is tracked`);
+      tree.set(rel, `${tree.get(rel)}\n${append}\n`);
+    }
+    return scanTree(tree);
+  };
+  const wrapper = 'import { createPool as mk } from "./pool.js";\nexport const uncheckedPool = (c: import("./pool.js").PoolConfig) => mk(c);';
+  const caller = 'import { uncheckedPool } from "@kauro/persistence";\nexport const openUnchecked = (c: never) => uncheckedPool(c);';
+  // the ordinary aliased wrapper in the package index (a listed site, exempt from the pool import rule as a re-export module)
+  assert.ok(mutated(["packages/persistence/src/index.ts", wrapper]).some((p) => p.startsWith("packages/persistence/src/index.ts ")), "index.ts wrapper");
+  // the same wrapper, now with an application caller that never applies connectionSecurityOf: still refused (at the wrapper, which makes the caller unreachable)
+  assert.ok(mutated(["packages/persistence/src/index.ts", wrapper], ["apps/api/src/main.ts", caller]).some((p) => p.startsWith("packages/persistence/src/index.ts ")), "wrapper plus caller");
+  // the computed index-factory wrapper in the listed runner
+  for (const text of [
+    'import * as I from "../index.js";\nexport const open = (c: never) => (I as never as Record<string, (c: never) => unknown>)["create" + "Pool"]!(c);',
+    'export const open = async (c: never) => ((await import("../index.js")) as never as Record<string, (c: never) => unknown>)["create" + "Pool"]!(c);',
+    'import * as P from "@kauro/persistence";\nexport const open = (c: never) => (P as never as Record<string, (c: never) => unknown>)["create" + "Pool"]!(c);',
+    'export * from "../index.js";',
+  ]) assert.ok(mutated(["packages/persistence/src/migrations/runner.ts", text]).some((p) => p.startsWith("packages/persistence/src/migrations/runner.ts ")), text);
+  // a caller of the factory itself in a tracked application file that does not apply connectionSecurityOf
+  const direct = mutated(["apps/api/src/main.ts", 'import { createPool } from "@kauro/persistence";\nexport const openDirect = (c: never) => createPool(c);']);
+  assert.ok(direct.some((p) => p.startsWith("apps/api/src/main.ts ")), "direct caller");
+  // DB-TLS-R5: an erased import-type alias in a non-site persistence file is not a problem
+  assert.deepEqual(mutated(["packages/persistence/src/evidence.ts", 'export type ErasedPoolConfig = import("./pool.js").PoolConfig;']), []);
 });
 
 const login = { host: "db.example.test", port: 1, database: "kauro", user: "u", poolMax: 1, passwordFile: "pw" };
