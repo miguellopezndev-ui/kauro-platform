@@ -52,6 +52,7 @@ import { grantCorporateRole, recordQualifiedFiscalIssuer, recordQualifiedPayment
 import { clockAt, expireSealedRevision, sealSourceRevision } from "./source-lifecycle.js";
 import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "./temporary-postgres.js";
 import { serverNow } from "./server-now.js";
+import { mintTestDatabaseEnvironment } from "../environment.js";
 import { LOCK_WAIT_POLL_ATTEMPTS, LOCK_WAIT_POLL_INTERVAL_MS, raceStatementTimeoutMs } from "./faults/bounds.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
@@ -212,7 +213,7 @@ const EDGE_EVIDENCE: Readonly<Partial<Record<CapabilityPublicationState, string>
 
 export async function start(): Promise<Harness> {
   const pg = await startTemporaryPostgres();
-  const base = { environment: "LOCAL", host: "127.0.0.1", port: pg.port, database: ROLES.database, max: 4 } as const;
+  const base = { environment: mintTestDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: pg.port, database: ROLES.database, max: 4 } as const;
   const appPool = createPool({ ...base, user: ROLES.appLogin, applicationName: "kauro-test-api" });
   const controlPool = createPool({ ...base, user: ROLES.controlLogin, applicationName: "kauro-test-control" });
   const assurancePool = createPool({ ...base, max: 2, user: ROLES.assuranceLogin, applicationName: "kauro-test-assurance" });

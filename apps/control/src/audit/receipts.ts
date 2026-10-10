@@ -17,7 +17,7 @@ import type { CancellationChannel, CoreEvidenceClass, ExecutionLimits, ValidateP
 import { DOMAINS, canonicalBytes, isSha256Hex, rawDigest, structuredDigest, type RowCounts, type Sha256Hex, type UtcInstant } from "@kauro/contracts";
 import { AttemptScratchStore } from "@kauro/data-plane";
 import type { AgencyId, Environment, PlanBody, PlanId, ValidationReceiptId, ValidationReceiptRecord } from "@kauro/domain";
-import { PgValidationReceiptRecorder, createPool, type PoolErrorSink } from "@kauro/persistence";
+import { PgValidationReceiptRecorder, createPool, type DatabaseEnvironment, type PoolErrorSink } from "@kauro/persistence";
 
 /** The validator's write path: one append-only receipt, recorded by kauro_validator (persistence's PgValidationReceiptRecorder). */
 export interface ValidationReceipts {
@@ -218,7 +218,7 @@ export interface ValidatorDatabaseConfig {
   readonly user: string;
   readonly password?: string;
   /** Outside LOCAL the connection is certificate-verified and its password is a file (I-2, I-3): see connectionSecurityOf. */
-  readonly environment: Environment;
+  readonly environment: DatabaseEnvironment;
   readonly passwordFile?: string;
   readonly tlsCaFile?: string;
   readonly poolMax: number;

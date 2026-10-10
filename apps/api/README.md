@@ -116,6 +116,20 @@ over a real socket) — see `docs/design/B06-case-map.md`.
   Outside LOCAL: `KAURO_DB_TLS_CA_FILE` required, `rejectUnauthorized: true`, the host a DNS name, the password only as a file.
   `apps/api/test/db-connection-sites.test.ts` fails when any other file loads a PostgreSQL driver, loads a module by a non-literal name or
   through a module-loading primitive outside its exact allowlist, or writes a TLS setting.
+- The environment a connection is checked against is a branded `DatabaseEnvironment` (`packages/persistence/src/environment.ts`): `createPool`
+  and the migrator connection refuse any string, literal or built at run time, with a type error and a `TypeError`
+  (`environment.ts:48`, called from `pool.ts:60` and `pool.ts:337`). Production values come from one minter, claimed once per process
+  (`environment.ts:36`) by `apps/api/src/config.ts:234` and fed only the validated `KAURO_ENVIRONMENT` (`config.ts:239`); tests use
+  `testDatabaseEnvironment` from the test-only `@kauro/persistence/testing` subpath. The scan pins both minters to their files and still
+  refuses a `"LOCAL"` literal in production code, because a literal fed to the configuration would mint a genuine LOCAL value.
+- Threat model (disclosed residuals). The guard targets accidental insecure connections in reviewed first-party code: an import, an
+  option or a literal that a reviewer would read as harmless. Deliberate runtime reflection is out of scope, as it is for any code running
+  in the process, which can already read every secret it holds. Named residuals: (1) computed-key reflection, e.g.
+  `Reflect.get(process, "getBuiltin" + "Module")` or `module["create" + "Require"]`, reaches a loader without a literal the AST can see;
+  (2) `client.constructor` of a client from `KauroPool.acquire` / `connectUnverified` (`pool.ts:239`, `pool.ts:221`) is the driver's
+  `Client` class, which can open an unchecked connection; (3) `tools/` is outside the scan (`db-connection-sites.test.ts:36` lists `apps`
+  and `packages` only). The only `tools/` file that opens a pool, `tools/openapi.mjs:693-694`, uses a test-minted LOCAL environment on
+  `127.0.0.1:1` and asserts at `openapi.mjs:724` that no connection was opened, so it cannot reach a non-LOCAL database.
 - Password files are read once, when the connection is opened at start. **B14 obligation:** a secret rotation (database password or CA
   bundle) triggers a rolling restart of every instance; nothing re-reads the file while the process runs.
 - Known and unchanged (N7): the one-shot migration job still accepts the owner's password as the plain `KAURO_DB_MIGRATOR_PASSWORD` in

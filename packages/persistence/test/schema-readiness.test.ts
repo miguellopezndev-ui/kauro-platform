@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { compareSchema, createPool, listMigrations, readSchemaLedger } from "../src/index.js";
-import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
+import { ROLES, startTemporaryPostgres, type TemporaryPostgres, testDatabaseEnvironment } from "../src/testing/index.js";
 
 let pg: TemporaryPostgres;
 before(async () => {
@@ -21,8 +21,8 @@ test("R42: the runtime roles read the ledger (and cannot write it); compared wit
   const last = shipped.at(-1);
   assert.ok(last);
   const pools = [
-    createPool({ environment: "LOCAL", host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.appLogin, max: 1, applicationName: "kauro-readiness-app" }),
-    createPool({ environment: "LOCAL", host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.controlLogin, max: 1, applicationName: "kauro-readiness-control" }),
+    createPool({ environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.appLogin, max: 1, applicationName: "kauro-readiness-app" }),
+    createPool({ environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.controlLogin, max: 1, applicationName: "kauro-readiness-control" }),
   ];
   const oracle = await pg.connect("postgres");
   try {

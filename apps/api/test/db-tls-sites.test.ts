@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "@kauro/persistence/testing";
+import { ROLES, startTemporaryPostgres, type TemporaryPostgres, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import { API_APPLICATION_NAME, COMMISSION_APPLICATION_NAME, PAYMENT_APPLICATION_NAME, SESSIONS_APPLICATION_NAME, openCommissionPools, openDatabase, openPaymentPools, runMigrationJob, systemClock, systemRandom } from "../src/index.js";
 import { ConnectionSecurityError, listMigrations } from "@kauro/persistence";
 
@@ -44,7 +44,7 @@ async function backends(prefix: string): Promise<Array<[string, boolean]>> {
 
 test("ADV-1: the api runtime pool and the session boundary's pool (SANDBOX) are TLS backends according to pg_stat_ssl", async () => {
   const db = await openDatabase({
-    environment: "SANDBOX",
+    databaseEnvironment: testDatabaseEnvironment("SANDBOX"),
     database: { ...login(ROLES.appLogin, 2), statementTimeoutMs: 10_000 },
     migrateOnStart: null,
     identity: { assuranceDatabase: { user: ROLES.assuranceLogin, poolMax: 1, passwordFile: pg.tls?.passwordFile ?? "" } },
@@ -60,7 +60,7 @@ test("ADV-1: the api runtime pool and the session boundary's pool (SANDBOX) are 
 });
 
 test("ADV-1: the commission service's two pools and the payment service's three are TLS backends according to pg_stat_ssl", async () => {
-  const deps = { clock: systemClock, random: systemRandom, environment: "SANDBOX" as const };
+  const deps = { clock: systemClock, random: systemRandom, environment: testDatabaseEnvironment("SANDBOX") };
   const commission = await openCommissionPools({ commission: login(ROLES.commissionLogin), control: login(ROLES.controlLogin) }, deps);
   try {
     assert.deepEqual(
@@ -70,7 +70,7 @@ test("ADV-1: the commission service's two pools and the payment service's three 
   } finally {
     await commission.close();
   }
-  const db = await openDatabase({ environment: "SANDBOX", database: { ...login(ROLES.appLogin), statementTimeoutMs: 10_000 }, migrateOnStart: null });
+  const db = await openDatabase({ databaseEnvironment: testDatabaseEnvironment("SANDBOX"), database: { ...login(ROLES.appLogin), statementTimeoutMs: 10_000 }, migrateOnStart: null });
   const payment = await openPaymentPools(db.pool, { payment: login(ROLES.paymentLogin), control: login(ROLES.controlLogin), ingress: login(ROLES.ingressLogin) }, deps);
   try {
     assert.deepEqual(
@@ -107,12 +107,12 @@ const named = (variable: string) => (e: unknown) => e instanceof ConnectionSecur
 test("ADV-8: outside LOCAL a missing runtime password file and a missing assurance password file each refuse the start, naming their own variable", async () => {
   const missing = join(dir, "no-such-file");
   await assert.rejects(
-    openDatabase({ environment: "SANDBOX", database: { ...login(ROLES.appLogin), passwordFile: missing, statementTimeoutMs: 10_000 }, migrateOnStart: null }),
+    openDatabase({ databaseEnvironment: testDatabaseEnvironment("SANDBOX"), database: { ...login(ROLES.appLogin), passwordFile: missing, statementTimeoutMs: 10_000 }, migrateOnStart: null }),
     named("KAURO_DB_PASSWORD_FILE"),
   );
   await assert.rejects(
     openDatabase({
-      environment: "SANDBOX",
+      databaseEnvironment: testDatabaseEnvironment("SANDBOX"),
       database: { ...login(ROLES.appLogin), statementTimeoutMs: 10_000 },
       migrateOnStart: null,
       identity: { assuranceDatabase: { user: ROLES.assuranceLogin, poolMax: 1, passwordFile: missing } },
@@ -124,13 +124,13 @@ test("ADV-8: outside LOCAL a missing runtime password file and a missing assuran
 test("ADV-8: the TLS cluster requires the password (scram): a wrong one is refused by the server, so a site that drops its password setting fails", async () => {
   const wrong = join(dir, "wrong-password");
   writeFileSync(wrong, "not-the-cluster-password\n");
-  await assert.rejects(openDatabase({ environment: "SANDBOX", database: { ...login(ROLES.appLogin), passwordFile: wrong, statementTimeoutMs: 10_000 }, migrateOnStart: null }), /password authentication failed/i);
+  await assert.rejects(openDatabase({ databaseEnvironment: testDatabaseEnvironment("SANDBOX"), database: { ...login(ROLES.appLogin), passwordFile: wrong, statementTimeoutMs: 10_000 }, migrateOnStart: null }), /password authentication failed/i);
 });
 
 test("ADV-7: when the assurance password file cannot be read, the runtime pool opened before it is closed, not leaked", async () => {
   await assert.rejects(
     openDatabase({
-      environment: "SANDBOX",
+      databaseEnvironment: testDatabaseEnvironment("SANDBOX"),
       database: { ...login(ROLES.appLogin), statementTimeoutMs: 10_000 },
       migrateOnStart: null,
       identity: { assuranceDatabase: { user: ROLES.assuranceLogin, poolMax: 1, passwordFile: join(dir, "no-such-file") } },

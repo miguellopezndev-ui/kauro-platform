@@ -55,6 +55,7 @@ import {
   type AgencyFixture,
   type Harness,
   type RecordedSeller,
+  testDatabaseEnvironment,
 } from "@kauro/persistence/testing";
 import { createCommissionService, openCommissionPools, type CommissionHoldPoint, type CommissionPools, type CommissionService } from "../src/index.js";
 import { paymentWorld, type PaymentWorld } from "./payment-support.js";
@@ -154,7 +155,7 @@ export async function commissionWorld(): Promise<CommissionWorld> {
   const pw = await paymentWorld();
   const h = pw.w.h;
   const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database } as const;
-  const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs(), environment: "LOCAL" });
+  const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs(), environment: testDatabaseEnvironment("LOCAL") });
   const dispatcherClock = movableClock();
   const completions = new ContractFakePreparationCompletion({ clock });
   const holds = new CommissionHolds();

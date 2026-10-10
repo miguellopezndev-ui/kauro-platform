@@ -20,13 +20,13 @@
  * parameter — to the configured sink, by default one line on stderr.
  */
 import { Client, Pool, type PoolClient, type QueryResult, type QueryResultRow } from "pg";
+import { nameOfDatabaseEnvironment, type DatabaseEnvironment, type DatabaseEnvironmentName } from "./environment.js";
 import { ConnectionSecurityError, connectionSecurityOf, sslOptionsOf, type ConnectionSecurityInput } from "./tls.js";
 
 // The driver's error class, for the SQLSTATE classification of sql.ts: this module is the only one that imports the driver (DB-TLS-R4 allowlist)
 export { DatabaseError } from "pg";
 
-export type DatabaseEnvironment = "LOCAL" | "SANDBOX" | "LIVE";
-const DATABASE_ENVIRONMENTS: ReadonlyArray<string> = Object.freeze(["LOCAL", "SANDBOX", "LIVE"]);
+export type { DatabaseEnvironment } from "./environment.js";
 
 /**
  * What every connection this module opens is given about its security, as the deployment names it (AWS-DELTA I-2, I-3). The pool and the
@@ -34,7 +34,10 @@ const DATABASE_ENVIRONMENTS: ReadonlyArray<string> = Object.freeze(["LOCAL", "SA
  * that skipped the rule (DB-TLS-R4 root cause: the rule is enforced at the single construction point, not looked for in the callers).
  */
 export interface ConnectionSecurityConfig {
-  /** The deployment environment; outside LOCAL: verified TLS, a DNS host, the password from its file, no PG* fallbacks. Required. */
+  /**
+   * The deployment environment, minted from the validated configuration (never a string: DB-TLS gap 2); outside LOCAL: verified TLS, a DNS
+   * host, the password from its file, no PG* fallbacks. Required.
+   */
   readonly environment: DatabaseEnvironment;
   /** LOCAL only (refused outside LOCAL). */
   readonly password?: string;
@@ -48,12 +51,8 @@ export interface ConnectionSecurityConfig {
   readonly processEnv?: ConnectionSecurityInput["processEnv"];
 }
 
-function environmentOf(config: { readonly environment?: unknown }): DatabaseEnvironment {
-  const environment = config.environment;
-  if (typeof environment !== "string" || !DATABASE_ENVIRONMENTS.includes(environment)) {
-    throw new TypeError("a database connection names its environment (LOCAL, SANDBOX or LIVE): the pool applies the connection security rule itself (DB-TLS-R4)");
-  }
-  return environment as DatabaseEnvironment;
+function environmentOf(config: { readonly environment?: unknown }): DatabaseEnvironmentName {
+  return nameOfDatabaseEnvironment(config.environment);
 }
 
 /** The driver's `password` and `ssl` settings of one connection, from connectionSecurityOf and nothing else. */

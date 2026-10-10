@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { Client } from "pg";
 import { MigratorRoleError, applyMigrationsAs, createPool, sslOptionsOf } from "../src/index.js";
+import { testDatabaseEnvironment } from "../src/testing/index.js";
 
 const PGBIN = process.env["PGBIN"] && existsSync(process.env["PGBIN"]) ? process.env["PGBIN"] : process.platform === "win32" ? "C:/Tools/pgsql17/bin" : "/usr/lib/postgresql/17/bin";
 const exe = (name: string): string => join(PGBIN, process.platform === "win32" ? `${name}.exe` : name);
@@ -39,7 +40,7 @@ test("I-2: sslOptionsOf carries the CA bytes and rejectUnauthorized true, and no
 
 test("I-2: the pool's ssl options carry rejectUnauthorized true and the CA bytes; without tls the pool has no ssl (LOCAL unchanged)", async () => {
   const ca = "-----BEGIN CERTIFICATE-----\nBBBB\n-----END CERTIFICATE-----\n";
-  const base = { environment: "LOCAL", host: "db.example.test", port: 5432, database: "kauro", user: "kauro_app_test", max: 1, applicationName: "t" } as const;
+  const base = { environment: testDatabaseEnvironment("LOCAL"), host: "db.example.test", port: 5432, database: "kauro", user: "kauro_app_test", max: 1, applicationName: "t" } as const;
   const dir = mkdtempSync(join(tmpdir(), "kauro-pool-ca-"));
   writeFileSync(join(dir, "ca.pem"), ca);
   const withTls = createPool({ ...base, tlsCaFile: join(dir, "ca.pem") });
@@ -145,7 +146,7 @@ test("I-2 handshake: the right CA connects over TLS; a wrong CA and a host name 
 
 test("I-2 handshake: the migrator connection verifies too (right CA reaches the role check, wrong CA is refused at the handshake)", { skip: SKIP }, async () => {
   await new Promise((r) => setTimeout(r, 500));
-  const connection = { environment: "LOCAL", host: "localhost", port, database: "postgres", user: "postgres" } as const;
+  const connection = { environment: testDatabaseEnvironment("LOCAL"), host: "localhost", port, database: "postgres", user: "postgres" } as const;
   await assert.rejects(applyMigrationsAs({ ...connection, tlsCaFile: join(base, "ca.crt") }), MigratorRoleError, "TLS succeeded: the role check ran and refused the superuser");
   await assert.rejects(applyMigrationsAs({ ...connection, tlsCaFile: join(base, "other-ca.crt") }), /self.signed|unable to (get|verify)|certificate/i);
 });

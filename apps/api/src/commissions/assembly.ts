@@ -12,7 +12,7 @@
 import type { PreparationCompletionSource } from "@kauro/application";
 import type { Clock, CommissionPolicy, Environment, RandomBytes } from "@kauro/domain";
 import type { KauroPool, PgCommercialUnitOfWorkFactory, PoolErrorSink, RuntimeRole } from "@kauro/persistence";
-import { createCommercialUnitOfWorkFactory, createPool } from "@kauro/persistence";
+import { createCommercialUnitOfWorkFactory, createPool, type DatabaseEnvironment } from "@kauro/persistence";
 import type { DatabaseConnectionConfig } from "../config.js";
 
 /** Where an interleaving is fixed or a crash injected (tests only, like B09's hold points): after an effect, before its settlement. */
@@ -57,7 +57,7 @@ async function verified(pool: KauroPool, role: RuntimeRole): Promise<void> {
  * Opens the commission service's verified pools and builds B10's commercial unit-of-work factory over them. Nothing stays open when
  * a login is refused.
  */
-export async function openCommissionPools(databases: CommissionDatabases, deps: { readonly clock: Clock; readonly random: RandomBytes; readonly statementTimeoutMs?: number; readonly onPoolError?: PoolErrorSink; readonly environment: Environment }): Promise<CommissionPools> {
+export async function openCommissionPools(databases: CommissionDatabases, deps: { readonly clock: Clock; readonly random: RandomBytes; readonly statementTimeoutMs?: number; readonly onPoolError?: PoolErrorSink; readonly environment: DatabaseEnvironment }): Promise<CommissionPools> {
   const open = (config: CommissionDatabases["commission"], suffix: string): KauroPool => {
     const { poolMax, password, passwordFile, tlsCaFile, ...connection } = config;
     // createPool applies connectionSecurityOf itself (DB-TLS-R4): TLS, DNS host and the password file outside LOCAL

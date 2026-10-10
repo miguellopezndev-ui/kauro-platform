@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 import { isApplicationOrigin } from "@kauro/application";
 import type { Environment } from "@kauro/domain";
 import { ENVIRONMENTS, PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
-import { ConnectionSecurityError, DEFAULT_MIGRATOR_CONNECT_TIMEOUT_MS, DEFAULT_MIGRATOR_LOCK_TIMEOUT_MS, DEFAULT_MIGRATOR_STATEMENT_TIMEOUT_MS, connectionSecurityOf, type ConnectionSecurityInput } from "@kauro/persistence";
+import { ConnectionSecurityError, claimEnvironmentMinter, type DatabaseEnvironment, DEFAULT_MIGRATOR_CONNECT_TIMEOUT_MS, DEFAULT_MIGRATOR_LOCK_TIMEOUT_MS, DEFAULT_MIGRATOR_STATEMENT_TIMEOUT_MS, connectionSecurityOf, type ConnectionSecurityInput } from "@kauro/persistence";
 
 export interface DatabaseConnectionConfig {
   readonly host: string;
@@ -74,6 +74,8 @@ export interface PublicApiConfig {
 
 export interface ApiConfig {
   readonly environment: Environment;
+  /** The same environment as the brand every database connection requires (DB-TLS gap 2): minted here, from KAURO_ENVIRONMENT, only. */
+  readonly databaseEnvironment: DatabaseEnvironment;
   readonly http: HttpConfig;
   /** The runtime login role (a member of kauro_app, never the owner, never a superuser: 08 "Database isolation"). */
   readonly database: DatabaseConnectionConfig & { readonly poolMax: number; readonly statementTimeoutMs: number };
@@ -227,10 +229,14 @@ function flag(env: Env, name: string, fallback: boolean): boolean {
   throw new ConfigError(name, "must be true or false");
 }
 
-function environmentOf(env: Env): Environment {
+// DB-TLS gap 2: the one production minter of a connection's environment, claimed once per process when this module loads (a second claim
+// anywhere fails the load, so the environment of a connection has this one source)
+const mintDatabaseEnvironment = claimEnvironmentMinter();
+
+function environmentOf(env: Env): { readonly environment: Environment; readonly databaseEnvironment: DatabaseEnvironment } {
   const raw = required(env, "KAURO_ENVIRONMENT");
   if (!(ENVIRONMENTS as ReadonlyArray<string>).includes(raw)) throw new ConfigError("KAURO_ENVIRONMENT", `must be one of ${ENVIRONMENTS.join(", ")}`);
-  return raw as Environment;
+  return { environment: raw as Environment, databaseEnvironment: mintDatabaseEnvironment(raw) };
 }
 
 const ROLE_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
@@ -276,7 +282,7 @@ export function readSecretFile(variable: string, path: string): string {
 }
 
 export function loadConfig(env: Env = process.env): ApiConfig {
-  const environment = environmentOf(env);
+  const { environment, databaseEnvironment } = environmentOf(env);
   // N7: the serving process never receives the owner's credential in its environment, whatever the mode (08 "privileged
   // migration roles are never used by request handlers"; 07 "Migration roles are separate from runtime")
   if (optional(env, MIGRATOR_PASSWORD_VARIABLE) !== undefined) {
@@ -303,6 +309,7 @@ export function loadConfig(env: Env = process.env): ApiConfig {
   if (bearerTokensFile !== null && environment !== "LOCAL") throw new ConfigError("KAURO_AUTH_BEARER_TOKENS_FILE", "is accepted in the LOCAL environment only");
   const config: ApiConfig = {
     environment,
+    databaseEnvironment,
     http: {
       host: optional(env, "KAURO_HTTP_HOST") ?? "127.0.0.1",
       port: integer(env, "KAURO_HTTP_PORT", 3000, 1, 65535),
@@ -433,6 +440,7 @@ export function readKeyFile(variable: string, path: string): Uint8Array {
 /** The one-shot migration job's configuration (N7): the owner role, its limits and, when given, its password file. */
 export interface MigrationJobConfig {
   readonly environment: Environment;
+  readonly databaseEnvironment: DatabaseEnvironment;
   readonly migrator: MigratorConfig;
 }
 
@@ -443,7 +451,7 @@ export interface MigrationJobConfig {
  * are applied. Like loadConfig it never keeps the password.
  */
 export function loadMigrationJobConfig(env: Env = process.env): MigrationJobConfig {
-  const environment = environmentOf(env);
+  const { environment, databaseEnvironment } = environmentOf(env);
   if (optional(env, MIGRATOR_PASSWORD_VARIABLE) !== undefined && optional(env, MIGRATOR_PASSWORD_FILE_VARIABLE) !== undefined) {
     throw new ConfigError(MIGRATOR_PASSWORD_FILE_VARIABLE, `is exclusive with ${MIGRATOR_PASSWORD_VARIABLE}`);
   }
@@ -452,5 +460,5 @@ export function loadMigrationJobConfig(env: Env = process.env): MigrationJobConf
   const database = optional(env, "KAURO_DB_NAME") ?? "kauro";
   const migrator = migratorOf(env, host, port, database, optional(env, "KAURO_DB_USER"));
   checkConnectionSecurity(environment, { host, passwordRequired: false, ...(migrator.tlsCaFile === undefined ? {} : { tlsCaFile: migrator.tlsCaFile }) }, env);
-  return { environment, migrator };
+  return { environment, databaseEnvironment, migrator };
 }

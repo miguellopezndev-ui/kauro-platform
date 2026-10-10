@@ -22,7 +22,7 @@ import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { CorrelationId, ExecutionContext, SettlementId, UserId } from "@kauro/domain";
 import { registryCommissionPolicy, registryPricePolicy, toUtcInstant } from "@kauro/domain";
 import { PgCommercialUnitOfWork, PgCommercialUnitOfWorkFactory, ledgerOf, statementsOf } from "@kauro/persistence";
-import { ROLES, raceStatementTimeoutMs, serverNow, TEST_CLOCK_OFFSET_SETTING, recordAccruedLine, recordActiveSeller, recordClaim, recordConversion, recordEligibleLine, recordProspect, type RecordedSeller, type SellerTerms } from "@kauro/persistence/testing";
+import { ROLES, raceStatementTimeoutMs, serverNow, TEST_CLOCK_OFFSET_SETTING, recordAccruedLine, recordActiveSeller, recordClaim, recordConversion, recordEligibleLine, recordProspect, type RecordedSeller, type SellerTerms, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import { proposeCommissionClose } from "@kauro/application";
 import { COMMISSION_APPLICATION_NAME, createCommissionService, createPeriodsSweep, openCommissionPools, statementServiceRuntime, type CommissionPools, type CommissionService } from "../src/index.js";
 import { CommissionHolds, approvedPlan, captureOf, checkoutOf, purchase, recordSyntheticSchedule, sellingAgency, statedQuote, type CommissionWorld, type Purchase, type Selling } from "./commission-support.js";
@@ -154,7 +154,7 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
     ...(options.sessions === true ? { sessions: true } : {}),
     commissions: async (h) => {
       const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database } as const;
-      const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs(), environment: "LOCAL" });
+      const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs(), environment: testDatabaseEnvironment("LOCAL") });
       opened.pools = pools;
       const units = new StandingUnits(pools.pools, () => (standing === null ? null : { at: standing }));
       return { binding: { units: faults.wrap(units), calendar, payoutEvidence: { integrationClass: payouts.integrationClass, verify: (r) => (faults.verifier === null ? payouts.verify(r) : (faults.verifier(r, (x) => payouts.verify(x)) as ReturnType<typeof payouts.verify>)) }, providerTimer: { start: (ms) => (faults.timer === null ? realProviderCallTimer.start(ms) : faults.timer(ms)) }, hold: serviceHolds.hook }, close: () => pools.close() };

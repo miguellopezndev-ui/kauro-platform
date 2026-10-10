@@ -25,6 +25,8 @@ export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyAsOptions, App
 export { COMMERCIAL_UNIQUE_FAILURES } from "./sqlstate.js";
 export { SQLSTATE, failureOfSqlState, SOURCE_CONSTRAINT_FAILURES, EXECUTION_CONSTRAINT_FAILURES, AUDIT_CONSTRAINT_FAILURES, commerceReplayOf, COMMERCE_REPLAY_CONSTRAINTS, COMMERCE_INTEGRITY_CONSTRAINTS } from "./sqlstate.js";
 export { createPool, classifyError, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
+export { claimEnvironmentMinter } from "./environment.js";
+export type { DatabaseEnvironment, DatabaseEnvironmentName } from "./environment.js";
 export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
 export { PgWebSessionStore, WEB_SESSION_STATEMENT_TIMEOUT_MS } from "./web-sessions.js";

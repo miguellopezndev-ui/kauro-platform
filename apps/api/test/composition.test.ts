@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { MigratorRoleError, PrivilegedRoleError, listMigrations } from "@kauro/persistence";
-import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "@kauro/persistence/testing";
+import { ROLES, startTemporaryPostgres, type TemporaryPostgres, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import { BearerTokenFileError, ConfigError, authenticatorOf, bootstrap, loadConfig, parseBearerTokenFile } from "../src/index.js";
 import { statementTimeoutOf } from "../src/config.js";
 import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
@@ -114,6 +114,7 @@ test("configuration: every variable is validated and a missing or malformed one 
   const config = loadConfig(envOf({ KAURO_DB_HOST: undefined, KAURO_DB_NAME: undefined, KAURO_HTTP_HOST: undefined, KAURO_HTTP_PORT: undefined }));
   assert.deepEqual(config, {
     environment: "LOCAL",
+    databaseEnvironment: testDatabaseEnvironment("LOCAL"),
     http: { host: "127.0.0.1", port: 3000, trustedProxyHops: 0, requestTimeoutMs: 30_000, connectionTimeoutMs: 60_000, shutdownDeadlineMs: 8_000 },
     database: { host: "127.0.0.1", port: pg.port, database: "kauro", user: ROLES.appLogin, poolMax: 2, statementTimeoutMs: 10_000 },
     migrateOnStart: null,

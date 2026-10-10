@@ -7,7 +7,7 @@ import { Client, type PoolClient } from "pg";
 import { after, before, test } from "node:test";
 import { DomainFailure, abandonWorkOf, isDomainFailure, limitWorkOf, type AgencyId, type CausationId, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
 import { PrivilegedRoleError, createPool, listMigrations, translateDatabaseError } from "../src/index.js";
-import { ROLES } from "../src/testing/index.js";
+import { ROLES, testDatabaseEnvironment } from "../src/testing/index.js";
 import { END_BACKEND_WAIT_MS, endAbandonedBackend } from "../src/unit-of-work.js";
 import { barrier, clock, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 
@@ -42,7 +42,7 @@ test("the harness applied every migration from an empty cluster and the pools ru
 
 test("a pool refuses a superuser login and the owner login before any statement runs (08: privileged roles never serve requests)", async () => {
   for (const user of [ROLES.superuser, ROLES.owner]) {
-    const pool = createPool({ environment: "LOCAL", host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user, max: 1, applicationName: "kauro-test-privileged" });
+    const pool = createPool({ environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user, max: 1, applicationName: "kauro-test-privileged" });
     try {
       await assert.rejects(pool.acquire(), (e: unknown) => e instanceof PrivilegedRoleError, user);
       assert.equal(pool.totalCount, 0, "the privileged connection was destroyed, not pooled");
@@ -50,7 +50,7 @@ test("a pool refuses a superuser login and the owner login before any statement 
       await pool.end();
     }
   }
-  assert.throws(() => createPool({ environment: "LOCAL", host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, max: 25, applicationName: "x" }), RangeError);
+  assert.throws(() => createPool({ environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, max: 25, applicationName: "x" }), RangeError);
 });
 
 test("a context runs only on the pool of its role: SYSTEM is refused on the request pool, TENANT and IDENTITY on the control pool", async () => {

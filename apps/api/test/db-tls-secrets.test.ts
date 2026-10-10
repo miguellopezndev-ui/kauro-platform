@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { ConnectionSecurityError } from "@kauro/persistence";
 import { ConfigError, applyMigrationsWith, loadConfig, loadMigrationJobConfig } from "../src/index.js";
+import { testDatabaseEnvironment } from "@kauro/persistence/testing";
 
 let dir: string;
 let caFile: string;
@@ -115,5 +116,5 @@ test("ADV-9: outside LOCAL the runtime and assurance password files are required
 
 test("ADV-9: the migration connection outside LOCAL needs an explicit password (never pg's PGPASSWORD / pgpass fallback)", async () => {
   const migrator = { host: "db.example.test", port: 1, database: "kauro", user: "kauro_owner", tlsCaFile: caFile, connectTimeoutMs: 100, statementTimeoutMs: 1000, lockTimeoutMs: 100, passwordFile: null };
-  await assert.rejects(async () => applyMigrationsWith("LIVE", migrator, undefined), (e: unknown) => e instanceof ConnectionSecurityError && e.variable === "KAURO_DB_MIGRATOR_PASSWORD");
+  await assert.rejects(async () => applyMigrationsWith(testDatabaseEnvironment("LIVE"), migrator, undefined), (e: unknown) => e instanceof ConnectionSecurityError && e.variable === "KAURO_DB_MIGRATOR_PASSWORD");
 });

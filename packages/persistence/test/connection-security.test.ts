@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { ConnectionSecurityError, connectionSecurityOf, createPool, KauroPool } from "../src/index.js";
 import * as persistence from "../src/index.js";
+import { testDatabaseEnvironment } from "../src/testing/index.js";
 
 let dir: string;
 let ca: string;
@@ -94,7 +95,7 @@ test("DB-TLS-R1: outside LOCAL the host must be a DNS name pg dials itself: an e
 });
 
 test("DB-TLS-R3: a KauroPool is constructed by createPool only: the class taken by any import route refuses construction before a pg pool exists", async () => {
-  const config = { environment: "LOCAL", host: "db.example.test", port: 1, database: "kauro", user: "u", max: 1, applicationName: "db-tls-r3" } as const;
+  const config = { environment: testDatabaseEnvironment("LOCAL"), host: "db.example.test", port: 1, database: "kauro", user: "u", max: 1, applicationName: "db-tls-r3" } as const;
   const Constructor = KauroPool as unknown as new (...args: unknown[]) => unknown;
   const Member = (persistence as unknown as Record<string, new (...args: unknown[]) => unknown>)["KauroPool"]!;
   const RunTime = ((await import("../src/index.js")) as unknown as Record<string, new (...args: unknown[]) => unknown>)["KauroPool"]!;

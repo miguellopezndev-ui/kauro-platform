@@ -48,7 +48,7 @@ import type {
 import { SOURCE_SWEEPERS, type ExecutionSweeperName } from "@kauro/application";
 import { createIdGenerator, toUtcInstant, type Clock, type Environment, type IdGenerator, type LeaseOwnerId, type SourceUnitOfWorkFactory } from "@kauro/domain";
 import { IsolatedContainerInspector, IsolatedSelectionEvaluator } from "@kauro/data-plane";
-import { createPool, createUnitOfWorkFactory, type KauroPool, type PoolErrorSink } from "@kauro/persistence";
+import { createPool, createUnitOfWorkFactory, type DatabaseEnvironment, type KauroPool, type PoolErrorSink } from "@kauro/persistence";
 import { AuthorityJournal } from "./consumers/authority-journal.js";
 import { SelectionEvaluation } from "./consumers/selection-evaluation.js";
 import { StorageLifecycle } from "./consumers/storage-lifecycle.js";
@@ -216,7 +216,7 @@ export interface ControlDatabaseConfig {
   readonly user: string;
   readonly password?: string;
   /** Outside LOCAL the connection is certificate-verified and its password is a file (I-2, I-3): see connectionSecurityOf. */
-  readonly environment: Environment;
+  readonly environment: DatabaseEnvironment;
   readonly passwordFile?: string;
   readonly tlsCaFile?: string;
   /** The control plane's connection budget (07 "Connection budget"). */

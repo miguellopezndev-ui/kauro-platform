@@ -2,7 +2,7 @@
 // pool are TLS backends according to pg_stat_ssl.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
-import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "@kauro/persistence/testing";
+import { ROLES, startTemporaryPostgres, type TemporaryPostgres, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import { CONTROL_APPLICATION_NAME, openControlDatabase, openValidatorReceipts } from "../src/index.js";
 
 let pg: TemporaryPostgres;
@@ -15,7 +15,7 @@ after(async () => {
 
 test("ADV-1: openControlDatabase and openValidatorReceipts (SANDBOX) hold TLS backends", async () => {
   assert.ok(pg.tls);
-  const base = { host: pg.tls.host, port: pg.port, database: ROLES.database, poolMax: 1, environment: "SANDBOX" as const, tlsCaFile: pg.tls.caFile, passwordFile: pg.tls.passwordFile };
+  const base = { host: pg.tls.host, port: pg.port, database: ROLES.database, poolMax: 1, environment: testDatabaseEnvironment("SANDBOX"), tlsCaFile: pg.tls.caFile, passwordFile: pg.tls.passwordFile };
   const control = await openControlDatabase({ ...base, user: ROLES.controlLogin });
   const validator = await openValidatorReceipts({ ...base, user: ROLES.validatorLogin }, "kauro-control-validator-tls");
   try {

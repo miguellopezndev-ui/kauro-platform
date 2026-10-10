@@ -11,6 +11,7 @@ import { after, before, test } from "node:test";
 import { ConnectionSecurityError, createPool as openPool, type KauroPool, type PoolConfig } from "../src/index.js";
 import * as index from "../src/index.js";
 import { migratorClientOf } from "../src/pool.js";
+import { testDatabaseEnvironment } from "../src/testing/index.js";
 import pg from "pg";
 
 let dir: string;
@@ -54,26 +55,30 @@ const login = { host: "db.example.test", port: 1, database: "kauro", user: "u", 
 
 test("DB-TLS-R4 / ADV-1: every route to createPool refuses an insecure configuration outside LOCAL before a pool exists", async () => {
   for (const [route, create] of await routes()) {
-    for (const environment of ["SANDBOX", "LIVE"] as const) {
+    for (const name of ["SANDBOX", "LIVE"] as const) {
+      const environment = testDatabaseEnvironment(name);
       const secure = { ...login, environment, tlsCaFile: ca, passwordFile: pw, processEnv: {} };
-      assert.throws(() => create({ ...secure, tlsCaFile: undefined } as never), refusedBy("KAURO_DB_TLS_CA_FILE"), `${route} ${environment}: no CA`);
-      assert.throws(() => create({ ...secure, passwordFile: undefined, password: "plain" } as never), refusedBy("KAURO_DB_PASSWORD"), `${route} ${environment}: plain password`);
-      assert.throws(() => create({ ...secure, passwordFile: undefined } as never), refusedBy("KAURO_DB_PASSWORD_FILE"), `${route} ${environment}: no password file`);
-      assert.throws(() => create({ ...secure, host: "10.0.0.1" }), refusedBy("KAURO_DB_HOST"), `${route} ${environment}: IP host`);
-      assert.throws(() => create({ ...secure, host: "" }), refusedBy("KAURO_DB_HOST"), `${route} ${environment}: empty host`);
+      assert.throws(() => create({ ...secure, tlsCaFile: undefined } as never), refusedBy("KAURO_DB_TLS_CA_FILE"), `${route} ${name}: no CA`);
+      assert.throws(() => create({ ...secure, passwordFile: undefined, password: "plain" } as never), refusedBy("KAURO_DB_PASSWORD"), `${route} ${name}: plain password`);
+      assert.throws(() => create({ ...secure, passwordFile: undefined } as never), refusedBy("KAURO_DB_PASSWORD_FILE"), `${route} ${name}: no password file`);
+      assert.throws(() => create({ ...secure, host: "10.0.0.1" }), refusedBy("KAURO_DB_HOST"), `${route} ${name}: IP host`);
+      assert.throws(() => create({ ...secure, host: "" }), refusedBy("KAURO_DB_HOST"), `${route} ${name}: empty host`);
       for (const variable of ["PGHOST", "PGHOSTADDR", "PGPASSWORD", "PGSSLMODE", "PGPASSFILE"]) {
-        assert.throws(() => create({ ...secure, processEnv: { [variable]: "192.0.2.10" } }), refusedBy(variable), `${route} ${environment}: ${variable}`);
+        assert.throws(() => create({ ...secure, processEnv: { [variable]: "192.0.2.10" } }), refusedBy(variable), `${route} ${name}: ${variable}`);
       }
     }
     // no environment at all (a JavaScript caller, a cast): refused, never treated as LOCAL
-    assert.throws(() => create({ ...login } as never), /names its environment/, `${route}: no environment`);
-    assert.throws(() => create({ ...login, environment: "PRODUCTION" } as never), /names its environment/, `${route}: unknown environment`);
+    assert.throws(() => create({ ...login } as never), /never a string/, `${route}: no environment`);
+    // DB-TLS gap 2: a plain string, literal or built at run time, and a look-alike object are refused: only a minted environment opens a connection
+    for (const forged of ["LOCAL", "LIVE", ["LOC", "AL"].join(""), { name: "LOCAL" }, Object.freeze({ name: "LIVE" })]) {
+      assert.throws(() => create({ ...login, environment: forged } as never), /never a string/, `${route}: ${JSON.stringify(forged)}`);
+    }
   }
 });
 
 test("DB-TLS-R4 / ADV-1: every route to createPool yields a verified-TLS pool with the file password outside LOCAL; a smuggled ssl setting does not reach the driver", async () => {
   for (const [route, create] of await routes()) {
-    const pool = create({ ...login, environment: "LIVE", tlsCaFile: ca, passwordFile: pw, processEnv: {}, ssl: false, tls: { ca: "x" } } as never);
+    const pool = create({ ...login, environment: testDatabaseEnvironment("LIVE"), tlsCaFile: ca, passwordFile: pw, processEnv: {}, ssl: false, tls: { ca: "x" } } as never);
     try {
       const options = optionsOf(pool);
       assert.equal(options.ssl?.rejectUnauthorized, true, route);
@@ -86,7 +91,7 @@ test("DB-TLS-R4 / ADV-1: every route to createPool yields a verified-TLS pool wi
 });
 
 test("DB-TLS-R4: LOCAL is unchanged: no CA needed, a plain password accepted, no ssl unless a CA file is named", async () => {
-  const pool = openPool({ ...login, host: "127.0.0.1", environment: "LOCAL", password: "p", processEnv: { PGHOST: "127.0.0.1" } });
+  const pool = openPool({ ...login, host: "127.0.0.1", environment: testDatabaseEnvironment("LOCAL"), password: "p", processEnv: { PGHOST: "127.0.0.1" } });
   try {
     assert.equal(optionsOf(pool).ssl, undefined);
     assert.equal(optionsOf(pool).passwordGiven, true);
@@ -98,23 +103,25 @@ test("DB-TLS-R4: LOCAL is unchanged: no CA needed, a plain password accepted, no
 test("DB-TLS-R4: the migrator connection is built under the same rule (CA, DNS host, explicit credential outside LOCAL)", () => {
   const timeouts = { connectionTimeoutMillis: 1000, statement_timeout: 1000, lock_timeout: 1000 };
   const migrator = { host: "db.example.test", port: 1, database: "kauro", user: "kauro_owner", processEnv: {} } as const;
-  for (const environment of ["SANDBOX", "LIVE"] as const) {
-    assert.throws(() => migratorClientOf({ ...migrator, environment, password: "p" }, timeouts), refusedBy("KAURO_DB_TLS_CA_FILE"), environment);
-    assert.throws(() => migratorClientOf({ ...migrator, environment, password: "p", tlsCaFile: ca, host: "10.0.0.1" }, timeouts), refusedBy("KAURO_DB_HOST"), environment);
-    assert.throws(() => migratorClientOf({ ...migrator, environment, tlsCaFile: ca }, timeouts), refusedBy("KAURO_DB_MIGRATOR_PASSWORD"), environment);
-    assert.throws(() => migratorClientOf({ ...migrator, environment, password: "p", tlsCaFile: ca, processEnv: { PGHOST: "192.0.2.10" } }, timeouts), refusedBy("PGHOST"), environment);
+  for (const name of ["SANDBOX", "LIVE"] as const) {
+    const environment = testDatabaseEnvironment(name);
+    assert.throws(() => migratorClientOf({ ...migrator, environment, password: "p" }, timeouts), refusedBy("KAURO_DB_TLS_CA_FILE"), name);
+    assert.throws(() => migratorClientOf({ ...migrator, environment, password: "p", tlsCaFile: ca, host: "10.0.0.1" }, timeouts), refusedBy("KAURO_DB_HOST"), name);
+    assert.throws(() => migratorClientOf({ ...migrator, environment, tlsCaFile: ca }, timeouts), refusedBy("KAURO_DB_MIGRATOR_PASSWORD"), name);
+    assert.throws(() => migratorClientOf({ ...migrator, environment, password: "p", tlsCaFile: ca, processEnv: { PGHOST: "192.0.2.10" } }, timeouts), refusedBy("PGHOST"), name);
     const client = migratorClientOf({ ...migrator, environment, password: "p", tlsCaFile: ca }, { ...timeouts, ssl: false } as never);
     const ssl = (client as unknown as { connectionParameters: { ssl?: { ca?: string; rejectUnauthorized?: boolean } } }).connectionParameters.ssl;
-    assert.equal(ssl?.rejectUnauthorized, true, `${environment}: verified TLS, the smuggled ssl: false did not reach the driver`);
+    assert.equal(ssl?.rejectUnauthorized, true, `${name}: verified TLS, the smuggled ssl: false did not reach the driver`);
     assert.equal(ssl?.ca, CA_TEXT);
   }
-  assert.throws(() => migratorClientOf({ ...migrator } as never, timeouts), /names its environment/);
-  const local = migratorClientOf({ ...migrator, environment: "LOCAL" }, timeouts);
+  assert.throws(() => migratorClientOf({ ...migrator } as never, timeouts), /never a string/);
+  assert.throws(() => migratorClientOf({ ...migrator, environment: "LOC" + "AL" } as never, timeouts), /never a string/);
+  const local = migratorClientOf({ ...migrator, environment: testDatabaseEnvironment("LOCAL") }, timeouts);
   assert.equal((local as unknown as { connectionParameters: { ssl?: unknown } }).connectionParameters.ssl, false, "LOCAL unchanged: no TLS, no password required");
 });
 
 test("DB-TLS gap 1 (6de1436): the driver pool is unreachable from a KauroPool: no raw, no property holds a pg Pool, its Client class or its options; the security record is frozen", async () => {
-  const pool = openPool({ ...login, environment: "LIVE", tlsCaFile: ca, passwordFile: pw, processEnv: {} });
+  const pool = openPool({ ...login, environment: testDatabaseEnvironment("LIVE"), tlsCaFile: ca, passwordFile: pw, processEnv: {} });
   try {
     const loose = pool as unknown as Record<string, unknown>;
     assert.equal("raw" in pool, false, "no raw property at run time");
@@ -140,4 +147,22 @@ test("DB-TLS gap 1 (6de1436): the driver pool is unreachable from a KauroPool: n
     await pool.end();
   }
   assert.equal(pool.ended, true);
+});
+
+test("DB-TLS gap 2: the production minter is handed out once per process; a second claim is refused", async () => {
+  const { claimEnvironmentMinter } = await import("../src/index.js");
+  const mint = claimEnvironmentMinter();
+  assert.equal(mint("LIVE").name, "LIVE");
+  assert.throws(() => mint("PRODUCTION"), TypeError);
+  assert.throws(() => claimEnvironmentMinter(), /already claimed/);
+});
+
+test("DB-TLS gap 2: a plain string is a compile-time error too (the brand is a unique symbol)", () => {
+  const compileOnly = (): void => {
+    // @ts-expect-error a string literal is not a DatabaseEnvironment
+    openPool({ ...login, environment: "LOCAL" });
+    // @ts-expect-error a string built at run time is not either
+    migratorClientOf({ host: "h", port: 1, database: "d", user: "u", environment: "LOC" + "AL" }, { connectionTimeoutMillis: 1, statement_timeout: 1, lock_timeout: 1 });
+  };
+  assert.equal(typeof compileOnly, "function");
 });

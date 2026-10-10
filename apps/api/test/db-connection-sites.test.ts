@@ -20,6 +20,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { ConnectionSecurityError } from "@kauro/persistence";
+import { testDatabaseEnvironment } from "@kauro/persistence/testing";
 import { openCommissionPools, openPaymentPools } from "../src/index.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
@@ -103,7 +104,7 @@ const EXACT_ALLOWLIST: ReadonlyArray<{ readonly file: string; readonly line: num
   // DB-TLS gap 2: the "LOCAL" values that are not an environment handed to a connection: the two lists of the three environments, the
   // origin policy kind of the web host, and the browser suite's default for its own local stack
   { file: "packages/domain/src/model/idempotency.ts", line: 17, text: 'export const ENVIRONMENTS: ReadonlyArray<Environment> = ["LOCAL", "SANDBOX", "LIVE"];' },
-  { file: "packages/persistence/src/pool.ts", line: 29, text: 'const DATABASE_ENVIRONMENTS: ReadonlyArray<string> = Object.freeze(["LOCAL", "SANDBOX", "LIVE"]);' },
+  { file: "packages/persistence/src/environment.ts", line: 23, text: 'const NAMES: ReadonlyArray<string> = Object.freeze(["LOCAL", "SANDBOX", "LIVE"]);' },
   { file: "apps/web/src/server/host-config.ts", line: 44, text: 'if (blank(publicOrigin) && blank(appOrigin)) return local ? { ok: true, policy: { kind: "LOCAL" } } : { ok: false, problem: "ORIGINS_MISSING" };' },
   { file: "apps/web/playwright.config.ts", line: 39, text: 'KAURO_ENV: process.env["KAURO_ENV"] ?? "LOCAL",' },
 ];
@@ -112,6 +113,11 @@ const EXACT_ALLOWLIST: ReadonlyArray<{ readonly file: string; readonly line: num
  * DB-TLS gap 2 (6de1436): the environment of a connection comes from the validated runtime configuration only (apps/api/src/config.ts
  * environmentOf, KAURO_ENVIRONMENT, read by loadConfig and loadMigrationJobConfig), never from a literal. Fail closed: a "LOCAL" string in a
  * value position is a finding wherever it is not compared (===, !==, ==, !=, a case label), outside test code and the exact allowlist.
+ *
+ * Since the brand (packages/persistence/src/environment.ts) createPool and the migrator refuse any string, literal or built at run time, so
+ * this rule no longer guards the connection itself. It is KEPT for what the brand trusts: the input of the production minter. A literal
+ * fed to the configuration (`loadConfig({ ...env, KAURO_ENVIRONMENT: "LOCAL" })`, `env["KAURO_ENVIRONMENT"] ?? "LOCAL"`) mints a genuine
+ * LOCAL value that the brand accepts; this rule finds it. The minters themselves are pinned by MINTER_FILES below.
  */
 const TEST_CODE = /(?:^|\/)(?:e2e|testing)\/|\.(?:test|spec)\.[cm]?[jt]sx?$/;
 function isComparedOnly(node: ts.Node): boolean {
@@ -119,6 +125,12 @@ function isComparedOnly(node: ts.Node): boolean {
   if (ts.isCaseClause(p) && p.expression === node) return true;
   return ts.isBinaryExpression(p) && [ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken, ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken].includes(p.operatorToken.kind);
 }
+
+/** DB-TLS gap 2 brand: the only files that may name a minter of DatabaseEnvironment (test files may name them too: they never run in production). */
+const MINTER_FILES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  ["claimEnvironmentMinter", new Set(["packages/persistence/src/environment.ts", "packages/persistence/src/index.ts", "apps/api/src/config.ts"])],
+  ["mintTestDatabaseEnvironment", new Set(["packages/persistence/src/environment.ts", "packages/persistence/src/testing/index.ts", "packages/persistence/src/testing/harness.ts"])],
+]);
 
 interface Finding {
   readonly file: string;
@@ -205,6 +217,10 @@ function findingsOfUncached(file: string, text: string): Finding[] {
     }
     if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && node.text === "LOCAL" && !TEST_CODE.test(file) && !isComparedOnly(node)) {
       report(node, '"LOCAL" as a value outside test code: the environment of a connection comes from the validated configuration (KAURO_ENVIRONMENT), never from a literal');
+    }
+    const named = ts.isIdentifier(node) ? node.text : literalOf(node);
+    if (named !== undefined && MINTER_FILES.get(named)?.has(file) === false && !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) {
+      report(node, `${named} mints the environment of a database connection: only ${[...(MINTER_FILES.get(named) ?? [])].join(", ")} may name it`);
     }
     if (ts.isElementAccessExpression(node)) {
       const key = literalOf(node.argumentExpression);
@@ -372,6 +388,17 @@ test("scan self-test: DB-TLS gap 2: a literal \"LOCAL\" environment in productio
   for (const rel of ["packages/persistence/src/testing/harness.ts", "apps/web/e2e/support/serve.mjs", "apps/api/src/a.test.ts"]) assert.deepEqual(problemsOf(rel, 'createPool({ environment: "LOCAL" });'), [], rel);
 });
 
+test("scan self-test: DB-TLS gap 2 brand: a minter of the database environment named outside MINTER_FILES is caught", () => {
+  for (const [rel, text] of [
+    ["apps/control/src/composition.ts", 'import { claimEnvironmentMinter } from "@kauro/persistence";\nexport const m = claimEnvironmentMinter();'],
+    ["apps/api/src/main.ts", 'import * as P from "@kauro/persistence";\nexport const m = P.claimEnvironmentMinter();'],
+    ["apps/api/src/main.ts", 'import * as P from "@kauro/persistence";\nexport const m = (P as never as Record<string, () => unknown>)["claimEnvironmentMinter"]!();'],
+    ["packages/persistence/src/pool.ts", 'import { mintTestDatabaseEnvironment } from "./environment.js";\nexport const e = mintTestDatabaseEnvironment("LIVE");'],
+  ] as const) assert.ok(problemsOf(rel, text).some((p) => p.includes("mints the environment")), `${rel}: ${text}`);
+  assert.deepEqual(problemsOf("apps/api/src/config.ts", 'import { claimEnvironmentMinter } from "@kauro/persistence";\nconst mint = claimEnvironmentMinter();'), []);
+  assert.deepEqual(problemsOf("packages/persistence/test/x.test.ts", 'import { claimEnvironmentMinter } from "../src/index.js";\nclaimEnvironmentMinter();'), []);
+});
+
 test("scan self-test: DB-TLS-R5 / ADV-2: type-only references load nothing and are never findings", () => {
   for (const [rel, text] of [
     ["packages/persistence/src/evidence.ts", 'export const f = (pool: import("./pool.js").KauroPool) => pool;'],
@@ -477,7 +504,7 @@ test("DB-TLS-R4 / ADV-1 / ADV-2 on the complete tree: a direct driver load anywh
 const login = { host: "db.example.test", port: 1, database: "kauro", user: "u", poolMax: 1, passwordFile: "pw" };
 const secure = { ...login, tlsCaFile: "ca.pem" };
 const plain = { host: "db.example.test", port: 1, database: "kauro", user: "u", poolMax: 1, tlsCaFile: "ca.pem", password: "x" };
-const deps = (environment: "SANDBOX" | "LIVE") => ({ clock: { now: () => 0 } as never, random: (() => new Uint8Array(1)) as never, environment });
+const deps = (environment: "SANDBOX" | "LIVE") => ({ clock: { now: () => 0 } as never, random: (() => new Uint8Array(1)) as never, environment: testDatabaseEnvironment(environment) });
 const refused = (variable: string) => (e: unknown) => e instanceof ConnectionSecurityError && e.message.startsWith(`${variable}:`);
 
 test("the commission and payment roots refuse SANDBOX and LIVE without a CA, with a plain password or with an IP host", async () => {

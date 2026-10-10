@@ -18,7 +18,7 @@ import type { DurableOperation, FiscalDocumentBridge, PaymentProviderAdapter, Pr
 import type { Clock, CommerceUnitOfWorkFactory, Environment, InboxIngress, RandomBytes } from "@kauro/domain";
 import { createIdGenerator } from "@kauro/domain";
 import type { IngressFactRecorder, KauroPool, PoolErrorSink, RuntimeRole } from "@kauro/persistence";
-import { PgInboxIngress, PgIngressFactRecorder, createCommerceUnitOfWorkFactory, createPool } from "@kauro/persistence";
+import { PgInboxIngress, PgIngressFactRecorder, createCommerceUnitOfWorkFactory, createPool, type DatabaseEnvironment } from "@kauro/persistence";
 import type { DatabaseConnectionConfig } from "../config.js";
 
 /** The external ports an edition binds to the payment service (B15 provider adapters); B07's lineage is the platform's own (edition.ts). */
@@ -85,7 +85,7 @@ async function verified(pool: KauroPool, role: RuntimeRole): Promise<void> {
  * unit-of-work factory over the three command groups, B06's inbox ingress and the ingress fact recorder. Nothing stays open when a
  * login is refused.
  */
-export async function openPaymentPools(app: KauroPool, databases: PaymentDatabases, deps: { readonly clock: Clock; readonly random: RandomBytes; readonly statementTimeoutMs?: number; readonly onPoolError?: PoolErrorSink; readonly environment: Environment }): Promise<PaymentPools> {
+export async function openPaymentPools(app: KauroPool, databases: PaymentDatabases, deps: { readonly clock: Clock; readonly random: RandomBytes; readonly statementTimeoutMs?: number; readonly onPoolError?: PoolErrorSink; readonly environment: DatabaseEnvironment }): Promise<PaymentPools> {
   const open = (config: PaymentDatabases["payment"], suffix: string): KauroPool => {
     const { poolMax, password, passwordFile, tlsCaFile, ...connection } = config;
     // createPool applies connectionSecurityOf itself (DB-TLS-R4): TLS, DNS host and the password file outside LOCAL

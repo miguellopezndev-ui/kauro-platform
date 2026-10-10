@@ -21,7 +21,7 @@ import type { FastifyInstance } from "fastify";
 import { REQUEST_LIMITS, type Problem } from "@kauro/application";
 import { INQUIRY_BUYER_TYPES, INQUIRY_DESTINATIONS, INQUIRY_RECORD_BANDS, INQUIRY_TIMINGS, createIdGenerator, toUtcInstant, type Clock } from "@kauro/domain";
 import { PgCapabilityPublication, PgInquiryStore } from "@kauro/persistence";
-import { ROLES, raceStatementTimeoutMs, startHarness, waitForLockWait, type Harness } from "@kauro/persistence/testing";
+import { ROLES, raceStatementTimeoutMs, startHarness, waitForLockWait, type Harness, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import { API_APPLICATION_NAME, assembleApi, createBearerTokenAuthenticator, loadContractSchemas, openDatabase, type DatabaseHandle } from "../src/index.js";
 
 const PUBLIC_ORIGIN = "https://www.kauro.test";
@@ -63,7 +63,7 @@ before(async () => {
   h = await startHarness();
   db = await openDatabase({
     database: { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, poolMax: 6, statementTimeoutMs: raceStatementTimeoutMs() },
-    environment: "LOCAL",
+    databaseEnvironment: testDatabaseEnvironment("LOCAL"),
     migrateOnStart: null,
   });
   const base = {
