@@ -1,0 +1,58 @@
+{
+  "agree": [
+    {
+      "id": "nfc-nfd-distinct-nfc",
+      "valueJson": "{\"name\": \"\\u00e9\"}",
+      "canonical": "{\"name\":\"\u00e9\"}",
+      "sha256": "2f16b8477146a1b2ba7d6bb7cf7c9979c191cc2838a107dbf5f0d920b4cb3ba1"
+    },
+    {
+      "id": "nfc-nfd-distinct-nfd",
+      "valueJson": "{\"name\": \"e\\u0301\"}",
+      "canonical": "{\"name\":\"e\u0301\"}",
+      "sha256": "6a547588c4055916e090ed61467326046dd52810679d03bfb84d862a7123522e"
+    },
+    {
+      "id": "astral-value",
+      "valueJson": "{\"emoji\": \"\\ud83d\\ude00\", \"han\": \"\\ud842\\udfb7\"}",
+      "canonical": "{\"emoji\":\"\ud83d\ude00\",\"han\":\"\ud842\udfb7\"}",
+      "sha256": "c3b1ff03fd7be8e876140d5680c35ff1935ac2791f7201a1bb8f8c4c9c75fb54"
+    },
+    {
+      "id": "astral-key-alone",
+      "valueJson": "{\"\\ud83d\\ude00\": 1}",
+      "canonical": "{\"\ud83d\ude00\":1}",
+      "sha256": "763606c9e0046348cc185a6e829e12ae6c0f3565b940f8184901a4d83dda6c33"
+    },
+    {
+      "id": "escapes",
+      "valueJson": "{\"s\": \"a\\\"b\\\\c\\n\\t\\u0001\\u001f/ \\u2028\"}",
+      "canonical": "{\"s\":\"a\\\"b\\\\c\\n\\t\\u0001\\u001f/ \u2028\"}",
+      "sha256": "8ec3b957f514f883281e7d2ed5869b2b6e3f106c07b59045e80759253a2e7198"
+    },
+    {
+      "id": "large-integer-strings",
+      "valueJson": "{\"cents\": \"9007199254740993\", \"micros\": \"123456789012345678901234567890\"}",
+      "canonical": "{\"cents\":\"9007199254740993\",\"micros\":\"123456789012345678901234567890\"}",
+      "sha256": "298618bb58570e8efa697432561994565f5bd7fc97bea26f471190b6e9bfcb8f"
+    },
+    {
+      "id": "ordered-arrays",
+      "valueJson": "{\"a\": [3, 1, 2, [{\"z\": 1, \"a\": 2}], null, true, false, \"x\"], \"b\": []}",
+      "canonical": "{\"a\":[3,1,2,[{\"a\":2,\"z\":1}],null,true,false,\"x\"],\"b\":[]}",
+      "sha256": "43cfc82c247d93d10cbb1dc65808e98ab94c4ee8b2a31f9e07d4973768964a50"
+    },
+    {
+      "id": "nested-key-order",
+      "valueJson": "{\"b\": {\"d\": 1, \"c\": 2}, \"a\": {\"y\": [1, 2], \"x\": {}}, \"B\": 0, \"_\": 1, \"\\u00e9\": 2}",
+      "canonical": "{\"B\":0,\"_\":1,\"a\":{\"x\":{},\"y\":[1,2]},\"b\":{\"c\":2,\"d\":1},\"\u00e9\":2}",
+      "sha256": "704975d0a3f2f8529da1eefb34e4cfeecf487b9bcd200cf14127fdc986618707"
+    },
+    {
+      "id": "numbers",
+      "valueJson": "{\"a\":0,\"b\":-7,\"c\":1.5,\"d\":9007199254740991,\"e\":0.1}",
+      "canonical": "{\"a\":0,\"b\":-7,\"c\":1.5,\"d\":9007199254740991,\"e\":0.1}",
+      "sha256": "22d940e0a73c65522e731f62ae03016d05c99e93c2e83d9c37475633564a6494"
+    }
+  ]
+}
