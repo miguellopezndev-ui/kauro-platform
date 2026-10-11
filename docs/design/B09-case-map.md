@@ -238,3 +238,23 @@ rows on every verify.
 - **G-FISCAL_LOCAL** (manual 15): R2-128 and the local fiscal boundary are demonstrable here (the bridge's `prepare` and the
   database's validation guard, under the profile in force at the tax point); issuance itself (CMD035, R2-082..R2-084) is B15's and
   needs the owner's fiscal identity, the numbering authorization and the issuance entitlement.
+
+## Appendix (2026-10-07): Payments V1 re-target of the PARTIAL remainders
+
+Owner decision Payments V1 (`docs/authority/decisions/2026-10-07-PAYMENTS-V1.md`) parks PayPal and makes the V1 rail a USD bank
+transfer (design [ACH-ROUTE r7](ACH-ROUTE.md) §0, cases [ACH-case-map](ACH-case-map.md)). This appendix only re-targets what
+remains of the accepted rows: no row, status cell, cited test or title above changes, and the closure counts stand as accepted.
+The table has three columns so the row parsers of `tools/test/b09-case-map.test.mjs` and `tools/evidence.mjs` ignore it.
+
+| Accepted row(s) | Remainder as accepted | Remainder under Payments V1 |
+|---|---|---|
+| S057, S058, S059, R2-078, R2-128 | B15 (S059 also B08; R2-078 R2-085; R2-128 CMD035, R2-082..R2-084) | bank-route half EXECUTED_LOCAL in ACH-04..ACH-09, ACH-16 + LIVE ACH-LIVE-01 / ACH-REFUND-LIVE-01 (B15); R2-085 → ST1/ST2 (L-SETTLE); fiscal issuance unchanged (B15, S-B) |
+| R2-081, R2-140 | B10 | unchanged; bank half in ACH-08, ACH-09, RFG-01 |
+| CMD028-OK, CMD028-DENY, CMD028-RACE | B15 (DENY also B08) | bank intent EXECUTED_LOCAL in ACH-03 (I2 cells) + LIVE ACH-LIVE-01 |
+| CMD029-*, CMD030-*, CMD033-*, CMD034-* | B15 (some also B08, B10) | **DEFERRED** with the parked automated-provider rail (DV1-09, no date); bank equivalents C6/P1, C5/C6, X1/G2/NR, SI2/C6; CMD033 on a bank-transfer refund is 409 MANUAL_RAIL_NO_AUTOMATED_OUTBOUND (RFG-02, NR); CMD034-DENY's R2-085 half → ST1/ST2 |
+| S060 | B10 | unchanged |
+
+The simulator self-tests in `packages/application/test/commerce-fakes.test.ts` stay (every accepted B09/B10 test uses the
+simulator) and are labelled "simulator self-test, not V1 rail evidence". G-PAYMENT's live half reads (ACH-ROUTE r8 DV1-04): no
+production without collection; the route reaches GENERAL only with ACH-LIVE-01 and ACH-REFUND-LIVE-01 on one payment (credit
+reconciled, its refund sent and recorded with the send receipt); "commercially live" also needs delivery and the fiscal document.
