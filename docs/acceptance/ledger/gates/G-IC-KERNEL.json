@@ -7,7 +7,7 @@
   {
    "case": "IC-01",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -15,7 +15,7 @@
   {
    "case": "IC-02",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -23,7 +23,7 @@
   {
    "case": "IC-03",
    "package": "B03",
-   "claimed": null,
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -31,7 +31,7 @@
   {
    "case": "IC-04",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -39,7 +39,7 @@
   {
    "case": "IC-06",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -47,7 +47,7 @@
   {
    "case": "IC-07",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -55,7 +55,7 @@
   {
    "case": "IC-08",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -63,7 +63,7 @@
   {
    "case": "IC-09",
    "package": "B03",
-   "claimed": null,
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -71,7 +71,7 @@
   {
    "case": "IC-12",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -79,7 +79,7 @@
   {
    "case": "S038",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -87,7 +87,7 @@
   {
    "case": "S039",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -95,7 +95,7 @@
   {
    "case": "S040",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -103,7 +103,7 @@
   {
    "case": "S041",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -111,7 +111,7 @@
   {
    "case": "S095",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -119,7 +119,7 @@
   {
    "case": "CAP01",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -127,7 +127,7 @@
   {
    "case": "CAP02",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -135,7 +135,7 @@
   {
    "case": "CAP03",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -143,7 +143,7 @@
   {
    "case": "CAP04",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -151,7 +151,7 @@
   {
    "case": "CAP05",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -159,7 +159,7 @@
   {
    "case": "CAP06",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -167,7 +167,7 @@
   {
    "case": "CAP07",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -175,7 +175,7 @@
   {
    "case": "CAP08",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -183,7 +183,7 @@
   {
    "case": "CAP09",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -191,7 +191,7 @@
   {
    "case": "CAP10",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -199,7 +199,7 @@
   {
    "case": "CAP11",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -207,7 +207,7 @@
   {
    "case": "CAP12",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -215,7 +215,7 @@
   {
    "case": "R2-031",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -223,7 +223,7 @@
   {
    "case": "R2-032",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -231,7 +231,7 @@
   {
    "case": "R2-033",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -239,7 +239,7 @@
   {
    "case": "R2-034",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -247,7 +247,7 @@
   {
    "case": "R2-035",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -255,7 +255,7 @@
   {
    "case": "R2-036",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -263,7 +263,7 @@
   {
    "case": "R2-037",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -271,7 +271,7 @@
   {
    "case": "R2-038",
    "package": "B03",
-   "claimed": null,
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -279,7 +279,7 @@
   {
    "case": "CMD020-OK",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -287,7 +287,7 @@
   {
    "case": "CMD020-DENY",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -295,7 +295,7 @@
   {
    "case": "CMD020-RACE",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -303,7 +303,7 @@
   {
    "case": "CMD021-OK",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -311,7 +311,7 @@
   {
    "case": "CMD021-DENY",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -319,7 +319,7 @@
   {
    "case": "CMD021-RACE",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -327,7 +327,7 @@
   {
    "case": "CMD022-OK",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -335,7 +335,7 @@
   {
    "case": "CMD022-DENY",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -343,7 +343,7 @@
   {
    "case": "CMD022-RACE",
    "package": "B03",
-   "claimed": null,
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null

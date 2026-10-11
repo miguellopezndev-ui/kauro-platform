@@ -18,11 +18,15 @@ import {
   convertStatusBlocks,
   convertTableMap,
   ledgerFiles,
+  README_OUTSIDE_LINES,
+  README_OUTSIDE_TEXT,
   ledgerOfRepo,
   loadRegistry,
+  loadReviews,
   main,
   readInputs,
   readPinned,
+  readmeTable,
   readSidecars,
   reviewCommitViolations,
   reviewIndex,
@@ -280,12 +284,16 @@ test("the ledger lists the 441 registry cases; the only missing ones belong to a
   const missing = ledger.violations.filter((v) => v.kind === "MISSING_CASE");
   assert.deepEqual(missing.map((v) => v.subject).sort(), ledger.cases.filter((c) => unpinned.has(c.package)).map((c) => c.case).sort());
   for (const [path, content] of Object.entries(ledgerFiles(ledger))) assert.equal(read(path), content, `${path} is stale — run node tools/ledger.mjs --write`);
-  // the README's hand table claims no acceptance the ledger does not compute
-  // no README status is claimed without its review; the hand table still names the commit merged to main (4b33e26) where the
-  // accepted subject is the latest accepting round (d9bbfd0) for B06, B07 and B09 (PR18-3 (c)) until B regenerates it
-  const readmeClaimed = ledger.violations.filter((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW");
-  assert.deepEqual(readmeClaimed.filter((v) => !/^README names commit/.test(v.detail)), []);
-  assert.deepEqual(readmeClaimed.map((v) => v.subject), ["B06", "B07", "B09"]);
+  // the README's generated table claims no status or commit the ledger does not compute (B06, B07 and B09 name the accepted
+  // subject d9bbfd0, PR18-3 (c))
+  assert.deepEqual(ledger.violations.filter((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW"), []);
+  // ADV-2 (r4): the table between the ledger markers of docs/acceptance/README.md is the generated table byte for byte, every
+  // column (cases, status, accepted subject, rounds, waiting for), not only status and commit
+  const readme = read("docs/acceptance/README.md");
+  const [start, end] = ["<!-- ledger:table:start -->", "<!-- ledger:table:end -->"];
+  assert.ok(readme.includes(start) && readme.includes(end), "docs/acceptance/README.md carries the ledger markers");
+  assert.equal(readme.slice(readme.indexOf(start) + start.length, readme.indexOf(end)), `\n${readmeTable(ledger)}`, "the README table is stale — run node tools/ledger.mjs --write --readme");
+  assert.deepEqual(ledger.violations.filter((v) => /^README_/.test(v.kind)), []);
 });
 
 // A platform case map in the table format converts with the review that accepts it; a row that lost its review agreement is a claim.
@@ -367,10 +375,11 @@ test("PR18-6 (M5): reviewOf binds a row only while the package's latest round ac
 test("PR18-3 (c): a README row whose commit is not the package's accepted subject is a claim without review", () => {
   const f = clean();
   const readme = (commit) => `| Package | Cases | Status | Commit on main |\n|---|---|---|---|\n| B01 one | 2 | ACCEPTED | \`${commit}\` |\n`;
-  assert.deepEqual(kinds(computeLedger({ ...f, readme: readme("cB011") })), []);
+  // a hand table is itself outside the markers: its id token is a README_OUTSIDE_MARKERS violation (ADV-5 r5); the exact list is pinned (ADV-9)
+  assert.deepEqual(kinds(computeLedger({ ...f, readme: readme("cB011") })), ["README_OUTSIDE_MARKERS README"]);
   const ledger = computeLedger({ ...f, readme: readme("deadbee") });
-  assert.deepEqual(kinds(ledger), ["README_CLAIM_WITHOUT_REVIEW B01"]);
-  assert.match(ledger.violations[0].detail, /deadbee.*cB011/);
+  assert.deepEqual(kinds(ledger), ["README_CLAIM_WITHOUT_REVIEW B01", "README_OUTSIDE_MARKERS README"]);
+  assert.match(ledger.violations.find((v) => v.kind === "README_CLAIM_WITHOUT_REVIEW").detail, /deadbee.*cB011/);
 });
 
 test("PR18-9: an external map's rows are bound by its package's accepting review only when the review's commit is the pinned commit of the snapshot", () => {
@@ -441,9 +450,14 @@ test("PR18-9: a snapshot whose commit, path or packages differ from its pin in i
   }
 });
 
-/** Whether a test title is written in a test file: as is, with its quotes escaped, or with its apostrophes escaped. */
+/**
+ * Whether a test title is written in a test file: as the literal title (any quote kind, escapes undone) of a test, it, describe,
+ * suite or context call, modifiers such as .skip or .only included. A comment, another string or a longer title is not it (ADV-6).
+ */
 function titleIn(source, title) {
-  return [title, title.replace(/"/g, '\\"'), title.replace(/'/g, "\\'"), title.replace(/`/g, "\\`")].some((t) => source.includes(t));
+  const call = /(?<![\w.$])(?:test|it|describe|suite|context)(?:\.\w+)*\s*\(\s*(["'`])((?:\\[\s\S]|(?!\1)[^\\])*)\1/g;
+  for (const m of source.matchAll(call)) if (m[2].replace(/\\([\s\S])/g, "$1") === title) return true;
+  return false;
 }
 
 test("PR18-8: every citation of every platform sidecar names a test file that exists and a title written in it (each part of a nested describe :: it title, escaped quotes included); only a row that names its PLANNED half may cite a test file not written yet", () => {
@@ -483,4 +497,188 @@ test("PR18-10: obligations entered in B16's sidecar at B10 close survive `sideca
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
+});
+
+test("ADV-5: the command line binds every review to the history (reviewCommitViolations is wired into main), which ledgerOfRepo and the committed outputs leave out", () => {
+  const repo = mkdtempSync(join(tmpdir(), "ledger-wired-"));
+  try {
+    for (const p of ["packages/contracts/registry", "docs/acceptance/case-maps", "docs/acceptance/reviews", "docs/acceptance/ledger/inputs.json", "docs/acceptance/ledger/external", "docs/acceptance/README.md"]) cpSync(join(root, p), join(repo, p), { recursive: true });
+    const git = (...a) => execFileSync("git", ["-C", repo, ...a], { encoding: "utf8" }).trim();
+    git("init", "-q");
+    git("config", "user.email", "t@example.invalid");
+    git("config", "user.name", "t");
+    git("add", "-A");
+    git("commit", "-qm", "inputs only: no reviewed commit is in this history");
+    const unbound = (violations) => violations.filter((v) => v.kind === "REVIEW_COMMIT_UNBOUND").map((v) => v.subject).sort();
+    assert.deepEqual(unbound(ledgerOfRepo(repo).ledger.violations), [], "the committed outputs carry no git-dependent result");
+    const lines = [];
+    const code = main(["--json"], repo, (l) => lines.push(l));
+    const external = new Set(readInputs(repo).external.flatMap((i) => i.packages));
+    const platformReviews = execFileSync("git", ["-C", root, "ls-files", "docs/acceptance/reviews"], { encoding: "utf8" }).split("\n").filter((f) => /\/B\d\d-round\d+-[0-9a-f]+\.json$/.test(f));
+    assert.ok(platformReviews.length > 0);
+    assert.equal(code, 1);
+    assert.deepEqual(unbound(JSON.parse(lines.join("\n")).violations), platformReviews.map((f) => f.split("/").pop().replace(/\.json$/, "")).filter((id) => !external.has(id.slice(0, 3))).sort(), "every review of a platform package (an external one is bound to its pin instead)");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("ADV-3 (r4): one `--write --readme` pass from a stale README converges — the written ledger, gate records, README table and README equal a fresh computation", () => {
+  const repo = mkdtempSync(join(tmpdir(), "ledger-converge-"));
+  try {
+    for (const p of ["packages/contracts/registry", "docs/acceptance"]) cpSync(join(root, p), join(repo, p), { recursive: true });
+    const readmeFile = join(repo, "docs/acceptance/README.md");
+    const honest = readFileSync(readmeFile, "utf8");
+    const stale = honest.replace("`d9bbfd0` · B06-round3-d9bbfd0", "`4b33e26` · B06-round3-d9bbfd0");
+    assert.notEqual(stale, honest);
+    writeFileSync(readmeFile, stale);
+    assert.ok(ledgerOfRepo(repo).ledger.violations.some((v) => v.subject === "B06" && v.kind === "README_CLAIM_WITHOUT_REVIEW"), "the README starts stale");
+    main(["--write", "--readme"], repo, () => {});
+    const { ledger } = ledgerOfRepo(repo);
+    for (const [path, content] of Object.entries(ledgerFiles(ledger))) assert.equal(readFileSync(join(repo, path), "utf8"), content, `${path} is stale after one pass`);
+    assert.equal(readFileSync(readmeFile, "utf8"), honest, "the README is the generated one after one pass");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+// ADV-4 (r4): the residual violations of this repository, by kind and subject, each with its reason. They are true data; anything
+// else (a new kind, or one more or one fewer of a pinned kind) fails the suite, since the ledger CLI's exit is not part of CI.
+const RESIDUAL = {
+  // PLANNED rows outside B20/B21: MC B01 R2-009, MC B02 S034 and R2-017, B11 S068, S070 and R2-063
+  PLANNED_OUTSIDE_B20_B21: ["R2-009", "R2-017", "R2-063", "S034", "S068", "S070"],
+  // IC-B03 SIMULATED rows: the IC map at 2d01430 names no later package (live usefulness is B04 qualification; an IC-side map
+  // decision), plus the B03 rows that cite no carrier
+  REMAINDER_WITHOUT_OWNER: ["CAP01", "CAP02", "CAP03", "CAP04", "CAP05", "CAP06", "CAP07", "CAP08", "CAP09", "CAP10", "CAP11", "CAP12", "IC-04", "IC-06", "IC-07", "IC-08", "R2-029", "R2-030", "R2-037", "R2-038", "S039", "S095"],
+};
+const countsOf = (violations) => Object.fromEntries(Object.entries(Object.groupBy(violations, (v) => v.kind)).map(([k, vs]) => [k, vs.length]).sort(([a], [b]) => a.localeCompare(b)));
+const subjectsOf = (violations) => Object.fromEntries(Object.entries(Object.groupBy(violations, (v) => v.kind)).map(([k, vs]) => [k, vs.map((v) => v.subject).sort()]).sort(([a], [b]) => a.localeCompare(b)));
+
+test("ADV-4 (r4): the repository's violations are exactly the pinned residual set (22 REMAINDER_WITHOUT_OWNER, 6 PLANNED_OUTSIDE_B20_B21), in the computation and in the committed ledger.json; a new violation of any kind, or one more of a pinned kind, changes the counts", () => {
+  const { ledger, externals, missingInputs } = ledgerOfRepo(root);
+  assert.deepEqual(countsOf(ledger.violations), { PLANNED_OUTSIDE_B20_B21: 6, REMAINDER_WITHOUT_OWNER: 22 });
+  assert.deepEqual(subjectsOf(ledger.violations), RESIDUAL);
+  assert.deepEqual(subjectsOf(JSON.parse(read("docs/acceptance/ledger/ledger.json")).violations), RESIDUAL, "the committed ledger.json carries the same set");
+  // a count must be able to fail: the same inputs mutated, one violation each
+  const reviews = loadReviews(root);
+  const sidecars = readSidecars(root);
+  const base = (s) => computeLedger({ registry, sidecars: s, externals, missingInputs, reviews });
+  assert.deepEqual(countsOf(base(sidecars).violations), { PLANNED_OUTSIDE_B20_B21: 6, REMAINDER_WITHOUT_OWNER: 22 }, "the README-free computation is the same set");
+  const mutate = (pkg, pick, change) => sidecars.map((s) => (s.package === pkg ? { ...s, rows: s.rows.map((r) => (r === s.rows.find(pick) ? { ...r, ...change } : r)) } : s));
+  // a new kind: a B20 row loses the owner's date
+  assert.deepEqual(countsOf(base(mutate("B20", (r) => r.ownerDate, { ownerDate: null })).violations), { OWNER_DATE_MISSING: 1, PLANNED_OUTSIDE_B20_B21: 6, REMAINDER_WITHOUT_OWNER: 22 });
+  // one more of a pinned kind: a B10 row claimed PLANNED; a B10 PARTIAL row that names no carrier
+  assert.deepEqual(countsOf(base(mutate("B10", (r) => r.class === "EXECUTED_LOCAL", { class: "PLANNED" })).violations), { PLANNED_OUTSIDE_B20_B21: 7, REMAINDER_WITHOUT_OWNER: 22 });
+  assert.deepEqual(countsOf(base(mutate("B10", (r) => r.class === "PARTIAL", { inheritedTo: [], claimed: "PARTIAL" })).violations), { PLANNED_OUTSIDE_B20_B21: 6, REMAINDER_WITHOUT_OWNER: 23 });
+});
+
+test("ADV-6: a cited title is written only as the title of a test, it or describe call — a comment, a longer title or another string does not satisfy it; escaped quotes and every quote kind do", () => {
+  const source = [
+    "// refuses a stale lease (a comment)",
+    'const note = "refuses a stale lease";',
+    'test("refuses a stale lease twice", () => {});',
+    "describe('outer', () => {",
+    '  it("says \\"no\\"", () => {});',
+    "  it.skip(`uses a backtick`, () => {});",
+    "  test('it\\'s fine', async () => {});",
+    "});",
+  ].join("\n");
+  assert.equal(titleIn(source, "refuses a stale lease"), false);
+  assert.equal(titleIn(source, "refuses a stale lease twice"), true);
+  assert.equal(titleIn(source, "outer"), true);
+  assert.equal(titleIn(source, 'says "no"'), true);
+  assert.equal(titleIn(source, "uses a backtick"), true);
+  assert.equal(titleIn(source, "it's fine"), true);
+  assert.equal(titleIn(source, "fine"), false);
+});
+
+test("ADV-5 (r5): the README text outside the ledger markers byte-equals the pinned text — every evasion (tables, lookalike characters, entities, split ids, claims without an id) is exactly one README_OUTSIDE_MARKERS violation; the real README and a CRLF copy are clean", () => {
+  const readme = read("docs/acceptance/README.md");
+  const { externals, missingInputs } = ledgerOfRepo(root);
+  const readmeKinds = (text) => computeLedger({ registry, sidecars: readSidecars(root), externals, missingInputs, reviews: loadReviews(root), readme: text }).violations.filter((v) => /^README_/.test(v.kind));
+  assert.deepEqual(readmeKinds(readme), [], "control: the committed README has no README_ violation");
+  assert.deepEqual(readmeKinds(readme.replace(/\r?\n/g, "\r\n")), [], "a CRLF copy (the Windows leg) is clean");
+  const outside = (extra) => readmeKinds(`${readme}\n${extra}\n`).filter((v) => v.kind === "README_OUTSIDE_MARKERS");
+  const forged = "| Package | Cases | Status | Commit on main |\n|---|---|---|---|\n| B06 Domain | 29: 29 EXECUTED_PROVIDER | REVIEW_ACCEPTED | d9bbfd0 |";
+  const evasions = {
+    "pipe table": forged,
+    "first cell in backticks": forged.replace("| B06 Domain |", "| `B06` Domain |"),
+    "first cell in bold": forged.replace("| B06 Domain |", "| **B06** Domain |"),
+    "table without leading pipes": "Package | Status\n--- | ---\nB06 | REVIEW_ACCEPTED",
+    "indented table": "    | Package | Status |\n    |---|---|\n    | B06 | REVIEW_ACCEPTED |",
+    "HTML table": "<table><tr><td>Domain</td><td>accepted</td></tr></table>",
+    "lowercase id": "| b06 | REVIEW_ACCEPTED |",
+    "id without the zero": "| B6 | REVIEW_ACCEPTED |",
+    "id in a sentence": "Domain (B06) is accepted.",
+    "id in a link": "[B06](x) is accepted.",
+    "id in an html tag": "<b>B06</b> is accepted.",
+    "id in a quote": "> B06 is accepted.",
+    "id in a list": "- B06: accepted",
+    "id in a code fence": "```\nB06 REVIEW_ACCEPTED\n```",
+    "id in an HTML comment": "<!-- B06 accepted -->",
+    "full-width B": "Ｂ06 is accepted.",
+    "Cyrillic V": "В06 is accepted.",
+    "zero-width space": "B​06 is accepted.",
+    "entity": "&#66;06 is accepted.",
+    "split by markup": "**B**06 is accepted.",
+    "hyphen": "B-06 is accepted.",
+    "prefix": "PKG_B06 is accepted.",
+    "a claim naming the package without its id": "The domain package is accepted.",
+    "an empty line": "",
+  };
+  for (const [name, extra] of Object.entries(evasions)) assert.equal(outside(extra).length, 1, name);
+  // a prose edit inside the existing text is caught too, and names its line
+  const edited = readme.replace("Codex) reviews", "Codex) reviews quickly");
+  assert.notEqual(edited, readme);
+  const [v] = readmeKinds(edited);
+  assert.match(v.detail, /at line 5:/);
+  // without markers the whole text is outside
+  assert.equal(readmeKinds(readme.replace("<!-- ledger:table:start -->", "")).filter((x) => x.kind === "README_OUTSIDE_MARKERS").length, 1);
+});
+
+test("ADV-7 (r5): a README with no ledger markers, or with the end marker before the start, yields README_TABLE_NOT_GENERATED from ledgerOfRepo", () => {
+  const readme = read("docs/acceptance/README.md");
+  const [start, end] = ["<!-- ledger:table:start -->", "<!-- ledger:table:end -->"];
+  const variants = { "no markers": readme.replace(start, "").replace(end, ""), "end before start": readme.replace(start, "@@S@@").replace(end, start).replace("@@S@@", end) };
+  for (const [name, text] of Object.entries(variants)) {
+    assert.notEqual(text, readme, name);
+    const repo = mkdtempSync(join(tmpdir(), "ledger-markers-"));
+    try {
+      for (const p of ["packages/contracts/registry", "docs/acceptance"]) cpSync(join(root, p), join(repo, p), { recursive: true });
+      writeFileSync(join(repo, "docs/acceptance/README.md"), text);
+      assert.ok(ledgerOfRepo(repo).ledger.violations.some((v) => v.kind === "README_TABLE_NOT_GENERATED" && /has no .* markers/.test(v.detail)), name);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  }
+});
+
+test("ADV-6 (r5): every review record of this repository is bound to its history (REVIEW_COMMIT_UNBOUND: each commit resolves; an accepting latest round is an ancestor of HEAD, or the external pin) — a shallow clone fails, never skips", () => {
+  const shallow = execFileSync("git", ["-C", root, "rev-parse", "--is-shallow-repository"], { encoding: "utf8" }).trim();
+  assert.equal(shallow, "false", "shallow clone: review-commit check needs full history (fetch-depth 0)");
+  const { externals } = ledgerOfRepo(root);
+  const pins = Object.fromEntries(externals.flatMap((e) => e.packages.map((p) => [p, e.commit])));
+  assert.deepEqual(reviewCommitViolations(root, loadReviews(root), pins), [], "a rebased reviewed lane breaks the reviewed commit's ancestry: update the review record to the rebased sha with a range-diff EquivalenceReceipt in .kauro/reviews");
+});
+
+test("ADV-6 (r5, control): a review naming a commit that does not exist, B06-round1-deadbee, fails the review-commit check", () => {
+  const repo = mkdtempSync(join(tmpdir(), "ledger-unbound-"));
+  try {
+    const git = (...a) => execFileSync("git", ["-C", repo, ...a], { stdio: "ignore" });
+    git("init", "-q");
+    git("config", "user.email", "t@example.invalid");
+    git("config", "user.name", "t");
+    git("commit", "-q", "--allow-empty", "-m", "base");
+    const review = { id: "B06-round1-deadbee", package: "B06", round: 1, commit: "deadbee", verdict: "ACCEPT", cases: [] };
+    const out = reviewCommitViolations(repo, [review], {});
+    assert.deepEqual(out.map((v) => [v.kind, v.subject]), [["REVIEW_COMMIT_UNBOUND", "B06-round1-deadbee"]]);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test("ADV-10: the pinned README lines (one array element per line) hold no package-id token anywhere — a lint on reviewed text, so a hand table is never re-pinned by accident", () => {
+  assert.ok(README_OUTSIDE_LINES.length > 5 && README_OUTSIDE_LINES.join("\n") === README_OUTSIDE_TEXT);
+  const idLines = README_OUTSIDE_LINES.filter((l) => /\bB(?:0?\d|1\d|2[01])\b/i.test(l));
+  assert.deepEqual(idLines, [], "the pin must not contain a package-id token (case-insensitive B00-B21) on any line");
 });

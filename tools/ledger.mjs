@@ -14,9 +14,12 @@
 //
 // It fails (exit 1) when a case is missing, a cross citation has no inherited mark, a PARTIAL or SIMULATED row names nobody who
 // carries the rest, a row claims a review that does not accept it
-// or a README row claims acceptance without one, a case is PLANNED outside B20/B21 (whose only class is PLANNED_POST_B19 with the
+// or a README row claims acceptance without one (the README table between the ledger markers must be the generated table, every
+// column; a status table with an unrecognised header is refused; outside the markers the README must equal the pinned text README_OUTSIDE_TEXT — README_OUTSIDE_MARKERS), a case is PLANNED outside B20/B21 (whose only class is PLANNED_POST_B19 with the
 // owner's date), or the vendored registry no longer matches PROVENANCE.json. A claim is never acceptance: a row's class counts as
-// demonstrated only through its accepting review. Usage:
+// demonstrated only through its accepting review.
+// Rebase note: a reviewed lane that is rebased changes the reviewed commit's ancestry (REVIEW_COMMIT_UNBOUND): update the review record to
+// the rebased sha with a range-diff EquivalenceReceipt in .kauro/reviews. Usage:
 //
 //   node tools/ledger.mjs [--json] [--mc <file>@<sha>] [--ic <file>@<sha> ...] [--write] [--readme]
 //   node tools/ledger.mjs sidecars [--write]
@@ -412,11 +415,85 @@ export function convertExternal(input, pinned, registry) {
 const rank = (klass) => (CLASSES.indexOf(klass) < 0 ? CLASSES.length : CLASSES.indexOf(klass));
 const strongest = (rows) => rows.reduce((best, r) => (best === null || rank(r.class) < rank(best.class) ? r : best), null);
 
-/** The README table's rows: package id, status and the commit it names. */
+/** The README's markers around the generated table (`node tools/ledger.mjs --readme` writes between them). */
+export const README_MARKERS = ["<!-- ledger:table:start -->", "<!-- ledger:table:end -->"];
+/** The text between the README's markers, or null when either marker is missing. */
+export function readmeSection(text) {
+  const [start, end] = README_MARKERS;
+  const a = text.indexOf(start);
+  const b = text.indexOf(end);
+  return a < 0 || b < a ? null : text.slice(a + start.length, b);
+}
+
+/** A README status table whose columns are not the ones the ledger checks: refused, never read as an unchecked claim. */
+export class ReadmeHeaderError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ReadmeHeaderError";
+  }
+}
+
+/**
+ * The README text outside the generated section is pinned (ADV-5 r5, a true allowlist): it must byte-equal README_OUTSIDE_TEXT
+ * (line endings normalised to LF), so no table, package id, lookalike character or claim of any kind can be added outside the
+ * markers without changing this constant in the same commit, where review sees it. To edit the README prose on purpose, change
+ * README_OUTSIDE_TEXT with it.
+ */
+export const README_OUTSIDE_LINES = [
+  "# Package acceptance records",
+  "",
+  "Amendment A4 of the authority (edition KAURO-2026.09-R2, `C:\\Projects\\Kauro\\authority\\r2\\amendments\\A4_OPERATING_MODEL.md`)",
+  "defines package acceptance: (a) the case map gives every registry case its evidence class and test; (b) the full verify is",
+  "green on the exact commit on Windows, Linux and in CI; (c) an independent reviewer from another model provider (Codex) reviews",
+  "that exact commit against the registry cases and answers ACCEPT or ACCEPT_WITH_MINOR, the re-check covering only its findings;",
+  "(d) the commit is on `main`. Formal acceptance follows `registry/program.json` dependencies: a package whose conditions hold",
+  "but whose dependencies are not yet accepted is **REVIEW_ACCEPTED**.",
+  "",
+  "Raw reviewer answers are in `reviews/` (`<package>-round<n>-<commit>.json`, schema `tools/review/review-schema.json` on the",
+  "operator host).",
+  "",
+  "",
+  "",
+];
+export const README_OUTSIDE_TEXT = README_OUTSIDE_LINES.join("\n");
+/** The README text with the marker region (both markers and what is between) removed and LF line endings; null without markers. */
+export function readmeOutside(text) {
+  const [start, end] = README_MARKERS;
+  const a = text.indexOf(start);
+  const b = text.indexOf(end);
+  if (a < 0 || b < a) return null;
+  return (text.slice(0, a) + text.slice(b + end.length)).replace(/\r\n/g, "\n");
+}
+/** The first line where the README's outside text differs from the pinned text, or null when it equals it. */
+export function readmeOutsideDiff(text) {
+  const got = readmeOutside(text) ?? text.replace(/\r\n/g, "\n");
+  if (got === README_OUTSIDE_TEXT) return null;
+  const a = got.split("\n");
+  const b = README_OUTSIDE_TEXT.split("\n");
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return { line: i + 1, got: a[i] ?? "(end of text)", pinned: b[i] ?? "(end of text)" };
+}
+
+/** A cell's text without backtick, bold or italic markup. */
+const plainCell = (cell) => (cell ?? "").replace(/[`*_]/g, "").trim();
+const README_PACKAGE_ID = /^(B(?:0\d|1\d|2[01]))\b/;
+
+/**
+ * The README table's rows: package id, status and the commit it names, from the hand table's "commit on main" column or the
+ * generated table's "accepted subject (commit · review)" column. A status table — one with a status column, a first column
+ * "package" or a row naming a package — must have all three columns: a renamed one throws ReadmeHeaderError (ADV-2 r4), so a
+ * rename can never silence the commit check.
+ */
 export function readmeClaims(text) {
+  const commitColumn = (header) => header.findIndex((h) => h === "commit on main" || h.startsWith("accepted subject"));
   return tablesOf(text)
-    .filter((t) => t.header[0] === "package" && t.header.includes("status"))
-    .flatMap((t) => t.rows.map(({ cells }) => ({ package: /^(B\d\d)\b/.exec(cells[0])?.[1], status: cells[t.header.indexOf("status")], commit: shasIn(cells[t.header.indexOf("commit on main")] ?? "")[0] ?? null })))
+    .filter((t) => t.header[0] === "package" || t.header.includes("status") || t.rows.some(({ cells }) => README_PACKAGE_ID.test(plainCell(cells[0]))))
+    .flatMap((t) => {
+      const missing = [t.header[0] === "package" ? null : 'a first column "package"', t.header.includes("status") ? null : 'a "status" column', commitColumn(t.header) >= 0 ? null : 'a "commit on main" or "accepted subject (commit · review)" column'].filter(Boolean);
+      if (missing.length) throw new ReadmeHeaderError(`README table at line ${t.line} (${t.header.join(" | ")}): a status table needs ${missing.join(", ")}`);
+      return t.rows.map(({ cells }) => ({ package: README_PACKAGE_ID.exec(plainCell(cells[0]))?.[1], status: cells[t.header.indexOf("status")], commit: shasIn(cells[commitColumn(t.header)] ?? "")[0] ?? null }));
+    })
     .filter((r) => r.package);
 }
 
@@ -425,6 +502,7 @@ export function readmeClaims(text) {
  * external maps that could not be read.
  */
 export function computeLedger({ registry, sidecars, externals = [], missingInputs = [], reviews = [], readme = "" }) {
+  readme = readme.replace(/\r\n/g, "\n"); // line endings are not content (the Windows leg checks out CRLF)
   const violations = [];
   const flag = (kind, subject, detail) => violations.push({ kind, subject, detail });
   const { latest, entryOf, reviewOf } = reviewIndex(reviews);
@@ -570,8 +648,20 @@ export function computeLedger({ registry, sidecars, externals = [], missingInput
     };
   });
 
-  // a README row is a claim; acceptance is the computed status
-  for (const claim of readmeClaims(readme)) {
+  // a README row is a claim; acceptance is the computed status. A status table the ledger cannot read is a violation (ADV-2 r4);
+  // the table between the markers must be the generated table, every column (cases, status, subject, rounds, waiting for)
+  let claims = [];
+  try {
+    claims = readmeClaims(readme);
+  } catch (error) {
+    if (!(error instanceof ReadmeHeaderError)) throw error;
+    flag("README_TABLE_UNRECOGNISED", "README", error.message);
+  }
+  const section = readmeSection(readme);
+  if (section !== null && section !== `\n${readmeTable({ packages })}`) flag("README_TABLE_NOT_GENERATED", "README", "the table between the ledger markers is not the generated table — run node tools/ledger.mjs --write --readme");
+  const outsideDiff = readme === "" ? null : readmeOutsideDiff(readme);
+  if (outsideDiff) flag("README_OUTSIDE_MARKERS", "README", `outside the ledger markers the README differs from the pinned text (README_OUTSIDE_TEXT) at line ${outsideDiff.line}: "${outsideDiff.got.slice(0, 80)}" instead of "${outsideDiff.pinned.slice(0, 80)}"`);
+  for (const claim of claims) {
     const p = packages.find((x) => x.package === claim.package);
     if (/ACCEPTED/.test(claim.status) && !(p && (p.status === "REVIEW_ACCEPTED" || p.status === "ACCEPTED"))) {
       flag("README_CLAIM_WITHOUT_REVIEW", claim.package, `README says ${claim.status}; computed ${p?.status ?? "unknown package"}`);
@@ -672,6 +762,7 @@ export function ledgerOfRepo(root = ROOT, args = { _: [] }, registry = loadRegis
     readme: existsSync(readmeFile) ? readFileSync(readmeFile, "utf8") : "",
   });
   for (const d of drift) ledger.violations.push({ kind: "EXTERNAL_SNAPSHOT_DRIFT", subject: "inputs", detail: d });
+  if (!existsSync(readmeFile) || readmeSection(readFileSync(readmeFile, "utf8")) === null) ledger.violations.push({ kind: "README_TABLE_NOT_GENERATED", subject: "README", detail: `docs/acceptance/README.md is missing or has no ${README_MARKERS.join(" … ")} markers` });
   return { inputs, externals, missingInputs, ledger };
 }
 
@@ -701,9 +792,21 @@ export function main(argv, root = ROOT, log = console.log) {
     return stale.length ? 1 : 0;
   }
 
-  const { inputs, externals, ledger } = ledgerOfRepo(root, args, registry);
+  let { inputs, externals, ledger } = ledgerOfRepo(root, args, registry);
   const readmeFile = join(root, "docs", "acceptance", "README.md");
 
+  // ADV-3 (r4): the README first, then the ledger computed against the regenerated README, so one pass is a fixed point (the
+  // table depends only on the packages, which no README claim changes; a table that moves on the recomputation is an error)
+  if (args["--readme"]) {
+    const text = readFileSync(readmeFile, "utf8");
+    const [start, end] = README_MARKERS;
+    if (readmeSection(text) === null) throw new Error(`docs/acceptance/README.md has no ${start} … ${end} markers`);
+    const table = readmeTable(ledger);
+    writeFileSync(readmeFile, `${text.slice(0, text.indexOf(start) + start.length)}
+${table}${text.slice(text.indexOf(end))}`);
+    ({ inputs, externals, ledger } = ledgerOfRepo(root, args, registry));
+    if (readmeTable(ledger) !== table) throw new Error("the README table changed when the ledger was recomputed against it");
+  }
   if (args["--write"]) {
     for (const e of externals) {
       const input = inputs.find((i) => i.id === e.id);
@@ -712,13 +815,6 @@ export function main(argv, root = ROOT, log = console.log) {
     }
     mkdirSync(join(root, LEDGER_DIR, "gates"), { recursive: true });
     for (const [path, content] of Object.entries(ledgerFiles(ledger))) writeFileSync(join(root, path), content);
-  }
-  if (args["--readme"]) {
-    const text = readFileSync(readmeFile, "utf8");
-    const start = "<!-- ledger:table:start -->";
-    const end = "<!-- ledger:table:end -->";
-    if (!text.includes(start) || !text.includes(end)) throw new Error(`docs/acceptance/README.md has no ${start} … ${end} markers`);
-    writeFileSync(readmeFile, `${text.slice(0, text.indexOf(start) + start.length)}\n${readmeTable(ledger)}${text.slice(text.indexOf(end))}`);
   }
 
   // bound to the history after the committed outputs are written: they hold no git-dependent result

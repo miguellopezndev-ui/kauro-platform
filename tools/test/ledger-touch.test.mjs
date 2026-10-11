@@ -3,7 +3,7 @@
 // with the changes that reopen a package (a cited test or an own row) reported apart.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -43,14 +43,22 @@ test("touched: a file in a package's globs or a changed case touches it; a cited
     globsOf,
   });
   assert.deepEqual(result.map((r) => [r.package, r.files, r.cases, r.reopen]), [
-    ["B08", ["apps/control/src/x.ts", "apps/control/test/a.test.ts"], [], { citedTests: ["apps/control/test/a.test.ts"], ownRows: [] }],
-    ["B09", [], ["S057"], { citedTests: [], ownRows: ["S057"] }],
+    ["B08", ["apps/control/src/x.ts", "apps/control/test/a.test.ts"], [], { citedTests: ["apps/control/test/a.test.ts"], ownRows: [], reviews: [] }],
+    ["B09", [], ["S057"], { citedTests: [], ownRows: ["S057"], reviews: [] }],
   ]);
 });
 
 // --- a repository with a synthetic program: B00 accepted at X (its review recorded at Y), B01 not accepted ------------------------
+// `external`: B01's map is external (MC, pinned at PIN, no sidecar) and its accepting review, bound to PIN, is recorded at Y too.
+// `globsLater`: the attribution file does not exist at X yet; Y adds it.
 
-function fixture() {
+const PIN = "3b4b0aea4f1879ffb4189a55a16f22f4520787d4";
+const MC = { id: "MC", flag: "mc", repository: "kauro-migration-core", path: "docs/design/B01-B02-case-map.md", commit: PIN, format: "table", packages: ["B01"] };
+const SNAP = `docs/acceptance/ledger/external/MC-${PIN.slice(0, 12)}.json`;
+const snapshot = (test = ["test/mc.test.ts :: refuses"]) => ({ id: "MC", repository: MC.repository, path: MC.path, commit: PIN, packages: ["B01"], rows: [{ case: "S003", class: "EXECUTED_LOCAL", test, commit: PIN.slice(0, 7), reviewId: null, inheritedTo: [] }] });
+const GLOBS = "docs/acceptance/ledger/package-globs.json";
+
+function fixture({ external = false, globsLater = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "touch-"));
   const git = (...a) => execFileSync("git", ["-C", dir, "-c", "core.quotepath=off", ...a], { encoding: "utf8" }).trim();
   const write = (path, value) => {
@@ -75,26 +83,31 @@ function fixture() {
   write(`${reg}/additional_scenarios.json`, []);
   write(`${reg}/gates.json`, [{ id: "G-X", owner: "21", package: "B00", caseIds: ["S001", "S002", "S003"], evidenceRule: "r" }]);
   write(`${reg}/PROVENANCE.json`, { files: {} });
-  write("docs/acceptance/ledger/inputs.json", { external: [] });
-  write("docs/acceptance/ledger/package-globs.json", { shared: ["package.json"], packages: { B00: ["src/**"], B01: ["lib/**"] } });
+  write("docs/acceptance/ledger/inputs.json", { external: external ? [MC] : [] });
+  const globs = { shared: ["package.json"], packages: { B00: ["src/**"], B01: ["lib/**"] } };
+  if (!globsLater) write(GLOBS, globs);
+  if (external) write(SNAP, snapshot());
   write("package.json", "{}\n");
   write("src/a.ts", "export const a = 1;\n");
   write("lib/b.ts", "export const b = 1;\n");
   write("test/a.test.ts", "test('a', () => {});\n");
   const row = (id, extra = {}) => ({ case: id, class: "EXECUTED_LOCAL", test: ["test/a.test.ts :: a"], commit: null, reviewId: null, inheritedTo: [], ...extra });
   write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: [row("S001"), row("S002")] });
-  write("docs/acceptance/case-maps/B01.json", { package: "B01", rows: [{ case: "S003", class: "NOT_EXECUTED", test: [], commit: null, reviewId: null, inheritedTo: [] }] });
+  if (!external) write("docs/acceptance/case-maps/B01.json", { package: "B01", rows: [{ case: "S003", class: "NOT_EXECUTED", test: [], commit: null, reviewId: null, inheritedTo: [] }] });
   const X = commit("accepted subject");
   const reviewId = `B00-round1-${X.slice(0, 7)}`;
   write(`docs/acceptance/reviews/${reviewId}.json`, { verdict: "ACCEPT", cases: ["S001", "S002"].map((id) => ({ id, claimed_status: "EXECUTED_LOCAL", agree: true })) });
-  write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: [row("S001", { reviewId, commit: X.slice(0, 7) }), row("S002", { reviewId, commit: X.slice(0, 7) })] });
+  const ownRows = (extra = {}) => [row("S001", { reviewId, commit: X.slice(0, 7), ...extra }), row("S002", { reviewId, commit: X.slice(0, 7) })];
+  write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: ownRows() });
+  if (globsLater) write(GLOBS, globs);
+  if (external) write(`docs/acceptance/reviews/B01-round1-${PIN.slice(0, 7)}.json`, { verdict: "ACCEPT", cases: [{ id: "S003", claimed_status: "EXECUTED_LOCAL", agree: true }] });
   const Y = commit("review recorded");
   const run = (...argv) => {
     const lines = [];
     const code = main([...argv, "--json"], dir, (l) => lines.push(l));
     return { code, out: code === 2 ? lines.join("\n") : JSON.parse(lines.join("\n")) };
   };
-  return { dir, git, write, commit, X, Y, run, reg, program, done: () => rmSync(dir, { recursive: true, force: true }) };
+  return { dir, git, write, commit, X, Y, run, reg, program, globs, ownRows, reviewId, done: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
 test("PR18-6 (T6): main end to end — the ACCEPTED package (not only REVIEW_ACCEPTED) is diffed; recording its review touches nothing; a later change to its files touches it; an unresolvable target is exit 2", () => {
@@ -118,11 +131,15 @@ test("PR18-1: a renamed cited test is seen under both names and reopens the pack
   try {
     f.git("mv", "test/a.test.ts", "test/z.test.ts");
     f.write("src/ñandú.ts", "export const n = 1;\n");
-    f.commit("rename and non-ASCII");
-    const [b00] = f.run().out.touched;
+    f.write("test/zz.ts", "export const after = 1;\n");
+    f.commit("rename and non-ASCII, and a path sorted after the rename");
+    const r = f.run();
+    const [b00] = r.out.touched;
     assert.equal(b00.package, "B00");
     assert.deepEqual(b00.reopen.citedTests, ["test/a.test.ts"]);
     assert.ok(b00.files.includes("src/ñandú.ts"), `files: ${b00.files.join(", ")}`);
+    // ADV-4: the new name and the path after the rename are seen too (neither has an owner in the fixture, so the run fails)
+    assert.deepEqual([r.code, r.out.unattributed], [1, ["test/z.test.ts", "test/zz.ts"]]);
   } finally {
     f.done();
   }
@@ -224,5 +241,200 @@ test("an inherited row in another package's sidecar touches the case's owner but
     assert.deepEqual(changedOwnRows, [{ case: "S003", package: "B01" }]);
   } finally {
     f.done();
+  }
+});
+
+// --- the family "evidence" (a false not-touched verdict): every scope path the tool can see -----------------------------------------
+// One row per path: the change made in a commit after Y and the outcome it must have. A path is either loud (an accepted package it
+// belongs to is listed, or the run fails) or listed here as inert with its reason. Every tracked file of the fixture and every
+// repository input the tool reads (SCOPE_INPUTS) must have a row, so a new path or a new input without a row fails this test.
+const FAMILY = [
+  { path: "src/a.ts", why: "B00's package glob", change: (f) => f.write("src/a.ts", "export const a = 2;\n"), code: 0, touched: ["B00"] },
+  { path: "test/a.test.ts", why: "B00's cited test", change: (f) => f.write("test/a.test.ts", "test('a', () => { /* changed */ });\n"), code: 0, touched: ["B00"] },
+  { path: "lib/b.ts", why: "the package glob of B01, an accepted external package", change: (f) => f.write("lib/b.ts", "export const b = 2;\n"), code: 0, touched: ["B01"] },
+  { path: "package.json", why: "a shared glob touches every accepted package (ADV-3)", change: (f) => f.write("package.json", "{ \"x\": 1 }\n"), code: 0, touched: ["B00", "B01"] },
+  { path: GLOBS, why: "re-attribution: src/** moved from B00 to B01 in the commit that edits src/a.ts (ADV-1)", change: (f) => { f.write(GLOBS, { ...f.globs, packages: { B00: [], B01: ["lib/**", "src/**"] } }); f.write("src/a.ts", "export const a = 2;\n"); }, code: 0, touched: ["B00", "B01"] },
+  { path: GLOBS, why: "a package's globs changed alone (ADV-1)", change: (f) => f.write(GLOBS, { ...f.globs, packages: { ...f.globs.packages, B00: ["src/**", "tools/**"] } }), code: 0, touched: ["B00"] },
+  { path: GLOBS, why: "the shared list changed alone (ADV-1)", change: (f) => f.write(GLOBS, { ...f.globs, shared: [] }), code: 0, touched: ["B00", "B01"] },
+  { path: "docs/acceptance/ledger/inputs.json", why: "the pin of B01's external map moved (ADV-2)", change: (f) => f.write("docs/acceptance/ledger/inputs.json", { external: [{ ...MC, commit: "1111111aea4f1879ffb4189a55a16f22f4520787d" }] }), code: 0, touched: ["B01"] },
+  { path: SNAP, why: "B01's external snapshot (ADV-2)", change: (f) => f.write(SNAP, snapshot(["test/mc.test.ts :: refuses twice"])), code: 0, touched: ["B01"] },
+  { path: "docs/acceptance/case-maps/B00.json", why: "B00's own row: a citation added", change: (f) => f.write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: f.ownRows({ test: ["test/a.test.ts :: a", "test/a.test.ts :: b"] }) }), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/case-maps/B00.json", why: "B00's own row: a class its review does not accept (the package stops computing as accepted; it is still listed)", change: (f) => f.write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: f.ownRows({ class: "PARTIAL", inheritedTo: ["B01"] }) }), code: 0, touched: ["B00"] },
+  { path: "docs/design/B00-notes.md", why: "B00's design documents", change: (f) => f.write("docs/design/B00-notes.md", "a note\n"), code: 0, touched: ["B00"] },
+  { path: "packages/contracts/registry/program.json", why: "a case moved between packages (old and new owner); the registry file has no owner in the fixture", change: (f) => f.write(`${f.reg}/program.json`, [{ ...f.program[0], caseIds: ["S001"] }, { ...f.program[1], caseIds: ["S002", "S003"] }]), code: 1, touched: ["B00", "B01"] },
+  { path: "packages/contracts/registry/cases.json", why: "a case record changed", change: (f) => f.write(`${f.reg}/cases.json`, [{ id: "S001", gate: "G-X", expected: "two" }, { id: "S002", gate: "G-X", expected: "one" }, { id: "S003", gate: "G-X", expected: "one" }]), code: 1, touched: ["B00"] },
+  { path: "packages/contracts/registry/additional_scenarios.json", why: "a scenario record added for a case", change: (f) => f.write(`${f.reg}/additional_scenarios.json`, [{ id: "S003", note: "x" }]), code: 1, touched: ["B01"] },
+  { path: "packages/contracts/registry/gates.json", why: "an unowned non-doc file fails the run", change: (f) => f.write(`${f.reg}/gates.json`, [{ id: "G-X", owner: "21", package: "B00", caseIds: ["S001", "S002", "S003"], evidenceRule: "r2" }]), code: 1, touched: [] },
+  { path: "packages/contracts/registry/PROVENANCE.json", why: "an unowned non-doc file fails the run", change: (f) => f.write(`${f.reg}/PROVENANCE.json`, { files: {}, note: "x" }), code: 1, touched: [] },
+  { path: "infra/main.tf", why: "a new non-doc file no glob owns fails the run", change: (f) => f.write("infra/main.tf", "# x\n"), code: 1, touched: [] },
+  { path: "docs/acceptance/reviews/", why: "INERT only when ADDED: a new round file is an acceptance itself (it moves the subject, it is not a change after it)", change: (f) => f.write(`docs/acceptance/reviews/B00-round2-${f.X.slice(0, 7)}.json`, { verdict: "ACCEPT", note: "x", cases: ["S001", "S002"].map((id) => ({ id, claimed_status: "EXECUTED_LOCAL", agree: true })) }), code: 0, touched: [] },
+  { path: "docs/acceptance/reviews/", why: "ADV-1 (r4): the accepting review edited in place (a case's claimed class)", change: (f) => f.write(`docs/acceptance/reviews/${f.reviewId}.json`, { verdict: "ACCEPT", cases: [{ id: "S001", claimed_status: "EXECUTED_PROVIDER", agree: true }, { id: "S002", claimed_status: "EXECUTED_LOCAL", agree: true }] }), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/reviews/", why: "ADV-1 (r4): the accepting review's verdict flipped in place (the package stops computing as accepted; it is still listed)", change: (f) => f.write(`docs/acceptance/reviews/${f.reviewId}.json`, { verdict: "REJECT", cases: ["S001", "S002"].map((id) => ({ id, claimed_status: "EXECUTED_LOCAL", agree: true })) }), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/reviews/", why: "ADV-1 (r4): the accepting review deleted", change: (f) => f.git("rm", "-q", `docs/acceptance/reviews/${f.reviewId}.json`), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/reviews/", why: "ADV-1 (r4): the external package's accepting review edited in place", change: (f) => f.write(`docs/acceptance/reviews/B01-round1-${PIN.slice(0, 7)}.json`, { verdict: "ACCEPT", cases: [{ id: "S003", claimed_status: "EXECUTED_PROVIDER", agree: true }] }), code: 0, touched: ["B01"] },
+  { path: "docs/acceptance/reviews/", why: "ADV-1 (r4): the external package's accepting review deleted", change: (f) => f.git("rm", "-q", `docs/acceptance/reviews/B01-round1-${PIN.slice(0, 7)}.json`), code: 0, touched: ["B01"] },
+  { path: "docs/acceptance/case-maps/B00.json", why: "ADV-1 (r4) sweep: a row's review bookkeeping pointed at a review the range does not add", change: (f) => f.write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: f.ownRows({ reviewId: "B00-round1-0000000" }) }), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/case-maps/B00.json", why: "ADV-1 (r4) sweep: a row's review commit changed alone", change: (f) => f.write("docs/acceptance/case-maps/B00.json", { package: "B00", rows: f.ownRows({ commit: "1234567" }) }), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/case-maps/B00.json", why: "ADV-1 (r4) sweep: an inherited obligation entered in the package's own sidecar", change: (f) => f.write("docs/acceptance/case-maps/B00.json", { package: "B00", obligations: [{ from: "B01", case: "S003", status: "NOT_APPLICABLE", ownerSigned: true }], rows: f.ownRows() }), code: 0, touched: ["B00"] },
+  { path: "docs/acceptance/README.md", why: "INERT: the README is a claim the ledger recomputes; any text outside the generated one that differs from the pinned text is a ledger violation (README_OUTSIDE_MARKERS, tools/test/ledger.test.mjs ADV-5 r5)", change: (f) => f.write("docs/acceptance/README.md", "| Package | Status |\n|---|---|\n| B00 zero | ACCEPTED |\n"), code: 0, touched: [] },
+  { path: "docs/other.md", why: "INERT: a document of no package", change: (f) => f.write("docs/other.md", "x\n"), code: 0, touched: [] },
+];
+
+test("family evidence: every scope path acceptance-touch can see is loud (an accepted package it belongs to is listed, or the run fails) or inert by a stated reason, and every tracked file and every input the tool reads has a row", async () => {
+  const touch = await import("../acceptance-touch.mjs");
+  const covered = (p) => FAMILY.some((r) => r.path === p || (r.path.endsWith("/") && p.startsWith(r.path)));
+  const base = fixture({ external: true });
+  try {
+    const tracked = base.git("ls-files", "-z").split("\0").filter(Boolean);
+    assert.deepEqual(tracked.filter((p) => !covered(p)), [], "every tracked file has a family row");
+    const atY = base.run();
+    assert.deepEqual([atY.code, atY.out.touched], [0, []], `the fixture at Y is clean: ${JSON.stringify(atY.out)}`);
+  } finally {
+    base.done();
+  }
+  const wrong = [];
+  for (const r of FAMILY) {
+    const f = fixture({ external: true });
+    try {
+      r.change(f);
+      f.commit(r.why);
+      const { code, out } = f.run();
+      const got = code === 2 ? `exit 2: ${out}` : JSON.stringify([code, out.touched.map((t) => t.package)]);
+      if (got !== JSON.stringify([r.code, r.touched])) wrong.push(`${r.path} (${r.why}): expected ${JSON.stringify([r.code, r.touched])}, got ${got}`);
+    } finally {
+      f.done();
+    }
+  }
+  assert.deepEqual(wrong, []);
+  assert.ok(Array.isArray(touch.SCOPE_INPUTS) && touch.SCOPE_INPUTS.length > 0, "acceptance-touch.mjs exports SCOPE_INPUTS, the repository inputs it reads");
+  for (const input of touch.SCOPE_INPUTS) assert.ok(FAMILY.some((r) => r.path.startsWith(input) || input.startsWith(r.path)), `no family row for the input ${input}`);
+});
+
+test("ADV-1: a re-attribution in package-globs.json never hides a change — the globs at the package's subject and at the target are united, a package whose globs (or the shared list) changed is touched, and a package accepted before the file existed is compared with the file's first version", () => {
+  const f = fixture();
+  try {
+    f.write(GLOBS, { ...f.globs, packages: { B00: [], B01: ["lib/**", "src/**"] } });
+    f.write("src/a.ts", "export const a = 2;\n");
+    f.commit("move src/** to B01 and edit src/a.ts");
+    const r = f.run();
+    assert.deepEqual([r.code, r.out.touched.map((t) => [t.package, t.files])], [0, [["B00", [GLOBS, "src/a.ts"]]]]);
+  } finally {
+    f.done();
+  }
+  const g = fixture();
+  try {
+    g.write(GLOBS, { ...g.globs, packages: { B00: [], B01: ["lib/**", "src/**"] } });
+    g.commit("move src/** to B01");
+    g.write("src/a.ts", "export const a = 2;\n");
+    g.commit("edit src/a.ts later");
+    assert.deepEqual(g.run(`${g.git("rev-parse", "HEAD~1")}..HEAD`).out.touched.map((t) => [t.package, t.files]), [["B00", [GLOBS, "src/a.ts"]]], "the left bound never narrows B00's range");
+  } finally {
+    g.done();
+  }
+  const h = fixture({ globsLater: true });
+  try {
+    assert.deepEqual(h.run().out.touched, [], "adding the attribution file is not a change of B00's globs");
+    h.write(GLOBS, { ...h.globs, packages: { B00: [], B01: ["lib/**", "src/**"] } });
+    h.write("src/a.ts", "export const a = 2;\n");
+    h.commit("move src/** to B01 and edit src/a.ts");
+    assert.deepEqual(h.run().out.touched.map((t) => [t.package, t.files]), [["B00", [GLOBS, "src/a.ts"]]]);
+  } finally {
+    h.done();
+  }
+});
+
+test("ADV-2: an external package (its map pinned in inputs.json, its review bound to the core's commit) is diffed from the platform commit that recorded its accepting review; its pin, its snapshot and its cases touch it", () => {
+  const f = fixture({ external: true });
+  try {
+    const atY = f.run();
+    assert.deepEqual([atY.code, atY.out.touched], [0, []], typeof atY.out === "string" ? atY.out : "");
+    f.write("docs/acceptance/ledger/inputs.json", { external: [{ ...MC, commit: "1111111aea4f1879ffb4189a55a16f22f4520787d" }] });
+    f.commit("pin moved");
+    const [b01, ...rest] = f.run().out.touched;
+    assert.deepEqual(rest, []);
+    assert.deepEqual([b01.package, b01.acceptedSubject.commit, b01.files, b01.range], ["B01", PIN.slice(0, 7), ["docs/acceptance/ledger/inputs.json"], `${f.Y.slice(0, 7)}..${f.git("rev-parse", "HEAD").slice(0, 7)}`]);
+  } finally {
+    f.done();
+  }
+});
+
+test("ADV-3: a changed shared file (package.json) touches every accepted package through main()", () => {
+  const f = fixture();
+  try {
+    f.write("package.json", "{ \"x\": 1 }\n");
+    f.commit("manifest");
+    const r = f.run();
+    assert.deepEqual([r.code, r.out.touched.map((t) => [t.package, t.files])], [0, [["B00", ["package.json"]]]]);
+  } finally {
+    f.done();
+  }
+});
+
+test("ADV-7: a file at a revision is null only when the revision's tree has no such path — an unknown revision or a corrupt object is an error, never an absent file", async () => {
+  const { fileAt } = await import("../acceptance-touch.mjs");
+  assert.equal(typeof fileAt, "function", "acceptance-touch.mjs exports fileAt");
+  const f = fixture();
+  try {
+    assert.equal(fileAt(f.dir, "HEAD", "no/such/file.json"), null);
+    assert.match(fileAt(f.dir, "HEAD", "src/a.ts"), /export const a = 1/);
+    assert.throws(() => fileAt(f.dir, "no-such-revision", "src/a.ts"));
+    // corrupt B00's sidecar blob at HEAD: the tree still lists it, reading it fails
+    const blob = f.git("rev-parse", "HEAD:docs/acceptance/case-maps/B00.json");
+    const object = join(f.dir, ".git", "objects", blob.slice(0, 2), blob.slice(2));
+    chmodSync(object, 0o644);
+    writeFileSync(object, "not a zlib stream");
+    assert.throws(() => fileAt(f.dir, "HEAD", "docs/acceptance/case-maps/B00.json"));
+    assert.throws(() => changedCaseRows(f.dir, f.X, "HEAD", loadRegistry(f.dir)), "a corrupt sidecar is an error, not a deleted map");
+  } finally {
+    f.done();
+  }
+});
+
+test("ADV-1 (r4): a review record that exists at the start of a package's range and is edited in place or deleted touches and reopens that package (the accepting round, an older round, an external package's review); only a newly added round file is inert", () => {
+  const path = (f) => `docs/acceptance/reviews/${f.reviewId}.json`;
+  const local = ["S001", "S002"].map((id) => ({ id, claimed_status: "EXECUTED_LOCAL", agree: true }));
+  const only = (r) => {
+    assert.equal(r.code, 0, JSON.stringify(r.out));
+    assert.equal(r.out.touched.length, 1, JSON.stringify(r.out.touched));
+    const [t] = r.out.touched;
+    return [t.package, t.files, t.reopen.reviews];
+  };
+  const f = fixture();
+  try {
+    f.write(path(f), { verdict: "ACCEPT", cases: [{ ...local[0], claimed_status: "EXECUTED_PROVIDER" }, local[1]] });
+    f.commit("edit the accepting review in place");
+    assert.deepEqual(only(f.run()), ["B00", [path(f)], [path(f)]]);
+  } finally {
+    f.done();
+  }
+  const g = fixture();
+  try {
+    g.git("rm", "-q", path(g));
+    g.commit("delete the accepting review");
+    assert.deepEqual(only(g.run()), ["B00", [path(g)], [path(g)]]);
+  } finally {
+    g.done();
+  }
+  const h = fixture();
+  try {
+    const round2 = `docs/acceptance/reviews/B00-round2-${h.X.slice(0, 7)}.json`;
+    h.write(round2, { verdict: "ACCEPT", cases: local });
+    h.commit("a new round file: inert");
+    assert.deepEqual(h.run().out.touched, [], "only a newly added round file is inert");
+    h.write(path(h), { verdict: "ACCEPT", cases: [{ ...local[0], agree: false }, local[1]] });
+    h.commit("an older round's agreement flipped in place");
+    assert.deepEqual(only(h.run()), ["B00", [path(h)], [path(h)]]);
+  } finally {
+    h.done();
+  }
+  const e = fixture({ external: true });
+  try {
+    const review = `docs/acceptance/reviews/B01-round1-${PIN.slice(0, 7)}.json`;
+    e.write(review, { verdict: "ACCEPT", cases: [{ id: "S003", claimed_status: "EXECUTED_PROVIDER", agree: true }] });
+    e.commit("edit the external package's review in place");
+    const r = e.run();
+    assert.deepEqual(r.out.touched.map((t) => [t.package, t.files, t.reopen.reviews]), [["B01", [review], [review]]]);
+  } finally {
+    e.done();
   }
 });
