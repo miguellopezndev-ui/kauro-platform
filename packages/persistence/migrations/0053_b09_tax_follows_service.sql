@@ -1,4 +1,3 @@
--- PENDING (not a migration yet): takes the next free number after the planned 0053..0059 of SEC-DEPTH-PROVENANCE.md are placed; renumber at merge.
 -- 0053 — B09-TAX-ROUNDING: the tax of a refund follows its service. A refund with no service carries no tax (KP012), so a rounding cent
 -- left unreturned by a failed booked refund stays with the remaining balance and is returned by the refund that takes the service it
 -- belongs to, never forced onto a service-0 refund that would revoke the entitlement while the quote's release guard still holds it.
