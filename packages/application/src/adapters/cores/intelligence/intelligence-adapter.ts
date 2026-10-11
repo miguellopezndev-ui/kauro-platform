@@ -119,6 +119,8 @@ export class IntelligenceCoreAdapter implements InterpretPort {
     const failed = (): InterpretResult => ({ evidenceClass: this.evidenceClass, outcome: "FAILED", candidateDecisions: null, reservedCents: 0, spentCents: 0 });
     const document = request.candidateManifest.document;
     if (!isManifestDocument(document)) return failed();
+    // no funded room under the AUDIT grant, no reservation and no run (D8-GRANT-1, D8-GRANT-2)
+    if (!Number.isFinite(request.fundedCeilingCents) || request.fundedCeilingCents <= 0) return failed();
     const d = this.#d;
     const deadlineMs = Date.parse(request.interpretationDeadlineAt);
     if (!Number.isFinite(deadlineMs)) return failed();
@@ -136,7 +138,7 @@ export class IntelligenceCoreAdapter implements InterpretPort {
     }
     // the manifest the step was given must be the one this profile plans now (D8-CAU-5): a changed expected set fails before any reservation
     const mode = inputs.targetContract === null ? ("CLEAN_ONLY" as const) : inputs.targetContract.contract.instance.mode;
-    const projectRevision = { projectRevisionId: request.revisionId, projectRevisionHash: document.revisionHash, mode, supportEnvelopeVersion: d.supportEnvelopeVersion };
+    const projectRevision = { projectRevisionId: document.revisionHash, projectRevisionHash: document.revisionHash, mode, supportEnvelopeVersion: d.supportEnvelopeVersion };
     const expected = planExpectedCandidates({ projectRevision, sourceProfile: inputs.sourceProfile, candidateSet: inputs.candidateSet, targetContract: inputs.targetContract });
     if (expected.candidateSetHash !== request.candidateManifest.candidateSetHash || expected.expectedSetHash !== document.expectedSetHash) return failed();
 
