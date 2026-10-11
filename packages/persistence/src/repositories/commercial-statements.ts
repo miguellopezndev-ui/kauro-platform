@@ -562,10 +562,18 @@ export class PgStatementRepository implements StatementRepository {
          FROM kauro.commission_holds WHERE line_id = ANY ($1::uuid[]) ORDER BY line_id, opened_at, hold_id`,
       [lineIds],
     );
-    const offsets = await execute<{ offset_id: string; seller_id: string; negative_line_id: string; against_line_id: string; amount_cents: string; agreement_id: string; recorded_at: string }>(
+    const offsets = await execute<{ offset_id: string; seller_id: string; negative_line_id: string; against_line_id: string; amount_cents: string; agreement_id: string; recorded_at: string; released_cents: string }>(
       this.db,
-      `SELECT offset_id, seller_id, negative_line_id, against_line_id, amount_cents, agreement_id, ${canonical("recorded_at")}
+      `SELECT offset_id, seller_id, negative_line_id, against_line_id, amount_cents, agreement_id, ${canonical("recorded_at")},
+              (SELECT coalesce(sum(r.amount_cents), 0) FROM kauro.commission_offset_releases r WHERE r.offset_id = commission_offsets.offset_id) AS released_cents
          FROM kauro.commission_offsets WHERE negative_line_id = ANY ($1::uuid[]) OR against_line_id = ANY ($1::uuid[]) ORDER BY recorded_at, offset_id`,
+      [lineIds],
+    );
+    // the seller credit of each settled line: recognized (R - V) and itemized by statements not CORRECTED (OFF-R1, OFF-R2)
+    const credit = await execute<{ line_id: string; recognized: string; itemized: string }>(
+      this.db,
+      `SELECT l.line_id, kauro.commission_line_credit_recognized(l.line_id) AS recognized, kauro.commission_line_credit_itemized(l.line_id) AS itemized
+         FROM kauro.commission_lines l WHERE l.line_id = ANY ($1::uuid[]) AND EXISTS (SELECT 1 FROM kauro.seller_credit_entries e WHERE e.line_id = l.line_id) ORDER BY l.line_id`,
       [lineIds],
     );
     const poolIds = [...new Set(lines.map((l) => l.poolId as string))];
@@ -705,8 +713,10 @@ export class PgStatementRepository implements StatementRepository {
           amountCents: money(r.amount_cents),
           agreementId: r.agreement_id as SellerAgreementId,
           recordedAt: instantOf(r.recorded_at),
+          releasedCents: money(r.released_cents),
         }),
       ),
+      credit: credit.rows.map((r) => ({ lineId: r.line_id as CommissionLineId, recognizedCents: money(r.recognized), itemizedCents: money(r.itemized) })),
       offsetTerms: terms.rows.map((r) => ({ lineId: r.line_id as CommissionLineId, agreementId: r.agreement_id as SellerAgreementId, offsetTerms: r.offset_terms })),
       undeliveredBeforeCutoff: await this.undeliveredBefore(cutoffAt),
     };
