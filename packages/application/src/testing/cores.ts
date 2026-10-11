@@ -38,3 +38,5 @@ export type {
   IntelligenceCoreOperation,
   IntelligenceCoreStep,
 } from "./contract-fake-intelligence-core.js";
+export { CORE_PORT_CONTRACT } from "./core-port-contract.js";
+export type { CorePortBackend, CorePortContractCase } from "./core-port-contract.js";

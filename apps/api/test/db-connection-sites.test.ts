@@ -101,6 +101,8 @@ const EXACT_ALLOWLIST: ReadonlyArray<{ readonly file: string; readonly line: num
   { file: "packages/data-plane/src/sandbox/child.ts", line: 30, text: "const task = (await import(pathToFileURL(job.task).href)) as { run?: (payload: unknown, context: { readonly workDir: string }) => Promise<unknown> };" },
   { file: "packages/data-plane/src/sandbox/preload.ts", line: 26, text: 'import { syncBuiltinESMExports } from "node:module";' },
   { file: "packages/data-plane/src/sandbox/preload.ts", line: 29, text: 'import workerThreads from "node:worker_threads";' },
+  { file: "packages/data-plane/src/cores/child-preload-fs.ts", line: 10, text: 'import { syncBuiltinESMExports } from "node:module";' },
+  { file: "packages/data-plane/src/cores/core-child.ts", line: 56, text: "const task = (await import(pathToFileURL(job.task).href)) as { run?: (payload: unknown, context: CoreChildContext) => Promise<unknown> };" },
   // DB-TLS gap 2: the "LOCAL" values that are not an environment handed to a connection: the two lists of the three environments, the
   // origin policy kind of the web host, and the browser suite's default for its own local stack
   { file: "packages/domain/src/model/idempotency.ts", line: 17, text: 'export const ENVIRONMENTS: ReadonlyArray<Environment> = ["LOCAL", "SANDBOX", "LIVE"];' },

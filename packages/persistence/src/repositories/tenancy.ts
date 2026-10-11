@@ -189,7 +189,7 @@ export class PgAgencyRepository implements AgencyRepository {
   }
 
   async lock(agencyId: AgencyId): Promise<AgencyRecord | null> {
-    const r = await execute<AgencyRow>(this.db, `SELECT ${AGENCY_COLUMNS} FROM kauro.agencies WHERE agency_id = $1 FOR UPDATE`, [agencyId]);
+    const r = await execute<AgencyRow>(this.db, `SELECT ${AGENCY_COLUMNS} FROM kauro.agencies WHERE agency_id = $1 FOR NO KEY UPDATE`, [agencyId]);
     return r.rows[0] ? agencyRecord(r.rows[0]) : null;
   }
 
@@ -327,7 +327,7 @@ export class PgMembershipRepository implements MembershipRepository {
   }
 
   async lock(membershipId: MembershipId): Promise<MembershipRecord | null> {
-    const r = await execute<MembershipRow>(this.db, `SELECT ${MEMBERSHIP_COLUMNS} FROM kauro.memberships WHERE membership_id = $1 FOR UPDATE`, [membershipId]);
+    const r = await execute<MembershipRow>(this.db, `SELECT ${MEMBERSHIP_COLUMNS} FROM kauro.memberships WHERE membership_id = $1 FOR NO KEY UPDATE`, [membershipId]);
     return r.rows[0] ? membershipRecord(r.rows[0]) : null;
   }
 

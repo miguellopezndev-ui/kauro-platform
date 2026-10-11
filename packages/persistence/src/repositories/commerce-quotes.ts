@@ -229,7 +229,7 @@ export class PgQuoteRepository implements QuoteRepository {
   }
 
   async lock(quoteId: QuoteId): Promise<QuoteRecord | null> {
-    const r = await execute<QuoteRow>(this.ctx.db, `SELECT ${QUOTE_COLUMNS} FROM kauro.quotes WHERE quote_id = $1 FOR UPDATE`, [quoteId]);
+    const r = await execute<QuoteRow>(this.ctx.db, `SELECT ${QUOTE_COLUMNS} FROM kauro.quotes WHERE quote_id = $1 FOR NO KEY UPDATE`, [quoteId]);
     return r.rows[0] ? quoteRecord(r.rows[0]) : null;
   }
 

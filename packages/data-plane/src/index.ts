@@ -37,3 +37,17 @@ export {
 } from "./attempt/scratch-store.js";
 export { FencedArtifactWriter, type FencedArtifactWriterOptions, type StagedManifestRequest } from "./attempt/artifact-writer.js";
 export { GenerationSourceReader, type GenerationSourceReaderOptions } from "./attempt/source-reader.js";
+export { AttemptByteLedger, ScratchBudgetExceeded } from "./cores/attempt-byte-ledger.js";
+export {
+  CORE_RUN_DIRECTORY,
+  MIGRATION_CORE_VERSION,
+  MigrationCoreAdapter,
+  coreInputPathOf,
+  coreTargetModeOf,
+  platformTargetModeOf,
+  removeOrphanStepScratch,
+  rowCountsOf,
+  type CoreAdapterHooks,
+  type MigrationCoreAdapterOptions,
+} from "./cores/migration-core-adapter.js";
+export { SYSTEM_TIMERS, type CoreTimers } from "./cores/operation.js";

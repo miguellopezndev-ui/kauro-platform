@@ -180,6 +180,9 @@ importers:
       '@kauro/domain':
         specifier: workspace:*
         version: link:../domain
+      '@kauro/migration-core':
+        specifier: workspace:*
+        version: link:../migration-core
     devDependencies:
       '@types/node':
         specifier: 24.3.1
@@ -203,6 +206,9 @@ importers:
 
   packages/intelligence-core:
     dependencies:
+      '@kauro/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       kauro-intelligence-core:
         specifier: file:../../vendor/kauro-intelligence-core-0.6.0.tgz
         version: file:vendor/kauro-intelligence-core-0.6.0.tgz(kauro-migration-core@file:vendor/kauro-migration-core-3.0.0.tgz)
@@ -219,6 +225,9 @@ importers:
 
   packages/migration-core:
     dependencies:
+      '@kauro/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       kauro-migration-core:
         specifier: file:../../vendor/kauro-migration-core-3.0.0.tgz
         version: file:vendor/kauro-migration-core-3.0.0.tgz

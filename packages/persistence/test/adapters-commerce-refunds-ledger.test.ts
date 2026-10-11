@@ -204,7 +204,7 @@ test("a refund's completion and a funds observation of its capture are ordered b
     const r = await uow.commerce.captures.observeFunds(sale.captureId as CaptureId, 1, { fundsState: "HELD", observedAt: clock.now(), evidenceHash: sha(`held-${sale.captureId}`) }, clock.now());
     return { r, events: [...uow.events.appended] };
   });
-  await waitForLockWait(h.oracle, "kauro-test-payment", "FROM kauro.capture_facts WHERE capture_id = $1 FOR UPDATE");
+  await waitForLockWait(h.oracle, "kauro-test-payment", "FROM kauro.capture_facts WHERE capture_id = $1 FOR NO KEY UPDATE");
   hold.open();
   const [done, held] = await Promise.all([completion, funds]);
   assert.equal(done.events.find((e) => e.eventType === "refund.completed.v1")?.payload["fundsState"], "UNKNOWN", "the completion took its money from the balance it saw");

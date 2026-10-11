@@ -188,7 +188,7 @@ export class PgCaptureFactRepository implements CaptureFactRepository {
   }
 
   async lock(captureId: CaptureId): Promise<CaptureFactRecord | null> {
-    const r = await execute<CaptureRow>(this.ctx.db, `SELECT ${CAPTURE_COLUMNS} FROM kauro.capture_facts WHERE capture_id = $1 FOR UPDATE`, [captureId]);
+    const r = await execute<CaptureRow>(this.ctx.db, `SELECT ${CAPTURE_COLUMNS} FROM kauro.capture_facts WHERE capture_id = $1 FOR NO KEY UPDATE`, [captureId]);
     return r.rows[0] ? captureRecord(r.rows[0]) : null;
   }
 
@@ -520,7 +520,7 @@ export class PgCommercialAuthorizationRepository implements CommercialAuthorizat
   }
 
   async lock(authorizationId: CommercialAuthorizationId): Promise<CommercialAuthorizationRecord | null> {
-    const r = await execute<AuthorizationRow>(this.ctx.db, `SELECT ${AUTHORIZATION_COLUMNS} FROM kauro.commercial_authorizations WHERE authorization_id = $1 FOR UPDATE`, [authorizationId]);
+    const r = await execute<AuthorizationRow>(this.ctx.db, `SELECT ${AUTHORIZATION_COLUMNS} FROM kauro.commercial_authorizations WHERE authorization_id = $1 FOR NO KEY UPDATE`, [authorizationId]);
     return r.rows[0] ? authorizationRecord(r.rows[0]) : null;
   }
 
