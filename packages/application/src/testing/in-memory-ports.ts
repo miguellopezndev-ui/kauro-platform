@@ -568,6 +568,12 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
         return [...s.targetContracts.values()].find((t) => t.agencyId === agencyId && t.projectId === projectId && t.bodyHash === hash) ?? null;
       },
       findLatestForProject: () => notInMemory("TargetContractRepository.findLatestForProject"),
+      getArtifact: () => notInMemory("TargetContractRepository.getArtifact"),
+      getLifecycle: () => notInMemory("TargetContractRepository.getLifecycle"),
+      lockLifecycle: () => notInMemory("TargetContractRepository.lockLifecycle"),
+      getBody: () => notInMemory("TargetContractRepository.getBody"),
+      createDraft: () => notInMemory("TargetContractRepository.createDraft"),
+      confirm: () => notInMemory("TargetContractRepository.confirm"),
     },
     plans: {
       async get(planId: PlanId) {

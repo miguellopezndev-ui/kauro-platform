@@ -114,6 +114,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // package B10 (failure-matrix lane 6c): sales and attribution changes ordered with the commands resting on them (tail vs designation,
     // identity assurance, agreement changes, the activation's step-up at COMMIT)
     "0049_b10g6c_sales_ordering.sql",
+    // package B17: CMD018 CreateTargetContract and CMD019 ConfirmTargetContract (target artifacts, the contract's version and confirmation columns)
+    "0050_b17_target_contracts.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

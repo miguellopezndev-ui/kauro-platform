@@ -11,7 +11,7 @@ import type { AuditState } from "@kauro/domain";
 import type { CommandResult } from "../api/envelope.js";
 import type { CommandHandler, CommandSpec } from "../ports/command-handler.js";
 import type { PlanView } from "../api/views.js";
-import type { AuditView } from "./views.js";
+import type { AuditView, TargetContractView } from "./views.js";
 
 function spec<Body>(s: CommandSpec<Body>): CommandSpec<Body> {
   return Object.freeze(s);
@@ -120,7 +120,57 @@ export const VALIDATE_PLAN: CommandSpec<ValidatePlanBody> = spec<ValidatePlanBod
 });
 export type ValidatePlanHandler = CommandHandler<ValidatePlanBody, never>;
 
+// --- CMD018 CreateTargetContract ------------------------------------------------------------------------------------------------
+
+export interface CreateTargetContractBody {
+  /** The admitted structured metadata artifact of the project's target instance: data, never executable schema. */
+  readonly metadataArtifactRef: string;
+  /** The importer profile the contract is qualified against. */
+  readonly importerProfileId: string;
+}
+export const CREATE_TARGET_CONTRACT: CommandSpec<CreateTargetContractBody> = spec<CreateTargetContractBody>({
+  id: "CMD018",
+  name: "CreateTargetContract",
+  method: "POST",
+  path: "/api/v1/projects/{projectId}/target-contracts",
+  role: "AGENCY_OPERATOR",
+  scope: "AGENCY_HEADER",
+  aggregateParam: "projectId",
+  expectedVersionRequired: false,
+  stepUpRequired: false,
+  authorityHashFields: [],
+  fields: ["metadataArtifactRef", "importerProfileId"],
+});
+export type CreateTargetContractHandler = CommandHandler<CreateTargetContractBody, TargetContractView>;
+
+// --- CMD019 ConfirmTargetContract -----------------------------------------------------------------------------------------------
+
+export interface ConfirmTargetContractBody {
+  /** The contract's version (TargetContract.version: the fence between a confirmation and a concurrent one). */
+  readonly expectedVersion: number;
+  /** The body digest the confirming actor was shown: a digest that is not the stored body's is a stale request, never a confirmation of unseen content. */
+  readonly bodyHash: string;
+  /** The evidence of what was disclosed to the confirming actor (the complete body and the destination scope). */
+  readonly confirmationEvidenceRef: string;
+}
+export const CONFIRM_TARGET_CONTRACT: CommandSpec<ConfirmTargetContractBody> = spec<ConfirmTargetContractBody>({
+  id: "CMD019",
+  name: "ConfirmTargetContract",
+  method: "POST",
+  path: "/api/v1/target-contracts/{contractId}/confirm",
+  role: "AGENCY_APPROVER",
+  scope: "AGENCY_HEADER",
+  aggregateParam: "contractId",
+  expectedVersionRequired: true,
+  stepUpRequired: false,
+  authorityHashFields: [],
+  fields: ["expectedVersion", "bodyHash", "confirmationEvidenceRef"],
+});
+export type ConfirmTargetContractHandler = CommandHandler<ConfirmTargetContractBody, TargetContractView>;
+
 export const AUDIT_COMMANDS = Object.freeze({
+  CMD018: CREATE_TARGET_CONTRACT,
+  CMD019: CONFIRM_TARGET_CONTRACT,
   CMD020: START_AUDIT,
   CMD021: CANCEL_AUDIT,
   CMD022: CREATE_PLAN,
@@ -129,6 +179,8 @@ export const AUDIT_COMMANDS = Object.freeze({
 export type AuditCommandId = keyof typeof AUDIT_COMMANDS;
 
 export interface AuditHandlers {
+  readonly CMD018: CreateTargetContractHandler;
+  readonly CMD019: ConfirmTargetContractHandler;
   readonly CMD020: StartAuditHandler;
   readonly CMD021: CancelAuditHandler;
   readonly CMD022: CreatePlanHandler;

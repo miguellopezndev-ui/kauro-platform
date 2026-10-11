@@ -17,6 +17,7 @@ import { COMMERCE_FAILURE_REASONS } from "../commerce/failure-reasons.js";
 import { COMMERCIAL_FAILURE_REASONS } from "../commercial/failure-reasons.js";
 import { EXECUTION_FAILURE_REASONS } from "./execution/failure-reasons.js";
 import { AUDIT_FAILURE_REASONS } from "./audit/failure-reasons.js";
+import { TARGET_FAILURE_REASONS } from "./target-contract.js";
 
 export const FAILURE_CODES = [
   "INVALID_REQUEST",
@@ -298,6 +299,8 @@ export const FAILURE_REASONS = [
   ...AUDIT_FAILURE_REASONS,
   // agency recurrence and commissions (package B10; docs/design/B10-commercial-domain.md §12)
   ...COMMERCIAL_FAILURE_REASONS,
+  // target contracts (package B17: CMD018, CMD019)
+  ...TARGET_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

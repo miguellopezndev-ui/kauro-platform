@@ -28,6 +28,10 @@ function schema(command: string, required: ReadonlyArray<string>, properties: Re
 }
 
 export const AUDIT_REQUEST_SCHEMAS = Object.freeze({
+  /** CreateTargetContract. */
+  CMD018: schema("CMD018", ["metadataArtifactRef", "importerProfileId"], { metadataArtifactRef: ID, importerProfileId: ID }),
+  /** ConfirmTargetContract. */
+  CMD019: schema("CMD019", ["expectedVersion", "bodyHash", "confirmationEvidenceRef"], { expectedVersion: VERSION, bodyHash: HASH, confirmationEvidenceRef: ID }),
   /** StartAudit. */
   CMD020: schema("CMD020", ["targetContractId", "auditPolicyVersion"], { targetContractId: ID, auditPolicyVersion: LABEL }),
   /** CancelAudit. */

@@ -239,3 +239,5 @@ export * from "./model/execution/index.js";
 
 // audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; docs/design/B08-audit-approval-jobs.md)
 export * from "./model/audit/index.js";
+// target contracts (package B17: CMD018, CMD019)
+export * from "./model/target-contract.js";

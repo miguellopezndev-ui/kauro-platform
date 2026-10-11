@@ -7,6 +7,8 @@
 import type { AuditHandlers } from "../contracts.js";
 import type { CoreServices } from "../core-services.js";
 import { cancelAuditHandler } from "./cancel-audit.js";
+import { confirmTargetContractHandler } from "./confirm-target-contract.js";
+import { createTargetContractHandler } from "./create-target-contract.js";
 import { createPlanHandler } from "./create-plan.js";
 import { startAuditHandler } from "./start-audit.js";
 import { validatePlanHandler } from "./validate-plan.js";
@@ -14,6 +16,8 @@ import type { AuditRuntime } from "./shared.js";
 
 export function createAuditHandlers(runtime: AuditRuntime, cores: CoreServices): AuditHandlers {
   return Object.freeze({
+    CMD018: createTargetContractHandler(runtime),
+    CMD019: confirmTargetContractHandler(runtime),
     CMD020: startAuditHandler(runtime),
     CMD021: cancelAuditHandler(runtime),
     CMD022: createPlanHandler(runtime, cores.planCompiler),
@@ -25,4 +29,4 @@ export type { AuditRuntime } from "./shared.js";
 export { createAuditReadHandlers, type AuditReadHandlers } from "./reads.js";
 export { AUDIT_INTAKE_ROUTES, DECISION_ARTIFACT_INTAKE_ROLE, DECISION_DOCUMENT_MAX_BYTES, createAuditIntakeHandlers, type AuditIntakeHandlers, type AuditReadRuntime } from "./intake.js";
 export { AGENCY_CANCELLED_REASON } from "./cancel-audit.js";
-export { auditActions, auditView } from "./projections.js";
+export { auditActions, auditView, targetContractActions, targetContractView } from "./projections.js";
