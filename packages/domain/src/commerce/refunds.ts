@@ -112,6 +112,9 @@ export function taxRemainingAfter(allocation: Pick<RefundComponents, "serviceCen
 export function refundTaxFor(allocation: RefundComponents, committed: RefundComponents, serviceCents: bigint, rule: TaxRuleSnapshot): bigint {
   const basisAfter = allocation.serviceCents - committed.serviceCents - serviceCents;
   if (basisAfter < 0n) throw new RangeError("the refund exceeds the remaining service basis");
+  // B09-TAX-ROUNDING: the tax follows the service refunded; a refund with no service carries none, and a rounding cent a failed booked
+  // refund left unreturned stays with the remaining balance until the refund that takes the service it belongs to.
+  if (serviceCents === 0n) return 0n;
   return assertMoney(allocation.taxCents - taxRemainingAfter(allocation, basisAfter, rule) - committed.taxCents);
 }
 

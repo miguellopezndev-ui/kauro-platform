@@ -1971,6 +1971,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | EXECUTION_STARTED | — | always | COMMAND | the paid execution has started: the entitlement can no longer be re-bound to a replacement (R2-092) |
 | 409 | PRECONDITION_FAILED | REPLACEMENT_SCOPE_CHANGED | — | always | COMMAND | the replacement is not of the paid mode, target and band: current.mismatch carries the base comparison; a larger scope is charged only after a refund and a new accepted quote (R2-093) |
 | 409 | PRECONDITION_FAILED | REPLACEMENT_ALLOWANCE_SPENT | — | always | COMMAND | the one included pre-execution source replacement of this purchase is spent |
+| 409 | PRECONDITION_FAILED | UNLISTED_TRANSITION | — | — | COMMAND | the live quote cannot be superseded: a purchase of it still stands (a capture of it is in flight, or its refunds have not returned every service and tax cent); nothing is written and the refusal is final until the purchase is settled |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 422 | CAPABILITY_UNAVAILABLE | ENVELOPE_NOT_OFFERED | — | — | COMMAND | the billable units are beyond the offered launch envelope (a band above capacity.launchSourceUnits) |

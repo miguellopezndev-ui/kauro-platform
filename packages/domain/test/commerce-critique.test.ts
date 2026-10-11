@@ -423,3 +423,24 @@ test("B09-N5 (D-FISC-B4, D-FISC-B6): every document of a sale takes the version 
   assert.equal(saleProfileAt([unknownAtSale], saleTaxPoint), unknownAtSale, "while unresolved, the unknown records its blocker");
   assert.equal(saleProfileAt([reReview], saleTaxPoint), null, "nothing in force at the tax point");
 });
+
+test("B09-TAX-ROUNDING (KP012): after a failed booked refund the committed tax is one cent short, and a refund with zero service still carries zero tax — the cent stays with the remaining service and is returned by the refund that takes it", () => {
+  // service 100, tax 19 at 19%: R1 books 5 service/1 tax (then FAILS), R2 books 5 service/0 tax (cumulative: rule(90)=17 -> 19-17-1... see below)
+  const allocation = { serviceCents: 100n, taxCents: 19n, excessCents: 0n };
+  const rh = (basis: bigint): bigint => roundHalfUpBps(basis, 1900);
+  let found = false;
+  for (let s = 1n; s * 2n < 100n && !found; s += 1n) {
+    const t1 = 19n - rh(100n - s);
+    const t2 = 19n - rh(100n - 2n * s) - t1;
+    if (t2 >= t1) continue;
+    found = true;
+    // R1 failed: only R2 stays committed, short of what its own service would release by t1 - t2
+    const committed = { serviceCents: s, taxCents: t2, excessCents: 0n };
+    assert.equal(refundTaxFor(allocation, committed, 0n, RULE_19), 0n, "a service-0 refund carries no tax even though the cumulative rule is one cent in arrears");
+    assert.deepEqual(checkRefundTax(allocation, committed, { serviceCents: 0n, taxCents: 0n, excessCents: 0n }, RULE_19), { kind: "OK" });
+    assert.deepEqual(checkRefundTax(allocation, committed, { serviceCents: 0n, taxCents: 1n, excessCents: 0n }, RULE_19), { kind: "TAX_INCONSISTENT", expectedTaxCents: 0n });
+    // the refund that takes the remaining service returns the whole remaining tax, the cent included: the sum ends at exactly the collected tax
+    assert.equal(refundTaxFor(allocation, committed, 100n - s, RULE_19), 19n - t2);
+  }
+  assert.ok(found, "a path-dependent pair exists for service 100 / tax 19");
+});

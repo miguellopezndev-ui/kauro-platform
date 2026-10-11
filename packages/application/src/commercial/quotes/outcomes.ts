@@ -26,6 +26,7 @@ export const CREATE_QUOTE_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freez
   outcome("COMMAND", "PRECONDITION_FAILED", "EXECUTION_STARTED", "the paid execution has started: the entitlement can no longer be re-bound to a replacement (R2-092)", { current: "ALWAYS" }),
   outcome("COMMAND", "PRECONDITION_FAILED", "REPLACEMENT_SCOPE_CHANGED", "the replacement is not of the paid mode, target and band: current.mismatch carries the base comparison; a larger scope is charged only after a refund and a new accepted quote (R2-093)", { current: "ALWAYS" }),
   outcome("COMMAND", "PRECONDITION_FAILED", "REPLACEMENT_ALLOWANCE_SPENT", "the one included pre-execution source replacement of this purchase is spent", { current: "ALWAYS" }),
+  outcome("COMMAND", "PRECONDITION_FAILED", "UNLISTED_TRANSITION", "the live quote cannot be superseded: a purchase of it still stands (a capture of it is in flight, or its refunds have not returned every service and tax cent); nothing is written and the refusal is final until the purchase is settled"),
   outcome("COMMAND", "INTEGRITY_FAILURE", "PROVIDER_SERVICES_UNAVAILABLE", "no payment service or re-binder is bound in this edition: a replacement of a paid purchase writes nothing"),
   outcome("COMMAND", "INTEGRITY_FAILURE", "PLAN_SERVICES_UNAVAILABLE", "no source availability reader is bound in this edition"),
 ]);
