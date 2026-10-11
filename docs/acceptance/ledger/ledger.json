@@ -1,0 +1,4677 @@
+{
+ "cases": [
+  {
+   "case": "R2-115",
+   "package": "B00",
+   "gate": "G-FACTS",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-116",
+   "package": "B00",
+   "gate": "G-FACTS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-117",
+   "package": "B00",
+   "gate": "G-FACTS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-118",
+   "package": "B00",
+   "gate": "G-FACTS",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "MC-01",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "MC-02",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "MC-03",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "MC-04",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "MC-05",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "MC-06",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S021",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S022",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S023",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S025",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S026",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S027",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S028",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S029",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S030",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S031",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S032",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-001",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-002",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-003",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-004",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-005",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-006",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-007",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-008",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-009",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "PLANNED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-010",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-011",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-012",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-013",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD024-OK",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD024-DENY",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD024-RACE",
+   "package": "B01",
+   "gate": "G-MC-SEMANTICS",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "MC-07",
+   "package": "B02",
+   "gate": "G-MC-RELEASE",
+   "claimed": "SIMULATED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S034",
+   "package": "B02",
+   "gate": "G-MC-RELEASE",
+   "claimed": "PLANNED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S092",
+   "package": "B02",
+   "gate": "G-MC-RELEASE",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-014",
+   "package": "B02",
+   "gate": "G-CAPACITY",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-015",
+   "package": "B02",
+   "gate": "G-CAPACITY",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-016",
+   "package": "B02",
+   "gate": "G-CAPACITY",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-017",
+   "package": "B02",
+   "gate": "G-MC-RELEASE",
+   "claimed": "PLANNED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-01",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-02",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-03",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-04",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-05",
+   "package": "B03",
+   "gate": "G-IC-PRIVACY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-06",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-07",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-08",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-09",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-12",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S036",
+   "package": "B03",
+   "gate": "G-IC-PRIVACY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S037",
+   "package": "B03",
+   "gate": "G-IC-PRIVACY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S038",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S039",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S040",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S041",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S095",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CAP01",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CAP02",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CAP03",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CAP04",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CAP05",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CAP06",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CAP07",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CAP08",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CAP09",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CAP10",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CAP11",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CAP12",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-027",
+   "package": "B03",
+   "gate": "G-IC-PRIVACY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-028",
+   "package": "B03",
+   "gate": "G-IC-PRIVACY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-029",
+   "package": "B03",
+   "gate": "G-IC-PRIVACY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-030",
+   "package": "B03",
+   "gate": "G-IC-PRIVACY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-031",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-032",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-033",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-034",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-035",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-036",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-037",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-038",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD020-OK",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD020-DENY",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD020-RACE",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD021-OK",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD021-DENY",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD021-RACE",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD022-OK",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD022-DENY",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD022-RACE",
+   "package": "B03",
+   "gate": "G-IC-KERNEL",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-10",
+   "package": "B04",
+   "gate": "G-IC-QUALITY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-11",
+   "package": "B04",
+   "gate": "G-IC-QUALITY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "IC-13",
+   "package": "B04",
+   "gate": "G-IC-QUALITY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S042",
+   "package": "B04",
+   "gate": "G-IC-QUALITY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S043",
+   "package": "B04",
+   "gate": "G-IC-QUALITY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S044",
+   "package": "B04",
+   "gate": "G-IC-QUALITY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S091",
+   "package": "B04",
+   "gate": "G-IC-QUALITY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-039",
+   "package": "B04",
+   "gate": "G-IC-QUALITY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-040",
+   "package": "B04",
+   "gate": "G-IC-QUALITY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-041",
+   "package": "B04",
+   "gate": "G-IC-QUALITY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-042",
+   "package": "B04",
+   "gate": "G-IC-QUALITY",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S045",
+   "package": "B05",
+   "gate": "G-MONO",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S046",
+   "package": "B05",
+   "gate": "G-MONO",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S047",
+   "package": "B05",
+   "gate": "G-MONO",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S051",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S052",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S089",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S090",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S093",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-043",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-058",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-059",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD001-OK",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD001-DENY",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD001-RACE",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD009-OK",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD009-DENY",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD009-RACE",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD010-OK",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD010-DENY",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD010-RACE",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD011-OK",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD011-DENY",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD011-RACE",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD023-OK",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD023-DENY",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD023-RACE",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD025-OK",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD025-DENY",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD025-RACE",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD026-OK",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD026-DENY",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD026-RACE",
+   "package": "B06",
+   "gate": "G-DOMAIN",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S024",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S053",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S054",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-051",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-052",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD012-OK",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD012-DENY",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD012-RACE",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD013-OK",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD013-DENY",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD013-RACE",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD014-OK",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD014-DENY",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD014-RACE",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD015-OK",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD015-DENY",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD015-RACE",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD016-OK",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD016-DENY",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD016-RACE",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD017-OK",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD017-DENY",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD017-RACE",
+   "package": "B07",
+   "gate": "G-UPLOAD",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B07-round7-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S035",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "S055",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "S056",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "S061",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "S062",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "S075",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "R2-044",
+   "package": "B08",
+   "gate": "G-DOMAIN",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "R2-045",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "R2-046",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "CMD036-OK",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "CMD036-DENY",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "CMD036-RACE",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "CMD037-OK",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "CMD037-DENY",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "CMD037-RACE",
+   "package": "B08",
+   "gate": "G-JOB",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "S057",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S058",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S059",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S060",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-077",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-078",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-081",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-128",
+   "package": "B09",
+   "gate": "G-FISCAL_LOCAL",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-140",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD028-OK",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD028-DENY",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD028-RACE",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD029-OK",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD029-DENY",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD029-RACE",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD030-OK",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD030-DENY",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD030-RACE",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD031-OK",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD031-DENY",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD031-RACE",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD032-OK",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD032-DENY",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD032-RACE",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD033-OK",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD033-DENY",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD033-RACE",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD034-OK",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD034-DENY",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD034-RACE",
+   "package": "B09",
+   "gate": "G-PAYMENT",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B09-round5-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-079",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-080",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-086",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-087",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-088",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-089",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-090",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-091",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-092",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-093",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-094",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-095",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-096",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-097",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-098",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-099",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-100",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-101",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-102",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-103",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-104",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-105",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-127",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-136",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-137",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-138",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-139",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-141",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD002-OK",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD002-DENY",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD002-RACE",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD027-OK",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD027-DENY",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD027-RACE",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD043-OK",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD043-DENY",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD043-RACE",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD045-OK",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD045-DENY",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD045-RACE",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD046-OK",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD046-DENY",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD046-RACE",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD047-OK",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD047-DENY",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD047-RACE",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD048-OK",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD048-DENY",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD048-RACE",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD049-OK",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD049-DENY",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD049-RACE",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD050-OK",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD050-DENY",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD050-RACE",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD051-OK",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD051-DENY",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD051-RACE",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD052-OK",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD052-DENY",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD052-RACE",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD053-OK",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD053-DENY",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD053-RACE",
+   "package": "B10",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S066",
+   "package": "B11",
+   "gate": "G-UX",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S067",
+   "package": "B11",
+   "gate": "G-UX",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S068",
+   "package": "B11",
+   "gate": "G-UX",
+   "claimed": "PLANNED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S069",
+   "package": "B11",
+   "gate": "G-UX",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S070",
+   "package": "B11",
+   "gate": "G-UX",
+   "claimed": "PLANNED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-062",
+   "package": "B11",
+   "gate": "G-UX_AGENCY",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-063",
+   "package": "B11",
+   "gate": "G-UX_AGENCY",
+   "claimed": "PLANNED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-064",
+   "package": "B11",
+   "gate": "G-UX_AGENCY",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-065",
+   "package": "B11",
+   "gate": "G-UX_AGENCY",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-134",
+   "package": "B11",
+   "gate": "G-UX_AGENCY",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD044-OK",
+   "package": "B11",
+   "gate": "G-UX",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD044-DENY",
+   "package": "B11",
+   "gate": "G-UX",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD044-RACE",
+   "package": "B11",
+   "gate": "G-UX",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-066",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-067",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-068",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-129",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-130",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-131",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-132",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-135",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD061-OK",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD061-DENY",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD061-RACE",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD062-OK",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD062-DENY",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD062-RACE",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD063-OK",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD063-DENY",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD063-RACE",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD064-OK",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD064-DENY",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD064-RACE",
+   "package": "B12",
+   "gate": "G-UX_PRIVATE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-069",
+   "package": "B13",
+   "gate": "G-REPORT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-070",
+   "package": "B13",
+   "gate": "G-REPORT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-071",
+   "package": "B13",
+   "gate": "G-REPORT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD008-OK",
+   "package": "B13",
+   "gate": "G-REPORT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD008-DENY",
+   "package": "B13",
+   "gate": "G-REPORT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD008-RACE",
+   "package": "B13",
+   "gate": "G-REPORT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD039-OK",
+   "package": "B13",
+   "gate": "G-REPORT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD039-DENY",
+   "package": "B13",
+   "gate": "G-REPORT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD039-RACE",
+   "package": "B13",
+   "gate": "G-REPORT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S072",
+   "package": "B14",
+   "gate": "G-CLOUD",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S073",
+   "package": "B14",
+   "gate": "G-CLOUD",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S074",
+   "package": "B14",
+   "gate": "G-CLOUD",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-072",
+   "package": "B14",
+   "gate": "G-CLOUD",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-073",
+   "package": "B14",
+   "gate": "G-CLOUD",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-075",
+   "package": "B14",
+   "gate": "G-CLOUD",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-061",
+   "package": "B15",
+   "gate": "G-INTEGRATION",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-082",
+   "package": "B15",
+   "gate": "G-FISCAL",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-083",
+   "package": "B15",
+   "gate": "G-FISCAL",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-084",
+   "package": "B15",
+   "gate": "G-FISCAL",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-085",
+   "package": "B15",
+   "gate": "G-PAYMENT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-133",
+   "package": "B15",
+   "gate": "G-INTEGRATION",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD035-OK",
+   "package": "B15",
+   "gate": "G-FISCAL",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD035-DENY",
+   "package": "B15",
+   "gate": "G-FISCAL",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD035-RACE",
+   "package": "B15",
+   "gate": "G-FISCAL",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S048",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S049",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S050",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S063",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S064",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S065",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S071",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S076",
+   "package": "B16",
+   "gate": "G-SECURITY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S094",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-047",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-048",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-049",
+   "package": "B16",
+   "gate": "G-SECURITY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-050",
+   "package": "B16",
+   "gate": "G-SECURITY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-053",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-054",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-055",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-056",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-057",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-060",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-074",
+   "package": "B16",
+   "gate": "G-RECOVERY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-076",
+   "package": "B16",
+   "gate": "G-RECOVERY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-123",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-124",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-125",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-126",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD003-OK",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD003-DENY",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD003-RACE",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD004-OK",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD004-DENY",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD004-RACE",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD005-OK",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD005-DENY",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD005-RACE",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD006-OK",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD006-DENY",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD006-RACE",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD007-OK",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD007-DENY",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD007-RACE",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD038-OK",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD038-DENY",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD038-RACE",
+   "package": "B16",
+   "gate": "G-TENANT",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD042-OK",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD042-DENY",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD042-RACE",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD054-OK",
+   "package": "B16",
+   "gate": "G-SECURITY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD054-DENY",
+   "package": "B16",
+   "gate": "G-SECURITY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD054-RACE",
+   "package": "B16",
+   "gate": "G-SECURITY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD055-OK",
+   "package": "B16",
+   "gate": "G-SECURITY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD055-DENY",
+   "package": "B16",
+   "gate": "G-SECURITY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD055-RACE",
+   "package": "B16",
+   "gate": "G-SECURITY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD056-OK",
+   "package": "B16",
+   "gate": "G-RECOVERY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD056-DENY",
+   "package": "B16",
+   "gate": "G-RECOVERY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD056-RACE",
+   "package": "B16",
+   "gate": "G-RECOVERY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD057-OK",
+   "package": "B16",
+   "gate": "G-RECOVERY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD057-DENY",
+   "package": "B16",
+   "gate": "G-RECOVERY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD057-RACE",
+   "package": "B16",
+   "gate": "G-RECOVERY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD060-OK",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD060-DENY",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD060-RACE",
+   "package": "B16",
+   "gate": "G-DELETE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S033",
+   "package": "B17",
+   "gate": "G-CAPACITY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S077",
+   "package": "B17",
+   "gate": "G-CAPACITY",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S078",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-018",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-019",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-020",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-021",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-022",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-023",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-024",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-025",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-026",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD018-OK",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD018-DENY",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD018-RACE",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD019-OK",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD019-DENY",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD019-RACE",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD040-OK",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD040-DENY",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD040-RACE",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD041-OK",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD041-DENY",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD041-RACE",
+   "package": "B17",
+   "gate": "G-VENDOR",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S079",
+   "package": "B18",
+   "gate": "G-RELEASE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S080",
+   "package": "B18",
+   "gate": "G-RELEASE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S088",
+   "package": "B18",
+   "gate": "G-RELEASE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-113",
+   "package": "B18",
+   "gate": "G-RELEASE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-114",
+   "package": "B18",
+   "gate": "G-RELEASE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD058-OK",
+   "package": "B18",
+   "gate": "G-RELEASE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD058-DENY",
+   "package": "B18",
+   "gate": "G-RELEASE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD058-RACE",
+   "package": "B18",
+   "gate": "G-RELEASE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD059-OK",
+   "package": "B18",
+   "gate": "G-RELEASE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD059-DENY",
+   "package": "B18",
+   "gate": "G-RELEASE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD059-RACE",
+   "package": "B18",
+   "gate": "G-RELEASE",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S081",
+   "package": "B19",
+   "gate": "G-BUSINESS",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S082",
+   "package": "B19",
+   "gate": "G-BUSINESS",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S083",
+   "package": "B19",
+   "gate": "G-BUSINESS",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S084",
+   "package": "B19",
+   "gate": "G-BUSINESS",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S086",
+   "package": "B19",
+   "gate": "G-PRODUCTION",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S087",
+   "package": "B19",
+   "gate": "G-BUSINESS",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S096",
+   "package": "B19",
+   "gate": "G-BUSINESS",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-109",
+   "package": "B19",
+   "gate": "G-BUSINESS",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-110",
+   "package": "B19",
+   "gate": "G-BUSINESS",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-111",
+   "package": "B19",
+   "gate": "G-BUSINESS",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-119",
+   "package": "B19",
+   "gate": "G-PRODUCTION",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S085",
+   "package": "B20",
+   "gate": "G-OPERATING-MATURITY",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-106",
+   "package": "B20",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-107",
+   "package": "B20",
+   "gate": "G-COMMERCIAL",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-108",
+   "package": "B20",
+   "gate": "G-OPERATING-MATURITY",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-112",
+   "package": "B21",
+   "gate": "G-OPERATING-LOOP",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-120",
+   "package": "B21",
+   "gate": "G-OPERATING-LOOP",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-121",
+   "package": "B21",
+   "gate": "G-OPERATING-LOOP",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-122",
+   "package": "B21",
+   "gate": "G-OPERATING-LOOP",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "packages": [
+  {
+   "package": "B00",
+   "title": "Observed baseline and business readiness",
+   "cases": 4,
+   "counts": {
+    "NOT_EXECUTED": 2,
+    "EXECUTED_LOCAL": 2
+   },
+   "status": "IN_PROGRESS",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B01",
+   "title": "Migration semantics and hostile inputs",
+   "cases": 33,
+   "counts": {
+    "EXECUTED_LOCAL": 29,
+    "PLANNED": 1,
+    "PARTIAL": 3
+   },
+   "status": "IN_PROGRESS",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B02",
+   "title": "Migration qualification and distribution",
+   "cases": 7,
+   "counts": {
+    "SIMULATED": 1,
+    "PLANNED": 2,
+    "EXECUTED_LOCAL": 4
+   },
+   "status": "IN_PROGRESS",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B03",
+   "title": "Intelligence offline kernel and compiler",
+   "cases": 50,
+   "counts": {
+    "MISSING": 50
+   },
+   "status": "INCOMPLETE_MAP",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B04",
+   "title": "Model qualification and Intelligence release",
+   "cases": 11,
+   "counts": {
+    "MISSING": 11
+   },
+   "status": "INCOMPLETE_MAP",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B05",
+   "title": "Monorepo and shared contracts",
+   "cases": 3,
+   "counts": {
+    "NOT_EXECUTED": 3
+   },
+   "status": "NOT_STARTED",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B06",
+   "title": "Domain, database and authorization",
+   "cases": 29,
+   "counts": {
+    "EXECUTED_LOCAL": 18,
+    "PARTIAL": 11
+   },
+   "status": "REVIEW_ACCEPTED",
+   "acceptedSubject": {
+    "commit": "d9bbfd0",
+    "reviewId": "B06-round3-d9bbfd0"
+   },
+   "rounds": [
+    "REJECT a7203f0",
+    "ACCEPT 4b33e26",
+    "ACCEPT d9bbfd0"
+   ],
+   "waitingFor": "B05 → B02, B04 → B01, B03 → B00"
+  },
+  {
+   "package": "B07",
+   "title": "Upload, inspection and source lifecycle",
+   "cases": 23,
+   "counts": {
+    "PARTIAL": 12,
+    "EXECUTED_LOCAL": 11
+   },
+   "status": "REVIEW_ACCEPTED",
+   "acceptedSubject": {
+    "commit": "d9bbfd0",
+    "reviewId": "B07-round7-d9bbfd0"
+   },
+   "rounds": [
+    "REJECT 0f15636",
+    "REJECT 6b670e3",
+    "REJECT 77d5fa6",
+    "REJECT 09faf25",
+    "ACCEPT d23af32",
+    "ACCEPT 4b33e26",
+    "ACCEPT d9bbfd0"
+   ],
+   "waitingFor": "B06 → B05 → B02, B04 → B01, B03 → B00"
+  },
+  {
+   "package": "B08",
+   "title": "Audit, approval and processing authority",
+   "cases": 15,
+   "counts": {
+    "PARTIAL": 8,
+    "EXECUTED_LOCAL": 7
+   },
+   "status": "REVIEW_ACCEPTED",
+   "acceptedSubject": {
+    "commit": "88cf29d",
+    "reviewId": "B08-round3-88cf29d"
+   },
+   "rounds": [
+    "REJECT f49ca76",
+    "ACCEPT d9bbfd0",
+    "ACCEPT 88cf29d"
+   ],
+   "waitingFor": "B07 → B06 → B05 → B02, B04 → B01, B03 → B00"
+  },
+  {
+   "package": "B09",
+   "title": "Payments and fiscal workflow",
+   "cases": 30,
+   "counts": {
+    "PARTIAL": 23,
+    "EXECUTED_LOCAL": 7
+   },
+   "status": "REVIEW_ACCEPTED",
+   "acceptedSubject": {
+    "commit": "d9bbfd0",
+    "reviewId": "B09-round5-d9bbfd0"
+   },
+   "rounds": [
+    "REJECT 0f15636",
+    "ACCEPT 6b670e3",
+    "ACCEPT d23af32",
+    "ACCEPT 4b33e26",
+    "ACCEPT d9bbfd0"
+   ],
+   "waitingFor": "B06 → B05 → B02, B04 → B01, B03 → B00"
+  },
+  {
+   "package": "B10",
+   "title": "Agency recurrence and commission domain",
+   "cases": 64,
+   "counts": {
+    "EXECUTED_LOCAL": 53,
+    "PARTIAL": 11
+   },
+   "status": "IN_PROGRESS",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B11",
+   "title": "Public and agency application",
+   "cases": 13,
+   "counts": {
+    "PARTIAL": 8,
+    "PLANNED": 3,
+    "EXECUTED_LOCAL": 2
+   },
+   "status": "IN_PROGRESS",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B12",
+   "title": "Seller and owner application",
+   "cases": 20,
+   "counts": {
+    "NOT_EXECUTED": 20
+   },
+   "status": "NOT_STARTED",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B13",
+   "title": "Reports and package experience",
+   "cases": 9,
+   "counts": {
+    "NOT_EXECUTED": 9
+   },
+   "status": "NOT_STARTED",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B14",
+   "title": "Cloud foundation and actual worker host",
+   "cases": 6,
+   "counts": {
+    "NOT_EXECUTED": 6
+   },
+   "status": "NOT_STARTED",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B15",
+   "title": "Real external integration",
+   "cases": 9,
+   "counts": {
+    "NOT_EXECUTED": 9
+   },
+   "status": "NOT_STARTED",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B16",
+   "title": "Security and restoration qualification",
+   "cases": 61,
+   "counts": {
+    "NOT_EXECUTED": 61
+   },
+   "status": "NOT_STARTED",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B17",
+   "title": "Integrated capacity and target qualification",
+   "cases": 24,
+   "counts": {
+    "NOT_EXECUTED": 24
+   },
+   "status": "NOT_STARTED",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B18",
+   "title": "Final candidate and independent release audit",
+   "cases": 11,
+   "counts": {
+    "NOT_EXECUTED": 11
+   },
+   "status": "NOT_STARTED",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B19",
+   "title": "Commercial production activation",
+   "cases": 11,
+   "counts": {
+    "NOT_EXECUTED": 11
+   },
+   "status": "NOT_STARTED",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B20",
+   "title": "First customers and operating maturity",
+   "cases": 4,
+   "counts": {
+    "PLANNED_POST_B19": 4
+   },
+   "status": "NOT_STARTED",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  },
+  {
+   "package": "B21",
+   "title": "Continuing operation and growth handoff",
+   "cases": 4,
+   "counts": {
+    "PLANNED_POST_B19": 4
+   },
+   "status": "NOT_STARTED",
+   "acceptedSubject": null,
+   "rounds": [],
+   "waitingFor": ""
+  }
+ ],
+ "violations": [
+  {
+   "kind": "PLANNED_OUTSIDE_B20_B21",
+   "subject": "R2-009",
+   "detail": "MC@3b4b0aea4f18: PLANNED (PLANNED(M1))"
+  },
+  {
+   "kind": "PLANNED_OUTSIDE_B20_B21",
+   "subject": "S034",
+   "detail": "MC@3b4b0aea4f18: PLANNED (PLANNED(evidence))"
+  },
+  {
+   "kind": "PLANNED_OUTSIDE_B20_B21",
+   "subject": "R2-017",
+   "detail": "MC@3b4b0aea4f18: PLANNED (PLANNED(post-publication))"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-01",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-02",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-03",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-04",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-05",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-06",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-07",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-08",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-09",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-12",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "S036",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "S037",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "S038",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "S039",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "S040",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "S041",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "S095",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CAP01",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CAP02",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CAP03",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CAP04",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CAP05",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CAP06",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CAP07",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CAP08",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CAP09",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CAP10",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CAP11",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CAP12",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-027",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-028",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-029",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-030",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-031",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-032",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-033",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-034",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-035",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-036",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-037",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-038",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CMD020-OK",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CMD020-DENY",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CMD020-RACE",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CMD021-OK",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CMD021-DENY",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CMD021-RACE",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CMD022-OK",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CMD022-DENY",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "CMD022-RACE",
+   "detail": "B03: input IC-B03 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B03-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-10",
+   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-11",
+   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "IC-13",
+   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "S042",
+   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "S043",
+   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "S044",
+   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "S091",
+   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-039",
+   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-040",
+   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-041",
+   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
+  },
+  {
+   "kind": "MISSING_CASE",
+   "subject": "R2-042",
+   "detail": "B04: input IC-B04 unavailable (not pinned in docs/acceptance/ledger/inputs.json; pass --ic <checkout>/docs/design/B04-case-map.md@<sha>)"
+  },
+  {
+   "kind": "PLANNED_OUTSIDE_B20_B21",
+   "subject": "S068",
+   "detail": "docs/acceptance/case-maps/B11.json: PLANNED (**MISSING** — PLANNED (W6))"
+  },
+  {
+   "kind": "PLANNED_OUTSIDE_B20_B21",
+   "subject": "S070",
+   "detail": "docs/acceptance/case-maps/B11.json: PLANNED (**MISSING** — PLANNED (W10))"
+  },
+  {
+   "kind": "PLANNED_OUTSIDE_B20_B21",
+   "subject": "R2-063",
+   "detail": "docs/acceptance/case-maps/B11.json: PLANNED (**MISSING** — PLANNED (W9))"
+  },
+  {
+   "kind": "OWNER_DATE_MISSING",
+   "subject": "S085",
+   "detail": "B20: PLANNED_POST_B19 without the owner's date"
+  },
+  {
+   "kind": "OWNER_DATE_MISSING",
+   "subject": "R2-106",
+   "detail": "B20: PLANNED_POST_B19 without the owner's date"
+  },
+  {
+   "kind": "OWNER_DATE_MISSING",
+   "subject": "R2-107",
+   "detail": "B20: PLANNED_POST_B19 without the owner's date"
+  },
+  {
+   "kind": "OWNER_DATE_MISSING",
+   "subject": "R2-108",
+   "detail": "B20: PLANNED_POST_B19 without the owner's date"
+  },
+  {
+   "kind": "OWNER_DATE_MISSING",
+   "subject": "R2-112",
+   "detail": "B21: PLANNED_POST_B19 without the owner's date"
+  },
+  {
+   "kind": "OWNER_DATE_MISSING",
+   "subject": "R2-120",
+   "detail": "B21: PLANNED_POST_B19 without the owner's date"
+  },
+  {
+   "kind": "OWNER_DATE_MISSING",
+   "subject": "R2-121",
+   "detail": "B21: PLANNED_POST_B19 without the owner's date"
+  },
+  {
+   "kind": "OWNER_DATE_MISSING",
+   "subject": "R2-122",
+   "detail": "B21: PLANNED_POST_B19 without the owner's date"
+  },
+  {
+   "kind": "README_CLAIM_WITHOUT_REVIEW",
+   "subject": "B06",
+   "detail": "README names commit 4b33e26; the accepted subject is d9bbfd0 (B06-round3-d9bbfd0)"
+  },
+  {
+   "kind": "README_CLAIM_WITHOUT_REVIEW",
+   "subject": "B07",
+   "detail": "README names commit 4b33e26; the accepted subject is d9bbfd0 (B07-round7-d9bbfd0)"
+  },
+  {
+   "kind": "README_CLAIM_WITHOUT_REVIEW",
+   "subject": "B09",
+   "detail": "README names commit 4b33e26; the accepted subject is d9bbfd0 (B09-round5-d9bbfd0)"
+  }
+ ]
+}

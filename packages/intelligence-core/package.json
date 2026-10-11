@@ -1,0 +1,33 @@
+{
+  "name": "@kauro/intelligence-core",
+  "version": "0.1.0",
+  "description": "Kauro wrapper of the vendored Intelligence Core (kauro-intelligence-core, provisional 0.6.0 pin until the release): re-exports the core's root API exactly and is the only place the raw core may be imported; the core's ./benchmark subpath is never exposed (D5-1, D5-6, S045/S046).",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": false,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "kauro-intelligence-core": "0.6.0",
+    "kauro-migration-core": "3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2"
+  }
+}

@@ -240,7 +240,7 @@ export async function auditWorld(): Promise<AuditWorld> {
 
 /** The owner's funding act (Q8-1): the platform's monthly pool, on the control plane's own login. */
 export async function fundPool(aw: Pick<AuditWorld, "w" | "poolId">, ceilingCents = 22_000n): Promise<string> {
-  const client = await aw.w.h.controlPool.raw.connect();
+  const client = await aw.w.h.controlPool.connectUnverified();
   try {
     const poolId = await fundPlatformPool(client, { ceilingCents });
     aw.poolId = poolId;

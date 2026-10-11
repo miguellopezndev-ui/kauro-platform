@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { MigratorRoleError, PrivilegedRoleError, listMigrations } from "@kauro/persistence";
-import { ROLES, startTemporaryPostgres, type TemporaryPostgres } from "@kauro/persistence/testing";
+import { ROLES, databaseEnvironmentNameOf, startTemporaryPostgres, type TemporaryPostgres, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import { BearerTokenFileError, ConfigError, authenticatorOf, bootstrap, loadConfig, parseBearerTokenFile } from "../src/index.js";
 import { statementTimeoutOf } from "../src/config.js";
 import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
@@ -107,13 +107,16 @@ test("configuration: every variable is validated and a missing or malformed one 
   assert.throws(() => loadConfig(envOf({ KAURO_DB_MIGRATE_ON_START: "true" })), configError("KAURO_DB_MIGRATOR_USER"));
   assert.throws(() => loadConfig(envOf({ KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.appLogin })), configError("KAURO_DB_MIGRATOR_USER"));
   // the LOCAL bearer-token file is refused outside LOCAL
-  assert.throws(() => loadConfig(envOf({ KAURO_ENVIRONMENT: "SANDBOX", KAURO_AUTH_BEARER_TOKENS_FILE: "tokens.json" })), configError("KAURO_AUTH_BEARER_TOKENS_FILE"));
+  assert.throws(() => loadConfig(envOf({ KAURO_ENVIRONMENT: "SANDBOX", KAURO_DB_HOST: "localhost", KAURO_AUTH_BEARER_TOKENS_FILE: "tokens.json" })), configError("KAURO_AUTH_BEARER_TOKENS_FILE"));
   // secrets never appear in a refusal
   assert.throws(() => loadConfig(envOf({ KAURO_DB_PASSWORD: "hunter2-secret", KAURO_DB_POOL_MAX: "99" })), (e: unknown) => configError("KAURO_DB_POOL_MAX")(e) && !(e as Error).message.includes("hunter2"));
   // a complete LOCAL environment with its defaults
   const config = loadConfig(envOf({ KAURO_DB_HOST: undefined, KAURO_DB_NAME: undefined, KAURO_HTTP_HOST: undefined, KAURO_HTTP_PORT: undefined }));
+  // the connection environment is the branded value minted from KAURO_ENVIRONMENT (DB-TLS gap 2): a plain object or another name fails here
+  assert.equal(databaseEnvironmentNameOf(config.databaseEnvironment), "LOCAL");
   assert.deepEqual(config, {
     environment: "LOCAL",
+    databaseEnvironment: testDatabaseEnvironment("LOCAL"),
     http: { host: "127.0.0.1", port: 3000, trustedProxyHops: 0, requestTimeoutMs: 30_000, connectionTimeoutMs: 60_000, shutdownDeadlineMs: 8_000 },
     database: { host: "127.0.0.1", port: pg.port, database: "kauro", user: ROLES.appLogin, poolMax: 2, statementTimeoutMs: 10_000 },
     migrateOnStart: null,
@@ -143,8 +146,8 @@ test("authentication of this edition: the LOCAL bearer-token file is a closed do
   refused(JSON.stringify({ subjects: [{ ...entry, token: "short" }] }), "16..512");
   for (const environment of ["SANDBOX", "LIVE"]) {
     // outside LOCAL the list cursors' key is a required shared secret (N16); with it, the missing verifier refuses the start
-    assert.throws(() => loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1" })), configError("KAURO_API_CURSOR_KEY_FILE"), environment);
-    assert.throws(() => authenticatorOf(loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: "cursor.key" }))), configError("KAURO_ENVIRONMENT"), environment);
+    assert.throws(() => loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_DB_HOST: "localhost", KAURO_HTTP_TRUSTED_PROXY_HOPS: "1" })), configError("KAURO_API_CURSOR_KEY_FILE"), environment);
+    assert.throws(() => authenticatorOf(loadConfig(envOf({ KAURO_ENVIRONMENT: environment, KAURO_DB_HOST: "localhost", KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_API_CURSOR_KEY_FILE: "cursor.key", KAURO_DB_TLS_CA_FILE: "ca.pem", KAURO_DB_PASSWORD_FILE: "pw" }))), configError("KAURO_ENVIRONMENT"), environment);
   }
   assert.throws(() => authenticatorOf(loadConfig(envOf())), configError("KAURO_AUTH_BEARER_TOKENS_FILE"));
 });
@@ -180,7 +183,7 @@ test("bootstrap on a real cluster: migrations on start as the owner (idempotent)
     }
     await api.close();
     closed = true;
-    assert.equal(api.database.pool.raw.ended, true, "close() ends the pool");
+    assert.equal(api.database.pool.ended, true, "close() ends the pool");
     await assert.rejects(fetch(`${api.address}/api/v1/agencies`, { method: "POST" }), "the socket is closed");
   } finally {
     if (!closed) await api.close();

@@ -1,0 +1,8 @@
+{
+ "note": "The case maps of the core libraries, each pinned to its repository path and commit (A4: the ledger reads them at pinned commits). B sets the commit of each input to the commit under review; `node tools/ledger.mjs --mc|--ic <checkout>/<path>@<sha> --write` writes its snapshot to external/<id>-<sha12>.json. A null commit is an input not yet pinned: its packages' cases are MISSING until it is.",
+ "external": [
+  { "id": "MC", "flag": "mc", "repository": "miguellopezndev-ui/kauro-migration-core", "path": "docs/design/B01-B02-case-map.md", "commit": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4", "format": "table", "packages": ["B01", "B02"] },
+  { "id": "IC-B03", "flag": "ic", "repository": "miguellopezndev-ui/kauro-intelligence-core", "path": "docs/design/B03-case-map.md", "commit": null, "format": "status-blocks", "packages": ["B03"] },
+  { "id": "IC-B04", "flag": "ic", "repository": "miguellopezndev-ui/kauro-intelligence-core", "path": "docs/design/B04-case-map.md", "commit": null, "format": "status-blocks", "packages": ["B04"] }
+ ]
+}

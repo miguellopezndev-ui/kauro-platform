@@ -1,0 +1,47 @@
+{
+ "package": "B20",
+ "generatedBy": "node tools/ledger.mjs sidecars --write",
+ "source": {
+  "file": null,
+  "registry": "packages/contracts/registry/program.json",
+  "note": "post-launch package: PLANNED_POST_B19 until the owner dates it"
+ },
+ "rows": [
+  {
+   "case": "S085",
+   "class": "PLANNED_POST_B19",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "ownerDate": null
+  },
+  {
+   "case": "R2-106",
+   "class": "PLANNED_POST_B19",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "ownerDate": null
+  },
+  {
+   "case": "R2-107",
+   "class": "PLANNED_POST_B19",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "ownerDate": null
+  },
+  {
+   "case": "R2-108",
+   "class": "PLANNED_POST_B19",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "ownerDate": null
+  }
+ ]
+}

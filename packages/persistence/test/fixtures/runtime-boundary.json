@@ -608,6 +608,18 @@
           "updated_at"
         ]
       },
+      "kauro.leases": {
+        "SELECT": [
+          "expires_at",
+          "fence",
+          "owner_id",
+          "resource_id",
+          "resource_kind"
+        ],
+        "UPDATE": [
+          "resource_id"
+        ]
+      },
       "kauro.outbox_records": {
         "SELECT": [
           "consumer",
@@ -3194,6 +3206,22 @@
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())",
+      "check": null
+    },
+    "leases/leases_commission_lock": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "(resource_kind = 'OUTBOX_DISPATCH'::text)",
+      "check": "false"
+    },
+    "leases/leases_commission_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "(resource_kind = 'OUTBOX_DISPATCH'::text)",
       "check": null
     },
     "leases/leases_control": {

@@ -38,6 +38,9 @@
   "serverOnlyImport": "server-only",
   "environmentReaders": ["\\bprocess\\s*(\\?\\.|\\.)\\s*env\\b", "\\bprocess\\s*\\[\\s*[\"']env[\"']\\s*\\]", "\\bimport\\.meta\\.env\\b", "\\{[^}]*\\benv\\b[^}]*\\}\\s*=\\s*process\\b"],
   "forbiddenInClientBundles": { "directives": ["use server", "use cache"], "specifiers": ["next/og"] },
-  "serverOnlyPackages": ["pg", "fastify", "@kauro/persistence", "@kauro/data-plane", "@kauro/application", "@kauro/domain", "@kauro/authorization"],
+  "serverOnlyPackages": ["pg", "fastify", "@kauro/migration-core", "@kauro/intelligence-core", "kauro-migration-core", "kauro-intelligence-core", "@kauro/persistence", "@kauro/data-plane", "@kauro/application", "@kauro/domain", "@kauro/authorization"],
+  "$commentRawCores": "B05 D5-1/D5-6 (S046). Each vendored core (a pinned tarball under vendor/) is importable only by its wrapper package, at the root; the wrapper re-exports the core's root API and nothing else. rawCoreForbiddenSubpaths are never imported by production source, not even by the wrapper (the IC campaign surface).",
+  "rawCores": { "kauro-migration-core": "@kauro/migration-core", "kauro-intelligence-core": "@kauro/intelligence-core" },
+  "rawCoreForbiddenSubpaths": ["/benchmark"],
   "credentialPatterns": ["DATABASE_URL", "PAYPAL_CLIENT_SECRET", "SERVICE_ACCOUNT_KEY", "PRIVATE_KEY", "process\\.env\\.[A-Z0-9_]*(SECRET|TOKEN|PASSWORD|KEY)"]
 }

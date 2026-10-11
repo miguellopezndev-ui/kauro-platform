@@ -16,8 +16,8 @@ import { join } from "node:path";
 import type { CancellationChannel, CoreEvidenceClass, ExecutionLimits, ValidatePort, ValidateResult } from "@kauro/application";
 import { DOMAINS, canonicalBytes, isSha256Hex, rawDigest, structuredDigest, type RowCounts, type Sha256Hex, type UtcInstant } from "@kauro/contracts";
 import { AttemptScratchStore } from "@kauro/data-plane";
-import type { AgencyId, PlanBody, PlanId, ValidationReceiptId, ValidationReceiptRecord } from "@kauro/domain";
-import { PgValidationReceiptRecorder, createPool, type PoolErrorSink } from "@kauro/persistence";
+import type { AgencyId, Environment, PlanBody, PlanId, ValidationReceiptId, ValidationReceiptRecord } from "@kauro/domain";
+import { PgValidationReceiptRecorder, createPool, type DatabaseEnvironment, type PoolErrorSink } from "@kauro/persistence";
 
 /** The validator's write path: one append-only receipt, recorded by kauro_validator (persistence's PgValidationReceiptRecorder). */
 export interface ValidationReceipts {
@@ -217,6 +217,10 @@ export interface ValidatorDatabaseConfig {
   readonly database: string;
   readonly user: string;
   readonly password?: string;
+  /** Outside LOCAL the connection is certificate-verified and its password is a file (I-2, I-3): see connectionSecurityOf. */
+  readonly environment: DatabaseEnvironment;
+  readonly passwordFile?: string;
+  readonly tlsCaFile?: string;
   readonly poolMax: number;
   readonly onPoolError?: PoolErrorSink;
 }
@@ -231,7 +235,11 @@ export async function openValidatorReceipts(config: ValidatorDatabaseConfig, app
     port: config.port,
     database: config.database,
     user: config.user,
+    // createPool applies connectionSecurityOf itself (DB-TLS-R4): TLS, DNS host and the password file outside LOCAL
+    environment: config.environment,
     ...(config.password === undefined ? {} : { password: config.password }),
+    ...(config.passwordFile === undefined ? {} : { passwordFile: config.passwordFile }),
+    ...(config.tlsCaFile === undefined ? {} : { tlsCaFile: config.tlsCaFile }),
     max: config.poolMax,
     applicationName,
     ...(config.onPoolError === undefined ? {} : { onError: config.onPoolError }),

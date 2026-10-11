@@ -29,7 +29,7 @@ import type { UtcInstant } from "@kauro/contracts";
 import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
+import { bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, type DatabaseEnvironment, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import { commercialPrincipalReader } from "./commercial-principals.js";
 import type { ApiConfig, IdentityConfig, MigratorConfig } from "./config.js";
@@ -104,16 +104,17 @@ export interface DatabaseDependencies {
  * Applies every pending migration as `migrator` on its own bounded connection (R37), closed afterwards: the LOCAL migrations on
  * start and the one-shot migration job (migration-job.ts). `password` is handed to that connection only; nothing keeps it.
  */
-export function applyMigrationsWith(migrator: MigratorConfig, password: string | undefined): Promise<ApplyResult> {
-  const { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs, passwordFile: _passwordFile, ...connection } = migrator;
+export function applyMigrationsWith(environment: DatabaseEnvironment, migrator: MigratorConfig, password: string | undefined): Promise<ApplyResult> {
+  const { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs, passwordFile: _passwordFile, tlsCaFile, ...connection } = migrator;
+  // the migrator's credential is its own (N7): applyMigrationsAs applies connectionSecurityOf and requires it explicitly outside LOCAL (DB-TLS-R4, ADV-9)
   return applyMigrationsAs(
-    { ...connection, ...(password === undefined ? {} : { password }), applicationName: `${API_APPLICATION_NAME}-migrator` },
+    { ...connection, environment, ...(password === undefined ? {} : { password }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), applicationName: `${API_APPLICATION_NAME}-migrator` },
     { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs },
   );
 }
 
 /** What opening the database needs from the configuration (the session boundary's login, when it is bound). */
-export type DatabaseConfig = Pick<ApiConfig, "database" | "migrateOnStart"> & { readonly identity?: Pick<IdentityConfig, "assuranceDatabase"> | null };
+export type DatabaseConfig = Pick<ApiConfig, "databaseEnvironment" | "database" | "migrateOnStart"> & { readonly identity?: Pick<IdentityConfig, "assuranceDatabase"> | null };
 
 /**
  * Opens the database side of the process: applies pending migrations as the migrator when configured (its own connection,
@@ -127,9 +128,10 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   const shipped = listMigrations();
   const codeSchemaVersion = shipped.reduce((max, f) => Math.max(max, f.version), 0);
   let migrations: ApplyResult | null = null;
-  if (config.migrateOnStart !== null) migrations = await applyMigrationsWith(config.migrateOnStart, deps.migratorPassword);
-  const { poolMax, statementTimeoutMs, ...connection } = config.database;
-  const pool = createPool({ ...connection, max: poolMax, applicationName: API_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+  if (config.migrateOnStart !== null) migrations = await applyMigrationsWith(config.databaseEnvironment, config.migrateOnStart, deps.migratorPassword);
+  const { poolMax, statementTimeoutMs, tlsCaFile, password, passwordFile, ...connection } = config.database;
+  // createPool applies connectionSecurityOf itself (DB-TLS-R4): TLS, DNS host and the password file outside LOCAL
+  const pool = createPool({ ...connection, environment: config.databaseEnvironment, ...(password === undefined ? {} : { password }), ...(passwordFile === undefined ? {} : { passwordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), max: poolMax, applicationName: API_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
   try {
     const { client, connection: verified } = await pool.acquire();
     client.release();
@@ -143,16 +145,17 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   let assurancePool: KauroPool | null = null;
   const boundary = config.identity?.assuranceDatabase;
   if (boundary !== undefined) {
-    const { poolMax: boundaryMax, ...login } = boundary;
-    assurancePool = createPool({ host: connection.host, port: connection.port, database: connection.database, ...login, max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+    const { poolMax: boundaryMax, user: boundaryUser, password: boundaryPassword, passwordFile: boundaryPasswordFile } = boundary;
     try {
+      // the password file is read inside the try: a failure closes the runtime pool opened above, never leaks it (ADV-7)
+      assurancePool = createPool({ environment: config.databaseEnvironment, host: connection.host, port: connection.port, database: connection.database, user: boundaryUser, ...(boundaryPassword === undefined ? {} : { password: boundaryPassword }), ...(boundaryPasswordFile === undefined ? {} : { passwordFile: boundaryPasswordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), passwordNames: { password: "KAURO_DB_ASSURANCE_PASSWORD", passwordFile: "KAURO_DB_ASSURANCE_PASSWORD_FILE" }, max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
       const { client, connection: verified } = await assurancePool.acquire();
       client.release();
       if (verified.role !== "kauro_assurance") {
         throw new Error(`the session boundary's login must be a member of kauro_assurance; ${verified.loginRole} is a member of ${verified.role} (B06 D-EVID-1, B11 D-AUTH-1)`);
       }
     } catch (e) {
-      await assurancePool.end();
+      await assurancePool?.end();
       await pool.end();
       throw e;
     }
