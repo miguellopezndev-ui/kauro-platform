@@ -44,7 +44,7 @@ import type { CreateQuoteView } from "@kauro/application";
 import type { UserId } from "@kauro/domain";
 import { connectionPid, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { paymentServiceEffect } from "../src/payments/consumers.js";
-import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld, type StoredBankArtifact } from "./bank-support.js";
+import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld, type HeldLock, type StoredBankArtifact } from "./bank-support.js";
 import { deliveryOf } from "./commission-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { agentOf, integrationWorld, planOf, quoted, type Agent, type IntegrationWorld } from "./integration-support.js";
@@ -140,6 +140,8 @@ export const L = (): Lane => {
 export async function startLane(): Promise<Lane> {
   const iw = await integrationWorld();
   const bw = await bankWorld({ world: iw });
+  // the product's registered holds (BANK_HOLD_POINTS) pass the routed invocation's fault points
+  iw.w.bank.hold = (point) => iw.faults.passPoint(point);
   bound = { iw, bw, owner: iw.owner };
   return bound;
 }
@@ -369,6 +371,38 @@ export async function paid(o: Order, over: Partial<CreditFacts> = {}): Promise<{
 // --- harness routing ----------------------------------------------------------------------------------------------------------------
 
 export const openPay = (): Promise<HarnessConnection> => openConnection(L().iw.h.pg.clientConfig(LOGIN));
+/**
+ * The advisory stream lock of one account held by a connection of the payment login (the KIT's holdInboundStream / holdOutboundStream take the
+ * fixed BANK_ACCOUNT; a cell's subject lives on its own fresh account, so it holds that account's stream).
+ */
+export async function holdStream(accountRef: string, stream: "INBOUND" | "OUTBOUND"): Promise<HeldLock> {
+  const { iw, bw } = L();
+  const connection = await openPay();
+  let ended = false;
+  const lock: HeldLock = {
+    kind: stream === "INBOUND" ? "INBOUND_STREAM" : "L1_OUTBOUND_STREAM",
+    pid: connectionPid(connection),
+    connection,
+    async release() {
+      if (ended) return;
+      ended = true;
+      try {
+        await connection.query("ROLLBACK");
+      } finally {
+        await connection.end();
+      }
+    },
+  };
+  try {
+    await connection.query("BEGIN");
+    await connection.query("SELECT pg_advisory_xact_lock(kauro.bank_stream_lock_key($1, $2, $3))", [bw.environment, accountRef, stream]);
+  } catch (e) {
+    await lock.release();
+    throw e;
+  }
+  void iw;
+  return lock;
+}
 export function routed<T>(ctx: FaultContext, conn: HarnessConnection, fn: () => Promise<T>, steps: ReadonlyArray<SqlStep> = [], target?: number): Promise<T> {
   return L().iw.faults.on(conn, ROLE, ctx.points, steps, fn, target === undefined ? {} : { target });
 }

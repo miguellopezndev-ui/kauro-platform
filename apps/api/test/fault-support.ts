@@ -322,6 +322,9 @@ export class FaultRouting {
       get: (target, prop) => {
         const value: unknown = Reflect.get(target, prop, target);
         if (typeof value !== "function") return value;
+        // inside a routed invocation (faults.on / onRoles) the payment service's units run over the routed connection of the login of the
+        // role they need, exactly as the api's request units do (wrap): the lane L-INBOUND's service steps and owner commands
+        if (prop === "run" && this.#als.getStore() !== undefined) return (Reflect.get(this.wrap(target), "run") as (...a: unknown[]) => unknown);
         const route = this.#pay.getStore();
         if (prop !== "run" || route === undefined) return (value as (...a: unknown[]) => unknown).bind(target);
         const traced = {
@@ -339,6 +342,15 @@ export class FaultRouting {
         return (crashableFactory(traced, route.points, "uow", ["run"]) as { run: (...a: unknown[]) => unknown }).run;
       },
     });
+  }
+
+  /**
+   * Passes the named point of the routed invocation's fault points (a registered hold of the product code: BANK_HOLD_POINTS), when one is
+   * running; outside a routed invocation nothing is armed and it returns at once.
+   */
+  async passPoint(name: string): Promise<void> {
+    const route = this.#als.getStore();
+    if (route !== undefined) await route.points.pass(name);
   }
 
   /** The api's request factory, or the routed one inside `on`. */

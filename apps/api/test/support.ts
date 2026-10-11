@@ -421,7 +421,7 @@ export interface World {
   readonly vault: ContractFakeSessionVault;
   readonly internalErrors: Array<{ correlationId: string; error: unknown }>;
   /** The bank-transfer route's restricted evidence store, bound after start-up (bank-support.ts bankWorld binds its CONTRACT_FAKE store). */
-  readonly bank: { evidence: BankEvidenceStore | null };
+  readonly bank: { evidence: BankEvidenceStore | null; hold: ((point: string) => Promise<void>) | null };
   /** Agency A (DRAFT) and its people. */
   readonly A: AgencyFixture;
   readonly owner: Person;
@@ -669,10 +669,10 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const { artifacts: _artifacts, patchCompiler: _patchCompiler, disclosures: _disclosures, ...withoutPlanServices } = configured;
   const collaborators: Partial<B06Collaborators> = options.realPlanServices === true ? withoutPlanServices : configured;
 
-  const bank: { evidence: BankEvidenceStore | null } = { evidence: null };
+  const bank: { evidence: BankEvidenceStore | null; hold: ((point: string) => Promise<void>) | null } = { evidence: null, hold: null };
   const app = assembleApi({
     environment: "LOCAL",
-    bank: { evidence: () => bank.evidence, classifier: () => contractFakeBankDetailsClassifier },
+    bank: { evidence: () => bank.evidence, classifier: () => contractFakeBankDetailsClassifier, hold: (point) => (bank.hold === null ? Promise.resolve() : bank.hold(point)) },
     unitOfWork: (options.wrapUnitOfWork ?? ((f) => f))(instrumentedFactory(db.unitOfWork, holds, stats)),
     database: db,
     authenticator: createBearerTokenAuthenticator(tokens),

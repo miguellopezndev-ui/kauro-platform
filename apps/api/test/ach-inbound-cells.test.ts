@@ -38,6 +38,7 @@ import {
   finance,
   footprint,
   holdAndWait,
+  holdStream,
   importSI2,
   importsOf,
   inboundRoutes,
@@ -359,7 +360,7 @@ for (const row of OWNER_ROWS) {
       const s = await row.subject(`${row.code}-revoke-${what}`);
       const before = await fpOf(s);
       const { proof } = await proofOf(o.person);
-      const held = row.lock === "OUTBOUND" ? await bw.holdOutboundStream() : await bw.holdInboundStream();
+      const held = await holdStream(s.accountRef, row.lock);
       try {
         const { waiting } = await bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => s.run({ owner: o.person, proof })), `${row.code} held at its first lock`);
         await ctx.revoked(`${what} while ${row.code} is held`, () => revokeOwner(what, o, proof));
@@ -434,7 +435,7 @@ for (const row of OWNER_ROWS) {
     const { bw } = L();
     // replaced before the read: the confirmation waits at the INBOUND lock, the bytes change, it reads them and refuses
     const a = await draft("c4-race-replaced-first");
-    const held = await bw.holdInboundStream();
+    const held = await holdStream(a.route.accountRef, "INBOUND");
     try {
       const { waiting } = await bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => confirmC6(a.credit.creditId)), "C6 waits before its read");
       bw.evidence.corrupt(a.artifact.artifactRef, new TextEncoder().encode("replaced"));
@@ -450,7 +451,7 @@ for (const row of OWNER_ROWS) {
     const running = ctx.operation("C6 held after its read", () => onFresh(ctx, () => confirmC6(b.credit.creditId)));
     await reach(pause, running, "C6 at its gate read");
     bw.evidence.corrupt(b.artifact.artifactRef, new TextEncoder().encode("replaced after the read"));
-    const held2 = await bw.holdInboundStream();
+    const held2 = await holdStream(b.route.accountRef, "INBOUND");
     try {
       pause.release();
       const conn = await openPay();
@@ -683,7 +684,7 @@ for (const row of OWNER_ROWS) {
     await matchService(c.creditId);
     const own = await ownOwner("m1-revoke");
     const { proof } = await proofOf(own.person);
-    const held = await bw.holdInboundStream();
+    const held = await holdStream(o.route.accountRef, "INBOUND");
     try {
       const version = Number((await creditRow(c.creditId))!.version);
       const { waiting } = await bw.mustWaitOn(ctx, held, (cc) => routed(ctx, cc, () => attributeM2(c.creditId, o.orderId, version, { owner: own.person, proof })), "the owner's override held");
@@ -1154,7 +1155,7 @@ function retire(o: Order, key: string): Promise<Reply> {
   };
   cell(`OK ACH-M-SI1-RACE (concurrent reads): ${label}`, "race", async (ctx) => {
     const { route, a } = await stmt("si1-race");
-    const held = await L().bw.holdOutboundStream();
+    const held = await holdStream(route.accountRef, "OUTBOUND");
     try {
       const w1 = await L().bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => importSI2(route.accountRef, a, { key: freshKey("si1-a") })), "import A reads, then waits at L1");
       const w2 = await L().bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => importSI2(route.accountRef, a, { key: freshKey("si1-b") })), "import B reads the same ref, then waits at L1");
