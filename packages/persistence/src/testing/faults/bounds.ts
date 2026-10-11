@@ -28,6 +28,14 @@ export const INJECTED_STATEMENT_TIMEOUT_MS = 1_500;
 export const RACE_STATEMENT_TIMEOUT_MS = 3 * LOCK_WAIT_OBSERVATION_MS; // >= 2x every harness window: tools/test/race-timeout-bounds.test.mjs
 
 /** Reproduction-only override: restore the old 10 s test config while delaying the holder's release. */
+/**
+ * The default bound on one fault cell's whole body (runCell): three race statement bounds, so a cell that legitimately observes
+ * several waits (each at most RACE_STATEMENT_TIMEOUT_MS) still passes under load, while a cell body that never settles fails with
+ * a message naming the cell instead of hanging the run. A cell overrides it with CellOptions.timeoutMs.
+ */
+export const CELL_TIMEOUT_MS = 3 * RACE_STATEMENT_TIMEOUT_MS;
+
+/** Reproduction-only override: restore the old 10 s test config while delaying the holder's release. */
 export function raceStatementTimeoutMs(): number {
   const value = process.env["KAURO_TEST_RACE_STATEMENT_TIMEOUT_MS"];
   if (value === undefined) return RACE_STATEMENT_TIMEOUT_MS;

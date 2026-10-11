@@ -9,7 +9,10 @@ import type { LeaseOwnerId, ResourceId } from "@kauro/domain";
 import { toUtcInstant } from "@kauro/domain";
 import { ids, sha, start, type Harness } from "../src/testing/harness.js";
 import {
+  CELL_TIMEOUT_MS,
+  RACE_STATEMENT_TIMEOUT_MS,
   FAULT_KINDS,
+  CellTimedOut,
   FaultNotInjected,
   FaultPointNotReached,
   FaultPoints,
@@ -456,6 +459,15 @@ test("FH-R2 (evidence) an expiry cell FAILS when its declared deadline was not c
   const exactly = controlledClock("2030-01-01T00:00:00.000Z");
   exactly.set("2030-01-01T00:00:01.000Z");
   assert.deepEqual(exactly.moveLog.map((m) => [m.from, m.to]), [[Date.parse("2030-01-01T00:00:00.000Z"), Date.parse("2030-01-01T00:00:01.000Z")]]);
+});
+
+test("a cell body that never settles FAILS at the bound with a message naming the cell (CellTimedOut); a settling body is untouched; a bad bound is refused", async () => {
+  const cell = { id: "HUNG", step: "never settles", fault: "retry", expect: "n/a" } as const;
+  const started = Date.now();
+  await assert.rejects(runCell(cell, () => new Promise<void>(() => undefined), { timeoutMs: 200 }), (e: unknown) => e instanceof CellTimedOut && /HUNG \[retry\] never settles/.test(e.message) && /200 ms/.test(e.message));
+  assert.ok(Date.now() - started < 5_000, "failed fast, not at the default bound");
+  await assert.rejects(runCell(cell, async () => undefined, { timeoutMs: 0 }), /positive integer/);
+  assert.ok(CELL_TIMEOUT_MS >= 3 * RACE_STATEMENT_TIMEOUT_MS);
 });
 
 // a registered cell, as a package's matrix writes one: the clock moves a lease past its time to live between two claims
