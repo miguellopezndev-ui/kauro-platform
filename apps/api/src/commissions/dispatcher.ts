@@ -83,16 +83,30 @@ export function createCommissionDispatcher(rt: CommissionRuntime, consumer: Comm
       if (claim.kind === "REFUSED") throw new DomainFailure("INTEGRITY_FAILURE", `the lease of ${COMMISSIONS_CONSUMER} was refused: ${claim.reason}`);
       const claimedFence = claim.lease.fence;
       let fence = claimedFence;
-      const claimed = await units.run(control(), (uow) => uow.outboxDispatch.claim(COMMISSIONS_CONSUMER, runOptions.limit ?? 25, rt.clock.now(), OUTBOX_CLAIM_SECONDS));
+      if (rt.hold !== null) await rt.hold("BATCH_BEFORE_CLAIM", { eventId: null, ownerId });
+      // the batch claim is fenced by the lease in its own unit of work (matrix row D): the heartbeat under (owner, fence, not expired) and the
+      // claim commit together, and the heartbeat's row lock makes a takeover wait for this COMMIT. A dispatcher that lost the lease between
+      // its lease claim and here claims nothing and the pass raises PRECONDITION_FAILED (reason LEASE_FENCED).
+      const claimed = await units.run(control(), async (uow) => {
+        const now = rt.clock.now();
+        const lease = await uow.leases.heartbeat("OUTBOX_DISPATCH", resourceId, ownerId, claimedFence, DISPATCH_LEASE_SECONDS, now);
+        if (lease === null) throw new DomainFailure("PRECONDITION_FAILED", `the dispatcher ${ownerId} no longer holds the lease of ${COMMISSIONS_CONSUMER} under fence ${claimedFence}: nothing was claimed`, { reason: "LEASE_FENCED" });
+        return uow.outboxDispatch.claim(COMMISSIONS_CONSUMER, runOptions.limit ?? 25, now, OUTBOX_CLAIM_SECONDS);
+      });
       const out: Array<CommissionDispatchPass["deliveries"][number]> = [];
       for (const d of claimed) {
         let outcome: CommissionDeliveryOutcome;
         let errorCode: string | undefined;
         let settle: { readonly kind: "DELIVERED" } | { readonly kind: "FAILED"; readonly code: string; readonly retryAt: UtcInstant | null };
         try {
-          outcome = await consumer.handle(deliveryOf(d));
+          outcome = await consumer.handle(deliveryOf(d), { resourceId, ownerId, fence, now: () => rt.clock.now() });
           settle = { kind: "DELIVERED" };
         } catch (e) {
+          if (e instanceof DomainFailure && e.details.reason === "LEASE_FENCED") {
+            // the effect's COMMIT was fenced (matrix row L2): nothing was written, and a dispatcher that lost the lease settles nothing more
+            out.push({ eventId: d.event.eventId, eventType: d.event.eventType, outcome: "FENCED", errorCode: "LEASE_FENCED" });
+            break;
+          }
           if (e instanceof NotDueYet) {
             outcome = "RESCHEDULED";
             settle = { kind: "FAILED", code: "NOT_DUE", retryAt: e.retryAt };
