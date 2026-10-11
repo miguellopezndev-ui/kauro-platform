@@ -5,6 +5,7 @@
 // only reads (row digests, exact instants) and never writes a row under test. The setup of the sales rows is the test-only fixtures of
 // @kauro/persistence/testing (sales-fixtures.ts), each row written by the role that owns it; the purchases and the accrued lines are
 // the schema support's (b10-commission-support.ts), written as the payment and commission services write them.
+import { invariantsAfterEach } from "../src/testing/invariants.js";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { AgencyId, AssistanceAgreementId, CommissionEntitlementId, ProjectId, SellerId } from "@kauro/domain";
@@ -31,6 +32,8 @@ import {
 } from "./b10-commission-support.js";
 
 let w: World;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => w.h.oracle);
 
 before(async () => {
   w = await openWorld("b10-sales-adapters");

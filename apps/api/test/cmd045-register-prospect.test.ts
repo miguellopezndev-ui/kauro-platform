@@ -4,6 +4,7 @@
 // reactivated through spelling or duplicate-list import"). The real route, the real authorizers, the sales adapters and PostgreSQL 17
 // through the runtime login roles; the superuser only reads. The sellers are recorded with every activation fact by the corporate owner,
 // the source evidence and contacts by their registrars, the suppressions by the owner (test/sales-support.ts).
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { ProspectView } from "@kauro/application";
@@ -12,6 +13,8 @@ import { asOperator, recordSourceEvidence, salesWorld, suppress, type SalesWorld
 import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, replayTextOf, waitForApiLockWait, type Person } from "./support.js";
 
 let sw: SalesWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => sw.w.h.oracle);
 before(async () => {
   sw = await salesWorld({}, "cmd045");
 });

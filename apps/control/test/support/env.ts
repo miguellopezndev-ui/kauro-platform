@@ -18,7 +18,7 @@ import { ContractFakeAuthorityJournal, ContractFakeObjectStorage, ContractFakeSe
 import { ContractFakeMalwareScanner, type ContractFakeScannerOptions } from "@kauro/data-plane/testing";
 import { createIdGenerator, toUtcInstant, type Clock, type CorrelationId, type IdGenerator } from "@kauro/domain";
 import { createPool, createUnitOfWorkFactory, type KauroPool, type PgUnitOfWorkFactory } from "@kauro/persistence";
-import { ROLES, TEST_CLOCK_OFFSET_SETTING, raceStatementTimeoutMs, startHarness, type Harness } from "@kauro/persistence/testing";
+import { ROLES, TEST_CLOCK_OFFSET_SETTING, raceStatementTimeoutMs, startHarness, type Harness, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import { assembleControlPlane, platformParsers, type ControlPlane } from "../../src/index.js";
 
 export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() };
@@ -111,8 +111,8 @@ export async function appUnitsAhead(env: ControlEnv, offsetSeconds: number): Pro
 }
 
 async function unitsAhead(env: ControlEnv, user: string, applicationName: string, offsetSeconds: number): Promise<{ readonly units: PgUnitOfWorkFactory; serverNow(): Promise<string>; close(): Promise<void> }> {
-  const pool = createPool({ host: "127.0.0.1", port: env.h.pg.port, database: ROLES.database, user, max: 1, applicationName, idleTimeoutMs: 600_000 });
-  const c = await pool.raw.connect();
+  const pool = createPool({ environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: env.h.pg.port, database: ROLES.database, user, max: 1, applicationName, idleTimeoutMs: 600_000 });
+  const c = await pool.connectUnverified();
   try {
     await c.query("SELECT set_config($1, $2, false)", [TEST_CLOCK_OFFSET_SETTING, String(offsetSeconds)]);
   } finally {
@@ -126,7 +126,7 @@ async function unitsAhead(env: ControlEnv, user: string, applicationName: string
   };
 }
 
-const connectTo = (pool: KauroPool) => pool.raw.connect();
+const connectTo = (pool: KauroPool) => pool.connectUnverified();
 /** A connection of a runtime pool (the pg client the persistence adapters run on). */
 export type RawClient = Awaited<ReturnType<typeof connectTo>>;
 

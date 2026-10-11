@@ -19,20 +19,91 @@
  * classification — pool name, the connection's state, error class, SQLSTATE or errno code, never the message or a connection
  * parameter — to the configured sink, by default one line on stderr.
  */
-import { Pool, type PoolClient } from "pg";
+import { BlockList, isIP } from "node:net";
+import { Client, Pool, type PoolClient, type QueryResult, type QueryResultRow } from "pg";
+import { nameOfDatabaseEnvironment, type DatabaseEnvironment, type DatabaseEnvironmentName } from "./environment.js";
+import { ConnectionSecurityError, connectionSecurityOf, sslOptionsOf, type ConnectionSecurityInput } from "./tls.js";
+
+// The driver's error class, for the SQLSTATE classification of sql.ts: this module is the only one that imports the driver (DB-TLS-R4 allowlist)
+export { DatabaseError } from "pg";
+
+export type { DatabaseEnvironment } from "./environment.js";
+
+/**
+ * What every connection this module opens is given about its security, as the deployment names it (AWS-DELTA I-2, I-3). The pool and the
+ * migrator apply connectionSecurityOf to it themselves, at construction: no caller, alias or wrapper can hand the driver a configuration
+ * that skipped the rule (DB-TLS-R4 root cause: the rule is enforced at the single construction point, not looked for in the callers).
+ */
+export interface ConnectionSecurityConfig {
+  /**
+   * The deployment environment, minted from the validated configuration (never a string: DB-TLS gap 2); outside LOCAL: verified TLS, a DNS
+   * host, the password from its file, no PG* fallbacks. Required.
+   */
+  readonly environment: DatabaseEnvironment;
+  /** LOCAL only (refused outside LOCAL). */
+  readonly password?: string;
+  /** The mounted-secret password file; required outside LOCAL. */
+  readonly passwordFile?: string;
+  /** The CA bundle file (KAURO_DB_TLS_CA_FILE); required outside LOCAL. */
+  readonly tlsCaFile?: string;
+  /** The variables the deployment names the password inputs by, for the refusal text. */
+  readonly passwordNames?: ConnectionSecurityInput["names"];
+  /** Where PGPASSWORD, PGPASSFILE, PGSSLMODE, PGHOST and PGHOSTADDR are looked for (default process.env). */
+  readonly processEnv?: ConnectionSecurityInput["processEnv"];
+}
+
+function environmentOf(config: { readonly environment?: unknown }): DatabaseEnvironmentName {
+  return nameOfDatabaseEnvironment(config.environment);
+}
+
+const LOOPBACK = new BlockList();
+LOOPBACK.addSubnet("127.0.0.0", 8, "ipv4");
+LOOPBACK.addAddress("::1", "ipv6");
+
+/**
+ * Loopback host (ADV-1): 127.0.0.0/8, ::1, `localhost`, or a unix socket directory (starts with "/"). An empty or missing host is NOT
+ * loopback: pg would fall back to PGHOST, so a LOCAL connection must name its host.
+ */
+export function isLoopbackHost(host: unknown): boolean {
+  if (typeof host !== "string" || host.length === 0) return false;
+  if (host.startsWith("/")) return true;
+  if (host.toLowerCase() === "localhost") return true;
+  const family = isIP(host);
+  if (family === 4) return LOOPBACK.check(host, "ipv4");
+  if (family === 6) return LOOPBACK.check(host, "ipv6");
+  return false;
+}
+
+/** The driver's `password` and `ssl` settings of one connection, from connectionSecurityOf and nothing else. */
+function securedSettingsOf(config: ConnectionSecurityConfig & { readonly host: string }, passwordRequired = true): { password?: string; ssl?: ReturnType<typeof sslOptionsOf> } {
+  // ADV-1, by construction: LOCAL means no TLS, so it may only ever dial this machine. Whatever route minted a LOCAL environment
+  // (the test-only minter included), it cannot reach a remote host: the refusal is here, in the one function every connection passes.
+  if (environmentOf(config) === "LOCAL" && !isLoopbackHost(config.host)) {
+    throw new ConnectionSecurityError("KAURO_DB_HOST", "must be a loopback address (127.0.0.0/8, ::1, localhost) or a unix socket path in the LOCAL environment: LOCAL connects without TLS");
+  }
+  const security = connectionSecurityOf(environmentOf(config), {
+    host: config.host,
+    ...(config.password === undefined ? {} : { password: config.password }),
+    ...(config.passwordFile === undefined ? {} : { passwordFile: config.passwordFile }),
+    ...(config.tlsCaFile === undefined ? {} : { tlsCaFile: config.tlsCaFile }),
+    ...(config.passwordNames === undefined ? {} : { names: config.passwordNames }),
+    ...(config.processEnv === undefined ? {} : { processEnv: config.processEnv }),
+    passwordRequired,
+  });
+  return { ...(security.password === undefined ? {} : { password: security.password }), ...(security.tls === undefined ? {} : { ssl: sslOptionsOf(security.tls) }) };
+}
 
 export type RuntimeRole = "kauro_app" | "kauro_control" | "kauro_assurance" | "kauro_validator" | "kauro_ingress" | "kauro_payment" | "kauro_commission";
 
 /** The runtime groups: B06's five, package B09's payment service (0013) and package B10's commission service (0028; D10-CTX-1). */
 export const RUNTIME_ROLES: ReadonlyArray<RuntimeRole> = Object.freeze(["kauro_app", "kauro_control", "kauro_assurance", "kauro_validator", "kauro_ingress", "kauro_payment", "kauro_commission"]);
 
-export interface PoolConfig {
+export interface PoolConfig extends ConnectionSecurityConfig {
   readonly host: string;
   readonly port: number;
   readonly database: string;
   /** The LOGIN role; must be a member of exactly one runtime group role (RUNTIME_ROLES). */
   readonly user: string;
-  readonly password?: string;
   /** Connection ceiling of this instance (07 connection budget). Required: the budget is a decision, not a default. */
   readonly max: number;
   readonly applicationName: string;
@@ -118,17 +189,30 @@ function isRuntimeRole(value: string): value is RuntimeRole {
   return (RUNTIME_ROLES as ReadonlyArray<string>).includes(value);
 }
 
+/**
+ * DB-TLS-R3: the only way to a KauroPool is createPool. The token is module-private, so no import route (an alias, a namespace or
+ * computed member, the index re-export, a run-time import) can construct one elsewhere. DB-TLS-R4: the constructor applies
+ * connectionSecurityOf itself, so whatever reaches createPool (an aliased re-export, a wrapper, a run-time import) builds a secure pool.
+ */
+const CREATE: unique symbol = Symbol("KauroPool.create");
+
 /** A pool whose every physical connection was verified to be an unprivileged runtime role of one known group. */
 export class KauroPool {
   readonly #pool: Pool;
   readonly #verified = new WeakMap<PoolClient, VerifiedConnection>();
   readonly #sink: PoolErrorSink;
   readonly config: PoolConfig;
+  /** What the driver was given about security, copied at construction (the TLS options, whether a password was given; never the password). */
+  readonly connectionSecurity: { readonly ssl?: { readonly ca: string; readonly rejectUnauthorized: true }; readonly passwordGiven: boolean };
 
-  constructor(config: PoolConfig) {
+  constructor(config: PoolConfig, token: typeof CREATE) {
+    if (token !== CREATE) throw new TypeError("KauroPool is constructed by createPool only (DB-TLS-R3)");
     if (!Number.isInteger(config.max) || config.max < 1 || config.max > 24) {
       throw new RangeError("pool max must be an integer between 1 and 24 (07 connection budget: the application ceiling is twenty-four)");
     }
+    // DB-TLS-R4: the security rule is applied here, before the driver sees the configuration (it reads the password and CA files)
+    const secured = securedSettingsOf(config);
+    this.connectionSecurity = Object.freeze({ ...(secured.ssl === undefined ? {} : { ssl: Object.freeze({ ...secured.ssl }) }), passwordGiven: secured.password !== undefined });
     this.config = config;
     const idleTx = Math.max(1, Math.floor(config.idleInTransactionTimeoutMs ?? 30_000));
     this.#pool = new Pool({
@@ -136,7 +220,7 @@ export class KauroPool {
       port: config.port,
       database: config.database,
       user: config.user,
-      ...(config.password === undefined ? {} : { password: config.password }),
+      ...secured,
       max: config.max,
       application_name: config.applicationName,
       idleTimeoutMillis: config.idleTimeoutMs ?? 30_000,
@@ -150,9 +234,26 @@ export class KauroPool {
     this.#pool.on("error", (error: Error) => this.#sink({ pool: config.applicationName, connection: "IDLE", ...classifyError(error) }));
   }
 
-  /** The underlying pg pool (tests and diagnostics only; units of work go through `acquire`). */
-  get raw(): Pool {
-    return this.#pool;
+  /**
+   * DB-TLS gap 1 (6de1436): the driver pool is never handed out (no `raw`): its Client class and its options (ssl, host, password) would let
+   * a holder build or re-point a connection that skipped connectionSecurityOf. What callers need is narrow:
+   *
+   * A pooled connection WITHOUT the role verification of `acquire` and without its in-use error listener. Its one production use is the side
+   * connection that ends an abandoned unit's backend (endAbandonedBackend, ADV-8/ADV-13), which runs a signalling statement only; otherwise
+   * test fixtures and diagnostics.
+   */
+  connectUnverified(): Promise<PoolClient> {
+    return this.#pool.connect();
+  }
+
+  /** One statement on a pooled connection, without role verification: test fixtures and diagnostics only (units of work use `acquire`). */
+  query<R extends QueryResultRow = QueryResultRow>(text: string, values?: ReadonlyArray<unknown>): Promise<QueryResult<R>> {
+    return this.#pool.query<R>(text, values === undefined ? undefined : [...values]);
+  }
+
+  /** Whether `end` was called. */
+  get ended(): boolean {
+    return this.#pool.ended;
   }
 
   /**
@@ -229,5 +330,48 @@ export class KauroPool {
 }
 
 export function createPool(config: PoolConfig): KauroPool {
-  return new KauroPool(config);
+  return new KauroPool(config, CREATE);
+}
+
+/** Where the migrator connects (07 "Restoration and migration": migration roles are separate from runtime). */
+export interface MigratorConnection extends Omit<ConnectionSecurityConfig, "password" | "passwordFile" | "passwordNames"> {
+  readonly host: string;
+  readonly port: number;
+  readonly database: string;
+  /** The owner role of the kauro objects (LOGIN, not SUPERUSER, not BYPASSRLS); never a runtime login role. */
+  readonly user: string;
+  /** The migrator's own credential (N7), read by its entrypoint; required outside LOCAL, so pg never falls back to PGPASSWORD or a pgpass file (ADV-9). */
+  readonly password?: string;
+  readonly applicationName?: string;
+}
+
+/** The migrator connection's driver timeouts, in milliseconds. */
+export interface MigratorClientTimeouts {
+  readonly connectionTimeoutMillis: number;
+  readonly statement_timeout: number;
+  readonly lock_timeout: number;
+}
+
+/**
+ * The migrator's one dedicated connection (not yet connected), under the same rule as every pool: connectionSecurityOf at construction
+ * (DB-TLS-R4). The migrator holds its credential itself, so outside LOCAL the password is required explicitly, never from a file.
+ */
+export function migratorClientOf(connection: MigratorConnection, timeouts: MigratorClientTimeouts): Client {
+  const { ssl } = securedSettingsOf({ environment: connection.environment, host: connection.host, ...(connection.tlsCaFile === undefined ? {} : { tlsCaFile: connection.tlsCaFile }), ...(connection.processEnv === undefined ? {} : { processEnv: connection.processEnv }) }, false);
+  if (environmentOf(connection) !== "LOCAL" && connection.password === undefined) {
+    throw new ConnectionSecurityError("KAURO_DB_MIGRATOR_PASSWORD", "is required outside LOCAL (or KAURO_DB_MIGRATOR_PASSWORD_FILE): the migration connection is always given its password explicitly");
+  }
+  return new Client({
+    host: connection.host,
+    port: connection.port,
+    database: connection.database,
+    user: connection.user,
+    ...(connection.password === undefined ? {} : { password: connection.password }),
+    ...(ssl === undefined ? {} : { ssl }),
+    application_name: connection.applicationName ?? "kauro-migrator",
+    // picked one by one: nothing a caller passes can reach the driver beside the secured settings
+    connectionTimeoutMillis: timeouts.connectionTimeoutMillis,
+    statement_timeout: timeouts.statement_timeout,
+    lock_timeout: timeouts.lock_timeout,
+  });
 }

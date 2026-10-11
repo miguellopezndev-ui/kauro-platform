@@ -3,6 +3,7 @@
 // reported by an earlier statement, no OFFSET recorded) stays with its successor, whether the statement is corrected directly (CMD051) or
 // superseded in CMD053's COMMIT after its payout FAILED or RETURNED (D10-GAP-12). Its own world: three sellers go through the same three
 // closes. PostgreSQL 17 through the runtime login roles; the superuser only reads.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { PayoutIntentView, PayoutReconciliationView, PeriodCloseView, StatementCorrectionView } from "@kauro/application";
@@ -10,6 +11,8 @@ import { approvePayout, bankCash, claimedCents, closeMonth, commissionContext, c
 import { completed } from "./support.js";
 
 let sw: StatementsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => sw.h.oracle);
 before(async () => {
   sw = await statementsWorld();
 });

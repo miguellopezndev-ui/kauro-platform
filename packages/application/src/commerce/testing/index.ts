@@ -17,3 +17,29 @@ export type { CapacityAnswer, DeliveryCapacityFake } from "./platform-fakes.js";
 export { CapacityUnansweredError, createDeliveryCapacityFake } from "./platform-fakes.js";
 export type { InMemoryCommerceStore, InMemoryCommercePorts, InMemoryCommerceOptions } from "./in-memory-commerce.js";
 export { emptyCommerceStore, createInMemoryCommercePorts } from "./in-memory-commerce.js";
+export type {
+  BankFakeKind,
+  BankFakeMethod,
+  BankFakeScript,
+  BankEvidenceFakeOptions,
+  BankEvidenceFake,
+  FakeCreditFields,
+  FakeDestinationFields,
+  FakeOutboundFields,
+  FakeDebitFields,
+  FakeStatementFields,
+} from "./bank-evidence-fake.js";
+export {
+  BANK_FAKE_PROVIDER,
+  BANK_FAKE_FORMAT,
+  BANK_FAKE_NORMALIZER,
+  createBankEvidenceFake,
+  fakeCreditBytes,
+  fakeOutboundBytes,
+  fakeStatementBytes,
+  classifyFakeCredit,
+  classifyFakeOutbound,
+  classifyFakeStatement,
+} from "./bank-evidence-fake.js";
+// the CONTRACT_FAKE account-details classifier of the bank-transfer route (lane L-ROUTE, R1)
+export { classifyFakeAccountDetails, contractFakeBankDetailsClassifier } from "./bank-details-fake.js";

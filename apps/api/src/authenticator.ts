@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { AuthenticatedSubject } from "@kauro/application";
 import { isCalendarDateTime } from "@kauro/application";
-import { identityUserId, type DomainFailure } from "@kauro/domain";
+import { identityUserId, type DomainFailure, type UnitOfWork } from "@kauro/domain";
 
 export interface Authenticator {
   authenticate(headers: Readonly<Record<string, string | undefined>>): Promise<AuthenticatedSubject | null>;
@@ -23,6 +23,19 @@ export interface Authenticator {
    * ORIGIN_REJECTED, CSRF_TOKEN_INVALID) — decided here, before the command journal is reserved. The server prefers it.
    */
   authenticateRequest?(request: AuthenticationRequest): Promise<Authentication>;
+  /**
+   * The request's credential held for an effect it authorizes (FAILURE-MATRIX-TEMPLATE rule 16, PV1R-07 r4), when the authenticator has a
+   * lockable credential: a cookie session's row locked FOR SHARE inside `uow`'s own transaction for `userId` (the lock its revocation and every
+   * touch conflict with; the unit's COMMIT is the release); `liveAt` judges the row as locked at an instant the caller reads after the hold.
+   * Null when the request presents no credential that names a session or subject.
+   */
+  holdRequest?(request: AuthenticationRequest, uow: UnitOfWork, userId: string): Promise<HeldCredential | null>;
+}
+
+/** A credential as held by holdRequest. */
+export interface HeldCredential {
+  readonly userId: string;
+  liveAt(nowMs: number): boolean;
 }
 
 /** What authentication sees of a request: its method and its lowercased single-valued headers. */
@@ -33,7 +46,17 @@ export interface AuthenticationRequest {
 
 /** An authenticated subject, no credential at all, or credentials refused as such (the refusal's failure). */
 export type Authentication =
-  | { readonly kind: "SUBJECT"; readonly subject: AuthenticatedSubject; readonly sessionSecret: string | null }
+  | {
+      readonly kind: "SUBJECT";
+      readonly subject: AuthenticatedSubject;
+      readonly sessionSecret: string | null;
+      /**
+       * A session credential's first ended instant on the process clock (min of its idle and absolute deadlines as resumed): a caller that
+       * awaits after this authentication judges the session live at an instant it reads after its own last await (TIME-AFTER-AWAIT,
+       * PV1R-02 r2). Absent for a bearer credential (judged by its verifier when presented).
+       */
+      readonly liveUntil?: string;
+    }
   | { readonly kind: "NONE" }
   | { readonly kind: "REFUSED"; readonly failure: DomainFailure };
 

@@ -30,7 +30,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   // operational probes, every payment route of
   // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1), the execution and audit routes of package B08 (CMD036 ExecuteProject, CMD037 CancelJob, GetJob; CMD020 StartAudit, CMD021 CancelAudit, CMD022 CreatePlan, CMD024 ValidatePlan, GetAudit and the decision artifact intake; D8-API-1, D8-CMA-7), the served commands of package
   // B10 (CMD002 and CMD043, mandate B10-AGENCY-LIFECYCLE; CMD027, mandate B10-COMMANDS-QUOTE; CMD045..CMD047, mandate B10-COMMANDS-PROSPECTS; CMD048..CMD050, mandate B10-COMMANDS-SELLERS),
-  // the five routes of the browser session boundary (B11 W2) and the two public routes (B11 W5b)
+  // the five routes of the browser session boundary (B11 W2), the two public routes (B11 W5b), and the Payments V1 bank-transfer
+  // routes (L-ROUTE: the five operational bank-route commands, getBankRoute, and the KIT read getTransferInstructions)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -40,8 +41,10 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/agencies/{agencyId}/members ListMembers",
       "GET /api/v1/audits/{auditId} GetAudit",
       "GET /api/v1/jobs/{jobId} GetJob",
+      "GET /api/v1/operations/bank-routes/{routeId} getBankRoute",
       "GET /api/v1/operations/refunds/{refundId} GetRefundReview",
       "GET /api/v1/payment-orders/{orderId} GetPaymentOrder",
+      "GET /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions",
       "GET /api/v1/projects/{projectId} GetProject",
       "GET /api/v1/projects/{projectId}/support-cases ListSupportCases",
       "GET /api/v1/public/capability-publication getCapabilityPublication",
@@ -71,6 +74,11 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/clients/{clientId}/archive ArchiveClient",
       "POST /api/v1/clients/{clientId}/projects CreateProject",
       "POST /api/v1/jobs/{jobId}/cancel CancelJob",
+      "POST /api/v1/operations/bank-routes configureBankRoute",
+      "POST /api/v1/operations/bank-routes/{routeId}/details replaceBankRouteDetails",
+      "POST /api/v1/operations/bank-routes/{routeId}/disable disableBankRoute",
+      "POST /api/v1/operations/bank-routes/{routeId}/enable enableBankRoute",
+      "POST /api/v1/operations/bank-routes/{routeId}/verify verifyBankRoute",
       "POST /api/v1/payment-orders/{orderId}/capture CapturePayment",
       "POST /api/v1/payment-orders/{orderId}/reconcile ReconcilePayment",
       "POST /api/v1/payments/webhooks/{provider} ReceivePaymentWebhook",
@@ -126,7 +134,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
     const problemStatuses = sources.application.outcomesByStatus(sources.application.READ_OUTCOMES[read.operationId]).map(([status]) => String(status));
     assert.deepEqual(Object.keys(op.responses).sort(), ["200", ...problemStatuses].sort());
   }
-  // the probes, the session routes and the public routes are the operational routes of @kauro/application (R42 connected to R23):
+  // the probes, the session routes, the public routes and the Payments V1 bank-transfer routes (L-ROUTE) are the operational routes of @kauro/application (R42 connected to R23):
   // documented with the replies they declare — a probe with the one Problem default, a session or public route with one Problem per
   // status of its closed catalogue (like a command's), a body-less 204 without content, a request body where the route takes one
   for (const route of sources.operationalRoutes) {
@@ -149,6 +157,13 @@ test("the committed document is the generated one, byte for byte, and matches ev
     "GET /api/v1/public/identity-config getIdentityConfig",
     "GET /api/v1/public/capability-publication getCapabilityPublication",
     "POST /api/v1/public/inquiries createInquiry",
+    "POST /api/v1/operations/bank-routes configureBankRoute",
+    "POST /api/v1/operations/bank-routes/{routeId}/verify verifyBankRoute",
+    "POST /api/v1/operations/bank-routes/{routeId}/enable enableBankRoute",
+    "POST /api/v1/operations/bank-routes/{routeId}/disable disableBankRoute",
+    "POST /api/v1/operations/bank-routes/{routeId}/details replaceBankRouteDetails",
+    "GET /api/v1/operations/bank-routes/{routeId} getBankRoute",
+    "GET /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions",
   ]);
   // the public routes take no credential (an explicit empty security requirement) and the inquiry names the Origin it demands
   for (const [path, method] of [["/api/v1/public/capability-publication", "get"], ["/api/v1/public/inquiries", "post"]]) assert.deepEqual(expected.paths[path][method].security, [], path);

@@ -372,10 +372,11 @@ export const COMMERCIAL_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object
   },
 ] satisfies ReadonlyArray<ViewDefinition>);
 
-/** The success reply of each B10 command: status and the view its COMPLETED envelope carries. B10 answers synchronously: nothing is ACCEPTED. */
+/** The success reply of each B10 command: status and the view its COMPLETED envelope carries. B10 answers synchronously, except CMD027's replacement whose re-binding timed out (ACCEPTED). */
 export const COMMERCIAL_COMMAND_RESPONSES = Object.freeze({
   CMD002: { status: 200, view: "AgencyActivationView", accepted: false },
-  CMD027: { status: 201, view: "CreateQuoteView", accepted: false },
+  // an included replacement whose re-binding does not answer within its bound answers the retriable 202 (D10-GAP-6a, B10 REPL_TMO)
+  CMD027: { status: 201, view: "CreateQuoteView", accepted: true },
   CMD043: { status: 200, view: "AgencyClosureView", accepted: false },
   CMD045: { status: 201, view: "ProspectView", accepted: false },
   CMD046: { status: 201, view: "AttributionClaimView", accepted: false },

@@ -1,0 +1,67 @@
+{
+ "gate": "G-CLOUD",
+ "manual": "14",
+ "package": "B14",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "S072",
+   "package": "B14",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S073",
+   "package": "B14",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S074",
+   "package": "B14",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-072",
+   "package": "B14",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-073",
+   "package": "B14",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-075",
+   "package": "B14",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B14"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B14",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

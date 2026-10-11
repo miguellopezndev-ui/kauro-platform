@@ -16,6 +16,15 @@ import { zoneIsKnown } from "./calendar.js";
  */
 export const COMPENSATION_PLANNING_GUARD_BPS = 1500;
 
+/**
+ * The provider-time plausibility tolerance (owner decision D-15; example 10), policy constant version 1: a provider completion
+ * may sit up to 10 s after the purchase's confirmation or before its order's creation (clock skew between provider and server)
+ * and still be plausible. Symmetric and inclusive: exactly 10 000 ms is plausible, 10 001 ms is not. Changing the value is a new
+ * version of this constant, never an edit in place.
+ */
+export const PROVIDER_TIME_PLAUSIBILITY_TOLERANCE_VERSION = 1;
+export const PROVIDER_TIME_PLAUSIBILITY_TOLERANCE_MS = 10000;
+
 export interface CommissionPolicy {
   /** The registry policy version the calculation follows (pricing.scheduleVersion, e.g. R2-INITIAL), recorded on every line. */
   readonly version: string;

@@ -1,0 +1,91 @@
+{
+ "gate": "G-BUSINESS",
+ "manual": "19",
+ "package": "B19",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "S081",
+   "package": "B19",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S082",
+   "package": "B19",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S083",
+   "package": "B19",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S084",
+   "package": "B19",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S087",
+   "package": "B19",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S096",
+   "package": "B19",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-109",
+   "package": "B19",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-110",
+   "package": "B19",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-111",
+   "package": "B19",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B19"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B19",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

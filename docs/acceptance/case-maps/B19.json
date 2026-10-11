@@ -1,0 +1,99 @@
+{
+ "package": "B19",
+ "generatedBy": "node tools/ledger.mjs sidecars --write",
+ "source": {
+  "file": null,
+  "registry": "packages/contracts/registry/program.json",
+  "note": "no case map yet: no evidence claimed"
+ },
+ "rows": [
+  {
+   "case": "S081",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S082",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S083",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S084",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S086",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S087",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S096",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-109",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-110",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-111",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-119",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  }
+ ]
+}

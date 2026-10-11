@@ -1,0 +1,817 @@
+{
+ "package": "B10",
+ "generatedBy": "node tools/ledger.mjs sidecars --write",
+ "source": {
+  "file": "docs/design/B10-case-map.md",
+  "sha256": "04bf0a87c8c48cb48ebbd5b92e740671bd053af17779f6b40659c39c8053ed52"
+ },
+ "rows": [
+  {
+   "case": "R2-079",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/commercial-money.test.ts :: R2-079 (example 1): a first-project pool at 1000 bps on a 97125-cent service collection is 9713 cents rounded half-up once; the 5275-cent processor fee, the collected tax and any excess change nothing in the basis",
+    "packages/domain/test/commerce-money-pricing.test.ts :: R2-080 arithmetic kernel: 4 % of 123025 is 4921; after a 20000 service refund 4121; the adjustment is -800",
+    "packages/persistence/test/b10-ledger-adapters.test.ts :: R2-079 at the ledger: the accrual of a founding first purchase writes, as the commission service, one ACQUISITION pool of basis 97125 and 9713 cents and one ACCRUED_PENDING line at 1000 bps, and a pool whose cents differ from round(basis x rate) is refused KC002",
+    "apps/api/test/b10-scenarios.test.ts :: R2-079 (example 1): a founding agency's first HubSpot purchase of 50000 units, quoted by CreateQuote at 129500 - 32375 = 97125 and paid through CreatePaymentOrder and CapturePayment, accrues one 9713-cent ACCRUED_PENDING line for its accepted seller — not payable at capture, the 5275-cent fee recorded apart, the founding slot CONSUMED"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-080",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/commercial-money.test.ts :: R2-080 (examples 2 and 6): 129500 at a 500-bps repeat discount is 123025; its 400-bps pool is 4921; after a 20000-cent service refund the cumulative entitlement is 4121 and the adjustment -800; refunding the remaining 103025 posts -4121, so the adjustments sum to -4921",
+    "packages/domain/test/commerce-money-pricing.test.ts :: R2-080 arithmetic kernel: 4 % of 123025 is 4921; after a 20000 service refund 4121; the adjustment is -800",
+    "packages/persistence/test/b10-ledger-adapters.test.ts :: R2-080 at the ledger: refund.completed.v1 with serviceBasisAfterCents 103025 appends one REFUND DECREASE adjustment of 800 with new cumulative 4121 to the 4921 line, a replay of the same event adds nothing, and an adjustment that is not the cumulative difference is refused KC015",
+    "apps/api/test/b10-scenarios.test.ts :: R2-080 (examples 2 and 6): the agency's second project, for another end client, is quoted at 123025 and accrues 4921 at 400 bps; RequestRefund, ApproveRefund and ExecuteRefund of 20000 service cents revise the line to 4121 with one -800 adjustment, and the owner's and the seller's statement projections show the same cents"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-086",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/commercial-rules.test.ts :: R2-086: the eligibility set of an agency with one qualifying prior project for End Client A counts it for a quote of End Client B's project and selects 500 bps; the quoted project is never in its own set",
+    "packages/persistence/test/b10-recurrence-migrations.test.ts :: R2-086 at the database: kauro.qualifying_projects_at counts a qualifying purchase of another project of the agency confirmed inside [as_of - 8760 h, as_of), whatever its end client, and excludes the quoted project, other agencies' purchases and purchases confirmed at or after as_of",
+    "apps/api/test/cmd027-create-quote.test.ts :: R2-086 (example 2): CreateQuote for the agency's second project, serving another end client than its first paid project, issues a quote at 500 bps — 123025 cents in the 50000-unit HubSpot band — whose snapshot names exactly the first project"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-087",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/commercial-rules.test.ts :: R2-087 and R2-088 (example 4): nine prior qualifying projects select 500 bps, ten 1000, twenty-four 1000 and twenty-five 1500; the current project never counts toward its own threshold and a project counts once however many captures it has",
+    "apps/api/test/cmd027-create-quote.test.ts :: R2-087 (example 4): an agency with ten qualifying prior projects, one of them with an excess second capture, is quoted at 1000 bps for its next project; the snapshot names exactly those ten projects once each and never the quoted project"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-088",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/commercial-rules.test.ts :: R2-087 and R2-088 (example 4): nine prior qualifying projects select 500 bps, ten 1000, twenty-four 1000 and twenty-five 1500; the current project never counts toward its own threshold and a project counts once however many captures it has",
+    "apps/api/test/cmd027-create-quote.test.ts :: R2-088 (example 4): an agency with twenty-five qualifying prior projects is quoted at 1500 bps, and the issued quote keeps its snapshot, price and terms hash after a twenty-sixth purchase and after a full refund of a counted project"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-089",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b10-recurrence-migrations.test.ts :: R2-089 at the database: a qualifying purchase whose service was fully refunded or whose capture was reversed leaves kauro.qualifying_projects_at while its confirmation sequence and first designation stay, and a partly refunded one stays counted",
+    "apps/api/test/cmd027-create-quote.test.ts :: R2-089 (example 5): after the agency's only prior purchase is fully refunded, CreateQuote issues at 0 bps with an empty set while the first designation still names that purchase, and a quote issued before the refund keeps its 500 bps"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-090",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b10-recurrence-migrations.test.ts :: R2-090 at the database: a slot holds at most one live reservation, an agency holds at most one founding reservation per cohort, a reservation must be named by its quote's snapshot at COMMIT, and a consumed slot is never freed, not by a full refund (KC014)",
+    "packages/persistence/test/b10-recurrence-adapters.test.ts :: R2-090: two agencies' reservations of the last free slot serialize on its row — the second waits, observed in pg_stat_activity, re-checks and takes no slot — in both orders, and three slots never hold four live reservations",
+    "apps/api/test/cmd027-create-quote.test.ts :: R2-090 (example 17): two eligible agencies' CreateQuote calls racing for the last founding slot, held at the slot update, yield one quote at 2500 bps with its RESERVED reservation and one at the other agency's own tier with foundingOffer NONE_AVAILABLE, whose answer states that actual price"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-091",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b10-recurrence-adapters.test.ts :: R2-091: FoundingOfferReader reports no reservable slot once the three slots are consumed, and the recurrence set and quote issuance core of any agency are unaffected by the cohort",
+    "apps/api/test/cmd027-create-quote.test.ts :: R2-091: once the three founding slots are consumed, a fourth eligible agency's CreateQuote issues a standard quote with foundingOffer NONE_AVAILABLE and CreatePaymentOrder accepts it; the cohort caps the discount, never the sale"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-092",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd027-create-quote.test.ts :: R2-092 (example 18): on a paid project whose entitlement is ACTIVE, CreateQuote for a new approved plan of a corrected revision in the same band issues a replacement quote carrying the paid terms, re-binds the purchase through PurchaseRebinder, revokes the old entitlement SOURCE_REPLACED and spends the one included allowance — no order, no fee, the new approval required",
+    "apps/api/test/cmd027-create-quote.test.ts :: R2-092: a replacement whose re-binding the payment service refuses is withdrawn with its reason, and a second same-band replacement after the allowance is spent is REPLACEMENT_ALLOWANCE_SPENT with nothing written",
+    "apps/api/test/b10-scenarios.test.ts :: R2-092 (example 18): a paid agency replaces its source once before execution — CreateRevision, seal, a new approval and the replacement quote — and ExecuteProject's authority is the re-bound entitlement, the old one never reusable"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-093",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd027-create-quote.test.ts :: R2-093 (example 18): a replacement revision of 50001 billable units on a project paid at the 50000-unit band is 409 PRECONDITION_FAILED REPLACEMENT_SCOPE_CHANGED with the band comparison 129500 to 199500 cents, writing no quote, re-binding, order or capture",
+    "apps/api/test/b10-scenarios.test.ts :: R2-093: the larger scope is charged only after the paid purchase is refunded and a new quote is issued and explicitly accepted by CreatePaymentOrder; no capture ever covers the difference silently"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-094",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/commercial-time.test.ts :: R2-094 (example 11): a first confirmation at 2028-02-29T15:00:00Z (10:00 America/Bogota) ends its window exclusively at 2029-02-28T15:00:00Z and one at 2026-09-12T14:00:00Z at 2027-09-12T14:00:00Z — twelve calendar months at the same wall time with the day clamped, never 365 days",
+    "packages/persistence/test/b10-sales-migrations.test.ts :: R2-094 at the database: an entitlement's window_ends_at must equal twelve calendar months after window_starts_at at the America/Bogota wall time with the day clamped, and its first capture, window, share and agreement cannot change",
+    "apps/api/test/b10-commission-service.test.ts :: R2-094: after a first confirmation at 2028-02-29T15:00:00Z, a subsequent capture completed at the provider at 2029-02-28T14:59:59Z accrues a 400-bps line and one completed at 2029-02-28T15:00:00Z accrues no acquisition line"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-095",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b10-sales-adapters.test.ts :: R2-095 (example 12): reassigning seller A's acquired agency to seller B appends B's current assignment and service assignment while A's entitlement, allocation, window and accrued lines are unchanged row for row",
+    "apps/api/test/cmd048-assign-account.test.ts :: R2-095: AssignAccount to seller B with a prepared assistance agreement answers the new operational owner and B's compensation for new work, while seller A's entitlement, allocation share, window and accrued lines stay A's and B gains no row of them",
+    "apps/api/test/b10-scenarios.test.ts :: R2-095 (example 12): after AssignAccount moves A's acquired agency to seller B, the agency's next purchase inside A's window accrues A's 400-bps line and no line for B; B's assistance agreement signed before a later order accrues B's own 400-bps pool beside A's, never reducing it"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-096",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b10-ledger-adapters.test.ts :: R2-096 at the ledger: a full service refund of the first purchase moves its 1000-bps line ACCRUED_PENDING to VOID with cumulative 0, while qualifying_purchases, the entitlement's first capture and window and the consumed slot stay",
+    "apps/api/test/b10-scenarios.test.ts :: R2-096 (example 5): with the agency's first purchase fully refunded, its next purchase inside the window accrues 400 bps, never 1000; the first designation, the window and the CONSUMED founding slot are unchanged and the first line is VOID at zero"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-097",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/commercial-money.test.ts :: R2-097 (example 8): a 9713-cent pool split 6000/4000 allocates 5828 and 3885, split 5000/5000 between seller_a and seller_b allocates 4857 and 4856, and a one-cent pool at 3333/3333/3334 gives the cent to the third; every allocation sums to the pool after each cumulative refund down to zero",
+    "packages/persistence/test/b10-ledger-migrations.test.ts :: R2-097 at the database: a pool's cents equal round(basis x rate) and its lines' allocations sum to it at COMMIT (KC002), one pool exists per purchase and source, and an allocation's shares sum to 10000 bps (KC003)",
+    "apps/api/test/b10-scenarios.test.ts :: R2-097: AcceptAttribution freezing a 6000/4000 split of two sellers' claims makes the agency's first purchase accrue one 9713-cent pool with lines of 5828 and 3885 cents, never two 10% pools"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-098",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/commercial-rules.test.ts :: R2-098 (example 3): the buyer's recurrence discount and the seller's residual are decided apart — a discount with a residual, a discount without one after the window, a residual without a discount and neither all occur",
+    "apps/api/test/b10-commission-service.test.ts :: R2-098 (example 3): a purchase completed at the provider at or after the window end accrues no acquisition line, and no assistance line without a prior agreement, while the seller's earned lines of the window stay on their path to payment",
+    "apps/api/test/b10-scenarios.test.ts :: R2-098 (example 3): after the window the agency's next project is still quoted at its 500-bps recurrence discount, its capture accrues nothing for the seller, and the seller's earlier ELIGIBLE line is paid on the next statement"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-099",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b10-sales-adapters.test.ts :: R2-099: an assistance agreement records its seller, agency, project or next purchase, 400 bps and signing instant before any work, and an agreement signed after a purchase's order was created applies to no pool of that purchase",
+    "apps/api/test/b10-commission-service.test.ts :: R2-099 (example 3): a post-window purchase whose order follows a signed assistance agreement accrues one ASSISTANCE pool at 400 bps for that seller only, separate from any acquisition pool, and the seller's old lines never wait on the new work"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-100",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b10-sales-migrations.test.ts :: R2-100 at the database: a tail entry exists only for an ACCEPTED unexpired claim of the terminated seller whose agency has no qualifying purchase (KC011), and ends 2160 hours after the termination's effective instant",
+    "apps/api/test/cmd050-terminate-seller.test.ts :: R2-100 (example 13): TerminateSeller with a manifest of two enumerated active opportunities records exactly two tail entries ending 2160 h after the effective instant, and the thousand prospects the seller registered from a scraped list gain no tail, claim or entitlement",
+    "apps/api/test/b10-scenarios.test.ts :: R2-100: an enumerated opportunity's first purchase inside the tail converts its claim and creates the departed seller's entitlement; a first purchase after the tail's end or of an unlisted agency creates none"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-101",
+   "class": "PARTIAL",
+   "test": [
+    "packages/domain/test/commercial-time.test.ts :: R2-101: eligibility is due 720 hours after a FINAL completion; a STAGE completion starts no clock, and funds not AVAILABLE or a covering hold keep a due line from ELIGIBLE",
+    "packages/persistence/test/b10-ledger-migrations.test.ts :: R2-101 at the database: a line becomes ELIGIBLE only with a FINAL completion of its purchase at least 720 hours old and its capture's funds AVAILABLE (KC007)",
+    "apps/api/test/b10-commission-service.test.ts :: R2-101 (example 15): a parent-stage STAGE completion reported by the preparation-completion fake leaves the line ACCRUED_PENDING, and the FINAL completion 720 hours later with funds available makes it ELIGIBLE in the ELIGIBILITY sweep"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B08",
+    "B13"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-102",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b10-ledger-adapters.test.ts :: R2-102: a 1000-cent hold on the disputed part of one line leaves the line on its path, and the statement composition withholds exactly those cents with reason and review date while 50000 cents of unrelated eligible lines stay payable",
+    "apps/api/test/cmd051-close-commission-period.test.ts :: R2-102 (examples 21 and 25): CloseCommissionPeriod issues a statement in which the disputed 1000 cents are a held item with its reason and review date, the undisputed 50000 cents are payable, and accrued pending, eligible, held, paid and negative totals are separate",
+    "apps/api/test/cmd052-approve-commission-payout.test.ts :: R2-102: ApproveCommissionPayout authorizes exactly the undisputed payable of that statement; the held cents are in no intent",
+    "apps/api/test/commission-statement-reads.test.ts :: GetCommissionStatement answers a seller its own statement and the owner any — per line the agency and project reference, first or repeat, basis, rate, share, cumulative, previously paid, adjustment, hold reason and review date — and never another seller's rows, a destination digest, contact details or customer CRM values"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-103",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/b10-sales-migrations.test.ts :: R2-103 at the database: a payout destination becomes VERIFIED only with the seller's own step-up proof at the change and an owner verification at least 172800 seconds later; a change without that proof stays PENDING_VERIFICATION",
+    "apps/api/test/cmd052-approve-commission-payout.test.ts :: R2-103 (example 22): a seller's bank change just before payout leaves ApproveCommissionPayout 409 PAYEE_UNVERIFIED for the new destination, and an intent authorized earlier keeps its original destination version and digest while the change is pending",
+    "apps/api/test/cmd053-reconcile-commission-payout.test.ts :: R2-103 (example 22): evidence from the payout-evidence fake naming the new destination for an intent bound to the old one is PAYOUT_EVIDENCE_MISMATCH and changes nothing; only evidence for the bound destination settles it"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B12",
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-104",
+   "class": "PARTIAL",
+   "test": [
+    "packages/domain/test/commercial-money.test.ts :: R2-104 (example 7): a paid 4921-cent line revised to 4121 shows accrual 4921, payout 4921, adjustment -800 and balance -800; a later eligible amount is offset only under SIGNED_FUTURE_OFFSET terms, otherwise the balance is an owner REPAYMENT_REVIEW, WRITE_OFF or DISPUTE item",
+    "packages/persistence/test/b10-ledger-migrations.test.ts :: R2-104 at the database: an offset against a later line is refused without SIGNED_FUTURE_OFFSET terms (KC017), a PAID line moves to ADJUSTED with an appended adjustment, and its paid cents and payout rows never change",
+    "apps/api/test/b10-scenarios.test.ts :: R2-104 (examples 7 and 25): a 20000-cent service refund after the seller was paid 4921 posts -800, the line PAID to ADJUSTED, and the next statement shows the original accrual, the payout, the adjustment and the -800 balance with its project and reason; no port can debit the seller"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B10"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-105",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/commercial-money.test.ts :: R2-105 (example 23): a 100000-cent retainer plus 150000 cents of commission against 1500000 cents of attributable net service is 16.67%, EXCEEDS_PLANNING_GUARD above 1500 bps by exact integer comparison, labelled a business planning guard and never a legal ceiling",
+    "apps/api/test/cmd051-close-commission-period.test.ts :: R2-105: the period close records the owner's compensation-guard review per seller — retainer, commission accrued, attributable net service, 16.67% EXCEEDS_PLANNING_GUARD — and still issues the statement; the guard refuses nothing"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-127",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b10-recurrence-adapters.test.ts :: R2-127: a reservation ends at its quote's 336-hour expiry, a superseding or replacement quote never inherits or extends it, FoundingOfferReader's preview reserves nothing, and a quote past its price expiry with a payment in flight moves its reservation to RECONCILIATION_HOLD",
+    "apps/api/test/cmd027-create-quote.test.ts :: R2-127 (examples 16 and 17): a founding quote reserves one slot until its original 336-hour expiry; a superseding CreateQuote of the same project releases it and issues at the agency's own tier, and no later quote of that agency revives a founding reservation",
+    "apps/api/test/b10-commission-service.test.ts :: R2-127: the QUOTE_EXPIRY sweep expires a founding quote with nothing in flight and releases its slot; with an uncertain capture it holds the reservation in RECONCILIATION_HOLD until the capture consumes the slot or a proved no-capture releases it"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-136",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/commercial-money.test.ts :: R2-136 (example 4): a synthetic 1002-cent basis at a 2500-bps discount rounds the 250.5-cent discount once to 251 and nets 751, never 752 by rounding the complementary 7500 bps, and is no price band of the schedule",
+    "packages/persistence/test/b10-recurrence-adapters.test.ts :: R2-136 at the issuance core: a quote priced from a 1002-cent base at 2500 bps stores discount 251 and service 751, and the database refuses 750 or 752 as the rounded arithmetic"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-137",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b10-recurrence-migrations.test.ts :: R2-137 at the database: two first captures of one agency confirmed at once serialize on its recurrence lock in both orders — one sequence 1, the other sequence 2 with its own provider completion instant — and neither sequence nor designation can be rewritten (KC001)",
+    "apps/api/test/b10-commission-service.test.ts :: R2-137 (examples 9 and 10): P confirmed first keeps sequence 1 and its 1000-bps pool; Q, whose authenticated provider completion is earlier but observed later, is sequence 2 at 400 bps inside the window — never a second 1000-bps pool — and a provider completion after its own confirmation is held PROVIDER_TIME_UNVERIFIED",
+    "apps/api/test/b10-scenarios.test.ts :: R2-137 (example 9): two projects' capture reconciliations of one agency held at the designation trigger in both interleavings end with one first project, one 1000-bps and one 400-bps pool and the same final statement projection"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-138",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/commercial-time.test.ts :: R2-138 (example 11): the subsequent rate is 400 bps iff the verified provider completion precedes the exclusive window end — one second before qualifies, exactly at the end does not — whatever the quote, confirmation or notification instant",
+    "apps/api/test/b10-commission-service.test.ts :: R2-138: two subsequent captures completed at the provider one second before and exactly at the local twelve-month endpoint, both notified a day later, accrue 400 bps for the first and no acquisition line for the second"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-139",
+   "class": "PARTIAL",
+   "test": [
+    "packages/domain/test/commercial-time.test.ts :: R2-139 (example 21): with weekends and 2026-10-12 excluded, the fifth banking day after September 2026 is 2026-10-07 and the tenth 2026-10-15; the same calendar without that holiday gives 2026-10-07 and 2026-10-14",
+    "packages/persistence/test/b10-ledger-migrations.test.ts :: R2-139 at the database: a period's close and pay dates are stored with the calendar version they came from, and a statement closed on a TEST_FIXTURE calendar is labelled SIMULATED",
+    "packages/application/test/commercial-fakes.test.ts :: the banking-calendar fake serves the controlled fixture with 2026-10-12 nonbanking, labelled TEST_FIXTURE and evidence class SIMULATED, never VERIFIED_FEED, and records each call",
+    "apps/api/test/cmd051-close-commission-period.test.ts :: OK: the commission service closes a due September 2026 period on the test calendar — 200 with one immutable ISSUED statement per seller itemizing each line, dated 2026-10-07 with pay date 2026-10-15 and labelled SIMULATED, its ELIGIBLE lines PAYABLE and the period CLOSED"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-141",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b10-agency-adapters.test.ts :: R2-141 (example 24): a display-name and owner e-mail change leaves the agency's id, first designation, consumed slot, recurrence set, attribution and ledger rows unchanged, and a recorded consolidation decision of two agencies merges no dataset, membership, designation or attribution and changes neither's quote eligibility",
+    "packages/persistence/test/b10-recurrence-migrations.test.ts :: R2-141 at the database: agency_relationship_decisions are append-only reviewed records, and every recurrence, founding, attribution and ledger row stays keyed by its own agency"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD002-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd002-activate-agency.test.ts :: OK: the agency's OWNER activates its DRAFT agency with the published terms and privacy versions and its current reviewed billing profile — 200 with the agency ACTIVE at the next version, one append-only acceptance naming both versions, their document hashes and the membership, agency.activated.v1, and no capability written",
+    "packages/persistence/test/b10-agency-adapters.test.ts :: CMD002 through the adapters: the published agreement versions are read after their shared locks, the acceptance is appended once, and B06's agencies_authority admits the activation only for the agency's current OWNER"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD002-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd002-activate-agency.test.ts :: DENY: another agency's OWNER is a foreign tenant (404) and a BILLING member a wrong role (403 ROLE_INSUFFICIENT); then one missing prerequisite at a time — an unpublished terms version AGREEMENT_VERSION_NOT_PUBLISHED, another agency's billing profile BILLING_PROFILE_MISMATCH, an unreviewed profile FISCAL_TREATMENT_UNREVIEWED, an ACTIVE agency AGENCY_NOT_DRAFT — each leaves the agency as it was with no acceptance",
+    "packages/persistence/test/b10-recurrence-migrations.test.ts :: CMD002 at the database: an acceptance names published agreement versions and the accepting OWNER membership of its agency, and acceptances cannot be updated or deleted"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD002-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd002-activate-agency.test.ts :: RACE: an identical retry replays the 200 without a second acceptance, the same key with another billingProfileRef is 409 IDEMPOTENCY_CONFLICT, two keys racing on one expectedVersion yield one activation and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the agency DRAFT with no acceptance"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD027-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd027-create-quote.test.ts :: OK: an AGENCY_BILLING member's CreateQuote on the approved plan of a sealed, available revision answers 201 with the quote ISSUED — base band, applied discount rounded once, service, reviewed tax, total, expiry at issuance + 336 h, source availability the earlier of that and B07's deadline, terms hash KAURO_QUOTE_TERMS_V1 — its snapshot at the issuance instant, quote.drafted.v1 and quote.issued.v1",
+    "apps/api/test/cmd027-create-quote.test.ts :: OK (not stacked): a founding-eligible agency with two qualifying prior projects is quoted at max(2500, 500) = 2500 bps with its slot RESERVED, never 3000, and the eligibility view names the count, the tier, the founding offer and the lookback start",
+    "packages/persistence/test/b10-recurrence-adapters.test.ts :: CMD027 issuance core: the snapshot's set is inserted from kauro.qualifying_projects_at under the recurrence lock's shared half in the same statement as its count and tier, the founding slot is taken in ascending slot order, and quote_issuances names the journal entry, the quote and the reservation"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD027-DENY",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd027-create-quote.test.ts :: DENY: another agency's project is a foreign tenant (404) and a VIEWER or APPROVER a wrong role (403); then one missing prerequisite at a time — zero billable units NO_BILLABLE_UNITS, a band beyond the launch envelope ENVELOPE_NOT_OFFERED, an unapproved plan, an expired source SOURCE_EXPIRED, an unreviewed fiscal treatment FISCAL_TREATMENT_UNREVIEWED, another billing profile BILLING_PROFILE_MISMATCH, a DRAFT or CLOSING agency AGENCY_NOT_ACTIVE — each writes no quote, snapshot or reservation",
+    "packages/persistence/test/b10-recurrence-migrations.test.ts :: CMD027 at the database: kauro_app cannot write qualifying_purchases, agency_recurrence or a slot's consumption, a reservation's quote must be an ISSUED quote of its agency, and a replacement quote needs its paid terms",
+    "apps/api/test/cmd027-create-quote.test.ts :: DENY (buyer type): with the buyer-type fake answering unset, CreateQuote is 409 PRECONDITION_FAILED BUYER_TYPE_UNSET and writes nothing; answering AGENCY or IN_HOUSE, the same request issues the same price"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B11"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD027-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd027-create-quote.test.ts :: RACE: an identical retry replays the 201 with the same quote, the same key with another planId is 409 IDEMPOTENCY_CONFLICT, two keys for one project serialize on its live quote with the wait observed and supersede exactly once, and a crash before COMMIT leaves no quote, snapshot or reservation",
+    "apps/api/test/cmd027-create-quote.test.ts :: RACE (snapshot against designation): a CreateQuote held after its shared recurrence lock and a first-purchase designation of the same agency serialize in both orders — the quote's set includes the new purchase with its tier or excludes it wholly, never half",
+    "apps/api/test/cmd027-create-quote.test.ts :: RACE (replacement): a crash before the replacement's intent commits leaves nothing, a crash between the intent commit and the payment service's re-binding resumes from the journal entry to one re-binding, and a crash after the re-binding completes the same answer — the purchase is never re-bound twice"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD043-OK",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd043-close-agency.test.ts :: OK: the OWNER with a fresh step-up requests closure of an ACTIVE agency with nothing in flight — 200 with the agency CLOSING, one closure record inventorying withdrawn open quotes, live authorizations, open refunds, non-terminal tax documents, the agency's OPEN reconciliation cases with kind and amount (an UNKNOWN_REFUND among them), active work and the managed-deletion schedule, and agency.closing.v1",
+    "apps/api/test/cmd043-close-agency.test.ts :: OK (new work stops): after CloseAgency the agency's ISSUED quote is WITHDRAWN with its founding reservation RELEASED, CreatePaymentOrder and CreateProject of the agency are refused AGENCY_NOT_ACTIVE, and its sellers' commission lines are unchanged with their edges to payment intact"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B16"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD043-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd043-close-agency.test.ts :: DENY: another agency's closure is a foreign tenant (404) and a BILLING member a wrong role (403); then one missing prerequisite at a time — no fresh step-up ASSURANCE_REQUIRED, a stale version STALE_VERSION, a payment order in flight or an uncertain refund CLOSURE_OBLIGATIONS_UNRECONCILED — each leaves the agency and its obligations unchanged",
+    "packages/persistence/test/b10-recurrence-migrations.test.ts :: CMD043 at the database: CLOSING to CLOSED is refused while any payment order, refund, live authorization or tax document of the agency is non-terminal or any reconciliation case of the agency is OPEN, an UNKNOWN_REFUND keyed by its provider_ref included (KC006), and no runtime role can delete a commission, fiscal or ledger row of a closing agency"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD043-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd043-close-agency.test.ts :: RACE: an identical retry replays the 200, the same key with another assuranceProofRef is 409 IDEMPOTENCY_CONFLICT, CloseAgency racing CreatePaymentOrder of the agency's issued quote serializes on the agency in both orders — the order commits first and the closure is 409 CLOSURE_OBLIGATIONS_UNRECONCILED, or the closure commits first and the order is refused AGENCY_NOT_ACTIVE — and a crash before COMMIT leaves the agency ACTIVE"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD045-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd045-register-prospect.test.ts :: OK: an ACTIVE seller registers a prospect from its own AGENCY-segment source evidence and business contact — 201 with one RESEARCHED prospect owned by the seller, its organization key, no claim, no attribution, and a view without contact details or customer data; the owner may register one too",
+    "packages/application/test/commercial-contracts.test.ts :: the commercial contracts: every request schema carries exactly the registry fields of its command, every view is closed and withholds contact details, destination digests and other sellers' rows, and CommercialAuthorizer admits a seller only while its row is ACTIVE and the owner only with an ACTIVE grant"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD045-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd045-register-prospect.test.ts :: DENY: an agency member's tenant session is a foreign scope and a CANDIDATE or TERMINATED seller a wrong role (403); then one missing prerequisite at a time — source evidence of another seller or segment SOURCE_EVIDENCE_INVALID, an organization spelled differently but suppressed by organization or contact key PROSPECT_SUPPRESSED, a live duplicate PROSPECT_EXISTS — nothing is written",
+    "packages/persistence/test/b10-sales-migrations.test.ts :: CMD045 at the database: source evidence admits only the AGENCY segment, one live prospect exists per normalized organization key, and a prospect whose organization or contact key is suppressed is refused KC016",
+    "packages/domain/test/commercial-rules.test.ts :: CMD045: the organization key KAURO_PROSPECT_ORGANIZATION_V1 normalizes case, IDNA, a leading www. and a trailing dot, so every spelling of one business domain has one key and a re-imported list maps to the same keys"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD045-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd045-register-prospect.test.ts :: RACE: an identical retry replays the 201, the same key with another organizationLabel is 409 IDEMPOTENCY_CONFLICT, two sellers registering one organization at once yield one prospect and one 409 PROSPECT_EXISTS with the wait observed, and a crash before COMMIT leaves no prospect"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD046-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd046-claim-prospect.test.ts :: OK: an ACTIVE seller claims a prospect it owns with substantive evidence under its active agreement version — 201 with one SUBMITTED claim whose review deadline is 2160 h later, and no allocation, entitlement or agency ownership"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD046-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd046-claim-prospect.test.ts :: DENY: another seller's prospect is a foreign scope (404) and the owner or an agency member a wrong role (403); then one missing prerequisite at a time — a stale agreement version AGREEMENT_VERSION_MISMATCH, a list import or tracking link alone CLAIM_EVIDENCE_INSUFFICIENT, the seller's second live claim CLAIM_EXISTS — nothing is written",
+    "apps/api/test/cmd046-claim-prospect.test.ts :: DENY (conflict review): a claim on a prospect with another seller's accepted or live claim is written DISPUTED in the same transaction and owns nothing",
+    "packages/persistence/test/b10-sales-migrations.test.ts :: CMD046 at the database: a claim needs its seller ACTIVE with that agreement version, one live claim exists per seller and prospect, and a claim's evidence and deadlines cannot change"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD046-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd046-claim-prospect.test.ts :: RACE: an identical retry replays the 201, the same key with another evidenceHash is 409 IDEMPOTENCY_CONFLICT, two sellers' claims of one prospect serialize on its claims lock with the wait observed — the second is DISPUTED — and a crash before COMMIT leaves no claim"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD047-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd047-accept-attribution.test.ts :: OK: the owner accepts a SUBMITTED claim with a prepared allocation naming the agency, the ruling reason and one 10000-bps share — 200 with the claim ACCEPTED, expiring 2160 h after acceptance, the allocation frozen and a competing claim REJECTED",
+    "apps/api/test/cmd047-accept-attribution.test.ts :: OK (split): an allocation of two sellers' claims at 6000/4000 under their signed agreements is frozen once and both claims are ACCEPTED"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD047-DENY",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd047-accept-attribution.test.ts :: DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — shares summing to 9999 SHARES_NOT_WHOLE, a claim submitted after the agency's first payment order CLAIM_AFTER_FIRST_ORDER, a second full-rate seller's allocation for the agency ATTRIBUTION_EXISTS, a stale version — nothing is written and no pool can double",
+    "apps/api/test/cmd047-accept-attribution.test.ts :: DENY (buyer type, D58): with the buyer-type fake answering unset or IN_HOUSE, AcceptAttribution is 409 PRECONDITION_FAILED BUYER_TYPE_UNSET or IN_HOUSE_NOT_ATTRIBUTABLE and writes nothing; answering AGENCY, the same request freezes the allocation",
+    "packages/persistence/test/b10-sales-migrations.test.ts :: CMD047 at the database: one frozen allocation exists per agency, its shares sum to 10000 bps at COMMIT (KC003) with each beneficiary's pool terms equal to its signed agreement, and no assignment row can reference or alter it"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B11"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD047-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd047-accept-attribution.test.ts :: RACE: an identical retry replays the 200, the same key with another shareAllocationRef is 409 IDEMPOTENCY_CONFLICT, two acceptances for one agency racing yield one allocation and one ATTRIBUTION_EXISTS with the wait observed, and a crash before COMMIT leaves the claim SUBMITTED"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD048-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd048-assign-account.test.ts :: OK: the owner assigns an agency to an ACTIVE seller with a prepared service assignment — 200 with one current account assignment and the previous one ended, the agency's allocation, entitlements, window and first designation unchanged row for row"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD048-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd048-assign-account.test.ts :: DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a CANDIDATE or TERMINATED seller SELLER_NOT_ACTIVE, no prepared service assignment SERVICE_ASSIGNMENT_UNPREPARED, a stale version — and no request shape resets the window or the first designation",
+    "packages/persistence/test/b10-sales-migrations.test.ts :: CMD048 at the database: account assignments are append-only with one current per agency, and no runtime role can update an entitlement's first capture, window or share or the agency's first designation"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD048-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd048-assign-account.test.ts :: RACE: an identical retry replays the 200, the same key with another sellerId is 409 IDEMPOTENCY_CONFLICT, two assignments on one version yield one and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the previous assignment current"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD049-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd049-activate-seller.test.ts :: OK: the owner with a fresh step-up activates a CANDIDATE seller whose agreement is signed and whose legal review, assessment, confidentiality acceptance, VERIFIED destination, tax documentation and MFA identity are recorded — 200 with the seller ACTIVE on that agreement's compensation version, able to register prospects and read only its own statements",
+    "packages/application/test/commercial-contracts.test.ts :: the commercial contracts: every request schema carries exactly the registry fields of its command, every view is closed and withholds contact details, destination digests and other sellers' rows, and CommercialAuthorizer admits a seller only while its row is ACTIVE and the owner only with an ACTIVE grant"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD049-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd049-activate-seller.test.ts :: DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — an unsigned agreement, a contractor label without a legal review of its substance, no assessment evidence, an unverified destination, no fresh step-up — each refused with the seller left CANDIDATE",
+    "packages/persistence/test/b10-sales-migrations.test.ts :: CMD049 at the database: a seller becomes ACTIVE only with a signed agreement, a confirming legal review, assessment and confidentiality records, a VERIFIED destination and tax documentation (KC005), and a seller's session reads only its own sales rows"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD049-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd049-activate-seller.test.ts :: RACE: an identical retry replays the 200, the same key with another agreementId is 409 IDEMPOTENCY_CONFLICT, two activations racing yield one ACTIVE seller with the wait observed, and a crash before COMMIT leaves it CANDIDATE"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD050-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd050-terminate-seller.test.ts :: OK: the owner terminates an ACTIVE seller with prepared terms and an enumerated manifest — 200 with the seller TERMINATED at the effective instant, its assignments ended, its prospects unassigned, its entitlements TERMINATED_WITH_RESIDUAL, its unlisted open claims EXPIRED and one tail entry per listed opportunity"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD050-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd050-terminate-seller.test.ts :: DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — a manifest entry of an agency that already purchased or of another seller's claim TAIL_NOT_ENUMERATED, a manifest of unclaimed scraped prospects TAIL_NOT_ENUMERATED, no termination terms TERMINATION_TERMS_UNPREPARED, a stale version — nothing is written",
+    "packages/persistence/test/b10-ledger-migrations.test.ts :: CMD050 at the database: no runtime role holds DELETE on any B10 table, and a terminated seller's lines, adjustments, statements and payout rows are unchanged by the termination"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD050-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd050-terminate-seller.test.ts :: RACE: an identical retry replays the 200, the same key with another manifest is 409 IDEMPOTENCY_CONFLICT, two terminations on one expectedVersion yield one TERMINATED seller and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the seller ACTIVE with its claims and entitlements unchanged",
+    "apps/api/test/b10-scenarios.test.ts :: CMD050-RACE: TerminateSeller racing AcceptAttribution of the seller's unlisted claim, held at the seller row, serializes in both orders — acceptance first: the claim is ACCEPTED, then EXPIRED as unlisted by the termination; termination first: the claim is EXPIRED and AcceptAttribution is 409 CLAIM_NOT_REVIEWABLE — and no live claim of a terminated seller remains"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD051-OK",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd051-close-commission-period.test.ts :: OK: the commission service closes a due September 2026 period on the test calendar — 200 with one immutable ISSUED statement per seller itemizing each line, dated 2026-10-07 with pay date 2026-10-15 and labelled SIMULATED, its ELIGIBLE lines PAYABLE and the period CLOSED",
+    "packages/persistence/test/b10-ledger-adapters.test.ts :: CMD051 through the adapters: the cutoff hash KAURO_COMMISSION_CUTOFF_V1 over the included lines, adjustments and holds is recomputed identically from the rows and changes with any of them, and statements and their items cannot be updated or deleted",
+    "apps/api/test/commission-statement-reads.test.ts :: GetCommissionStatement answers a seller its own statement and the owner any — per line the agency and project reference, first or repeat, basis, rate, share, cumulative, previously paid, adjustment, hold reason and review date — and never another seller's rows, a destination digest, contact details or customer CRM values"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD051-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd051-close-commission-period.test.ts :: DENY: a user token or the finance service is a wrong service identity (403) and another period a foreign scope (404); then one missing prerequisite at a time — an undelivered COMMISSIONS record before the cutoff INPUTS_UNRECONCILED, a changed ledger LEDGER_CHANGED, a period not yet due PERIOD_NOT_DUE — and a line awaiting final completion or AVAILABLE funds stays a reasoned hold item, never payable",
+    "packages/persistence/test/b10-ledger-migrations.test.ts :: CMD051 at the database: a line becomes PAYABLE only through an ISSUED statement item naming it, and a line without a FINAL completion 720 hours old or AVAILABLE funds cannot be ELIGIBLE (KC007)"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD051-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd051-close-commission-period.test.ts :: RACE: an identical retry replays the 200 with the same statements, the same key with another ledgerCutoffHash is 409 IDEMPOTENCY_CONFLICT, a close racing a refund adjustment serializes on the period in both orders — the adjustment is in this statement or the next, never both or neither — and a crash before COMMIT leaves the period OPEN"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD052-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd052-approve-commission-payout.test.ts :: OK: the owner with a fresh step-up approves an ISSUED statement's payable to the seller's VERIFIED destination with bank-available cash — 200 with one AUTHORIZED intent of exactly the payable, fee bearer KAURO, the destination's version and digest and reference kauro-payout-<intentId>, the statement APPROVED, and no transfer"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD052-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd052-approve-commission-payout.test.ts :: DENY: an agency member's tenant session is a foreign scope and the seller a wrong role (403); then one missing prerequisite at a time — an unverified or superseded payee PAYEE_UNVERIFIED, a zero payable NOTHING_PAYABLE, cash short of the payable and the live intents FUNDS_UNAVAILABLE, no fresh step-up — and a one-cent payable is approved in full with no fee deducted",
+    "packages/persistence/test/b10-ledger-migrations.test.ts :: CMD052 at the database: an intent's amount equals its statement's payable, its payee is a VERIFIED destination version of the statement's seller (KC009), and one live intent exists per statement"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD052-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd052-approve-commission-payout.test.ts :: RACE: an identical retry replays the 200, the same key with another payeeRef is 409 IDEMPOTENCY_CONFLICT, two approvals of one statement yield one intent and one 409 STALE_VERSION with the wait observed, and a crash before COMMIT leaves the statement ISSUED with no intent"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD053-OK",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd053-reconcile-commission-payout.test.ts :: OK: the finance service reconciles an intent with SETTLED evidence from the payout-evidence fake matching reference, destination digest, amount and currency — 200 with the intent SETTLED, the statement PAID with the evidence hash and its lines PAID; FAILED or RETURNED evidence keeps the intent FAILED or RETURNED, the lines HELD PAYOUT_FAILED with a review date and the statement superseded by its correcting statement (CORRECTED, D10-GAP-12)",
+    "packages/persistence/test/b10-ledger-migrations.test.ts :: CMD053 at the database: a line becomes PAID only when its statement's intent is SETTLED with an evidence hash (KC010), and a FAILED or RETURNED intent is kept with its evidence"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD053-DENY",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd053-reconcile-commission-payout.test.ts :: DENY: a user token or the commission service is a wrong service identity (403) and an intent of another statement a foreign scope (404); then one missing prerequisite at a time — evidence of another reference, destination or amount PAYOUT_EVIDENCE_MISMATCH, SUBMITTED-only evidence PAYOUT_NOT_SETTLED — nothing changes and the lines stay PAYABLE",
+    "packages/persistence/test/b10-ledger-migrations.test.ts :: CMD053 at the database: a line becomes PAID only when its statement's intent is SETTLED with an evidence hash (KC010), and a FAILED or RETURNED intent is kept with its evidence"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD053-RACE",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd053-reconcile-commission-payout.test.ts :: RACE: an identical retry replays the 200, the same key with other evidence is 409 IDEMPOTENCY_CONFLICT, two reconciliations of one intent yield one settlement with the wait observed, and a crash before COMMIT leaves the intent AUTHORIZED and the lines PAYABLE",
+    "packages/persistence/test/b10-ledger-adapters.test.ts :: CMD053 through the adapters: settling an intent takes its statement's row lock, so two settlements serialize and the second finds it SETTLED and changes nothing"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  }
+ ]
+}

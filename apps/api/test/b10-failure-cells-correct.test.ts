@@ -4,6 +4,7 @@
 // cell observes the correction waiting on the statement's row lock or holding it until its COMMIT, and a partial cell fails after a
 // statement of the unit completed. A correction has no route (D10-GAP-7): it is called as the commission service over its runtime.
 // PostgreSQL 17 through the runtime login roles; the superuser only reads. Nothing sleeps.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { PayoutIntentView, PayoutReconciliationView, PeriodCloseView, StatementCorrectionView } from "@kauro/application";
@@ -14,6 +15,8 @@ import type { SqlStep } from "./fault-support.js";
 import { completed, freshKey, outcome, type Reply } from "./support.js";
 
 let sw: StatementsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => sw.h.oracle);
 before(async () => {
   sw = await statementsWorld();
 });

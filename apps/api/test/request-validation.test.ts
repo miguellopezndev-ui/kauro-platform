@@ -257,14 +257,20 @@ test("exactly the fourteen catalogue routes and the selection manifest intake ar
   const commercialGets = new Set(COMMERCIAL_SERVED_READ_IDS.map((id) => fastifyPath(COMMERCIAL_READ_ROUTES[id].path)));
   for (const path of commercialGets) assert.ok(w.app.hasRoute({ method: "GET", url: path }) && path.startsWith("/api/v1/"), path);
   const inventory = routeInventoryOf(w.app);
+  // lane PV1 ACH-ROUTE (Payments V1, A8): the bank-route operations as POST and the route and transfer-instruction reads as GET, served
+  // beside the catalogue and named here exactly (RULED CHANGE, docs/review/pv1-route-test-repairs.md)
+  const bankPosts = new Set(["/api/v1/operations/bank-routes", "/api/v1/operations/bank-routes/:routeId/verify", "/api/v1/operations/bank-routes/:routeId/enable", "/api/v1/operations/bank-routes/:routeId/disable", "/api/v1/operations/bank-routes/:routeId/details"]);
+  const bankGets = new Set(["/api/v1/operations/bank-routes/:routeId", "/api/v1/payment-orders/:orderId/transfer-instructions"].filter((path) => !commerceGets.has(path)));
+  assert.deepEqual(inventory.filter((r) => r.method === "POST" && bankPosts.has(r.url)).map((r) => r.url).sort(), [...bankPosts].sort());
+  assert.deepEqual(inventory.filter((r) => r.method === "GET" && bankGets.has(r.url)).map((r) => r.url).sort(), [...bankGets].sort());
   // B06's seven commands, B07's six (design §11), B08's two job commands and four audit commands (design §12), B11's CMD044 and the
   // selection manifest and decision artifact intakes (D-SEL-2, D8-CMA-7); beside them every served route of
   // package B09 — the request side (M4) and the payment service's routes (M3), served in every edition (D-REQ-B1, D-M3-B1) — and
   // nothing else of the payment catalogue
-  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url) && !commercialPosts.has(r.url)).length, 22);
+  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url) && !commercialPosts.has(r.url) && !bankPosts.has(r.url)).length, 22);
   assert.deepEqual(inventory.filter((r) => commercialPosts.has(r.url) && r.method === "POST").map((r) => r.url).sort(), [...commercialPosts].sort());
   // the five manual-10 reads, the two support reads (B11 W4), the seven source reads (B07 design §9.1), GetJob and GetAudit (B08 design §12)
-  assert.equal(inventory.filter((r) => r.method === "GET" && r.url.startsWith("/api/v1/") && !commerceGets.has(r.url) && !commercialGets.has(r.url)).length, 16);
+  assert.equal(inventory.filter((r) => r.method === "GET" && r.url.startsWith("/api/v1/") && !commerceGets.has(r.url) && !commercialGets.has(r.url) && !bankGets.has(r.url)).length, 16);
   assert.deepEqual(inventory.filter((r) => commercePosts.has(r.url) && r.method === "POST").map((r) => r.url).sort(), [...commercePosts].sort());
   assert.deepEqual(inventory.filter((r) => commerceGets.has(r.url) && r.method === "GET").map((r) => r.url).sort(), [...commerceGets].sort());
   // each route validates its body against its own closed request schema

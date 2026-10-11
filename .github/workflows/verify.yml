@@ -3,28 +3,52 @@ name: verify
 on:
   push:
     branches: [main]
+  # Draft PRs run nothing (a draft cannot merge). `labeled` exists so that adding the `windows` label to the final candidate
+  # runs the Windows leg on its exact head (owner D-03, 2026-10-05); every label event reruns all the head's legs (see plan).
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
+  # Which legs run (owner D-03, 2026-10-05): ubuntu on every non-draft PR head; Windows only on main, on dispatch, and on a PR
+  # that carries the `windows` label (the final candidate). On an ordinary PR the required context `verify (windows-latest)`
+  # therefore does not report and the PR cannot merge until its final head has a real Windows success: a skipped leg never
+  # stands in for a green one.
+  plan:
+    name: plan
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
+    outputs:
+      include: ${{ steps.plan.outputs.include }}
+    steps:
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          HAS_WINDOWS_LABEL: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'windows') }}
+        run: |
+          set -eu
+          ubuntu='{"os":"ubuntu-24.04","pgbin":"/usr/lib/postgresql/17/bin"}'
+          windows='{"os":"windows-latest","pgbin":"C:/pgsql17/pgsql/bin"}'
+          # Every PR run carries ALL legs required for its head: GitHub evaluates a PR's required checks on the LATEST run of
+          # this workflow for the head, so a run with fewer legs (e.g. a label event) would leave a required context "expected".
+          if [ "$EVENT" != pull_request ] || [ "$HAS_WINDOWS_LABEL" = true ]; then legs="$ubuntu,$windows"; else legs="$ubuntu"; fi
+          echo "include=[$legs]" >> "$GITHUB_OUTPUT"
+          echo "legs: [$legs]"
+
   verify:
     name: verify (${{ matrix.os }})
+    needs: plan
+    if: needs.plan.outputs.include != '[]'
+    # No concurrency group: no run ever cancels another. GitHub judges a PR's required checks on the newest run of this
+    # workflow for the head, and job scheduling order is not guaranteed, so any cross-run cancellation could cancel a leg of
+    # that newest run. Cost only: superseded heads and duplicate label runs finish (they never vouch for another head).
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-24.04
-            pgbin: /usr/lib/postgresql/17/bin
-          # Windows on every PR (owner 2026-10-04): local Windows verify is then only needed at package close.
-          - os: windows-latest
-            pgbin: C:/pgsql17/pgsql/bin
+        include: ${{ fromJSON(needs.plan.outputs.include) }}
     runs-on: ${{ matrix.os }}
     env:
       PGBIN: ${{ matrix.pgbin }}

@@ -1,0 +1,107 @@
+{
+ "gate": "G-RELEASE",
+ "manual": "21",
+ "package": "B18",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "S079",
+   "package": "B18",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S080",
+   "package": "B18",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S088",
+   "package": "B18",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-113",
+   "package": "B18",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-114",
+   "package": "B18",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD058-OK",
+   "package": "B18",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD058-DENY",
+   "package": "B18",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD058-RACE",
+   "package": "B18",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD059-OK",
+   "package": "B18",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD059-DENY",
+   "package": "B18",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD059-RACE",
+   "package": "B18",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B18"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B18",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

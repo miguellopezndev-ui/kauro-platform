@@ -5,7 +5,7 @@
 // hand-calculated from the example's wall times (America/Bogota is UTC-05:00 all year), never read back from the function.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { acquisitionRate, bankingDayAfterMonthEnd, commissionPeriodOf, eligibilityDecision, recurrenceWindowEndsAt, registryCommissionPolicy, type EligibilityFacts } from "../src/index.js";
+import { PROVIDER_TIME_PLAUSIBILITY_TOLERANCE_MS, acquisitionRate, providerTimePlausible, bankingDayAfterMonthEnd, commissionPeriodOf, eligibilityDecision, recurrenceWindowEndsAt, registryCommissionPolicy, type EligibilityFacts } from "../src/index.js";
 
 test("R2-094 (example 11): a first confirmation at 2028-02-29T15:00:00Z (10:00 America/Bogota) ends its window exclusively at 2029-02-28T15:00:00Z and one at 2026-09-12T14:00:00Z at 2027-09-12T14:00:00Z — twelve calendar months at the same wall time with the day clamped, never 365 days", () => {
   const terms = registryCommissionPolicy();
@@ -81,8 +81,9 @@ test("R2-138 (example 11): the subsequent rate is 400 bps iff the verified provi
   assert.deepEqual(at("2027-09-12T14:00:00.000Z", { confirmationSeq: 1 }), { kind: "FIRST", rateBps: 1000 });
   // an implausible or missing provider instant holds the cutoff decision, never guessed from another instant (example 10)
   const held = { kind: "HELD", rateBps: 400, reason: "PROVIDER_TIME_UNVERIFIED" };
-  assert.deepEqual(at("2027-09-12T13:59:59.000Z", { confirmedAt: "2027-09-12T13:59:58.000Z" }), held, "completed after its own confirmation");
-  assert.deepEqual(at("2027-09-12T13:59:59.000Z", { orderCreatedAt: "2027-09-12T13:59:59.001Z" }), held, "completed before its order existed");
+  assert.deepEqual(at("2027-09-12T13:59:59.000Z", { confirmedAt: "2027-09-12T13:59:48.000Z" }), held, "completed 11 s after its own confirmation (D-15: 1 s is tolerated)");
+  assert.deepEqual(at("2027-09-12T13:59:59.000Z", { orderCreatedAt: "2027-09-12T14:00:10.000Z" }), held, "completed 11 s before its order existed");
+  assert.deepEqual(at("2027-09-12T13:59:59.000Z", { confirmedAt: "2027-09-12T13:59:58.000Z" }), { kind: "REPEAT", rateBps: 400 }, "completed 1 s after confirmation is no longer HELD");
   assert.deepEqual(at(null), held, "no authenticated provider completion");
   assert.throws(() => at("2027-09-12T13:59:59.000Z", { confirmationSeq: 0 }), RangeError);
 });
@@ -118,4 +119,17 @@ test("R2-139 (example 21): with weekends and 2026-10-12 excluded, the fifth bank
   for (const bad of [() => bankingDayAfterMonthEnd("2026-09", 0, plain), () => bankingDayAfterMonthEnd("2026-13", 5, plain), () => bankingDayAfterMonthEnd("2026-9", 5, plain), () => bankingDayAfterMonthEnd("2026-09", 5, { nonbankingDates: ["12/10/2026"], ...covering })]) {
     assert.throws(bad, RangeError);
   }
+});
+
+test("D-15 boundaries: provider time is plausible within 10 s of confirmation (after) and of order creation (before); exactly 10 s is INCLUSIVE (plausible), 10.001 s is HELD", () => {
+  assert.equal(PROVIDER_TIME_PLAUSIBILITY_TOLERANCE_MS, 10000);
+  const base = Date.parse("2027-03-01T12:00:00.000Z");
+  const iso = (ms: number) => new Date(base + ms).toISOString();
+  for (const [delta, ok] of [[9999, true], [10000, true], [10001, false]] as const) {
+    assert.equal(providerTimePlausible({ confirmedAt: iso(0), orderCreatedAt: iso(-3600000), providerCompletedAt: iso(delta) }), ok, `after confirmation by ${delta} ms (10000 inclusive)`);
+  }
+  for (const [delta, ok] of [[9999, true], [10000, true], [10001, false]] as const) {
+    assert.equal(providerTimePlausible({ confirmedAt: iso(3600000), orderCreatedAt: iso(0), providerCompletedAt: iso(-delta) }), ok, `before order creation by ${delta} ms (10000 inclusive)`);
+  }
+  assert.equal(providerTimePlausible({ confirmedAt: iso(0), orderCreatedAt: iso(-3600000), providerCompletedAt: null }), false);
 });

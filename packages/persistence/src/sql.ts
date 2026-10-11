@@ -6,7 +6,8 @@
  */
 import type { UtcInstant } from "@kauro/contracts";
 import { DomainFailure, toUtcInstant } from "@kauro/domain";
-import { DatabaseError, type PoolClient, type QueryResult, type QueryResultRow } from "pg";
+import type { PoolClient, QueryResult, QueryResultRow } from "pg";
+import { DatabaseError } from "./pool.js";
 import { SQLSTATE, failureOfSqlState } from "./sqlstate.js";
 
 /** A unique constraint refused a write and no taxonomy code fits without the handler's knowledge (design §4.2 sqlstate). */

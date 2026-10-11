@@ -9,6 +9,7 @@
 // integer cents are written here, never read back from the code under test. Nothing sleeps: interleavings are held at named points and
 // every wait is observed in pg_stat_activity. The founding cohort's three slots serve the whole cluster; the window sweeps, which stand
 // a year ahead, run last.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { ExecuteRefundView, WebhookAck } from "@kauro/application";
@@ -47,6 +48,8 @@ import { deliver, execute, postWebhook, reconcile, storeQuery } from "./payment-
 import { clock, completed, ids } from "./support.js";
 
 let cw: CommissionWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => cw.h.oracle);
 before(async () => {
   cw = await commissionWorld();
 });
@@ -595,6 +598,55 @@ test("example 19: a tax-inclusive 112000-cent capture of a 100000-cent service l
   assert.deepEqual(poolShape(await poolsOf(cw, p.authorizationId)), [{ source: "ACQUISITION", rateKind: "FIRST", rateBps: 1000, basis: "50000", pool: "5000" }]);
   const [line] = await linesOf(cw, p.authorizationId);
   assert.deepEqual((await adjustmentsOf(cw, line!.line_id)).map((x) => [x.reason, x.direction, x.amount_cents, x.new_cumulative_entitlement_cents, x.new_basis_cents]), [["REFUND", "DECREASE", "5000", "5000", "50000"]]);
+});
+
+/**
+ * The bank-transfer rail over this commission world (lane L-INBOUND, PAYMENTS-V1 §7.26): a purchase paid by one exact bank credit through
+ * L-ROUTE's I2 and L-INBOUND's C5/C6/M1-M2/P1, its funds observation (a credit version with fundsState) and its refund through the manual
+ * rail (L-REFUND's F2/X1/G2). KIT seam IN1 (missing on a6e64be): commissionWorld({ bankEvidence }) wiring the CONTRACT_FAKE bank store
+ * into this world's api and payment runtime, exposing `cw.bank` with exactly these three operations.
+ */
+interface BankRail {
+  purchase(s: Selling, label: string): Promise<Purchase>;
+  funds(p: Purchase, state: "HELD" | "AVAILABLE"): Promise<void>;
+  refunded(s: Selling, p: Purchase, serviceCents: bigint, taxCents?: bigint): Promise<string>;
+}
+function bankRail(): BankRail {
+  const rail = (cw as unknown as { bank?: BankRail }).bank;
+  if (rail === undefined) throw new Error("SEAM IN1 missing on KIT: commissionWorld({ bankEvidence }) exposing cw.bank { purchase, funds, refunded } over the CONTRACT_FAKE bank store (L-ROUTE I2 + L-INBOUND C5/C6/P1 + L-REFUND F2/X1/G2)");
+  return rail;
+}
+
+test("OK rail parity: an exact bank-transfer capture accrues, holds and adjusts commission exactly as a provider capture of the same cents", async () => {
+  const rail = bankRail();
+  const { s: sp } = await acquired("rail-provider");
+  const { s: sb } = await acquired("rail-bank");
+  const provider = await purchase(cw, sp, "rail-provider");
+  const bank = await rail.purchase(sb, "rail-bank");
+  assert.deepEqual([bank.serviceCents, bank.taxCents, bank.totalCents], [provider.serviceCents, provider.taxCents, provider.totalCents], "the same cents on both rails");
+  await dispatch();
+  // accrues: one first-purchase pool on the allocated service, the same rate, basis and pool
+  const pp = poolShape(await poolsOf(cw, provider.authorizationId));
+  assert.deepEqual(pp, [{ source: "ACQUISITION", rateKind: "FIRST", rateBps: 1000, basis: SERVICE.toString(), pool: FIRST_POOL }]);
+  assert.deepEqual(poolShape(await poolsOf(cw, bank.authorizationId)), pp, "the bank capture accrues exactly as the provider capture");
+  const [pLine] = await linesOf(cw, provider.authorizationId);
+  const [bLine] = await linesOf(cw, bank.authorizationId);
+  // holds: funds held at the provider / at the receiving bank -> the same FUNDS_HELD hold of the same cents
+  await fundsAtProvider(provider, "DELAYED");
+  await rail.funds(bank, "HELD");
+  await dispatch();
+  const holdOf = async (lineId: string) => (await oracleRows<{ reason: string; amount_cents: string; state: string }>(cw, "SELECT reason, amount_cents::text, state FROM kauro.commission_holds WHERE line_id = $1", [lineId])).map((h) => [h.reason, h.amount_cents, h.state]);
+  assert.deepEqual(await holdOf(pLine!.line_id), [["FUNDS_HELD", FIRST_POOL, "OPEN"]]);
+  assert.deepEqual(await holdOf(bLine!.line_id), await holdOf(pLine!.line_id), "held exactly alike");
+  assert.deepEqual([(await lineState(bLine!.line_id)).state, (await lineState(pLine!.line_id)).state], ["HELD", "HELD"]);
+  // adjusts: a 50,000-cent service refund decreases both bases and entitlements by the same cents
+  await refunded(sp, provider, 50_000n);
+  await rail.refunded(sb, bank, 50_000n);
+  await dispatch();
+  const adj = async (lineId: string) => (await adjustmentsOf(cw, lineId)).map((x) => [x.reason, x.direction, x.amount_cents, x.new_cumulative_entitlement_cents, x.new_basis_cents]);
+  // basis 97,125 - 50,000 = 47,125; the line's entitlement follows its pool round_half_up_bps(47125, 1000) = 4713 (split per share)
+  assert.deepEqual((await adj(pLine!.line_id)).map((x) => [x[0], x[1], x[4]]), [["REFUND", "DECREASE", "47125"]]);
+  assert.deepEqual(await adj(bLine!.line_id), await adj(pLine!.line_id), "adjusted exactly alike");
 });
 
 // --- the window sweeps (they stand up to a year ahead: last) -----------------------------------------------------------------

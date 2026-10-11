@@ -10,6 +10,7 @@
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import {
   DomainFailure,
+  LiveQuoteChangedFailure,
   baseServiceCents,
   quoteAmounts,
   quoteTermsHash,
@@ -137,6 +138,8 @@ function issuanceRecord(r: IssuanceRow): QuoteIssuanceRecord {
 }
 
 const LIVE_QUOTE_STATES: ReadonlySet<string> = new Set(["DRAFT", "ISSUED", "ACCEPTED_FOR_CHECKOUT"]);
+/** quotes_one_live_per_project's predicate: an unpaid quote being drafted, issued or accepted, or an accepted replacement. */
+const isLive = (q: { readonly state: string; readonly replacesQuoteId?: unknown }): boolean => q.state === "ACCEPTED_FOR_CHECKOUT" || (q.replacesQuoteId === undefined && LIVE_QUOTE_STATES.has(q.state));
 
 export class PgRecurrenceRepository implements RecurrenceRepository {
   constructor(
@@ -200,7 +203,8 @@ export class PgRecurrenceRepository implements RecurrenceRepository {
       const previous = await this.founding.reservationOfQuote(superseded.quoteId);
       if (previous !== null && (previous.state === "RESERVED" || previous.state === "RECONCILIATION_HOLD")) {
         const write = await this.founding.release(previous.reservationId, previous.version, request.issuedAt);
-        if (write.kind !== "APPLIED") throw new DomainFailure("STALE_VERSION", "the superseded quote's reservation changed", { currentVersion: write.currentVersion });
+        // retryable, the project's quote as current (CMD027 adds it): never the reservation's version as if it were the quote's (D10-GAP-25)
+        if (write.kind !== "APPLIED") throw new LiveQuoteChangedFailure("the superseded quote's reservation changed between its read and its release");
         released = write.record;
       }
     }
@@ -327,17 +331,22 @@ export class PgRecurrenceRepository implements RecurrenceRepository {
 
   /** The project's live quote FOR UPDATE; an unpaid one is superseded by the quote being issued (its event: quote.superseded.v1). */
   async #supersedePrevious(request: QuoteIssuanceRequest): Promise<QuoteRecord | null> {
+    // the live predicate of quotes_one_live_per_project (the same as CMD027's liveQuoteOf, D10-GAP-25), aliased so a fault step tells them apart
     const found = await execute<{ quote_id: string }>(
       this.db,
-      `SELECT quote_id FROM kauro.quotes WHERE agency_id = $1 AND project_id = $2 AND replaces_quote_id IS NULL AND state IN ('DRAFT', 'ISSUED', 'ACCEPTED_FOR_CHECKOUT')`,
+      `SELECT q.quote_id FROM kauro.quotes q
+        WHERE q.agency_id = $1 AND q.project_id = $2
+          AND ((q.replaces_quote_id IS NULL AND q.state IN ('DRAFT', 'ISSUED', 'ACCEPTED_FOR_CHECKOUT')) OR q.state = 'ACCEPTED_FOR_CHECKOUT')`,
       [request.agencyId, request.projectId],
     );
     const id = found.rows[0]?.quote_id as QuoteId | undefined;
     if (id === undefined) return null;
     const locked = await this.quotes.lock(id);
-    if (locked === null || !LIVE_QUOTE_STATES.has(locked.state)) return null;
+    // the caller holds the live quote's lock (CMD027 lockLiveQuote): a quote no longer live here is a changed project, never a missing one
+    if (locked === null) throw new LiveQuoteChangedFailure("the project's live quote is no longer visible under this request");
+    if (!isLive(locked)) throw new DomainFailure("STALE_VERSION", "the project's live quote changed under this request", { currentVersion: locked.version, currentState: locked.state }, true);
     const write = await this.quotes.transition(locked.quoteId, locked.version, { state: "SUPERSEDED", supersededByQuoteId: request.quoteId }, request.issuedAt);
-    if (write.kind !== "APPLIED") throw new DomainFailure("STALE_VERSION", "the previous quote of the project changed", { currentVersion: write.currentVersion });
+    if (write.kind !== "APPLIED") throw new DomainFailure("STALE_VERSION", "the previous quote of the project changed", { currentVersion: write.currentVersion, currentState: write.currentState }, true);
     return write.record;
   }
 

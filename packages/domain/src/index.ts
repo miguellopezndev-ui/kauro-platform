@@ -47,6 +47,7 @@ export {
   RETRYABLE_FAILURE_CODES,
   DomainFailure,
   StaleVersionFailure,
+  LiveQuoteChangedFailure,
   IdempotencyConflictFailure,
   PreconditionFailure,
   InvalidRequestFailure,

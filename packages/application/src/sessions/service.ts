@@ -22,13 +22,14 @@
  *            ASSURANCE_REQUIRED (STEP_UP_NOT_OWNED, STEP_UP_MISSING, STEP_UP_STALE) and DENY facts of the caller's stream.
  */
 import type { UtcInstant } from "@kauro/contracts";
-import type { AssuranceProofId, Clock, CorrelationId, IdGenerator, IdentityFacts, RandomBytes, UnitOfWorkFactory, UserId } from "@kauro/domain";
+import type { AssuranceProofId, Clock, CorrelationId, IdGenerator, IdentityFacts, RandomBytes, UnitOfWork, UnitOfWorkFactory, UserId } from "@kauro/domain";
 import { DomainFailure, identityUserId, subjectDigest, toUtcInstant } from "@kauro/domain";
+import { credentialEnded } from "../api/authority.js";
 import type { AuthenticatedSubject } from "../api/envelope.js";
 import { problemOf, type Problem } from "../api/problems.js";
 import { recordDenialFact, recordIdentityFact, refuseAnonymously } from "../commands/runtime.js";
 import { STEP_UP_FRESHNESS_SECONDS } from "../ports/assurance-and-admission.js";
-import type { IdentityTokenVerifier, VerifiedIdentityToken, WebSessionRecord, WebSessionStore } from "../ports/sessions.js";
+import type { IdentityTokenVerifier, SessionFence, StepUpRequest, VerifiedIdentityToken, WebSessionRecord, WebSessionStore } from "../ports/sessions.js";
 import { SESSION_POLICY, csrfTokenOf, mintSessionSecret, sessionSecretDigest } from "./protocol.js";
 
 /** The policy version every fact of this boundary names (08 "Audit events": policy version is recorded). */
@@ -75,6 +76,8 @@ export interface SessionServiceDependencies {
   readonly verifier: IdentityTokenVerifier;
   /** The authentication boundary's store (kauro_assurance). */
   readonly store: WebSessionStore;
+  /** The session fence of the request handlers' unit of work (PV1R-07 r4): the presented session locked FOR SHARE in the effect's own transaction. */
+  readonly fence: SessionFence;
 }
 
 export type SessionOutcome<T> = { readonly kind: "OK"; readonly value: T } | { readonly kind: "PROBLEM"; readonly problem: Problem };
@@ -84,11 +87,23 @@ export interface ResumedSession {
   readonly session: WebSessionRecord;
 }
 
+/**
+ * A session judged under the fence (FAILURE-MATRIX-TEMPLATE rule 16): locked FOR SHARE inside the effect's own unit of work, the caller reads
+ * its clock after the lock was granted and judges `liveAt` at that instant; a revocation that began after the lock waits until the unit's COMMIT
+ * (the release is that COMMIT).
+ */
+export interface HeldSession {
+  /** Not revoked, before the idle and the absolute deadlines of the row as locked. */
+  liveAt(nowMs: number): boolean;
+}
+
 export interface SessionService {
   /** `replacing`: the secret of the session cookie the sign-in request carried, which the new session replaces (ended once open). */
   open(request: { readonly correlationId: CorrelationId; readonly idToken: string; readonly replacing?: string | null }): Promise<SessionOutcome<{ readonly secret: string; readonly view: SessionView }>>;
   /** The live session of a secret and its subject, or null; moves last-seen at most once a minute. */
   resume(secret: string): Promise<ResumedSession | null>;
+  /** The session of a secret locked FOR SHARE in `uow`'s own transaction for `userId`, as locked; null when no session has that secret for that person. */
+  holdIn(uow: UnitOfWork, secret: string, userId: UserId): Promise<HeldSession | null>;
   viewOf(secret: string, session: WebSessionRecord): SessionView;
   revoke(request: { readonly correlationId: CorrelationId; readonly secret: string | null }): Promise<SessionOutcome<null>>;
   stepUp(request: { readonly correlationId: CorrelationId; readonly subject: AuthenticatedSubject; readonly secret: string | null; readonly idToken: string }): Promise<SessionOutcome<StepUpProofView>>;
@@ -115,8 +130,21 @@ function factsOf(token: VerifiedIdentityToken, userId: UserId): IdentityFacts {
   };
 }
 
-function isLive(session: WebSessionRecord, nowMs: number): boolean {
+/** The authenticated subject of a session: its person with the facts its token proved at sign-in. */
+function subjectOfSession(session: WebSessionRecord): AuthenticatedSubject {
+  return {
+    identity: { userId: session.userId, emailVerifiedAt: session.emailVerifiedAt, mfaEnrolledAt: session.mfaAt, state: "ACTIVE" },
+    provider: session.provider,
+    subjectHash: session.subjectHash,
+  };
+}
+
+function isLiveRow(session: Pick<WebSessionRecord, "revokedAt" | "idleExpiresAt" | "absoluteExpiresAt">, nowMs: number): boolean {
   return session.revokedAt === null && nowMs < Date.parse(session.idleExpiresAt) && nowMs < Date.parse(session.absoluteExpiresAt);
+}
+
+function isLive(session: WebSessionRecord, nowMs: number): boolean {
+  return isLiveRow(session, nowMs);
 }
 
 export function createSessionService(deps: SessionServiceDependencies): SessionService {
@@ -191,7 +219,7 @@ export function createSessionService(deps: SessionServiceDependencies): SessionS
         await recordIdentityFact(runtime, { userId, action: SESSION_ACTIONS.open, outcome: "ALLOW", reasonCode: SESSION_ALLOW_REASONS.opened, assuranceClass: "SESSION", policyVersion: SESSION_POLICY_VERSION, correlationId });
         // the browser holds one session: the one its cookie named before this sign-in ends now (no session outlives its cookie)
         if (replacing !== null) {
-          const ended = await deps.store.revoke(sessionSecretDigest(replacing), now, REPLACED_REASON);
+          const ended = await deps.store.revoke(sessionSecretDigest(replacing), () => deps.clock.now(), REPLACED_REASON);
           if (ended.outcome === "REVOKED") {
             await recordIdentityFact(runtime, { userId: ended.userId, action: SESSION_ACTIONS.revoke, outcome: "ALLOW", reasonCode: SESSION_ALLOW_REASONS.revoked, assuranceClass: "SESSION", policyVersion: SESSION_POLICY_VERSION, correlationId });
           }
@@ -200,22 +228,24 @@ export function createSessionService(deps: SessionServiceDependencies): SessionS
       }),
 
     async resume(secret) {
-      const now = deps.clock.now();
-      const session = await deps.store.resume(sessionSecretDigest(secret), now, SESSION_POLICY.idleSeconds, SESSION_POLICY.touchSeconds);
-      if (session === null || !isLive(session, Date.parse(now))) return null;
-      const subject: AuthenticatedSubject = {
-        identity: { userId: session.userId, emailVerifiedAt: session.emailVerifiedAt, mfaEnrolledAt: session.mfaAt, state: "ACTIVE" },
-        provider: session.provider,
-        subjectHash: session.subjectHash,
-      };
-      return { subject, session };
+      const session = await deps.store.resume(sessionSecretDigest(secret), () => deps.clock.now(), SESSION_POLICY.idleSeconds, SESSION_POLICY.touchSeconds);
+      // liveness judged at an instant read after the store returned (TIME-AFTER-AWAIT, PV1R-02 r2): a session that expires while the store
+      // waits (its connection, its statement) is ended, never judged at a sample taken before the wait
+      if (session === null || !isLive(session, Date.parse(deps.clock.now()))) return null;
+      return { subject: subjectOfSession(session), session };
+    },
+
+    async holdIn(uow, secret, userId) {
+      const locked = await deps.fence.lockPresented(uow, sessionSecretDigest(secret), userId);
+      if (locked === null) return null;
+      return { liveAt: (nowMs) => isLiveRow(locked, nowMs) };
     },
 
     revoke: ({ correlationId, secret }) =>
       outcomeOf(correlationId, async () => {
         if (secret === null) return { kind: "OK", value: null };
         // the person the fact names is the session's; a secret that names no session, or one already ended, records nothing
-        const revoked = await deps.store.revoke(sessionSecretDigest(secret), deps.clock.now(), LOGOUT_REASON);
+        const revoked = await deps.store.revoke(sessionSecretDigest(secret), () => deps.clock.now(), LOGOUT_REASON);
         if (revoked.outcome === "REVOKED") {
           await recordIdentityFact(runtime, { userId: revoked.userId, action: SESSION_ACTIONS.revoke, outcome: "ALLOW", reasonCode: SESSION_ALLOW_REASONS.revoked, assuranceClass: "SESSION", policyVersion: SESSION_POLICY_VERSION, correlationId });
         }
@@ -237,22 +267,22 @@ export function createSessionService(deps: SessionServiceDependencies): SessionS
           return refuse(new DomainFailure("ASSURANCE_REQUIRED", "the re-authentication is another person's", { reason: "STEP_UP_NOT_OWNED" }));
         }
         if (token.secondFactor === null) return refuse(new DomainFailure("ASSURANCE_REQUIRED", "the re-authentication has no second factor", { reason: "STEP_UP_MISSING" }));
-        const now = deps.clock.now();
-        if (Date.parse(now) - Date.parse(token.authTime) > SESSION_POLICY.stepUpReauthenticationSeconds * 1000) {
-          return refuse(new DomainFailure("ASSURANCE_REQUIRED", "the re-authentication is too old", { reason: "STEP_UP_STALE" }));
-        }
-        // the proof is the re-authentication itself: issued when the person re-authenticated (never later than now), fresh for
-        // the B06 window (D-ASSUR-1)
-        const issuedAt = earlier(token.authTime, now);
-        const proof = {
+        // the proof is the re-authentication itself: issued when the person re-authenticated (never later than now), fresh for the B06 window
+        // (D-ASSUR-1). Its age (300 s) and its instants are judged by the store at the instant it reads AFTER the session lock (rule 16, r7 ADV-1)
+        const request: StepUpRequest = {
           proofId: deps.ids.next() as AssuranceProofId,
           userId,
-          kind: "STEP_UP" as const,
-          method: token.secondFactor === "totp" ? ("TOTP" as const) : ("IDP_REAUTH" as const),
-          issuedAt,
-          expiresAt: plusSeconds(issuedAt, STEP_UP_FRESHNESS_SECONDS),
+          kind: "STEP_UP",
+          method: token.secondFactor === "totp" ? "TOTP" : "IDP_REAUTH",
+          authTime: token.authTime,
+          maxAgeSeconds: SESSION_POLICY.stepUpReauthenticationSeconds,
+          freshnessSeconds: STEP_UP_FRESHNESS_SECONDS,
         };
-        await deps.store.recordStepUp(proof, correlationId, now, secret === null ? null : sessionSecretDigest(secret));
+        const recorded = await deps.store.recordStepUp(request, correlationId, () => deps.clock.now(), secret === null ? null : sessionSecretDigest(secret));
+        // the session ended (revoked, idle or absolute deadline) before the lock was granted: the unauthenticated answer, nothing recorded
+        if (recorded.outcome === "ENDED") throw credentialEnded();
+        if (recorded.outcome !== "RECORDED") return refuse(new DomainFailure("ASSURANCE_REQUIRED", "the re-authentication is too old", { reason: "STEP_UP_STALE" }));
+        const proof = recorded.proof;
         await recordIdentityFact(runtime, { userId, action: SESSION_ACTIONS.stepUp, outcome: "ALLOW", reasonCode: SESSION_ALLOW_REASONS.stepUpIssued, assuranceClass: "STEP_UP", policyVersion: SESSION_POLICY_VERSION, correlationId });
         return { kind: "OK", value: { proofId: proof.proofId, expiresAt: proof.expiresAt } };
       }),

@@ -431,3 +431,23 @@ test("D-FAKE-B1: no contract fake is reachable from production wiring — the pa
   const offenders = production.filter((f) => /["']@kauro\/application\/testing["']/.test(readFileSync(f, "utf8")));
   assert.deepEqual(offenders, []);
 });
+
+test("R2-080 (Windows flake, main 21b310f): the PayPal fake completes a capture strictly between its order's creation at the provider and the capture call, and a PENDING capture strictly between its creation and its completion, so the database's later confirmation (its own clock, possibly a few ms behind) is never before the provider's completion", async () => {
+  const w = world();
+  const created = w.clock.nowMs(); // the fixed clock: the order is created at the provider at this instant
+  const orderId = await approvedOrder(w);
+  w.clock.advance(100);
+  const callAt = w.clock.nowMs();
+  const captureId = w.paypal.captureAtProvider(orderId);
+  const view = (await w.paypal.observeOrder({ providerOrderId: orderId })).captures.find((c) => c.providerCaptureId === captureId)!;
+  const completed = Date.parse(view.providerCompletedAt!);
+  assert.ok(completed > created && completed < callAt, `completion ${completed} strictly inside (${created}, ${callAt})`);
+
+  const pendingOrder = await approvedOrder(w);
+  const pendingId = w.paypal.captureAtProvider(pendingOrder, { status: "PENDING" });
+  const pendingCreated = w.clock.nowMs();
+  w.clock.advance(100);
+  w.paypal.updateCapture(pendingId, { status: "COMPLETED" });
+  const done = Date.parse((await w.paypal.observeOrder({ providerOrderId: pendingOrder })).captures.find((c) => c.providerCaptureId === pendingId)!.providerCompletedAt!);
+  assert.ok(done > pendingCreated && done < w.clock.nowMs(), "a PENDING capture completes strictly before the observation that completes it");
+});

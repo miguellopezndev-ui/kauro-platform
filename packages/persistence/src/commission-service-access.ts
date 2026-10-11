@@ -163,6 +163,24 @@ export class PgCommissionWork {
   }
 
   /**
+   * The effect's lease fence (B10 matrix rows D and L2; migration 0048): takes the dispatcher's OUTBOX_DISPATCH lease row FOR SHARE under
+   * (owner, fence, not expired at `now`) and raises PRECONDITION_FAILED (reason LEASE_FENCED, as the lease functions' KA005) when no row answers, so a unit of work whose dispatcher lost or outlived
+   * the lease rolls back instead of committing. Called as the unit's last statement: the share lock holds the row until COMMIT, so a
+   * takeover (claim_lease's UPDATE) waits for this COMMIT and never lands between the guard and it. `now` is the dispatcher's own clock,
+   * the one the lease's instants were written with (B06 D-LEASE-1).
+   */
+  async holdDispatchLease(resourceId: string, ownerId: string, fence: number, now: UtcInstant): Promise<void> {
+    const r = await execute(
+      this.db,
+      `SELECT 1 FROM kauro.leases
+        WHERE resource_kind = 'OUTBOX_DISPATCH' AND resource_id = $1 AND owner_id = $2 AND fence = $3 AND expires_at > $4::timestamptz
+          FOR SHARE`,
+      [resourceId, ownerId, fence, now],
+    );
+    if (r.rowCount !== 1) throw new DomainFailure("PRECONDITION_FAILED", "the dispatcher no longer holds its lease under this fence: the effect is not committed", { reason: "LEASE_FENCED" });
+  }
+
+  /**
    * Runs one write the database may refuse under a savepoint, so a refusal leaves the unit of work usable: the value, or the refusal.
    * Only for a refusal the caller answers (a guard it cannot read beforehand); anything else it rethrows.
    */

@@ -4,11 +4,13 @@
 // type-checks every typed entry point with a strict TypeScript that checks all declaration files (skipLibCheck off), so a
 // public .d.ts that names a type of an undeclared dependency fails here. Nothing from the workspace is reachable from the
 // consumer except through the tarballs.
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkVendoredCores } from "./vendor-cores.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const publishable = [];
@@ -24,6 +26,12 @@ for (const group of ["packages"]) {
   }
 }
 if (publishable.length === 0) throw new Error("no publishable workspace package found");
+
+// D5-1: the vendored cores are proven first (sha256 == MANIFEST == SHA256SUMS == lock integrity, no sibling/link/workspace spec);
+// the consumer then resolves both raw cores to those same tarballs (absolute paths), never to a registry or a sibling tree.
+const vendorProblems = checkVendoredCores({ root });
+if (vendorProblems.problems.length) throw new Error(["vendored cores failed the vendor-cores check:", ...vendorProblems.problems].join(" | "));
+for (const note of vendorProblems.notes) console.log("vendor-cores: " + note);
 
 const work = mkdtempSync(join(tmpdir(), "kauro-clean-consume-"));
 const tarballs = join(work, "tarballs");
@@ -43,9 +51,11 @@ try {
   // must resolve them to the tarballs, never to a registry, so every sibling is also an override.
   // The consumer runs the workspace's own package manager (root packageManager): a newer global pnpm no longer reads
   // package.json "pnpm.overrides" and would resolve the siblings from the public registry instead of the tarballs.
+  const overrides = { ...spec };
+  for (const core of vendorProblems.cores) overrides[core.name] = "file:" + resolve(root, core.file).split("\\").join("/");
   const rootManifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   if (typeof rootManifest.packageManager !== "string" || !rootManifest.packageManager.startsWith("pnpm@")) throw new Error("the workspace root pins no pnpm packageManager");
-  writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "kauro-clean-consumer", private: true, type: "module", packageManager: rootManifest.packageManager, dependencies: spec, pnpm: { overrides: spec } }, null, 2));
+  writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "kauro-clean-consumer", private: true, type: "module", packageManager: rootManifest.packageManager, dependencies: spec, pnpm: { overrides } }, null, 2));
   writeFileSync(join(consumer, ".npmrc"), `store-dir=${join(work, "store").split("\\").join("/")}\nnode-linker=isolated\n`);
   execFileSync("pnpm", ["install", "--ignore-workspace", "--no-frozen-lockfile"], { cwd: consumer, stdio: "inherit", shell: process.platform === "win32" });
   // the public entry points: each package's main entry and every typed export subpath (e.g. @kauro/persistence/testing)
@@ -66,6 +76,12 @@ if (canonicalize({ b: 1, a: [2, 1] }) !== '{"a":[2,1],"b":1}') throw new Error("
 if (CONTRACT_NAMES.length !== Object.keys(schemas.$defs).length) throw new Error("schemas vs types");
 if (COMMANDS.length < 60) throw new Error("commands");
 console.log("clean consumer ok:", CONTRACT_NAMES.length, "contracts,", COMMANDS.length, "commands, provenance", provenance().files["contracts.json"].slice(0, 12));
+// both vendored cores through their wrappers, from the tarballs alone: a real call of each, not only an export count
+const mc = await import("@kauro/migration-core");
+if (typeof mc.runMigration !== "function" || typeof mc.verifyPackage !== "function") throw new Error("@kauro/migration-core lost runMigration/verifyPackage");
+const ic = await import("@kauro/intelligence-core");
+if (typeof ic.RunLedger !== "function" || typeof ic.SystemClock !== "function") throw new Error("@kauro/intelligence-core lost RunLedger/SystemClock");
+console.log("clean consumer ok: both vendored cores load through their wrappers");
 // every other public entry point (every package's main entry and every typed subpath) resolves and exposes something
 // from the tarball alone
 for (const name of ${JSON.stringify(typedEntries.filter((n) => n !== "@kauro/contracts"))}) {

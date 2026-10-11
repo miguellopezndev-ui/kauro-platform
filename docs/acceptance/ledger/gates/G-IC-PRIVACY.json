@@ -1,0 +1,75 @@
+{
+ "gate": "G-IC-PRIVACY",
+ "manual": "06",
+ "package": "B03",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "IC-05",
+   "package": "B03",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S036",
+   "package": "B03",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S037",
+   "package": "B03",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-027",
+   "package": "B03",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-028",
+   "package": "B03",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-029",
+   "package": "B03",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-030",
+   "package": "B03",
+   "claimed": null,
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B03"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B03",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

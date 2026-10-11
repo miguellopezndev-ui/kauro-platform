@@ -166,7 +166,7 @@ async function project(t: Tenant): Promise<{ readonly projectId: ProjectId; read
 
 /** One raw transaction on a runtime pool with the context bound (fixtures that position the TEST CLOCK). */
 async function rawTx<T>(pool: KauroPool, agencyId: string, userId: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
-  const c = await pool.raw.connect();
+  const c = await pool.connectUnverified();
   let destroy: Error | undefined;
   try {
     await c.query("BEGIN");

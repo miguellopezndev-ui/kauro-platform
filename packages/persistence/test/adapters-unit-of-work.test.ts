@@ -3,10 +3,12 @@
 // transactions, exceptions, retry paths and concurrent pooled requests. 07 "Transaction discipline": state, event and
 // outbox commit atomically; read committed with locks and constraints, bounded serializable retries where chosen).
 import assert from "node:assert/strict";
+import { Client, type PoolClient } from "pg";
 import { after, before, test } from "node:test";
-import { DomainFailure, isDomainFailure, type AgencyId, type CausationId, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
-import { PrivilegedRoleError, createPool, listMigrations } from "../src/index.js";
-import { ROLES } from "../src/testing/index.js";
+import { DomainFailure, abandonWorkOf, isDomainFailure, limitWorkOf, type AgencyId, type CausationId, type ClientId, type MembershipId, type UserId } from "@kauro/domain";
+import { PrivilegedRoleError, createPool, listMigrations, translateDatabaseError } from "../src/index.js";
+import { ROLES, testDatabaseEnvironment } from "../src/testing/index.js";
+import { END_BACKEND_WAIT_MS, endAbandonedBackend } from "../src/unit-of-work.js";
 import { barrier, clock, start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 
 let h: Harness;
@@ -40,7 +42,7 @@ test("the harness applied every migration from an empty cluster and the pools ru
 
 test("a pool refuses a superuser login and the owner login before any statement runs (08: privileged roles never serve requests)", async () => {
   for (const user of [ROLES.superuser, ROLES.owner]) {
-    const pool = createPool({ host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user, max: 1, applicationName: "kauro-test-privileged" });
+    const pool = createPool({ environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user, max: 1, applicationName: "kauro-test-privileged" });
     try {
       await assert.rejects(pool.acquire(), (e: unknown) => e instanceof PrivilegedRoleError, user);
       assert.equal(pool.totalCount, 0, "the privileged connection was destroyed, not pooled");
@@ -48,7 +50,7 @@ test("a pool refuses a superuser login and the owner login before any statement 
       await pool.end();
     }
   }
-  assert.throws(() => createPool({ host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, max: 25, applicationName: "x" }), RangeError);
+  assert.throws(() => createPool({ environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, max: 25, applicationName: "x" }), RangeError);
 });
 
 test("a context runs only on the pool of its role: SYSTEM is refused on the request pool, TENANT and IDENTITY on the control pool", async () => {
@@ -283,6 +285,219 @@ test("statement_timeout is transaction-local: a lock wait past the ceiling fails
     } finally {
       client.release();
     }
+  }
+});
+
+test("work a caller gave up inside a unit of work (a bound elapsed) destroys its connection: the unit answers without waiting for the abandoned call, the backend ends, the abandoned call's next statements fail there, and later requests on the pool are unaffected (D10-GAP-6a)", async () => {
+  const locked = barrier();
+  const release = barrier();
+  const holder = h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
+    assert.notEqual(await uow.agencies.lock(A.agencyId), null);
+    locked.open();
+    await release.wait;
+  });
+  await locked.wait;
+  let abandonedPid = 0;
+  let late: Promise<unknown> = Promise.resolve();
+  const given = h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
+    const client = (uow as unknown as { client: PoolClient }).client;
+    abandonedPid = Number((await client.query("SELECT pg_backend_pid() AS pid")).rows[0].pid);
+    // the call the caller starts and then gives up: it waits on the holder's lock and, were it ever answered, goes on to read
+    late = uow.agencies.lock(A.agencyId).then(() => uow.endClients.countOpenProjects(uow.ids.next() as ClientId));
+    late.catch(() => undefined);
+    for (let seen = false; !seen; ) {
+      await h.oracle.query("SELECT pg_stat_clear_snapshot()");
+      seen = (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1 AND wait_event_type = 'Lock'", [abandonedPid])).rows.length === 1;
+    }
+    abandonWorkOf(uow, "the bound of the call elapsed");
+    throw new DomainFailure("CAPACITY_UNAVAILABLE", "the call did not answer in time", { retryAfterSeconds: 1 }, true);
+  });
+  given.catch(() => undefined);
+  // the answer comes while the holder still holds the lock: nothing queued a ROLLBACK behind the abandoned call
+  const answered = await Promise.race([given.then(() => "committed", (e: unknown) => failure(e).code), new Promise<string>((resolve) => setTimeout(() => resolve("still waiting for the abandoned call"), 5_000))]);
+  assert.equal(answered, "CAPACITY_UNAVAILABLE");
+  await assert.rejects(late, "the abandoned call fails on its destroyed connection, it never reads on a pooled one");
+  // ADV-8: the backend of the abandoned unit ends WHILE the holder still holds the lock it waited on (release is not open yet): the abandon
+  // cancelled and terminated it, it did not wait for the lock to be granted or for its statement to time out, and its locks went with it
+  try {
+    const gone = Date.now() + 5_000;
+    let alive = true;
+    while (alive && Date.now() < gone) {
+      await h.oracle.query("SELECT pg_stat_clear_snapshot()");
+      alive = (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [abandonedPid])).rows.length === 1;
+      if (alive) await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.equal(alive, false, "the abandoned backend is gone from pg_stat_activity before the holder releases its lock");
+    assert.equal((await h.oracle.query("SELECT 1 FROM pg_locks WHERE pid = $1", [abandonedPid])).rows.length, 0, "no lock is held or awaited by the abandoned backend");
+  } finally {
+    release.open();
+  }
+  await holder;
+  for (let i = 0; i < 4; i++) {
+    const { client } = await h.appPool.acquire();
+    try {
+      assert.notEqual(Number((await client.query("SELECT pg_backend_pid() AS pid")).rows[0].pid), abandonedPid);
+    } finally {
+      client.release();
+    }
+  }
+  assert.notEqual(await h.app.run(h.tenant(A.agencyId, owner), (uow) => uow.agencies.lock(A.agencyId)), null, "a later request on the pool runs unaffected");
+});
+
+test("work that returns normally after the caller gave it up is refused INTEGRITY_FAILURE before COMMIT: nothing is committed and its backend ends (D10-GAP-6a, ADV-12)", async () => {
+  const authority = await h.processingAuthority(A);
+  const before = await h.oracle.query("SELECT count(*)::int AS n FROM kauro.end_clients");
+  let abandonedPid = 0;
+  let outcome: unknown;
+  try {
+    outcome = await h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
+      abandonedPid = Number((await (uow as unknown as { client: PoolClient }).client.query("SELECT pg_backend_pid() AS pid")).rows[0].pid);
+      const clientId = uow.ids.next() as ClientId;
+      await uow.endClients.insert({ clientId, agencyId: A.agencyId, displayName: "Written by abandoned work", processingAuthorityRef: authority, createdByMembershipId: A.ownerMembershipId, createdAt: clock.now() });
+      // the write is complete (state and its event, as h.endClient writes it): without the refusal the unit WOULD commit it
+      await uow.events.publish({ aggregateKind: "end_client", aggregateId: clientId, aggregateVersion: 1, agencyId: A.agencyId, eventType: "end_client.created.v1", actor: { kind: "USER", userId: owner }, causationId: uow.ids.next() as CausationId, correlationId: uow.context.correlationId, payload: { clientId, agencyId: A.agencyId, processingAuthorityRef: authority, createdByMembershipId: A.ownerMembershipId } });
+      abandonWorkOf(uow, "the bound of the call elapsed");
+      return "returned normally";
+    });
+  } catch (e) {
+    outcome = e;
+  }
+  assert.equal(failure(outcome).code, "INTEGRITY_FAILURE", `an abandoned unit never answers the work's result: ${String(outcome)}`);
+  const after = await h.oracle.query("SELECT count(*)::int AS n FROM kauro.end_clients");
+  assert.equal(after.rows[0].n, before.rows[0].n, "the write of the abandoned unit was never committed");
+  assert.equal((await h.oracle.query("SELECT count(*)::int AS n FROM kauro.end_clients WHERE display_name = 'Written by abandoned work'")).rows[0].n, 0);
+  const gone = Date.now() + 5_000;
+  let alive = true;
+  while (alive && Date.now() < gone) {
+    await h.oracle.query("SELECT pg_stat_clear_snapshot()");
+    alive = (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [abandonedPid])).rows.length === 1;
+    if (alive) await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  assert.equal(alive, false, "the abandoned unit's backend ended (its client was destroyed, never returned to the pool)");
+});
+
+test("the explicit end of an abandoned backend is fenced by pid AND start instant: a recycled pid (another backend start) is never terminated, the named backend is (ADV-13)", async () => {
+  const { client } = await h.appPool.acquire();
+  let released = false;
+  try {
+    const named = (await client.query("SELECT pg_backend_pid() AS pid, (SELECT extract(epoch FROM backend_start)::text FROM pg_stat_get_activity(pg_backend_pid())) AS started")).rows[0] as { pid: number; started: string };
+    const alive = async (): Promise<boolean> => {
+      await h.oracle.query("SELECT pg_stat_clear_snapshot()");
+      return (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [named.pid])).rows.length === 1;
+    };
+    // the pid is this session's but the start instant is another backend's: the pid was recycled, the session must not be signalled
+    await endAbandonedBackend(h.appPool, { pid: named.pid, startedAt: "1.000000" });
+    assert.equal(await alive(), true, "a pid with another start instant is left alone");
+    assert.equal((await client.query("SELECT 1 AS ok")).rows[0].ok, 1, "and the session still answers");
+    // the same pid with the start instant it was named with is ended
+    await endAbandonedBackend(h.appPool, { pid: named.pid, startedAt: named.started });
+    const gone = Date.now() + 5_000;
+    while ((await alive()) && Date.now() < gone) await new Promise((resolve) => setTimeout(resolve, 25));
+    assert.equal(await alive(), false, "the backend that matches both is terminated");
+    client.release(new Error("terminated by the test"));
+    released = true;
+  } finally {
+    if (!released) client.release();
+  }
+});
+
+test("the explicit end is skipped when the side connection is not in hand within the wait: a connection that arrives late is released unused, no statement runs late (ADV-13)", async () => {
+  const statements: string[] = [];
+  let releases = 0;
+  const side = { query: async (sql: string) => void statements.push(sql), release: () => void releases++, on: () => side, off: () => side };
+  const stand = { connectUnverified: () => new Promise((resolve) => setTimeout(() => resolve(side), END_BACKEND_WAIT_MS + 500)) };
+  const began = Date.now();
+  await endAbandonedBackend(stand as never, { pid: 1, startedAt: "1.0" });
+  assert.ok(Date.now() - began < END_BACKEND_WAIT_MS + 400, "the answer does not wait for the side connection beyond the wait");
+  await new Promise((resolve) => setTimeout(resolve, 1_000));
+  assert.deepEqual(statements, [], "no signalling statement ran after the wait");
+  assert.equal(releases, 1, "the late connection went back to the pool unused");
+});
+
+test("a unit limited as a whole is ended by the database at its limit although each of its statements started inside it: the second statement of a call does not extend the lock lifetime (D10-GAP-6a, Codex F2)", async () => {
+  const LIMIT_MS = 2_000;
+  const first = new Client(h.pg.clientConfig("kauro_owner"));
+  const second = new Client(h.pg.clientConfig("kauro_owner"));
+  await first.connect();
+  await second.connect();
+  let given: Promise<unknown> = Promise.resolve();
+  try {
+    await first.query("BEGIN");
+    await first.query("LOCK TABLE kauro.projects IN ACCESS EXCLUSIVE MODE");
+    await second.query("BEGIN");
+    await second.query("LOCK TABLE kauro.end_clients IN ACCESS EXCLUSIVE MODE");
+    let pid = 0;
+    let armedAt = 0;
+    const armed = barrier();
+    // the unit takes its agency's row lock, limits its whole lifetime, then runs a call of two sequential statements: the first waits on `first`'s
+    // table lock until the test releases it one second before the limit, the second then waits on `second`'s for as long as the test lets it.
+    // statement_timeout (30 s) never fires: only the transaction limit can end the session in time
+    given = h.app.run(
+      h.tenant(A.agencyId, owner),
+      async (uow) => {
+        const client = (uow as unknown as { client: PoolClient }).client;
+        assert.notEqual(await uow.agencies.lock(A.agencyId), null);
+        pid = Number((await client.query("SELECT pg_backend_pid() AS pid")).rows[0].pid);
+        await limitWorkOf(uow, LIMIT_MS);
+        armedAt = Date.now();
+        armed.open();
+        await client.query("SELECT count(*) FROM kauro.projects");
+        await client.query("SELECT count(*) FROM kauro.end_clients");
+      },
+      { statementTimeoutMs: 30_000 },
+    );
+    given.catch(() => undefined);
+    await armed.wait;
+    const lockedAgency = async (): Promise<boolean> => {
+      await h.oracle.query("BEGIN");
+      try {
+        await h.oracle.query("SELECT 1 FROM kauro.agencies WHERE agency_id = $1 FOR UPDATE NOWAIT", [A.agencyId]);
+        return false;
+      } catch (e) {
+        if ((e as { code?: string }).code === "55P03") return true;
+        throw e;
+      } finally {
+        await h.oracle.query("ROLLBACK");
+      }
+    };
+    await new Promise((resolve) => setTimeout(resolve, LIMIT_MS / 2 - (Date.now() - armedAt)));
+    await first.query("COMMIT"); // the first statement answers one second before the limit; the second starts now
+    assert.equal(await lockedAgency(), true, "the unit still holds its agency lock one second before its limit, inside the second statement");
+    const deadline = armedAt + LIMIT_MS + 700;
+    let alive = true;
+    while (alive && Date.now() < deadline) {
+      await h.oracle.query("SELECT pg_stat_clear_snapshot()");
+      alive = (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [pid])).rows.length === 1;
+      if (alive) await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.equal(alive, false, "the database ended the limited unit's session at its limit (plus a margin), not when its second statement ended");
+    assert.equal(await lockedAgency(), false, "and its agency lock is released");
+    await assert.rejects(given, "the unit failed: it can never commit what it did");
+  } finally {
+    await second.query("ROLLBACK").catch(() => undefined);
+    await first.query("ROLLBACK").catch(() => undefined);
+    await second.end();
+    await first.end();
+    await given.catch(() => undefined);
+  }
+});
+
+test("a session the database ended at its transaction limit answers the retriable CAPACITY_UNAVAILABLE, never INTERNAL_ERROR, and commits nothing (D10-GAP-6a, ADV-6)", async () => {
+  const before = await h.oracle.query("SELECT count(*)::int AS n FROM kauro.end_clients");
+  const authority = await h.processingAuthority(A);
+  await assert.rejects(
+    h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
+      await uow.endClients.insert({ clientId: uow.ids.next() as ClientId, agencyId: A.agencyId, displayName: "Never committed", processingAuthorityRef: authority, createdByMembershipId: A.ownerMembershipId, createdAt: clock.now() });
+      await limitWorkOf(uow, 200);
+      await (uow as unknown as { client: PoolClient }).client.query("SELECT pg_sleep(5)");
+    }),
+    (e: unknown) => failure(e).code === "CAPACITY_UNAVAILABLE" && failure(e).retryable,
+  );
+  assert.equal((await h.oracle.query("SELECT count(*)::int AS n FROM kauro.end_clients")).rows[0].n, before.rows[0].n, "nothing committed");
+  // the SQLSTATEs themselves
+  for (const code of ["25P04", "57P01"]) {
+    const translated = translateDatabaseError(Object.assign(new Error("terminating connection"), { code, severity: "FATAL" }));
+    assert.ok(translated !== null && translated.code === "CAPACITY_UNAVAILABLE" && translated.retryable, code);
   }
 });
 

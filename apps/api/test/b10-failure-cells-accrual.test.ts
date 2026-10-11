@@ -5,6 +5,7 @@
 // statements of an effect are the cell's steps (test/fault-support.ts), and every sweep pass and consumer delivery goes through the helpers of
 // b10-cells-support.ts, which assert that nothing failed behind the background sink before any recovery run. PostgreSQL 17 through the runtime
 // login roles; the superuser only reads. Nothing sleeps.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before } from "node:test";
 import { assignedThrough, integrationWorld, oracleRows, providerReports, terminationBody, type IntegrationWorld } from "./integration-support.js";
@@ -18,6 +19,8 @@ import type { SqlStep } from "./fault-support.js";
 import { deliver, execute as paymentExecute } from "./payment-support.js";
 
 let iw: IntegrationWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => iw.h.oracle);
 before(async () => {
   iw = await integrationWorld();
   bindCells(iw);

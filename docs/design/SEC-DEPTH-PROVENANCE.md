@@ -43,7 +43,7 @@ assignments, 0 unmapped (33 tables mapped, 6 residual).
 - SDP-35: founding_slots (read by 0028:311) is row 25: birth only by its 0028 seed (B11), so no extra discounted slot can be minted.
 r11 answered Codex design r10 (7e9174c, REJECT: SDP-21/29 FIXED, SDP-26/30 PARTIAL, SDP-31/32/33 new) by changing the METHOD: section 3
 is a per-table LIFETIME matrix (birth, every guarded transition, DELETE, TRUNCATE, identity, deferred queue per parent and child)
-over every table a G1-G14 guard or a B binding reads or protects; the R27 cells are generated from it (rule 15).
+over every table a G1-G14 guard or a B binding reads or protects; the R27 cells are generated from it (rule 22).
 - SDP-31: both capacity ledgers refuse DELETE/TRUNCATE, the platform singleton refuses INSERT after its seed (its only birth), the
   agency ledger's agency_id is immutable and is born empty (B9, section 3 rows 22-23). F13 corrected.
 - SDP-32: a lease's cancel_version moves only by +1 in a statement that changes nothing else, and a JOB_ATTEMPT lease only while
@@ -54,10 +54,10 @@ over every table a G1-G14 guard or a B binding reads or protects; the R27 cells 
 r10 answered Codex design r9 (84ef1e6, REJECT: SDP-20/22/23/24/25/27/28 FIXED, SDP-21/26 PARTIAL, SDP-29/30 new):
 - SDP-30 (and the SDP-21 remainder): every derived/bookkeeping column is bound at BIRTH as well as at UPDATE (grant ledger_seq,
   order allocation, agency last admission, lease cancel_version), and every deferred relation is queued per PARENT row on INSERT and
-  UPDATE as well as per child, so an empty relation is checked too (B2, B3, B4, B5, B9; section 2 BIRTH row; rule 11).
+  UPDATE as well as per child, so an empty relation is checked too (B2, B3, B4, B5, B9; section 2 BIRTH row; rule 18).
 - SDP-29: one global lock order (grants before requests, a carve before its pool, every grant lock FOR NO KEY UPDATE); the sweep,
   the reservation and every reconciling writer follow it; the accountants that run after a request or carve lock use NOWAIT (B3
-  lock protocol; rule 14).
+  lock protocol; rule 21).
 - SDP-26 remainder: birth DENY cells, per-parent commit cells and the sweep-actor RACE cells in both orders (R12e, R26).
 r9 answered Codex design r8 (8cb7299, REJECT, SDP-20..28), one line each:
 - SDP-20: KA001 and every other immediate decision read the membership facts under the agency lock, never the counter (B5a).
@@ -71,9 +71,9 @@ r9 answered Codex design r8 (8cb7299, REJECT, SDP-20..28), one line each:
 - SDP-26: compositional cells added to C; every DENY has a named OK sibling (C2).
 - SDP-27: B14-R1 states the login shape itself (appendix).
 - SDP-28: agency_recurrence is bound column by column, last_confirmed_at included (B5b).
-Root cause: three families were seen twice in r8 (SDP-20/28, SDP-21/26, SDP-22/24/25): template rules 11-13. r9 showed the birth
-half of rule 11 (SDP-30 after SDP-20/28) and a lock-order family (SDP-29 after SEC-109): rules 11-13 now say "at birth and
-update" and rule 14 is new (`docs/design/FAILURE-MATRIX-TEMPLATE.md`). Section 2 sweeps every analogous path in the inventory.
+Root cause: three families were seen twice in r8 (SDP-20/28, SDP-21/26, SDP-22/24/25): template rules 18-20. r9 showed the birth
+half of rule 18 (SDP-30 after SDP-20/28) and a lock-order family (SDP-29 after SEC-109): rules 18-20 now say "at birth and
+update" and rule 21 is new (`docs/design/FAILURE-MATRIX-TEMPLATE.md`). Section 2 sweeps every analogous path in the inventory.
 
 ## 0. Facts established from the code
 
@@ -164,7 +164,7 @@ the pending checks earlier, and a later write of the row queues a new check (SEC
 | G13 | 0006:202 | leases fence, owner, heartbeat, expiry, checkpoint | caller instants | B2: server clock; born fence 1, cancel_version 0; same holder keeps a stored checkpoint, never needs one |
 | G14 | 0021:740, 0022:606 | authorization CONSUMED / DELIVERED | `rolsuper` skips the fact check | B10: skip removed; the existing fact checks bind every role |
 
-## 2. Family sweep (root cause; template rules 11-13)
+## 2. Family sweep (root cause; template rules 18-20)
 
 | Family (rule) | r8 findings | Paths checked in 0001-0044 | Outcome |
 |---|---|---|---|
@@ -180,7 +180,7 @@ the pending checks earlier, and a later write of the row queues a new check (SEC
 | CHECKER: certification by lexical mention (15) | SDP-41 | firesOnUpdateOf WHEN rule, fnReads row rule | fixed: exact change-predicate or reviewed-text allowlist; row-specific reads |
 | IDENTITY exemption (single; P1) | SDP-23 | grep of F1 | only G14 (removed) and G5 (authorisation, kept) |
 
-## 3. Lifetime matrix (rule 15): every table a G1-G14 guard or a B binding reads or protects
+## 3. Lifetime matrix (rule 22): every table a G1-G14 guard or a B binding reads or protects
 
 One row per table (the 10 corporate history subjects share row 17). Cells name the guard (existing file:line or the B section) or
 say why none is needed. "frozen" = BEFORE DELETE FOR EACH ROW and BEFORE TRUNCATE FOR EACH STATEMENT executing forbid_change (F14:
@@ -461,7 +461,7 @@ admission then UPDATEs it; SDP-30). Lifetime (SDP-31): both ledgers frozen again
 with live_jobs = 0 and its agency_id is immutable; execution_capacity refuses INSERT after 0046 (its seed is its only birth; a
 replacement birth is not supported) and its recount is also queued AFTER INSERT. live_jobs is recounted per ledger row and per job
 (0021:406-413).
-B11 lifetime freeze (rule 15), `0052_lifetime_freeze.sql`: generated from section 3: every "frozen (B11)" cell gets BEFORE DELETE
+B11 lifetime freeze (rule 22), `0052_lifetime_freeze.sql`: generated from section 3: every "frozen (B11)" cell gets BEFORE DELETE
 FOR EACH ROW and BEFORE TRUNCATE FOR EACH STATEMENT executing kauro.forbid_change; the three config tables (row 15) also refuse
 INSERT and UPDATE; founding_slots (row 25) refuses INSERT (its 0028 seed is its only birth; a test that needs a synthetic cohort
 seeds it as the oracle under ALTER TABLE ... DISABLE TRIGGER, the TCB path of P2, as a migration would).

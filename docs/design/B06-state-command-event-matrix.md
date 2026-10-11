@@ -360,10 +360,15 @@ platform machine (B09 decision D-MACH-B5); initial REQUESTED; terminal COMPLETED
 | REQUESTED | reject_refund | REJECTED | B12: the owner's finance review rejects a request with a stated code; no registry command names a rejection (open question Q-B09-3) | refund.rejected.v1 | database |
 | APPROVED | dispatch_intent_committed | SUBMITTING | CMD033 ExecuteRefund (B09) | refund.submitting.v1 | route |
 | APPROVED | authorization_lapsed | FAILED | B09: the reconciler, when a reversal of the capture lapses an APPROVED refund before any dispatch | refund.failed.v1 | database |
+| APPROVED | manual_execution_declared | SUBMITTING | L-REFUND: planned, not implemented: the owner's declared execution of a BANK_TRANSFER refund (X1), its attempt DECLARED in the same transaction; no served command performs it yet | refund.submitting.v1 | database |
 | SUBMITTING | authenticated_completed | COMPLETED | CMD033 ExecuteRefund (B09) | refund.completed.v1 | route |
 | SUBMITTING | ambiguous_transport_result | UNCERTAIN | CMD033 ExecuteRefund (B09) | refund.uncertain.v1 | route |
 | SUBMITTING | proved_no_effect | APPROVED | CMD033 ExecuteRefund (B09) | refund.approved.v1 | route |
 | SUBMITTING | provider_refused | FAILED | CMD033 ExecuteRefund (B09) | refund.failed.v1 | route |
+| SUBMITTING | manual_execution_window_lapsed | UNCERTAIN | L-REFUND: planned, not implemented: the declared BANK_TRANSFER attempt passes its manual execution window on the database clock (X2) and an UNCERTAIN_EFFECT case opens; no served sweep performs it yet | refund.uncertain.v1 | database |
+| SUBMITTING | manual_return_recorded | COMPLETED | L-REFUND: planned, not implemented: classified execution evidence satisfies every record predicate of the DECLARED (G2) or UNCERTAIN (G2, X3 EXECUTED) BANK_TRANSFER attempt; both edges, from SUBMITTING and from UNCERTAIN; no served command performs them yet | refund.completed.v1 | database |
+| UNCERTAIN | manual_return_recorded | COMPLETED | L-REFUND: planned, not implemented: classified execution evidence satisfies every record predicate of the DECLARED (G2) or UNCERTAIN (G2, X3 EXECUTED) BANK_TRANSFER attempt; both edges, from SUBMITTING and from UNCERTAIN; no served command performs them yet | refund.completed.v1 | database |
+| UNCERTAIN | owner_attested_no_effect | FAILED | L-REFUND: planned, not implemented: the owner attests NOT_EXECUTED for an UNCERTAIN BANK_TRANSFER attempt with the lag, coverage and no-potential-debit predicates (X3); no served command performs it yet | refund.failed.v1 | database |
 | UNCERTAIN | reconciliation_completed | COMPLETED | CMD034 ReconcilePayment (B09) | refund.completed.v1 | route |
 | UNCERTAIN | reconciliation_proves_no_effect | APPROVED | CMD034 ReconcilePayment (B09) | refund.approved.v1 | route |
 | UNCERTAIN | reconciliation_proves_refusal | FAILED | CMD034 ReconcilePayment (B09) | refund.failed.v1 | route |
@@ -1463,6 +1468,11 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | APPROVAL_NOT_CURRENT | — | — | COMMAND | the quoted plan is no longer APPROVED under the quoted, unwithdrawn approval of the quoted body |
 | 409 | PRECONDITION_FAILED | FISCAL_TREATMENT_UNREVIEWED | — | — | COMMAND | the agency's current fiscal profile carries no reviewed treatment (R2-082): the sale path is blocked |
 | 409 | PRECONDITION_FAILED | FISCAL_TREATMENT_CHANGED | — | — | COMMAND | the reviewed treatment is no longer the one the quote was priced with: a new quote is required |
+| 409 | PRECONDITION_FAILED | ROUTE_NOT_ENABLED | — | — | COMMAND | the named bank route is not ENABLED at a verified version for this agency (CONTROLLED allowlist or GENERAL): no order and no instructions |
+| 409 | PAYMENT_PENDING | OPEN_ORDER_EXISTS | — | — | COMMAND | the project already has an open order (of any route): no second checkout |
+| 409 | PRECONDITION_FAILED | PLAN_WITHDRAWN | — | — | COMMAND | the quoted plan's approval was withdrawn |
+| 409 | PRECONDITION_FAILED | TRANSFER_WINDOW_TOO_SHORT | — | — | COMMAND | the time left before the instruction deadline is shorter than the route's minimum transfer window |
+| 409 | PRECONDITION_FAILED | DETAILS_EXPIRED | — | — | COMMAND | the validity of the route version's verified account details passed at the effect instant: no order and no instructions |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 422 | SOURCE_EXPIRED | — | — | — | COMMAND | the quoted source revision is no longer SEALED (S060: a price-valid quote does not keep deleted data executable) |
@@ -1474,6 +1484,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | DELIVERY_CAPACITY_UNAVAILABLE | — | — | COMMAND | the processing admission reports no deliverable capacity for the purchased scope; retry later with the same key |
+| 503 | CAPACITY_UNAVAILABLE | EVIDENCE_UNAVAILABLE | — | — | COMMAND | no bank route integration is bound in this deployment; retry later |
 
 ### CMD029 CapturePayment
 

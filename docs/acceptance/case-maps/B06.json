@@ -1,0 +1,436 @@
+{
+ "package": "B06",
+ "generatedBy": "node tools/ledger.mjs sidecars --write",
+ "source": {
+  "file": "docs/design/B06-case-map.md",
+  "sha256": "5c05f86882c1cfc523648b6cb7249b97eced9be709b1d739f10baf5947dd6802"
+ },
+ "rows": [
+  {
+   "case": "S051",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/discipline.test.ts :: S051: two revisions racing on one plan version through the plan adapter — one compare-and-swap applies, the loser waits on the row lock and reads STALE with the current version; a second successor of the same predecessor is refused by plans_supersedes_once",
+    "apps/api/test/cmd023-revise-plan.test.ts :: RACE: two RevisePlan calls with expectedVersion 2 — one 201, one 409 STALE_VERSION carrying successorId",
+    "apps/api/test/cmd025-approve-plan.test.ts :: RACE: two ApprovePlan calls — one 201, one 409; no approval of a superseded body"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "S052",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/journals-leases.test.ts :: S052: through the command journal adapter the same digest replays the stored response and a different digest under the same key is CONFLICT with no second row; the identity index makes the key unique, a committed entry is final, the same key in another agency is another identity",
+    "packages/persistence/test/journals-leases.test.ts :: a concurrent duplicate blocks on the identity until the first transaction commits, then sees the committed entry; after a rollback it proceeds as first",
+    "packages/persistence/test/adapters-journals-outbox.test.ts :: S052: same key + same body replays the stored 201 and body without a second row; same key + different body is CONFLICT with no effect",
+    "apps/api/test/idempotency.test.ts :: same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect",
+    "apps/api/test/idempotency.test.ts :: same key + same body → 200/201 replayed:true with the original body",
+    "apps/api/test/idempotency.test.ts :: response lost after commit → retry with the same key returns the journaled result",
+    "apps/api/test/idempotency.test.ts :: concurrent duplicate: two in-flight identical requests → exactly one effect and the same durable answer; after the first rolls back, the duplicate proceeds as the first",
+    "apps/api/test/pipeline-authorization.test.ts :: R7/R12 DENY: an idempotent replay is answered only to a caller who is still authorized — suspended 403, revoked 404, each recorded; a conflicting body gets the same refusal; reactivated, the replay is the original answer byte for byte",
+    "apps/api/test/pipeline-authorization.test.ts :: R7 control (recovery kept): a CMD025 replay needs the approver's current membership and role, not a fresh step-up — after the proof aged past the freshness window the replay still returns the journaled approval, while a new approval with that proof is ASSURANCE_REQUIRED"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "S089",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/journals-leases.test.ts :: S089: a request journal entry cannot be materialized with a short SHA, without a positive reservation, without a grant or with an upstream that is not resolved (failed, cancelled, uncertain, unconsumed, unknown, of another scope, repeated or itself); the valid controls commit",
+    "packages/persistence/test/adapters-journals-outbox.test.ts :: S089 (structural): the request journal refuses a short hash, a zero ceiling and an absent grant; fence-scoped updates; response before consume; terminal states final",
+    "packages/persistence/test/adapters-journals-outbox.test.ts :: S089 failed upstream through the adapter: a dispatch intent naming an upstream that failed, was cancelled, is uncertain, is not yet consumed, is unknown or belongs to another agency is refused UPSTREAM_UNRESOLVED and materializes nothing; naming consumed upstreams it is RESERVED; an upstream that fails or is consumed concurrently is ordered before the reservation"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [
+    "B03",
+    "B07",
+    "B08"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "S090",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/journals-leases.test.ts :: S090: a lease preserves subject, deadline, cost and checkpoint identity across a takeover; a resume without the checkpoint, with a reset deadline, another subject or another cost authority is refused",
+    "packages/persistence/test/adapters-leases.test.ts :: S090 through the adapter: claim, HELD, checkpoint under the fence, refused resumes (no or another checkpoint, reset deadline, another subject, another cost authority), a valid takeover that keeps subject, clock, cost and checkpoint identity, advances the fence and fences the old owner out",
+    "packages/persistence/test/adapters-leases.test.ts :: B06-R1: an expired JOB_ATTEMPT or MODEL_TASK lease that never stored a checkpoint cannot be resumed — another owner's takeover with no checkpoint or an invented one is REFUSED RESUME_WITHOUT_CHECKPOINT and the lease stays as its first owner left it; an OUTBOX_DISPATCH lease, which spends nothing, is still taken over without one, never with an invented one",
+    "packages/persistence/test/adapters-leases.test.ts :: B06-R1: an expired owner re-claiming its own lease is a resume, not a renewal — without the stored checkpoint or with another it is REFUSED RESUME_WITHOUT_CHECKPOINT and keeps no fence; with the stored checkpoint it resumes under a new fence (1 -> 2) that fences its old one out; while the lease is live the holder's re-claim keeps its fence only when it names the stored checkpoint",
+    "packages/persistence/test/journals-leases.test.ts :: B06-R1 (database): the guard beneath claim_lease refuses the control plane's own UPDATE that takes over a live lease, advances a live holder's fence, resumes a spending lease that stored no checkpoint or names a checkpoint other than the stored one; the takeover of an expired OUTBOX_DISPATCH lease without a checkpoint commits"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "S093",
+   "class": "PARTIAL",
+   "test": [
+    "packages/application/test/schema-boundary.test.ts :: KnownSchemaId is exactly the contract names, the request schema ids, the response schema ids and Problem",
+    "packages/application/test/schema-boundary.test.ts :: the generated TargetContract schema types customer metadata as data (closed object with an objects array), never as a schema",
+    "apps/api/test/schema-boundary.test.ts :: the validator the api composes is closed: exactly the contract names, the request schema ids, the response schema ids and Problem; it has no compile entry, and an unknown schema id is INTEGRITY_FAILURE before the input is read",
+    "apps/api/test/schema-boundary.test.ts :: customer target metadata that looks like a JSON Schema is validated as data by the application-owned TargetContract schema and never compiled",
+    "apps/api/test/schema-boundary.test.ts :: through the served routes, schema-shaped request members are refused before any unit of work opens, and a label that spells a JSON Schema is stored and answered verbatim"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [
+    "B15",
+    "B17"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-043",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/last-owner.test.ts :: two owners removing each other: one transition commits, the other is refused — its actor's authority ended with the first commit (KA010); one owner remains",
+    "packages/persistence/test/last-owner.test.ts :: two owners leaving at once (each revoking their own ownership while reading two active owners): one commits, the other waits on the agency row lock and is refused with LAST_OWNER (KA001); one owner remains",
+    "packages/persistence/test/last-owner.test.ts :: the sole owner cannot revoke themselves; a non-owner can be revoked; closure authority permits the removal",
+    "packages/persistence/test/last-owner.test.ts :: a suspension of the last owner is refused the same way (the invariant covers every listed edge)",
+    "packages/persistence/test/adapters-unit-of-work.test.ts :: the last active owner cannot be removed through the membership repository: PRECONDITION_FAILED / LAST_OWNER_PROTECTED (R2-043 at the adapter boundary)",
+    "packages/persistence/test/integrity-guards.test.ts :: R10: active_owner_count is written only by the membership trigger — the runtime role can neither raise it by hand nor forge it at birth, so the last real owner stays protected",
+    "packages/persistence/test/recheck-guards.test.ts :: N11: the membership write boundary — a VIEWER's own session cannot promote itself, an ADMIN cannot grant or touch OWNER, only the invited identity accepts and only with a consumed invitation; the OWNER's changes commit"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [
+    "B16"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-058",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/request-validation.test.ts :: R2-058: a string \"false\" where a boolean is expected is INVALID_REQUEST (type), never coerced; a missing approval member is never defaulted",
+    "packages/application/test/command-contracts.test.ts :: request schemas are closed 2020-12 objects whose properties are exactly the catalogue fields, typed by the field vocabulary"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "R2-059",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/request-validation.test.ts :: R2-059: POST /clients/{id}/projects with verified=true and agencyOwner=true is 400 INVALID_REQUEST UNKNOWN_FIELD before any transaction; a valid neighbour body creates the project",
+    "packages/application/test/command-contracts.test.ts :: no request schema exposes a server-owned member (verified, agencyOwner, state, agencyId, version, hashes of bytes)"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD001-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd001-create-agency.test.ts :: OK: a verified identity creates one DRAFT agency and one ACTIVE OWNER membership in one transaction",
+    "apps/api/test/pipeline-authorization.test.ts :: R26: an unauthenticated command, a non-member probe and an identity-status denial each leave one durable DENY fact of the right shape; CMD001 records the owner grant and CMD025 the step-up as ALLOW facts in the agency's stream, and a replay records nothing"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD001-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd001-create-agency.test.ts :: DENY: unverified identity → 403 NOT_AUTHORIZED IDENTITY_UNVERIFIED; unauthenticated → 401; a second DRAFT for the same creator → 429 ADMISSION_LIMITED DRAFT_AGENCY_EXISTS",
+    "apps/api/test/cmd001-create-agency.test.ts :: RACE: identical retry replays the same agency; same key with another displayName → 409 IDEMPOTENCY_CONFLICT; crash before COMMIT leaves nothing; response lost after COMMIT is recovered by the key"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD001-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd001-create-agency.test.ts :: RACE: identical retry replays the same agency; same key with another displayName → 409 IDEMPOTENCY_CONFLICT; crash before COMMIT leaves nothing; response lost after COMMIT is recovered by the key",
+    "apps/api/test/cmd001-create-agency.test.ts :: OK: a verified identity creates one DRAFT agency and one ACTIVE OWNER membership in one transaction"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD009-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd009-create-client.test.ts :: OK: an OPERATOR creates a client; two clients may share a label and keep distinct ids",
+    "apps/api/test/cmd009-create-client.test.ts :: OK (deployment path): CreateClient records the end-client processing authority in its own unit of work — an agency created through the route creates its first client with nothing recorded beforehand; its reference binds a second workspace; another agency cannot record or use it"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD009-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd009-create-client.test.ts :: DENY: member of another agency → 404; VIEWER → 403 ROLE_INSUFFICIENT; processingAuthorityRef of another agency → 400 UNKNOWN_REFERENCE",
+    "apps/api/test/cmd009-create-client.test.ts :: OK: an OPERATOR creates a client; two clients may share a label and keep distinct ids"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD009-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd009-create-client.test.ts :: RACE: identical retry replays; conflicting same key → 409; crash at the commit boundary leaves no client and no event",
+    "apps/api/test/cmd009-create-client.test.ts :: OK: an OPERATOR creates a client; two clients may share a label and keep distinct ids"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD010-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd010-archive-client.test.ts :: OK: an ADMIN archives an ACTIVE client; CreateProject on it is then refused; projects, revisions, approvals and receipts remain"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD010-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd010-archive-client.test.ts :: DENY: OPERATOR → 403; foreign client → 404; stale expectedVersion → 409 STALE_VERSION with current",
+    "apps/api/test/cmd010-archive-client.test.ts :: OK: an ADMIN archives an ACTIVE client; CreateProject on it is then refused; projects, revisions, approvals and receipts remain"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD010-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd010-archive-client.test.ts :: RACE: two archive calls with the same expectedVersion → one 200, one 409; identical retry replays; the same key with another expectedVersion or another client → 409 IDEMPOTENCY_CONFLICT; a crash before COMMIT leaves the client ACTIVE and the same key then archives it; a response lost after COMMIT is recovered by the key",
+    "apps/api/test/cmd010-archive-client.test.ts :: OK: an ADMIN archives an ACTIVE client; CreateProject on it is then refused; projects, revisions, approvals and receipts remain"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD011-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd011-create-project.test.ts :: OK: an OPERATOR creates a CLEAN project on an ACTIVE client with an offered capability; the response lists readiness blockers"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD011-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd011-create-project.test.ts :: DENY: foreign/wrong role → 404/403; HUBSPOT with no offered capability → 422 CAPABILITY_UNAVAILABLE MODE_NOT_OFFERED; HUBSPOT without targetInstanceRef → 400; archived client → 409",
+    "apps/api/test/cmd011-create-project.test.ts :: RACE: a capability suspension racing CreateProject — the project holds the mode's transition lock to COMMIT: a suspension that comes second waits for the project; one committed first refuses it 422 CAPABILITY_UNAVAILABLE",
+    "apps/api/test/cmd011-create-project.test.ts :: RACE: an agency transition racing CreateProject — the project holds the agency's transition lock to COMMIT: a closure that comes second waits for the project; one committed first refuses it 409 AGENCY_NOT_OPEN",
+    "apps/api/test/cmd011-create-project.test.ts :: N3 RACE: a capability suspension queued behind an in-flight project is never overtaken — a project requested after it waits behind the suspension and is refused 422 CAPABILITY_UNAVAILABLE",
+    "apps/api/test/cmd011-create-project.test.ts :: N3 RACE: an agency closure queued behind an in-flight project is never overtaken — a project requested after it waits behind the closure and is refused 409 AGENCY_NOT_OPEN"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD011-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd011-create-project.test.ts :: RACE: identical retry replays; conflicting same key → 409; a crash before COMMIT commits nothing; a unit of work interrupted between the project insert and the revision insert commits nothing and the same key then creates the pair once; a project row without its revision cannot commit (deferred FK)",
+    "apps/api/test/cmd011-create-project.test.ts :: OK: an OPERATOR creates a CLEAN project on an ACTIVE client with an offered capability; the response lists readiness blockers"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD023-OK",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd023-revise-plan.test.ts :: OK: an OPERATOR revises a VALIDATED plan; predecessor SUPERSEDED, successor VALIDATION_REQUIRED with a new body hash; the impact map names the invalidated receipt",
+    "apps/api/test/cmd023-revise-plan.test.ts :: APPROVED: revising an approved plan takes the approval's controller and reconciled consequences; the approval is withdrawn with its own event in the same transaction, so no live approval remains on the SUPERSEDED plan",
+    "apps/api/test/plan-integrity.test.ts :: N10 positive neighbour: an honest compilation is stored with the digest the repository computes, and the successor keeps the predecessor's subjects",
+    "apps/api/test/plan-integrity.test.ts :: N10: a compiled body whose claimed hash is not its KAURO_PLAN_BODY_V1 digest is refused 422 INTEGRITY_FAILURE BODY_DIGEST_MISMATCH — no successor, nothing superseded, no journal row",
+    "apps/api/test/plan-integrity.test.ts :: N10: a compiled body moved to another source is refused 400 INVALID_REQUEST PATCH_EFFECT_NOT_PERMITTED on decisionPatchArtifactRef — a typed patch edits decisions, never the plan's subject",
+    "apps/api/test/outcome-catalogue.test.ts :: N13: the deployable edition's own outcome of CreatePlan and RevisePlan is in their catalogues — with the edition's collaborators and no core bound both answer 422 INTEGRITY_FAILURE CORE_SERVICES_UNAVAILABLE, nothing is journaled, no plan is written or changed, and no violation reaches the sink"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [
+    "B03",
+    "B08"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD023-DENY",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd023-revise-plan.test.ts :: DENY: APPROVER → 403; foreign plan → 404; expectedVersion of a superseded plan → 409 STALE_VERSION with successorId; patch naming an unknown candidate → 400",
+    "apps/api/test/cmd023-revise-plan.test.ts :: DENY (typed patch): each compiler rejection answers its own reason and the same code on the field; only a reference that does not resolve is UNKNOWN_REFERENCE",
+    "apps/api/test/cmd023-revise-plan.test.ts :: APPROVED: revising an approved plan takes the approval's controller and reconciled consequences; the approval is withdrawn with its own event in the same transaction, so no live approval remains on the SUPERSEDED plan",
+    "apps/api/test/cmd025-approve-plan.test.ts :: RACE: two ApprovePlan calls — one 201, one 409; no approval of a superseded body",
+    "apps/api/test/role-matrix.test.ts :: N17: every served command against every role — OWNER, ADMIN, OPERATOR, APPROVER, BILLING, VIEWER, a SUSPENDED and an INVITED member, a member of another agency: each role the registry role does not admit is refused with its reason and a durable DENY fact in the right stream and no effect, and each admitted role succeeds through the same route"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [
+    "B03",
+    "B08",
+    "B09"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD023-RACE",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd023-revise-plan.test.ts :: RACE: two revisions on one version → one successor; identical retry replays; the same key with another patch → 409 IDEMPOTENCY_CONFLICT; crash leaves the predecessor unsuperseded and the same key then revises it once",
+    "apps/api/test/cmd023-revise-plan.test.ts :: RACE: RevisePlan of an APPROVED plan and WithdrawApproval serialize on the plan lock — one of them ends the approval, once",
+    "apps/api/test/cmd023-revise-plan.test.ts :: OK: an OPERATOR revises a VALIDATED plan; predecessor SUPERSEDED, successor VALIDATION_REQUIRED with a new body hash; the impact map names the invalidated receipt"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [
+    "B03",
+    "B08"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD025-OK",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd025-approve-plan.test.ts :: OK: an APPROVER with a fresh step-up approves a VALIDATED plan whose receipt, source and target are current; the approval hash binds the named preimage",
+    "packages/application/test/approval-hash.test.ts :: CMD025-OK golden vector: approvalHashOf over the fixed KAURO_PLAN_APPROVAL_V1 preimage equals the hex derived outside the product; the test oracle reproduces it",
+    "packages/application/test/approval-hash.test.ts :: every one of the nine members is bound by the approval hash, and the domain separates it from every other digest class",
+    "apps/api/test/cmd025-approve-plan.test.ts :: the approval binds its source and target through the planHash the approver names (the interim binding of the manual-10 / catalogue conflict, open question Q9)",
+    "apps/api/test/cmd025-approve-plan.test.ts :: N9: a plan of one project can never be bound to another project's sealed source or confirmed target — the plan itself is refused at insert, so no approval can bind them",
+    "apps/api/test/cmd025-approve-plan.test.ts :: N10: the planHash an approval binds is recomputed from the stored body — a plan whose stored hash is not the digest of its body is refused 422 INTEGRITY_FAILURE BODY_DIGEST_MISMATCH and nothing is approved",
+    "packages/persistence/test/recheck-guards.test.ts :: N9: a plan's source and target are a sealed revision and a target contract of its own project — naming another project's is refused at insert, whatever the hashes; the plan's subject columns are its body's members",
+    "apps/api/test/response-contract.test.ts :: R29: the approval the routes answer carries actorId, and a consumer recomputes approvalHash from the wire DTO alone — when approved and after withdrawal",
+    "packages/persistence/test/integrity-guards.test.ts :: R5/R13: an approval binds its actor, the actor's own membership in this agency and a step-up proof of that same actor",
+    "packages/persistence/test/integrity-guards.test.ts :: R5 (acting session): an approval and its withdrawal are acts of the session's own identity — nobody records an approval in the approver's name, even with the approver's membership and fresh proof, nor a withdrawal under another member's membership; the approver's own session and the owner's own membership can",
+    "packages/persistence/test/recheck-guards.test.ts :: N11: the agency's state and agreements are the OWNER's decisions, and an approval is recorded only by an ACTIVE approving membership of the acting session and withdrawn only by its controller"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [
+    "B08"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD025-DENY",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd025-approve-plan.test.ts :: DENY: OPERATOR → 403; foreign → 404; stale/missing step-up → 403 ASSURANCE_REQUIRED; stale receipt → 422 PLAN_NOT_VALIDATED; disclosuresHash computed without the CLEAR set → 409 STALE_VERSION mismatch [disclosuresHash]; EXPIRED source → 422 SOURCE_EXPIRED; superseded target → 422 TARGET_STALE",
+    "apps/api/test/cmd025-approve-plan.test.ts :: B06-R2 DENY: a source still SEALED whose governing retention deadline has passed on the server clock — the sweeper has not expired it yet — is refused 422 SOURCE_EXPIRED: no approval, the plan still VALIDATED v4, no journal row; the same approval of a source whose retention lies ahead is 201",
+    "apps/api/test/cmd025-approve-plan.test.ts :: RACE: a source expiry racing ApprovePlan — the approval holds the sealed revision's transition lock to COMMIT: an expiry that comes second waits and then reads the approval; an expiry committed first is refused 422 SOURCE_EXPIRED",
+    "apps/api/test/cmd025-approve-plan.test.ts :: RACE: a target-contract supersession racing ApprovePlan — the approval holds the contract's transition lock to COMMIT: a supersession that comes second waits and then reads the approval; one committed first is refused 422 TARGET_STALE",
+    "apps/api/test/cmd025-approve-plan.test.ts :: N3 RACE: a source expiry queued behind an in-flight approval is never overtaken — an approval requested after it, of another plan on the same source, waits behind the expiry and is refused 422 SOURCE_EXPIRED",
+    "apps/api/test/cmd025-approve-plan.test.ts :: N4: the target currency is the plan's own project's contract — superseding it refuses the approval 422 TARGET_STALE even while another project of the agency holds a current contract with the same body hash",
+    "apps/api/test/role-matrix.test.ts :: N17: every served command against every role — OWNER, ADMIN, OPERATOR, APPROVER, BILLING, VIEWER, a SUSPENDED and an INVITED member, a member of another agency: each role the registry role does not admit is refused with its reason and a durable DENY fact in the right stream and no effect, and each admitted role succeeds through the same route"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [
+    "B08"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD025-RACE",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd025-approve-plan.test.ts :: RACE: two approvers on one version → one 201, one 409; identical retry replays; conflicting → 409 IDEMPOTENCY_CONFLICT; a crash before COMMIT leaves the plan VALIDATED with no approval and the same key then approves it once",
+    "apps/api/test/cmd025-approve-plan.test.ts :: OK: an APPROVER with a fresh step-up approves a VALIDATED plan whose receipt, source and target are current; the approval hash binds the named preimage"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [
+    "B08"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD026-OK",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd026-withdraw-approval.test.ts :: OK: the approving actor withdraws; approval carries withdrawn_at/by/reason, plan WITHDRAWN; the outbox routes EXECUTION_CONTROL; completed external actions are listed separately",
+    "apps/api/test/cmd026-withdraw-approval.test.ts :: OK (reason label): the withdrawal reason is the registry's label — 'Customer asked us to stop' is accepted, stored and answered verbatim, and never copied into an event payload",
+    "packages/persistence/test/inbox-outbox.test.ts :: N20: the dispatcher claims due records of its consumer with their event, delivers under the attempt it claimed, retries, dead-letters, and a claim that expired and was taken again settles nothing (FENCED)",
+    "packages/persistence/test/inbox-outbox.test.ts :: N20: two dispatchers claiming at once take disjoint records (SKIP LOCKED), and the request handlers can neither claim nor settle a record",
+    "packages/persistence/test/recheck-guards.test.ts :: N5: ending an approval moves its plan out of APPROVED in the same transaction — a withdrawal written alone, leaving the plan APPROVED under no live authority, is refused at COMMIT (KA020)"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [
+    "B08",
+    "B17"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD026-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd026-withdraw-approval.test.ts :: DENY: VIEWER → 403; another APPROVER → 403 NOT_APPROVAL_CONTROLLER; foreign → 404; plan not APPROVED → 409 PRECONDITION_FAILED; stale version → 409 STALE_VERSION",
+    "apps/api/test/cmd026-withdraw-approval.test.ts :: OK: the approving actor withdraws; approval carries withdrawn_at/by/reason, plan WITHDRAWN; the outbox routes EXECUTION_CONTROL; completed external actions are listed separately",
+    "apps/api/test/pipeline-authorization.test.ts :: R18 DENY: CMD026 checks the approval controller before version and state — a non-controlling APPROVER is NOT_APPROVAL_CONTROLLER (recorded) with a stale version and on a WITHDRAWN plan; the controller and an OWNER get the version and state answers; a plan that never carried an approval answers its state"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL (integration)"
+  },
+  {
+   "case": "CMD026-RACE",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd026-withdraw-approval.test.ts :: RACE: two withdrawals → one 200, one 409; identical retry replays; a withdrawal cannot be undone (KA004)",
+    "apps/api/test/cmd026-withdraw-approval.test.ts :: OK: the approving actor withdraws; approval carries withdrawn_at/by/reason, plan WITHDRAWN; the outbox routes EXECUTION_CONTROL; completed external actions are listed separately"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0",
+   "inheritedTo": [
+    "B08",
+    "B17"
+   ],
+   "claimed": "PARTIAL"
+  }
+ ]
+}
