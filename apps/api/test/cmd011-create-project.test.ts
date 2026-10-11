@@ -299,10 +299,10 @@ test("RACE: a capability suspension racing CreateProject — the project holds t
     w.asTenant(w.A, (c) => c.query("UPDATE kauro.capabilities SET capability_id = capability_id WHERE capability_id = $1", [w.cleanCapabilityId])),
     (e: unknown) => typeof e === "object" && e !== null && (e as { code?: string }).code === "42501",
   );
-  await assert.rejects(
-    w.asTenant(w.A, (c) => c.query("UPDATE kauro.capabilities SET state = 'SUSPENDED' WHERE capability_id = $1", [w.cleanCapabilityId])),
-    (e: unknown) => typeof e === "object" && e !== null && (e as { code?: string }).code === "42501",
-  );
+  // B18 (migration 0051): the only column the runtime role may write is the restriction path state -> SUSPENDED, and only
+  // through the corporate-owner policy; an agency session matches no row, so nothing changes (CMD059 tests cover the owner)
+  const nonOwnerWrite = await w.asTenant(w.A, (c) => c.query("UPDATE kauro.capabilities SET state = 'SUSPENDED' WHERE capability_id = $1", [w.cleanCapabilityId]));
+  assert.equal(nonOwnerWrite.rowCount, 0);
   assert.equal((await w.row<{ state: string }>("capabilities", "capability_id = $1", [w.cleanCapabilityId]))?.state, "AVAILABLE_LIMITED");
 });
 
