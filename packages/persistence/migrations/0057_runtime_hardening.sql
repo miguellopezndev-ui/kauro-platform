@@ -1,4 +1,4 @@
--- 0057 — SEC-DEPTH-PROVENANCE A1/R1/R2 (tier 1; provisional number, renumbered at merge): the runtime principals stay outside the
+-- 0057 — SEC-DEPTH-PROVENANCE A1/R1/R2 (tier 1; provisional number: renumbered to 0059 at merge, after b10 seller_credit 0057 and b05 core_documents 0058): the runtime principals stay outside the
 -- guard-execution boundary (P2). Runtime groups, their logins and PUBLIC lose TEMPORARY and CREATE on the database (a pg_temp function
 -- or table is a place a session could shadow an unqualified name), PUBLIC loses CREATE on schema public and EXECUTE on every kauro
 -- trigger function, and the pg_parameter_acl grants of SET / ALTER SYSTEM to PUBLIC or a runtime principal are revoked where this role

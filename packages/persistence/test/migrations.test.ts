@@ -129,7 +129,7 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0056_offset_claims_yield.sql",
     // SEC-DEPTH-PROVENANCE L1 (A1/R1/R2): runtime principals outside the guard-execution boundary (provisional number, renumbered at merge)
     "0057_runtime_hardening.sql",
-    // "0057_seller_credit.sql", (pending)
+    // (0057 seller_credit and 0058 core_documents land first on main; this file is renumbered to 0059 at merge)
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
