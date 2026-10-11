@@ -1,0 +1,109 @@
+// UI18 Free data health check as markup. Separates what the api reports (status, deadlines, allowance), the decisions waiting for the
+// person, and what is not supported; a used-up allowance keeps the measured profile and says the interpretation is incomplete. Customer
+// strings and codes are text nodes. Pure markup: the container owns the read and the cancel run.
+import { Banner, Button, Deadline, StatusBadge, type Tone } from "@kauro/ui";
+import type { ReactElement } from "react";
+import type { AuditView } from "../../api/generated.ts";
+import { message } from "../../copy/en.ts";
+import { healthCheckModel } from "./model.ts";
+
+export interface HealthCheckViewProps {
+  readonly audit: AuditView;
+  readonly onRefresh: () => void;
+  readonly onCancel: () => void;
+  readonly cancelling: boolean;
+}
+
+const TONE: Readonly<Record<AuditView["state"], Tone>> = {
+  QUEUED: "info",
+  PROFILING: "info",
+  INTERPRETING: "info",
+  VALIDATING: "info",
+  DRAFT_READY: "success",
+  NEEDS_DECISION: "warning",
+  UNSUPPORTED: "warning",
+  FAILED: "danger",
+  CANCELLED: "neutral",
+  EXPIRED: "neutral",
+};
+
+export function HealthCheckDetails({ audit, onRefresh, onCancel, cancelling }: HealthCheckViewProps): ReactElement {
+  const model = healthCheckModel(audit);
+  return (
+    <div className="kauro-health-check">
+      <p>{message("screen.health.lead.body")}</p>
+      <section aria-labelledby="health-status">
+        <h2 id="health-status">{message("screen.health.state.label")}</h2>
+        <p role="status">
+          <StatusBadge tone={TONE[model.state]}>{message(`screen.health.state.${model.state}`)}</StatusBadge>
+        </p>
+        {model.running ? <p>{message("screen.health.progress.body")}</p> : null}
+        <dl>
+          <div><dt>{message("screen.health.started.label")}</dt><dd><Deadline at={audit.startedAt} timeZone="UTC" /></dd></div>
+          {audit.interpretationDeadlineAt === undefined ? null : <div><dt>{message("screen.health.interpretation.label")}</dt><dd><Deadline at={audit.interpretationDeadlineAt} timeZone="UTC" /></dd></div>}
+          <div><dt>{message("screen.health.deadline.label")}</dt><dd><Deadline at={audit.absoluteDeadline} timeZone="UTC" /></dd></div>
+          <div><dt>{message("screen.health.grant.label")}</dt><dd>{message(`screen.health.grant.${audit.grantState}`)}</dd></div>
+        </dl>
+        {model.interpretationIncomplete ? (
+          <Banner tone="warning" title={message("screen.health.exhausted.title")} announce="status">
+            <p>{message("screen.health.exhausted.body")}</p>
+          </Banner>
+        ) : null}
+        {model.terminalReason === null ? null : (
+          <p>
+            {message("screen.health.reason.label")}: <code>{model.terminalReason}</code>
+          </p>
+        )}
+      </section>
+      <section aria-labelledby="health-decisions">
+        <h2 id="health-decisions">{message("screen.health.decisions.heading")}</h2>
+        {model.pendingDecisions.length === 0 ? (
+          <p>{message("screen.health.decisions.none.body")}</p>
+        ) : (
+          <ul>
+            {model.pendingDecisions.map((code) => (
+              <li key={code}>
+                <code>{code}</code>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      {model.unsupportedCapabilities.length === 0 ? null : (
+        <section aria-labelledby="health-unsupported">
+          <h2 id="health-unsupported">{message("screen.health.unsupported.heading")}</h2>
+          <ul>
+            {model.unsupportedCapabilities.map((code) => (
+              <li key={code}>
+                <code>{code}</code>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <p className="kauro-actions">
+        {model.terminal ? null : (
+          <Button variant="secondary" onClick={onRefresh}>
+            {message("screen.health.refresh.label")}
+          </Button>
+        )}{" "}
+        {model.canCancel ? (
+          <Button variant="secondary" disabled={cancelling} aria-busy={cancelling ? true : undefined} onClick={() => (cancelling ? undefined : onCancel())}>
+            {message("screen.health.cancel.cta")}
+          </Button>
+        ) : null}
+      </p>
+      {cancelling ? <p role="status">{message("screen.health.cancel.working.body")}</p> : null}
+    </div>
+  );
+}
+
+/** No check has been requested for the project (no audit in the address). */
+export function NoHealthCheck(): ReactElement {
+  return (
+    <section>
+      <h2>{message("screen.health.none.title")}</h2>
+      <p>{message("screen.health.none.body")}</p>
+    </section>
+  );
+}
