@@ -1,0 +1,34 @@
+{
+  "name": "@kauro/reports",
+  "version": "0.1.0",
+  "description": "Kauro reports (B13): the verified report model built from a Migration Core package and its manifest. Pure: it reads bytes it is handed, renders nothing to PDF and fetches nothing.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": false,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-reporter=spec \"dist/test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@kauro/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "typescript": "5.9.2"
+  }
+}

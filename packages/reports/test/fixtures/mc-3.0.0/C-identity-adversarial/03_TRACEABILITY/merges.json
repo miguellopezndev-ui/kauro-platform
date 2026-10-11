@@ -1,0 +1,79 @@
+{
+  "merges": [
+    {
+      "absorbedRowLocatorIds": [
+        "F-bbfd2003e6d8:S0:R3"
+      ],
+      "associationRemaps": [],
+      "conflicts": [],
+      "fieldDecisions": [],
+      "identityEvidence": [
+        {
+          "authority": "PROVING",
+          "heldByMembers": 2,
+          "kind": "SOURCE_RECORD_ID",
+          "reasonCode": "IDENTITY_PROVEN_SOURCE_RECORD_ID",
+          "value": "crm_a|acme-crm-a|contacts-a|CONTACT|SOURCE_RECORD_ID|||1001"
+        }
+      ],
+      "mergeId": "mg_6b9043ead94cc74e",
+      "object": "CONTACT",
+      "ruleVersion": "1.0.0",
+      "survivorMigrationKey": "mk_contact_b9480e7a0434d2787753",
+      "survivorRowLocatorId": "F-bbfd2003e6d8:S0:R2"
+    },
+    {
+      "absorbedRowLocatorIds": [
+        "F-bbfd2003e6d8:S0:R9"
+      ],
+      "associationRemaps": [],
+      "conflicts": [
+        {
+          "destinationField": "contact.email",
+          "reasonCode": "IDENTITY_MERGE_FIELD_CONFLICT",
+          "semanticsClass": "STANDARD",
+          "values": [
+            {
+              "rowLocatorId": "F-bbfd2003e6d8:S0:R8",
+              "value": "katherine@analytical.example"
+            },
+            {
+              "rowLocatorId": "F-bbfd2003e6d8:S0:R9",
+              "value": "katherine.johnson@analytical.example"
+            }
+          ]
+        },
+        {
+          "destinationField": "contact.jobTitle",
+          "reasonCode": "IDENTITY_MERGE_FIELD_CONFLICT",
+          "semanticsClass": "STANDARD",
+          "values": [
+            {
+              "rowLocatorId": "F-bbfd2003e6d8:S0:R8",
+              "value": "Mathematician"
+            },
+            {
+              "rowLocatorId": "F-bbfd2003e6d8:S0:R9",
+              "value": "Aerospace Technologist"
+            }
+          ]
+        }
+      ],
+      "fieldDecisions": [],
+      "identityEvidence": [
+        {
+          "authority": "PROVING",
+          "heldByMembers": 2,
+          "kind": "SOURCE_RECORD_ID",
+          "reasonCode": "IDENTITY_PROVEN_SOURCE_RECORD_ID",
+          "value": "crm_a|acme-crm-a|contacts-a|CONTACT|SOURCE_RECORD_ID|||1006"
+        }
+      ],
+      "mergeId": "mg_7b70d4f1d3ef8965",
+      "object": "CONTACT",
+      "ruleVersion": "1.0.0",
+      "survivorMigrationKey": "mk_contact_83af06c5621687c00470",
+      "survivorRowLocatorId": "F-bbfd2003e6d8:S0:R8"
+    }
+  ]
+}

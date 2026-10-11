@@ -1,0 +1,194 @@
+{
+  "artifacts": [
+    {
+      "byteLength": 646,
+      "kind": "MACHINE_IMPORT_CSV",
+      "path": "01_IMPORT/clean-only/contacts.csv",
+      "rowCount": 8,
+      "sha256": "a49ca7a601ce304f52664c178ea251c413d49cb7e2b2d856ead2f6d5a1aa2667"
+    },
+    {
+      "byteLength": 77,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/destination-conflicts.csv",
+      "rowCount": 0,
+      "sha256": "05f9663497ca6282b6d5c6d274100f42e29623b2496d4eb158ffa248bba456d0"
+    },
+    {
+      "byteLength": 157,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+      "rowCount": 0,
+      "sha256": "086a9ccaeddde8d7f5f8d158d9c050452f570cf42b3e2385c6aa8bfcde236c00"
+    },
+    {
+      "byteLength": 1304,
+      "kind": "HUMAN_VIEW_CSV",
+      "path": "02_EXCEPTIONS/formula-risk.csv",
+      "rowCount": 7,
+      "sha256": "5d0da4752bdeaafc635f7dcf4c6b8c1b563c177b9315ecaf8fd0ea9adeef3b81"
+    },
+    {
+      "byteLength": 145,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/isolated.csv",
+      "rowCount": 0,
+      "sha256": "77158a3c7e750595f4be722070519a4cdae796420b73caff6117840b242e1d75"
+    },
+    {
+      "byteLength": 114,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/leftovers.csv",
+      "rowCount": 0,
+      "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+    },
+    {
+      "byteLength": 114,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/rejected-input.csv",
+      "rowCount": 0,
+      "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+    },
+    {
+      "byteLength": 1493,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/unmapped-fields.csv",
+      "rowCount": 5,
+      "sha256": "9d63c3bc498320a9d9128bb35e1de0c5fb44981761e28d1bbb243bad1589e010"
+    },
+    {
+      "byteLength": 206,
+      "kind": "MACHINE_EXCEPTION_CSV",
+      "path": "02_EXCEPTIONS/unresolved-associations.csv",
+      "rowCount": 0,
+      "sha256": "d0efcfc09f4e1d53ce26a3b410252680069be09956c191b850b3ee1c936f40bf"
+    },
+    {
+      "byteLength": 274,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/associations.csv",
+      "rowCount": 0,
+      "sha256": "8dffe96314114baf20a78b2c4e861f78a2bfdba215777b90aa7259c11be49673"
+    },
+    {
+      "byteLength": 4410,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/changes.csv",
+      "rowCount": 10,
+      "sha256": "b645404dde7bb0188ffb4cd57e017ab8e57e69510ffbb320dbedc3fe99519885"
+    },
+    {
+      "byteLength": 9245,
+      "kind": "DOCUMENT",
+      "path": "03_TRACEABILITY/config.normalized.json",
+      "rowCount": null,
+      "sha256": "40e2a5091853d9f6e2c770b2cbc8c0cd68b94f039949a385285a08f0ecb71404"
+    },
+    {
+      "byteLength": 109,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/destination-matching.csv",
+      "rowCount": 0,
+      "sha256": "b572fb9c9af32a87898e824321ec6a2fab85f7feb31a2f120819781d442d5b2b"
+    },
+    {
+      "byteLength": 1055,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/flags.csv",
+      "rowCount": 2,
+      "sha256": "17d8baf32b2b6a94157e05d50b6583dca9b83c6a2544880480893d71c1535b10"
+    },
+    {
+      "byteLength": 875,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/import-crosswalk.csv",
+      "rowCount": 8,
+      "sha256": "887225325d147063c977cf6b458ab56dc0152499a7fc38ffdc5687a1883ded6d"
+    },
+    {
+      "byteLength": 36,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/instance-verification.csv",
+      "rowCount": 0,
+      "sha256": "418e6bd6d0d7bad87790f4625e9ae9d5be53da8cc2b9b0f6145cee9eaad57d44"
+    },
+    {
+      "byteLength": 19,
+      "kind": "DOCUMENT",
+      "path": "03_TRACEABILITY/merges.json",
+      "rowCount": null,
+      "sha256": "847c1ecf26a213bd1fed56d1309f963b1152b3aa1d3ae81d7c3ac0d060811f37"
+    },
+    {
+      "byteLength": 1748,
+      "kind": "DOCUMENT",
+      "path": "03_TRACEABILITY/reconciliation.json",
+      "rowCount": null,
+      "sha256": "88574b010628186b5e174e96c1bd2adfa7298be6f4fd9fece45c519d224f7b3d"
+    },
+    {
+      "byteLength": 4265,
+      "kind": "MACHINE_EVIDENCE_CSV",
+      "path": "03_TRACEABILITY/source-lineage.csv",
+      "rowCount": 8,
+      "sha256": "511fd1a02eaf08ee9da7d26644f490c2cf93887285b681b876fe24355d703ebd"
+    },
+    {
+      "byteLength": 4460,
+      "kind": "DOCUMENT",
+      "path": "04_DOCUMENTATION/audit.md",
+      "rowCount": null,
+      "sha256": "63823ec5f1a579333a1315177844b5191a566971e2728bcc9ce2f802640613c7"
+    },
+    {
+      "byteLength": 653,
+      "kind": "HUMAN_VIEW_CSV",
+      "path": "04_DOCUMENTATION/data-view/clean-only/contacts.csv",
+      "rowCount": 8,
+      "sha256": "7214a9da39eea2be8b05965ec3552b983febd30ef896ed85f3850f2ab46558e7"
+    },
+    {
+      "byteLength": 1640,
+      "kind": "DOCUMENT",
+      "path": "04_DOCUMENTATION/import-instructions.md",
+      "rowCount": null,
+      "sha256": "5b9d870e33d1529cb86577213b297028c35c40ed356993de1b19f41c9c568f51"
+    }
+  ],
+  "bundleId": "B-4d0d2a15e1ade00c",
+  "configHash": "40e2a5091853d9f6e2c770b2cbc8c0cd68b94f039949a385285a08f0ecb71404",
+  "coreVersion": "3.0.0",
+  "inputs": [
+    {
+      "byteLength": 715,
+      "encoding": "UTF8",
+      "encodingEvidence": "UTF8_VALIDATED",
+      "fileId": "F-0db063383513",
+      "format": "CSV",
+      "path": "contacts.csv",
+      "sha256": "0db0633835134b4a9c7782a9035a4c6deae18db0324e1f93ea004f545de95021",
+      "sheets": [
+        {
+          "columnCount": 9,
+          "dataRowCount": 8,
+          "hidden": false,
+          "readerRowCount": 8,
+          "rejectedRowCount": 0,
+          "sheetId": "S0",
+          "sheetName": null
+        }
+      ]
+    }
+  ],
+  "manifestVersion": "2.1.0",
+  "relationshipCandidates": 0,
+  "runId": "run_13174ec28740b76d61f91a28",
+  "sourceProfileHash": null,
+  "sourceRegistryVersion": "2026-09-06",
+  "target": {
+    "adapterVersion": "1.0.0",
+    "importMode": "CREATE_ONLY",
+    "mode": "CLEAN_ONLY",
+    "targetContractHash": null
+  }
+}

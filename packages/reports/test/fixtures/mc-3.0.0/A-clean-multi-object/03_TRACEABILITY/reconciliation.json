@@ -1,0 +1,75 @@
+{
+  "associations": {
+    "accountedFor": 12,
+    "byDisposition": {
+      "DEDUPLICATED": 0,
+      "LEFTOVER": 0,
+      "OUTPUT": 12,
+      "UNRESOLVED": 0
+    },
+    "equationHolds": true,
+    "sourceEdges": 12,
+    "withoutDisposition": 0
+  },
+  "bundleId": "B-5aa7638ee54fbb15",
+  "cells": {
+    "changed": 8,
+    "clearedByExplicitAuthorization": 0,
+    "flagged": 0,
+    "rowsWithChanges": 8,
+    "unmappedPreserved": 0
+  },
+  "configHash": "159f0923d6329083299e2383044804642450bd66cd39f0379f22eb4f3748fcab",
+  "coreVersion": "3.0.0",
+  "destination": {
+    "instanceVerificationItems": 0,
+    "keyConflicts": 0,
+    "spreadsheetFormulaRiskValues": 8
+  },
+  "identity": {
+    "absorbedRows": 0,
+    "consentConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "duplicateCandidateRows": 0,
+    "mergeConflicts": 0,
+    "provenMerges": 0
+  },
+  "inputs": {
+    "fileCount": 5,
+    "sheetCount": 5,
+    "totalByteLength": 1397
+  },
+  "reasonCodeTally": {
+    "ASSOCIATION_RESOLVED": 16,
+    "INGEST_ROW_ACCEPTED": 15,
+    "TRANSFORM_PHONE_E164": 8
+  },
+  "records": {
+    "byObject": {
+      "COMPANY": 4,
+      "CONTACT": 5,
+      "DEAL": 3,
+      "LEAD": 3
+    },
+    "deliveredTotal": 15
+  },
+  "runId": "run_1e78f48c07a50c92162685d9",
+  "sourceRows": {
+    "accountedFor": 19,
+    "byDisposition": {
+      "ISOLATED": 0,
+      "LEFTOVER": 0,
+      "MERGED_PROVEN": 0,
+      "OUTPUT": 19,
+      "REJECTED_INPUT": 0
+    },
+    "equationHolds": true,
+    "ingested": 19,
+    "total": 19,
+    "withoutDisposition": 0
+  },
+  "target": {
+    "importMode": "CREATE_ONLY",
+    "mode": "CLEAN_ONLY"
+  }
+}

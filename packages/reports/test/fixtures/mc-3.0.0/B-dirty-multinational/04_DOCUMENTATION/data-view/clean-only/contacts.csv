@@ -1,0 +1,9 @@
+contact.createdAt,contact.email,contact.firstName,contact.lastName,contact.phone,contact.postalCode
+not a date,aegir@nordur.example,Ægir,Þórsson,'+3545612345,101
+2026-06-30,grace@analytical.example,Grace,Hopper,'+14155552671,01730
+2026-05-22,oliver@bletchley.example,Oliver,Bennett,'+442079460958,MK3 6EB
+2026-04-10,lucia@iberia.example,Lucía,Fernández,'+34612345678,28013
+2026-07-04,yoshiko@tokyo.example,芳子,山田,'+81332345678,100-0001
+2026-01-15,SOFIA@andina.example,Sofia,Restrepo,'+573001234567,110111
+2026-02-20,mateo@andina.example,Mateo,Gómez,'+573011234567,110221
+2026-03-05,valentina@andina.example,Valentina,Ruiz,3021234567,050021
