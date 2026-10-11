@@ -91,6 +91,11 @@ export {
   endJob,
 } from "./execution-fixtures.js";
 export type { FixtureArtifact } from "./execution-fixtures.js";
+export { consumeThroughExecution, deliverThroughExecution } from "./execution-delivery.js";
+export type { ConsumedThroughExecution, DeliveredThroughExecution } from "./execution-delivery.js";
+// SEC-DEPTH-PROVENANCE kit: the superuser-nested probe (P1) and the slow-check hook
+export { nestedAsSuperuser, slowCheckHook } from "./depth-probe.js";
+export type { DepthProbe } from "./depth-probe.js";
 // audit authority (package B08, mandate B08-PERSISTENCE-AUDIT): the owner's funding act of the platform's model pool (Q8-1)
 export { fundPlatformPool } from "./audit-fixtures.js";
 export type { FundedPoolOptions } from "./audit-fixtures.js";
