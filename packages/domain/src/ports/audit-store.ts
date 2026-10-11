@@ -32,6 +32,7 @@ import type {
   PlanValidationResult,
 } from "../model/audit/records.js";
 import type { AuditDiscovery } from "./audit-discovery.js";
+import type { ImportStageStore } from "./import-stage-store.js";
 import type { ExecutionUnitOfWork, ExecutionUnitOfWorkFactory } from "./execution-store.js";
 import type { LeaseRecord } from "./lease-store.js";
 import type { VersionedWrite } from "./repositories.js";
@@ -246,6 +247,8 @@ export interface AuditUnitOfWork extends ExecutionUnitOfWork, Pick<SourceUnitOfW
   readonly audits: AuditStore;
   /** The control plane's discovery reads of audit work (mandate B08-CONTROL-AUDIT, D8-CAU-1). */
   readonly auditDiscovery: AuditDiscovery;
+  /** B17: the import stages and their receipts (CMD040, CMD041). */
+  readonly importStages: ImportStageStore;
 }
 
 export interface AuditUnitOfWorkFactory extends ExecutionUnitOfWorkFactory {

@@ -16,7 +16,7 @@ import type { ServiceMode, TargetContractRecord } from "./aggregates.js";
 /** How old an observation may be when the agency confirms it (a policy the confirmation applies on the database's clock). */
 export const TARGET_OBSERVATION_FRESHNESS_SECONDS = 86_400;
 
-export const TARGET_ARTIFACT_KINDS = ["METADATA", "CONFIRMATION_EVIDENCE"] as const;
+export const TARGET_ARTIFACT_KINDS = ["METADATA", "CONFIRMATION_EVIDENCE", "STAGE_RECEIPT"] as const;
 export type TargetArtifactKind = (typeof TARGET_ARTIFACT_KINDS)[number];
 
 /** The reasons of CMD018 and CMD019 (appended to the closed FAILURE_REASONS of model/errors.ts). */

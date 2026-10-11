@@ -523,6 +523,36 @@
           "mode",
           "project_id"
         ]
+      },
+      "kauro.import_stages": {
+        "UPDATE": [
+          "continuation_receipt_hash",
+          "continued_at",
+          "continued_by_membership_id",
+          "state",
+          "version"
+        ]
+      },
+      "kauro.stage_receipts": {
+        "INSERT": [
+          "agency_id",
+          "failed_rows",
+          "identity_mapping_hash",
+          "instance_id",
+          "mapping",
+          "matched_rows",
+          "project_id",
+          "receipt_file_hash",
+          "receipt_id",
+          "receipt_upload_ref",
+          "result",
+          "revision",
+          "source_package_hash",
+          "stage_id",
+          "submitted_by_membership_id",
+          "unresolved_rows",
+          "validator_version"
+        ]
       }
     },
     "kauro_assurance": {
@@ -5484,6 +5514,38 @@
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "import_stages/import_stages_tenant_advance": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "((agency_id = kauro.current_agency_id()) AND ((continued_by_membership_id IS NULL) OR (EXISTS ( SELECT 1\n   FROM kauro.memberships m\n  WHERE ((m.agency_id = import_stages.agency_id) AND (m.membership_id = import_stages.continued_by_membership_id) AND (m.user_id = kauro.current_user_id()) AND (m.state = 'ACTIVE'::text) AND (m.role = ANY (ARRAY['OWNER'::text, 'ADMIN'::text, 'APPROVER'::text])))))))"
+    },
+    "import_stages/import_stages_tenant_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": null
+    },
+    "stage_receipts/stage_receipts_tenant_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": null
+    },
+    "stage_receipts/stage_receipts_tenant_submit": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "((agency_id = kauro.current_agency_id()) AND (EXISTS ( SELECT 1\n   FROM kauro.memberships m\n  WHERE ((m.agency_id = stage_receipts.agency_id) AND (m.membership_id = stage_receipts.submitted_by_membership_id) AND (m.user_id = kauro.current_user_id()) AND (m.state = 'ACTIVE'::text) AND (m.role = ANY (ARRAY['OWNER'::text, 'ADMIN'::text, 'OPERATOR'::text]))))))"
     }
   },
   "tables": {
@@ -5959,6 +6021,12 @@
         "SELECT"
       ],
       "kauro.target_artifacts": [
+        "SELECT"
+      ],
+      "kauro.import_stages": [
+        "SELECT"
+      ],
+      "kauro.stage_receipts": [
         "SELECT"
       ]
     },

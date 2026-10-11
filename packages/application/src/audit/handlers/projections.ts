@@ -4,10 +4,10 @@
  * never the sealed revision's or the target's hash, the requesting membership, the profile evidence, a step, a task, a provider or the
  * pool the grant was carved from — and shared by CancelAudit's answer and the GetAudit read, so the two show the audit the same way.
  */
-import type { AuditRecord, CostGrantRecord, MembershipRole, TargetContractLifecycle } from "@kauro/domain";
+import type { AuditRecord, CostGrantRecord, ImportStageRecord, MembershipRole, StageReceiptRecord, TargetContractLifecycle } from "@kauro/domain";
 import { findTransition, roleSatisfies } from "@kauro/domain";
-import { CANCEL_AUDIT, CONFIRM_TARGET_CONTRACT, CREATE_PLAN } from "../contracts.js";
-import type { AuditResourceAction, AuditView, TargetContractAction, TargetContractView } from "../views.js";
+import { CANCEL_AUDIT, CONFIRM_TARGET_CONTRACT, CONTINUE_STAGE, CREATE_PLAN, SUBMIT_STAGE_RECEIPT } from "../contracts.js";
+import type { AuditResourceAction, AuditView, ImportStageAction, ImportStageView, TargetContractAction, TargetContractView } from "../views.js";
 import { utc } from "./shared.js";
 
 /**
@@ -66,5 +66,45 @@ export function targetContractView(contract: TargetContractLifecycle, objectCoun
     state: contract.state,
     objectCount,
     permittedActions: targetContractActions(role, contract),
+  };
+}
+
+/**
+ * The commands the caller may issue on an import stage (informative, B06 D-PERM-1): SubmitStageReceipt while the stage awaits a receipt
+ * (or needs a correction), for an operating role; ContinueStage on a verified stage not yet continued, or one whose fully accounted
+ * partial receipt awaits the approver, for an approving role.
+ */
+export function importStageActions(role: MembershipRole, stage: Pick<ImportStageRecord, "state" | "continuedAt">): ReadonlyArray<ImportStageAction> {
+  const out: ImportStageAction[] = [];
+  if (roleSatisfies(SUBMIT_STAGE_RECEIPT.role, role) && (stage.state === "AWAITING_AGENCY_IMPORT" || stage.state === "NEEDS_CORRECTION")) out.push("SubmitStageReceipt");
+  if (roleSatisfies(CONTINUE_STAGE.role, role) && stage.continuedAt === undefined && (stage.state === "VERIFIED_SUCCESS" || stage.state === "RECEIPT_VALIDATING")) out.push("ContinueStage");
+  return out;
+}
+
+export function importStageView(stage: ImportStageRecord, receipt: StageReceiptRecord | null, role: MembershipRole): ImportStageView {
+  return {
+    stageId: stage.stageId,
+    projectId: stage.projectId,
+    sequence: stage.sequence,
+    objectApiName: stage.objectApiName,
+    operation: stage.operation,
+    state: stage.state,
+    parentStageIds: stage.parentStageIds,
+    packageHash: stage.packageHash,
+    receiptRequired: stage.receiptRequired,
+    expiresAt: utc(stage.expiresAt),
+    version: stage.version,
+    ...(receipt !== null
+      ? {
+          receiptRevision: receipt.revision,
+          receiptResult: receipt.result,
+          identityMappingHash: receipt.identityMappingHash,
+          matchedRows: receipt.matchedRows,
+          failedRows: receipt.failedRows,
+          unresolvedRows: receipt.unresolvedRows,
+        }
+      : {}),
+    ...(stage.continuedAt !== undefined ? { continuedAt: utc(stage.continuedAt) } : {}),
+    permittedActions: importStageActions(role, stage),
   };
 }

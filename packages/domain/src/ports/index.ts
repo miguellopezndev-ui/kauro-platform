@@ -217,3 +217,5 @@ export type {
 } from "./audit-store.js";
 // the control plane's discovery of audit work (package B08, mandate B08-CONTROL-AUDIT)
 export type { AuditRef, GrantRef, AuditSource, DraftValidation, ValidationSubject, GrantScope, GrantUsage, AuditDiscovery } from "./audit-discovery.js";
+// import stages and their receipts (package B17: CMD040, CMD041)
+export type { ImportStageStore } from "./import-stage-store.js";

@@ -18,6 +18,7 @@ import { COMMERCIAL_FAILURE_REASONS } from "../commercial/failure-reasons.js";
 import { EXECUTION_FAILURE_REASONS } from "./execution/failure-reasons.js";
 import { AUDIT_FAILURE_REASONS } from "./audit/failure-reasons.js";
 import { TARGET_FAILURE_REASONS } from "./target-contract.js";
+import { IMPORT_STAGE_FAILURE_REASONS } from "./import-stage.js";
 import { CAPABILITY_FAILURE_REASONS } from "./capability-governance.js";
 
 export const FAILURE_CODES = [
@@ -302,6 +303,8 @@ export const FAILURE_REASONS = [
   ...COMMERCIAL_FAILURE_REASONS,
   // target contracts (package B17: CMD018, CMD019)
   ...TARGET_FAILURE_REASONS,
+  // import stages and receipts (package B17: CMD040, CMD041)
+  ...IMPORT_STAGE_FAILURE_REASONS,
   // capability governance (package B18: CMD058, CMD059)
   ...CAPABILITY_FAILURE_REASONS,
 ] as const;

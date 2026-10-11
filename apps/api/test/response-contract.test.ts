@@ -175,6 +175,9 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/audits/:auditId/cancel", "CancelAudit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD021" } }],
       ["POST", "/api/v1/audits/:auditId/plans", "CreatePlan", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD022" } }],
       ["POST", "/api/v1/plans/:planId/validate", "ValidatePlan", { 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
+      // the import stage commands (B17): CMD040 validates a receipt (200), CMD041 records the continuation (200)
+      ["POST", "/api/v1/projects/:projectId/import-stages/:stageId/receipts", "SubmitStageReceipt", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD040" } }],
+      ["POST", "/api/v1/projects/:projectId/import-stages/:stageId/continue", "ContinueStage", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD041" } }],
       // the support package (B11 W4)
       ["POST", "/api/v1/projects/:projectId/support-cases", "CreateSupportCase", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD044" } }],
       // the manual-10 reads (N16)

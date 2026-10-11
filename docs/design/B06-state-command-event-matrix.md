@@ -179,10 +179,10 @@ registry machine; initial PREPARED; terminal VERIFIED_SUCCESS, VERIFIED_PARTIAL,
 | — | (initial PREPARED) | PREPARED | B08: fenced staging prepares the stage | — (no event type registered: the owning package registers it with the edge) | — |
 | PREPARED | verified_stage_package | RELEASED | B08: verification and publication | — (no event type registered: the owning package registers it with the edge) | — |
 | RELEASED | agency_starts_import_workflow | AWAITING_AGENCY_IMPORT | B11: the agency's staged import journey | — (no event type registered: the owning package registers it with the edge) | — |
-| AWAITING_AGENCY_IMPORT | receipt_submitted | RECEIPT_UPLOADED | CMD040 SubmitStageReceipt (B17) | — (no event type registered: the owning package registers it with the edge) | — |
+| AWAITING_AGENCY_IMPORT | receipt_submitted | RECEIPT_UPLOADED | CMD040 SubmitStageReceipt (B17) | — (no event type registered: the owning package registers it with the edge) | route |
 | RECEIPT_VALIDATING | receipt_complete | VERIFIED_SUCCESS | B17: receipt validation | — (no event type registered: the owning package registers it with the edge) | — |
 | RECEIPT_VALIDATING | receipt_missing_or_ambiguous | NEEDS_CORRECTION | B17: receipt validation | — (no event type registered: the owning package registers it with the edge) | — |
-| NEEDS_CORRECTION | corrected_receipt_admitted | RECEIPT_VALIDATING | CMD040 SubmitStageReceipt (B17) | — (no event type registered: the owning package registers it with the edge) | — |
+| NEEDS_CORRECTION | corrected_receipt_admitted | RECEIPT_VALIDATING | CMD040 SubmitStageReceipt (B17) | — (no event type registered: the owning package registers it with the edge) | route |
 | RELEASED | stage_requires_no_receipt_and_preparation_complete | VERIFIED_SUCCESS | B08: stage publication | — (no event type registered: the owning package registers it with the edge) | — |
 | AWAITING_AGENCY_IMPORT | retention_deadline | EXPIRED | B16: staged retention caps | — (no event type registered: the owning package registers it with the edge) | — |
 | NEEDS_CORRECTION | retention_deadline | EXPIRED | B16: staged retention caps | — (no event type registered: the owning package registers it with the edge) | — |
@@ -190,7 +190,7 @@ registry machine; initial PREPARED; terminal VERIFIED_SUCCESS, VERIFIED_PARTIAL,
 | RELEASED | cancellation_wins | CANCELLED | B08: stage cancellation | — (no event type registered: the owning package registers it with the edge) | — |
 | AWAITING_AGENCY_IMPORT | cancellation_wins | CANCELLED | B08: stage cancellation | — (no event type registered: the owning package registers it with the edge) | — |
 | RECEIPT_UPLOADED | receipt_validator_claims | RECEIPT_VALIDATING | B17: receipt validation | — (no event type registered: the owning package registers it with the edge) | — |
-| RECEIPT_VALIDATING | approved_partial_scope_accounted | VERIFIED_PARTIAL | CMD041 ContinueStage (B17) | — (no event type registered: the owning package registers it with the edge) | — |
+| RECEIPT_VALIDATING | approved_partial_scope_accounted | VERIFIED_PARTIAL | CMD041 ContinueStage (B17) | — (no event type registered: the owning package registers it with the edge) | route |
 
 ### Capability
 
@@ -517,6 +517,8 @@ settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh st
 | CMD037 CancelJob | POST /api/v1/jobs/{jobId}/cancel | AGENCY_OPERATOR | AGENCY_HEADER | — | Job cancel_command | processing_job.cancel_requested.v1 | processing_job.cancel_requested.v1 → EXECUTION_CONTROL |
 | CMD018 CreateTargetContract | POST /api/v1/projects/{projectId}/target-contracts | AGENCY_OPERATOR | AGENCY_HEADER | — |  |  | — |
 | CMD019 ConfirmTargetContract | POST /api/v1/target-contracts/{contractId}/confirm | AGENCY_APPROVER | AGENCY_HEADER | — |  |  | — |
+| CMD040 SubmitStageReceipt | POST /api/v1/projects/{projectId}/import-stages/{stageId}/receipts | AGENCY_OPERATOR | AGENCY_HEADER | — | ImportStage receipt_submitted; ImportStage corrected_receipt_admitted |  | — |
+| CMD041 ContinueStage | POST /api/v1/projects/{projectId}/import-stages/{stageId}/continue | AGENCY_APPROVER | AGENCY_HEADER | — | ImportStage approved_partial_scope_accounted |  | — |
 | CMD020 StartAudit | POST /api/v1/revisions/{revisionId}/audits | AGENCY_OPERATOR | AGENCY_HEADER | — | Audit (initial QUEUED); CostGrant (initial PREPARED) | cost_grant.prepared.v1, cost_grant.authorized.v1, audit.queued.v1 | audit.queued.v1 → AUDIT_ORCHESTRATION |
 | CMD021 CancelAudit | POST /api/v1/audits/{auditId}/cancel | AGENCY_OPERATOR | AGENCY_HEADER | — | Audit cancellation_wins | audit.cancelled.v1 | audit.cancelled.v1 → AUDIT_ORCHESTRATION |
 | CMD022 CreatePlan | POST /api/v1/audits/{auditId}/plans | AGENCY_OPERATOR | AGENCY_HEADER | — | Plan (initial DRAFT) | plan.created.v1, plan.validation_required.v1 | — |
@@ -1346,6 +1348,97 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 422 | TARGET_STALE | — | — | — | COMMAND | the contract was superseded: a superseded version is never confirmed |
 | 422 | INTEGRITY_FAILURE | BODY_DIGEST_MISMATCH | — | — | COMMAND | the stored body is not the body its digest names |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD040 SubmitStageReceipt
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 400 | INVALID_REQUEST | UNKNOWN_REFERENCE | UNKNOWN_REFERENCE | — | COMMAND | the receipt upload is not a STAGE_RECEIPT artifact of this stage's project |
+| 400 | INVALID_REQUEST | RECEIPT_INVALID | — | — | COMMAND | the receipt document is not the closed source-to-target mapping shape |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the import stage is not visible to the caller's agency |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | the stage changed between the read and the write: the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | STAGE_NOT_AWAITING_RECEIPT | — | always | COMMAND | the stage is not awaiting a receipt (only AWAITING_AGENCY_IMPORT and NEEDS_CORRECTION accept one); current names its version and state |
+| 409 | PRECONDITION_FAILED | STAGE_EXPIRED | — | — | COMMAND | the stage's bounded workflow deadline passed on the database's clock: no receipt is admitted after it, recovery is explicit |
+| 409 | PRECONDITION_FAILED | RECEIPT_INSTANCE_MISMATCH | — | — | COMMAND | the receipt was produced for another target instance than the stage's |
+| 409 | PRECONDITION_FAILED | RECEIPT_PACKAGE_MISMATCH | — | — | COMMAND | sourcePackageHash is not the stage's exact package |
+| 409 | PRECONDITION_FAILED | RECEIPT_FOREIGN_IDS | — | — | COMMAND | the receipt names source identities that are not members of the stage: nothing was recorded |
+| 409 | PRECONDITION_FAILED | RECEIPT_ALREADY_SUBMITTED | — | — | COMMAND | these exact receipt bytes were already submitted for the stage: a correction is new evidence |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD041 ContinueStage
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the import stage is not visible to the caller's agency |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the stage's current version, or validatedReceiptHash is not the digest of its latest validated receipt; the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | STAGE_ALREADY_CONTINUED | — | always | COMMAND | the continuation was already recorded: it is recorded once; current names its version and state |
+| 409 | PRECONDITION_FAILED | STAGE_NOT_CONTINUABLE | — | always | COMMAND | the stage is not verified (or awaiting the approver's partial scope): it needs its receipt, a correction or an explicit recovery; current names its version and state |
+| 409 | PRECONDITION_FAILED | STAGE_EXPIRED | — | — | COMMAND | the stage's bounded workflow deadline passed on the database's clock: continuation needs explicit recovery, never guessed identities |
+| 409 | PRECONDITION_FAILED | PARENT_STAGE_NOT_VERIFIED | — | — | COMMAND | a required parent stage is not verified, or its workflow lapsed |
+| 409 | PRECONDITION_FAILED | CHILD_PLAN_NOT_APPROVED | — | — | COMMAND | the plan the stage belongs to is not an APPROVED plan |
+| 409 | PRECONDITION_FAILED | STAGE_TARGET_MISMATCH | — | — | COMMAND | the stage's target instance is not the project's current target: explicit recovery, not guessed IDs |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | INTEGRITY_FAILURE | RECEIPT_DIGEST_MISMATCH | — | — | COMMAND | the stored receipt mapping is not the mapping its digest names |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
@@ -2580,6 +2673,34 @@ the check proves every citation resolves to an existing test.
 | invalid schema | `cmd018-cmd019-target-contract.test.ts` :: "CMD019-DENY…" |
 | lost response | `cmd018-cmd019-target-contract.test.ts` :: "CMD019-RACE…" |
 | external uncertainty | NOT_APPLICABLE: ConfirmTargetContract records the approver confirmation on the stored contract and calls no CRM or provider; the observation freshness is judged on the database clock |
+
+### CMD040 SubmitStageReceipt
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd040-cmd041-import-stage.test.ts` :: "CMD040-OK…" |
+| wrong role | `cmd040-cmd041-import-stage.test.ts` :: "CMD040-DENY…" |
+| wrong agency | `cmd040-cmd041-import-stage.test.ts` :: "CMD040-DENY…" |
+| stale version | NOT_APPLICABLE: SubmitStageReceipt carries no expectedVersion (registry fields: receiptUploadRef, sourcePackageHash) - the stage row lock orders two receipts and the loser is told STAGE_NOT_AWAITING_RECEIPT with the stage's current version and state, never STALE_VERSION |
+| duplicate request | `cmd040-cmd041-import-stage.test.ts` :: "CMD040-RACE…" |
+| changed-body same key | `cmd040-cmd041-import-stage.test.ts` :: "CMD040-RACE…" |
+| invalid schema | `cmd040-cmd041-import-stage.test.ts` :: "CMD040-DENY…" |
+| lost response | `cmd040-cmd041-import-stage.test.ts` :: "CMD040-RACE…" |
+| external uncertainty | NOT_APPLICABLE: SubmitStageReceipt validates the stored receipt artifact as data against the stage's membership and calls no CRM or provider; the stage deadline is judged on the database clock |
+
+### CMD041 ContinueStage
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd040-cmd041-import-stage.test.ts` :: "CMD041-OK…" |
+| wrong role | `cmd040-cmd041-import-stage.test.ts` :: "CMD041-DENY…" |
+| wrong agency | `cmd040-cmd041-import-stage.test.ts` :: "CMD041-DENY…" |
+| stale version | `cmd040-cmd041-import-stage.test.ts` :: "CMD041-DENY…" |
+| duplicate request | `cmd040-cmd041-import-stage.test.ts` :: "CMD041-RACE…" |
+| changed-body same key | `cmd040-cmd041-import-stage.test.ts` :: "CMD041-RACE…" |
+| invalid schema | `cmd040-cmd041-import-stage.test.ts` :: "CMD041-DENY…" |
+| lost response | `cmd040-cmd041-import-stage.test.ts` :: "CMD041-RACE…" |
+| external uncertainty | NOT_APPLICABLE: ContinueStage records the approver's continuation on the stored stage and calls no CRM or provider; the workflow deadline is judged on the database clock |
 
 ### CMD020 StartAudit
 

@@ -11,7 +11,7 @@ import type { AuditState } from "@kauro/domain";
 import type { CommandResult } from "../api/envelope.js";
 import type { CommandHandler, CommandSpec } from "../ports/command-handler.js";
 import type { PlanView } from "../api/views.js";
-import type { AuditView, TargetContractView } from "./views.js";
+import type { AuditView, ImportStageView, TargetContractView } from "./views.js";
 
 function spec<Body>(s: CommandSpec<Body>): CommandSpec<Body> {
   return Object.freeze(s);
@@ -168,6 +168,52 @@ export const CONFIRM_TARGET_CONTRACT: CommandSpec<ConfirmTargetContractBody> = s
 });
 export type ConfirmTargetContractHandler = CommandHandler<ConfirmTargetContractBody, TargetContractView>;
 
+// --- CMD040 SubmitStageReceipt --------------------------------------------------------------------------------------------------
+
+export interface SubmitStageReceiptBody {
+  /** The admitted receipt upload (a STAGE_RECEIPT artifact of the stage's project): the source-to-target identity mapping the CRM produced. */
+  readonly receiptUploadRef: string;
+  /** The exact package of the stage the agency imported. */
+  readonly sourcePackageHash: string;
+}
+export const SUBMIT_STAGE_RECEIPT: CommandSpec<SubmitStageReceiptBody> = spec<SubmitStageReceiptBody>({
+  id: "CMD040",
+  name: "SubmitStageReceipt",
+  method: "POST",
+  path: "/api/v1/projects/{projectId}/import-stages/{stageId}/receipts",
+  role: "AGENCY_OPERATOR",
+  scope: "AGENCY_HEADER",
+  aggregateParam: "stageId",
+  expectedVersionRequired: false,
+  stepUpRequired: false,
+  authorityHashFields: [],
+  fields: ["receiptUploadRef", "sourcePackageHash"],
+});
+export type SubmitStageReceiptHandler = CommandHandler<SubmitStageReceiptBody, ImportStageView>;
+
+// --- CMD041 ContinueStage --------------------------------------------------------------------------------------------------------
+
+export interface ContinueStageBody {
+  /** The stage's version (ImportStage.version: the fence between a continuation and a concurrent receipt or continuation). */
+  readonly expectedVersion: number;
+  /** The identity mapping digest of the validated receipt the approver was shown: a digest that is not the stage's current one is stale. */
+  readonly validatedReceiptHash: string;
+}
+export const CONTINUE_STAGE: CommandSpec<ContinueStageBody> = spec<ContinueStageBody>({
+  id: "CMD041",
+  name: "ContinueStage",
+  method: "POST",
+  path: "/api/v1/projects/{projectId}/import-stages/{stageId}/continue",
+  role: "AGENCY_APPROVER",
+  scope: "AGENCY_HEADER",
+  aggregateParam: "stageId",
+  expectedVersionRequired: true,
+  stepUpRequired: false,
+  authorityHashFields: [],
+  fields: ["expectedVersion", "validatedReceiptHash"],
+});
+export type ContinueStageHandler = CommandHandler<ContinueStageBody, ImportStageView>;
+
 export const AUDIT_COMMANDS = Object.freeze({
   CMD018: CREATE_TARGET_CONTRACT,
   CMD019: CONFIRM_TARGET_CONTRACT,
@@ -175,6 +221,8 @@ export const AUDIT_COMMANDS = Object.freeze({
   CMD021: CANCEL_AUDIT,
   CMD022: CREATE_PLAN,
   CMD024: VALIDATE_PLAN,
+  CMD040: SUBMIT_STAGE_RECEIPT,
+  CMD041: CONTINUE_STAGE,
 } as const);
 export type AuditCommandId = keyof typeof AUDIT_COMMANDS;
 
@@ -185,6 +233,8 @@ export interface AuditHandlers {
   readonly CMD021: CancelAuditHandler;
   readonly CMD022: CreatePlanHandler;
   readonly CMD024: ValidatePlanHandler;
+  readonly CMD040: SubmitStageReceiptHandler;
+  readonly CMD041: ContinueStageHandler;
 }
 
 // --- the read and the intake ---------------------------------------------------------------------------------------------------

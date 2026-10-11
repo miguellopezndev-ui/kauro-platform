@@ -9,7 +9,7 @@
  * the control plane: the view names the sealed source and the target by id only.
  */
 import type { UtcInstant } from "@kauro/contracts";
-import type { AuditState, CostGrantState, DecisionArtifactKind, ServiceMode, TargetContractState } from "@kauro/domain";
+import type { AuditState, CostGrantState, DecisionArtifactKind, ImportStageState, ReceiptResult, ServiceMode, TargetContractState } from "@kauro/domain";
 
 /** The operations a caller may issue on an audit (informative, never authority; B06 D-PERM-1). */
 export const AUDIT_RESOURCE_ACTIONS = ["CancelAudit", "CreatePlan"] as const;
@@ -81,4 +81,35 @@ export interface DecisionArtifactIntakeView {
   readonly kind: DecisionArtifactKind;
   readonly contentHash: string;
   readonly created: boolean;
+}
+
+/** The operations a caller may issue on an import stage (informative, never authority; B06 D-PERM-1). */
+export const IMPORT_STAGE_ACTIONS = ["SubmitStageReceipt", "ContinueStage"] as const;
+export type ImportStageAction = (typeof IMPORT_STAGE_ACTIONS)[number];
+
+/**
+ * An import stage (B17: CMD040's answer and CMD041's): its dependency order, target object and operation, state, exact package and
+ * deadline, and the summary of its latest validated receipt (the digest of the identity mapping and the counts). The stage's source
+ * identities and the receipt's source-to-target mapping stay in the stage and the receipt, never in the view.
+ */
+export interface ImportStageView {
+  readonly stageId: string;
+  readonly projectId: string;
+  readonly sequence: number;
+  readonly objectApiName: string;
+  readonly operation: "CREATE_ONLY" | "UPDATE_ONLY" | "UPSERT" | "ASSOCIATION_ONLY";
+  readonly state: ImportStageState;
+  readonly parentStageIds: ReadonlyArray<string>;
+  readonly packageHash: string;
+  readonly receiptRequired: boolean;
+  readonly expiresAt: UtcInstant;
+  readonly version: number;
+  readonly receiptRevision?: number;
+  readonly receiptResult?: ReceiptResult;
+  readonly identityMappingHash?: string;
+  readonly matchedRows?: number;
+  readonly failedRows?: number;
+  readonly unresolvedRows?: number;
+  readonly continuedAt?: UtcInstant;
+  readonly permittedActions: ReadonlyArray<ImportStageAction>;
 }

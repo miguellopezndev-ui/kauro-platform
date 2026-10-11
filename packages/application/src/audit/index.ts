@@ -9,6 +9,10 @@ export type {
   CreateTargetContractHandler,
   ConfirmTargetContractBody,
   ConfirmTargetContractHandler,
+  SubmitStageReceiptBody,
+  SubmitStageReceiptHandler,
+  ContinueStageBody,
+  ContinueStageHandler,
   StartAuditBody,
   StartAuditAccepted,
   StartAuditHandler,
@@ -25,11 +29,11 @@ export type {
   AuditRouteSpec,
   AuditIntakeId,
 } from "./contracts.js";
-export { CREATE_TARGET_CONTRACT, CONFIRM_TARGET_CONTRACT, START_AUDIT, CANCEL_AUDIT, CREATE_PLAN, VALIDATE_PLAN, AUDIT_POLL_AFTER_SECONDS, AUDIT_COMMANDS, AUDIT_ROUTES } from "./contracts.js";
+export { CREATE_TARGET_CONTRACT, CONFIRM_TARGET_CONTRACT, SUBMIT_STAGE_RECEIPT, CONTINUE_STAGE, START_AUDIT, CANCEL_AUDIT, CREATE_PLAN, VALIDATE_PLAN, AUDIT_POLL_AFTER_SECONDS, AUDIT_COMMANDS, AUDIT_ROUTES } from "./contracts.js";
 export type { AuditRequestSchemaCommand, AuditRequestSchemaId } from "./request-schemas.js";
 export { AUDIT_REQUEST_SCHEMAS, AUDIT_REQUEST_SCHEMA_IDS, DECISION_ARTIFACT_SCHEMA_ID, DECISION_ARTIFACT_SCHEMA } from "./request-schemas.js";
-export type { AuditGrantClass, AuditResourceAction, AuditView, DecisionArtifactIntakeView, TargetContractAction, TargetContractView } from "./views.js";
-export { AUDIT_GRANT_CLASSES, AUDIT_RESOURCE_ACTIONS, TARGET_CONTRACT_ACTIONS } from "./views.js";
+export type { AuditGrantClass, AuditResourceAction, AuditView, DecisionArtifactIntakeView, TargetContractAction, TargetContractView, ImportStageAction, ImportStageView } from "./views.js";
+export { AUDIT_GRANT_CLASSES, AUDIT_RESOURCE_ACTIONS, TARGET_CONTRACT_ACTIONS, IMPORT_STAGE_ACTIONS } from "./views.js";
 export { AUDIT_COMMAND_OUTCOMES, AUDIT_INTAKE_OUTCOMES, AUDIT_ROUTE_OUTCOMES } from "./outcomes.js";
 export { AUDIT_COMMAND_RESPONSES, AUDIT_VIEW_DEFINITIONS } from "./response-views.js";
 export { AUDIT_READ_ROUTES } from "./read-specs.js";
