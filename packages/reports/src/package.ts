@@ -109,6 +109,8 @@ export interface ImportFile {
   readonly object: CoreObject | null;
   /** The two ends of an association file; null for a record file. */
   readonly association: { readonly from: CoreObject; readonly to: CoreObject } | null;
+  /** For a table the core cut into numbered parts: this file's part and the family's part count; null for an uncut table. */
+  readonly part: { readonly part: number; readonly of: number } | null;
 }
 
 export interface VerifiedPackage {
@@ -177,6 +179,7 @@ function parseJson(bytes: Uint8Array): unknown {
   return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
 }
 
+const NUMBERED_PART = /-([0-9]{3})\.csv$/;
 const ASSOCIATION_FILE = /^01_IMPORT\/[A-Za-z0-9._-]+\/associations\/([a-z]+)_to_([a-z]+)\.csv$/;
 const ASSOCIATION_KEY_COLUMNS: readonly string[] = ["association_key", "Association Key", "Kauro_Association_Key__c"];
 
@@ -364,7 +367,7 @@ export function readMigrationPackage(files: PackageFiles): VerifiedPackage {
       continue;
     }
     edgeFiles.push(a);
-    importFiles.set(a.path, { object: null, association: { from, to } });
+    importFiles.set(a.path, { object: null, association: { from, to }, part: null });
   }
   const sumRows = (list: readonly PackageArtifact[]): number => list.reduce((s, a) => s + (a.rowCount ?? 0), 0);
   if (sumRows(recordFiles) !== rec.records.deliveredTotal) mismatch(RECONCILIATION_PATH, "records.deliveredTotal differs from the records in the import files");
@@ -450,7 +453,7 @@ export function readMigrationPackage(files: PackageFiles): VerifiedPackage {
         seenSurvivors.add(survivor);
         const known = importFiles.get(path);
         if (known !== undefined && known.object !== object) mismatch(CROSSWALK_PATH, "one import file is crosswalked to two objects");
-        importFiles.set(path, { object, association: null });
+        importFiles.set(path, { object, association: null, part: null });
         const importTable = tables.get(path);
         const keyColumns = importTable === undefined ? [] : importTable.header.flatMap((h, i) => (ASSOCIATION_KEY_COLUMNS.includes(h) ? [i] : []));
         if (associationKey === "" ? keyColumns.length !== 0 : keyColumns.length !== 1 || importTable?.rows[n - 1]?.[keyColumns[0] as number] !== associationKey)
@@ -464,6 +467,27 @@ export function readMigrationPackage(files: PackageFiles): VerifiedPackage {
         const delivered = recordFiles.filter((f) => importFiles.get(f.path)?.object === object).reduce((s, f) => s + (f.rowCount ?? 0), 0);
         if (delivered !== rec.records.byObject[object]) mismatch(RECONCILIATION_PATH, `records.byObject.${object} differs from its import files`);
       }
+    }
+  }
+  // cut tables (Migration Core `import-partition.ts`, `-NNN` parts): a family is the path without its part number; a cut
+  // family holds exactly parts 1..m and no unnumbered sibling, so "Part n of m" is a fact, not a count of similar names
+  const families = new Map<string, number[]>();
+  for (const a of importArtifacts) {
+    const m = NUMBERED_PART.exec(a.path);
+    const family = m === null ? a.path : `${a.path.slice(0, m.index)}.csv`;
+    families.set(family, [...(families.get(family) ?? []), m === null ? 0 : Number(m[1])]);
+  }
+  const partOf = new Map<string, { part: number; of: number }>();
+  for (const [family, numbers] of families) {
+    if (numbers.length === 1 && numbers[0] === 0) continue;
+    const sorted = [...numbers].sort((x, y) => x - y);
+    if (!sorted.every((n, i) => n === i + 1)) {
+      problems.add("IMPORT_PARTS_INVALID", family, "a cut table's parts are not exactly 1..m, or an unnumbered file sits beside them");
+      continue;
+    }
+    for (const a of importArtifacts) {
+      const m = NUMBERED_PART.exec(a.path);
+      if (m !== null && `${a.path.slice(0, m.index)}.csv` === family) partOf.set(a.path, { part: Number(m[1]), of: sorted.length });
     }
   }
   problems.throwIfAny();
@@ -483,7 +507,7 @@ export function readMigrationPackage(files: PackageFiles): VerifiedPackage {
     artifacts,
     reconciliation: rec,
     lineage: { rows: lineageRows, recordRows, byKindDisposition },
-    importFiles: Object.fromEntries(importFiles),
+    importFiles: Object.fromEntries([...importFiles].map(([path, file]) => [path, { ...file, part: partOf.get(path) ?? null }])),
   });
   VERIFIED.add(verified);
   return verified;
