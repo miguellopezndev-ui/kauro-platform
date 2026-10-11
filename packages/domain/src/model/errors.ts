@@ -293,6 +293,9 @@ export const FAILURE_REASONS = [
   // attribution claims (B10 failure matrix CLAIM_DEADLINE, CLAIM_LAPSE_ACCEPT): CMD047 meets a claim whose review deadline is reached on the
   // database clock; placed before B09's list, like B11's, so that B09, B08 and B10's section 12 keep their order (D11-SYNC-1)
   "CLAIM_EXPIRED",
+  // the one commission lock order (B10 lane OFFSET, G-ORD-1/2): a lock call names a line that is absent / a second lock call would wait
+  "COMMISSION_LINE_NOT_FOUND",
+  "LOCK_ORDER_CONTENTION",
   // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md §7.2)
   ...COMMERCE_FAILURE_REASONS,
   // processing authority (package B08; docs/design/B08-audit-approval-jobs.md §9, D8-SQL-1)
