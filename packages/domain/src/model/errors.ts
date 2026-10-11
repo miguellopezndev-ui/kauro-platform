@@ -287,6 +287,9 @@ export const FAILURE_REASONS = [
   // the public inquiry (B11 W5b, D-PUB-3): refused by the per-address or per-e-mail limiter; its origin rule reuses ORIGIN_REJECTED
   // (W2) and its detector the support reasons above
   "INQUIRY_RATE_LIMITED",
+  // attribution claims (B10 failure matrix CLAIM_DEADLINE, CLAIM_LAPSE_ACCEPT): CMD047 meets a claim whose review deadline is reached on the
+  // database clock; placed before B09's list, like B11's, so that B09, B08 and B10's section 12 keep their order (D11-SYNC-1)
+  "CLAIM_EXPIRED",
   // payments and fiscal workflow (package B09; docs/design/B09-payments-fiscal.md §7.2)
   ...COMMERCE_FAILURE_REASONS,
   // processing authority (package B08; docs/design/B08-audit-approval-jobs.md §9, D8-SQL-1)

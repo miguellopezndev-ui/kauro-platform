@@ -5,7 +5,7 @@
 // once with `bindCells(iw)` in `before`; every file runs in a process of its own, so the binding is the file's.
 import assert from "node:assert/strict";
 import type { Client } from "pg";
-import { assertInvariants, connectionPid, faultCell, openConnection, type CellOptions, type FaultContext, type FaultKind, type FaultPoints, type HarnessConnection, type MatrixCell } from "@kauro/persistence/testing";
+import { assertInvariants, connectionPid, EFFECT_CLOCK_MARGIN_MS, faultCell, LOCK_WAIT_OBSERVATION_MS, LOCK_WAIT_POLL_ATTEMPTS, LOCK_WAIT_POLL_INTERVAL_MS, openConnection, type CellOptions, type FaultContext, type FaultKind, type FaultPoints, type HarnessConnection, type MatrixCell } from "@kauro/persistence/testing";
 import { createCommissionService, type CommissionService } from "../src/index.js";
 import type { CommissionSweepName, SweepReport } from "../src/commissions/sweeps.js";
 import { providerReports, type IntegrationWorld } from "./integration-support.js";
@@ -194,6 +194,74 @@ export async function observeBlocked(waiter: HarnessConnection, holder: HarnessC
     if (Date.now() > deadline) throw new Error(`${what}: the waiter was never seen waiting on the holder's lock`);
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
+}
+
+/**
+ * Observes a backend of `login` waiting on a lock the backend `holderPid` holds, for a waiter that does not run on a harness connection
+ * (the payment service's reconciler on its own pool, so neither ctx.mustWait nor observeBlocked can name it): polled every
+ * LOCK_WAIT_POLL_INTERVAL_MS for at most LOCK_WAIT_OBSERVATION_MS, the harness's own bounds. It fails as soon as the waiter's
+ * operation settled without being seen waiting (`settled`), or when nothing is seen in time. Returns the waiting backend's pid.
+ */
+export async function observeBlockedBy(holderPid: number, login: Login, settled: () => boolean, what: string): Promise<number> {
+  const oracle = iwOf().h.oracle;
+  for (let attempt = 0; attempt < LOCK_WAIT_POLL_ATTEMPTS; attempt++) {
+    if (settled()) throw new Error(`${what}: the waiter finished without waiting on the holder's lock`);
+    const r = await oracle.query<{ pid: number }>(
+      "SELECT pid FROM pg_stat_activity WHERE usename = $2 AND wait_event_type = 'Lock' AND $1::int = ANY (pg_blocking_pids(pid))",
+      [holderPid, login],
+    );
+    // seen waiting on the holder: it cannot have settled meanwhile
+    if (r.rows.length === 1) return r.rows[0]!.pid;
+    if (r.rows.length > 1) throw new Error(`${what}: ${r.rows.length} backends of ${login} wait on the holder, not the one waiter`);
+    await new Promise((resolve) => setTimeout(resolve, LOCK_WAIT_POLL_INTERVAL_MS));
+  }
+  throw new Error(`${what}: the waiter was never seen waiting on the holder's lock within ${LOCK_WAIT_OBSERVATION_MS} ms`);
+}
+
+/** An instant of the database (microseconds) as epoch milliseconds, truncated. */
+const epochMsOf = (iso: string): number => Date.parse(iso.replace(/(\.\d{3})\d*Z$/, "$1Z"));
+
+/**
+ * Places the effect clock of the transaction open on `conn` EFFECT_CLOCK_MARGIN_MS before `deadline` (a database instant): kauro.effect_now()
+ * is the controlled instant plus the time the transaction has run (0038), so the controlled clock moves to the deadline less that elapsed
+ * time (measured by the transaction itself, rounded up) and less the margin, and is put on the transaction (onServer). Returns the instant
+ * kauro.server_now() then reads. Called at a pause of the unit, inside the cell's operation.
+ */
+export async function effectClockBefore(ctx: Pick<FaultContext, "clock">, conn: HarnessConnection, deadline: string): Promise<string> {
+  const r = await conn.query<{ ms: string }>("SELECT ceil(extract(epoch FROM clock_timestamp() - transaction_timestamp()) * 1000)::text AS ms");
+  ctx.clock.set(epochMsOf(deadline) - Number(r.rows[0]!.ms) - EFFECT_CLOCK_MARGIN_MS);
+  return ctx.clock.onServer(conn);
+}
+
+/**
+ * The waiter (observed waiting on the holder, its effect clock placed by effectClockBefore at `instant`) began its waiting statement with its
+ * effect clock before `deadline`; the cell then lets the waiter's effect clock run past the deadline while it still waits, measured on the
+ * database (instant + clock_timestamp() - xact_start, the waiter's kauro.effect_now()): it sleeps only the remainder the database reports,
+ * never more than EFFECT_CLOCK_MARGIN_MS, and asserts the waiter's effect clock past the deadline with the waiter still waiting on the holder.
+ */
+export async function crossedWhileWaiting(waiter: HarnessConnection, holder: HarnessConnection, instant: string, deadline: string, what: string): Promise<void> {
+  const oracle = iwOf().h.oracle;
+  const look = async (): Promise<{ readonly began_before: boolean; readonly waiting: boolean; readonly remaining_ms: string }> => {
+    const r = await oracle.query<{ began_before: boolean; waiting: boolean; remaining_ms: string }>(
+      `SELECT $3::timestamptz + (query_start - xact_start) < $4::timestamptz AS began_before,
+              wait_event_type IS NOT DISTINCT FROM 'Lock' AND $2::int = ANY (pg_blocking_pids(pid)) AS waiting,
+              (extract(epoch FROM $4::timestamptz - ($3::timestamptz + (clock_timestamp() - xact_start))) * 1000)::text AS remaining_ms
+         FROM pg_stat_activity WHERE pid = $1`,
+      [connectionPid(waiter), connectionPid(holder), instant, deadline],
+    );
+    const row = r.rows[0];
+    if (row === undefined) throw new Error(`${what}: the waiter's backend is gone`);
+    return row;
+  };
+  const first = await look();
+  assert.equal(first.began_before, true, `${what}: its effect clock stood before the deadline when its waiting statement began`);
+  assert.equal(first.waiting, true, `${what}: it waits on the holder`);
+  const remaining = Number(first.remaining_ms);
+  assert.ok(remaining <= EFFECT_CLOCK_MARGIN_MS, `${what}: the deadline is ${remaining} ms ahead of its effect clock, beyond the harness margin ${EFFECT_CLOCK_MARGIN_MS} ms`);
+  if (remaining >= 0) await new Promise((resolve) => setTimeout(resolve, Math.ceil(remaining) + 1));
+  const second = await look();
+  assert.equal(second.waiting, true, `${what}: it still waits on the holder`);
+  assert.ok(Number(second.remaining_ms) < 0, `${what}: its effect clock ran past the deadline while it waited (${second.remaining_ms} ms ahead)`);
 }
 
 // --- the ledger of a purchase, read by the superuser ----------------------------------------------------------------------------------

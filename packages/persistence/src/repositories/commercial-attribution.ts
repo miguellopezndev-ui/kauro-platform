@@ -277,6 +277,12 @@ export class PgAttributionRepository implements AttributionRepository {
     return r.rows[0]?.ok === true;
   }
 
+  /** The review deadline judged by the database at the instant of this statement (kauro.effect_now(), after every wait before it; D10-GAP-11, ADV-1) with the lapse's comparison: the deadline instant itself is past. */
+  async reviewDeadlineReached(claimId: AttributionClaimId): Promise<boolean> {
+    const r = await execute<{ reached: boolean }>(this.db, "SELECT review_deadline_at <= kauro.effect_now() AS reached FROM kauro.attribution_claims WHERE claim_id = $1", [claimId]);
+    return r.rows[0]?.reached === true;
+  }
+
   async claimsOfProspect(prospectId: ProspectId): Promise<ReadonlyArray<AttributionClaimRecord>> {
     const r = await execute<ClaimRow>(this.db, `SELECT ${CLAIM} FROM kauro.attribution_claims WHERE prospect_id = $1 ORDER BY submitted_at, claim_id`, [prospectId]);
     return r.rows.map(claimRecord);
@@ -328,6 +334,21 @@ export class PgAttributionRepository implements AttributionRepository {
       [limit],
     );
     return r.rows.map(claimRecord);
+  }
+
+  /**
+   * Whether the claim is due to lapse now, by lapsedClaims's own comparison on the database clock: a SUBMITTED or DISPUTED claim at its
+   * review deadline, an ACCEPTED one at its termination tail's end or else its acceptance window's. The CLAIM_WINDOWS pass asks it again
+   * after the claim's lock, so a claim accepted while the pass waited (its window now running) is settled, never lapsed.
+   */
+  async claimLapsed(claimId: AttributionClaimId): Promise<boolean> {
+    const r = await execute<{ due: boolean }>(
+      this.db,
+      `SELECT (CASE WHEN c.state = 'ACCEPTED' THEN coalesce((SELECT max(t.ends_at) FROM kauro.termination_tail_entries t WHERE t.claim_id = c.claim_id), c.expires_at) ELSE c.review_deadline_at END) <= kauro.effect_now() AS due
+         FROM kauro.attribution_claims c WHERE c.claim_id = $1 AND c.state IN ${LIVE}`,
+      [claimId],
+    );
+    return r.rows[0]?.due === true;
   }
 
   // allocations (D10-ATTR-1) -------------------------------------------------------------------------------------------------------

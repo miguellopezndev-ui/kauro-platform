@@ -4,6 +4,15 @@ export const LOCK_WAIT_POLL_INTERVAL_MS = 25;
 export const LOCK_WAIT_OBSERVATION_MS = LOCK_WAIT_POLL_ATTEMPTS * LOCK_WAIT_POLL_INTERVAL_MS;
 
 /**
+ * How far before a deadline a cell places a transaction's effect clock (kauro.effect_now(): the controlled instant plus the time the
+ * transaction has run since its start, 0038) when the statements that follow must still judge the deadline ahead: twenty harness poll
+ * intervals, the allowance for the rest of a unit (a dozen statements with the harness's server probes around each) under the
+ * stress-cells load. Under one second on purpose: an admit leg placed this close catches a judge that compares a second early, and a
+ * cell that lets a waiting transaction's effect clock run past a deadline waits at most this long (adversary b10-6c ADV-8).
+ */
+export const EFFECT_CLOCK_MARGIN_MS = 20 * LOCK_WAIT_POLL_INTERVAL_MS;
+
+/**
  * One observation allowance, one for oracle round trips / runner scheduling, and one for releasing the holder and committing.
  * waitForLockWait's polling sleeps alone consume 10 s; its SQL probes add wall time. Some races observe two waits before release.
  * mustWait / observeBlocked also allow 10 s. Their evidence and rejection bounds stay unchanged; a test statement must outlive them.

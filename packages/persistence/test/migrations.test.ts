@@ -111,6 +111,9 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0047_session_fence.sql",
     // B10-T1-b gaps D and L2: the commission effect COMMIT fenced by the dispatcher lease (lock-only privileges of kauro_commission; provisional number)
     "0048_commission_dispatch_fence.sql",
+    // package B10 (failure-matrix lane 6c): sales and attribution changes ordered with the commands resting on them (tail vs designation,
+    // identity assurance, agreement changes, the activation's step-up at COMMIT)
+    "0049_b10g6c_sales_ordering.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

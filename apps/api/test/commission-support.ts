@@ -273,12 +273,12 @@ export interface Attribution {
  * ACTIVE sellers with every activation fact recorded by the owner, one prospect registered by the first, and each seller's SUBMITTED
  * claim on it (CMD045, CMD046 as their writes): what precedes an agency's first purchase.
  */
-export async function claimsOn(cw: CommissionWorld, label: string, sellers = 1): Promise<Attribution> {
+export async function claimsOn(cw: CommissionWorld, label: string, sellers = 1, submittedAt?: string): Promise<Attribution> {
   const recorded: RecordedSeller[] = [];
   for (let i = 0; i < sellers; i++) recorded.push(await recordActiveSeller(cw.h, { ownerUserId: cw.kora, subject: `${label}-seller-${i + 1}` }));
   const prospect = await recordProspect(cw.h, { by: recorded[0]!, domain: `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.example` });
   const claimIds: string[] = [];
-  for (const seller of recorded) claimIds.push((await recordClaim(cw.h, { seller, prospectId: prospect.prospectId })).claimId);
+  for (const seller of recorded) claimIds.push((await recordClaim(cw.h, { seller, prospectId: prospect.prospectId, ...(submittedAt !== undefined ? { at: submittedAt } : {}) })).claimId);
   return { sellers: recorded, prospectId: prospect.prospectId, claimIds };
 }
 
@@ -286,8 +286,21 @@ export async function claimsOn(cw: CommissionWorld, label: string, sellers = 1):
  * CMD047's writes by the owner: the allocation of the claims to the agency (1000/400 bps, twelve months, the shares given in bps in
  * seller order), frozen with every claim ACCEPTED at that instant — `at` on the labelled TEST CLOCK when given. Returns the allocation.
  */
+export function acquisitionInstants(acceptedAt: string): { readonly submittedAt: string; readonly orderAt: string } {
+  const before = (hours: number) => new Date(Date.parse(acceptedAt) - hours * HOUR_MS).toISOString();
+  return { submittedAt: before(24), orderAt: before(12) };
+}
+
 export async function acceptAttribution(cw: CommissionWorld, agencyId: string, a: Attribution, shares: ReadonlyArray<number>, at: string | null = null): Promise<string> {
   const allocationId = ids.next();
+  if (at !== null) {
+    const due = await cw.h.oracle.query<{ claim_id: string; review_deadline_at: Date }>("SELECT claim_id, review_deadline_at FROM kauro.attribution_claims WHERE claim_id = ANY($1::uuid[])", [a.claimIds]);
+    for (const row of due.rows) {
+      if (Date.parse(at) > row.review_deadline_at.getTime()) {
+        throw new Error(`fixture error: claim ${row.claim_id} is accepted at ${at}, past its review deadline ${row.review_deadline_at.toISOString()}; submit it at a test instant first (claimsOn(..., submittedAt) with acquisitionInstants(acceptedAt)) and create the first order at orderAt`);
+      }
+    }
+  }
   await asOperatorAt(cw.h, cw.kora, at, async (c) => {
     await c.query(
       `INSERT INTO kauro.attribution_allocations (allocation_id, agency_id, prospect_id, identity_evidence_hash, ruling_reason, ruling_evidence_hash, first_bps, repeat_bps, recurring_months, prepared_by_user_id, prepared_at, created_at, updated_at)
@@ -464,6 +477,8 @@ export interface Checkout {
   readonly orderId: PaymentOrderId;
   readonly attemptId: PaymentAttemptId;
   readonly providerOrderId: string;
+  /** The test-clock instant the order was created at (its later transitions are stamped there too); absent = the real clock. */
+  readonly at?: string;
 }
 
 /**
@@ -472,11 +487,12 @@ export interface Checkout {
  * flight — then, unless `inFlight`, T3: the payment service records the provider's authenticated creation of the order at the provider
  * fake (nothing in flight, nothing captured).
  */
-export async function checkoutOf(cw: CommissionWorld, s: Selling, quote: QuoteFacts, options: { readonly inFlight?: boolean } = {}): Promise<Checkout> {
+export async function checkoutOf(cw: CommissionWorld, s: Selling, quote: QuoteFacts, options: { readonly inFlight?: boolean; readonly at?: string } = {}): Promise<Checkout> {
   const { h } = cw;
   const route = cw.pw.route;
   const created = await h.commerce.run(h.tenant(s.agency.agencyId, s.agency.ownerUserId), async (uow) => {
-    const now = clock.now();
+    const now = options.at ?? clock.now();
+    if (options.at !== undefined) await (uow as unknown as { readonly client: Client }).client.query(`SELECT set_config('${TEST_CLOCK_OFFSET_SETTING}', extract(epoch FROM ($1::timestamptz - transaction_timestamp()))::text, true)`, [options.at]);
     const reservation = await uow.journal.reserve(
       { environment: "LOCAL", actor: { kind: "USER", userId: s.agency.ownerUserId }, agencyId: s.agency.agencyId, operation: "CMD028", key: `fixture_${uow.ids.next().replace(/-/g, "")}` },
       sha(`checkout-${quote.quoteId}`),
@@ -509,11 +525,11 @@ export async function checkoutOf(cw: CommissionWorld, s: Selling, quote: QuoteFa
     return { orderId, attemptId };
   });
   await h.commerce.run(h.tenant(s.agency.agencyId, s.agency.ownerUserId), async (uow) => {
-    const now = clock.now();
+    const now = options.at ?? clock.now();
     if ((await uow.commerce.attempts.transition(created.attemptId, 1, { state: "DISPATCHING", lastObservedAt: now }, now)).kind !== "APPLIED") throw new Error("the attempt's claim was stale");
     if ((await uow.commerce.orders.transition(created.orderId, 1, { state: "CREATING" }, now)).kind !== "APPLIED") throw new Error("the order's claim was stale");
   });
-  const checkout: Checkout = { agencyId: s.agency.agencyId, quote, orderId: created.orderId, attemptId: created.attemptId, providerOrderId: "" };
+  const checkout: Checkout = { agencyId: s.agency.agencyId, quote, orderId: created.orderId, attemptId: created.attemptId, providerOrderId: "", ...(options.at !== undefined ? { at: options.at } : {}) };
   return options.inFlight === true ? checkout : providerCreated(cw, checkout);
 }
 
@@ -527,7 +543,7 @@ export async function providerCreated(cw: CommissionWorld, checkout: Checkout): 
   const route = pw.route;
   await cw.h.commerce.run(cw.h.service(), async (uow) => {
     if ((await uow.adoptScope("PAYMENT_ORDER", checkout.orderId)) === null) throw new Error("the payment service could not adopt the order's scope");
-    const now = clock.now();
+    const now = checkout.at ?? clock.now();
     if ((await uow.commerce.attempts.transition(checkout.attemptId, 2, { state: "CONFIRMED", lastObservedAt: now, evidenceHash: sha(`create-evidence-${checkout.orderId}`) }, now)).kind !== "APPLIED") throw new Error("the attempt's result was stale");
     if ((await uow.commerce.orders.transition(checkout.orderId, 2, { state: "CREATED", providerOrderId, providerApprovalUrl: `https://www.sandbox.paypal.com/checkoutnow?token=${providerOrderId}` }, now)).kind !== "APPLIED") throw new Error("the order's creation was stale");
     await uow.scopes.record({ kind: "PROVIDER_ORDER", key: `${route.provider}|${route.environment}|${providerOrderId}`, agencyId: checkout.agencyId, orderId: checkout.orderId }, now);
@@ -592,7 +608,8 @@ export async function captureOf(cw: CommissionWorld, s: Selling, checkout: Check
     }
     const captureId = uow.ids.next() as CaptureId;
     const authorizationId = uow.ids.next() as CommercialAuthorizationId;
-    const now = clock.now();
+    // an order created at a test instant is captured at the confirmation instant, never before the order
+    const now = checkout.at !== undefined ? (options.confirmedAt ?? checkout.at) : clock.now();
     await uow.commerce.captures.insert({
       captureId,
       agencyId: s.agency.agencyId,
@@ -655,11 +672,11 @@ export async function captureOf(cw: CommissionWorld, s: Selling, checkout: Check
 }
 
 /** A purchase of a fresh approved plan of the agency: B09's fixture quote, its checkout and the reconciled capture. */
-export async function purchase(cw: CommissionWorld, s: Selling, label: string, options: CaptureOptions & { readonly beforeOrder?: (plan: PlanFixture) => Promise<void> } = {}): Promise<Purchase> {
+export async function purchase(cw: CommissionWorld, s: Selling, label: string, options: CaptureOptions & { readonly beforeOrder?: (plan: PlanFixture) => Promise<void>; readonly orderAt?: string } = {}): Promise<Purchase> {
   const plan = await approvedPlan(cw, s, label);
   if (options.beforeOrder !== undefined) await options.beforeOrder(plan);
   const quote = await fixtureQuote(cw, s, plan);
-  return captureOf(cw, s, await checkoutOf(cw, s, quote), options);
+  return captureOf(cw, s, await checkoutOf(cw, s, quote, options.orderAt === undefined ? {} : { at: options.orderAt }), options);
 }
 
 // --- refunds and provider facts -------------------------------------------------------------------------------------------------

@@ -478,6 +478,11 @@ export interface AttributionRepository {
   getClaim(claimId: AttributionClaimId): Promise<AttributionClaimRecord | null>;
   /** The claim FOR UPDATE, after its prospect's claims lock (CMD047, CMD050). */
   lockClaim(claimId: AttributionClaimId): Promise<AttributionClaimRecord | null>;
+  /**
+   * Whether the claim's review deadline is reached on the database clock (review_deadline_at <= kauro.effect_now() after every wait before it, the CLAIM_WINDOWS
+   * lapse's own comparison at its microsecond grain): CMD047 refuses such a claim CLAIM_EXPIRED whether or not the sweep lapsed it.
+   */
+  reviewDeadlineReached(claimId: AttributionClaimId): Promise<boolean>;
   claimsOfProspect(prospectId: ProspectId): Promise<ReadonlyArray<AttributionClaimRecord>>;
   /** The seller's open claims (SUBMITTED, DISPUTED, ACCEPTED): CMD050 expires the unlisted ones. */
   openClaimsOf(sellerId: SellerId): Promise<ReadonlyArray<AttributionClaimRecord>>;
@@ -496,6 +501,8 @@ export interface AttributionRepository {
   transitionClaim(claimId: AttributionClaimId, expectedVersion: number, change: ClaimChange, now: UtcInstant): Promise<VersionedWrite<AttributionClaimRecord>>;
   /** The CLAIM_WINDOWS sweep's work: live claims past their review deadline, acceptance window or tail. */
   lapsedClaims(now: UtcInstant, limit: number): Promise<ReadonlyArray<AttributionClaimRecord>>;
+  /** Whether the claim is due to lapse now (lapsedClaims's comparison on the database clock), asked again after its lock by CLAIM_WINDOWS. */
+  claimLapsed(claimId: AttributionClaimId): Promise<boolean>;
 
   getAllocation(allocationId: AttributionAllocationId): Promise<AttributionAllocationRecord | null>;
   /** The agency's frozen allocation (one per agency; ATTRIBUTION_EXISTS), or null. */
