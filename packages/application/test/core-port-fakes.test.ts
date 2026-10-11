@@ -164,7 +164,7 @@ test("the labelled Migration-core fake verifies a package only against the expec
   const expected: ExpectedAuthority = { revisionHash: sha("revision-1"), planHash: sha("plan-1"), targetContractHash: sha("target-1"), coreVersion: "contract-fake-migration-core-2.0.3", requiredArtifacts: [wanted] };
 
   const valid = await core.verify({ jobId: v7(1), attemptId: v7(2), artifacts: [wanted], declaredSummary: { ok: true } }, expected);
-  assert.deepEqual(valid, { evidenceClass: "SIMULATED", verdict: "VALID", problems: [] });
+  assert.deepEqual(valid, { evidenceClass: "SIMULATED", coreVersion: "contract-fake-migration-core-2.0.3", verdict: "VALID", problems: [] });
 
   const missing = await core.verify({ jobId: v7(1), attemptId: v7(2), artifacts: [], declaredSummary: { ok: false } }, expected);
   assert.equal(missing.evidenceClass, "SIMULATED");

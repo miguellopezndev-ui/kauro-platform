@@ -27,6 +27,7 @@
 import { createHash } from "node:crypto";
 import type { RowCounts, Sha256Hex } from "@kauro/contracts";
 import type {
+  CoreCallControls,
   CoreEvidenceClass,
   ExecutionEnvelopePort,
   ExecutionOutcome,
@@ -113,6 +114,7 @@ const EMPTY_OUTCOME: Omit<ExecutionOutcome, "evidenceClass" | "terminalCause"> =
 
 export class ContractFakeMigrationCore implements ProfilePort, ValidatePort, ExecutionEnvelopePort, PackageVerifierPort {
   readonly evidenceClass: CoreEvidenceClass = "SIMULATED";
+  readonly coreVersion = CONTRACT_FAKE_MIGRATION_CORE_VERSION;
   #sequence = 0;
   readonly #calls: MigrationCoreCall[] = [];
   readonly #holds = new Map<string, HoldRecord[]>();
@@ -169,6 +171,7 @@ export class ContractFakeMigrationCore implements ProfilePort, ValidatePort, Exe
       const profileHash = digestOf({ token: CONTRACT_FAKE_MIGRATION_CORE_TOKEN, revisionHash: request.revisionHash });
       return {
         evidenceClass: this.evidenceClass,
+        coreVersion: this.coreVersion,
         outcome: "PROFILED" as const,
         profileHash,
         profileDocument: { token: CONTRACT_FAKE_MIGRATION_CORE_TOKEN, revisionHash: request.revisionHash },
@@ -182,6 +185,7 @@ export class ContractFakeMigrationCore implements ProfilePort, ValidatePort, Exe
       const corePackageHash = CONTRACT_FAKE_MIGRATION_CORE_PACKAGE_HASH;
       return {
         evidenceClass: this.evidenceClass,
+        coreVersion: this.coreVersion,
         outcome: "VALID" as const,
         receipt: {
           revisionHash: request.revisionHash,
@@ -199,7 +203,7 @@ export class ContractFakeMigrationCore implements ProfilePort, ValidatePort, Exe
   }
 
   execute(subject: ExecutionSubject, io: HostIo): Promise<ExecutionOutcome> {
-    const terminal = (terminalCause: ExecutionTerminalCause): ExecutionOutcome => ({ evidenceClass: this.evidenceClass, terminalCause, ...EMPTY_OUTCOME });
+    const terminal = (terminalCause: ExecutionTerminalCause): ExecutionOutcome => ({ evidenceClass: this.evidenceClass, coreVersion: this.coreVersion, terminalCause, ...EMPTY_OUTCOME });
     return this.#record("execute", async () => {
       await this.#wait("cancellation");
       const cancellation = await io.cancellation.check();
@@ -226,6 +230,7 @@ export class ContractFakeMigrationCore implements ProfilePort, ValidatePort, Exe
 
       return {
         evidenceClass: this.evidenceClass,
+        coreVersion: this.coreVersion,
         terminalCause: "COMPLETED",
         stagedArtifacts: [staged],
         reconciliationSummary: { token: CONTRACT_FAKE_MIGRATION_CORE_TOKEN, attemptId: subject.attemptId },
@@ -234,7 +239,7 @@ export class ContractFakeMigrationCore implements ProfilePort, ValidatePort, Exe
     });
   }
 
-  verify(candidate: PackageCandidate, expected: ExpectedAuthority): Promise<PackageVerificationResult> {
+  verify(candidate: PackageCandidate, expected: ExpectedAuthority, _controls?: CoreCallControls): Promise<PackageVerificationResult> {
     return this.#record("verify", () => {
       const keyOf = (artifact: StagedArtifact): string => `${artifact.role}:${artifact.objectName}:${artifact.generation}`;
       const expectedByKey = new Map(expected.requiredArtifacts.map((artifact) => [keyOf(artifact), artifact]));
@@ -258,7 +263,7 @@ export class ContractFakeMigrationCore implements ProfilePort, ValidatePort, Exe
       const declared = candidate.declaredSummary as { readonly ok?: unknown } | null;
       if (declared !== null && declared?.ok === true && problems.length > 0) problems.push("FALSE_SUMMARY");
       const verdict: PackageVerificationVerdict = problems.length === 0 ? "VALID" : "INVALID";
-      return Promise.resolve({ evidenceClass: this.evidenceClass, verdict, problems });
+      return Promise.resolve({ evidenceClass: this.evidenceClass, coreVersion: this.coreVersion, verdict, problems });
     });
   }
 }
