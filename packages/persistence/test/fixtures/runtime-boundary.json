@@ -823,6 +823,22 @@
           "version"
         ]
       },
+      "kauro.core_documents": {
+        "INSERT": [
+          "agency_id",
+          "doc_hash",
+          "document",
+          "kind"
+        ]
+      },
+      "kauro.core_plan_bindings": {
+        "INSERT": [
+          "agency_id",
+          "config_document",
+          "core_config_hash",
+          "plan_hash"
+        ]
+      },
       "kauro.cost_grants": {
         "INSERT": [
           "ceiling_cents",
@@ -6330,6 +6346,12 @@
         "SELECT"
       ],
       "kauro.commercial_authorizations": [
+        "SELECT"
+      ],
+      "kauro.core_documents": [
+        "SELECT"
+      ],
+      "kauro.core_plan_bindings": [
         "SELECT"
       ],
       "kauro.corporate_roles": [
