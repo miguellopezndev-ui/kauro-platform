@@ -785,6 +785,33 @@ APPLICABILITY.CMD024 = {
   "external uncertainty": "NOT_APPLICABLE: ValidatePlan records one validation intent and calls no provider or core — the deterministic validation runs after COMMIT in the control plane's PLAN_VALIDATION (mandate B08-CONTROL-AUDIT), whose receipt settles the intent; a lost delivery leaves the intent due (D8-PLAN-2)",
 };
 
+// package B17 target-contract commands (CMD018, CMD019; registry cases CMD018-OK/-DENY/-RACE and CMD019-OK/-DENY/-RACE)
+const TARGET_CONTRACT = "cmd018-cmd019-target-contract.test.ts";
+const T18 = (k) => [[TARGET_CONTRACT, "CMD018-" + k]];
+const T19 = (k) => [[TARGET_CONTRACT, "CMD019-" + k]];
+APPLICABILITY.CMD018 = {
+  "legitimate state": T18("OK"),
+  "wrong role": T18("DENY"),
+  "wrong agency": T18("DENY"),
+  "stale version": "NOT_APPLICABLE: CreateTargetContract carries no expectedVersion (registry fields: metadataArtifactRef, importerProfileId) - it creates the draft at version 1; a project that already holds the exact body answers TARGET_CONTRACT_EXISTS, never STALE_VERSION",
+  "duplicate request": T18("RACE"),
+  "changed-body same key": T18("RACE"),
+  "invalid schema": T18("DENY"),
+  "lost response": T18("RACE"),
+  "external uncertainty": "NOT_APPLICABLE: CreateTargetContract reads the stored metadata artifact as data and calls no CRM or provider; the observation is judged on the database clock",
+};
+APPLICABILITY.CMD019 = {
+  "legitimate state": T19("OK"),
+  "wrong role": T19("DENY"),
+  "wrong agency": T19("DENY"),
+  "stale version": T19("DENY"),
+  "duplicate request": T19("RACE"),
+  "changed-body same key": T19("RACE"),
+  "invalid schema": T19("DENY"),
+  "lost response": T19("RACE"),
+  "external uncertainty": "NOT_APPLICABLE: ConfirmTargetContract records the approver confirmation on the stored contract and calls no CRM or provider; the observation freshness is judged on the database clock",
+};
+
 // --- sources --------------------------------------------------------------------------------------------------------------------
 
 export async function loadMatrixSources() {
@@ -858,6 +885,9 @@ export async function loadMatrixSources() {
   published.CMD020 = [...new Set([...grantEvents(startAudit), ...literalEvents(startAudit)])];
   published.CMD021 = [...new Set(literalEvents(auditMethod("cancelAudit")))];
   published.CMD024 = [...new Set(planEvents(auditMethod("requestValidation")))];
+  // package B17 target-contract commands (CMD018, CMD019): they journal their response only and publish no domain event (GAP: no target_contract aggregate kind yet)
+  published.CMD018 = [];
+  published.CMD019 = [];
   // package B09's served commands (D-REQ-B7): their specs, catalogues and published events from the application's served lists
   const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS };
   const outcomes = { ...application.COMMAND_OUTCOMES };

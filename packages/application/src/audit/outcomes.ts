@@ -20,6 +20,24 @@ export const CORE_SERVICES_UNAVAILABLE = outcome("COMMAND", "INTEGRITY_FAILURE",
 
 /** The command-specific outcomes, by command (design §12; reference/COMMAND_CATALOGUE preconditions and failures). */
 const COMMAND_SPECIFIC: Readonly<Record<AuditCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+  CMD018: [
+    NOT_VISIBLE("the project"),
+    outcome("COMMAND", "INVALID_REQUEST", "UNKNOWN_REFERENCE", "the metadata artifact is not a METADATA artifact of this agency", { fieldCodes: ["UNKNOWN_REFERENCE"] }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "TARGET_SCOPE_MISMATCH", "the artifact belongs to another project, CRM mode or target instance than the project's (or than its earlier contract's)"),
+    outcome("COMMAND", "INVALID_REQUEST", "TARGET_METADATA_INVALID", "the metadata document is not the closed target metadata shape (an unknown member or a verified flag is refused)"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "OBSERVATION_IN_FUTURE", "the observation is dated after the database's clock"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "TARGET_CONTRACT_EXISTS", "the project already holds this exact observed body: one contract per body, nothing was written"),
+  ],
+  CMD019: [
+    NOT_VISIBLE("the target contract"),
+    outcome("COMMAND", "STALE_VERSION", null, "expectedVersion is not the contract's current version, or bodyHash is not the digest of its stored body (a reused digest over changed metadata is never a confirmation); the current safe version and state come back", { current: "ALWAYS" }),
+    outcome("COMMAND", "INVALID_REQUEST", "UNKNOWN_REFERENCE", "the confirmation evidence is not a CONFIRMATION_EVIDENCE artifact of this contract's project", { fieldCodes: ["UNKNOWN_REFERENCE"] }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "TARGET_ALREADY_CONFIRMED", "the contract is already confirmed: a confirmation is recorded once; current names its version and state", { current: "ALWAYS" }),
+    outcome("COMMAND", "TARGET_STALE", null, "the contract was superseded: a superseded version is never confirmed"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "OBSERVATION_IN_FUTURE", "the observation is dated after the database's clock"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "OBSERVATION_NOT_FRESH", "the observation is older than the freshness window: observe the target again"),
+    outcome("COMMAND", "INTEGRITY_FAILURE", "BODY_DIGEST_MISMATCH", "the stored body is not the body its digest names"),
+  ],
   CMD020: [
     NOT_VISIBLE("the revision"),
     outcome("COMMAND", "PRECONDITION_FAILED", "REVISION_NOT_SEALED", "the revision is not SEALED: a draft, a locked or a rejected revision has no immutable manifest to audit; current names its version and state", { current: "ALWAYS" }),
@@ -58,6 +76,8 @@ function commandCatalogue(command: AuditCommandId): ReadonlyArray<ProblemOutcome
 
 /** The closed problem catalogue of each audit command. */
 export const AUDIT_COMMAND_OUTCOMES: Readonly<Record<AuditCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
+  CMD018: commandCatalogue("CMD018"),
+  CMD019: commandCatalogue("CMD019"),
   CMD020: commandCatalogue("CMD020"),
   CMD021: commandCatalogue("CMD021"),
   CMD022: commandCatalogue("CMD022"),

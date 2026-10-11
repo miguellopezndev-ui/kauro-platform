@@ -9,7 +9,7 @@
  * unsupported capabilities by stable finding codes.
  */
 import { RESPONSE_FIELD_VOCABULARY, VIEW_MEMBER_KIT, type ViewDefinition } from "../api/view-kit.js";
-import { AUDIT_GRANT_CLASSES, AUDIT_RESOURCE_ACTIONS } from "./views.js";
+import { AUDIT_GRANT_CLASSES, AUDIT_RESOURCE_ACTIONS, TARGET_CONTRACT_ACTIONS } from "./views.js";
 import { COST_GRANT_STATES, DECISION_ARTIFACT_KINDS } from "@kauro/domain";
 
 const { ID, HASH, UTC } = RESPONSE_FIELD_VOCABULARY;
@@ -26,6 +26,8 @@ const AUDIT_ACTIONS_DESCRIPTION =
 
 /** The success reply of each audit command: CMD020 and CMD024 answer B06's ACCEPTED envelope; CMD021 the audit; CMD022 the plan it created. */
 export const AUDIT_COMMAND_RESPONSES = Object.freeze({
+  CMD018: { status: 201, view: "TargetContractView" },
+  CMD019: { status: 200, view: "TargetContractView" },
   CMD020: { status: 202, view: null },
   CMD021: { status: 200, view: "AuditView" },
   CMD022: { status: 201, view: "PlanView" },
@@ -33,6 +35,32 @@ export const AUDIT_COMMAND_RESPONSES = Object.freeze({
 } as const);
 
 export const AUDIT_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
+  {
+    name: "TargetContractView",
+    description:
+      "A target contract version (B17: CMD018's and CMD019's answer): its CRM mode, instance and importer bindings, the digest of its immutable body, the observation and confirmation instants and its version; the metadata objects stay in the contract, never in the view.",
+    contract: "TargetContract",
+    withheld: {
+      objects: "The complete observed metadata is the contract's body: the view names it by bodyHash and objectCount; it is data the importer consumes, never a customer value of this reply.",
+    },
+    members: {
+      contractId: registry(true, NARROW_ID),
+      projectId: platform(true, ID, "The project the contract was observed for."),
+      mode: registry(true),
+      instanceId: registry(true, NARROW_ID),
+      importerProfileId: registry(true, NARROW_ID),
+      importerVersion: registry(true),
+      bodyHash: registry(true),
+      observedAt: registry(true),
+      confirmedAt: registry(false),
+      authorityEvidenceHash: registry(true),
+      capabilityVersion: registry(true),
+      version: platform(true, { type: "integer", minimum: 1 }, "The contract's version: 1 as a DRAFT, 2 once confirmed (CMD019's expectedVersion)."),
+      state: platform(true, { type: "string", enum: ["DRAFT", "CONFIRMED", "SUPERSEDED"] }, "DRAFT until the agency confirms this exact body, CONFIRMED afterwards, SUPERSEDED once a later contract replaced it."),
+      objectCount: platform(true, { type: "integer", minimum: 0 }, "How many target objects the stored body describes."),
+      permittedActions: platform(true, { type: "array", maxItems: TARGET_CONTRACT_ACTIONS.length, items: { type: "string", enum: [...TARGET_CONTRACT_ACTIONS] } }, "The commands the caller may issue on this contract, derived server-side from the caller's role and the contract's state; informative, never authority (B06 D-PERM-1)."),
+    },
+  },
   {
     name: "AuditView",
     description:

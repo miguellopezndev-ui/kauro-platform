@@ -4,10 +4,10 @@
  * never the sealed revision's or the target's hash, the requesting membership, the profile evidence, a step, a task, a provider or the
  * pool the grant was carved from — and shared by CancelAudit's answer and the GetAudit read, so the two show the audit the same way.
  */
-import type { AuditRecord, CostGrantRecord, MembershipRole } from "@kauro/domain";
+import type { AuditRecord, CostGrantRecord, MembershipRole, TargetContractLifecycle } from "@kauro/domain";
 import { findTransition, roleSatisfies } from "@kauro/domain";
-import { CANCEL_AUDIT, CREATE_PLAN } from "../contracts.js";
-import type { AuditResourceAction, AuditView } from "../views.js";
+import { CANCEL_AUDIT, CONFIRM_TARGET_CONTRACT, CREATE_PLAN } from "../contracts.js";
+import type { AuditResourceAction, AuditView, TargetContractAction, TargetContractView } from "../views.js";
 import { utc } from "./shared.js";
 
 /**
@@ -41,5 +41,30 @@ export function auditView(audit: AuditRecord, grant: CostGrantRecord, role: Memb
     ...(audit.terminalReason !== undefined ? { terminalReason: audit.terminalReason } : {}),
     ...(audit.draftPlanId !== undefined ? { draftPlanId: audit.draftPlanId } : {}),
     permittedActions: auditActions(role, audit),
+  };
+}
+
+/** The commands the caller may issue on a target contract (informative, B06 D-PERM-1): ConfirmTargetContract on a DRAFT, for an approving role. */
+export function targetContractActions(role: MembershipRole, contract: Pick<TargetContractLifecycle, "state">): ReadonlyArray<TargetContractAction> {
+  return roleSatisfies(CONFIRM_TARGET_CONTRACT.role, role) && contract.state === "DRAFT" ? ["ConfirmTargetContract"] : [];
+}
+
+export function targetContractView(contract: TargetContractLifecycle, objectCount: number, role: MembershipRole): TargetContractView {
+  return {
+    contractId: contract.contractId,
+    projectId: contract.projectId,
+    mode: contract.mode,
+    instanceId: contract.instanceId,
+    importerProfileId: contract.importerProfileId,
+    importerVersion: contract.importerVersion,
+    bodyHash: contract.bodyHash,
+    observedAt: utc(contract.observedAt),
+    ...(contract.confirmedAt !== undefined ? { confirmedAt: utc(contract.confirmedAt) } : {}),
+    authorityEvidenceHash: contract.authorityEvidenceHash,
+    capabilityVersion: contract.capabilityVersion,
+    version: contract.version,
+    state: contract.state,
+    objectCount,
+    permittedActions: targetContractActions(role, contract),
   };
 }

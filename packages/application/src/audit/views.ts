@@ -9,7 +9,7 @@
  * the control plane: the view names the sealed source and the target by id only.
  */
 import type { UtcInstant } from "@kauro/contracts";
-import type { AuditState, CostGrantState, DecisionArtifactKind } from "@kauro/domain";
+import type { AuditState, CostGrantState, DecisionArtifactKind, ServiceMode, TargetContractState } from "@kauro/domain";
 
 /** The operations a caller may issue on an audit (informative, never authority; B06 D-PERM-1). */
 export const AUDIT_RESOURCE_ACTIONS = ["CancelAudit", "CreatePlan"] as const;
@@ -18,6 +18,32 @@ export type AuditResourceAction = (typeof AUDIT_RESOURCE_ACTIONS)[number];
 /** How the audit's grant is classified for the customer: every audit of this edition runs on a free AUDIT grant carved from the platform's pool. */
 export const AUDIT_GRANT_CLASSES = ["FREE_AUDIT"] as const;
 export type AuditGrantClass = (typeof AUDIT_GRANT_CLASSES)[number];
+
+/** The operations a caller may issue on a target contract (informative, never authority; B06 D-PERM-1). */
+export const TARGET_CONTRACT_ACTIONS = ["ConfirmTargetContract"] as const;
+export type TargetContractAction = (typeof TARGET_CONTRACT_ACTIONS)[number];
+
+/**
+ * A target contract version (B17: CMD018's answer and CMD019's): its bindings and its digest, never its metadata body (the objects stay
+ * in the contract; the confirming actor is shown the body and its digest, and confirms exactly that digest).
+ */
+export interface TargetContractView {
+  readonly contractId: string;
+  readonly projectId: string;
+  readonly mode: ServiceMode;
+  readonly instanceId: string;
+  readonly importerProfileId: string;
+  readonly importerVersion: string;
+  readonly bodyHash: string;
+  readonly observedAt: UtcInstant;
+  readonly confirmedAt?: UtcInstant;
+  readonly authorityEvidenceHash: string;
+  readonly capabilityVersion: string;
+  readonly version: number;
+  readonly state: TargetContractState;
+  readonly objectCount: number;
+  readonly permittedActions: ReadonlyArray<TargetContractAction>;
+}
 
 export interface AuditView {
   readonly auditId: string;

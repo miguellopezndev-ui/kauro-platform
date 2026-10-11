@@ -29,6 +29,7 @@ import type {
 import type {
   AgencyId,
   ApprovalId,
+  ArtifactRef,
   AssuranceProofId,
   CapabilityId,
   ClientId,
@@ -46,6 +47,7 @@ import type {
   ValidationReceiptId,
 } from "../model/ids.js";
 import type { AssuranceProof } from "../model/identity.js";
+import type { NewTargetContract, TargetArtifactRecord, TargetBody, TargetContractLifecycle } from "../model/target-contract.js";
 import type { MembershipRole } from "../model/roles.js";
 import type { IdentityFacts, SecurityActor } from "../model/tenant.js";
 
@@ -302,6 +304,23 @@ export interface TargetContractRepository {
   lockCurrentByHash(agencyId: AgencyId, projectId: ProjectId, targetContractHash: Sha256Hex): Promise<TargetContractRecord | null>;
   /** The project's most recently observed contract, whatever its confirmation (a project read's readiness facts, N16). */
   findLatestForProject(projectId: ProjectId): Promise<TargetContractRecord | null>;
+
+  // --- B17: CMD018 CreateTargetContract, CMD019 ConfirmTargetContract ---------------------------------------------------------
+  /** A target artifact (metadata or confirmation evidence) of the caller's agency; another agency's and a nonexistent one answer alike (null). */
+  getArtifact(artifactRef: ArtifactRef): Promise<TargetArtifactRecord | null>;
+  /** The contract with its lifecycle (version, state, confirmation), without a lock. */
+  getLifecycle(contractId: TargetContractId): Promise<TargetContractLifecycle | null>;
+  /** The contract's row locked FOR UPDATE: the one serialization point of a confirmation, held until the unit of work ends. */
+  lockLifecycle(contractId: TargetContractId): Promise<TargetContractLifecycle | null>;
+  /** The stored body of a contract, exactly as its digest was derived (CMD019 recomputes the digest from it). */
+  getBody(contractId: TargetContractId): Promise<{ readonly body: TargetBody; readonly bodyHash: Sha256Hex } | null>;
+  /**
+   * Inserts the contract as a DRAFT (version 1), deriving its bodyHash with targetBodyDigest; null when the project already holds this
+   * exact body (one contract per observed body; nothing is written).
+   */
+  createDraft(input: NewTargetContract): Promise<TargetContractLifecycle | null>;
+  /** The DRAFT to CONFIRMED edge at `expectedVersion`: the instant is the database's; a version miss is STALE, nothing changes. */
+  confirm(contractId: TargetContractId, expectedVersion: number, confirmation: { readonly membershipId: MembershipId; readonly evidenceRef: ArtifactRef }): Promise<VersionedWrite<TargetContractLifecycle>>;
 }
 
 // --- plans and approvals ----------------------------------------------------------------------------------------------

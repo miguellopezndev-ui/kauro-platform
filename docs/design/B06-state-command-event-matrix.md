@@ -515,6 +515,8 @@ settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh st
 | CMD044 CreateSupportCase | POST /api/v1/projects/{projectId}/support-cases | AGENCY_MEMBER | AGENCY_HEADER | — | SupportCase (initial OPEN) | support_case.opened.v1 | — |
 | CMD036 ExecuteProject | POST /api/v1/projects/{projectId}/execute | AGENCY_OPERATOR | AGENCY_HEADER | — | Job (initial QUEUED) | processing_job.queued.v1 | processing_job.queued.v1 → JOB_EXECUTION |
 | CMD037 CancelJob | POST /api/v1/jobs/{jobId}/cancel | AGENCY_OPERATOR | AGENCY_HEADER | — | Job cancel_command | processing_job.cancel_requested.v1 | processing_job.cancel_requested.v1 → EXECUTION_CONTROL |
+| CMD018 CreateTargetContract | POST /api/v1/projects/{projectId}/target-contracts | AGENCY_OPERATOR | AGENCY_HEADER | — |  |  | — |
+| CMD019 ConfirmTargetContract | POST /api/v1/target-contracts/{contractId}/confirm | AGENCY_APPROVER | AGENCY_HEADER | — |  |  | — |
 | CMD020 StartAudit | POST /api/v1/revisions/{revisionId}/audits | AGENCY_OPERATOR | AGENCY_HEADER | — | Audit (initial QUEUED); CostGrant (initial PREPARED) | cost_grant.prepared.v1, cost_grant.authorized.v1, audit.queued.v1 | audit.queued.v1 → AUDIT_ORCHESTRATION |
 | CMD021 CancelAudit | POST /api/v1/audits/{auditId}/cancel | AGENCY_OPERATOR | AGENCY_HEADER | — | Audit cancellation_wins | audit.cancelled.v1 | audit.cancelled.v1 → AUDIT_ORCHESTRATION |
 | CMD022 CreatePlan | POST /api/v1/audits/{auditId}/plans | AGENCY_OPERATOR | AGENCY_HEADER | — | Plan (initial DRAFT) | plan.created.v1, plan.validation_required.v1 | — |
@@ -1256,6 +1258,92 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | JOB_ALREADY_READY | — | always | COMMAND | the publication committed first (S062): the job is READY and current names its package; a cancellation never rolls a package back |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD018 CreateTargetContract
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 400 | INVALID_REQUEST | UNKNOWN_REFERENCE | UNKNOWN_REFERENCE | — | COMMAND | the metadata artifact is not a METADATA artifact of this agency |
+| 400 | INVALID_REQUEST | TARGET_METADATA_INVALID | — | — | COMMAND | the metadata document is not the closed target metadata shape (an unknown member or a verified flag is refused) |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the project is not visible to the caller's agency |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | TARGET_SCOPE_MISMATCH | — | — | COMMAND | the artifact belongs to another project, CRM mode or target instance than the project's (or than its earlier contract's) |
+| 409 | PRECONDITION_FAILED | OBSERVATION_IN_FUTURE | — | — | COMMAND | the observation is dated after the database's clock |
+| 409 | PRECONDITION_FAILED | TARGET_CONTRACT_EXISTS | — | — | COMMAND | the project already holds this exact observed body: one contract per body, nothing was written |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD019 ConfirmTargetContract
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 400 | INVALID_REQUEST | UNKNOWN_REFERENCE | UNKNOWN_REFERENCE | — | COMMAND | the confirmation evidence is not a CONFIRMATION_EVIDENCE artifact of this contract's project |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the target contract is not visible to the caller's agency |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the contract's current version, or bodyHash is not the digest of its stored body (a reused digest over changed metadata is never a confirmation); the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | TARGET_ALREADY_CONFIRMED | — | always | COMMAND | the contract is already confirmed: a confirmation is recorded once; current names its version and state |
+| 409 | PRECONDITION_FAILED | OBSERVATION_IN_FUTURE | — | — | COMMAND | the observation is dated after the database's clock |
+| 409 | PRECONDITION_FAILED | OBSERVATION_NOT_FRESH | — | — | COMMAND | the observation is older than the freshness window: observe the target again |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | TARGET_STALE | — | — | — | COMMAND | the contract was superseded: a superseded version is never confirmed |
+| 422 | INTEGRITY_FAILURE | BODY_DIGEST_MISMATCH | — | — | COMMAND | the stored body is not the body its digest names |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
@@ -2393,6 +2481,34 @@ the check proves every citation resolves to an existing test.
 | invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
 | lost response | `cmd037-cancel-job.test.ts` :: "RACE: an identical retry replays the 200…"<br>`cmd037-cancel-job.test.ts` :: "RACE (S062): CancelJob through the route racing the publication…" |
 | external uncertainty | NOT_APPLICABLE: CancelJob records the cancellation on the job row and calls no provider; the control plane's EXECUTION_CONTROL terminates the attempt by identity and observes until it is terminal or proved absent (mandate B08-CONTROL-EXECUTION), and a job that was published first answers JOB_ALREADY_READY (S062) |
+
+### CMD018 CreateTargetContract
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd018-cmd019-target-contract.test.ts` :: "CMD018-OK…" |
+| wrong role | `cmd018-cmd019-target-contract.test.ts` :: "CMD018-DENY…" |
+| wrong agency | `cmd018-cmd019-target-contract.test.ts` :: "CMD018-DENY…" |
+| stale version | NOT_APPLICABLE: CreateTargetContract carries no expectedVersion (registry fields: metadataArtifactRef, importerProfileId) - it creates the draft at version 1; a project that already holds the exact body answers TARGET_CONTRACT_EXISTS, never STALE_VERSION |
+| duplicate request | `cmd018-cmd019-target-contract.test.ts` :: "CMD018-RACE…" |
+| changed-body same key | `cmd018-cmd019-target-contract.test.ts` :: "CMD018-RACE…" |
+| invalid schema | `cmd018-cmd019-target-contract.test.ts` :: "CMD018-DENY…" |
+| lost response | `cmd018-cmd019-target-contract.test.ts` :: "CMD018-RACE…" |
+| external uncertainty | NOT_APPLICABLE: CreateTargetContract reads the stored metadata artifact as data and calls no CRM or provider; the observation is judged on the database clock |
+
+### CMD019 ConfirmTargetContract
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd018-cmd019-target-contract.test.ts` :: "CMD019-OK…" |
+| wrong role | `cmd018-cmd019-target-contract.test.ts` :: "CMD019-DENY…" |
+| wrong agency | `cmd018-cmd019-target-contract.test.ts` :: "CMD019-DENY…" |
+| stale version | `cmd018-cmd019-target-contract.test.ts` :: "CMD019-DENY…" |
+| duplicate request | `cmd018-cmd019-target-contract.test.ts` :: "CMD019-RACE…" |
+| changed-body same key | `cmd018-cmd019-target-contract.test.ts` :: "CMD019-RACE…" |
+| invalid schema | `cmd018-cmd019-target-contract.test.ts` :: "CMD019-DENY…" |
+| lost response | `cmd018-cmd019-target-contract.test.ts` :: "CMD019-RACE…" |
+| external uncertainty | NOT_APPLICABLE: ConfirmTargetContract records the approver confirmation on the stored contract and calls no CRM or provider; the observation freshness is judged on the database clock |
 
 ### CMD020 StartAudit
 

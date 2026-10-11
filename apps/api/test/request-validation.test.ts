@@ -263,11 +263,11 @@ test("exactly the fourteen catalogue routes and the selection manifest intake ar
   const bankGets = new Set(["/api/v1/operations/bank-routes/:routeId", "/api/v1/payment-orders/:orderId/transfer-instructions"].filter((path) => !commerceGets.has(path)));
   assert.deepEqual(inventory.filter((r) => r.method === "POST" && bankPosts.has(r.url)).map((r) => r.url).sort(), [...bankPosts].sort());
   assert.deepEqual(inventory.filter((r) => r.method === "GET" && bankGets.has(r.url)).map((r) => r.url).sort(), [...bankGets].sort());
-  // B06's seven commands, B07's six (design §11), B08's two job commands and four audit commands (design §12), B11's CMD044 and the
+  // B06's seven commands, B07's six (design §11), B08's two job commands and four audit commands (design §12), B17 two target contract commands (CMD018, CMD019), B11's CMD044 and the
   // selection manifest and decision artifact intakes (D-SEL-2, D8-CMA-7); beside them every served route of
   // package B09 — the request side (M4) and the payment service's routes (M3), served in every edition (D-REQ-B1, D-M3-B1) — and
   // nothing else of the payment catalogue
-  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url) && !commercialPosts.has(r.url) && !bankPosts.has(r.url)).length, 22);
+  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url) && !commercialPosts.has(r.url) && !bankPosts.has(r.url)).length, 24);
   assert.deepEqual(inventory.filter((r) => commercialPosts.has(r.url) && r.method === "POST").map((r) => r.url).sort(), [...commercialPosts].sort());
   // the five manual-10 reads, the two support reads (B11 W4), the seven source reads (B07 design §9.1), GetJob and GetAudit (B08 design §12)
   assert.equal(inventory.filter((r) => r.method === "GET" && r.url.startsWith("/api/v1/") && !commerceGets.has(r.url) && !commercialGets.has(r.url) && !bankGets.has(r.url)).length, 16);

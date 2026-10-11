@@ -32,11 +32,18 @@ import {
   type ProjectState,
   type RevisionId,
   type ServiceMode,
+  type ArtifactRef,
+  type NewTargetContract,
+  type TargetArtifactKind,
+  type TargetArtifactRecord,
+  type TargetBody,
   type TargetContractId,
+  type TargetContractLifecycle,
   type TargetContractRecord,
   type TargetContractRepository,
   type TargetInstanceRef,
   type VersionedWrite,
+  targetBodyDigest,
 } from "@kauro/domain";
 import { execute, instant, int, optionalInstant, optionalText, text, withOptional, type Queryable } from "../sql.js";
 import { awaitTransition, staleOrMissing } from "./tenancy.js";
@@ -404,6 +411,134 @@ export class PgTargetContractRepository implements TargetContractRepository {
     const r = await execute<ContractRow>(this.db, `SELECT ${CONTRACT_COLUMNS} FROM kauro.target_contracts WHERE project_id = $1 ORDER BY observed_at DESC, contract_id DESC LIMIT 1`, [projectId]);
     return r.rows[0] ? contractRecord(r.rows[0]) : null;
   }
+
+  // --- B17: CMD018 CreateTargetContract, CMD019 ConfirmTargetContract ---------------------------------------------------------
+
+  async getArtifact(artifactRef: ArtifactRef): Promise<TargetArtifactRecord | null> {
+    const r = await execute<ArtifactRow>(
+      this.db,
+      "SELECT artifact_id, agency_id, project_id, kind, mode, instance_id, document, content_hash, created_at FROM kauro.target_artifacts WHERE artifact_id = $1",
+      [artifactRef],
+    );
+    const row = r.rows[0];
+    if (!row) return null;
+    return {
+      artifactRef: row.artifact_id as ArtifactRef,
+      agencyId: row.agency_id as AgencyId,
+      projectId: row.project_id as ProjectId,
+      kind: row.kind,
+      mode: row.mode,
+      instanceId: row.instance_id,
+      document: row.document,
+      contentHash: row.content_hash,
+      createdAt: instant(row.created_at),
+    };
+  }
+
+  async getLifecycle(contractId: TargetContractId): Promise<TargetContractLifecycle | null> {
+    const r = await execute<LifecycleRow>(this.db, `SELECT ${LIFECYCLE_COLUMNS} FROM kauro.target_contracts WHERE contract_id = $1`, [contractId]);
+    return r.rows[0] ? lifecycleRecord(r.rows[0]) : null;
+  }
+
+  async lockLifecycle(contractId: TargetContractId): Promise<TargetContractLifecycle | null> {
+    const r = await execute<LifecycleRow>(this.db, `SELECT ${LIFECYCLE_COLUMNS} FROM kauro.target_contracts WHERE contract_id = $1 FOR UPDATE`, [contractId]);
+    return r.rows[0] ? lifecycleRecord(r.rows[0]) : null;
+  }
+
+  async getBody(contractId: TargetContractId): Promise<{ readonly body: TargetBody; readonly bodyHash: Sha256Hex } | null> {
+    const r = await execute<BodyRow>(
+      this.db,
+      "SELECT mode, instance_id, importer_profile_id, importer_version, objects, observed_at, authority_evidence_hash, capability_version, body_hash FROM kauro.target_contracts WHERE contract_id = $1",
+      [contractId],
+    );
+    const row = r.rows[0];
+    if (!row) return null;
+    return {
+      body: {
+        mode: row.mode,
+        instanceId: row.instance_id,
+        importerProfileId: row.importer_profile_id,
+        importerVersion: row.importer_version,
+        objects: row.objects,
+        observedAt: instant(row.observed_at),
+        authorityEvidenceHash: row.authority_evidence_hash,
+        capabilityVersion: row.capability_version,
+      },
+      bodyHash: row.body_hash,
+    };
+  }
+
+  async createDraft(input: NewTargetContract): Promise<TargetContractLifecycle | null> {
+    const b = input.body;
+    // the digest is derived here from the very values stored, never taken from a caller; the schema bundle and the authority evidence are
+    // the metadata artifact's content digest; the instant is the database's (D-PERS-1)
+    const r = await execute<LifecycleRow>(
+      this.db,
+      `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, NULL, $9, $12, kauro.server_now())
+       ON CONFLICT ON CONSTRAINT target_contracts_project_body DO NOTHING
+       RETURNING ${LIFECYCLE_COLUMNS}`,
+      [input.contractId, input.agencyId, input.projectId, b.mode, b.instanceId, b.importerProfileId, b.importerVersion, JSON.stringify(b.objects), b.authorityEvidenceHash, targetBodyDigest(b), b.observedAt, b.capabilityVersion],
+    );
+    return r.rows[0] ? lifecycleRecord(r.rows[0]) : null;
+  }
+
+  async confirm(
+    contractId: TargetContractId,
+    expectedVersion: number,
+    confirmation: { readonly membershipId: MembershipId; readonly evidenceRef: ArtifactRef },
+  ): Promise<VersionedWrite<TargetContractLifecycle>> {
+    const r = await execute<LifecycleRow>(
+      this.db,
+      `UPDATE kauro.target_contracts SET confirmed_at = kauro.server_now(), confirmed_by_membership_id = $3, confirmation_evidence_ref = $4, version = $2 + 1
+        WHERE contract_id = $1 AND version = $2 AND confirmed_at IS NULL AND superseded_at IS NULL RETURNING ${LIFECYCLE_COLUMNS}`,
+      [contractId, expectedVersion, confirmation.membershipId, confirmation.evidenceRef],
+    );
+    const row = r.rows[0];
+    if (row) return { kind: "APPLIED", record: lifecycleRecord(row) };
+    const now = await this.getLifecycle(contractId);
+    if (!now) throw new DomainFailure("NOT_FOUND", "target contract is not visible in this context");
+    return { kind: "STALE", currentVersion: now.version, currentState: now.state };
+  }
+}
+
+interface ArtifactRow {
+  artifact_id: string;
+  agency_id: string;
+  project_id: string;
+  kind: TargetArtifactKind;
+  mode: ServiceMode;
+  instance_id: string;
+  document: Record<string, unknown>;
+  content_hash: string;
+  created_at: Date;
+}
+
+interface LifecycleRow extends ContractRow {
+  version: number | string;
+  confirmed_by_membership_id: string | null;
+  confirmation_evidence_ref: string | null;
+}
+
+interface BodyRow {
+  mode: ServiceMode;
+  instance_id: string;
+  importer_profile_id: string;
+  importer_version: string;
+  objects: TargetBody["objects"];
+  observed_at: Date;
+  authority_evidence_hash: string;
+  capability_version: string;
+  body_hash: string;
+}
+
+const LIFECYCLE_COLUMNS = `${CONTRACT_COLUMNS}, version, confirmed_by_membership_id, confirmation_evidence_ref`;
+
+function lifecycleRecord(r: LifecycleRow): TargetContractLifecycle {
+  const base = contractRecord(r);
+  const state = r.superseded_at !== null ? "SUPERSEDED" : r.confirmed_at !== null ? "CONFIRMED" : "DRAFT";
+  const a = withOptional({ ...base, version: int(r.version), state } as TargetContractLifecycle, "confirmedByMembershipId", optionalText(r.confirmed_by_membership_id));
+  return withOptional(a, "confirmationEvidenceRef", optionalText(r.confirmation_evidence_ref) as ArtifactRef | undefined);
 }
 
 // --- capabilities (platform-wide; read by handlers, written by the control plane) ------------------------------------------
