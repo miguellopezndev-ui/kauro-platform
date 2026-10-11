@@ -686,10 +686,12 @@ export function serialize(document) {
 
 /** The routes the api's composition root registers, with the replies each declares (apps/api routeInventoryOf). */
 export async function registeredRoutes() {
-  const [api, persistence] = await Promise.all([load("apps/api/dist/src/index.js"), load("packages/persistence/dist/src/index.js")]);
+  const [api, persistence, testing] = await Promise.all([load("apps/api/dist/src/index.js"), load("packages/persistence/dist/src/index.js"), load("packages/persistence/dist/src/testing/index.js")]);
+  // a LOCAL environment from the test-only minter (DB-TLS gap 2): this inventory never connects (127.0.0.1:1, totalCount asserted 0 below)
+  const local = testing.testDatabaseEnvironment("LOCAL");
   // the real pg adapter, never connected: route registration opens no transaction, and the assertion below proves it
-  const pool = persistence.createPool({ host: "127.0.0.1", port: 1, database: "kauro", user: "kauro_route_inventory", max: 1, applicationName: "kauro-openapi-inventory" });
-  const boundaryPool = persistence.createPool({ host: "127.0.0.1", port: 1, database: "kauro", user: "kauro_route_inventory_sessions", max: 1, applicationName: "kauro-openapi-inventory-sessions" });
+  const pool = persistence.createPool({ environment: local, host: "127.0.0.1", port: 1, database: "kauro", user: "kauro_route_inventory", max: 1, applicationName: "kauro-openapi-inventory" });
+  const boundaryPool = persistence.createPool({ environment: local, host: "127.0.0.1", port: 1, database: "kauro", user: "kauro_route_inventory_sessions", max: 1, applicationName: "kauro-openapi-inventory-sessions" });
   try {
     // the composition root's own factory: the commerce unit of work over the app pool (the request side's reads bind to it)
     const unitOfWork = persistence.createCommerceUnitOfWorkFactory({ app: pool }, { clock: api.systemClock });
@@ -719,7 +721,7 @@ export async function registeredRoutes() {
     await app.ready();
     const inventory = api.routeInventoryOf(app);
     await app.close();
-    if (pool.raw.totalCount !== 0 || boundaryPool.raw.totalCount !== 0) throw new Error("building the route inventory opened a database connection");
+    if (pool.totalCount !== 0 || boundaryPool.totalCount !== 0) throw new Error("building the route inventory opened a database connection");
     return inventory;
   } finally {
     await pool.end();

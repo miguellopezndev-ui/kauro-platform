@@ -55,6 +55,7 @@ import {
   type AgencyFixture,
   type Harness,
   type RecordedSeller,
+  testDatabaseEnvironment,
 } from "@kauro/persistence/testing";
 import { createCommissionService, openCommissionPools, type CommissionHoldPoint, type CommissionPools, type CommissionService } from "../src/index.js";
 import { paymentWorld, type PaymentWorld } from "./payment-support.js";
@@ -154,7 +155,7 @@ export async function commissionWorld(): Promise<CommissionWorld> {
   const pw = await paymentWorld();
   const h = pw.w.h;
   const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database } as const;
-  const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs() });
+  const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs(), environment: testDatabaseEnvironment("LOCAL") });
   const dispatcherClock = movableClock();
   const completions = new ContractFakePreparationCompletion({ clock });
   const holds = new CommissionHolds();
@@ -580,7 +581,7 @@ export interface CaptureOptions {
  * before the order's own creation (also the database clock), which the domain requires too (providerTimePlausible).
  */
 async function defaultProviderCompletedAt(cw: CommissionWorld, orderId: PaymentOrderId): Promise<UtcInstant> {
-  const behind = Date.parse(await serverNow(cw.h.paymentPool.raw)) - 1000;
+  const behind = Date.parse(await serverNow(cw.h.paymentPool)) - 1000;
   const order = await cw.h.oracle.query<{ created_at: Date }>("SELECT created_at FROM kauro.payment_orders WHERE order_id = $1", [orderId]);
   const created = order.rows[0]?.created_at.getTime() ?? behind;
   return toUtcInstant(Math.max(behind, created));

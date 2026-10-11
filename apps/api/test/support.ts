@@ -66,7 +66,7 @@ import type {
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
 import { PgWebSessionStore } from "@kauro/persistence";
-import { ROLES, raceStatementTimeoutMs, serverNow, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
+import { ROLES, raceStatementTimeoutMs, serverNow, startHarness, waitForLockWait, type AgencyFixture, type Harness, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import {
   API_APPLICATION_NAME,
   activeWorkInspector,
@@ -614,6 +614,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const h = await startHarness();
   const db = await openDatabase({
     database: { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, poolMax: 6, statementTimeoutMs: raceStatementTimeoutMs() },
+    databaseEnvironment: testDatabaseEnvironment("LOCAL"),
     migrateOnStart: null,
     ...(options.sessions === true ? { identity: { assuranceDatabase: { user: ROLES.assuranceLogin, poolMax: 2 } } } : {}),
   });
@@ -905,12 +906,12 @@ export async function world(options: WorldOptions = {}): Promise<World> {
 
     async stepUp(person, freshness = "FRESH") {
       // recorded by the step-up verifier (kauro_assurance), never by the request-handler role whose gate the proof satisfies
-      const issuedMs = Date.parse(await serverNow(h.assurancePool.raw)) - 1000 - (freshness === "FRESH" ? 0 : 20 * 60_000);
+      const issuedMs = Date.parse(await serverNow(h.assurancePool)) - 1000 - (freshness === "FRESH" ? 0 : 20 * 60_000);
       return h.recordStepUp(person.userId, { issuedAt: toUtcInstant(issuedMs) });
     },
 
     async asTenant(agency, fn) {
-      const c = await h.appPool.raw.connect();
+      const c = await h.appPool.connectUnverified();
       try {
         await c.query("BEGIN");
         await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [agency.agencyId, agency.ownerUserId]);

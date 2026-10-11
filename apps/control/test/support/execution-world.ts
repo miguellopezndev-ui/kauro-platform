@@ -111,7 +111,7 @@ export const TEST_LIMITS: ExecutionLimits = Object.freeze({ hardMemoryBytes: 8 *
 
 // --- the labelled TEST CLOCK of the control plane's own units of work -----------------------------------------------------------
 
-const connectTo = (pool: KauroPool) => pool.raw.connect();
+const connectTo = (pool: KauroPool) => pool.connectUnverified();
 type RawClient = Awaited<ReturnType<typeof connectTo>>;
 /** What the world's raw statements need of a pg connection. */
 interface QueryClient {

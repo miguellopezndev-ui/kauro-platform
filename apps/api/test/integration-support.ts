@@ -341,7 +341,7 @@ export async function dispatched(iw: IntegrationWorld): Promise<ReadonlyArray<{ 
 export async function madeEligible(iw: IntegrationWorld, agencyId: string, p: Purchase): Promise<void> {
   await providerReports(iw, p, { disbursement: "INSTANT" });
   await dispatched(iw);
-  iw.completions.record({ agencyId: agencyId as never, captureId: p.captureId, kind: "FINAL", completedAt: toUtcInstant(Date.parse(await serverNow(iw.h.commissionPool.raw)) - 1000), source: "STAGED_PREPARATION" });
+  iw.completions.record({ agencyId: agencyId as never, captureId: p.captureId, kind: "FINAL", completedAt: toUtcInstant(Date.parse(await serverNow(iw.h.commissionPool)) - 1000), source: "STAGED_PREPARATION" });
   const report = await iw.ahead(720 * 3600 + 60).runSweep("ELIGIBILITY");
   assert.deepEqual(report.items.filter((i) => i.outcome.startsWith("FAILED")), [], "every item of the ELIGIBILITY sweep settled");
 }

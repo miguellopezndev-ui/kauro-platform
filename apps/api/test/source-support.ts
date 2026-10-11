@@ -127,7 +127,7 @@ export async function activate(w: World, agency: AgencyFixture = w.A): Promise<v
 
 /** One control-plane transaction (kauro_control) bound to the agency, as the harness's own fixtures open it. */
 export async function asControl<T>(w: World, agencyId: string, fn: (c: PoolClient) => Promise<T>): Promise<T> {
-  const c = await w.h.controlPool.raw.connect();
+  const c = await w.h.controlPool.connectUnverified();
   let destroy: Error | undefined;
   try {
     await c.query("BEGIN");
@@ -666,7 +666,7 @@ export async function revokeAdmission(w: World, agencyId: string, fileId: string
  * reserve now. The session reference is a digest only (no secret is stored: the upload's session is not delivered again).
  */
 export async function issuedUploadAt(w: World, revisionId: string, at: Date, person: Person, membershipId: string, bytes = 1_000_000): Promise<{ readonly uploadId: UploadId; readonly deadline: string }> {
-  const c = await w.h.appPool.raw.connect();
+  const c = await w.h.appPool.connectUnverified();
   let destroy: Error | undefined;
   try {
     await c.query("BEGIN");
@@ -715,7 +715,7 @@ export async function issuedUploadAt(w: World, revisionId: string, at: Date, per
  * bound to agency A (D-CTRL-1) — through the product's own source adapters, its labelled TEST CLOCK at `at` (null: the real clock).
  */
 export async function adapterTx<T>(w: World, person: Person | null, at: Date | null, fn: (step: ControlStep, emit: Emit, c: PoolClient) => Promise<T>): Promise<T> {
-  const c = await (person === null ? w.h.controlPool : w.h.appPool).raw.connect();
+  const c = await (person === null ? w.h.controlPool : w.h.appPool).connectUnverified();
   let destroy: Error | undefined;
   try {
     await c.query("BEGIN");
