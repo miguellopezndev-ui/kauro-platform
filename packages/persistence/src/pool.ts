@@ -172,7 +172,11 @@ const VERIFY_SQL = `
 SELECT current_user AS login_role,
        r.rolsuper, r.rolbypassrls, r.rolcreaterole, r.rolcreatedb,
        ARRAY(SELECT g FROM unnest($1::text[]) AS g WHERE pg_has_role(current_user, g, 'MEMBER') ORDER BY g) AS groups,
-       EXISTS (SELECT 1 FROM pg_database d WHERE d.datname = current_database() AND d.datdba = r.oid) AS owns_database
+       EXISTS (SELECT 1 FROM pg_database d WHERE d.datname = current_database() AND d.datdba = r.oid) AS owns_database,
+       has_database_privilege(current_user, current_database(), 'TEMPORARY') AS database_temporary,
+       has_database_privilege(current_user, current_database(), 'CREATE') AS database_create,
+       EXISTS (SELECT 1 FROM pg_namespace s WHERE has_schema_privilege(current_user, s.oid, 'CREATE')) AS schema_create,
+       current_setting('session_replication_role') AS replication_role
 FROM pg_catalog.pg_roles r WHERE r.rolname = current_user`;
 
 interface VerifyRow {
@@ -183,6 +187,10 @@ interface VerifyRow {
   rolcreatedb: boolean;
   groups: string[];
   owns_database: boolean;
+  database_temporary: boolean;
+  database_create: boolean;
+  schema_create: boolean;
+  replication_role: string;
 }
 
 function isRuntimeRole(value: string): value is RuntimeRole {
@@ -226,6 +234,8 @@ export class KauroPool {
       idleTimeoutMillis: config.idleTimeoutMs ?? 30_000,
       connectionTimeoutMillis: config.connectionTimeoutMs ?? 5_000,
       allowExitOnIdle: true,
+      // SEC-DEPTH A2: a physical connection is recycled after ten minutes, so a verified login is re-verified at least that often
+      maxLifetimeSeconds: 600,
       options: `-c idle_in_transaction_session_timeout=${idleTx}`,
     });
     // an idle client that errors (server restart, network) is dropped by pg; the error must not crash the process, and it
@@ -284,6 +294,12 @@ export class KauroPool {
     if (row.rolcreaterole) refuse("CREATEROLE");
     if (row.rolcreatedb) refuse("CREATEDB");
     if (row.owns_database) refuse("the database owner");
+    // SEC-DEPTH A2 / P2: a runtime login outside the guard-execution boundary can neither create temporary or schema objects nor
+    // run in a session that skips triggers (replica mode); migration 0057 removes the grants, this refuses a login that still has them
+    if (row.database_temporary) refuse("granted TEMPORARY on the database");
+    if (row.database_create) refuse("granted CREATE on the database");
+    if (row.schema_create) refuse("granted CREATE on a schema");
+    if (row.replication_role !== "origin") refuse(`running with session_replication_role = ${row.replication_role}`);
     const [role, ...others] = row.groups.filter(isRuntimeRole);
     if (role === undefined) return refuse("a member of no runtime group");
     if (others.length > 0) return refuse(`a member of more than one runtime group (${[role, ...others].join(", ")})`);

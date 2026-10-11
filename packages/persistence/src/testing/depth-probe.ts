@@ -37,7 +37,7 @@ async function install(oracle: Client, group: string, body: string, definer: boo
   await oracle.query("GRANT USAGE ON SCHEMA depth_probe TO " + group);
   await oracle.query(`CREATE TABLE ${table} (n int)`);
   await oracle.query(`GRANT INSERT ON ${table} TO ${group}`);
-  await oracle.query(`CREATE FUNCTION ${fn}() RETURNS trigger LANGUAGE plpgsql ${definer ? "SECURITY DEFINER" : ""} SET search_path = pg_catalog, kauro AS $probe$ BEGIN ${body}; RETURN NULL; END $probe$`);
+  await oracle.query(`CREATE FUNCTION ${fn}() RETURNS trigger LANGUAGE plpgsql ${definer ? "SECURITY DEFINER" : ""} SET search_path = pg_catalog, kauro AS $probe$ BEGIN ${body.replace(/;\s*$/, "")}; RETURN NULL; END $probe$`);
   await oracle.query(`CREATE TRIGGER probe_${n} AFTER INSERT ON ${table} FOR EACH ROW EXECUTE FUNCTION ${fn}()`);
   let dropped = false;
   return {
@@ -57,7 +57,17 @@ async function install(oracle: Client, group: string, body: string, definer: boo
 /** `sql` is a plpgsql statement list (semicolon-separated, no trailing RETURN) that runs as the superuser at depth 2. */
 export async function nestedAsSuperuser(oracle: Client, group: string, sql: string): Promise<DepthProbe> {
   if (sql.includes("$probe$")) throw new Error("the nested statement may not contain the probe's quote tag");
-  return install(oracle, group, sql.replace(/;\s*$/, ""), true);
+  return install(oracle, group, sql, true);
+}
+
+/**
+ * The same probe with a SECURITY INVOKER trigger function: `sql` runs with the RUNTIME session's own authority, one trigger level
+ * deeper than the caller's statement. Used where a test keeps asserting what the runtime role can (not) do at depth (the former
+ * pg_temp triggers, which the revoked TEMPORARY privilege no longer allows; SEC-DEPTH A5).
+ */
+export async function nestedAsInvoker(oracle: Client, group: string, sql: string): Promise<DepthProbe> {
+  if (sql.includes("$probe$")) throw new Error("the nested statement may not contain the probe's quote tag");
+  return install(oracle, group, sql, false);
 }
 
 /** Holds the runtime transaction for `ms` milliseconds at the probe insert (an INVOKER trigger: the runtime role's own authority). */

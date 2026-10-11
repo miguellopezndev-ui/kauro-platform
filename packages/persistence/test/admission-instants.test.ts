@@ -5,6 +5,7 @@ import { after, before, test } from "node:test";
 import type { ExecutionUnitOfWork, ProcessingAttemptId, ProcessingJobId } from "@kauro/domain";
 import { barrier, handled, waitForLockWait } from "../src/testing/harness.js";
 import { admitJob, controlOf, endJob, queueJob } from "../src/testing/execution-fixtures.js";
+import { nestedAsInvoker } from "../src/testing/depth-probe.js";
 import { service } from "./commerce-support.js";
 import { asControl, causeState, closeExecutionEnv, openExecutionEnv, oracle, purchase, refusedTransaction, type ExecutionEnv } from "./execution-support.js";
 
@@ -215,33 +216,25 @@ test("the ledger lock refuses the same clock tick and exposes EXECUTE only to co
         await c.query(`UPDATE kauro.execution_capacity SET last_admission_at = ${value} WHERE ledger_id = 1`);
       }, "KA082", `a direct write of last_admission_at = ${value} is refused`);
     }
-    // depth is no provenance: a pg_temp trigger (one level deeper) still cannot write a future instant or move an agency ahead
-    await refusedTransaction(env.control, service(env.A.agencyId), async (c) => {
-      await c.query(`CREATE FUNCTION pg_temp.stamp() RETURNS trigger LANGUAGE plpgsql AS $f$ BEGIN
-        UPDATE kauro.execution_capacity SET last_admission_at = 'infinity' WHERE ledger_id = 1; RETURN NULL; END $f$`);
-      await c.query("CREATE TEMP TABLE stamp_probe (x int) ON COMMIT DROP");
-      await c.query("CREATE TRIGGER stamp_probe AFTER INSERT ON stamp_probe FOR EACH ROW EXECUTE FUNCTION pg_temp.stamp()");
-      await c.query("INSERT INTO stamp_probe VALUES (1)");
-    }, "KA082", "a nested (depth 2) write of a future last_admission_at is refused");
-    await refusedTransaction(env.control, service(env.A.agencyId), async (c) => {
-      await c.query(`CREATE FUNCTION pg_temp.ahead() RETURNS trigger LANGUAGE plpgsql AS $f$ BEGIN
-        UPDATE kauro.agency_execution_capacity SET last_admitted_at = now() - interval '1 year' WHERE agency_id = '${env.A.agencyId}'; RETURN NULL; END $f$`);
-      await c.query("CREATE TEMP TABLE ahead_probe (x int) ON COMMIT DROP");
-      await c.query("CREATE TRIGGER ahead_probe AFTER INSERT ON ahead_probe FOR EACH ROW EXECUTE FUNCTION pg_temp.ahead()");
-      await c.query("INSERT INTO ahead_probe VALUES (1)");
-    }, "KA082", "a nested (depth 2) write moving an agency ahead in the fair order is refused");
+    // depth is no provenance: an oracle-created SECURITY INVOKER trigger (one level deeper, with the runtime role's own authority;
+    // the runtime role has no TEMPORARY privilege since 0057) still cannot write a future instant or move an agency ahead
+    const nested = async (sql: string, message: string): Promise<void> => {
+      const probe = await nestedAsInvoker(env.h.oracle, "kauro_control", sql);
+      try {
+        await refusedTransaction(env.control, service(env.A.agencyId), async (c) => { await probe.fire(c); }, "KA082", message);
+      } finally {
+        await probe.drop();
+      }
+    };
+    await nested("UPDATE kauro.execution_capacity SET last_admission_at = 'infinity' WHERE ledger_id = 1", "a nested (depth 2) write of a future last_admission_at is refused");
+    await nested(`UPDATE kauro.agency_execution_capacity SET last_admitted_at = now() - interval '1 year' WHERE agency_id = '${env.A.agencyId}'`, "a nested (depth 2) write moving an agency ahead in the fair order is refused");
     // ... nor, without admitting one of its jobs, push an agency back to "now" (starvation of a competitor; A has a ledger row from
     // the admission above, an UPDATE of a row-less agency would be vacuous) or stamp the platform "now"
     for (const [name, sql] of [
       ["demote", `UPDATE kauro.agency_execution_capacity SET last_admitted_at = kauro.server_now() WHERE agency_id = '${env.A.agencyId}'`],
       ["platform", "UPDATE kauro.execution_capacity SET last_admission_at = kauro.server_now() WHERE ledger_id = 1"],
     ] as const) {
-      await refusedTransaction(env.control, service(env.A.agencyId), async (c) => {
-        await c.query(`CREATE FUNCTION pg_temp.${name}() RETURNS trigger LANGUAGE plpgsql AS $f$ BEGIN ${sql}; RETURN NULL; END $f$`);
-        await c.query(`CREATE TEMP TABLE ${name}_probe (x int) ON COMMIT DROP`);
-        await c.query(`CREATE TRIGGER ${name}_probe AFTER INSERT ON ${name}_probe FOR EACH ROW EXECUTE FUNCTION pg_temp.${name}()`);
-        await c.query(`INSERT INTO ${name}_probe VALUES (1)`);
-      }, "KA082", `a nested "now" stamp with no admission in the transaction is refused (${name})`);
+      await nested(sql, `a nested "now" stamp with no admission in the transaction is refused (${name})`);
     }
   } finally {
     await endJob(env.h, env.A, job.jobId);
@@ -262,9 +255,10 @@ test("the consumption guard refuses admission evidence from a different transact
   const p = await purchase(env, env.A, "instant-cross-transaction");
   const job = await queueJob(env.h, env.A, p.authorizationId);
   await admitJob(env.h, env.A, job.jobId);
+  const h0 = env.h.oracle;
   try {
     // Invoke the actual deferred guard functions as the runtime role against the
-    // committed rows copied into temporary probes. This isolates the temporal
+    // committed rows copied into a probe table. This isolates the temporal
     // proof from immutability/event guards, without disabling any production guard.
     for (const [table, guard, idColumn, id] of [
       ["commercial_authorizations", "commercial_authorizations_consumption_bound", "authorization_id", p.authorizationId],
@@ -272,12 +266,21 @@ test("the consumption guard refuses admission evidence from a different transact
       // same-transaction half of the proof is the consumption guard above (admitted_at = server_now()), so the job-side guard
       // alone is not expected to refuse committed rows replayed in another transaction.
     ] as const) {
-      await refusedTransaction(env.control, service(env.A.agencyId), async (c) => {
-        await c.query(`CREATE TEMP TABLE admission_probe (LIKE kauro.${table}) ON COMMIT DROP`);
-        await c.query(`CREATE CONSTRAINT TRIGGER admission_probe_guard AFTER INSERT ON admission_probe
+      // the copy lives in an oracle-created probe table of schema depth_probe (the runtime role has no TEMPORARY privilege since 0057)
+      // with the REAL deferred guard attached; the runtime role writes the copied row, so the cross-transaction assertion is unchanged
+      await h0.query("CREATE SCHEMA IF NOT EXISTS depth_probe");
+      await h0.query("GRANT USAGE ON SCHEMA depth_probe TO kauro_control");
+      await h0.query(`CREATE TABLE depth_probe.admission_probe (LIKE kauro.${table})`);
+      try {
+        await h0.query(`CREATE CONSTRAINT TRIGGER admission_probe_guard AFTER INSERT ON depth_probe.admission_probe
           DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.${guard}()`);
-        await c.query(`INSERT INTO admission_probe SELECT * FROM kauro.${table} WHERE ${idColumn} = $1`, [id]);
-      }, "KA081", `${guard} refuses an admission recorded in a different transaction`);
+        await h0.query("GRANT INSERT ON depth_probe.admission_probe TO kauro_control");
+        await refusedTransaction(env.control, service(env.A.agencyId), async (c) => {
+          await c.query(`INSERT INTO depth_probe.admission_probe SELECT * FROM kauro.${table} WHERE ${idColumn} = $1`, [id]);
+        }, "KA081", `${guard} refuses an admission recorded in a different transaction`);
+      } finally {
+        await h0.query("DROP TABLE depth_probe.admission_probe");
+      }
     }
   } finally {
     await endJob(env.h, env.A, job.jobId);

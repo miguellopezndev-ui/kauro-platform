@@ -458,7 +458,10 @@ test("the binding cannot be redirected by a session search_path: neither tempora
     await refusedInSavepoint(c, () => eventOf(c, "shadow_kind", client.id, 1, A.agencyId), "KA006", undefined, `${where}: a shadow kind`);
   };
   const before_ = await eventCount();
-  // (1) temporary tables of the request handlers' own session, searched first
+  // (1) temporary tables of the request handlers' own session, searched first. Since 0057 no runtime login holds TEMPORARY: the
+  // oracle grants it to this test's login for the duration of the assertion and revokes it in finally (SEC-DEPTH A5)
+  await h.oracle.query("DO $g$ BEGIN EXECUTE format('GRANT TEMPORARY ON DATABASE %I TO kauro_app_test', current_database()); END $g$");
+  try {
   await tx(app, { agencyId: A.agencyId, userId: alice }, async (c) => {
     await c.query("CREATE TEMP TABLE aggregate_kinds (aggregate_kind text, table_name text, id_column text, owner_package text) ON COMMIT DROP");
     await c.query("INSERT INTO pg_temp.aggregate_kinds VALUES ('end_client', 'end_clients', 'client_id', 'B06'), ('shadow_kind', 'end_clients', 'client_id', 'B06')");
@@ -470,6 +473,9 @@ test("the binding cannot be redirected by a session search_path: neither tempora
     assert.equal((await c.query("SELECT count(*)::int AS n FROM end_clients WHERE client_id = $1", [phantom])).rows[0].n, 1);
     await probes(c, "temporary tables");
   });
+  } finally {
+    await h.oracle.query("DO $g$ BEGIN EXECUTE format('REVOKE TEMPORARY ON DATABASE %I FROM kauro_app_test', current_database()); END $g$");
+  }
   // (2) a schema an adversary controls, put first by the session
   await h.oracle.query("CREATE SCHEMA shadow");
   try {

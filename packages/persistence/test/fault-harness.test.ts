@@ -1241,13 +1241,21 @@ test("FH-R2 (r6) an onServer instant is consumed only when probes the harness ru
   // dollar quoting, a DO block: no transaction control in the text, the clock override is undone all the same
   await undone("an outside DO block (dollar-quoted) resetting the transaction's clock", a, () => a.query("DO $body$ BEGIN PERFORM set_config('kauro_test.clock_offset_seconds', '0', true); END $body$"), before(a));
   // a function body: the reset is hidden in a function called by a plain SELECT
-  await undone(
-    "an outside SELECT of a function whose body resets the transaction's clock",
-    a,
-    () => a.query("SELECT pg_temp.fault_undo_clock()"),
-    before(a),
-    () => a.query("CREATE FUNCTION pg_temp.fault_undo_clock() RETURNS text LANGUAGE sql AS $f$ SELECT set_config('kauro_test.clock_offset_seconds', '0', true) $f$"),
-  );
+  // (the helper function is oracle-created: the runtime login has no TEMPORARY privilege since 0057, so no pg_temp function)
+  await h.oracle.query("CREATE SCHEMA fault_clock_probe");
+  try {
+    await h.oracle.query("CREATE FUNCTION fault_clock_probe.fault_undo_clock() RETURNS text LANGUAGE sql AS $f$ SELECT set_config('kauro_test.clock_offset_seconds', '0', true) $f$");
+    await h.oracle.query("GRANT USAGE ON SCHEMA fault_clock_probe TO kauro_control");
+    await h.oracle.query("GRANT EXECUTE ON FUNCTION fault_clock_probe.fault_undo_clock() TO kauro_control");
+    await undone(
+      "an outside SELECT of a function whose body resets the transaction's clock",
+      a,
+      () => a.query("SELECT fault_clock_probe.fault_undo_clock()"),
+      before(a),
+    );
+  } finally {
+    await h.oracle.query("DROP SCHEMA fault_clock_probe CASCADE");
+  }
   // the operation's own multi-statement string: a comment-split ROLLBACK TO, then its read of the server clock
   await undone("the operation's own multi-statement string undoing the instant before its read", a, undefined, async (d) => {
     const r = (await a.query(`/* ; */ ROLLBACK TO SAVEPOINT before_clock; SELECT kauro.server_now() < '${d}'::timestamptz AS before`)) as unknown as Array<{ rows: Array<{ before: boolean }> }>;
