@@ -17,6 +17,7 @@ import { test, type TestOptions } from "node:test";
 import type { Client } from "pg";
 import type { UtcInstant } from "@kauro/contracts";
 import { toUtcInstant } from "@kauro/domain";
+import { CELL_TIMEOUT_MS } from "./bounds.js";
 import { controlledClock, epochMs, type ControlledClock, type InstantLike } from "./clock.js";
 import { bothOrders, concurrently, inOrder, lastSettledOrder, mustWait, producedIn, sequentially, settledOrderOf, type ActorOutcome, type HarnessConnection, type RaceRun, type RaceScenario, type WaitProbe, type Waiting } from "./interleave.js";
 import { FaultPoints, armCrashIn, crashedAt, terminateBackend } from "./points.js";
@@ -142,8 +143,17 @@ export class FaultNotInjected extends Error {
 export interface CellOptions {
   /** Where the controlled clock starts (default: now). */
   readonly clockStart?: InstantLike;
+  /** Bound on the cell body in ms (default CELL_TIMEOUT_MS): a body still running at the bound fails the cell, naming it. */
+  readonly timeoutMs?: number;
   /** Passed to node:test (timeouts). */
   readonly test?: TestOptions;
+}
+
+export class CellTimedOut extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CellTimedOut";
+  }
 }
 
 export type CellBody = (ctx: FaultContext) => Promise<void>;
@@ -388,7 +398,17 @@ function assertInjected(ctx: FaultContext): void {
 export async function runCell(cell: MatrixCell, body: CellBody, options: CellOptions = {}): Promise<FaultContext> {
   validCell(cell);
   const ctx = contextOf(cell, options);
-  await body(ctx);
+  const timeoutMs = options.timeoutMs ?? CELL_TIMEOUT_MS;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) throw new RangeError(`cell timeoutMs must be a positive integer, got ${String(timeoutMs)}`);
+  let timer: NodeJS.Timeout | undefined;
+  const bound = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new CellTimedOut(`fault cell "${cellTitle(cell)}" did not settle within ${timeoutMs} ms (CELL_TIMEOUT_MS bound): its body never settled`)), timeoutMs);
+  });
+  try {
+    await Promise.race([body(ctx), bound]);
+  } finally {
+    clearTimeout(timer);
+  }
   // the server probes still in flight for this cell's operations land first (a verdict that never lands proves nothing)
   for (const scope of evidenceOf.get(ctx)?.scopes ?? []) await scope.settled();
   ctx.points.assertAllReached();
