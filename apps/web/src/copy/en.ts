@@ -6,6 +6,7 @@
 // where AI never appears (A3 3.1); `.body` and `.hint` are running text.
 import type { NextStep, SharedState } from "../client/states.ts";
 import { PUBLIC_COPY } from "./public.ts";
+import { SCREEN_COPY } from "./screens.ts";
 
 /** The application's own entries: the shell, the shared states, their next steps, the guard (W3). */
 export const APPLICATION_COPY = {
@@ -101,7 +102,7 @@ export const APPLICATION_COPY = {
  * site's (copy/public.ts, the names and sentences A3 fixes word for word among them), merged by key prefix: no id is defined by both,
  * so the A3 rules that count a sentence count it once over everything a person can read.
  */
-export const EN = { ...APPLICATION_COPY, ...PUBLIC_COPY } as const;
+export const EN = { ...APPLICATION_COPY, ...PUBLIC_COPY, ...SCREEN_COPY } as const;
 
 export type MessageId = keyof typeof EN;
 export type MessageParams = Readonly<Record<string, string | number>>;

@@ -74,7 +74,7 @@ export const SCREENS: readonly Screen[] = [
  * without its page file and a page file without its id. The public screens are W5a's: UI01-UI08, UI48 and UI49 are pages, and the
  * legal documents UI45-UI47 are route handlers that answer the whole document (D-LEGAL-1).
  */
-export const IMPLEMENTED_SCREENS: ReadonlySet<string> = new Set<string>(["UI01", "UI02", "UI03", "UI04", "UI05", "UI06", "UI07", "UI08", "UI45", "UI46", "UI47", "UI48", "UI49"]);
+export const IMPLEMENTED_SCREENS: ReadonlySet<string> = new Set<string>(["UI23", "UI24", "UI01", "UI02", "UI03", "UI04", "UI05", "UI06", "UI07", "UI08", "UI45", "UI46", "UI47", "UI48", "UI49"]);
 
 export interface NavigationEntry {
   readonly screen: string;

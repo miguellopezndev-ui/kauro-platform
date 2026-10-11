@@ -25,6 +25,8 @@
     "src/shell/**/*.ts",
     "src/shell/**/*.tsx",
     "src/screens.ts",
+    "src/screens/**/*.ts",
+    "src/screens/**/*.tsx",
     "test/**/*.ts",
     "e2e/**/*.ts",
     "playwright.config.ts"
