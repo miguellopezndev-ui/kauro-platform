@@ -124,8 +124,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // FCG-B06-LEASE-1: claim_lease / heartbeat_lease / checkpoint_lease judge expiry at the database clock after the row lock (provisional number)
     "0054_lease_expiry_after_lock.sql",
     // package B10 lane OFFSET: offsets as claims that yield, the one lock order, noncash settlement (docs/design/B10-OFFSET.md)
-    "0055_offset_claims_yield.sql",
-    // "0056_seller_credit.sql", (pending)
+    "0056_offset_claims_yield.sql",
+    // "0057_seller_credit.sql", (pending)
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

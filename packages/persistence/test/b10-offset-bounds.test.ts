@@ -1,5 +1,5 @@
 // The offset amount bounds at the database (docs/design/B10-KIT-SUITES.md section 2.3, docs/design/B10-OFFSET.md section 6 F1; D10-NEG-1, D10-NEG-4,
-// R2-104; migrations 0030 and 0055 commission_offsets_authorized): an offset is admitted only from a settled source (PAID or ADJUSTED, or PAYABLE through
+// R2-104; migrations 0030 and 0056 commission_offsets_authorized): an offset is admitted only from a settled source (PAID or ADJUSTED, or PAYABLE through
 // a noncash-settled item) within the position its source has left after its live claims, and only against an ELIGIBLE receiving line within
 // what it can still pay after its OPEN holds and the live claims against it. These are insert-time facts, not state invariants (r3 R3-01: a later
 // one-cent INCREASE is legal and leaves an earlier offset beyond the position), so these DENY tests carry them, one per predicate of the guard.
