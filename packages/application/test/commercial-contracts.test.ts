@@ -93,7 +93,7 @@ test("principal, runtime role, scope and step-up follow the design's principal t
   assert.equal(serviceHoldsRole("payment-service", "COMMISSION_SERVICE"), false);
   assert.equal(serviceHoldsRole("commission-service", "PAYMENT_SERVICE"), false);
   assert.equal(serviceHoldsRole("constructor", "FINANCE_SERVICE"), false, "an inherited object key is not a service identity");
-  assert.equal(Object.keys(SERVICE_ROLE_TABLE).length, 5);
+  assert.equal(Object.keys(SERVICE_ROLE_TABLE).length, 6);
 });
 
 // --- sample bodies and DTOs the design specifies ----------------------------------------------------------------------------------

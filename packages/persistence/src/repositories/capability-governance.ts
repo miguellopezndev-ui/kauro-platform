@@ -12,6 +12,7 @@ import {
   type CapabilityId,
   type CapabilityRestrictionRecord,
   type CapabilityVersionRecord,
+  type OperationsActor,
   type UserId,
   type VersionedWrite,
 } from "@kauro/domain";
@@ -109,7 +110,7 @@ export class PgCapabilityGovernanceRepository implements CapabilityGovernanceRep
     readonly expectedRevision: number;
     readonly incidentRef: string;
     readonly priorState: Capability["state"];
-    readonly by: UserId;
+    readonly by: OperationsActor;
   }): Promise<VersionedWrite<CapabilityRestrictionRecord>> {
     const moved = await execute<{ revision: number }>(
       this.db,
@@ -120,10 +121,10 @@ export class PgCapabilityGovernanceRepository implements CapabilityGovernanceRep
     if (!next) return this.stale(input.capabilityId);
     const r = await execute<RestrictionRow>(
       this.db,
-      `INSERT INTO kauro.capability_restrictions (restriction_id, capability_id, incident_ref, prior_state, revision_after, recorded_by_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO kauro.capability_restrictions (restriction_id, capability_id, incident_ref, prior_state, revision_after, recorded_by_user_id, recorded_by_service)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING restriction_id, capability_id, incident_ref, prior_state, revision_after, to_char(created_at AT TIME ZONE 'UTC', ${CANONICAL_FORMAT}) AS created_at`,
-      [input.restrictionId, input.capabilityId, input.incidentRef, input.priorState, Number(next.revision), input.by],
+      [input.restrictionId, input.capabilityId, input.incidentRef, input.priorState, Number(next.revision), input.by.kind === "USER" ? input.by.userId : null, input.by.kind === "SERVICE" ? input.by.serviceId : null],
     );
     const row = r.rows[0]!;
     return { kind: "APPLIED", record: {
