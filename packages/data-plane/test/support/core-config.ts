@@ -91,3 +91,43 @@ export function tempRoot(): { root: string; dispose(): void } {
   const root = mkdtempSync(join(tmpdir(), "kauro-b05-"));
   return { root, dispose: () => rmSync(root, { recursive: true, force: true }) };
 }
+
+/** A virtual clock: `advance` fires the due timers in order; nothing here sleeps. */
+export class ManualTimers {
+  now = Date.now();
+  readonly #timers: Array<{ at: number; fire: () => void; live: boolean }> = [];
+  nowMs = (): number => this.now;
+  after = (ms: number, fire: () => void): (() => void) => {
+    const entry = { at: this.now + Math.max(0, ms), fire, live: true };
+    this.#timers.push(entry);
+    return () => {
+      entry.live = false;
+    };
+  };
+  /** Moves the clock and fires what is due; callers then `await settle()` for the promise continuations. */
+  advance(ms: number): void {
+    const target = this.now + ms;
+    for (;;) {
+      const due = this.#timers.filter((t) => t.live && t.at <= target).sort((a, b) => a.at - b.at)[0];
+      if (due === undefined) break;
+      due.live = false;
+      this.now = Math.max(this.now, due.at);
+      due.fire();
+    }
+    this.now = target;
+  }
+}
+
+export function settle(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
+/** A promise a test resolves by hand. */
+export function gate(): { promise: Promise<void>; open(): void; opened: boolean } {
+  let open!: () => void;
+  const promise = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  const g = { promise, opened: false, open: () => { g.opened = true; open(); } };
+  return g;
+}

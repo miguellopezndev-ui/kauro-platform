@@ -154,6 +154,9 @@ interface Call {
 export class MigrationCoreAdapter implements ExecutionEnvelopePort, ProfilePort, ValidatePort, PackageVerifierPort {
   readonly evidenceClass: CoreEvidenceClass = "EXECUTED_LOCAL";
   readonly coreVersion = MIGRATION_CORE_VERSION;
+  get attemptId(): Id {
+    return this.#o.attemptId;
+  }
   readonly #o: MigrationCoreAdapterOptions;
   readonly #timers: CoreTimers;
   readonly #residual: string[] = [];
@@ -337,6 +340,7 @@ export class MigrationCoreAdapter implements ExecutionEnvelopePort, ProfilePort,
       await this.#materialize(call, op, io.source, refs, live);
       op.assertLive();
       await this.#hold("E2");
+      const inputBytes = call.ledger.live;
       const quota = io.limits.scratchBudgetBytes - call.ledger.live - live();
       const res = await this.#child(call, op, { mode: "execute", configText: configText.original, runConfigText: configText.run, expectedConfigHash: subject.configHash, profileFiles: [] }, quota);
       const record = this.#recordOf(res);
@@ -350,6 +354,8 @@ export class MigrationCoreAdapter implements ExecutionEnvelopePort, ProfilePort,
       // inputs are deleted before staging (release order, D5-2c (3))
       rmSync(call.inputRoot, { recursive: true, force: true });
       call.ledger.creditTree(call.inputRoot);
+      await this.#hold("E3");
+      op.assertLive();
       const staged = await this.#stage(call, op, io, pkg);
       if (staged === "CORRUPT") return terminal("CORRUPT_INTERMEDIATE");
       return {
@@ -358,7 +364,7 @@ export class MigrationCoreAdapter implements ExecutionEnvelopePort, ProfilePort,
         terminalCause: "COMPLETED",
         stagedArtifacts: staged,
         reconciliationSummary: pkg.reconciliation,
-        resourceMetrics: { peakMemoryBytes: pkg.maxRssBytes, peakScratchBytes: call.ledger.peak + pkg.peakLedgerBytes, wallClockMs: timers.nowMs() - startMs },
+        resourceMetrics: { peakMemoryBytes: pkg.maxRssBytes, peakScratchBytes: Math.max(call.ledger.peak, inputBytes + pkg.peakLedgerBytes), wallClockMs: timers.nowMs() - startMs },
       };
     } catch (error) {
       if (error instanceof OperationEnded) return terminal(error.reason);

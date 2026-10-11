@@ -1,0 +1,68 @@
+{
+  "comment": "node:fs names imported by the vendored Migration Core 3.0.0 dist, the platform AttemptScratchStore and the child modules (B05 M23b); a name added to any needs an allowlist decision in fs-meter.ts",
+  "migrationCore": [
+    "closeSync",
+    "existsSync",
+    "fstatSync",
+    "lstatSync",
+    "mkdirSync",
+    "mkdtempSync",
+    "openSync",
+    "readFileSync",
+    "readSync",
+    "readdirSync",
+    "realpathSync",
+    "renameSync",
+    "rmSync",
+    "statSync",
+    "unlinkSync",
+    "writeFileSync",
+    "writeSync"
+  ],
+  "attemptScratchStore": [
+    "closeSync",
+    "existsSync",
+    "fstatSync",
+    "fsyncSync",
+    "lstatSync",
+    "mkdirSync",
+    "openSync",
+    "readSync",
+    "readdirSync",
+    "realpathSync",
+    "renameSync",
+    "rmdirSync",
+    "unlinkSync",
+    "writeSync"
+  ],
+  "childModules": [
+    "readFileSync",
+    "readdirSync",
+    "statSync",
+    "writeSync"
+  ],
+  "union": [
+    "closeSync",
+    "existsSync",
+    "fstatSync",
+    "fsyncSync",
+    "lstatSync",
+    "mkdirSync",
+    "mkdtempSync",
+    "openSync",
+    "readFileSync",
+    "readSync",
+    "readdirSync",
+    "realpathSync",
+    "renameSync",
+    "rmSync",
+    "rmdirSync",
+    "statSync",
+    "unlinkSync",
+    "writeFileSync",
+    "writeSync"
+  ],
+  "refused": [
+    "mkdtempSync"
+  ]
+}
