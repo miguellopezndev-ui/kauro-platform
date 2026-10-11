@@ -23,6 +23,7 @@ import {
   type QualifyingPurchaseFacts,
 } from "../src/index.js";
 import { TARGET_FAILURE_REASONS } from "../src/model/target-contract.js";
+import { CAPABILITY_FAILURE_REASONS } from "../src/model/capability-governance.js";
 
 const AGENCY = "0192a000-0000-7000-8000-0000000000a1" as AgencyId;
 const OTHER_AGENCY = "0192a000-0000-7000-8000-0000000000a2" as AgencyId;
@@ -197,9 +198,10 @@ test("every B10 failure reason of design section 12 is registered once in FAILUR
   ];
   assert.equal(section12.length, 43);
   assert.deepEqual([...COMMERCIAL_FAILURE_REASONS], section12, "the B10 list is section 12's, in its order");
-  // B17 (CMD018/CMD019) appends its target-contract reasons after B10's: strip that tail, then section 12 is the end
-  assert.deepEqual(FAILURE_REASONS.slice(FAILURE_REASONS.length - TARGET_FAILURE_REASONS.length), [...TARGET_FAILURE_REASONS], "B17 tail");
-  const all: ReadonlyArray<string> = FAILURE_REASONS.slice(0, FAILURE_REASONS.length - TARGET_FAILURE_REASONS.length);
+  // later packages append after B10's: B17 (CMD018/CMD019) target-contract reasons, then B18 (CMD058/CMD059) capability reasons
+  const later = [...TARGET_FAILURE_REASONS, ...CAPABILITY_FAILURE_REASONS];
+  assert.deepEqual(FAILURE_REASONS.slice(FAILURE_REASONS.length - later.length), later, "B17 and B18 tail");
+  const all: ReadonlyArray<string> = FAILURE_REASONS.slice(0, FAILURE_REASONS.length - later.length);
   for (const r of section12) {
     assert.equal(all.filter((x) => x === r).length, 1, `${r} is registered exactly once`);
     assert.match(r, /^[A-Z][A-Z0-9_]{2,63}$/);
