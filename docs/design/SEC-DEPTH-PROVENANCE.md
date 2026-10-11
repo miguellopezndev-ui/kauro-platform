@@ -250,7 +250,7 @@ money nor authority. Re-run when 0050-0057 land: a planned trigger missing from 
 - `attribution_claims` (row 17; feeds money) birth: [attribution_claims_initial_state]; imm: `claim_id`; bound: `state` [attribution_claims_transition] listed edge; `version` [attribution_claims_version] +1.
 - `audit_steps` (row 13; feeds authority) birth: [audit_steps_workflow]; imm: `agency_id` `audit_id` `claimed_at` `fence` `kind` `step_id`; first: `evidence_class` [audit_steps_workflow] the record UPDATE only (B12); `evidence_hash` [audit_steps_workflow] the record UPDATE only (B12); `outcome` [audit_steps_workflow] the record UPDATE only, with the other three (B12); `recorded_at` [audit_steps_workflow] the record UPDATE := now (0023:601).
 - `audits` (row 12; feeds authority) birth: [audits_workflow]; imm: `absolute_deadline_at` `agency_id` `audit_id` `created_at` `grant_id` `revision_id` `started_at` `target_contract_id`; bound: `cancel_version` [audits_workflow] +1 on cancellation_wins only (0023:458); `fence` [audits_workflow] B6; `finding_codes` [audits_workflow] only on ->NEEDS_DECISION/UNSUPPORTED (0023:473); `state` [audits_transition] listed edge; `updated_at` [audits_workflow] now(); `version` [audits_workflow] +1; first: `cancel_actor_kind` [audits_workflow] cancellation_wins with cancel_version +1 (0023:458); `candidate_manifest_hash` [audits_workflow] only on the audits_workflow edge that requires it (B12); `draft_plan_id` [audits_workflow] only on the draft-ready edge (0023:648, B12); `interpretation_deadline_at` [audits_workflow] ->INTERPRETING := least(now + 1200 s, absolute) (0023:511); `interpreting_at` [audits_workflow] ->INTERPRETING := now (0023:510); `profile_evidence_hash` [audits_workflow] only on the audits_workflow edge that requires it (B12); `profiling_at` [audits_workflow] ->PROFILING := now (0023:505); `terminal_at` [audits_workflow] terminal edges := now (0023:482); `terminal_reason` [audits_workflow] terminal edges only (B12); `validating_at` [audits_workflow] ->VALIDATING := now (0023:513).
-- `capabilities` (row 27; feeds authority) birth: [capabilities_initial_state]; imm: `capability_id`; bound: `state` [capabilities_transition] listed edge.
+- `capabilities` (row 27; feeds authority) birth: [capabilities_initial_state]; imm: `capability_id`; bound: `revision` [capabilities_revision_guard] never goes back (B18, 0051); `state` [capabilities_transition] listed edge.
 - `capture_facts` (row 4; feeds money) birth: [capture_facts_allocate]; imm: `agency_id` `amount_cents` `capture_id` `order_id`; bound: `allocated_service_cents` [capture_facts_monotonic] fixed at PENDING->COMPLETED (0015:388); `allocated_tax_cents` [capture_facts_monotonic] fixed at PENDING->COMPLETED (0015:388); `status` [capture_facts_monotonic] listed (0015:402); first: `provider_completed_at` [capture_facts_first_assignment] PENDING->COMPLETED or a COMPLETED birth only, <= now (B12).
 - `commercial_authorizations` (row 20; feeds money and authority) birth: [commercial_authorizations_require_capture]; imm: `agency_id` `approval_id` `authorization_id` `capture_id` `order_id` `project_id` `quote_id`; bound: `state` [commercial_authorizations_transition] listed + B10; first: `consumed_at` [commercial_authorizations_first_assignment] only in ACTIVE->CONSUMED := now (B12); `delivered_at` [commercial_authorizations_first_assignment] only in CONSUMED->DELIVERED := now, never while CONSUMED (B12, SDP-36); `job_ref` [commercial_authorizations_first_assignment] only in the UPDATE moving ACTIVE->CONSUMED, = the job admitted now; NULL at birth (B12, SDP-36).
 - `commercial_transitions` (row 14; feeds authority) birth: [commercial_transitions_recorded_by_trigger]; imm: `actor_user_id` `agency_id` `from_state` `machine` `recorded_at` `subject_id` `subject_version` `to_state`.
@@ -294,24 +294,24 @@ Residual B-LIFETIME-2 (feeds none): `domain_events` event evidence of versions (
 
 ### 3c Planned enforcing triggers (the check requires each in its migration once that file exists)
 
-- planned `commercial_authorizations_first_assignment` BEFORE INSERT OR UPDATE ON `commercial_authorizations` in 0051 (columns: `job_ref` `consumed_at` `delivered_at`) B10/B12, SDP-36
-- planned `execution_capacity_birth` BEFORE INSERT ON `execution_capacity` in 0051 (columns: `*`) B9: the seed is its only birth
-- planned `leases_birth` BEFORE INSERT ON `leases` in 0052 (columns: `fence` `cancel_version` `heartbeat_at` `expires_at` `created_at` `updated_at` `deadline_at`) B2: deadline_at within its subject's deadline
-- planned `capture_facts_first_assignment` BEFORE INSERT OR UPDATE ON `capture_facts` in 0054 (columns: `provider_completed_at`) B12
-- planned `payment_orders_allocation_birth` BEFORE INSERT ON `payment_orders` in 0054 (columns: `allocated_cents`) B4
-- planned `founding_slot_reservations_first_assignment` BEFORE INSERT OR UPDATE ON `founding_slot_reservations` in 0056 (columns: `consumed_at` `consumed_by_authorization_id`) B8/B12
-- planned `price_eligibility_snapshots_birth` AFTER INSERT ON `price_eligibility_snapshots` in 0056 (columns: `agency_id` `quote_id` `project_id` `founding_slot_ref` `founding_discount_bps` `policy_version` `qualifying_project_ids` `qualifying_count` `as_of` `lookback_starts_at`) B13, SDP-37
-- planned `target_contracts_lifetime` BEFORE INSERT OR UPDATE ON `target_contracts` in 0057 (columns: `confirmed_at` `superseded_at`) B14, SDP-38
-- planned `state_machines_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_machines` in 0057 (columns: `*`) B11
-- planned `state_transitions_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_transitions` in 0057 (columns: `*`) B11
-- planned `founding_slots_birth` BEFORE INSERT ON `founding_slots` in 0057 (columns: `*`) B11, SDP-35
-- planned `quotes_issuance_clock` BEFORE INSERT ON `quotes` in 0056 (columns: `issued_at` `expires_at` `price_policy_version` `replaces_quote_id`) B15, SDP-39
-- planned `founding_slot_reservations_eligibility` BEFORE INSERT ON `founding_slot_reservations` in 0056 (columns: `agency_id` `quote_id` `policy_version` `slot_no`) B13 (iii), SDP-40
-- planned `agency_execution_capacity_guard` BEFORE INSERT OR UPDATE ON `agency_execution_capacity` in 0051 (columns: `agency_id` `last_admitted_at` `live_jobs` `updated_at`) B9: redefined, also at birth
-- planned `execution_capacity_last_admission_guard` BEFORE UPDATE ON `execution_capacity` in 0051 (columns: `last_admission_at` `ledger_id` `updated_at`) B9/G11: redefined
-- planned `request_journal_guard` BEFORE INSERT OR UPDATE ON `request_journal` in 0053 (columns: `usage_state` `actual_cents` `reconciled_at` `state` `response_artifact_hash`) B3: redefined, usage frozen once RECONCILED
-- planned `agency_recurrence_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `agency_recurrence` in 0055 (columns: `*`) B5b: redefined, every column
-- planned `qualifying_purchases_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `qualifying_purchases` in 0056 (columns: `*`) B8: redefined, every column at birth, no update
+- planned `commercial_authorizations_first_assignment` BEFORE INSERT OR UPDATE ON `commercial_authorizations` in 0052 (columns: `job_ref` `consumed_at` `delivered_at`) B10/B12, SDP-36
+- planned `execution_capacity_birth` BEFORE INSERT ON `execution_capacity` in 0052 (columns: `*`) B9: the seed is its only birth
+- planned `leases_birth` BEFORE INSERT ON `leases` in 0053 (columns: `fence` `cancel_version` `heartbeat_at` `expires_at` `created_at` `updated_at` `deadline_at`) B2: deadline_at within its subject's deadline
+- planned `capture_facts_first_assignment` BEFORE INSERT OR UPDATE ON `capture_facts` in 0055 (columns: `provider_completed_at`) B12
+- planned `payment_orders_allocation_birth` BEFORE INSERT ON `payment_orders` in 0055 (columns: `allocated_cents`) B4
+- planned `founding_slot_reservations_first_assignment` BEFORE INSERT OR UPDATE ON `founding_slot_reservations` in 0057 (columns: `consumed_at` `consumed_by_authorization_id`) B8/B12
+- planned `price_eligibility_snapshots_birth` AFTER INSERT ON `price_eligibility_snapshots` in 0057 (columns: `agency_id` `quote_id` `project_id` `founding_slot_ref` `founding_discount_bps` `policy_version` `qualifying_project_ids` `qualifying_count` `as_of` `lookback_starts_at`) B13, SDP-37
+- planned `target_contracts_lifetime` BEFORE INSERT OR UPDATE ON `target_contracts` in 0058 (columns: `confirmed_at` `superseded_at`) B14, SDP-38
+- planned `state_machines_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_machines` in 0058 (columns: `*`) B11
+- planned `state_transitions_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_transitions` in 0058 (columns: `*`) B11
+- planned `founding_slots_birth` BEFORE INSERT ON `founding_slots` in 0058 (columns: `*`) B11, SDP-35
+- planned `quotes_issuance_clock` BEFORE INSERT ON `quotes` in 0057 (columns: `issued_at` `expires_at` `price_policy_version` `replaces_quote_id`) B15, SDP-39
+- planned `founding_slot_reservations_eligibility` BEFORE INSERT ON `founding_slot_reservations` in 0057 (columns: `agency_id` `quote_id` `policy_version` `slot_no`) B13 (iii), SDP-40
+- planned `agency_execution_capacity_guard` BEFORE INSERT OR UPDATE ON `agency_execution_capacity` in 0052 (columns: `agency_id` `last_admitted_at` `live_jobs` `updated_at`) B9: redefined, also at birth
+- planned `execution_capacity_last_admission_guard` BEFORE UPDATE ON `execution_capacity` in 0052 (columns: `last_admission_at` `ledger_id` `updated_at`) B9/G11: redefined
+- planned `request_journal_guard` BEFORE INSERT OR UPDATE ON `request_journal` in 0054 (columns: `usage_state` `actual_cents` `reconciled_at` `state` `response_artifact_hash`) B3: redefined, usage frozen once RECONCILED
+- planned `agency_recurrence_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `agency_recurrence` in 0056 (columns: `*`) B5b: redefined, every column
+- planned `qualifying_purchases_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `qualifying_purchases` in 0057 (columns: `*`) B8: redefined, every column at birth, no update
 
 ## A. Hardening (defence in depth; P2 lists what is NOT hardening)
 
