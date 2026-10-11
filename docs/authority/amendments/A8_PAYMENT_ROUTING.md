@@ -1,3 +1,9 @@
+> **SUPERSEDED IN PART (2026-10-07)** by the owner decision `docs/authority/decisions/2026-10-07-PAYMENTS-V1.md`:
+> PayPal Business is no longer the secondary/fallback route of the launch (rank 2, rules 2 "launches with PayPal only" and 3
+> "Alternative: PayPal / card", the B19 gate "may activate with PayPal alone", and the PayPal owner acts are SUPERSEDED).
+> PayPal is DEFERRED (parked, not deleted). ACH/USD (and wire, same details) through Wise Business is the V1 target,
+> conditioned on real capability. Rules 4-8 and the generic route model stand. History below is kept unchanged.
+
 # Amendment A8 — payment routing: ACH USD (Wise Business) first, PayPal Business second
 
 Status: owner decision of 2026-10-05 (chat instruction, recorded verbatim in substance by the builder). Amends manual 15
