@@ -1,0 +1,35 @@
+{
+ "gate": "G-OPERATING-MATURITY",
+ "manual": "26",
+ "package": "B20",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "S085",
+   "package": "B20",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-108",
+   "package": "B20",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B20"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B20",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

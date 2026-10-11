@@ -1,0 +1,265 @@
+{
+ "gate": "G-DOMAIN",
+ "manual": "07",
+ "package": "B06",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "S051",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S052",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S089",
+   "package": "B06",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S090",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "S093",
+   "package": "B06",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-043",
+   "package": "B06",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-044",
+   "package": "B08",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B08-round3-88cf29d",
+   "commit": "88cf29d"
+  },
+  {
+   "case": "R2-058",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "R2-059",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD001-OK",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD001-DENY",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD001-RACE",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD009-OK",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD009-DENY",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD009-RACE",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD010-OK",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD010-DENY",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD010-RACE",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD011-OK",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD011-DENY",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD011-RACE",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD023-OK",
+   "package": "B06",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD023-DENY",
+   "package": "B06",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD023-RACE",
+   "package": "B06",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD025-OK",
+   "package": "B06",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD025-DENY",
+   "package": "B06",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD025-RACE",
+   "package": "B06",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD026-OK",
+   "package": "B06",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD026-DENY",
+   "package": "B06",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": "EXECUTED_LOCAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  },
+  {
+   "case": "CMD026-RACE",
+   "package": "B06",
+   "claimed": "PARTIAL",
+   "demonstrated": "PARTIAL",
+   "reviewId": "B06-round3-d9bbfd0",
+   "commit": "d9bbfd0"
+  }
+ ],
+ "casePackages": [
+  "B06",
+  "B08"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B06",
+   "commit": "d9bbfd0",
+   "reviewId": "B06-round3-d9bbfd0"
+  },
+  {
+   "package": "B08",
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d"
+  }
+ ],
+ "status": "PARTIAL"
+}
