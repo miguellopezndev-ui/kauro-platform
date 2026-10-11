@@ -116,6 +116,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0049_b10g6c_sales_ordering.sql",
     // package B17: CMD018 CreateTargetContract and CMD019 ConfirmTargetContract (target artifacts, the contract's version and confirmation columns)
     "0050_b17_target_contracts.sql",
+    // package B18: CMD058 ChangeCapability and CMD059 RestrictCapability (capability revision, versions, restrictions)
+    "0051_b18_capabilities.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
