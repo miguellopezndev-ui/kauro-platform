@@ -269,3 +269,31 @@ export interface StatementCorrectionView {
   readonly correctedVersion: number;
   readonly statement: CommissionStatementView;
 }
+
+// --- CMD058 ChangeCapability, CMD059 RestrictCapability (package B18) ------------------------------------------------------------
+
+/** The capability states a view names (registry Capability machine). */
+export type CapabilityStateName = "DESIGN" | "IMPLEMENTED_UNACCEPTED" | "QUALIFIED_INTERNAL" | "AVAILABLE_LIMITED" | "AVAILABLE" | "SUSPENDED";
+
+/** CMD058: the PROSPECTIVE version recorded, the capability version (revision) it reached and the capability state, which the command never moves. */
+export interface CapabilityVersionView {
+  readonly capabilityId: string;
+  readonly version: number;
+  readonly status: "PROSPECTIVE";
+  readonly state: CapabilityStateName;
+  readonly profileHash: Sha256Hex;
+  readonly qualificationEvidenceCount: number;
+  readonly createdAt: UtcInstant;
+}
+
+/** CMD059: the capability SUSPENDED, the state it left, the restriction evidence and that admission of new work is closed. */
+export interface CapabilityRestrictionView {
+  readonly capabilityId: string;
+  readonly version: number;
+  readonly state: "SUSPENDED";
+  readonly priorState: CapabilityStateName;
+  readonly restrictionId: string;
+  readonly incidentRef: string;
+  readonly restrictedAt: UtcInstant;
+  readonly newAdmissionBlocked: true;
+}

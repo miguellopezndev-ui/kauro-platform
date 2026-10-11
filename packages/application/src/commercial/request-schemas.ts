@@ -72,6 +72,14 @@ export const COMMERCIAL_REQUEST_SCHEMAS = Object.freeze({
   CMD052: schema("CMD052", ["expectedVersion", "payeeRef", "authorizationRef"], { expectedVersion: VERSION, payeeRef: ID, authorizationRef: ID }),
   /** ReconcileCommissionPayout: the stored payout evidence the verifier authenticates. */
   CMD053: schema("CMD053", ["providerPayoutEvidenceRef"], { providerPayoutEvidenceRef: ID }),
+  /** ChangeCapability: the capability version read, the new profile hash and the qualification evidence hashes it cites (1..50; a repeated hash is recorded once). */
+  CMD058: schema("CMD058", ["expectedVersion", "profileHash", "qualificationEvidenceRefs"], {
+    expectedVersion: VERSION,
+    profileHash: HASH,
+    qualificationEvidenceRefs: { type: "array", minItems: 1, maxItems: 50, items: HASH },
+  }),
+  /** RestrictCapability: the capability version read and the incident that shows unsafe or unavailable behavior. */
+  CMD059: schema("CMD059", ["expectedVersion", "incidentRef"], { expectedVersion: VERSION, incidentRef: ID }),
 } as const);
 
 export type CommercialRequestSchemaCommand = keyof typeof COMMERCIAL_REQUEST_SCHEMAS;

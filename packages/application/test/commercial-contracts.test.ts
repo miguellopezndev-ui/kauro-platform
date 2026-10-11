@@ -57,7 +57,7 @@ test("every B10 command spec matches its catalogue entry: name, method, path, ro
     else assert.ok(spec.path.includes(`{${spec.aggregateParam}}`), id);
     assert.equal(spec.expectedVersionRequired, catalogue.fields.some((f) => f.name === "expectedVersion"), id);
   }
-  assert.deepEqual(Object.keys(COMMERCIAL_COMMANDS), [...B10_COMMANDS]);
+  assert.deepEqual(Object.keys(COMMERCIAL_COMMANDS), [...B10_COMMANDS, "CMD058", "CMD059"], "B10 twelve and B18 two capability commands");
   assert.equal(COMMERCIAL_COMMANDS.CMD045.aggregateParam, null, "a prospect is registered before it has an identity");
 });
 
