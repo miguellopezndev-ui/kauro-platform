@@ -24,7 +24,7 @@ a first cell also fires on INSERT and is not the learned-once trigger; every tab
 trigger; the residual admits only tables that feed neither. On 21b310f: 50 functions, 50 tables (48 mapped, 2 residual), 335
 columns, 53 first assignments, 16 planned triggers, 0 problems; the r12 doc fails it.
 - SDP-36: commercial_authorizations job_ref/consumed_at/delivered_at get `commercial_authorizations_first_assignment` (BEFORE INSERT
-  OR UPDATE, 0046): NULL at birth, first assigned only in the UPDATE that performs ACTIVE->CONSUMED / CONSUMED->DELIVERED, := now.
+  OR UPDATE, 0051): NULL at birth, first assigned only in the UPDATE that performs ACTIVE->CONSUMED / CONSUMED->DELIVERED, := now.
   The tool now rejects the r12 cell: the delivery bound's WHEN reads state only. Same family fixed for founding_slot_reservations
   (consumed_at/by) and capture_facts.provider_completed_at.
 - SDP-37: B13 binds every eligibility snapshot's birth to its sources: a founding rate only with the reservation it names, born in
@@ -139,7 +139,7 @@ The principals that can stop them form the trusted computing base (TCB) and are 
 no RDS login is assumed superuser), the table owner (migrator: DISABLE TRIGGER, DROP), any role with SET or ALTER SYSTEM on
 `session_replication_role` (replica mode skips ordinary, constraint and FK triggers), and any SECURITY DEFINER routine owned by
 one of them that a runtime role can execute. Runtime roles are kept out of the TCB as a correctness assumption, not hardening:
-0045 FAILS (not reports) when a runtime group, login or PUBLIC has `has_parameter_privilege(.., 'session_replication_role', 'SET')`,
+0050 FAILS (not reports) when a runtime group, login or PUBLIC has `has_parameter_privilege(.., 'session_replication_role', 'SET')`,
 owns a kauro/kauro_meta object, or can EXECUTE a SECURITY DEFINER routine in kauro, kauro_meta or public; the pool refuses a
 non-origin value at connect (A2). Production TCB membership is B14's (B14-R6). `SET CONSTRAINTS ALL IMMEDIATE` is no bypass: it runs
 the pending checks earlier, and a later write of the row queues a new check (SEC-106). No guard exempts by identity: `rolsuper`,
@@ -197,7 +197,7 @@ exact permitted transition. Queue = the deferred relation checks and what queues
 | 6 | processing_attempts | CREATED (0021:237), fence NULL (CHECK), ordinal = attempt_count + 1 (0021:599) | fence: once, at CREATED->CLAIMED (0021:235, :613), the lease fence it owns (B1); state: listed | frozen (B11) | frozen (B11) | attempt_id, job_id, ordinal (0021:233) | none: B1 is immediate |
 | 7 | leases | fence 1, cancel_version 0, instants := now (B2) | owner/fence: +1 only after expiry; heartbeat/expiry: now, never shortened; checkpoint: kept once stored; cancel_version: +1 alone, JOB_ATTEMPT only with a job cancel request (B2) | refused, DELETE revoked (B2) | frozen (B2) | kind, resource, deadline, subject, cost authority (0006:190) | none: immediate |
 | 8 | cost_grants | PREPARED v1, money 0, ledger_seq 0, server stamps (0023:133-150, B3) | money, ledger_seq: seq +1 with its event; frozen at CLOSED; state: listed, CLOSED needs every request RECONCILED (B3) | frozen (B3) | frozen (B3) | grant_id, agency, kind, pool, ceiling (0023:106) | INSERT/UPDATE OF money, ledger_seq, state / event INSERT; carve AUTHORIZED/CLOSED -> HOLD/RELEASE (B3) |
-| 9 | cost_grant_ledger_events | every column from its source (B3); OPENING only in 0048 | refused (B3) | refused (B3) | refused (B3) | append-only | child of row 8 |
+| 9 | cost_grant_ledger_events | every column from its source (B3); OPENING only in 0053 | refused (B3) | refused (B3) | refused (B3) | append-only | child of row 8 |
 | 10 | request_journal | usage not RECONCILED, reconciled_at NULL; reservation authorised (B3, 0023:292) | usage_state, actual_cents, reconciled_at: frozen once RECONCILED (B3); state (0006:159) | frozen (B3) | frozen (B3) | request_id, agency, reserved_cents, cost_grant_id (0006:100) | INSERT -> RESERVE, UPDATE OF usage_state -> RECONCILE (B3) |
 | 11 | model_tasks | current step (0023:710) | refused (0023:675) | refused (0023:675) | frozen (B11) | append-only | none |
 | 12 | audits | fence 0, cancel_version 0 (0023:439) | fence +1 with a step claimed at it now (B6); state: listed (0023:401) | frozen (B11) | frozen (B11) | audit_id, agency_id (0023:395) | none: immediate |
@@ -210,7 +210,7 @@ exact permitted transition. Queue = the deferred relation checks and what queues
 | 19 | qualifying_purchases | all 14 columns from facts (B8) | refused (0028:478) | refused (0028:478) | refused (0028:480) | insert-only | child of row 18; reservation reverse (B8) |
 | 20 | commercial_authorizations | ACTIVE (0015:634), capture required (0015:616) | CONSUMED only with its job ADMITTED now; DELIVERED only with READY + AVAILABLE now; every role (B10); job_ref, consumed_at, delivered_at once (0015:551) | frozen (B11) | frozen (B11) | ids (0015:549) | per authorization (0021:753, 0022:619) / per job (0021:730, 0022:594) |
 | 21 | price_eligibility_snapshots | projects bound (0014:417) | refused (0014:400) | refused (0014:400) | frozen (B11) | append-only | none |
-| 22 | execution_capacity | the migration seed (0021:294) is its only birth; INSERT refused after 0046 (B9) | active/waiting = recount (0021:410); last_admission_at = now, later, with an admission now (G11) | frozen (B9) | frozen (B9) | ledger_id CHECK = 1 (0021:287) | AFTER INSERT (new) and UPDATE (0021:410) / per job (0021:406-408) |
+| 22 | execution_capacity | the migration seed (0021:294) is its only birth; INSERT refused after 0051 (B9) | active/waiting = recount (0021:410); last_admission_at = now, later, with an admission now (G11) | frozen (B9) | frozen (B9) | ledger_id CHECK = 1 (0021:287) | AFTER INSERT (new) and UPDATE (0021:410) / per job (0021:406-408) |
 | 23 | agency_execution_capacity | live_jobs 0, last_admitted_at NULL (B9) | live_jobs = recount (0021:412); last_admitted_at = now, later, with an admission of this agency now (G12) | frozen (B9) | frozen (B9) | agency_id immutable (B9, new) | INSERT/UPDATE (0021:412) / per job (0021:406-408) |
 | 24 | package_versions | initial state (0022:223), workflow (0022:509) | state: listed; available_at once (0022:221); publication guard (0022:576) | frozen (B11) | frozen (B11) | ids (0022:219) | per job READY (0022:594) / per authorization (0022:619) |
 | 25 | founding_slots | the 0028 seed (0028:158) is its only birth; INSERT refused after it (B11, SDP-35) | held, live_reservation_id, live_agency_id: founding_slots_guard (0028:344), settled (0028:375); policy_version, slot_no: key, not updatable (0028:344) | refused (0028:345) | refused (0028:346) | PK (policy_version, slot_no) | reservation <-> slot (0028:321) |
@@ -240,7 +240,7 @@ first assign it and, in brackets, the trigger that enforces it on INSERT and on 
 each named trigger fires on that write and reads that column; whether the binding is sufficient is the design's claim and the
 tests' proof. Extractor limits (stated, Codex r12): views and wildcard reads are not followed; dynamic SQL is read through TG_ARGV
 and ->> literals only; functions are keyed by name in the single kauro schema. The residual holds only tables that feed neither
-money nor authority. Re-run when 0045-0052 land: a planned trigger missing from its migration then fails the check.
+money nor authority. Re-run when 0050-0057 land: a planned trigger missing from its migration then fails the check.
 
 - `agencies` (row 1; feeds authority) birth: [agencies_owner_count_guard]; imm: `agency_id` `created_by_user_id`; bound: `active_owner_count` [agencies_owner_count_guard] B5a recount; `state` [agencies_transition] listed edge by an owner (0002:91, :126).
 - `agency_execution_capacity` (row 23; feeds authority) birth: [agency_execution_capacity_ledgers]; bound: `agency_id` [agency_execution_capacity_guard] immutable (B9); `last_admitted_at` [agency_execution_capacity_guard] G12/B9 (born NULL); `live_jobs` [agency_execution_capacity_ledgers] recount (0021:412), born 0 (B9); `updated_at` [agency_execution_capacity_guard] now().
@@ -294,28 +294,28 @@ Residual B-LIFETIME-2 (feeds none): `domain_events` event evidence of versions (
 
 ### 3c Planned enforcing triggers (the check requires each in its migration once that file exists)
 
-- planned `commercial_authorizations_first_assignment` BEFORE INSERT OR UPDATE ON `commercial_authorizations` in 0046 (columns: `job_ref` `consumed_at` `delivered_at`) B10/B12, SDP-36
-- planned `execution_capacity_birth` BEFORE INSERT ON `execution_capacity` in 0046 (columns: `*`) B9: the seed is its only birth
-- planned `leases_birth` BEFORE INSERT ON `leases` in 0047 (columns: `fence` `cancel_version` `heartbeat_at` `expires_at` `created_at` `updated_at` `deadline_at`) B2: deadline_at within its subject's deadline
-- planned `capture_facts_first_assignment` BEFORE INSERT OR UPDATE ON `capture_facts` in 0049 (columns: `provider_completed_at`) B12
-- planned `payment_orders_allocation_birth` BEFORE INSERT ON `payment_orders` in 0049 (columns: `allocated_cents`) B4
-- planned `founding_slot_reservations_first_assignment` BEFORE INSERT OR UPDATE ON `founding_slot_reservations` in 0051 (columns: `consumed_at` `consumed_by_authorization_id`) B8/B12
-- planned `price_eligibility_snapshots_birth` AFTER INSERT ON `price_eligibility_snapshots` in 0051 (columns: `agency_id` `quote_id` `project_id` `founding_slot_ref` `founding_discount_bps` `policy_version` `qualifying_project_ids` `qualifying_count` `as_of` `lookback_starts_at`) B13, SDP-37
-- planned `target_contracts_lifetime` BEFORE INSERT OR UPDATE ON `target_contracts` in 0052 (columns: `confirmed_at` `superseded_at`) B14, SDP-38
-- planned `state_machines_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_machines` in 0052 (columns: `*`) B11
-- planned `state_transitions_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_transitions` in 0052 (columns: `*`) B11
-- planned `founding_slots_birth` BEFORE INSERT ON `founding_slots` in 0052 (columns: `*`) B11, SDP-35
-- planned `quotes_issuance_clock` BEFORE INSERT ON `quotes` in 0051 (columns: `issued_at` `expires_at` `price_policy_version` `replaces_quote_id`) B15, SDP-39
-- planned `founding_slot_reservations_eligibility` BEFORE INSERT ON `founding_slot_reservations` in 0051 (columns: `agency_id` `quote_id` `policy_version` `slot_no`) B13 (iii), SDP-40
-- planned `agency_execution_capacity_guard` BEFORE INSERT OR UPDATE ON `agency_execution_capacity` in 0046 (columns: `agency_id` `last_admitted_at` `live_jobs` `updated_at`) B9: redefined, also at birth
-- planned `execution_capacity_last_admission_guard` BEFORE UPDATE ON `execution_capacity` in 0046 (columns: `last_admission_at` `ledger_id` `updated_at`) B9/G11: redefined
-- planned `request_journal_guard` BEFORE INSERT OR UPDATE ON `request_journal` in 0048 (columns: `usage_state` `actual_cents` `reconciled_at` `state` `response_artifact_hash`) B3: redefined, usage frozen once RECONCILED
-- planned `agency_recurrence_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `agency_recurrence` in 0050 (columns: `*`) B5b: redefined, every column
-- planned `qualifying_purchases_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `qualifying_purchases` in 0051 (columns: `*`) B8: redefined, every column at birth, no update
+- planned `commercial_authorizations_first_assignment` BEFORE INSERT OR UPDATE ON `commercial_authorizations` in 0051 (columns: `job_ref` `consumed_at` `delivered_at`) B10/B12, SDP-36
+- planned `execution_capacity_birth` BEFORE INSERT ON `execution_capacity` in 0051 (columns: `*`) B9: the seed is its only birth
+- planned `leases_birth` BEFORE INSERT ON `leases` in 0052 (columns: `fence` `cancel_version` `heartbeat_at` `expires_at` `created_at` `updated_at` `deadline_at`) B2: deadline_at within its subject's deadline
+- planned `capture_facts_first_assignment` BEFORE INSERT OR UPDATE ON `capture_facts` in 0054 (columns: `provider_completed_at`) B12
+- planned `payment_orders_allocation_birth` BEFORE INSERT ON `payment_orders` in 0054 (columns: `allocated_cents`) B4
+- planned `founding_slot_reservations_first_assignment` BEFORE INSERT OR UPDATE ON `founding_slot_reservations` in 0056 (columns: `consumed_at` `consumed_by_authorization_id`) B8/B12
+- planned `price_eligibility_snapshots_birth` AFTER INSERT ON `price_eligibility_snapshots` in 0056 (columns: `agency_id` `quote_id` `project_id` `founding_slot_ref` `founding_discount_bps` `policy_version` `qualifying_project_ids` `qualifying_count` `as_of` `lookback_starts_at`) B13, SDP-37
+- planned `target_contracts_lifetime` BEFORE INSERT OR UPDATE ON `target_contracts` in 0057 (columns: `confirmed_at` `superseded_at`) B14, SDP-38
+- planned `state_machines_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_machines` in 0057 (columns: `*`) B11
+- planned `state_transitions_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_transitions` in 0057 (columns: `*`) B11
+- planned `founding_slots_birth` BEFORE INSERT ON `founding_slots` in 0057 (columns: `*`) B11, SDP-35
+- planned `quotes_issuance_clock` BEFORE INSERT ON `quotes` in 0056 (columns: `issued_at` `expires_at` `price_policy_version` `replaces_quote_id`) B15, SDP-39
+- planned `founding_slot_reservations_eligibility` BEFORE INSERT ON `founding_slot_reservations` in 0056 (columns: `agency_id` `quote_id` `policy_version` `slot_no`) B13 (iii), SDP-40
+- planned `agency_execution_capacity_guard` BEFORE INSERT OR UPDATE ON `agency_execution_capacity` in 0051 (columns: `agency_id` `last_admitted_at` `live_jobs` `updated_at`) B9: redefined, also at birth
+- planned `execution_capacity_last_admission_guard` BEFORE UPDATE ON `execution_capacity` in 0051 (columns: `last_admission_at` `ledger_id` `updated_at`) B9/G11: redefined
+- planned `request_journal_guard` BEFORE INSERT OR UPDATE ON `request_journal` in 0053 (columns: `usage_state` `actual_cents` `reconciled_at` `state` `response_artifact_hash`) B3: redefined, usage frozen once RECONCILED
+- planned `agency_recurrence_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `agency_recurrence` in 0055 (columns: `*`) B5b: redefined, every column
+- planned `qualifying_purchases_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `qualifying_purchases` in 0056 (columns: `*`) B8: redefined, every column at birth, no update
 
 ## A. Hardening (defence in depth; P2 lists what is NOT hardening)
 
-A1 `0045_runtime_hardening.sql` (migrator): `REVOKE TEMPORARY, CREATE ON DATABASE <current> FROM PUBLIC` and the seven groups;
+A1 `0050_runtime_hardening.sql` (migrator): `REVOKE TEMPORARY, CREATE ON DATABASE <current> FROM PUBLIC` and the seven groups;
 `REVOKE CREATE ON SCHEMA public FROM PUBLIC`; `REVOKE EXECUTE ... FROM PUBLIC` on every kauro trigger function; revokes
 `pg_parameter_acl` grants to PUBLIC or runtime groups where it holds the grant option (SDP-19: database ownership is not enough, the
 RDS master is not assumed superuser). It fails if TEMPORARY or CREATE on the database remains for a runtime group, and on the P2
@@ -339,11 +339,11 @@ Common: each replaced guard is a copy of its 0001-0044 body with only the cited 
 (transaction clock, D-CLOCK-1). Safe-integer CHECK `<= 9007199254740991` (ADD NOT VALID; VALIDATE) on processing_jobs.fence,
 .attempt_count; processing_attempts.fence, .ordinal; leases.fence, .cancel_version; audits.fence; audit_steps.fence;
 cost_grants.ledger_seq; cost_grant_ledger_events.seq.
-B1 processing_jobs (G3), `0046_job_fence_provenance.sql`, 0021:465-468 replaced: attempt_count/current_attempt_id change needs
+B1 processing_jobs (G3), `0051_job_fence_provenance.sql`, 0021:465-468 replaced: attempt_count/current_attempt_id change needs
 `NEW.attempt_count = OLD.attempt_count + 1` and an attempt (agency, job, `attempt_id = NEW.current_attempt_id`, `ordinal =
 NEW.attempt_count`, created_at = now); fence change needs `NEW.current_attempt_id = OLD.current_attempt_id`, `NEW.fence > OLD.fence`,
 that attempt CLAIMED at `fence = NEW.fence` with claimed_at = now, and `attempt_owns_lease`. jobRecord stays fail-closed.
-B2 leases (G13), `0047_lease_server_clock.sql`: deadline_at at birth (CLOCK sweep) is at most its subject's deadline: JOB_ATTEMPT
+B2 leases (G13), `0052_lease_server_clock.sql`: deadline_at at birth (CLOCK sweep) is at most its subject's deadline: JOB_ATTEMPT
 <= the job's execution_deadline_at, else its delivery_deadline_at; MODEL_TASK <= the model task's interpretation_deadline_at; the
 kinds that spend nothing keep the caller's deadline. cancel_version (SDP-32): a change is exactly +1 in an UPDATE that changes no owner,
 fence, expiry, heartbeat or checkpoint (cancel_lease's shape, 0006:331), and for JOB_ATTEMPT only while its job (resource_id) has
@@ -355,7 +355,7 @@ OLD.expires_at`; `OLD.checkpoint_hash IS NOT NULL => NEW.checkpoint_hash IS NOT 
 one may stay NULL or be stored; SDP-25). Takeover: `OLD.expires_at <= now`, fence + 1, checkpoint rules 0006:216-224. claim_lease
 and heartbeat_lease compute `expires_at = GREATEST(OLD.expires_at, LEAST(now + ttl, deadline_at))`, so a shorter TTL renews without
 refusal. All `p_now` overloads dropped (callers src/lease-store.ts:75/91/96, src/audit/store.ts:488, src/execution/store.ts:456/620).
-B3 grant ledger (G4), `0048_grant_ledger_events.sql`:
+B3 grant ledger (G4), `0053_grant_ledger_events.sql`:
 - `kauro.cost_grant_ledger_events (source_kind HOLD|RELEASE|RESERVE|RECONCILE|OPENING, source_id, grant_id, agency_id, seq,
   reserved_delta, spend_delta, recorded_at)`, PK (source_kind, source_id), UNIQUE (grant_id, seq); UPDATE/DELETE/TRUNCATE refused
   by trigger, no UPDATE/DELETE grant. RLS mirrors the writers (kauro_app HOLD of its agency; kauro_control the rest); SELECT both.
@@ -394,7 +394,7 @@ B3 grant ledger (G4), `0048_grant_ledger_events.sql`:
 - Event INSERT guard (event -> source, immediate): HOLD = carve of this pool AUTHORIZED with authorized_at = now, +ceiling;
   RELEASE = that carve CLOSED with closed_at = now, -ceiling, +its reconciled_spend_cents; RESERVE = request row with request_id =
   source_id and cost_grant_id = grant, +reserved_cents (once per request by PK; reserved_at is caller data and is not used);
-  RECONCILE = that request RECONCILED with reconciled_at = now, -reserved_cents, +actual_cents; OPENING refused after 0048.
+  RECONCILE = that request RECONCILED with reconciled_at = now, -reserved_cents, +actual_cents; OPENING refused after 0053.
   `seq = grant.ledger_seq + 1` read under the grant row lock; recorded_at := now.
 - Grant guard (immediate; 0023:155-160 replaced, `is_control_session()` not consulted for money): any change of reserved_cents,
   reconciled_spend_cents or ledger_seq needs `NEW.ledger_seq = OLD.ledger_seq + 1` and the event (grant, NEW.ledger_seq) with deltas
@@ -405,29 +405,29 @@ B3 grant ledger (G4), `0048_grant_ledger_events.sql`:
   reserved_cents = sum(reserved_delta), reconciled_spend_cents = sum(spend_delta): an unconsumed or orphan event fails its own
   transaction and never blocks the next writer; (ii) per inserted request its RESERVE event, per request entering RECONCILED its
   RECONCILE event, per carve entering AUTHORIZED/CLOSED its HOLD/RELEASE event.
-- Data step in 0048 before the guards exist: each existing grant with money gets one OPENING event (seq 1, current values) and
+- Data step in 0053 before the guards exist: each existing grant with money gets one OPENING event (seq 1, current values) and
   ledger_seq = 1; each existing RECONCILED request gets reconciled_at = updated_at.
-B4 allocation (G2), `0049_allocation_recount.sql`: an order is born with `allocated_cents = 0` (BEFORE INSERT, KP002; SDP-30);
+B4 allocation (G2), `0054_allocation_recount.sql`: an order is born with `allocated_cents = 0` (BEFORE INSERT, KP002; SDP-30);
 capture_facts_allocate (0015:437) computes still owed as `expected_amount_cents -
 coalesce(sum(allocated_service + allocated_tax) of the order's other COMPLETED/REVERSED captures, 0)`, not `o.allocated_cents`;
 immediate monotone kept; DEFERRABLE INITIALLY DEFERRED triggers queued per order (AFTER INSERT OR UPDATE OF allocated_cents ON
 payment_orders) and per capture (AFTER INSERT OR UPDATE OF status ON capture_facts) re-select the order and require the same sum
 over all its COMPLETED/REVERSED captures (0 for none), KP002. Read-only.
-B5a owner count (G1), `0050_owner_recurrence_recount.sql`: `maintain_active_owner_count` (0002:329-355) on delta <> 0: `SELECT state
+B5a owner count (G1), `0055_owner_recurrence_recount.sql`: `maintain_active_owner_count` (0002:329-355) on delta <> 0: `SELECT state
 FROM agencies WHERE agency_id = target FOR UPDATE` (lock order membership row -> agency row, as today), then KA001 when delta < 0,
 state NOT IN (CLOSING, CLOSED) and NOT EXISTS an ACTIVE OWNER membership of target (a fresh statement snapshot after the lock sees a
 removal committed while waiting; under REPEATABLE READ the counter UPDATE below raises 40001), then the counter UPDATE. The counter
 decides nothing; deferred recount = ACTIVE OWNER memberships (KA004), queued per agency (AFTER INSERT OR UPDATE OF
 active_owner_count) and per membership (AFTER INSERT, DELETE or UPDATE OF role, state). 0002:219: `a.active_owner_count = 0` becomes NOT EXISTS an
 ACTIVE OWNER membership. CLOSING never returns to ACTIVE (0002:154-160), so a transient closing cannot be restored.
-B5b recurrence (G9), in `0050`: immediate (0028:447-460 without depth): INSERT count = 1, first_confirmed_at = last_confirmed_at =
+B5b recurrence (G9), in `0055`: immediate (0028:447-460 without depth): INSERT count = 1, first_confirmed_at = last_confirmed_at =
 created_at = updated_at = now; UPDATE count = OLD + 1, first_* and created_at fixed, last_confirmed_at = updated_at = now and >= OLD
 (an older transaction designating after a newer one is refused KC001 and retried, unchanged 0028:458, SEC-110). Deferred (KC001), queued per
 recurrence row (AFTER INSERT OR UPDATE) and per purchase (AFTER INSERT): count = number of the agency's purchases = max(confirmation_seq); first_* = the seq-1 purchase (FK 0028:438); last_confirmed_at =
 max(confirmed_at) of the purchases.
-B6 audit fence (G6), in `0046`: copy of `audits_workflow` (0023:409-525) with 0023:453-455 replaced: fence change needs
+B6 audit fence (G6), in `0051`: copy of `audits_workflow` (0023:409-525) with 0023:453-455 replaced: fence change needs
 `NEW.fence = OLD.fence + 1` and an audit_steps row of this audit with fence = NEW.fence and claimed_at = now.
-B7 commercial history (G7), `0051_commercial_facts.sql`: `kauro.commercial_machines (machine PK, table_name, id_column,
+B7 commercial history (G7), `0056_commercial_facts.sql`: `kauro.commercial_machines (machine PK, table_name, id_column,
 state_column, history_scope TENANT|CORPORATE)`, migrator-written, seeded with exactly:
 
 | machine | table | id | scope | birth stamp |
@@ -448,31 +448,31 @@ of the subject and from_state = to_state of the greatest one (NULL only for vers
 to_state` (the writers never record an unchanged state, F9); version > 1 => subject.updated_at = now() (touch stamp; births are
 covered by the PK and version = 1 since 7 of 11 birth stamps are caller data); `recorded_at := now`, `actor_user_id :=
 kauro.current_user_id()` (normalised, as both writers set them). R17 asserts the 11 attachments' tgargs equal the registry.
-B8 founding consumption (G8) and purchases (G10), in `0051`: G8 adds `consumed_at = now` and the purchase's confirmed_at = now.
+B8 founding consumption (G8) and purchases (G10), in `0056`: G8 adds `consumed_at = now` and the purchase's confirmed_at = now.
 G10 binds every column: authorization_id, agency_id, project_id, quote_id, order_id, capture_id = the commercial_authorizations row
 (rebinding_id NULL, created_at = now); confirmation_seq = recurrence count after the upsert; confirmed_at = created_at = now;
 provider_completed_at, allocated_service_cents = its capture; order_created_at = its order; founding basis: NONE iff the snapshot's
 founding_discount_bps = 0; RESERVED_SLOT iff a RESERVED/RECONCILIATION_HOLD reservation of (agency, quote, founding_slot_ref) exists,
 founding_reservation_id = it; UNBACKED otherwise. Deferred reverse (KC001): a RESERVED_SLOT purchase's reservation is CONSUMED with
 consumed_by_authorization_id = the purchase's authorization.
-B9 admission instants (G11, G12), in `0046`: copies of 0044:64-81 and 0044:88-103 with only the `pg_trigger_depth() < 2 OR` removed;
+B9 admission instants (G11, G12), in `0051`: copies of 0044:64-81 and 0044:88-103 with only the `pg_trigger_depth() < 2 OR` removed;
 the agency guard also fires BEFORE INSERT and requires `last_admitted_at IS NULL` at birth (the upsert 0021:318 births NULL and the
 admission then UPDATEs it; SDP-30). Lifetime (SDP-31): both ledgers frozen against DELETE/TRUNCATE; agency_execution_capacity is born
-with live_jobs = 0 and its agency_id is immutable; execution_capacity refuses INSERT after 0046 (its seed is its only birth; a
+with live_jobs = 0 and its agency_id is immutable; execution_capacity refuses INSERT after 0051 (its seed is its only birth; a
 replacement birth is not supported) and its recount is also queued AFTER INSERT. live_jobs is recounted per ledger row and per job
 (0021:406-413).
-B11 lifetime freeze (rule 22), `0052_lifetime_freeze.sql`: generated from section 3: every "frozen (B11)" cell gets BEFORE DELETE
+B11 lifetime freeze (rule 22), `0057_lifetime_freeze.sql`: generated from section 3: every "frozen (B11)" cell gets BEFORE DELETE
 FOR EACH ROW and BEFORE TRUNCATE FOR EACH STATEMENT executing kauro.forbid_change; the three config tables (row 15) also refuse
 INSERT and UPDATE; founding_slots (row 25) refuses INSERT (its 0028 seed is its only birth; a test that needs a synthetic cohort
 seeds it as the oracle under ALTER TABLE ... DISABLE TRIGGER, the TCB path of P2, as a migration would).
 B12 first assignment (SDP-34), in the workflow copies of the owning lanes (processing_jobs, processing_attempts, audits,
-audit_steps, package_versions in `0046`; cost_grants, capture_facts in `0048`/`0049`): for every learned-once column of 3b, `NEW.c IS
+audit_steps, package_versions in `0051`; cost_grants, capture_facts in `0053`/`0054`): for every learned-once column of 3b, `NEW.c IS
 DISTINCT FROM OLD.c` is refused (KA004) unless this UPDATE is the operation its "first:" cell names; on that operation an instant
 is assigned by the workflow (`:= now` or the stated expression, a caller value is overwritten) and an id, hash or code must satisfy
 the cell's fact. Tables whose workflow does not fire on INSERT and every UPDATE get a dedicated `<table>_first_assignment` trigger
-(3c): commercial_authorizations (0046; r12 wrongly called these bound by B10, whose triggers fire only on the state edge, SDP-36),
-founding_slot_reservations (0051), capture_facts (0049).
-B13 eligibility snapshot birth (SDP-37), `price_eligibility_snapshots_birth`, DEFERRABLE INITIALLY DEFERRED AFTER INSERT in `0051`:
+(3c): commercial_authorizations (0051; r12 wrongly called these bound by B10, whose triggers fire only on the state edge, SDP-36),
+founding_slot_reservations (0056), capture_facts (0054).
+B13 eligibility snapshot birth (SDP-37), `price_eligibility_snapshots_birth`, DEFERRABLE INITIALLY DEFERRED AFTER INSERT in `0056`:
 (i) founding_discount_bps > 0 needs a founding_slot_reservations row with reservation_id = founding_slot_ref, the snapshot's agency,
 quote and policy_version, inserted in this transaction (its created_at = now) and RESERVED at COMMIT on a seeded slot whose
 live_reservation_id names it (with founding_slot_reservations_snapshot_binding, the two directions are checked); (ii) every
@@ -480,10 +480,10 @@ qualifying project id is the project of one of the agency's qualifying_purchases
 capture is not REVERSED and whose service is not fully refunded (the exclusion predicate is copied from the B10 eligibility read in
 src/repositories/commercial-recurrence.ts by the L3 designer, verify-before-spend), and qualifying_count = cardinality (CHECK
 0014:388): omitting a project only lowers the rate, so a subset check is the money bound. Historical data: the check binds births
-from 0051 on; 0051 reports (NOTICE) the count of existing founding snapshots without a reservation and does not rewrite them;
+from 0056 on; 0056 reports (NOTICE) the count of existing founding snapshots without a reservation and does not rewrite them;
 production holds none (pre-launch, no AWS data, A9). UNBACKED stays a valid designation basis only for a reservation RELEASED
 before capture (B8).
-B13 (iii) founding absence (SDP-40), `founding_slot_reservations_eligibility` BEFORE INSERT (0051) and inside
+B13 (iii) founding absence (SDP-40), `founding_slot_reservations_eligibility` BEFORE INSERT (0056) and inside
 price_eligibility_snapshots_birth for founding_discount_bps > 0: `pg_advisory_xact_lock_shared(kauro.transition_key(
 'kauro.agency_recurrence', agency))` (the shared half CreateQuote already holds, D10-REC-2), then refuse (KC001) when the agency has an
 agency_recurrence row, any qualifying_purchases row, or any other founding_slot_reservations row (a prior founding designation is a
@@ -491,15 +491,15 @@ CONSUMED one; a live one is a second founding offer). B13 branch R (replacement,
 replaces_quote_id, the snapshot's qualifying set, count, repeat, founding ref and rate, applied rate and policy equal the replaced
 quote's snapshot (itself bound at its own birth), the replaced quote is the one the re-binding names (B09 binding stands), and (i),
 (ii), (iii) do not apply; as_of/lookback still follow B15.
-B15 issuance clock (SDP-39), `quotes_issuance_clock` BEFORE INSERT on quotes (0051): issued_at = server_now() and expires_at =
+B15 issuance clock (SDP-39), `quotes_issuance_clock` BEFORE INSERT on quotes (0056): issued_at = server_now() and expires_at =
 issued_at + price_policies.quote_seconds of its policy (KA004 otherwise; CreateQuote and the replacement already take issuedAt from
 serverNow() in the writing unit, packages/application/src/commercial/quotes/create-quote.ts:138); price_eligibility_snapshots_birth: as_of = server_now() and lookback_starts_at
 = as_of - repeat_lookback_seconds of its policy. Fixtures that back-date quotes move the test clock (src/testing/server-now.ts),
 not the column (D-FIX-2).
-B14 target contract lifetime (SDP-38), `target_contracts_lifetime` BEFORE INSERT OR UPDATE in `0052`: confirmed_at and superseded_at
+B14 target contract lifetime (SDP-38), `target_contracts_lifetime` BEFORE INSERT OR UPDATE in `0057`: confirmed_at and superseded_at
 are NULL or := now at birth; each moves only NULL->now, once; superseded_at only once confirmed_at is set; neither is ever cleared
 or moved (KA004). The transition lock (0003:262) stays. R17 asserts, from pg_trigger, that every table of section 3 refuses DELETE and TRUNCATE.
-B10 authorization bounds (G14), in `0046`: copies of 0021:736-752 and 0022:602-618 without the `rolsuper` block (0021:740-742,
+B10 authorization bounds (G14), in `0051`: copies of 0021:736-752 and 0022:602-618 without the `rolsuper` block (0021:740-742,
 0022:606-608). The fact checks themselves are unchanged and now bind every role, the oracle included.
 
 ## C. Failure matrix. S = `packages/persistence/test/sec-depth-provenance.test.ts`, M = `.../sec-depth-money.test.ts`,
@@ -518,8 +518,8 @@ race proof (rule 1).
 
 | Row | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| R1 hardening A | N/A | N/A | N/A | GAP SEC-03 R :: "DENY SEC-DEPTH (release): 0045 records no ledger row when its revokes leave TEMPORARY to a runtime group" | N/A | N/A | GAP SEC-18 R :: "DENY SEC-DEPTH: a pooled runtime login cannot create a temporary table or a pg_temp function (42501)"; SEC-05 R :: "DENY SEC-DEPTH: the pool refuses a login with TEMPORARY, schema CREATE or a non-origin session_replication_role" | N/A |
-| R2 P2 boundary | N/A | N/A | N/A | GAP SEC-112 R :: "DENY SEC-DEPTH (release): 0045 fails when a runtime group, login or PUBLIC holds SET on session_replication_role, owns a kauro object or can execute a definer in kauro, kauro_meta or public" | N/A | N/A | GAP SEC-59 R :: "DENY SEC-DEPTH: a runtime login cannot SET LOCAL session_replication_role = replica (42501)" | N/A |
+| R1 hardening A | N/A | N/A | N/A | GAP SEC-03 R :: "DENY SEC-DEPTH (release): 0050 records no ledger row when its revokes leave TEMPORARY to a runtime group" | N/A | N/A | GAP SEC-18 R :: "DENY SEC-DEPTH: a pooled runtime login cannot create a temporary table or a pg_temp function (42501)"; SEC-05 R :: "DENY SEC-DEPTH: the pool refuses a login with TEMPORARY, schema CREATE or a non-origin session_replication_role" | N/A |
+| R2 P2 boundary | N/A | N/A | N/A | GAP SEC-112 R :: "DENY SEC-DEPTH (release): 0050 fails when a runtime group, login or PUBLIC holds SET on session_replication_role, owns a kauro object or can execute a definer in kauro, kauro_meta or public" | N/A | N/A | GAP SEC-59 R :: "DENY SEC-DEPTH: a runtime login cannot SET LOCAL session_replication_role = replica (42501)" | N/A |
 | R7 attempt -> attempt_count (0021:684) | GAP SEC-23 S :: "RACE SEC-DEPTH: two attempts for ordinal n+1, both orders held at the job's FOR SHARE, leave attempt_count = n+1 naming the committed attempt" | N/A guard | N/A no deadline read | N/A guard | N/A guard | GAP SEC-24 S :: "DENY SEC-DEPTH (superuser nested attempt_count): a superuser-owned nested attempt_count of n+1 with no attempt of that ordinal born now is refused KA080" | GAP SEC-25 S :: "DENY SEC-DEPTH (superuser nested current_attempt_id): a superuser-owned nested current_attempt_id naming another job's or an older attempt is refused KA080" | N/A guard |
 | R8 claim -> job fence (0021:686) | GAP SEC-26 S :: "RACE SEC-DEPTH (takeover): two claimants of an expired JOB_ATTEMPT lease, both orders held at the lease row, one fence wins and the job's fence is the winner's" | N/A guard | GAP SEC-27 S :: "EXPIRY SEC-DEPTH: a takeover claim at server_now = expires_at - 1 ms is HELD, at expires_at it advances the fence"; SEC-27b S :: "OK SEC-DEPTH: the initial claim of an absent lease is fence 1 and no takeover" | N/A guard | N/A guard | GAP SEC-28 S :: "DENY SEC-DEPTH (superuser nested fence max): a superuser-owned nested fence = 9223372036854775807 on an ACTIVE job is refused KA080 and jobRecord still reads the job"; SEC-28b S :: "DENY SEC-DEPTH (superuser nested fence in range): a superuser-owned nested fence = OLD + 1 with no attempt claimed at it now is refused KA080" | N/A: claim and bookkeeping share one transaction holding the lease row lock (0006:253); SEC-26 proves the wait | N/A guard |
 | R9 lease INSERT/DELETE | N/A single statement | N/A | N/A | N/A | N/A | N/A | GAP SEC-29 S :: "DENY SEC-DEPTH (lease delete): kauro_control cannot DELETE a lease"; SEC-30 S :: "DENY SEC-DEPTH (lease birth): an INSERT above fence 1 is refused and caller heartbeat/created instants are replaced by server_now" | N/A (DENY SEC-29/30) |
@@ -588,7 +588,7 @@ SEC-27b; SEC-140/141 -> "OK SEC-DEPTH
 the admission instants"; SEC-127 -> the same; SEC-128/129 -> "OK SEC-DEPTH (lease cancel): cancel_command then
 mirrorCancellation advances the JOB_ATTEMPT lease's cancel_version by one"; SEC-130 -> "OK SEC-DEPTH (config): a fresh migration
 run seeds every machine and registry row"; SEC-132 -> SEC-120; SEC-Lnn -> none (F14); SEC-05/18/59/112 -> "OK SEC-DEPTH: the pool admits a
-clean runtime login and 0045 passes on a clean cluster".
+clean runtime login and 0050 passes on a clean cluster".
 
 ## D. Accepted packages touched (A6: re-verify only these titles)
 
@@ -629,12 +629,12 @@ D1 G14 fixture moves (SDP-23; the kit helpers drive only production writers, nev
 |---|---|---|---|---|
 | K kit | src/testing/depth-probe.ts (`nestedAsSuperuser`, `slowCheckHook`), src/testing/execution-delivery.ts (`consumeThroughExecution`, `deliverThroughExecution`), src/testing/index.ts | - | 45 min, 90k | claude-sonnet-5-5 |
 | L0 fixtures | b09-critique.test.ts, apps/api/test/b09-scenarios.test.ts, apps/api/test/commission-support.ts | D1 | 40 min, 100k | claude-sonnet-5-5 |
-| L1 hardening | migrations/0045, src/pool.ts, R, admission-instants, aggregate-kinds, fault-harness tests | R1, R2, R17 | 70 min, 160k | claude-sonnet-5-5 |
-| L2a jobs+leases+audit+admission+bounds | migrations/0046, 0047, src/lease-store.ts, src/execution/store.ts, src/audit/store.ts (:488 only), S, journals-leases, adapters-leases, execution-adapters, execution-migrations, audit-adapters tests | R7-R11, R10b, R18, R22, R23, R26 (SEC-116/117), R28 (SEC-125..129), B12 jobs/attempts/audits/steps/packages, SEC-133/134, SEC-136/137 | 235 min, 530k | Opus |
-| L2b money | migrations/0048, 0049, src/audit/store.ts (:582-600), src/audit/store.ts (:194-198), src/audit/discovery.ts (:161-184), src/request-journal.ts (:78-105), M, audit-migrations, grant-reconciliation, adapters-journals-outbox tests | R12-R14, R12b-e, R26 (SEC-114/115/118/119), B12 grants/captures | 225 min, 530k | Opus |
-| L3 commercial | migrations/0050, 0051, H | R15, R16, R19-R21, R31, B13 (i-iii, R), B15, founding first assignment | 220 min, 500k | Opus |
+| L1 hardening | migrations/0050, src/pool.ts, R, admission-instants, aggregate-kinds, fault-harness tests | R1, R2, R17 | 70 min, 160k | claude-sonnet-5-5 |
+| L2a jobs+leases+audit+admission+bounds | migrations/0051, 0052, src/lease-store.ts, src/execution/store.ts, src/audit/store.ts (:488 only), S, journals-leases, adapters-leases, execution-adapters, execution-migrations, audit-adapters tests | R7-R11, R10b, R18, R22, R23, R26 (SEC-116/117), R28 (SEC-125..129), B12 jobs/attempts/audits/steps/packages, SEC-133/134, SEC-136/137 | 235 min, 530k | Opus |
+| L2b money | migrations/0053, 0054, src/audit/store.ts (:582-600), src/audit/store.ts (:194-198), src/audit/discovery.ts (:161-184), src/request-journal.ts (:78-105), M, audit-migrations, grant-reconciliation, adapters-journals-outbox tests | R12-R14, R12b-e, R26 (SEC-114/115/118/119), B12 grants/captures | 225 min, 530k | Opus |
+| L3 commercial | migrations/0055, 0056, H | R15, R16, R19-R21, R31, B13 (i-iii, R), B15, founding first assignment | 220 min, 500k | Opus |
 | L0b quote fixtures (D-FIX-1, D-FIX-2) | src/testing/commerce-purchases.ts (:205-264), test/commerce-support.ts (:400-432), harness cohort seed | SEC-138/142 siblings | 80 min, 180k | claude-sonnet-5-5 |
-| L4 lifetime | migrations/0052, T, b10-recurrence-adapters.test.ts (:592-595 only) | R27, R29 (SEC-Fnn, SEC-135), SEC-130, SEC-140/141 (B14) | 180 min, 380k | claude-sonnet-5-5 |
+| L4 lifetime | migrations/0057, T, b10-recurrence-adapters.test.ts (:592-595 only) | R27, R29 (SEC-Fnn, SEC-135), SEC-130, SEC-140/141 (B14) | 180 min, 380k | claude-sonnet-5-5 |
 
 src/audit/store.ts is split by line ranges (L2a :488, L2b :582-600): L2a lands first, L2b rebases. Order K -> L0 -> (L1 || L2a ||
 L2b) -> L3 -> L4; L2a needs L0 merged (B10 removes the skip the old fixtures used). Done = every GAP rewritten to C with its title; C1
@@ -673,7 +673,7 @@ are done in this commit.
 
 No design here; B14 designs and Codex-reviews it. Since r8 no database guard depends on which login writes (P1), so B14-R1..R3
 protect credentials and least privilege; the P2 boundary (runtime roles outside the TCB) is a correctness assumption B14 must keep.
-Database facts B14 can rely on: A1 hardening, the P2 failure conditions of 0045 and the A2 pool checks.
+Database facts B14 can rely on: A1 hardening, the P2 failure conditions of 0050 and the A2 pool checks.
 - B14-R1 Runtime credentials (pool and Data API) exist only for a login of this RUNTIME LOGIN shape for the intended group G (one
   of the seven): LOGIN, INHERIT, NOSUPERUSER, NOCREATEROLE, NOCREATEDB, NOBYPASSRLS, NOREPLICATION; exactly one pg_auth_members row
   with member = login, namely (roleid = G, admin_option FALSE, inherit_option TRUE, set_option TRUE); rows with roleid = login only
