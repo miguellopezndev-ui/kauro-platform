@@ -57,12 +57,12 @@ async function open(client: PoolClient, context: { readonly agencyId: string; re
 
 /** A writer under the tenant context of the agency's owner, on the request-handler role (as the owning package would write). */
 export async function tenantWriter(w: World, agency: AgencyFixture): Promise<HeldTransaction> {
-  return open(await w.h.appPool.raw.connect(), { agencyId: agency.agencyId, userId: agency.ownerUserId });
+  return open(await w.h.appPool.connectUnverified(), { agencyId: agency.agencyId, userId: agency.ownerUserId });
 }
 
 /** A writer on the control-plane role (capabilities are platform-wide rows the control plane owns). */
 export async function controlWriter(w: World): Promise<HeldTransaction> {
-  return open(await w.h.controlPool.raw.connect(), null);
+  return open(await w.h.controlPool.connectUnverified(), null);
 }
 
 /**
@@ -70,7 +70,7 @@ export async function controlWriter(w: World): Promise<HeldTransaction> {
  * sealed revision (the request-handler role cannot enter EXPIRED, D-ROLE-2).
  */
 export async function retentionSweeper(w: World, agency: AgencyFixture): Promise<HeldTransaction> {
-  return open(await w.h.controlPool.raw.connect(), { agencyId: agency.agencyId, userId: null });
+  return open(await w.h.controlPool.connectUnverified(), { agencyId: agency.agencyId, userId: null });
 }
 
 /**
@@ -78,7 +78,7 @@ export async function retentionSweeper(w: World, agency: AgencyFixture): Promise
  * consumers and sweepers write, held open for as long as a RACE test needs (e.g. UPLOAD_INSPECTION holding the revision row).
  */
 export async function boundControlWriter(w: World, agency: AgencyFixture): Promise<HeldTransaction> {
-  return open(await w.h.controlPool.raw.connect(), { agencyId: agency.agencyId, userId: null });
+  return open(await w.h.controlPool.connectUnverified(), { agencyId: agency.agencyId, userId: null });
 }
 
 /** Waits until the writer's connection is blocked on a lock while running a statement containing `fragment`; throws otherwise. */

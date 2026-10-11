@@ -31,5 +31,5 @@ export async function runMigrationJob(env: Readonly<Record<string, string | unde
       : inEnvironment === undefined || inEnvironment === ""
         ? undefined
         : inEnvironment;
-  return { config, result: await applyMigrationsWith(config.migrator, password) };
+  return { config, result: await applyMigrationsWith(config.databaseEnvironment, config.migrator, password) };
 }

@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { createServer, type Server, type Socket } from "node:net";
 import { test } from "node:test";
 import { MIGRATION_RUNNER_LOCK, applyMigrationsAs, listMigrations, type ApplyResult } from "../src/index.js";
-import { ROLES, startTemporaryPostgres, waitForLockWait } from "../src/testing/index.js";
+import { ROLES, startTemporaryPostgres, waitForLockWait, testDatabaseEnvironment } from "../src/testing/index.js";
 
 /** Fails loudly when `promise` has not settled within `ms`: a bounded wait, never a synchronization point. */
 async function within<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
@@ -32,7 +32,7 @@ test("R33: two runners started at once on a fresh database serialize on the runn
   const oracle = await pg.connect("postgres");
   try {
     const total = listMigrations().length;
-    const connection = { host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.owner };
+    const connection = { environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.owner } as const;
     // left to the scheduler, on a fresh database of the cluster: three runners at once, no failed start
     await oracle.query(`CREATE DATABASE kauro_second OWNER ${ROLES.owner}`);
     const second = { ...connection, database: "kauro_second" };
@@ -79,7 +79,7 @@ test("R37: the migrator is bounded — a host that accepts and never answers ref
   const silentPort = typeof address === "object" && address ? address.port : 0;
   try {
     await within(
-      assert.rejects(applyMigrationsAs({ host: "127.0.0.1", port: silentPort, database: ROLES.database, user: ROLES.owner }, { connectTimeoutMs: 300 }), (e: unknown) => e instanceof Error && /timeout/i.test(e.message)),
+      assert.rejects(applyMigrationsAs({ environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: silentPort, database: ROLES.database, user: ROLES.owner }, { connectTimeoutMs: 300 }), (e: unknown) => e instanceof Error && /timeout/i.test(e.message)),
       10_000,
       "migrator connecting to a silent host",
     );
@@ -96,7 +96,7 @@ test("R37: the migrator is bounded — a host that accepts and never answers ref
     await oracle.query("LOCK TABLE kauro_meta.schema_migrations IN ACCESS EXCLUSIVE MODE");
     await within(
       assert.rejects(
-        applyMigrationsAs({ host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.owner }, { lockTimeoutMs: 200 }),
+        applyMigrationsAs({ environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.owner }, { lockTimeoutMs: 200 }),
         (e: unknown) => typeof e === "object" && e !== null && (e as { code?: unknown }).code === "55P03",
       ),
       10_000,
@@ -104,7 +104,7 @@ test("R37: the migrator is bounded — a host that accepts and never answers ref
     );
     await oracle.query("ROLLBACK");
     // with the lock gone the same runner succeeds and applies nothing new
-    const again = await applyMigrationsAs({ host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.owner }, { lockTimeoutMs: 200 });
+    const again = await applyMigrationsAs({ environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: pg.port, database: ROLES.database, user: ROLES.owner }, { lockTimeoutMs: 200 });
     assert.deepEqual(counts(again), [0, listMigrations().length]);
   } finally {
     await oracle.end();

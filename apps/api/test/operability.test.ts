@@ -14,7 +14,7 @@ import { compileSchemaBundle } from "@kauro/application";
 import { DomainFailure } from "@kauro/domain";
 import type { PoolErrorEvent } from "@kauro/persistence";
 import { classifyError, listMigrations } from "@kauro/persistence";
-import { ROLES, raceStatementTimeoutMs, startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "@kauro/persistence/testing";
+import { ROLES, databaseEnvironmentNameOf, raceStatementTimeoutMs, testDatabaseEnvironment, startTemporaryPostgres, waitForLockWait, type TemporaryPostgres } from "@kauro/persistence/testing";
 import {
   API_APPLICATION_NAME,
   ConfigError,
@@ -211,7 +211,7 @@ test("configuration of the operating limits: the api pool stays inside the four-
   // R34: behind the platform's load balancer the hop count is a deployment fact
   assert.equal(loadConfig(base).http.trustedProxyHops, 0);
   assert.equal(loadConfig({ ...base, KAURO_HTTP_TRUSTED_PROXY_HOPS: "2" }).http.trustedProxyHops, 2);
-  assert.throws(() => loadConfig({ ...base, KAURO_ENVIRONMENT: "LIVE", KAURO_AUTH_BEARER_TOKENS_FILE: undefined }), configError("KAURO_HTTP_TRUSTED_PROXY_HOPS"));
+  assert.throws(() => loadConfig({ ...base, KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "localhost", KAURO_AUTH_BEARER_TOKENS_FILE: undefined }), configError("KAURO_HTTP_TRUSTED_PROXY_HOPS"));
   assert.throws(() => loadConfig({ ...base, KAURO_HTTP_TRUSTED_PROXY_HOPS: "5" }), configError("KAURO_HTTP_TRUSTED_PROXY_HOPS"));
   // R36 / R35
   assert.deepEqual(
@@ -238,19 +238,23 @@ test("configuration of the operating limits: the api pool stays inside the four-
   // N7: migrations on start are a LOCAL convenience; SANDBOX and LIVE migrate with the one-shot job before traffic shifts
   for (const environment of ["SANDBOX", "LIVE"]) {
     assert.throws(
-      () => loadConfig({ ...base, KAURO_ENVIRONMENT: environment, KAURO_AUTH_BEARER_TOKENS_FILE: undefined, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner }),
+      () => loadConfig({ ...base, KAURO_ENVIRONMENT: environment, KAURO_DB_HOST: "localhost", KAURO_AUTH_BEARER_TOKENS_FILE: undefined, KAURO_HTTP_TRUSTED_PROXY_HOPS: "1", KAURO_DB_MIGRATE_ON_START: "true", KAURO_DB_MIGRATOR_USER: ROLES.owner }),
       configError("KAURO_DB_MIGRATE_ON_START"),
       environment,
     );
   }
   assert.throws(() => loadConfig({ ...base, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"), "a password file without migrations on start");
   // the job's own configuration: the password in its environment or as a file, never both, and never configuration
-  assert.deepEqual(loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "10.0.0.5", KAURO_DB_NAME: "kauro", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET }), {
+  const job = loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "db.example.test", KAURO_DB_NAME: "kauro", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_TLS_CA_FILE: "ca.pem" });
+  // the connection environment is the branded value minted from KAURO_ENVIRONMENT (DB-TLS gap 2): a plain object or another name fails here
+  assert.equal(databaseEnvironmentNameOf(job.databaseEnvironment), "LIVE");
+  assert.deepEqual(job, {
     environment: "LIVE",
-    migrator: { host: "10.0.0.5", port: 5432, database: "kauro", user: ROLES.owner, connectTimeoutMs: 5_000, statementTimeoutMs: 120_000, lockTimeoutMs: 5_000, passwordFile: null },
+    databaseEnvironment: testDatabaseEnvironment("LIVE"),
+    migrator: { host: "db.example.test", port: 5432, database: "kauro", user: ROLES.owner, tlsCaFile: "ca.pem", connectTimeoutMs: 5_000, statementTimeoutMs: 120_000, lockTimeoutMs: 5_000, passwordFile: null },
   });
-  assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"));
-  assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_USER: ROLES.owner, KAURO_DB_MIGRATOR_USER: ROLES.owner }), configError("KAURO_DB_MIGRATOR_USER"));
+  assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "localhost", KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET, KAURO_DB_MIGRATOR_PASSWORD_FILE: secretFile }), configError("KAURO_DB_MIGRATOR_PASSWORD_FILE"));
+  assert.throws(() => loadMigrationJobConfig({ KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "localhost", KAURO_DB_USER: ROLES.owner, KAURO_DB_MIGRATOR_USER: ROLES.owner }), configError("KAURO_DB_MIGRATOR_USER"));
 });
 
 test("R44/N7: bootstrap never holds the owner's credential in an environment — it refuses KAURO_DB_MIGRATOR_PASSWORD by name before anything opens; LOCAL migrations on start read the password from a file, and it is no part of the configuration the running process keeps", async () => {
@@ -275,7 +279,7 @@ test("R44/N7: bootstrap never holds the owner's credential in an environment —
 });
 
 test("N7: a serving process (node dist/src/main.js) given the owner's password in its environment exits 1 before it listens, naming the variable and never the value; the one-shot job (node dist/src/migrate.js) migrates a fresh database, exits 0, and a second run applies nothing", async () => {
-  const fresh = await startTemporaryPostgres({ migrate: false });
+  const fresh = await startTemporaryPostgres({ migrate: false, tls: true });
   try {
     const serving = await envOf(fresh, { KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET });
     const refused = await runProcess(MAIN_ENTRY, serving, "the serving process given the owner's password");
@@ -283,7 +287,7 @@ test("N7: a serving process (node dist/src/main.js) given the owner's password i
     assert.match(refused.stderr, /kauro-api failed to start: ConfigError: KAURO_DB_MIGRATOR_PASSWORD: is never accepted by the serving process/);
     assert.ok(!refused.stderr.includes(MIGRATOR_SECRET) && !refused.stdout.includes(MIGRATOR_SECRET), "never the value");
     assert.ok(!refused.stderr.includes("listening"), "it never listened");
-    const job = { KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: "127.0.0.1", KAURO_DB_PORT: String(fresh.port), KAURO_DB_NAME: ROLES.database, KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: MIGRATOR_SECRET };
+    const job = { KAURO_ENVIRONMENT: "LIVE", KAURO_DB_HOST: fresh.tls?.host ?? "", KAURO_DB_TLS_CA_FILE: fresh.tls?.caFile ?? "", KAURO_DB_PORT: String(fresh.port), KAURO_DB_NAME: ROLES.database, KAURO_DB_MIGRATOR_USER: ROLES.owner, KAURO_DB_MIGRATOR_PASSWORD: fresh.tls?.password ?? "" };
     const first = await runProcess(MIGRATE_ENTRY, job, "the migration job on a fresh database");
     assert.equal(first.code, 0, first.stderr);
     assert.equal(first.stdout, `kauro-migrate LIVE: migrations applied: ${listMigrations().length}, already applied: 0\n`);
@@ -295,7 +299,7 @@ test("N7: a serving process (node dist/src/main.js) given the owner's password i
     assert.equal(superuser.code, 1);
     assert.match(superuser.stderr, /kauro-migrate failed: MigratorRoleError: /);
     // the in-process form of the job, with the password from a file
-    const inProcess = await runMigrationJob({ ...job, KAURO_DB_MIGRATOR_PASSWORD: undefined, KAURO_DB_MIGRATOR_PASSWORD_FILE: passwordFile() });
+    const inProcess = await runMigrationJob({ ...job, KAURO_DB_MIGRATOR_PASSWORD: undefined, KAURO_DB_MIGRATOR_PASSWORD_FILE: fresh.tls?.passwordFile });
     assert.deepEqual([inProcess.result.applied.length, inProcess.result.skipped.length], [0, listMigrations().length]);
   } finally {
     await fresh.stop();
@@ -410,7 +414,7 @@ test("R35: shutdown drains — the in-flight command is answered with Connection
     assert.equal(answered.headers.get("connection"), "close", "and closes its keep-alive connection");
     await answered.arrayBuffer();
     assert.deepEqual(await within(shutdown, 15_000, "shutdown"), { kind: "CLOSED" }, "the drain finished well inside the deadline");
-    assert.equal(api.database.pool.raw.ended, true);
+    assert.equal(api.database.pool.ended, true);
     await assert.rejects(fetch(`${api.address}/livez`), "no new connection is accepted");
   } finally {
     for (const socket of partial) socket.destroy();
@@ -441,7 +445,7 @@ test("R35: the shutdown deadline is kept — a command blocked past it has its c
     await oracle.query("ROLLBACK");
     locked = false;
     if (outcome.kind === "DEADLINE_EXCEEDED") await within(outcome.closing, 15_000, "the close after the deadline");
-    assert.equal(api.database.pool.raw.ended, true);
+    assert.equal(api.database.pool.ended, true);
   } finally {
     if (locked) await oracle.query("ROLLBACK");
     await oracle.end();

@@ -10,7 +10,7 @@ import type { Client } from "pg";
 import type { Sha256Hex } from "@kauro/contracts";
 import { toUtcInstant, type CorrelationId, type UserId } from "@kauro/domain";
 import { createPool, PgWebSessionStore, WEB_SESSION_STATEMENT_TIMEOUT_MS, type KauroPool } from "../src/index.js";
-import { INJECTED_STATEMENT_TIMEOUT_MS, LOCK_WAIT_OBSERVATION_MS, startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
+import { INJECTED_STATEMENT_TIMEOUT_MS, LOCK_WAIT_OBSERVATION_MS, startTemporaryPostgres, type TemporaryPostgres, testDatabaseEnvironment } from "../src/testing/index.js";
 import { bind, ids, person, sha, sqlState } from "./support.js";
 
 let pg: TemporaryPostgres;
@@ -22,7 +22,7 @@ before(async () => {
   pg = await startTemporaryPostgres();
   oracle = await pg.connect("postgres");
   app = await pg.connect("kauro_app_test");
-  assurancePool = createPool({ host: "127.0.0.1", port: pg.port, database: "kauro", user: "kauro_assurance_test", max: 4, applicationName: "session-fence-test-assurance" });
+  assurancePool = createPool({ environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: pg.port, database: "kauro", user: "kauro_assurance_test", max: 4, applicationName: "session-fence-test-assurance" });
   store = new PgWebSessionStore(assurancePool);
 });
 after(async () => {
