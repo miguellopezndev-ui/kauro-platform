@@ -121,6 +121,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // package B17: CMD040 SubmitStageReceipt and CMD041 ContinueStage (import stages, append-only receipt revisions, the STAGE_RECEIPT artifact kind)
     "0052_b17_import_stage_receipts.sql",
     "0053_b09_tax_follows_service.sql",
+    // FCG-B06-LEASE-1: claim_lease / heartbeat_lease / checkpoint_lease judge expiry at the database clock after the row lock (provisional number)
+    "0054_lease_expiry_after_lock.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
