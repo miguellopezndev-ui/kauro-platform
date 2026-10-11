@@ -349,6 +349,18 @@ export class DomainFailure extends Error {
   }
 }
 
+/**
+ * CMD027 (D10-GAP-25): the project's live quote changed under the request where the writer cannot name it (quotes_one_live_per_project
+ * refused the insert; the superseded quote's reservation changed between its read and its release). STALE_VERSION, retryable; CreateQuote
+ * adds the project's quote as current (current ALWAYS), keyed on this class and never on another STALE_VERSION.
+ */
+export class LiveQuoteChangedFailure extends DomainFailure {
+  constructor(message: string) {
+    super("STALE_VERSION", message, {}, true);
+    this.name = "LiveQuoteChangedFailure";
+  }
+}
+
 export class StaleVersionFailure extends DomainFailure {
   constructor(currentVersion: number, currentState: string, extra: Omit<FailureDetails, "currentVersion" | "currentState"> = {}) {
     super("STALE_VERSION", `stale version: current is ${currentVersion} (${currentState})`, { ...extra, currentVersion, currentState });

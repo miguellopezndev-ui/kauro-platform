@@ -1,0 +1,236 @@
+{
+ "package": "B08",
+ "generatedBy": "node tools/ledger.mjs sidecars --write",
+ "source": {
+  "file": "docs/design/B08-case-map.md",
+  "sha256": "5523325e78bb29041223fb1046b84440b57b6ca591401b7349bb60c1328eecdd"
+ },
+ "rows": [
+  {
+   "case": "S035",
+   "class": "PARTIAL",
+   "test": [
+    "packages/data-plane/test/attempt-scratch.test.ts :: S035: the attempt scratch refuses a segment beyond its byte quota as SCRATCH_EXHAUSTED, a short write as SHORT_WRITE and a segment whose bytes no longer match their checksum as CORRUPT_INTERMEDIATE, never a completed segment, and its cleanup removes exactly the attempt's own directory",
+    "packages/data-plane/test/fenced-artifact-writer.test.ts :: S035: the fenced artifact writer never turns a failed close, a short write or a read-back mismatch into a staged artifact, and writes nothing outside the attempt's staging prefix",
+    "apps/control/test/job-execution.test.ts :: S035 end to end: an attempt whose scratch fills, whose artifact write is short or whose intermediate bytes are corrupted ends its job FAILED with that exact cause, no package version leaves STAGED, and STAGING_JANITOR deletes exactly that attempt's staging objects and scratch",
+    "apps/control/test/staging-janitor.test.ts :: B08-R2 (S035, S075): a transient file-system failure of the scratch removal records a PARTIAL cleanup and the attempt stays discoverable — a later STAGING_JANITOR sweep removes its scratch and records CLEANED; after that nothing is cleaned twice"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [
+    "B01",
+    "B14"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "S055",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/execution-migrations.test.ts :: S055 at the database: a job commits only with its processing_job.queued.v1 event and its outbox record, one job per commercial authorization and one live job per project",
+    "apps/api/test/cmd036-execute-project.test.ts :: S055: the process dies after ExecuteProject commits and before any dispatch or answer — a retry with the same key replays the one job, a retry with another key answers the same job, and the undelivered outbox record is still due",
+    "apps/control/test/execution-control.test.ts :: S055: after a restart the dispatcher delivers the queued job's outbox record once and JOB_ADMISSION admits it once; a second delivery of the same record admits nothing and creates no second attempt"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "S056",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/adapters-leases.test.ts :: S090 through the adapter: claim, HELD, checkpoint under the fence, refused resumes (no or another checkpoint, reset deadline, another subject, another cost authority), a valid takeover that keeps subject, clock, cost and checkpoint identity, advances the fence and fences the old owner out",
+    "packages/persistence/test/execution-migrations.test.ts :: S056 at the database: a staged manifest, a verification or a publication of an attempt whose fence is not its job lease's current fence is refused KA080, and an attempt's provider job identity is its own deterministic identity, learned once",
+    "packages/data-plane/test/worker-host-fake.test.ts :: the labelled worker-host fake keys every provider job by the attempt's deterministic identity — a second create answers ALREADY_EXISTS, a scripted timeout after creation leaves a job that observe finds, termination acts on that identity only — and every record carries evidence class SIMULATED",
+    "apps/control/test/job-execution.test.ts :: S056: a duplicated admission delivery launches nothing twice; an ambiguous launch is reconciled by observing the attempt's identity before any other create; the old attempt that survives a takeover finishes a valid package that is never submitted, verified or published",
+    "packages/persistence/test/execution-adapters.test.ts :: B06-R1 seam (b08/land): the JOB_ATTEMPT lease is born at admission with the job's checkpoint — KAURO_JOB_ATTEMPT_CHECKPOINT_V1 over its admitted input — so once the lease lapsed the control plane abandons attempt 1 and PgExecutionStore.takeOver resumes the lease under fence 2 naming exactly that checkpoint; while the lease is live the takeover is HELD, and a claim naming no checkpoint or another is refused (KA005) and changes nothing",
+    "packages/persistence/test/audit-adapters.test.ts :: B06-R1 seam (b08/land): the MODEL_TASK lease is born with the model task's checkpoint — KAURO_MODEL_TASK_CHECKPOINT_V1 over its planned request — so once its dispatch owner's lease lapsed another owner's beginDispatch resumes it under fence 2 naming exactly that checkpoint and reserves its own intent at that fence; while the lease is live the other owner is HELD, and a claim naming no checkpoint or another is refused (KA005) and changes nothing",
+    "packages/persistence/test/execution-migrations.test.ts :: B08-R1 at the database: a package cannot become AVAILABLE once an INCLUDED sealed file of its job's revision lost its admission (GENERATION_CHANGED) although the revision stays SEALED and EXECUTION_CONTROL has not run — the publication waits on the file's transition lock behind the uncommitted revocation and is refused KA081 at COMMIT, a later publication is refused KA081 too, the package stays VERIFIED_PRIVATE, and a neighbour whose files are admitted publishes"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "S061",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/execution-migrations.test.ts :: S061 at the database: a package version becomes AVAILABLE only when every artifact of its staged manifest was read back at exactly its generation, sha256 and length from the attempt's own staging prefix, every delivery copy likewise, and the verification is VALID; a partial or foreign read-back is refused KA084",
+    "packages/application/test/core-port-fakes.test.ts :: the labelled Migration-core fake verifies a package only against the expected authority its caller supplies and rejects a missing, duplicated, extra or foreign artifact and a false summary; every record carries evidence class SIMULATED",
+    "apps/control/test/job-execution.test.ts :: S061: a staged manifest naming a partial blob, another attempt's object or an overwritten generation fails read-back, the job ends FAILED by verification_failure with the exact problem and its package is REVOKED with the evidence kept; the complete neighbour publishes",
+    "apps/control/test/job-execution.test.ts :: B08-R3 (S061): a delivery read-back that returns a partial blob, the process crashing after the copy and its negative read-back committed and before the job failed — the replayed package_version.verified_private.v1 re-derives DELIVERY_READBACK_PARTIAL_BLOB from the recorded read-back, fails the job, revokes the private package and releases the ACTIVE slot, never AVAILABLE"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [
+    "B01",
+    "B02",
+    "B14"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "S062",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/execution-adapters.test.ts :: S062: cancel_command and the publication serialize on the job row in both interleavings, the wait observed in pg_stat_activity — a publication behind a committed cancellation is refused and its package stays private, a cancellation behind a committed publication finds the job READY",
+    "packages/persistence/test/execution-adapters.test.ts :: S062 deletion half at the database: a project entering DELETION_REQUESTED and the publication serialize on the project's transition lock in both interleavings; a publication after it is refused KA081",
+    "apps/api/test/cmd037-cancel-job.test.ts :: RACE (S062): CancelJob through the route racing the publication — whichever commits first wins, observed by the lock wait, never both; after a publication the job is READY and CancelJob is 409 JOB_ALREADY_READY naming the package",
+    "apps/control/test/job-execution.test.ts :: stale authority at publication: a source revision superseded or expired, an approval withdrawn, a target contract superseded or a capability suspended after verification refuses the publication with its reason and the package is REVOKED, never AVAILABLE",
+    "apps/control/test/job-execution.test.ts :: B08-R1: an INCLUDED sealed file whose admission OBJECT_INVENTORY revoked (GENERATION_CHANGED) after verification — the revision still SEALED, the event not yet read by EXECUTION_CONTROL — refuses JOB_EXECUTION's publication with SOURCE_ADMISSION_REVOKED, the package REVOKED and never AVAILABLE, and the delayed event then finds nothing to repair; revoked (GENERATION_MISSING) before admission, JOB_ADMISSION cancels the QUEUED job with that reason and consumes nothing"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [
+    "B16"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "S075",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/execution-adapters.test.ts :: S075 at the database: an attempt cleanup records exactly one attempt with its provider identity, staging prefix, deleted generations and the host-reported cost and result, and only objects under that attempt's prefix can be recorded as its cleanup",
+    "packages/data-plane/test/worker-host-fake.test.ts :: the labelled worker-host fake reports the VM, disk and cost of each provider job it created, terminates only the identity it is given and answers NOT_FOUND for any other",
+    "apps/control/test/staging-janitor.test.ts :: S075: the worker dies and its lease lapses; STAGING_JANITOR terminates exactly that provider job, deletes by generation exactly the objects under that attempt's staging prefix and its scratch — a sibling attempt's and another agency's objects untouched — and records the VM, disk, cost and result the host reported",
+    "apps/control/test/staging-janitor.test.ts :: B08-R2 bound: a scratch removal that keeps failing is retried a bounded number of times — five PARTIAL records, never a sixth; the attempt then leaves discovery and a direct call refuses it",
+    "apps/control/test/staging-janitor.test.ts :: B08-R4 (S075): a transient timeout of the host's resource report does not finalize the cleanup without its cost — the pass stays open (not CLEANED) with the report pending, and once the host answers again the next sweep records CLEANED with the VM, disk, runtime and cost it reports"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [
+    "B14",
+    "B16"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-044",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd017-seal-revision.test.ts :: OK: an OPERATOR seals a READY_TO_SEAL revision — SEALED v5, the manifest (HASHING's preimage), the sealed subject and the file set with exact generations, the UNPAID record with hard deadline the first seal of the bytes + 14 days, one sealed event",
+    "packages/persistence/test/audit-migrations.test.ts :: R2-044 at the database: an audit commits only with a reservation on an AUTHORIZED, unexpired grant with room under its ceiling, and a dispatch intent is refused KA083 unless its reservation fits a funded grant",
+    "apps/api/test/cmd020-start-audit.test.ts :: R2-044: a revision sealed through SealRevision with no funded grant — StartAudit is 429 BUDGET_EXHAUSTED NO_FUNDED_GRANT, no audit, grant reservation, model task or dispatch intent exists and the core fakes recorded no call; the funded neighbour is QUEUED with its reservation"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-045",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/execution-migrations.test.ts :: R2-045 at the database: a package version cannot become AVAILABLE while its job's commercial authorization is REVOKED, its verification evidence and private artifacts remain, and the revocation and the publication serialize on the authorization's transition lock in both interleavings",
+    "apps/control/test/job-execution.test.ts :: R2-045: a reversal revokes the consumed authorization while the worker is still producing a valid package — EXECUTION_CONTROL requests the job's cancellation, the package is verified but never AVAILABLE, it ends REVOKED with its evidence retained privately, and the authorization is never DELIVERED"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-046",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/execution-model.test.ts :: R2-046: the fair scheduler orders queued jobs by the agency's held slots, then the agency's longest wait, then the job's queue instant and id, deterministically under any input order",
+    "packages/persistence/test/execution-migrations.test.ts :: R2-046 at the database: the ledgers admit at most one ACTIVE and three WAITING jobs globally and three live jobs per agency, a fourth live job of one agency is refused, and the ledgers cannot be edited around the jobs they summarize (KA082)",
+    "apps/api/test/cmd036-execute-project.test.ts :: R2-046: an agency's fourth ExecuteProject while three of its jobs are live is 503 CAPACITY_UNAVAILABLE EXECUTION_QUEUE_FULL with nothing written and its authorization ACTIVE, and DeliveryCapacityPort answers unavailable for that agency and available for another",
+    "apps/control/test/job-admission.test.ts :: R2-046: one agency's three paid-ready jobs and another agency's waiting job are admitted in the documented fair order — the waiting agency second, never last — within one ACTIVE and three WAITING slots, and admissions from two schedulers serialize on the global ledger"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD036-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd036-execute-project.test.ts :: OK: ExecuteProject with a live commercial authorization whose source, plan, approval, target, capture, retention and capability bind consistently answers 202 with one QUEUED job, one processing_job.queued.v1 event and one outbox record to JOB_EXECUTION, the job bound exactly to the authorization's subject",
+    "apps/control/test/job-admission.test.ts :: admission consumes the entitlement: QUEUED -> ADMITTED with the authorization ACTIVE -> CONSUMED naming the job, attempt 1 CLAIMED at lease fence 1 and the PAID_ORDINARY record anchored on the capture, in one unit of work",
+    "apps/control/test/b08-end-to-end.test.ts :: b08 end to end: a sealed revision is audited to DRAFT_READY, approved, paid, executed, admitted, run, verified and published — the package is AVAILABLE, the job READY and the authorization DELIVERED exactly once, every answer within its route's contract"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD036-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd036-execute-project.test.ts :: DENY: a VIEWER or an APPROVER is 403 ROLE_INSUFFICIENT and another agency's project 404; then one missing prerequisite at a time — a revoked authorization, a withdrawn approval, an expired source, a superseded target, a suspended capability, an agency not ACTIVE — is refused with its reason, nothing written and no outbox record",
+    "apps/api/test/cmd036-execute-project.test.ts :: DENY: ExecuteProject for an authorization that already has a job answers that same job, even after the job was cancelled, and never creates a second one",
+    "packages/persistence/test/execution-migrations.test.ts :: CMD036 at the database: a job binds exactly its authorization's project, plan, approval, source, target and capability, only while the authorization is ACTIVE, and request handlers can neither admit, consume, launch nor publish",
+    "apps/control/test/job-admission.test.ts :: admission re-reads the authority after the transition locks: a job whose authorization was revoked, whose approval was withdrawn or whose source expired while QUEUED is cancelled with its reason and consumes nothing",
+    "apps/api/test/cmd036-execute-project.test.ts :: B08-R1 (CMD036-DENY): an INCLUDED sealed file of the authorization's revision whose admission OBJECT_INVENTORY revoked (GENERATION_CHANGED) — the revision itself still SEALED and the event not yet read by EXECUTION_CONTROL — refuses ExecuteProject 422 SOURCE_EXPIRED with nothing written, while a neighbour purchase whose files are admitted executes"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD036-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd036-execute-project.test.ts :: RACE: an identical retry replays the 202, the same key with another authorization is 409 IDEMPOTENCY_CONFLICT, two keys for one authorization serialize on the project row with the wait observed and yield one job, and a crash before COMMIT leaves nothing",
+    "apps/api/test/cmd036-execute-project.test.ts :: RACE: ExecuteProject racing the payment service's revocation of the authorization serializes on the authorization's transition lock in both interleavings — the command is refused AUTHORIZATION_REVOKED, or the job exists QUEUED and the revocation's event is routed to EXECUTION_CONTROL"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD037-OK",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd037-cancel-job.test.ts :: OK: CancelJob on a RUNNING job answers 200 with the job CANCEL_REQUESTED, its cancellation version advanced, the live attempt's provider state and no published package identified, and one processing_job.cancel_requested.v1 event to EXECUTION_CONTROL",
+    "apps/api/test/job-reads.test.ts :: GetJob answers the job's state, attempt ordinal, deadlines, cancellation version and, once READY, its package id to live members of the agency only, never a provider identity, an object name or another agency's job",
+    "apps/control/test/execution-control.test.ts :: CMD037-OK continuation: EXECUTION_CONTROL advances the lease's cancellation version, terminates exactly the attempt's provider job, observes it terminal, revokes the private package and moves the job CANCEL_REQUESTED -> CANCELLED, releasing its capacity once"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD037-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd037-cancel-job.test.ts :: DENY: a VIEWER is 403, another agency's job 404, a stale version 409 STALE_VERSION, a CANCELLED or FAILED job 409 JOB_TERMINAL, and a READY job 409 JOB_ALREADY_READY naming its package with no promise of CRM rollback; nothing is written",
+    "packages/persistence/test/execution-migrations.test.ts :: CMD037 at the database: after cancel_command no attempt of the job is created, launched, submitted or published, and a cancellation is recorded once with its actor, reason and version",
+    "apps/control/test/execution-control.test.ts :: CMD037-DENY: the cancelled job's old worker is still live and finishes a valid package — its manifest submission, verification and publication are refused under the advanced cancellation and the package is never AVAILABLE",
+    "apps/control/test/cancellation-boundaries.test.ts :: cancellation after every await of the job pipeline — admission, launch, each observe, the worker's own awaits, manifest read, each read-back, the verifier, the delivery copies and the publication commit — leaves no AVAILABLE package, each boundary held by its hold point"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD037-RACE",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd037-cancel-job.test.ts :: RACE: an identical retry replays the 200, the same key with another reason is 409 IDEMPOTENCY_CONFLICT, two CancelJob calls on one version yield one cancellation and one 409 STALE_VERSION, and a crash before COMMIT leaves the job running",
+    "apps/control/test/execution-control.test.ts :: CMD037-RACE: a provider termination that times out stays UNCERTAIN and is reconciled by observing the attempt's identity until terminal; the job becomes CANCELLED only then, and a second delivery of the cancellation terminates nothing twice"
+   ],
+   "commit": "88cf29d",
+   "reviewId": "B08-round3-88cf29d",
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "PARTIAL"
+  }
+ ]
+}

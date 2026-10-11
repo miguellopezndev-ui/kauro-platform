@@ -41,7 +41,7 @@ interface Row {
 
 /** Inserts one fact as the request-handler role under the given context; returns the SQLSTATE of a refusal, or null. */
 async function insertAs(context: { readonly agencyId?: string; readonly userId?: string }, row: Row): Promise<string | null> {
-  const c = await h.appPool.raw.connect();
+  const c = await h.appPool.connectUnverified();
   try {
     await c.query("BEGIN");
     await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [context.agencyId ?? "", context.userId ?? ""]);
@@ -118,7 +118,7 @@ test("R2: an agency's runtime role reads its own stream only — never another a
   assert.equal(await insertAs({ agencyId: A.agencyId, userId: alice }, { agencyId: A.agencyId, actorKind: "USER", actorId: alice }), null);
   assert.equal(await insertAs({ agencyId: B.agencyId, userId: carol }, { agencyId: null, requestedAgencyId: B.agencyId, actorKind: "USER", actorId: carol }), null);
   assert.equal(await insertAs({}, { agencyId: null, requestedAgencyId: B.agencyId, actorKind: "ANONYMOUS", actorId: null, assuranceClass: "NONE" }), null);
-  const c = await h.appPool.raw.connect();
+  const c = await h.appPool.connectUnverified();
   let visible: ReadonlyArray<{ agency_id: string | null; requested_agency_id: string | null }>;
   try {
     await c.query("BEGIN");

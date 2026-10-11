@@ -4,6 +4,7 @@
 // retiring the reviewed agreement versions. The superuser only reads (row digests) and, for the one support operation no runtime role
 // holds — an agency's display name and its owner's verification fact are the platform's own records, edited by no B10 command — the
 // rename of R2-141. Interleavings are fixed by a held transaction and the lock wait observed in pg_stat_activity, never by a sleep.
+import { invariantsAfterEach } from "../src/testing/invariants.js";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { AgencyFixture } from "../src/testing/harness.js";
@@ -37,6 +38,8 @@ import {
 } from "./b10-commission-support.js";
 
 let w: World;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => w.h.oracle);
 
 before(async () => {
   w = await openWorld("b10-agency-adapters");

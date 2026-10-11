@@ -218,6 +218,27 @@ async function watchRefund(rt: PaymentRuntime, refundId: RefundId): Promise<Cons
   return watchAttempt(rt, live.orderId, live.attemptId);
 }
 
+// --- Payments V1 registration seam (lane KIT; docs/design/ACH-ROUTE.md) -----------------------------------------------------------
+
+/** A bank-transfer delivery handler a lane registers for one (consumer, event type); it runs exactly like the handlers above. */
+export type BankDeliveryHandler = (rt: PaymentRuntime, delivery: CommerceEventDelivery) => Promise<ConsumerOutcome>;
+
+const bankHandlers = new Map<string, BankDeliveryHandler>();
+
+/**
+ * Registers the handler of an event type of the bank-transfer route for the payment service. One handler per type: a second registration
+ * is a programming error and is refused, so two lanes can never both act on one delivery. With nothing registered the dispatch below is
+ * exactly what it was (NOT_APPLICABLE). FINANCE needs no registration: planPostings dispatches to core/bank-postings and core/return-postings.
+ */
+export function registerBankDeliveryHandler(eventType: string, handler: BankDeliveryHandler): void {
+  if (bankHandlers.has(eventType)) throw new Error(`a bank-transfer handler is already registered for ${eventType}`);
+  bankHandlers.set(eventType, handler);
+}
+
+function bankHandlerOf(eventType: string): BankDeliveryHandler | undefined {
+  return bankHandlers.get(eventType);
+}
+
 export function paymentServiceEffect(rt: PaymentRuntime): DeliveryEffect {
   return {
     consumer: "PAYMENT_SERVICE",
@@ -235,7 +256,7 @@ export function paymentServiceEffect(rt: PaymentRuntime): DeliveryEffect {
         case "refund.uncertain.v1":
           return watchRefund(rt, delivery.aggregateId as RefundId);
         default:
-          return "NOT_APPLICABLE";
+          return bankHandlerOf(delivery.eventType)?.(rt, delivery) ?? "NOT_APPLICABLE";
       }
     },
   };

@@ -9,6 +9,7 @@
  * No unit of work stays open across a model call, a cloud job creation, a payment API call or full-data processing (07): the
  * seven B06 commands are database-only and run in exactly one unit of work each.
  */
+import { DomainFailure } from "../model/errors.js";
 import type { AgencyId, MembershipId, UserId } from "../model/ids.js";
 import type { ExecutionContext } from "../model/tenant.js";
 import type { CommandJournal } from "./command-journal.js";
@@ -93,6 +94,55 @@ export interface UnitOfWork {
   resolveMembership(membershipId: MembershipId): void;
   /** The user this unit of work runs for (TENANT/IDENTITY contexts). */
   readonly userId: UserId | null;
+}
+
+/**
+ * A unit of work whose in-flight work its caller can give up (D10-GAP-6a): when a bound on a call made inside the unit elapses, the call
+ * keeps running on the unit's connection, so the connection must never go back to the pool. `abandonWork` marks the unit: it then ends
+ * in a failure, its connection is destroyed (never rolled back through the queue the abandoned call blocks, never returned), and what
+ * the abandoned call still tries on that connection fails there.
+ */
+export interface AbandonableWork {
+  abandonWork(reason: string): void;
+  /**
+   * Limits the lifetime of the WHOLE transaction from now on (ms), or lifts the limit (null): the database itself ends the session when it
+   * elapses, whatever statement it is in and whatever the unit's own statement timeout says (statement_timeout restarts with every
+   * statement; a call that runs several statements would otherwise hold the unit's locks past its bound). Armed before a bounded call and
+   * lifted when the call answered in time; an abandoned unit is never lifted (D10-GAP-6a).
+   */
+  limitWork(ms: number | null): Promise<void>;
+}
+
+/** Gives up the in-flight work of `uow` when it supports it (a unit of work of @kauro/persistence); other implementations have nothing to destroy. */
+/** Limits (or, with null, lifts the limit of) the transaction's remaining lifetime when the unit of work supports it; other implementations have nothing to limit. */
+export async function limitWorkOf(uow: object, ms: number | null): Promise<void> {
+  const candidate = uow as Partial<AbandonableWork>;
+  if (typeof candidate.limitWork === "function") await candidate.limitWork(ms);
+}
+
+/**
+ * A unit of work that re-judges facts at its committed instant (PV1R-03): `beforeCommit` registers a check the factory runs after the
+ * work returned and immediately before COMMIT, inside the same transaction (a throw rolls the whole unit back, nothing committed). A
+ * check reads its own instant then (the effect clock, after every wait of the work), so a decision taken earlier cannot outlive its
+ * boundary into the commit.
+ */
+export interface PreCommitChecks {
+  beforeCommit(check: () => Promise<void>): void;
+}
+
+/**
+ * Registers `check` on `uow` to run immediately before its COMMIT. Fails closed: a unit of work that cannot run checks at its COMMIT
+ * refuses the command (INTEGRITY_FAILURE) rather than commit an effect whose authority nobody re-judged.
+ */
+export function beforeCommitOf(uow: object, check: () => Promise<void>): void {
+  const candidate = uow as Partial<PreCommitChecks>;
+  if (typeof candidate.beforeCommit !== "function") throw new DomainFailure("INTEGRITY_FAILURE", "this unit of work cannot re-judge its facts at COMMIT");
+  candidate.beforeCommit(check);
+}
+
+export function abandonWorkOf(uow: object, reason: string): void {
+  const candidate = uow as Partial<AbandonableWork>;
+  if (typeof candidate.abandonWork === "function") candidate.abandonWork(reason);
 }
 
 export interface UnitOfWorkFactory {

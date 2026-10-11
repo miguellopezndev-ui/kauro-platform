@@ -1,0 +1,516 @@
+{
+ "id": "MC",
+ "repository": "miguellopezndev-ui/kauro-migration-core",
+ "path": "docs/design/B01-B02-case-map.md",
+ "commit": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+ "sha256": "b7ae4af18150f6dd413cf59a38774351a652ea304eefcede9fab7171ff140d00",
+ "packages": [
+  "B01",
+  "B02"
+ ],
+ "generatedBy": "node tools/ledger.mjs --mc <checkout>/docs/design/B01-B02-case-map.md@3b4b0aea4f1879ffb4189a55a16f22f4520787d4 --write",
+ "rows": [
+  {
+   "case": "MC-01",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/mc3-reopen-runtime.test.ts :: HUBSPOT CREATE_ONLY: a validly signed SALESFORCE contract is refused before any source read (audit MC-wrong-mode-attestation)"
+   ],
+   "commit": "ed09809",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "MC-02",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/mc3-reopen-runtime.test.ts :: refuses a Contact EXTERNAL_ID whose uniqueness only Account establishes (audit MC-match-object-foreign-first)",
+    "test/mc3-reopen-runtime.test.ts :: accepts a Contact EXTERNAL_ID that Contact itself establishes, whatever Account says (foreign-first)",
+    "test/unit/target-match.test.ts :: refuses an external id the instance does not also establish as unique"
+   ],
+   "commit": "ed09809",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "MC-03",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/mc3-reopen-runtime.test.ts :: refuses a profile whose totals were edited under a stale hash (audit MC-profile-body-with-stale-hash)",
+    "test/mc3-reopen-runtime.test.ts :: refuses a signed contract whose body was changed after loading (audit MC-instance-signed-body-changed)"
+   ],
+   "commit": "ed09809",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "MC-04",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/mc3-reopen-validation.test.ts :: MC-instance-readonly-field: email createable=FALSE updateable=FALSE is refused, nothing delivered",
+    "test/mc3-reopen-validation.test.ts :: MC-instance-missing-field: a contract that does not carry the email field is refused",
+    "test/mc3-reopen-validation.test.ts :: MC-instance-tiny-length: email length=3 isolates every record whose email is longer, preserved, and the package still verifies"
+   ],
+   "commit": "ed09809",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "MC-05",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/mc3-reopen-transform.test.ts :: refuses the three audit inputs instead of reinterpreting them",
+    "test/mc3-reopen-transform.test.ts :: still reads the audit control and other well-formed groupings"
+   ],
+   "commit": "ed09809",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "MC-06",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/mc3-reopen-transform.test.ts :: delivers the audit timestamp 0099-01-02T03:04:05Z with its own century",
+    "test/mc3-reopen-transform.test.ts :: refuses the audit serial 1000000000 and keeps the serial 45000 control",
+    "test/mc3-reopen-transform.test.ts :: handles the 1900 system edges: 0, 60, 61, the last day of 9999 and one beyond"
+   ],
+   "commit": "ed09809",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "S021",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/csv.test.ts :: agrees on a quoted comma, at every chunk size",
+    "test/unit/csv.test.ts :: agrees on a quoted newline, at every chunk size",
+    "test/unit/csv-incremental.test.ts :: [S021] public locators and counts agree whole and at every byte-chunk size, including splits inside a multi-byte character"
+   ],
+   "commit": "d0a53e5, d6fbca1",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "S022",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "golden G17-duplicate-headers :: delivers the expected values",
+    "test/unit/identity.test.ts :: separates a headerless column from a column whose header spells its position",
+    "golden G41-empty-and-repeated-headers :: delivers the expected values",
+    "test/unit/identity.test.ts :: [S022] an empty header and two repeated headers keep three positional field ids through the complete package"
+   ],
+   "commit": "d0a53e5, d6fbca1",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "S023",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/csv.test.ts :: refuses a declared encoding that contradicts the byte-order mark",
+    "test/unit/csv.test.ts :: fails with a byte offset rather than producing replacement characters",
+    "test/unit/ingest-hardening.test.ts :: refuses an unpaired surrogate rather than substituting U+FFFD"
+   ],
+   "commit": "6ce1cd0, 7492278",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "S025",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/transform.test.ts :: does not deliver a cached formula result by default",
+    "test/unit/xlsx.test.ts :: [S025] a formula cell without a cached value reads as cache-absent, distinct from a cached empty string"
+   ],
+   "commit": "431bcea, b419156",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "S026",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/transform.test.ts :: [S026] a local time in a declared zone's DST overlap is AMBIGUOUS unless the plan declares EARLIER or LATER",
+    "test/property/invariants.test.ts :: [S026] the host TZ does not move any delivered timestamp"
+   ],
+   "commit": "ce4b9ed, c33584e",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "S027",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "golden G14-identifiers :: delivers the expected values",
+    "test/unit/transform.test.ts :: keeps leading zeros"
+   ],
+   "commit": "a7253c0",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "S028",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/integration/value-exactness.test.ts :: [S028] a national number with an extension and no country is delivered whole and flagged, through the package"
+   ],
+   "commit": "ce4b9ed",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "S029",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/integration/value-intent.test.ts :: [S029] KEEP, SET, CLEAR and OMIT over empty values in one UPDATE give four distinct effects, and an unsupported CLEAR is blocked"
+   ],
+   "commit": "ce4b9ed",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "S030",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "golden G21-cross-namespace-ids :: delivers the expected values",
+    "golden G26-consent-conflict :: reports the expected merges in full"
+   ],
+   "commit": "a7253c0",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "S031",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "golden G07-proven-duplicate :: reports the expected merges in full",
+    "test/unit/records-by-row.test.ts :: [S031] a cluster's membership is written once: 2n members spill at most 2.2x the bytes of n",
+    "test/unit/records-by-row.test.ts :: [S031] each row entry names only its own member and the survivor",
+    "test/unit/records-by-row.test.ts :: [S031] the survivor of a set-aside merge still says how many rows it absorbed"
+   ],
+   "commit": "c3a527f, efbefcb",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "S032",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "G12-missing-endpoint :: gives each named relationship the expected disposition",
+    "golden G42-merge-absorbed-id-reference :: gives each named relationship the expected disposition"
+   ],
+   "commit": "c3a527f, efbefcb",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-001",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/ingest-hardening.test.ts :: [R2-001] an INDEPENDENT decision keeps both occurrences in lineage; EXCLUDE_ONE disposes the other occurrence's rows by name"
+   ],
+   "commit": "d0a53e5, d6fbca1",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-002",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/transform.test.ts :: [R2-002] keeps surrounding whitespace when the field has not approved trimming",
+    "test/unit/transform.test.ts :: [R2-002] an approved trim changes only its own field and records TRANSFORM_WHITESPACE_TRIMMED",
+    "test/integration/metamorphic.test.ts :: [R2-002] padding every value delivers the padded values unless a field approves trimming",
+    "test/unit/identity.test.ts :: [R2-002] source ids 'A' and ' A ' are two identity keys without an approved identity normalization",
+    "test/unit/identity.test.ts :: [R2-002] a whitespace-only source id counts as no id and is flagged, never keyed",
+    "test/unit/config.test.ts :: [R2-002] refuses a 2.x configuration and names the trim-default change, never reinterpreting it"
+   ],
+   "commit": "ce4b9ed, c33584e",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-003",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/integration/value-exactness.test.ts :: [R2-003] NFC and NFD spellings of one id stay two records without an approved identity normalization",
+    "test/integration/value-exactness.test.ts :: [R2-003] an approved NFC identity normalization records the collision as an identity decision naming both source values"
+   ],
+   "commit": "ce4b9ed, c33584e",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-004",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/integration/value-exactness.test.ts :: [R2-004] -0, -0.00 and 1.50 keep their lexical sign and scale, and IDENTIFIER -0 never matches 0"
+   ],
+   "commit": "ce4b9ed, c33584e",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-005",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/integration/value-exactness.test.ts :: [R2-005] a declared western grammar withholds the European minority rather than converting it, in changes and isolation artifacts",
+    "test/mc3-reopen-transform.test.ts :: applies the same grammar to the European convention"
+   ],
+   "commit": "ce4b9ed",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-006",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/mc3-reopen-transform.test.ts :: delivers the audit timestamp 0099-01-02T03:04:05Z with its own century",
+    "test/mc3-reopen-transform.test.ts :: renders a declared-format date with a two-digit year literally"
+   ],
+   "commit": "ed09809",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-007",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/mc3-reopen-transform.test.ts :: handles the 1900 system edges: 0, 60, 61, the last day of 9999 and one beyond",
+    "test/mc3-reopen-transform.test.ts :: handles the 1904 system edges: 0, negatives, the last day of 9999 and one beyond"
+   ],
+   "commit": "ed09809",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-008",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/transform.test.ts :: [R2-008] a nonexistent local time in the declared zone is unresolved and preserved, never shifted",
+    "test/unit/transform.test.ts :: [R2-008] a plan whose tzdata version differs from the runtime's is refused"
+   ],
+   "commit": "ce4b9ed, c33584e",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-009",
+   "class": "PLANNED",
+   "test": [
+    "test/mc3-reopen-validation.test.ts :: CREATE_ONLY: a record with no value for a required mapped field is isolated; the others are delivered",
+    "qualification/hubspot/run-import-qualification.mjs :: I11.requiredBlankIsRejected",
+    "qualification/hubspot/run-import-qualification.mjs :: I11.thePackagePredictedIt",
+    "qualification/salesforce/run-dataloader-qualification.mjs :: A8.requiredBlankIsRejected",
+    "qualification/salesforce/run-dataloader-qualification.mjs :: A8.thePackagePredictedIt"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "PLANNED(M1)"
+  },
+  {
+   "case": "R2-010",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/csv.test.ts :: does not rewrite a value a spreadsheet would read as a formula",
+    "test/unit/csv.test.ts :: round-trips through the reader byte for byte",
+    "test/integration/package.test.ts :: [R2-010] the import file keeps '=1+1' byte-exact while the human data view and formula-risk.csv neutralise it",
+    "test/integration/tamper.test.ts :: [R2-010] the verifier refuses a package whose human view carries an executable cell"
+   ],
+   "commit": "431bcea, 115ae98",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-011",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/ingest-hardening.test.ts :: refuses a workbook that contains two archive members with one name"
+   ],
+   "commit": "d0a53e5, d6fbca1",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-012",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/xlsx.test.ts :: refuses a document type declaration outright"
+   ],
+   "commit": "d0a53e5, d6fbca1",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-013",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/transform.test.ts :: delivers it with provenance when the configuration authorises it"
+   ],
+   "commit": "431bcea, b419156",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD024-OK",
+   "class": "PARTIAL",
+   "test": [
+    "test/property/invariants.test.ts :: produces identical artifacts twice",
+    "test/property/invariants.test.ts :: runMigration",
+    "test/integration/attested-run.test.ts :: [CMD024-engine] one subject validated twice yields identical evidence hashes; changing one bound body changes exactly its hash",
+    "test/integration/attested-run.test.ts :: [CMD024-engine] a subject that was altered after validation never verifies: an invalid receipt is never VALID",
+    "test/integration/attested-run.test.ts :: test/integration/tamper.test.ts",
+    "test/integration/public-consumer.test.ts :: [CMD024-OK][CMD024-DENY][CMD024-RACE] the installed package gives identical complete receipts, never a VALID bad one, and the same receipt on retry"
+   ],
+   "commit": "431bcea",
+   "reviewId": null,
+   "inheritedTo": [
+    "B08"
+   ],
+   "claimed": "PARTIAL(B08)"
+  },
+  {
+   "case": "CMD024-DENY",
+   "class": "PARTIAL",
+   "test": [],
+   "commit": "ed09809",
+   "reviewId": null,
+   "inheritedTo": [
+    "B08"
+   ],
+   "claimed": "PARTIAL(B08)"
+  },
+  {
+   "case": "CMD024-RACE",
+   "class": "PARTIAL",
+   "test": [],
+   "commit": "431bcea",
+   "reviewId": null,
+   "inheritedTo": [
+    "B06",
+    "B08"
+   ],
+   "claimed": "PARTIAL(B08)"
+  },
+  {
+   "case": "MC-07",
+   "class": "SIMULATED",
+   "test": [
+    "tools/release-dossier-selftest.mjs :: dossier.positive",
+    "tools/release-dossier-selftest.mjs :: mc07.differentExecutableSameVersion",
+    "tools/release-dossier-selftest.mjs :: mc07.sourceNotATar",
+    "tools/release-dossier-selftest.mjs :: mc07.preflightFalseFactUnderTrue",
+    "tools/release-dossier-selftest.mjs :: mc07.nullProvenance",
+    "test/integration/self-tests.test.ts :: [MC-07] release-dossier self-tests pass"
+   ],
+   "commit": "ed09809, 431bcea",
+   "reviewId": null,
+   "inheritedTo": [
+    "B02"
+   ],
+   "claimed": "SIMULATED"
+  },
+  {
+   "case": "S034",
+   "class": "PLANNED",
+   "test": [
+    "test/property/invariants.test.ts :: produces identical artifacts twice",
+    "test/unit/pack.test.ts :: carries no host in its container: mode 0644, uid and gid 0, a fixed mtime, gzip mtime 0 and OS byte 3"
+   ],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "PLANNED(evidence)"
+  },
+  {
+   "case": "S092",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "tools/evidence-selftest.mjs :: closure.onlyItsOwnInputsMoveTheFingerprint",
+    "tools/evidence-selftest.mjs :: closure.unresolvedImportRefusesToFingerprint",
+    "test/integration/self-tests.test.ts :: [S092] evidence self-tests pass"
+   ],
+   "commit": "431bcea, 115ae98",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-014",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/xlsx.test.ts :: refuses an archive that would expand beyond the configured limit"
+   ],
+   "commit": "d0a53e5, d6fbca1",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-015",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/csv.test.ts :: enforces the cell length limit with the numbers in the message"
+   ],
+   "commit": "d0a53e5, d6fbca1",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-016",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "test/unit/join.test.ts :: [R2-016] coGroup yields a hot key's first group after a bounded read and holds at most its buffer bound",
+    "test/unit/join.test.ts :: [R2-016] distinct targets of a key shared by n parents are found in linear work",
+    "test/unit/join.test.ts :: [R2-016] 100000 children of one parent give 100000 edges, counted independently of the join"
+   ],
+   "commit": "c3a527f, efbefcb",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-017",
+   "class": "PLANNED",
+   "test": [
+    "test/integration/public-consumer.test.ts :: profiles, proposes, runs, verifies and refuses tampering with only public exports",
+    "test/unit/pack.test.ts :: carries exactly the files and bytes \\",
+    "test/integration/self-tests.test.ts :: [R2-017] a same-version tarball with one hidden byte changed is refused before its install counts"
+   ],
+   "commit": "431bcea, 115ae98",
+   "reviewId": null,
+   "inheritedTo": [],
+   "claimed": "PLANNED(post-publication)"
+  }
+ ]
+}

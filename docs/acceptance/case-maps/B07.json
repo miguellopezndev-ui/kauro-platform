@@ -1,0 +1,433 @@
+{
+ "package": "B07",
+ "generatedBy": "node tools/ledger.mjs sidecars --write",
+ "source": {
+  "file": "docs/design/B07-case-map.md",
+  "sha256": "782774fbb9b6d09f9588f990c0e0962bb109e129d59be29ce0b52e8631056466"
+ },
+ "rows": [
+  {
+   "case": "S024",
+   "class": "PARTIAL",
+   "test": [
+    "packages/data-plane/test/container-inspection.test.ts :: S024: an XLSX with a traversal entry, duplicate entries, an XML entity or DTD, an external relationship, or an expansion beyond 1 GiB per part / 20 GiB total is refused CORRUPT_STRUCTURE, ACTIVE_CONTENT or RESOURCE_LIMIT — no write outside the attempt scratch, no network attempt, decompression stopped at the bound",
+    "packages/data-plane/test/container-inspection.test.ts :: D-ISO-1 negative controls: a probe that writes outside the attempt scratch is refused by the permission model and counted, a probe that connects or resolves a name is recorded by the network hooks and refused",
+    "apps/control/test/upload-inspection.test.ts :: S024 end to end: the hostile workbook is REJECTED with its class and no accepted generation, file or table exists",
+    "apps/control/test/end-to-end.test.ts :: b07/integration end to end: S024 and S053 through the handlers — a hostile workbook and a completion claiming a false size, each reported through CompleteUpload, are REJECTED by UPLOAD_INSPECTION with their class while an honest workbook's worksheet is admitted; GetUpload and GetInspection answer the control plane's receipts within their routes' contracts; STORAGE_LIFECYCLE deletes the rejected quarantine generations and AUTHORITY_JOURNAL tombstones both rejections; a whole control-plane cycle then finds nothing to repair",
+    "packages/persistence/test/source-migrations.test.ts :: S054 at the database: COVERED_CLEAN requires complete coverage of this object by pinned, fresh signatures — a skipped part or byte, a stale or future signature database, nothing expected, a container shorter than the object, a widened signature age are never clean (B07-F4) — and admission requires every separate result"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "S053",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: S053 at the database: a receipt describes exactly the recorded provider observation, and an admitted file names exactly the generation, digest and length its receipt observed and promoted",
+    "packages/persistence/test/source-adapters.test.ts :: the upload lifecycle through every UploadSessionRepository, SessionSecretRepository, StoredObjectRepository, InspectionReceiptRepository and SourceFileRepository method — reserve, attach, issue, report, claim, observe, inspect, promote, admit — each write by the runtime role that owns it, every instant the server's, the inventory frozen and customer text withheld from the control plane",
+    "packages/persistence/test/source-migrations.test.ts :: request handlers never enter the control plane's states and never write its evidence: an admission, a rejection, an expiry, READY_TO_SEAL, a revision's or a record's retention expiry is refused to kauro_app",
+    "packages/persistence/test/source-migrations.test.ts :: entering a lifecycle state without the facts its registry guard names is refused: all_uploads_completed without the agency's selection, READY_TO_SEAL without a complete evaluation, REJECTED without a failed one, a selection against another inventory or uploads in flight, SEALED without its manifest, seal anchor or retention record, a closed revision with an upload in flight",
+    "packages/data-plane/test/container-inspection.test.ts :: the detected format is the bytes', never the declaration's; an observed length the bytes contradict, an empty object and an object beyond the per-file bound are refused with the container at its verified length",
+    "apps/control/test/upload-inspection.test.ts :: S053: a completion claiming another generation, a false size or a false hash is REJECTED CLAIM_MISMATCH on the server's own observation; the true neighbour is admitted at the observed generation",
+    "apps/control/test/end-to-end.test.ts :: b07/integration end to end: S024 and S053 through the handlers — a hostile workbook and a completion claiming a false size, each reported through CompleteUpload, are REJECTED by UPLOAD_INSPECTION with their class while an honest workbook's worksheet is admitted; GetUpload and GetInspection answer the control plane's receipts within their routes' contracts; STORAGE_LIFECYCLE deletes the rejected quarantine generations and AUTHORITY_JOURNAL tombstones both rejections; a whole control-plane cycle then finds nothing to repair",
+    "apps/api/test/cmd017-seal-revision.test.ts :: DENY (B07-R1): the provider replaced or lost an included file's accepted generation after the evaluation and before any object inventory revoked it — the file still ADMITTED, the stored file and evaluation still agreeing — so the seal's provider hold, placed with the counted generation as its precondition, is refused and the seal answers 409 GENERATION_CHANGED; a provider that cannot answer is 503 CAPACITY_UNAVAILABLE GENERATION_NOT_OBSERVED; nothing is sealed, each refused attempt's hold record is closed and released, and the same key seals once the provider holds the counted generation",
+    "apps/api/test/cmd017-seal-revision.test.ts :: RACE (B07-R1, provider hold): the seal stopped AFTER its provider observation and hold and BEFORE its commit — (a) at its journal commit, the whole seal written; (b) waiting on the revision row another transaction holds — while the provider is asked to replace the accepted generation: the held generation refuses the replacement (OBJECT_HELD), the seal commits, and what it sealed is the generation the provider still holds live; nothing seals a generation that vanished",
+    "apps/control/test/seal-holds.test.ts :: B07-R1 release retries, the reviewer's reproduction of the re-check of 77d5fa6: a failed seal's release left RELEASING (the provider did not answer), the file still ADMITTED and the revision READY_TO_SEAL; past the claim's bound two release retries run — the first held at the provider (storage.holdNext releaseHold), the second finds the release claimed by the first and leaves it (IN_FLIGHT), recording nothing; a new SealRevision meanwhile places no hold while a release of the generation may still land (503 GENERATION_NOT_OBSERVED, nothing sealed); the first release then lands and is recorded by its claimant, the accepted object is overwritten and the seal resumed: nothing seals a generation that vanished (on 77d5fa6 the second retry recorded RELEASED, the seal held the generation, the late release cleared that hold, the overwrite succeeded and the seal committed the vanished generation)",
+    "apps/control/test/seal-holds.test.ts :: B07-R1 (third re-check) the reviewer's reproduction of the re-check of 09faf25: a seal fails before its commit and its own cleanup release is held at the provider (storage.holdNext releaseHold) until boundedProviderCall answers TIMEOUT while the call stays pending there; past that claim's 910-second in-flight bound (the TEST CLOCKs 960 s ahead) a retry releases and records RELEASED; a new SealRevision places its hold and waits at its journal commit; the original release then lands, an overwrite of the accepted object is attempted and the seal resumes — the delayed release names the metageneration of the hold incarnation it was sent for, so it fails its precondition (412) and clears nothing: the new hold survives, the overwrite is refused OBJECT_HELD and the seal commits the live held generation (on 09faf25 the delayed release cleared the new hold, the overwrite succeeded and the seal committed a replaced generation)",
+    "packages/application/test/source-provider-fakes.test.ts :: the labelled object-storage fake answers a finalized session with the completion reference the storage port parses into a claim — a forged generation, size or hash is still only a claim the observation contradicts, a foreign or malformed reference is MALFORMED — and refuses a misaligned chunk, a length other than declared and a destination outside the platform grammar"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "S054",
+   "class": "PARTIAL",
+   "test": [
+    "packages/domain/test/source-model.test.ts :: S054: a fully covered harmless file is COVERED_CLEAN; the engine's exit code and verdict never decide",
+    "packages/domain/test/source-model.test.ts :: S054: the scanner skipped an oversized part and exited clean -> NOT_SCANNED, never clean with a warning (21: a scanner skip labelled clean)",
+    "packages/domain/test/source-model.test.ts :: S054 neighbours: detection is BLOCKED whatever else happened; engine failures are ERROR; stale or unpinned engines are NOT_SCANNED",
+    "packages/domain/test/source-model.test.ts :: B07-F4: scan coverage is judged against the object — an expected list without the container, or with the container at another length than observed, is never clean",
+    "packages/persistence/test/source-migrations.test.ts :: S054 at the database: COVERED_CLEAN requires complete coverage of this object by pinned, fresh signatures — a skipped part or byte, a stale or future signature database, nothing expected, a container shorter than the object, a widened signature age are never clean (B07-F4) — and admission requires every separate result",
+    "packages/persistence/test/source-adapters.test.ts :: compare-and-swap and fences: a stale version answers STALE with the current version and state and writes nothing; a session issue or an inspection outcome of an attempt that no longer holds its fence is FENCE_DISCIPLINE; claimInspectionAttempt returns the database's claim instant exactly, and a receipt of an earlier attempt or one not starting at its claim is refused",
+    "packages/data-plane/test/scan-coverage.test.ts :: S054: an oversized part the labelled fake scanner skips with exit code 0 yields NOT_SCANNED INCOMPLETE_SCAN; the harmless file it covers fully, container at its observed length, is COVERED_CLEAN",
+    "packages/data-plane/test/scan-coverage.test.ts :: S054 neighbours through the labelled fake: a scan budget spent mid-object, an encrypted, failing or timed-out part, the EICAR test token, stale or future signatures, a drifted configuration and a container at another length than observed are never COVERED_CLEAN, each with its rejection class"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-051",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: R2-051 at the database: after the application deadline the session is tombstoned; a late object is registered as a quarantined residual and deleted under its generation; the deletion records the provider residual the location read-back implies; nothing of it is ever admitted",
+    "packages/persistence/test/source-migrations.test.ts :: B07-F2: every lifecycle instant is the server's — a reservation dated ahead, an expiry at the deadline value before the deadline, a seal dated back, an anchor ahead and a record or revision expiry dated ahead are refused; nothing is accepted after the deadline; only the labelled test clock of a test cluster stands a fixture in the past",
+    "packages/persistence/test/source-migrations.test.ts :: retention anchors survive failure: a reservation commits with its initiation anchor or not at all, each anchor is written once per subject, the hard cap never moves, and neither an upload, a record nor its revision expires before the governing deadline",
+    "packages/persistence/test/source-migrations.test.ts :: the provider session secret is readable by its requester only while UPLOADING and unexpired, by the control plane only when bound to the agency, and by nobody else",
+    "packages/persistence/test/source-migrations.test.ts :: N2: the provider-session evidence is the control plane's — a request handler's cancellation has the database request the provider cancellation, but no request handler records the provider's answer, reopens a session by an unobserved completion, or appends an event type of the control plane",
+    "packages/persistence/test/source-adapters.test.ts :: the deadline edges on the server clock: findDeadlinePassed finds live and unsealed-admitted uploads past their deadline across agencies (never a sealed one), reservation_expired and intake_deadline_reached commit only at or after the deadline — requesting the provider cancellation of an issued session — and nothing is accepted after it",
+    "packages/persistence/test/source-adapters.test.ts :: cancel_upload writes no provider-cancellation column: the database requests the provider cancellation with the tombstone of an issued session at the tombstone's instant, the control plane alone records the answer (UNCERTAIN, then CONFIRMED) and purges the secret, and an unissued reservation's cancellation requests nothing (D-ROLE-3)",
+    "packages/persistence/test/source-adapters.test.ts :: recordDeletion records the provider residual the latest location read-back implies, at the server's instant — refused at a location never read back; recordLocationPolicy and locationPolicyAt answer the read-back as stored; a failed deletion is retried; recordProviderResidual records the provider-reported expiry; the inventory enumerates raw, derived and residual objects",
+    "packages/persistence/test/source-adapters.test.ts :: no early expireRecord: a record whose effective deadline lies ahead is neither due nor expirable (LIFECYCLE_BINDING_MISSING) and its revision not due for retention_expires, while one whose deadline passed expires at the server's instant with its event, and the revision then expires by retention_expires and is available no more",
+    "packages/application/test/source-provider-fakes.test.ts :: the labelled object-storage fake keeps a resumable session usable past the application deadline until its provider horizon, answers cancellation CONFIRMED, UNSUPPORTED or UNCERTAIN as scripted, refuses an overwrite by generation precondition and reports its evidence class SIMULATED",
+    "packages/application/test/source-provider-fakes.test.ts :: the labelled object-storage fake reads and copies only an exact generation, deletes by generation (DELETED, ALREADY_ABSENT, PRECONDITION_FAILED) and keeps a deleted generation soft-deleted for the retention its read-back reports; a later policy change never shortens a retention already applied",
+    "packages/application/test/source-provider-fakes.test.ts :: the labelled session-vault fake seals a session reference with AES-256-GCM under its test key, the binding — agency, upload, requester, attempt — as associated data, and refuses to open it under another binding, another key or a tampered secret, never returning another upload's plaintext; evidence class SIMULATED",
+    "apps/control/test/storage-lifecycle.test.ts :: R2-051: the deadline sweeper expires a reservation at 24 h on the server clock while the fake provider session stays usable; the provider cancellation is requested and recorded (CONFIRMED, UNSUPPORTED, UNCERTAIN reconciled to the horizon); a late completion through the session is registered RESIDUAL and deleted by generation; the requester's late completion report through the source store is refused and nothing of it is admitted",
+    "apps/api/test/cmd014-complete-upload.test.ts :: DENY: another member's upload → 403 UPLOAD_NOT_OWNED; RESERVED → 409 SESSION_NOT_ISSUED; CANCELLED → 409 UPLOAD_CANCELLED; past the deadline → 409 RESERVATION_EXPIRED; a malformed reference → 400 COMPLETION_REF_MALFORMED; a claimed size and hash never mark the file ready",
+    "apps/control/test/end-to-end.test.ts :: FINAL-N3 on b07/integration: R2-051 across both halves — a reservation initiated twenty-five hours ago on the labelled TEST CLOCK is expired by UPLOAD_DEADLINES on the server clock while its provider session stays usable; the requester's late CompleteUpload of an object written through that session afterwards is 409 RESERVATION_EXPIRED through the CMD014 handler, STORAGE_LIFECYCLE cancels the session and deletes the late object by generation as a RESIDUAL, AUTHORITY_JOURNAL appends the expired upload's tombstone, and nothing of it is admitted",
+    "apps/control/test/storage-lifecycle.test.ts :: B07-R4: an unresolved provider cancellation outlives its provider horizon — STORAGE_LIFECYCLE and PROVIDER_SESSION_RECONCILIATION answered UNCERTAIN while the horizon was ahead, keeping the bearer record for the next attempt; once the horizon has passed on the server clock, PROVIDER_SESSION_RECONCILIATION still finds the record and purges it without asking the provider, the recorded state staying UNCERTAIN; agencies whose lapsed records were purged earlier never hide a later one"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [
+    "B15",
+    "B16"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-052",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: R2-052: two reservations that each fit alone serialize on the revision; only a combination within five billion bytes commits, and the per-file envelope holds",
+    "packages/persistence/test/source-migrations.test.ts :: the quota ledgers cannot be edited around the uploads they summarize (KA070 at commit)",
+    "packages/persistence/test/source-migrations.test.ts :: B07-F10: the ledgers are checked by a write that changed what an upload holds, in one snapshot — a ledger-neutral edge commits even while a ledger disagrees (never a false, nonretryable KA070), a ledger-changing edge is still refused KA070",
+    "packages/persistence/test/source-adapters.test.ts :: R2-052 through UploadSessionRepository.insert: two reservations that each fit alone serialize on the revision row (the wait observed in pg_stat_activity) and the loser is PRECONDITION_FAILED REVISION_QUOTA_EXCEEDED; the exact fit commits, the fifty-first file is REVISION_FILE_LIMIT and a file above 2e9 bytes is FILE_TOO_LARGE",
+    "apps/api/test/cmd013-reserve-upload.test.ts :: RACE (R2-052): two ReserveUpload calls that each fit the remaining quota — the second waits on the revision and is answered 409 REVISION_QUOTA_EXCEEDED; the ledger holds exactly the admitted combination"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD012-OK",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: lineage: a successor names a predecessor of its own project, a predecessor is superseded only by the successor that names it, and it is replaced at most once",
+    "packages/persistence/test/source-adapters.test.ts :: CMD012 through the adapters and firstSeals of reused bytes: the successor supersedes its sealed predecessor, the project pointer moves, the impact map names the plans bound to the old manifest, and a seal of the reused file is anchored on the first seal of the bytes with its fourteen days — a record restarting the clock at this seal is refused; replacementsSince and availabilityOf answer from the lineage and the records",
+    "packages/persistence/test/source-adapters.test.ts :: CMD012 over a mutable predecessor through the adapters: cancel_revision cancels it with its uploads in flight, releases their quota and names the successor (replacementsSince CANCELLED); a second mutable revision is REVISION_NOT_MUTABLE and a second successor of one predecessor PREDECESSOR_NOT_CURRENT",
+    "apps/api/test/cmd012-create-revision.test.ts :: OK: an OPERATOR replaces the project's SEALED revision — the predecessor SUPERSEDED with its manifest, files and record intact, a DRAFT successor naming it, the project pointer moved, the impact map naming the plans and approvals bound to the old manifest",
+    "apps/api/test/cmd012-create-revision.test.ts :: OK: replacing a mutable revision cancels it with its uploads in flight, their INTAKE_CANCELLED anchors, and releases their quota",
+    "apps/control/test/end-to-end.test.ts :: b07/integration end to end: CancelUpload and a CreateRevision over a mutable revision with an upload in flight reach STORAGE_LIFECYCLE and AUTHORITY_JOURNAL — each provider session the handler issued and sealed is cancelled with the reference the vault opens under the handler's binding, the answer recorded and the bearer record purged; a late object written through the replaced revision's session is registered RESIDUAL and deleted by generation; the tombstones of both cancelled uploads and of the cancelled revision are appended once each, and the late CompleteUpload is 409 UPLOAD_CANCELLED",
+    "apps/api/test/b07-b09-seams.test.ts :: B07+B09 seam, SourceLineageReader (B09 D-QUOTE-B6, B07 D-REV-1): the replacement's lineage is CMD012's — read by the payment service in its adopted agency under its own column grant: the replaced and replacement revisions, the replacement SEALED once the source lifecycle sealed it, with the evidence hash of the path; a revision sealed beside the paid one without lineage answers none",
+    "apps/api/test/b09-payment-service.test.ts :: D-QUOTE-B6: the PurchaseRebinder re-binds a paid capture to the included pre-execution source replacement in one SERVICE unit of work — the re-binding, the replaced entitlement REVOKED SOURCE_REPLACED (PRE_EXECUTION), the paid quote SUPERSEDED by the replacement, the replacement ACCEPTED_FOR_CHECKOUT and its entitlement on the same capture; a unit of work that adopted no stored operation is refused before anything is read, without the source lifecycle's lineage it is LINEAGE_MISSING, and once used the allowance is spent"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [
+    "B09",
+    "B10"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD012-DENY",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: lineage: a successor names a predecessor of its own project, a predecessor is superseded only by the successor that names it, and it is replaced at most once",
+    "apps/api/test/cmd012-create-revision.test.ts :: DENY: VIEWER → 403 ROLE_INSUFFICIENT; foreign project → 404; stale project version → 409 STALE_VERSION; a predecessor of another project → 400 UNKNOWN_REFERENCE; not the current revision → 409 PREDECESSOR_NOT_CURRENT; nothing committed",
+    "apps/api/test/cmd012-create-revision.test.ts :: DENY: after the replacement, ApprovePlan of a plan bound to the superseded source is 422 SOURCE_EXPIRED and no plan, receipt or approval names the new revision",
+    "apps/api/test/b07-b09-seams.test.ts :: B07+B09 seam, CommercialScopeInspector (B07 §17 item 7, B09 §15 item 6): CreateRevision over a revision a paid purchase rests on names its live CommercialAuthorization — in the reply's invalidated authority and in dataset_revision.superseded.v1 — read from B09's commercial authorizations in CMD012's own unit of work; a replaced revision nothing was bought on names none"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [
+    "B08",
+    "B09"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD012-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: revisions accept uploads only while DRAFT or UPLOADING, a project holds one mutable revision, and object names are opaque and scoped to their zone and agency",
+    "packages/persistence/test/source-migrations.test.ts :: lineage: a successor names a predecessor of its own project, a predecessor is superseded only by the successor that names it, and it is replaced at most once",
+    "packages/persistence/test/source-adapters.test.ts :: CMD012 over a mutable predecessor through the adapters: cancel_revision cancels it with its uploads in flight, releases their quota and names the successor (replacementsSince CANCELLED); a second mutable revision is REVISION_NOT_MUTABLE and a second successor of one predecessor PREDECESSOR_NOT_CURRENT",
+    "apps/api/test/cmd012-create-revision.test.ts :: RACE: two CreateRevision calls on one project version → one 201, one 409 STALE_VERSION; identical retry replays; the same key with another predecessor → 409 IDEMPOTENCY_CONFLICT; a crash between the inserts commits nothing"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD013-OK",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: the legitimate lifecycle passes every guard — reserve, issue, report, observe, inspect, promote, admit, select, evaluate, seal, anchor and retain — each write by the runtime role that owns it",
+    "packages/persistence/test/source-migrations.test.ts :: an agency holds two concurrent upload sessions: the third is refused by the capacity ledger, two racing reservations for the last slot serialize on it, and a tombstoned upload frees its slot exactly once",
+    "packages/persistence/test/source-adapters.test.ts :: the upload lifecycle through every UploadSessionRepository, SessionSecretRepository, StoredObjectRepository, InspectionReceiptRepository and SourceFileRepository method — reserve, attach, issue, report, claim, observe, inspect, promote, admit — each write by the runtime role that owns it, every instant the server's, the inventory frozen and customer text withheld from the control plane",
+    "packages/persistence/test/source-adapters.test.ts :: runSource binds the context of its unit of work: serverInstant() is the database's transaction time to the microsecond and every stamp the adapters write equals it — no caller instant reaches SQL; a SYSTEM context binds the agency of its work item, and an unbound one discovers work but registers nothing",
+    "apps/api/test/cmd013-reserve-upload.test.ts :: OK: an OPERATOR reserves 1 MB on a DRAFT revision — RESERVED then UPLOADING with the protected session delivered to the requester only, the revision UPLOADING, the quota and slot held, the deadline exactly 24 h after the initiation anchor at the server instant, the session sealed and never journaled"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD013-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: the provider session secret is readable by its requester only while UPLOADING and unexpired, by the control plane only when bound to the agency, and by nobody else",
+    "packages/persistence/test/source-migrations.test.ts :: R2-052: two reservations that each fit alone serialize on the revision; only a combination within five billion bytes commits, and the per-file envelope holds",
+    "packages/persistence/test/source-migrations.test.ts :: revisions accept uploads only while DRAFT or UPLOADING, a project holds one mutable revision, and object names are opaque and scoped to their zone and agency",
+    "packages/persistence/test/source-migrations.test.ts :: N4: tenant-scope pairs are bound by composite keys — a retention record's client is its project's client, and an upload is requested by the acting person through their own live operator membership, the pair bound for every writer",
+    "packages/persistence/test/source-adapters.test.ts :: D-PAIR-1 through UploadSessionRepository.insert: a request handler reserves only as the acting person through their own live OWNER, ADMIN or OPERATOR membership — another member's membership, a pair of one member's membership with another person and a VIEWER's own membership are refused, and nothing of them commits",
+    "packages/persistence/test/source-adapters.test.ts :: R2-052 through UploadSessionRepository.insert: two reservations that each fit alone serialize on the revision row (the wait observed in pg_stat_activity) and the loser is PRECONDITION_FAILED REVISION_QUOTA_EXCEEDED; the exact fit commits, the fifty-first file is REVISION_FILE_LIMIT and a file above 2e9 bytes is FILE_TOO_LARGE",
+    "apps/api/test/cmd013-reserve-upload.test.ts :: DENY: VIEWER → 403; foreign revision → 404; INSPECTING revision → 409 REVISION_NOT_ACCEPTING_UPLOADS; 2e9 + 1 bytes → 409 FILE_TOO_LARGE; a third session → 429 UPLOAD_CONCURRENCY_LIMITED; DRAFT agency → 409 AGENCY_NOT_ACTIVE; another member's session read → UNAVAILABLE NOT_REQUESTER — no provider call made"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD013-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: a reservation and a revision transition are ordered by the revision row: a cancellation in flight makes a later reservation wait and refuses it; a reservation in flight makes the cancellation wait, which then must tombstone it",
+    "packages/persistence/test/source-migrations.test.ts :: an agency holds two concurrent upload sessions: the third is refused by the capacity ledger, two racing reservations for the last slot serialize on it, and a tombstoned upload frees its slot exactly once",
+    "packages/persistence/test/source-adapters.test.ts :: the capacity race through UploadSessionRepository.insert: two reservations for the agency's last session slot serialize on its capacity ledger (the wait observed in pg_stat_activity) and the loser is ADMISSION_LIMITED UPLOAD_CONCURRENCY_LIMITED; a tombstoned upload frees its slot and its bytes exactly once",
+    "packages/persistence/test/source-adapters.test.ts :: compare-and-swap and fences: a stale version answers STALE with the current version and state and writes nothing; a session issue or an inspection outcome of an attempt that no longer holds its fence is FENCE_DISCIPLINE; claimInspectionAttempt returns the database's claim instant exactly, and a receipt of an earlier attempt or one not starting at its claim is refused",
+    "apps/api/test/cmd013-reserve-upload.test.ts :: RACE: identical retry → the same reservation and the session re-delivered; the same key with another declaration → 409; a retry while the first is pending → 409 OPERATION_PENDING; a crash after the intent resumes under a new fence and issues one session; a crash after the provider call cancels the undelivered session"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD014-OK",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: the legitimate lifecycle passes every guard — reserve, issue, report, observe, inspect, promote, admit, select, evaluate, seal, anchor and retain — each write by the runtime role that owns it",
+    "packages/persistence/test/source-migrations.test.ts :: S053 at the database: a receipt describes exactly the recorded provider observation, and an admitted file names exactly the generation, digest and length its receipt observed and promoted",
+    "packages/persistence/test/source-adapters.test.ts :: the upload lifecycle through every UploadSessionRepository, SessionSecretRepository, StoredObjectRepository, InspectionReceiptRepository and SourceFileRepository method — reserve, attach, issue, report, claim, observe, inspect, promote, admit — each write by the runtime role that owns it, every instant the server's, the inventory frozen and customer text withheld from the control plane",
+    "packages/data-plane/test/container-inspection.test.ts :: the worksheet inventory reports visibility, formulas and their caches, merged cells, hidden rows and columns and positional columns with label states; the expected scan parts are the container at its verified length and every part at its verified expanded length",
+    "packages/data-plane/test/stage-one-composition.test.ts :: stage-1 composition: a workbook finalized through the labelled storage fake's resumable session is observed by stat, inspected in isolation and scanned by the labelled scanner fake through the storage port's exact-generation read on the database clock — COVERED_CLEAN at the observed length; its promotion copy is re-read to the same digest and previewed, a second copy over the live destination is refused, and a generation the storage no longer holds is never read in its place; every provider record SIMULATED",
+    "apps/api/test/cmd014-complete-upload.test.ts :: OK: the requester reports completion → 202 ACCEPTED (operationId = uploadId, VERIFYING, status path, poll after 5 s); nothing is admitted by the request",
+    "apps/control/test/upload-inspection.test.ts :: OK: UPLOAD_INSPECTION observes, hashes, inspects, scans, promotes and admits the file (source_file.admitted.v1); the revision stays UPLOADING until the agency's selection closes the intake",
+    "apps/control/test/end-to-end.test.ts :: b07/integration end to end: ReserveUpload, the browser's upload through its session, CompleteUpload, UPLOAD_INSPECTION, the manifest intake, SelectInputTables, SELECTION_EVALUATION and SealRevision compose — each command through the application's handler on B06's pipeline, each continuation through the control plane's dispatcher, every answer and every source read over the control plane's rows within its route's contract — and the seal names the generation the control plane observed and promoted; CreateRevision over it is tombstoned REVISION_SUPERSEDED"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD014-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: request handlers never enter the control plane's states and never write its evidence: an admission, a rejection, an expiry, READY_TO_SEAL, a revision's or a record's retention expiry is refused to kauro_app",
+    "packages/persistence/test/source-migrations.test.ts :: B07-F2: every lifecycle instant is the server's — a reservation dated ahead, an expiry at the deadline value before the deadline, a seal dated back, an anchor ahead and a record or revision expiry dated ahead are refused; nothing is accepted after the deadline; only the labelled test clock of a test cluster stands a fixture in the past",
+    "packages/persistence/test/source-adapters.test.ts :: the deadline edges on the server clock: findDeadlinePassed finds live and unsealed-admitted uploads past their deadline across agencies (never a sealed one), reservation_expired and intake_deadline_reached commit only at or after the deadline — requesting the provider cancellation of an issued session — and nothing is accepted after it",
+    "apps/api/test/cmd014-complete-upload.test.ts :: DENY: another member's upload → 403 UPLOAD_NOT_OWNED; RESERVED → 409 SESSION_NOT_ISSUED; CANCELLED → 409 UPLOAD_CANCELLED; past the deadline → 409 RESERVATION_EXPIRED; a malformed reference → 400 COMPLETION_REF_MALFORMED; a claimed size and hash never mark the file ready"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD014-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: cancellation wins while verification races: a stale inspection attempt can attach no receipt and admit no file; fences never move backwards; the provider cancellation result only moves forward; the quota is released once",
+    "packages/persistence/test/source-adapters.test.ts :: compare-and-swap and fences: a stale version answers STALE with the current version and state and writes nothing; a session issue or an inspection outcome of an attempt that no longer holds its fence is FENCE_DISCIPLINE; claimInspectionAttempt returns the database's claim instant exactly, and a receipt of an earlier attempt or one not starting at its claim is refused",
+    "apps/api/test/cmd014-complete-upload.test.ts :: RACE: identical retry → the same 202; the same key with another reference → 409; a duplicate completion under another key → the same 202 (D-SAPI-5), another claim → 409 COMPLETION_CLAIM_CONFLICT; CompleteUpload racing CancelUpload serializes on the revision row"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD015-OK",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: an agency holds two concurrent upload sessions: the third is refused by the capacity ledger, two racing reservations for the last slot serialize on it, and a tombstoned upload frees its slot exactly once",
+    "packages/persistence/test/source-migrations.test.ts :: B07-F1: the last open upload cancelled (CMD015), expired (the deadline sweeper) or rejected (an inspection outcome) never strands the revision: each leaves it UPLOADING and closable by the selection of what was admitted",
+    "packages/persistence/test/source-migrations.test.ts :: R2-051 at the database: after the application deadline the session is tombstoned; a late object is registered as a quarantined residual and deleted under its generation; the deletion records the provider residual the location read-back implies; nothing of it is ever admitted",
+    "packages/persistence/test/source-migrations.test.ts :: N2: the provider-session evidence is the control plane's — a request handler's cancellation has the database request the provider cancellation, but no request handler records the provider's answer, reopens a session by an unobserved completion, or appends an event type of the control plane",
+    "packages/persistence/test/source-adapters.test.ts :: cancel_upload writes no provider-cancellation column: the database requests the provider cancellation with the tombstone of an issued session at the tombstone's instant, the control plane alone records the answer (UNCERTAIN, then CONFIRMED) and purges the secret, and an unissued reservation's cancellation requests nothing (D-ROLE-3)",
+    "apps/api/test/cmd015-cancel-upload.test.ts :: OK: the requester cancels an UPLOADING upload — CANCELLED, quota and slot released once, provider cancellation REQUESTED, the INTAKE_CANCELLED anchor; the revision stays UPLOADING",
+    "apps/control/test/storage-lifecycle.test.ts :: OK: STORAGE_LIFECYCLE cancels the provider session, records the result, purges the secret and deletes the quarantine objects by generation",
+    "apps/control/test/end-to-end.test.ts :: b07/integration end to end: CancelUpload and a CreateRevision over a mutable revision with an upload in flight reach STORAGE_LIFECYCLE and AUTHORITY_JOURNAL — each provider session the handler issued and sealed is cancelled with the reference the vault opens under the handler's binding, the answer recorded and the bearer record purged; a late object written through the replaced revision's session is registered RESIDUAL and deleted by generation; the tombstones of both cancelled uploads and of the cancelled revision are appended once each, and the late CompleteUpload is 409 UPLOAD_CANCELLED",
+    "packages/application/test/source-provider-fakes.test.ts :: the labelled object-storage fake keeps a resumable session usable past the application deadline until its provider horizon, answers cancellation CONFIRMED, UNSUPPORTED or UNCERTAIN as scripted, refuses an overwrite by generation precondition and reports its evidence class SIMULATED",
+    "apps/control/test/storage-lifecycle.test.ts :: B07-R4: an unresolved provider cancellation outlives its provider horizon — STORAGE_LIFECYCLE and PROVIDER_SESSION_RECONCILIATION answered UNCERTAIN while the horizon was ahead, keeping the bearer record for the next attempt; once the horizon has passed on the server clock, PROVIDER_SESSION_RECONCILIATION still finds the record and purges it without asking the provider, the recorded state staying UNCERTAIN; agencies whose lapsed records were purged earlier never hide a later one"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [
+    "B15",
+    "B16"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD015-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: cancellation wins while verification races: a stale inspection attempt can attach no receipt and admit no file; fences never move backwards; the provider cancellation result only moves forward; the quota is released once",
+    "packages/persistence/test/source-migrations.test.ts :: an agency holds two concurrent upload sessions: the third is refused by the capacity ledger, two racing reservations for the last slot serialize on it, and a tombstoned upload frees its slot exactly once",
+    "packages/persistence/test/source-adapters.test.ts :: the capacity race through UploadSessionRepository.insert: two reservations for the agency's last session slot serialize on its capacity ledger (the wait observed in pg_stat_activity) and the loser is ADMISSION_LIMITED UPLOAD_CONCURRENCY_LIMITED; a tombstoned upload frees its slot and its bytes exactly once",
+    "apps/api/test/cmd015-cancel-upload.test.ts :: DENY: another member → 403 UPLOAD_NOT_OWNED; ADMITTED → 409 UPLOAD_ADMITTED; already cancelled → 409 UPLOAD_TERMINAL; foreign → 404"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD015-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: D-LOCK-2 (B07-F14): a cancellation and an inspection outcome of the same revision are ordered by the revision row, never upload-first — whichever comes first, the other waits on the revision and then acts on the settled upload; neither deadlocks",
+    "packages/persistence/test/source-migrations.test.ts :: cancellation wins while verification races: a stale inspection attempt can attach no receipt and admit no file; fences never move backwards; the provider cancellation result only moves forward; the quota is released once",
+    "apps/api/test/cmd015-cancel-upload.test.ts :: RACE: two cancels on one version → one 200, one 409 STALE_VERSION; identical retry replays; the same key with another version → 409; a cancellation committed while UPLOAD_INSPECTION holds the revision row waits and then finds the upload settled"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD016-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: the legitimate lifecycle passes every guard — reserve, issue, report, observe, inspect, promote, admit, select, evaluate, seal, anchor and retain — each write by the runtime role that owns it",
+    "packages/persistence/test/source-migrations.test.ts :: B07-F1: the intake closes only by the agency's explicit selection — with two concurrent sessions per agency a three-file intake stays UPLOADING across the gap between reservations, the control plane can never close it, and the selection closes it once every upload is settled",
+    "packages/persistence/test/source-adapters.test.ts :: the revision lifecycle through SourceRevisionRepository, SelectionEvaluationRepository, SealedManifestRepository and RetentionRepository: the selection made against the revision's own inventory closes the intake (all_uploads_completed), is rebound and changed, the evaluation counts it READY_TO_SEAL, and the seal commits the manifest, the file set, the seal anchor and the UNPAID record of new bytes — every instant the server's",
+    "packages/persistence/test/source-adapters.test.ts :: SelectionManifestRepository.put is content-idempotent: the same body again answers the stored manifest with created false whatever id and instant the caller minted, another body is another manifest, and a body hash that is not the body's digest is refused",
+    "apps/api/test/cmd016-select-input-tables.test.ts :: OK: an OPERATOR stores a selection manifest (201, then the same body again → created false) and binds it on the UPLOADING revision — all_uploads_completed, the revision INSPECTING with the selection and inventory hashes, uncounted; SELECTION_EVALUATION then counts it READY_TO_SEAL",
+    "packages/data-plane/test/selection-evaluation.test.ts :: every selected file and table is counted: physical rows, logical records after projection, billable units, association edges — exact, per table and per projection",
+    "apps/control/test/end-to-end.test.ts :: B07-R2 end to end: a selection declaring two associations of one table is bound through SelectInputTables, counted by the real SELECTION_EVALUATION consumer — which persists each association's measured edges with its table, under the evaluation hash — and sealed by SealRevision with the sealed subject's per-association counts equal to an independent count, summing to the frozen association population"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD016-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: B07-F11: the database compares a selection with the revision's current inventory row by row — a manifest omitting an admitted file of the revision, omitting or mis-hashing a table of an included file, naming a table of no file it names, a file of another origin or a revoked file is refused; no table or column is appended once the file's upload left VERIFYING",
+    "packages/persistence/test/source-migrations.test.ts :: entering a lifecycle state without the facts its registry guard names is refused: all_uploads_completed without the agency's selection, READY_TO_SEAL without a complete evaluation, REJECTED without a failed one, a selection against another inventory or uploads in flight, SEALED without its manifest, seal anchor or retention record, a closed revision with an upload in flight",
+    "packages/persistence/test/source-migrations.test.ts :: no CHECK passes on a missing member: a selection manifest without its revision, inventory or file list, a COMPLETE evaluation without its counts, a sealed subject that names no revision and a manifest preimage beyond HASHING's four members are refused",
+    "packages/application/test/source-contracts.test.ts :: the B07 schemas compile under the strict validator; unknown members, coercible strings and oversized manifests are refused",
+    "packages/data-plane/test/selection-evaluation.test.ts :: hidden worksheets are counted only when the agency selects them with an acknowledgement; formulas are inert — a cached value is counted as stored, a missing or erroring cache, an external dependency or a rejected formula fails the table, and nothing is evaluated or fetched",
+    "packages/data-plane/test/selection-evaluation.test.ts :: the counting pass counts only the admitted bytes under the agency's choices: other bytes, an unknown pricing definition, a table of an excluded file, a revoked file, a parser of the other kind, an unconfirmed key, a projection over an unselected column, an invalid association, bytes undecodable as chosen and edges beyond the ceiling are refused, never silently dropped",
+    "apps/api/test/cmd016-select-input-tables.test.ts :: DENY: a manifest made against another inventory → 409 SELECTION_STALE; a hidden worksheet included without acknowledgement → 400 HIDDEN_SHEET_NOT_ACKNOWLEDGED; an undisposed table → 400 SELECTION_INCOMPLETE; uploads in flight → 409 UPLOADS_UNRESOLVED; VIEWER → 403; foreign → 404",
+    "packages/data-plane/test/selection-evaluation.test.ts :: B07-R3: a column the parser choice excludes as hidden never feeds the count — a projection whose key or fields name an excluded hidden column is refused PROJECTION_COLUMN_HIDDEN and nothing of it is counted, so a hidden formula's cached value never passes under REJECT_FORMULAS; the same projection with the hidden column included is counted under the formula policy, and a projection over the visible column counts with the hidden one excluded"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD016-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: a reservation and a revision transition are ordered by the revision row: a cancellation in flight makes a later reservation wait and refuses it; a reservation in flight makes the cancellation wait, which then must tombstone it",
+    "apps/api/test/cmd016-select-input-tables.test.ts :: RACE: two selections on one version → one 200, one 409 STALE_VERSION; identical retry replays; the same key with another manifest → 409; a selection racing the admission of the last open upload waits on the revision row and binds the settled inventory; a crash leaves the previous selection bound"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD017-OK",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: the legitimate lifecycle passes every guard — reserve, issue, report, observe, inspect, promote, admit, select, evaluate, seal, anchor and retain — each write by the runtime role that owns it",
+    "packages/domain/test/source-model.test.ts :: digests are domain separated; the manifest hash is exactly HASHING's KAURO_SOURCE_REVISION_V1 preimage and the sealed subject binds the revision (B07-F12)",
+    "packages/persistence/test/source-migrations.test.ts :: B07-F5: the unpaid hard cap belongs to the bytes — re-sealing reused bytes keeps their first seal's fourteen days, a seal whose bytes' window closed is refused, and neither a superseded revision nor its successor keeps the bytes admitted once their retention ended",
+    "packages/persistence/test/source-adapters.test.ts :: the revision lifecycle through SourceRevisionRepository, SelectionEvaluationRepository, SealedManifestRepository and RetentionRepository: the selection made against the revision's own inventory closes the intake (all_uploads_completed), is rebound and changed, the evaluation counts it READY_TO_SEAL, and the seal commits the manifest, the file set, the seal anchor and the UNPAID record of new bytes — every instant the server's",
+    "packages/persistence/test/source-adapters.test.ts :: CMD012 through the adapters and firstSeals of reused bytes: the successor supersedes its sealed predecessor, the project pointer moves, the impact map names the plans bound to the old manifest, and a seal of the reused file is anchored on the first seal of the bytes with its fourteen days — a record restarting the clock at this seal is refused; replacementsSince and availabilityOf answer from the lineage and the records",
+    "apps/api/test/cmd017-seal-revision.test.ts :: OK: an OPERATOR seals a READY_TO_SEAL revision — SEALED v5, the manifest (HASHING's preimage), the sealed subject and the file set with exact generations, the UNPAID record with hard deadline the first seal of the bytes + 14 days, one sealed event",
+    "apps/control/test/end-to-end.test.ts :: b07/integration end to end: ReserveUpload, the browser's upload through its session, CompleteUpload, UPLOAD_INSPECTION, the manifest intake, SelectInputTables, SELECTION_EVALUATION and SealRevision compose — each command through the application's handler on B06's pipeline, each continuation through the control plane's dispatcher, every answer and every source read over the control plane's rows within its route's contract — and the seal names the generation the control plane observed and promoted; CreateRevision over it is tombstoned REVISION_SUPERSEDED",
+    "apps/control/test/end-to-end.test.ts :: B07-R2 end to end: a selection declaring two associations of one table is bound through SelectInputTables, counted by the real SELECTION_EVALUATION consumer — which persists each association's measured edges with its table, under the evaluation hash — and sealed by SealRevision with the sealed subject's per-association counts equal to an independent count, summing to the frozen association population",
+    "apps/api/test/cmd017-seal-revision.test.ts :: B07-R1 hold record: a seal that commits keeps its provider hold SEALED (the generation held at the provider, OBJECT_HELD to a deletion); a seal refused after its hold was placed (reused bytes past their window, 409) and a seal that failed before its COMMIT (500) close their attempt's hold REFUSED and release it at the provider — the same key then holds again and seals; the loser of two seals on one version closes its hold and releases nothing the committed seal retains; the database refuses a hold of a revoked file, a second seal of a closed hold, and a release while a seal retains the generation",
+    "apps/control/test/seal-holds.test.ts :: B07-R1 RETENTION releases a sealed subject's provider hold when the retention of its bytes ends: sealed through SealRevision, the accepted generation is held and the provider refuses to delete it; before the hard deadline RETENTION releases nothing; past it (the TEST CLOCK fifteen days ahead) the file is revoked RETENTION_EXPIRED, the hold released at the provider before the deletion and the generation deleted; a release the provider does not answer leaves the hold RELEASING and the deletion DELETION_FAILED, and the next sweep past the attempt bound drives the release again so DELETION_RETRIES deletes"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [
+    "B03",
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD017-DENY",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: entering a lifecycle state without the facts its registry guard names is refused: all_uploads_completed without the agency's selection, READY_TO_SEAL without a complete evaluation, REJECTED without a failed one, a selection against another inventory or uploads in flight, SEALED without its manifest, seal anchor or retention record, a closed revision with an upload in flight",
+    "packages/persistence/test/source-migrations.test.ts :: S054 at the database: COVERED_CLEAN requires complete coverage of this object by pinned, fresh signatures — a skipped part or byte, a stale or future signature database, nothing expected, a container shorter than the object, a widened signature age are never clean (B07-F4) — and admission requires every separate result",
+    "packages/persistence/test/source-migrations.test.ts :: N1: sealed manifests and sealed file rows are the record of the seal that writes them — a file row added later to a sealed revision, a manifest dated back and a manifest or file row of a revision that is not sealing are refused, so no request handler keeps bytes admitted past their window or moves their first seal",
+    "packages/persistence/test/source-migrations.test.ts :: N4: tenant-scope pairs are bound by composite keys — a retention record's client is its project's client, and an upload is requested by the acting person through their own live operator membership, the pair bound for every writer",
+    "packages/persistence/test/source-migrations.test.ts :: B07-F2: every lifecycle instant is the server's — a reservation dated ahead, an expiry at the deadline value before the deadline, a seal dated back, an anchor ahead and a record or revision expiry dated ahead are refused; nothing is accepted after the deadline; only the labelled test clock of a test cluster stands a fixture in the past",
+    "packages/persistence/test/source-adapters.test.ts :: CMD012 through the adapters and firstSeals of reused bytes: the successor supersedes its sealed predecessor, the project pointer moves, the impact map names the plans bound to the old manifest, and a seal of the reused file is anchored on the first seal of the bytes with its fourteen days — a record restarting the clock at this seal is refused; replacementsSince and availabilityOf answer from the lineage and the records",
+    "apps/api/test/cmd017-seal-revision.test.ts :: DENY: a revoked admission → 409 INPUT_NOT_ADMITTED; a changed generation → 409 GENERATION_CHANGED; reused bytes past their window → 409 REUSE_NOT_AVAILABLE; selectionHash of another selection → 409 STALE_VERSION HASH_MISMATCH; stale version → 409; VIEWER → 403; foreign → 404 — the revision stays READY_TO_SEAL",
+    "apps/api/test/cmd017-seal-revision.test.ts :: DENY (B07-R1): the provider replaced or lost an included file's accepted generation after the evaluation and before any object inventory revoked it — the file still ADMITTED, the stored file and evaluation still agreeing — so the seal's provider hold, placed with the counted generation as its precondition, is refused and the seal answers 409 GENERATION_CHANGED; a provider that cannot answer is 503 CAPACITY_UNAVAILABLE GENERATION_NOT_OBSERVED; nothing is sealed, each refused attempt's hold record is closed and released, and the same key seals once the provider holds the counted generation",
+    "packages/persistence/test/source-adapters.test.ts :: B07-R1: the provider hold record of a seal (migration 0020, D-HOLD-1..D-HOLD-3) — a request handler intends a hold only as the acting person, at the server's instant with its 900-second bound, never for a revoked file; the control plane intends none; a release is refused while an attempt is INTENDED or a seal retains the generation, and no hold is intended while a release is being carried out; a hold is abandoned only past its bound, sealed only with a sealed file set, closed REFUSED only by a request handler and ABANDONED only by the control plane; its facts are set once, and another agency sees none of it",
+    "apps/api/test/cmd017-seal-revision.test.ts :: B07-R1 hold record: a seal that commits keeps its provider hold SEALED (the generation held at the provider, OBJECT_HELD to a deletion); a seal refused after its hold was placed (reused bytes past their window, 409) and a seal that failed before its COMMIT (500) close their attempt's hold REFUSED and release it at the provider — the same key then holds again and seals; the loser of two seals on one version closes its hold and releases nothing the committed seal retains; the database refuses a hold of a revoked file, a second seal of a closed hold, and a release while a seal retains the generation",
+    "packages/persistence/test/source-adapters.test.ts :: B07-R1 (second re-check), the release claim and its in-flight bound (migration 0020, D-HOLD-3) — a decided release is claimed by exactly one caller: its claim carries a fence token, a 900-second bound and an in-flight bound 10 seconds (PROVIDER_CALL_TIMEOUT_MS) past it; a second caller within the bound is left out (IN_FLIGHT) and the database refuses a second live claim; an answer of a caller that holds no claim, or of a claimant another caller superseded once its claim lapsed, is refused and records nothing (the adapter answers STALE, the database KA071), and no hold is released but under the claim answered in that very transaction; the claimant's own answer records; a new hold is refused while any claim may still land at the provider — until it is answered or its in-flight bound passed (the TEST CLOCK) — and admitted after it",
+    "apps/control/test/seal-holds.test.ts :: B07-R1 (second re-check) the seal re-asserts its holds after its commit and never answers a vanished generation silently: (a) a hold removed at the provider after the placement — outside every claim, even again while the re-assertion observes it — is placed again until the provider reports the live generation held (recorded HELD; a replacement is refused); (b) a generation released and replaced before the commit is recorded GENERATION_NOT_LIVE and handed to OBJECT_INVENTORY, which re-asserts it and revokes the file naming the sealed revision (GENERATION_MISSING: its first comparison already deleted the unregistered replacement); (c) a re-assertion the provider did not answer is left unconfirmed and OBJECT_INVENTORY re-asserts it once the attempt bound passed (never before); each runtime records only its own re-assertions",
+    "packages/persistence/test/source-adapters.test.ts :: B07-R1 (third re-check), the recorded hold incarnation (migration 0020, D-HOLD-4) — a hold records the metageneration its placement answered once, by the edge that ends its attempt (never again, never on another edge, never by the control plane), and seals only with it; a release claim names the greatest metageneration recorded for the holds it releases (the database refuses a claim naming another); the claimant may name a newer, re-observed one only while its claim is the object's latest, unanswered and live — an older or equal one, a lapsed, superseded or answered claim record nothing (the adapter answers STALE, the database KA071/KA072); a NOT_HELD answer (412, the generation live without a hold) releases the holds, having cleared nothing",
+    "apps/control/test/seal-holds.test.ts :: B07-R1 (third re-check) a claimed release names the metageneration of the hold incarnation it clears, and a 412 is re-observed, never retried blindly (D-HOLD-4): (a) two claimants of one failed seal's release past their bounds — the first times out and its call stays pending, the second's call is held — the first lands and clears the hold, so the second's, naming the same incarnation, fails its precondition: re-observed live without a hold it is recorded NOT_HELD, clearing nothing and issuing no other release; (b) a placement whose answer was lost lands while a failed seal's release is on its way (the hold placed again: a newer metageneration no record names) — the release fails its precondition, the claimant re-observes the generation live and held, records that metageneration under its live claim and releases under it"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD017-RACE",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/source-migrations.test.ts :: a seal and an intake-expiry revocation of its file are ordered by the file's transition lock: a seal in flight commits and the revocation that waited is refused; a revocation in flight commits and the seal that waited is refused",
+    "apps/api/test/cmd017-seal-revision.test.ts :: RACE: two seals on one version → one 200, one 409; identical retry replays; the same key with another hash → 409; a crash leaves the revision READY_TO_SEAL; a seal racing the intake-expiry sweeper through the product",
+    "apps/api/test/cmd017-seal-revision.test.ts :: RACE (B07-R1): the seal's hold placement held at the storage port while the provider replaces the accepted generation — released, the placement's generation precondition fails and the seal answers 409 GENERATION_CHANGED with nothing sealed; the seal never answers from what the provider held before the replacement",
+    "apps/api/test/cmd017-seal-revision.test.ts :: RACE (B07-R1, provider hold): the seal stopped AFTER its provider observation and hold and BEFORE its commit — (a) at its journal commit, the whole seal written; (b) waiting on the revision row another transaction holds — while the provider is asked to replace the accepted generation: the held generation refuses the replacement (OBJECT_HELD), the seal commits, and what it sealed is the generation the provider still holds live; nothing seals a generation that vanished",
+    "packages/application/test/source-provider-fakes.test.ts :: the labelled object-storage fake places a temporary hold on exactly the live generation under a generation precondition (another generation or none: GENERATION_NOT_LIVE, nothing held) and, while it is held, refuses every deletion and replacement of it — the port's delete, an out-of-band overwrite or deletion, a session finalizing or a copy onto its name — with OBJECT_HELD and nothing changed; released (idempotently, never another generation), the same deletion proceeds; the hold calls take hold points and scripted faults like every call (B07-R1, D-HOLD-1)",
+    "apps/control/test/seal-holds.test.ts :: B07-R1 crash between the provider hold and the commit: a seal whose process dies after its hold was placed — neither its unit of work nor its own release ran — leaves its hold INTENDED and the generation held (a replacement is still refused), nothing sealed; RETENTION leaves the attempt alone before its bound (and the database refuses to abandon it early) and, once the bound passed (the TEST CLOCK ahead), abandons it and releases the generation at the provider; the revision then seals with a new hold",
+    "apps/control/test/seal-holds.test.ts :: B07-R1 release retries, the reviewer's reproduction of the re-check of 77d5fa6: a failed seal's release left RELEASING (the provider did not answer), the file still ADMITTED and the revision READY_TO_SEAL; past the claim's bound two release retries run — the first held at the provider (storage.holdNext releaseHold), the second finds the release claimed by the first and leaves it (IN_FLIGHT), recording nothing; a new SealRevision meanwhile places no hold while a release of the generation may still land (503 GENERATION_NOT_OBSERVED, nothing sealed); the first release then lands and is recorded by its claimant, the accepted object is overwritten and the seal resumed: nothing seals a generation that vanished (on 77d5fa6 the second retry recorded RELEASED, the seal held the generation, the late release cleared that hold, the overwrite succeeded and the seal committed the vanished generation)",
+    "packages/persistence/test/source-adapters.test.ts :: B07-R1 (second re-check), the release claim and its in-flight bound (migration 0020, D-HOLD-3) — a decided release is claimed by exactly one caller: its claim carries a fence token, a 900-second bound and an in-flight bound 10 seconds (PROVIDER_CALL_TIMEOUT_MS) past it; a second caller within the bound is left out (IN_FLIGHT) and the database refuses a second live claim; an answer of a caller that holds no claim, or of a claimant another caller superseded once its claim lapsed, is refused and records nothing (the adapter answers STALE, the database KA071), and no hold is released but under the claim answered in that very transaction; the claimant's own answer records; a new hold is refused while any claim may still land at the provider — until it is answered or its in-flight bound passed (the TEST CLOCK) — and admitted after it",
+    "packages/application/test/source-provider-fakes.test.ts :: the labelled object-storage fake models the metageneration as Cloud Storage does (B07-R1 third re-check, D-HOLD-4): stat and a HELD placement report the hold and the metageneration; a written generation is at 1, every hold placement and every release that lands is a metadata update that increments it (also a placement on a held generation and a release of an unheld one), and a precondition that fails changes nothing; a release names the metageneration it clears — a stale one or another generation is 412 PRECONDITION_FAILED — and a release held at the provider keeps the precondition it was sent with, so landing after a newer placement it fails and the newer hold survives and refuses the overwrite; an effect whose answer was lost moved it on all the same; a new generation starts at 1",
+    "apps/control/test/seal-holds.test.ts :: B07-R1 (third re-check) the reviewer's reproduction of the re-check of 09faf25: a seal fails before its commit and its own cleanup release is held at the provider (storage.holdNext releaseHold) until boundedProviderCall answers TIMEOUT while the call stays pending there; past that claim's 910-second in-flight bound (the TEST CLOCKs 960 s ahead) a retry releases and records RELEASED; a new SealRevision places its hold and waits at its journal commit; the original release then lands, an overwrite of the accepted object is attempted and the seal resumes — the delayed release names the metageneration of the hold incarnation it was sent for, so it fails its precondition (412) and clears nothing: the new hold survives, the overwrite is refused OBJECT_HELD and the seal commits the live held generation (on 09faf25 the delayed release cleared the new hold, the overwrite succeeded and the seal committed a replaced generation)",
+    "packages/persistence/test/source-adapters.test.ts :: B07-R1 (third re-check), the recorded hold incarnation (migration 0020, D-HOLD-4) — a hold records the metageneration its placement answered once, by the edge that ends its attempt (never again, never on another edge, never by the control plane), and seals only with it; a release claim names the greatest metageneration recorded for the holds it releases (the database refuses a claim naming another); the claimant may name a newer, re-observed one only while its claim is the object's latest, unanswered and live — an older or equal one, a lapsed, superseded or answered claim record nothing (the adapter answers STALE, the database KA071/KA072); a NOT_HELD answer (412, the generation live without a hold) releases the holds, having cleared nothing",
+    "packages/persistence/test/source-adapters.test.ts :: B07-R1: the provider hold record of a seal (migration 0020, D-HOLD-1..D-HOLD-3) — a request handler intends a hold only as the acting person, at the server's instant with its 900-second bound, never for a revoked file; the control plane intends none; a release is refused while an attempt is INTENDED or a seal retains the generation, and no hold is intended while a release is being carried out; a hold is abandoned only past its bound, sealed only with a sealed file set, closed REFUSED only by a request handler and ABANDONED only by the control plane; its facts are set once, and another agency sees none of it"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B07-round7-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  }
+ ]
+}

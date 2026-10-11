@@ -1,0 +1,499 @@
+{
+ "package": "B16",
+ "generatedBy": "node tools/ledger.mjs sidecars --write",
+ "source": {
+  "file": null,
+  "registry": "packages/contracts/registry/program.json",
+  "note": "no case map yet: no evidence claimed"
+ },
+ "rows": [
+  {
+   "case": "S048",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S049",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S050",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S063",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S064",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S065",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S071",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S076",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S094",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-047",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-048",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-049",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-050",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-053",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-054",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-055",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-056",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-057",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-060",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-074",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-076",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-123",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-124",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-125",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-126",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD003-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD003-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD003-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD004-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD004-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD004-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD005-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD005-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD005-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD006-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD006-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD006-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD007-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD007-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD007-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD038-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD038-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD038-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD042-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD042-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD042-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD054-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD054-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD054-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD055-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD055-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD055-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD056-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD056-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD056-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD057-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD057-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD057-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD060-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD060-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD060-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  }
+ ]
+}

@@ -47,7 +47,9 @@ export function activateAgencyHandler(runtime: CommerceRequestRuntime, co: Agenc
           if (membership === null) throw new DomainFailure("INTEGRITY_FAILURE", "an activation was authorized without a membership");
           const body = envelope.body;
           const life = co.lifecycle(uow);
-          const agency = await uow.agencies.lock(agencyId);
+          // the agency's row FOR NO KEY UPDATE (never FOR UPDATE: the KEY SHARE of a reader's insert must not wait for it), then the
+          // exclusive half through the transition trigger (D10-TX-1)
+          const agency = (await life.lockAgencyRow(agencyId)) ? await uow.agencies.get(agencyId) : null;
           if (agency === null) throw new NotFoundFailure("agency");
           checkExpectedVersion(agency, body.expectedVersion);
           if (agency.state !== "DRAFT") {

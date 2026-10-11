@@ -25,11 +25,17 @@ export type { MigrationFile, AppliedMigration, ApplyOptions, ApplyAsOptions, App
 export { COMMERCIAL_UNIQUE_FAILURES } from "./sqlstate.js";
 export { SQLSTATE, failureOfSqlState, SOURCE_CONSTRAINT_FAILURES, EXECUTION_CONSTRAINT_FAILURES, AUDIT_CONSTRAINT_FAILURES, commerceReplayOf, COMMERCE_REPLAY_CONSTRAINTS, COMMERCE_INTEGRITY_CONSTRAINTS } from "./sqlstate.js";
 export { createPool, classifyError, KauroPool, PrivilegedRoleError, RUNTIME_ROLES } from "./pool.js";
+export { claimEnvironmentMinter } from "./environment.js";
+export type { DatabaseEnvironment, DatabaseEnvironmentName } from "./environment.js";
 export type { PoolConfig, PoolErrorEvent, PoolErrorSink, RuntimeRole, SafeErrorClassification, VerifiedConnection } from "./pool.js";
 export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidence.js";
 export { PgWebSessionStore, WEB_SESSION_STATEMENT_TIMEOUT_MS } from "./web-sessions.js";
 export type { StoredWebSession, NewStoredWebSession } from "./web-sessions.js";
-export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf } from "./unit-of-work.js";
+export { PgSessionFence } from "./session-fence.js";
+export type { LockedSession } from "./session-fence.js";
+export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf, bankRoutesOf, sessionFenceOf, effectInstantOf } from "./unit-of-work.js";
+export { PgBankRoutes } from "./repositories/bank-routes.js";
+export type { NewBankRoute, NewBankRouteVersion, NewTransferInstructions } from "./repositories/bank-routes.js";
 // processing authority (package B08, mandate B08-PERSISTENCE-EXECUTION; docs/design/B08-audit-approval-jobs.md §9, §10)
 export { createExecutionUnitOfWorkFactory, PgExecutionUnitOfWorkFactory, PgExecutionUnitOfWork, executionReadsOf } from "./unit-of-work.js";
 export { PgExecutionStore, PgExecutionReads, PgExecutionDiscovery, EXECUTION_CAPACITY_DOMAIN } from "./execution/index.js";
@@ -131,3 +137,5 @@ export { PgQuoteReads, quoteReadsOf } from "./commercial-quote-access.js";
 // what its sweeps find across agencies before each item is settled in a unit of work that adopts the item's agency
 export { PgCommissionWork, commissionWorkOf } from "./commission-service-access.js";
 export type { DueReservation, LedgerPurchase, ReleasableFundsHold, LineOnHeldFunds } from "./commission-service-access.js";
+export { ConnectionSecurityError, connectionSecurityOf, sslOptionsOf } from "./tls.js";
+export type { ConnectionSecurityInput, DatabaseTls, VerifiedSslOptions } from "./tls.js";

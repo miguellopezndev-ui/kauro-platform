@@ -1,0 +1,476 @@
+{
+ "package": "B09",
+ "generatedBy": "node tools/ledger.mjs sidecars --write",
+ "source": {
+  "file": "docs/design/B09-case-map.md",
+  "sha256": "7ab7b91e652991b4e4f9c75ae51827ebe8138560fdf96827d4c07c701b7bc404"
+ },
+ "rows": [
+  {
+   "case": "S057",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/b09-migrations.test.ts :: S058/S057: a capture of another payee is never a capture of the order; the obligation is allocated once and exactly; the authorization needs a completed capture that alone pays it",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F1: the request handlers cannot mint provider facts or execution authority — a capture fact, an observation, an attempt's result, a REFUND attempt, a learned provider identity, a CAPTURED order, available funds, a fee, a capture's status, an allocation, a case, a server refund request, a provider scope key, a re-binding and an entitlement written as kauro_app are refused; the payment service writes each",
+    "apps/api/test/b09-scenarios.test.ts :: S057: a browser return naming the provider order without a server capture creates no capture and no authorization; the order reads PENDING, then CHECKING while the capture is uncertain"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "S058",
+   "class": "PARTIAL",
+   "test": [
+    "packages/domain/test/commerce-capture-authority.test.ts :: S058: a capture of another provider, environment, order, payee or currency never matches the order; the amount is not identity",
+    "packages/persistence/test/b09-migrations.test.ts :: S058/S057: a capture of another payee is never a capture of the order; the obligation is allocated once and exactly; the authorization needs a completed capture that alone pays it",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F9: a mismatched capture response (DISPATCH_RESPONSE with its attempt) and a mismatched stored query (PROVIDER_QUERY with its artifact) are recorded as their specific exceptions in the operation's agency; the kinds are the domain's; two sources, an unattributed dispatch response and a body conflict outside a webhook are refused",
+    "packages/domain/test/commerce-critique.test.ts :: B09-F9 (D-ING-B3): every capture mismatch matchCapture can answer is a provider exception kind of the same name",
+    "packages/persistence/test/b09-critique.test.ts :: B09-N6: an attempt named by a provider exception, an observation or a capture fact is an attempt of the order that row names, and a case's capture and refund are its order's",
+    "packages/persistence/test/adapters-commerce-refunds-ledger.test.ts :: B09-FINAL-N1 (D-BIND-B2): a case that names a refund and a capture names the refund's own capture even when it names no order — the refund of one purchase beside the capture of another is refused as an integrity failure and writes nothing; the refund with its own capture opens",
+    "apps/api/test/b09-scenarios.test.ts :: S058: wrong amount, currency, payee, environment or signature — no authorization; each raises its exception or case and the order stays unpaid"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "S059",
+   "class": "PARTIAL",
+   "test": [
+    "packages/domain/test/commerce-capture-authority.test.ts :: S059: the revocation phase is the state the authorization leaves; a refund request records the delivery phase",
+    "packages/persistence/test/b09-migrations.test.ts :: S059/D-AUTH-B2: a reversal cannot commit while the entitlement it paid for is live; revoked with the phase of the state it leaves, it commits",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F14: a dispute in progress opens DISPUTE_OPEN with its amount and holds the funds; the capture stays COMPLETED and its entitlement live until the provider actually reverses it",
+    "packages/persistence/test/b09-critique.test.ts :: B09-N3: a capture first seen REVERSED is recorded COMPLETED and then REVERSED in one transaction — allocated, its completion sourcing the CAPTURE posting and its reversal the CHARGEBACK posting, its completion instant kept as the tax point; a REVERSED birth and a PENDING → REVERSED edge are refused",
+    "apps/api/test/b09-scenarios.test.ts :: S059: a reversal before the local capture observation is recorded, allocated and reversed; after delivery it revokes POST_DELIVERY; no second charge",
+    "apps/api/test/b09-review.test.ts :: B09-R2: a reversal observed together with or before the completion of a refund in flight nets every return against the capture exactly once — whatever the observation order the ledger returns the capture once: the receivable, the contract liability and the provider balances end at zero (with a kept fee, exactly the fee on the merchant's available balance and the processor expense), and the events of each scenario post the same balances in every delivery order"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B08",
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "S060",
+   "class": "PARTIAL",
+   "test": [
+    "packages/domain/test/commerce-capture-authority.test.ts :: checkout readiness: ready facts have no blocker; S060 — a price-valid quote whose source expired or was deleted blocks checkout",
+    "packages/persistence/test/b09-migrations.test.ts :: S060: a price-valid quote whose source expired can be paid for but carries no authorization (the capture is reconciled, the entitlement refused)",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F2 (remedy path): a paid capture whose subject no longer binds keeps its quote accepted until it is wholly refunded as KAURO_REMEDY; then the quote is released and a new quote of the project issues",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F2 (replacement path): a paid, unexecuted purchase is re-bound once to a replacement quote over a sealed replacement revision — the replaced entitlement revoked SOURCE_REPLACED, the replaced quote superseded, the replacement accepted and entitled on the same capture; a second replacement, an incomplete re-binding, one without source lineage, one after execution started and a replacement of another band are refused",
+    "apps/api/test/b09-scenarios.test.ts :: S060: a price-valid quote whose source expired blocks CreatePaymentOrder with SOURCE_EXPIRED; a new sealed revision of the same bytes still needs a new approval and a new quote"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B10"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-077",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/domain/test/commerce-money-pricing.test.ts :: R2-077: founding HubSpot 1-50k — base 129500, 2500 bps → discount 32375, service 97125, no cent drift",
+    "packages/persistence/test/b09-migrations.test.ts :: R2-077 and D-QUOTE-B1: a quote carries the exact rounded arithmetic of the registry schedule, the approved plan's own subject, its profile's reviewed rule and its snapshot's applied rate",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F10: a quote under an unknown price policy, a snapshot evaluated at another instant than the issuance, and a source promised in the past, beyond the price expiry or beyond the seal's hard cap are refused; the valid instants commit",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F12: the fourteen-day price expiry is 1,209,600 seconds under any session TimeZone — a quote whose expiry crosses a daylight-saving change commits under America/New_York — and every B09 interval constraint is written in hours, never days"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "R2-078",
+   "class": "PARTIAL",
+   "test": [
+    "packages/domain/test/commerce-money-pricing.test.ts :: R2-078: illustrative PSP fee on 97125 at 540 bps + 30 is 5275, net 91850 (half up once)",
+    "packages/persistence/test/b09-migrations.test.ts :: R2-078/D-LEDGER-B1: postings balance per source and currency at COMMIT, a replayed source posts nothing, and bank cash needs a bank statement",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F15: every posting carries its observed date, never after the posting; a correction sourced by the reviewed resolution of its case reverses and adjusts an event-sourced posting; a correction sourced by any other event is refused KP001",
+    "packages/persistence/test/b09-critique.test.ts :: B09-N4: a FUNDS posting moves money only between the provider's receivable, held and available balances, and bank money is posted only from a settlement; the funds move net of the fee the receivable already gave up, which leaves it at zero",
+    "packages/domain/test/commerce-critique.test.ts :: B09-N4 (D-LEDGER-B5): a capture's money sits in one provider balance at a time — its fee and every return are taken from the balance of the funds state their event names, and a funds observation moves the movable balance (the amount less the fee and the money returned), so while the capture's money covers what leaves it no provider balance of the capture goes negative, and none of it is ever bank money",
+    "apps/api/test/b09-ledger.test.ts :: R2-078: the FINANCE consumer posts the provider-reported fee of a capture, never the illustration; the net receivable is exact",
+    "packages/domain/test/commerce-critique.test.ts :: B09-N4 residual (D-LEDGER-B6): a full refund or a chargeback after a fee the provider keeps, and a fee reported after the money went back, take from the capture's own balance at most its movable balance and the kept fee from the merchant's available balance — the receivable and held balances end at zero, the available balance carries exactly the kept fee, and the balances do not depend on the order in which the events are posted",
+    "packages/persistence/test/adapters-commerce-balances.test.ts :: D-LEDGER-B6 and D-REF-B7 (the re-check's residual N4): the events that take money out of a capture carry its movable balance before them — a fee, two refund completions ordered by the capture's refund lock (the second observed waiting in pg_stat_activity, then counting the first) and a chargeback of the rest — and the FINANCE sets posted from those payloads leave the capture's receivable at zero and exactly the kept fee on the merchant's available balance",
+    "apps/api/test/b09-review.test.ts :: B09-R2: a reversal observed together with or before the completion of a refund in flight nets every return against the capture exactly once — whatever the observation order the ledger returns the capture once: the receivable, the contract liability and the provider balances end at zero (with a kept fee, exactly the fee on the merchant's available balance and the processor expense), and the events of each scenario post the same balances in every delivery order",
+    "apps/api/test/b09-review.test.ts :: B09-R4: a provider fee learned with a reversal, or after it, is a fact of the capture and is posted — the REVERSED observation's fee and a fee a later query reports for a reversed capture are each a capture.fee_observed.v1 version taken from the merchant's available balance (the reversal returned the capture's movable balance), a repeated observation adds nothing, and the kept fee ends on the processor expense"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-081",
+   "class": "PARTIAL",
+   "test": [
+    "packages/domain/test/commerce-money-pricing.test.ts :: R2-081: one-cent service refunds down to zero leave exactly zero cumulative entitlement and no residue",
+    "packages/domain/test/commerce-refunds-ledger.test.ts :: R2-081 at the refund boundary: 25 one-cent service refunds consume a 25-cent service capture to exactly zero; the 26th exceeds",
+    "packages/domain/test/commerce-critique.test.ts :: B09-F6 (D-REF-B6): refunded tax follows refunded service cumulatively at the sale's 19% rule — the one-cent sequence returns exactly the collected tax where per-refund rounding would leave a residue",
+    "apps/api/test/b09-scenarios.test.ts :: R2-081: one-cent refunds through CMD031–CMD033 publish serviceBasisAfterCents down to exactly zero; the 26th approval is refused REFUND_EXCEEDS_REMAINING",
+    "packages/persistence/test/adapters-commerce-balances.test.ts :: D-LEDGER-B6 and D-REF-B7 (the re-check's residual N4): the events that take money out of a capture carry its movable balance before them — a fee, two refund completions ordered by the capture's refund lock (the second observed waiting in pg_stat_activity, then counting the first) and a chargeback of the rest — and the FINANCE sets posted from those payloads leave the capture's receivable at zero and exactly the kept fee on the merchant's available balance",
+    "packages/persistence/test/adapters-commerce-balances.test.ts :: D-REF-B7: the database orders the completions of one capture's refunds whatever writes them — with the full-service check run at once in both transactions, the second completion waits for the first on the capture's refund lock (pg_stat_activity) and then sees it, so a full service refund that leaves the entitlement live is refused KP006 and nothing of the second commits"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B10"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-128",
+   "class": "PARTIAL",
+   "test": [
+    "packages/domain/test/commerce-fiscal.test.ts :: R2-128: two sales with the same USD amount and foreign-looking customers get the reviewed treatment or a block — never an inferred exemption",
+    "packages/persistence/test/b09-migrations.test.ts :: R2-128/D-FISC-B1: an unreviewed treatment stays a blocked draft that cannot be validated, while the capture's reconciliation is untouched; a reviewed one validates only with the collected amounts",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F4: an invoice validates under the profile version in force at the capture's completion although the profile was re-reviewed after the sale; the later version, and a version superseded before a later sale's tax point, are refused KP011",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F16: a debit note never validates; a credit note validates only against an ISSUED invoice and with exactly its fiscal snapshot",
+    "packages/persistence/test/b09-critique.test.ts :: B09-N5: fiscal profile versions form one lineage — a version is superseded only by a successor recorded at that very instant, and only an agency's first version supersedes nothing — so one version is current at a sale's tax point; a credit note of a refund completed after a re-review validates under the invoice's version, judged at the sale's tax point, and never under the re-review",
+    "packages/domain/test/commerce-critique.test.ts :: B09-N5 (D-FISC-B4, D-FISC-B6): every document of a sale takes the version of the sale's tax point — a credit note drafted after a re-review keeps the invoice's version and is judged at the capture's completion, never at the refund's; a later version never replaces a reviewed treatment for the sale, and a later review resolves an unknown one",
+    "apps/api/test/b09-fiscal.test.ts :: R2-128: the FISCAL consumer drafts a blocked invoice for an unreviewed profile and a validated one for a reviewed exempt export; the capture is reconciled in both"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "R2-140",
+   "class": "PARTIAL",
+   "test": [
+    "packages/domain/test/commerce-capture-authority.test.ts :: R2-140: two full captures of one obligation — the first pays it, the second is entirely excess; one entitlement, capped basis",
+    "packages/persistence/test/b09-migrations.test.ts :: R2-140: a second real capture of a paid obligation is recorded in full as excess — one entitlement, the basis capped to the obligation",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F3: an overpaid capture whose subject no longer binds files its EXCESS_CAPTURE and KAURO_REMEDY requests in the transaction that records it; a repeated filing is a no-op that cannot undo the capture; the agency can still request a refund of the same capture",
+    "apps/api/test/b09-scenarios.test.ts :: R2-140: two captures of one order through the webhook — both recorded, the second as excess with an EXCESS_CAPTURE case and refund request, a repeated delivery adds nothing, one authorization"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B10"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD028-OK",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/b09-migrations.test.ts :: CMD028/D-PROTO-B1: an order is the quote's exact amounts through the qualified route's merchant, one open checkout per project; a later attempt follows only a proved no-effect",
+    "apps/api/test/cmd028-create-payment-order.test.ts :: OK: an AGENCY_BILLING member creates one order for an issued quote — the intent commits before the provider call, the payment service settles the provider order, one provider order, 201 with the approval page"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD028-DENY",
+   "class": "PARTIAL",
+   "test": [
+    "packages/domain/test/commerce-critique.test.ts :: B09-F5 (D-CAP-B1): checkout is refused CAPACITY_UNAVAILABLE / DELIVERY_CAPACITY_UNAVAILABLE when the processing admission reports no deliverable capacity or answers nothing",
+    "apps/api/test/cmd028-create-payment-order.test.ts :: DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms, expired price, no deliverable capacity (CAPACITY_UNAVAILABLE), unqualified route, unreviewed treatment — is refused before any intent or provider call",
+    "apps/api/test/cmd028-create-payment-order.test.ts :: DENY (race): a source expiry committed between the intent and the capture leaves the order without authority — the capture is reconciled and no authorization is issued",
+    "apps/api/test/cmd028-create-payment-order.test.ts :: DENY (ambiguous): a creation timeout answers 202 and the same key observes by request identity — one provider order, never a second create"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B08",
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD028-RACE",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/b09-migrations.test.ts :: CMD028/D-PROTO-B1: an order is the quote's exact amounts through the qualified route's merchant, one open checkout per project; a later attempt follows only a proved no-effect",
+    "packages/persistence/test/b09-critique.test.ts :: B09-N7: a claim records a dispatch deadline in the future and at most the protocol's 60 seconds ahead — a century-long deadline written by the request handlers is refused, so no claimed attempt stays out of the watchdog's due set",
+    "apps/api/test/cmd028-create-payment-order.test.ts :: RACE: an identical retry replays the one order, the same key with another termsHash is 409 IDEMPOTENCY_CONFLICT with no effect, a crash before the intent commits leaves nothing, a crash between the intent commit and the claim resumes to one provider order, a crash between the claim and the settle (after the provider call) observes the order by its request identity and never creates a second one, and a second key is 409 PAYMENT_PENDING"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD029-OK",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/b09-critique.test.ts :: B09-F1: the request handlers cannot mint provider facts or execution authority — a capture fact, an observation, an attempt's result, a REFUND attempt, a learned provider identity, a CAPTURED order, available funds, a fee, a capture's status, an allocation, a case, a server refund request, a provider scope key, a re-binding and an entitlement written as kauro_app are refused; the payment service writes each",
+    "apps/api/test/cmd029-capture-payment.test.ts :: OK: capture through the server adapter — the payment service's settle step records the authenticated completion, the CAPTURED order and one CommercialAuthorization, and the request handler completes its journal"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD029-DENY",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/b09-critique.test.ts :: B09-F1: the request handlers cannot mint provider facts or execution authority — a capture fact, an observation, an attempt's result, a REFUND attempt, a learned provider identity, a CAPTURED order, available funds, a fee, a capture's status, an allocation, a case, a server refund request, a provider scope key, a re-binding and an entitlement written as kauro_app are refused; the payment service writes each",
+    "packages/persistence/test/b09-critique.test.ts :: B09-N1: an event records a version of an aggregate of its own kind and the state that version reaches — the request handlers publish only their own edges' events, every other commerce type is refused to them, an outbox record reaches only its event's subscribers, and a posting names its own source's event",
+    "apps/api/test/cmd029-capture-payment.test.ts :: DENY: a foreign tenant's order is NOT_FOUND, a wrong role is NOT_AUTHORIZED, and one missing prerequisite — a browser echo naming another order, an expired price, no deliverable capacity — is refused before any call; a forged webhook and an unknown capture result create no authorization",
+    "apps/api/test/b09-scenarios.test.ts :: S057: a browser return naming the provider order without a server capture creates no capture and no authorization; the order reads PENDING, then CHECKING while the capture is uncertain",
+    "apps/api/test/b09-scenarios.test.ts :: S058: wrong amount, currency, payee, environment or signature — no authorization; each raises its exception or case and the order stays unpaid"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B08",
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD029-RACE",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd029-capture-payment.test.ts :: RACE: an identical retry replays, the same key with another providerApprovalRef is 409 IDEMPOTENCY_CONFLICT with no effect, a crash before the intent commits leaves nothing, and a crash between the intent commit and the claim, one between the claim and the settle (after the provider call, observed by request identity and never dispatched again) and one between the settle and the journal completion converge to one capture and one authorization; the capture response and its webhook together yield one fact; a second capture command is 409 PAYMENT_PENDING",
+    "packages/persistence/test/b09-critique.test.ts :: B09-N7: a claim records a dispatch deadline in the future and at most the protocol's 60 seconds ahead — a century-long deadline written by the request handlers is refused, so no claimed attempt stays out of the watchdog's due set"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD030-OK",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd030-payment-webhook.test.ts :: OK: a verified capture event is stored once in the inbox and applied to its order — capture fact, CAPTURED order, authorization, inbox APPLIED with the result event",
+    "apps/api/test/b09-review.test.ts :: B09-R1: a provider refund is bound to a local refund only by its provider identity or its own request's evidence — a separate same-amount provider refund delivered while CMD033 waits between its call and its settle is an UNKNOWN_REFUND case with its own amount and never completes the local refund, which completes with the refund its own request made; a later provider refund claiming the completed refund's reference is a case of its own, never a silent NO_CHANGE"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD030-DENY",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/b09-migrations.test.ts :: D-SCOPE-B1/D-ING-B1: the scope index maps stored operations to their agency for the payment service and REFUND rows for owners only; the ingress records its own CMD030 facts; the payment service settles only payment providers' inbox records",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F11: the request handlers cannot claim a provider identity or index an object that does not exist; a provider key is the identity its object learned, recorded by the payment service",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F8/B09-F15: a funds availability and a fee learned after the completion are capture versions with events of their own that the ledger posts once; a funds change without a version is refused KA002, a second capture.completed.v1 of a capture is refused 23505, and a FUNDS posting sourced by the completion is refused KP001",
+    "packages/persistence/test/b09-critique.test.ts :: B09-N1: an event records a version of an aggregate of its own kind and the state that version reaches — the request handlers publish only their own edges' events, every other commerce type is refused to them, an outbox record reaches only its event's subscribers, and a posting names its own source's event",
+    "apps/api/test/cmd030-payment-webhook.test.ts :: DENY: an invalid signature (the wrong role of a sender) stores nothing but the denial; an event of a foreign tenant's environment or an unknown provider reference is an exception, never applied; one missing prerequisite — a wrong payee, currency, provider or order — is its specific exception and the record REJECTED; a duplicate delivery adds no capture, posting or commission event"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B10",
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD030-RACE",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd030-payment-webhook.test.ts :: RACE: an identical retry of a delivery is the same inbox record, a delivery with another body under the same event id (the webhook's IDEMPOTENCY_CONFLICT) is a recorded conflict never APPLIED, a crash between the ingress commit and the application applies the record once, and delivery racing the capture settle yields one fact",
+    "apps/api/test/b09-review.test.ts :: B09-R1: a provider refund is bound to a local refund only by its provider identity or its own request's evidence — a separate same-amount provider refund delivered while CMD033 waits between its call and its settle is an UNKNOWN_REFUND case with its own amount and never completes the local refund, which completes with the refund its own request made; a later provider refund claiming the completed refund's reference is a case of its own, never a silent NO_CHANGE"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD031-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd031-request-refund.test.ts :: OK: an AGENCY_BILLING member requests a refund of a paid project — REQUESTED with the proposal, delivery phase, terms hash, evidence reference and the reason stored verbatim",
+    "packages/persistence/test/adapters-commerce-refunds-ledger.test.ts :: refunds through the adapters: the agency's request (refund.requested.v1 to NOTIFICATIONS, the reason kept on the row and out of the payload), the reconciler's server request filed once per capture and origin with ON CONFLICT DO NOTHING (a repetition answers the open request and publishes nothing), the corporate owner's approval with its immutable intent (refund.approved.v1 to PAYMENT_SERVICE) and rejection, and the payment service's execution to COMPLETED — refund.completed.v1 names the funds state read under the capture's share lock and the capture's remaining service basis"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD031-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b09-migrations.test.ts :: CMD031/CMD032 boundaries: the agency files its own request; only a corporate owner in the finance scope reviews it, never the requester, never beyond the remaining capture, never outside READ COMMITTED",
+    "apps/api/test/cmd031-request-refund.test.ts :: DENY: a foreign tenant's project is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite (nothing refundable) is refused; a request never reaches the provider"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD031-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b09-migrations.test.ts :: CMD031/CMD032 boundaries: the agency files its own request; only a corporate owner in the finance scope reviews it, never the requester, never beyond the remaining capture, never outside READ COMMITTED",
+    "apps/api/test/cmd031-request-refund.test.ts :: RACE: an identical retry replays, the same key with another reasonCode is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary files nothing and the retry files it once, and a second key is 409 REFUND_REQUEST_OPEN"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD032-OK",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd032-approve-refund.test.ts :: OK: a KAURO_OWNER with a fresh step-up approves the remaining service and the tax it releases — the immutable intent with its authorization and effects hashes, refund.approved.v1 to PAYMENT_SERVICE",
+    "packages/persistence/test/adapters-commerce-refunds-ledger.test.ts :: refunds through the adapters: the agency's request (refund.requested.v1 to NOTIFICATIONS, the reason kept on the row and out of the payload), the reconciler's server request filed once per capture and origin with ON CONFLICT DO NOTHING (a repetition answers the open request and publishes nothing), the corporate owner's approval with its immutable intent (refund.approved.v1 to PAYMENT_SERVICE) and rejection, and the payment service's execution to COMPLETED — refund.completed.v1 names the funds state read under the capture's share lock and the capture's remaining service basis"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD032-DENY",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b09-migrations.test.ts :: CMD031/CMD032 boundaries: the agency files its own request; only a corporate owner in the finance scope reviews it, never the requester, never beyond the remaining capture, never outside READ COMMITTED",
+    "packages/persistence/test/b09-critique.test.ts :: B09-F6: an approval whose tax does not follow its service under the sale's 19% rule is refused KP012; the consistent split is approved; after another refund of the capture committed, the split computed without it is refused and the cumulative one approved",
+    "apps/api/test/cmd032-approve-refund.test.ts :: DENY: a foreign tenant's real refund is never revealed — outside the grant (agency A's owner, a revoked corporate owner) it is NOT_AUTHORIZED CORPORATE_ROLE_MISSING exactly like an id nobody holds, within the grant agency B's capture is NOT_FOUND like one, and the finance scope adopted through agency A's refund neither sees, approves nor adopts agency B's —, a wrong role (no KAURO_OWNER grant, or the requester) is NOT_AUTHORIZED, and one missing prerequisite — a stale step-up, an amount above the remaining capture, a tax split the sale's rule does not release, an uncovering standing policy — is refused; nothing is approved",
+    "apps/api/test/cmd032-approve-refund.test.ts :: D-REF-B4: a standing policy that covers the refund as it stands authorizes the approval without a step-up — the owner's review lists it among the applicable policies, the intent records the policy, and the ALLOW fact names it"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD032-RACE",
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b09-migrations.test.ts :: CMD032-RACE (D-REF-B3): an approval and a reversal of the same capture are ordered — the approval that waited for the reversal sees it and commits nothing",
+    "apps/api/test/cmd032-approve-refund.test.ts :: RACE: an identical retry replays, the same key with other amounts is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary leaves the refund REQUESTED, two approvals of one version give one 200 and one 409 STALE_VERSION, and an approval racing a reversal waits and is refused",
+    "packages/persistence/test/adapters-commerce-refunds-ledger.test.ts :: the approval-versus-reversal race: an approval of a refund waits, observed in pg_stat_activity, for the reversal of its capture that the payment service holds open, then sees it and is refused PRECONDITION_FAILED REFUND_EXCEEDS_REMAINING; the refund stays REQUESTED at version 1 and publishes nothing"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [],
+   "claimed": "EXECUTED_LOCAL"
+  },
+  {
+   "case": "CMD033-OK",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd033-execute-refund.test.ts :: OK: the payment service executes an approved refund once — SUBMITTING, the provider refund under the attempt's identity, COMPLETED with refund.completed.v1 to FINANCE, FISCAL, COMMISSIONS and NOTIFICATIONS",
+    "packages/persistence/test/adapters-commerce-refunds-ledger.test.ts :: refunds through the adapters: the agency's request (refund.requested.v1 to NOTIFICATIONS, the reason kept on the row and out of the payload), the reconciler's server request filed once per capture and origin with ON CONFLICT DO NOTHING (a repetition answers the open request and publishes nothing), the corporate owner's approval with its immutable intent (refund.approved.v1 to PAYMENT_SERVICE) and rejection, and the payment service's execution to COMPLETED — refund.completed.v1 names the funds state read under the capture's share lock and the capture's remaining service basis",
+    "packages/persistence/test/adapters-commerce-balances.test.ts :: D-REF-B7: the database orders the completions of one capture's refunds whatever writes them — with the full-service check run at once in both transactions, the second completion waits for the first on the capture's refund lock (pg_stat_activity) and then sees it, so a full service refund that leaves the entitlement live is refused KP006 and nothing of the second commits",
+    "apps/api/test/b09-review.test.ts :: B09-R1: a provider refund is bound to a local refund only by its provider identity or its own request's evidence — a separate same-amount provider refund delivered while CMD033 waits between its call and its settle is an UNKNOWN_REFUND case with its own amount and never completes the local refund, which completes with the refund its own request made; a later provider refund claiming the completed refund's reference is a case of its own, never a silent NO_CHANGE",
+    "apps/api/test/b09-review.test.ts :: B09-R2: a reversal observed together with or before the completion of a refund in flight nets every return against the capture exactly once — whatever the observation order the ledger returns the capture once: the receivable, the contract liability and the provider balances end at zero (with a kept fee, exactly the fee on the merchant's available balance and the processor expense), and the events of each scenario post the same balances in every delivery order"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B10",
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD033-DENY",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd033-execute-refund.test.ts :: DENY: a foreign tenant's real refund is out of reach — agency B's order and capture at the refund route are NOT_FOUND exactly like an id nobody holds, and the payment service's scope adopted through agency A's refund neither sees, changes nor adopts agency B's refund, capture or order —, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (not APPROVED; a reversed capture lapses it) is refused; a refund timeout stays UNCERTAIN (202) and a second execute is refused until reconciled — one provider refund call",
+    "apps/api/test/b09-review.test.ts :: B09-R3: the watchdog judges absence per refund — an authoritative provider view taken after the deadlines that shows an earlier completed refund of the same capture, and neither the refund whose request timed out without effect nor the one claimed but never sent, proves both had no effect: their attempts FAILED_NO_EFFECT, the refunds APPROVED again for a later deliberate attempt, the earlier refund untouched"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD033-RACE",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd033-execute-refund.test.ts :: RACE: an identical retry resumes the one operation, the same key with another expectedVersion is 409 IDEMPOTENCY_CONFLICT with no effect, a crash before the intent commits leaves nothing, a crash between the intent commit and the claim resumes to one provider refund, a crash between the claim and the settle (after the provider call) observes the refund by its request identity and never dispatches it again, and two executions under two keys give one claim and 409 PAYMENT_PENDING",
+    "apps/api/test/b09-review.test.ts :: B09-R1: a provider refund is bound to a local refund only by its provider identity or its own request's evidence — a separate same-amount provider refund delivered while CMD033 waits between its call and its settle is an UNKNOWN_REFUND case with its own amount and never completes the local refund, which completes with the refund its own request made; a later provider refund claiming the completed refund's reference is a case of its own, never a silent NO_CHANGE",
+    "apps/api/test/b09-review.test.ts :: B09-R2: a reversal observed together with or before the completion of a refund in flight nets every return against the capture exactly once — whatever the observation order the ledger returns the capture once: the receivable, the contract liability and the provider balances end at zero (with a kept fee, exactly the fee on the merchant's available balance and the processor expense), and the events of each scenario post the same balances in every delivery order"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD034-OK",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd034-reconcile-payment.test.ts :: OK: a stored provider query advances an uncertain capture to CAPTURED with its authorization and records a partial capture of the same query as an AMOUNT_MISMATCH case",
+    "apps/api/test/b09-review.test.ts :: B09-R1: a provider refund is bound to a local refund only by its provider identity or its own request's evidence — a separate same-amount provider refund delivered while CMD033 waits between its call and its settle is an UNKNOWN_REFUND case with its own amount and never completes the local refund, which completes with the refund its own request made; a later provider refund claiming the completed refund's reference is a case of its own, never a silent NO_CHANGE",
+    "apps/api/test/b09-review.test.ts :: B09-R2: a reversal observed together with or before the completion of a refund in flight nets every return against the capture exactly once — whatever the observation order the ledger returns the capture once: the receivable, the contract liability and the provider balances end at zero (with a kept fee, exactly the fee on the merchant's available balance and the processor expense), and the events of each scenario post the same balances in every delivery order",
+    "apps/api/test/b09-review.test.ts :: B09-R3: the watchdog judges absence per refund — an authoritative provider view taken after the deadlines that shows an earlier completed refund of the same capture, and neither the refund whose request timed out without effect nor the one claimed but never sent, proves both had no effect: their attempts FAILED_NO_EFFECT, the refunds APPROVED again for a later deliberate attempt, the earlier refund untouched",
+    "apps/api/test/b09-review.test.ts :: B09-R4: a provider fee learned with a reversal, or after it, is a fact of the capture and is posted — the REVERSED observation's fee and a fee a later query reports for a reversed capture are each a capture.fee_observed.v1 version taken from the merchant's available balance (the reversal returned the capture's movable balance), a repeated observation adds nothing, and the kept fee ends on the processor expense"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD034-DENY",
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/b09-migrations.test.ts :: R2-078/D-LEDGER-B1: postings balance per source and currency at COMMIT, a replayed source posts nothing, and bank cash needs a bank statement",
+    "packages/persistence/test/b09-critique.test.ts :: B09-N4: a FUNDS posting moves money only between the provider's receivable, held and available balances, and bank money is posted only from a settlement; the funds move net of the fee the receivable already gave up, which leaves it at zero",
+    "apps/api/test/cmd034-reconcile-payment.test.ts :: DENY: a foreign tenant's real order is out of reach — agency B's quote and capture at the order route are NOT_FOUND exactly like an id nobody holds, agency B's stored provider query applied to agency A's order is refused OBSERVATION_SUBJECT_MISMATCH naming nothing of B's, and the payment service's scope adopted through agency A's order neither sees agency B's order nor lets the reconciler apply B's query to it —, a wrong service identity is NOT_AUTHORIZED, and one missing prerequisite (no stored evidence; evidence of another order) is refused; a held or pending provider balance stays HELD and is never bank cash"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  },
+  {
+   "case": "CMD034-RACE",
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd034-reconcile-payment.test.ts :: RACE: an identical retry replays, the same key with another observationRef is 409 IDEMPOTENCY_CONFLICT with no effect, a crash at the intent/commit boundary applies the artifact once on retry, and reconciliation racing the webhook of the same capture yields one fact",
+    "apps/api/test/b09-review.test.ts :: B09-R1: a provider refund is bound to a local refund only by its provider identity or its own request's evidence — a separate same-amount provider refund delivered while CMD033 waits between its call and its settle is an UNKNOWN_REFUND case with its own amount and never completes the local refund, which completes with the refund its own request made; a later provider refund claiming the completed refund's reference is a case of its own, never a silent NO_CHANGE",
+    "apps/api/test/b09-review.test.ts :: B09-R2: a reversal observed together with or before the completion of a refund in flight nets every return against the capture exactly once — whatever the observation order the ledger returns the capture once: the receivable, the contract liability and the provider balances end at zero (with a kept fee, exactly the fee on the merchant's available balance and the processor expense), and the events of each scenario post the same balances in every delivery order"
+   ],
+   "commit": "d9bbfd0",
+   "reviewId": "B09-round5-d9bbfd0",
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL"
+  }
+ ]
+}

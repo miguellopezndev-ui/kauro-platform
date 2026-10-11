@@ -1,4 +1,5 @@
 // Reproduce a database clock behind Node on Linux, without timing sleeps or changing a production guard.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { toUtcInstant, type UserId } from "@kauro/domain";
@@ -11,6 +12,8 @@ import {
 import { ids, sha } from "./support.js";
 
 let cw: CommissionWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => cw.h.oracle);
 let selling: Selling;
 let attribution: Attribution;
 
@@ -26,13 +29,13 @@ before(async () => {
   // Explicit setup proofs keep the negative control focused on the defaults exercised by the two tests below.
   const record = cw.h.recordStepUp.bind(cw.h);
   cw.h.recordStepUp = async (user, options = {}) => record(user, {
-    ...options, issuedAt: options.issuedAt ?? toUtcInstant(Date.parse(await serverNow(cw.h.assurancePool.raw)) - 1000),
+    ...options, issuedAt: options.issuedAt ?? toUtcInstant(Date.parse(await serverNow(cw.h.assurancePool)) - 1000),
   });
   try { attribution = await claimsOn(cw, "clock-skew"); }
   finally { cw.h.recordStepUp = record; }
   await acceptAttribution(cw, selling.agency.agencyId, attribution, [10_000]);
   const first = await purchase(cw, selling, "clock-skew-first", {
-    providerCompletedAt: toUtcInstant(Date.parse(await serverNow(cw.h.paymentPool.raw)) - 1000),
+    providerCompletedAt: toUtcInstant(Date.parse(await serverNow(cw.h.paymentPool)) - 1000),
   });
   assert.equal(await cw.service.consumer.handle(await deliveryOf(cw, await eventOf(cw, first.captureId, "capture.completed.v1"))), "APPLIED");
 });
@@ -45,7 +48,7 @@ test("captureOf defaults accrue a repeat purchase under a database clock 5 ms be
   const checkout = await checkoutOf(cw, selling, await fixtureQuote(cw, selling, plan));
   // Pin confirmation to the skewed server instant observed just before the provider reports completion.
   // This removes scheduler latency from the negative control: Date.now() is necessarily later than confirmation.
-  const confirmedAt = await serverNow(cw.h.paymentPool.raw);
+  const confirmedAt = await serverNow(cw.h.paymentPool);
   const repeated = await captureOf(cw, selling, checkout, { confirmedAt });
   assert.equal(await cw.service.consumer.handle(await deliveryOf(cw, await eventOf(cw, repeated.captureId, "capture.completed.v1"))), "APPLIED");
   const lines = await linesOf(cw, repeated.authorizationId);

@@ -9,7 +9,8 @@ import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { AgencyId, ProjectId, QuoteId, RecurrenceRepository, UnitOfWork } from "@kauro/domain";
 import type { CommerceRequestCollaborators } from "../../commerce/request/runtime.js";
 import type { PurchaseRebinder } from "../../commerce/ports.js";
-import type { BuyerTypeReader } from "../ports.js";
+import type { LateFailureSink } from "../call-bound.js";
+import type { BuyerTypeReader, ProviderCallTimer } from "../ports.js";
 
 /** The reads CMD027 relies on beyond B06's and B09's repositories (@kauro/persistence quoteReadsOf). */
 export interface QuoteReads {
@@ -17,6 +18,14 @@ export interface QuoteReads {
   billableUnitsOf(request: { readonly agencyId: AgencyId; readonly projectId: ProjectId; readonly revisionHash: Sha256Hex }): Promise<number | null>;
   /** The project's live quote (the one `quotes_one_live_per_project` admits), or null. */
   liveQuoteOf(agencyId: AgencyId, projectId: ProjectId): Promise<QuoteId | null>;
+  /**
+   * The exclusive half of the project's first-issuance subject, held to COMMIT (D10-GAP-25): taken by CreateQuote only, when the project has
+   * no live quote to lock, so two first issuances of one project serialize. `wait` false only tries it (never waits after a quote row lock):
+   * false when another transaction holds it.
+   */
+  serializeFirstIssuance(agencyId: AgencyId, projectId: ProjectId, wait: boolean): Promise<boolean>;
+  /** The version and state of the project's live quote, else of its latest quote; null when the project has none (STALE_VERSION's current). */
+  currentQuoteOf(agencyId: AgencyId, projectId: ProjectId): Promise<{ readonly version: number; readonly state: string } | null>;
   /** The replacement of `quoteId` that is drafted or issued and not yet accepted by a re-binding, or null. */
   pendingReplacementOf(agencyId: AgencyId, quoteId: QuoteId): Promise<QuoteId | null>;
   /** kauro.server_now() of this transaction, exact to the microsecond: the issuance instant of a quote. */
@@ -47,6 +56,10 @@ export interface QuoteCollaborators {
   readonly reads: (uow: UnitOfWork) => QuoteReads;
   /** B09's re-binding of a paid capture to the replacement quote (D-QUOTE-B6); null: not bound (a replacement answers PROVIDER_SERVICES_UNAVAILABLE). */
   readonly rebinder: PurchaseRebinder | null;
+  /** The bound of the re-binding's call (PROVIDER_CALL_TIMEOUT_MS): realProviderCallTimer when absent; a fault cell binds a clock-driven one. */
+  readonly providerTimer?: ProviderCallTimer;
+  /** Where the failure of a re-binding after its bound elapsed goes (stderr when absent). */
+  readonly onLateFailure?: LateFailureSink;
   /** Test-only hold of the replacement protocol. */
   readonly hold?: (point: QuoteHoldPoint) => Promise<void>;
 }

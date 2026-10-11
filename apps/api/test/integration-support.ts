@@ -7,16 +7,18 @@
 // contract (status, COMPLETED envelope) before a test reads it; the superuser only reads. A leg of a scenario that stands at another
 // instant (a purchase after a window's end) runs through the labelled TEST CLOCK of the support it reuses (D10-CLOCK-1).
 import assert from "node:assert/strict";
+import type { LateFailure, ProviderCallTimer } from "@kauro/application";
+import { realProviderCallTimer } from "@kauro/application";
 import type { CapturePaymentView, CreatePaymentOrderView, CreateQuoteView, ExecuteRefundView, RequestRefundView, SalesAccountView, SellerTerminationView, AttributionView, PeriodCloseView, PayoutIntentView, PayoutReconciliationView, CommissionStatementView } from "@kauro/application";
 import { ContractFakeBuyerTypeReader } from "@kauro/application/testing";
 import { toUtcInstant } from "@kauro/domain";
 import type { ProjectId, UserId } from "@kauro/domain";
-import { recordClaim, recordProspect, serverNow, type RecordedSeller } from "@kauro/persistence/testing";
+import { FaultPoints, instrumentPort, operationClock, recordClaim, recordProspect, serverNow, type RecordedSeller } from "@kauro/persistence/testing";
 import { prepareAllocation } from "./sales-support.js";
 import { prepareManifest, prepareTerminationTerms } from "./sellers-support.js";
 import { captureOf, claimsOn, linesOf, oracleRows, poolsOf, quoteFactsOf, sellingAgency, type Attribution, type Purchase, type Selling } from "./commission-support.js";
 import { execute, reconcile, serviceToken, storeQuery } from "./payment-support.js";
-import { bankCash, claimedCents, closePeriod, seller, approvePayout, reconcilePayout, openMonth, proposal, readStatement, scriptEvidence, intentOf, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
+import { bankCash, claimedCents, closePeriod, seller, approvePayout, reconcilePayout, openMonth, closeInstant, proposal, readStatement, scriptEvidence, intentOf, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
 import { approveThroughRoute, call, clock, completed, freshKey, ids, type Person, type PlanFixture } from "./support.js";
 import { createRevision, projectPointer } from "./source-support.js";
 import { paymentRoutes } from "./commerce-support.js";
@@ -40,12 +42,48 @@ export async function claimed(iw: IntegrationWorld, label: string, count = 1): P
 export interface IntegrationWorld extends StatementsWorld {
   /** B11's buyer type port, bound to its labelled contract fake (SIMULATED): every selling agency below is an AGENCY. */
   readonly buyers: ContractFakeBuyerTypeReader;
+  /** The failures of collaborator calls after their bound elapsed (the late-failure sink of ApiAssembly.commercial), in order. */
+  readonly lateFailures: LateFailure[];
 }
 
-export async function integrationWorld(): Promise<IntegrationWorld> {
+/**
+ * The provider-call bound the world's commands run on (B10G-R4; ApiAssembly.commercial.providerTimer). Outside a cell operation it is the
+ * deployment's own timer. Inside one (ctx.operation) it elapses when the cell's controlled clock — the step clock the operation received —
+ * reads the bound's duration past the instant the bound started; the instant that crossed it is then handed to an instrumented sink inside
+ * the operation, so the harness proves the cell's deadline was crossed AND consumed by the operation (never by the test body).
+ */
+const POLL_MS = 20;
+const crossing = instrumentPort({ async elapsed(r: { readonly at: string }): Promise<string> { return r.at; } }, new FaultPoints(), "provider-timer");
+const cellProviderTimer: ProviderCallTimer = {
+  start(ms) {
+    const op = operationClock();
+    if (op === undefined) return realProviderCallTimer.start(ms);
+    const startedAt = op.nowMs();
+    let poll: ReturnType<typeof setInterval> | undefined;
+    const elapsed = new Promise<void>((resolve) => {
+      poll = setInterval(() => {
+        try {
+          if (op.nowMs() - startedAt < ms) return;
+          const at = op.now();
+          clearInterval(poll);
+          void crossing.elapsed({ at }).then(() => resolve());
+        } catch {
+          // the operation settled: its bound is moot
+          clearInterval(poll);
+        }
+      }, POLL_MS);
+      poll.unref();
+    });
+    return { elapsed, cancel: () => clearInterval(poll) };
+  },
+};
+
+/** `sessions: true` (opt-in, PV1 L-ROUTE r1 RR-4) binds the B11 session boundary; absent, the world is built exactly as before. */
+export async function integrationWorld(options: { readonly sessions?: boolean } = {}): Promise<IntegrationWorld> {
   const buyers = new ContractFakeBuyerTypeReader({ clock });
-  const sw = await statementsWorld({ commercial: { buyerTypes: buyers } });
-  return Object.assign(sw, { buyers });
+  const lateFailures: LateFailure[] = [];
+  const sw = await statementsWorld({ commercial: { buyerTypes: buyers, providerTimer: cellProviderTimer, onLateFailure: (late) => void lateFailures.push(late) }, ...(options.sessions === true ? { sessions: true } : {}) });
+  return Object.assign(sw, { buyers, lateFailures });
 }
 
 /** A selling agency with the BILLING member whose token the public payment commands run under. */
@@ -303,7 +341,7 @@ export async function dispatched(iw: IntegrationWorld): Promise<ReadonlyArray<{ 
 export async function madeEligible(iw: IntegrationWorld, agencyId: string, p: Purchase): Promise<void> {
   await providerReports(iw, p, { disbursement: "INSTANT" });
   await dispatched(iw);
-  iw.completions.record({ agencyId: agencyId as never, captureId: p.captureId, kind: "FINAL", completedAt: toUtcInstant(Date.parse(await serverNow(iw.h.commissionPool.raw)) - 1000), source: "STAGED_PREPARATION" });
+  iw.completions.record({ agencyId: agencyId as never, captureId: p.captureId, kind: "FINAL", completedAt: toUtcInstant(Date.parse(await serverNow(iw.h.commissionPool)) - 1000), source: "STAGED_PREPARATION" });
   const report = await iw.ahead(720 * 3600 + 60).runSweep("ELIGIBILITY");
   assert.deepEqual(report.items.filter((i) => i.outcome.startsWith("FAILED")), [], "every item of the ELIGIBILITY sweep settled");
 }
@@ -312,7 +350,7 @@ export async function madeEligible(iw: IntegrationWorld, agencyId: string, p: Pu
 export async function closedAt(iw: IntegrationWorld, month: string, at: string): Promise<{ readonly periodId: string; readonly view: PeriodCloseView }> {
   const periodId = await openMonth(iw, month);
   const ledgerCutoffHash = await proposal(iw, periodId);
-  iw.standAt(at);
+  iw.standAt(await closeInstant(iw, at));
   try {
     return { periodId, view: completed<PeriodCloseView>(await closePeriod(iw, periodId, { ledgerCutoffHash }), 200).data };
   } finally {

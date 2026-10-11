@@ -10,6 +10,7 @@
 // under test, each beside a nearby valid control. Instants are the server's: a leg that stands at another instant stands there on the
 // labelled TEST CLOCK (D10-CLOCK-1). Nothing sleeps: interleavings are held at named points and every wait is observed in
 // pg_stat_activity. The founding cohort's three slots serve the whole cluster, so the three titles that take them run first.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import type { CreatePaymentOrderView, CreateQuoteView, PayoutIntentView, PayoutReconciliationView } from "@kauro/application";
 import { after, before, test } from "node:test";
@@ -64,6 +65,8 @@ import {
 } from "./integration-support.js";
 
 let iw: IntegrationWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => iw.h.oracle);
 /** The agency of example 1, left by R2-079 for the titles that continue its history (examples 2 and 6). */
 let example1: { readonly a: Agent; readonly attribution: Claimed; readonly firstAuthorizationId: string } | null = null;
 before(async () => {

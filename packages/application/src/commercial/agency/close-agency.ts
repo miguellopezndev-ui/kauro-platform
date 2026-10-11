@@ -21,13 +21,14 @@
 import type { UtcInstant } from "@kauro/contracts";
 import { toUtcInstant } from "@kauro/domain";
 import type { AgencyClosureId, AgencyId, AssuranceProofId, CausationId, ClientId, ClosureCaseEntry, ClosureFromState, EndClientRecord, QuoteId } from "@kauro/domain";
-import { DomainFailure, NotFoundFailure, abandonSetup, requestClosure } from "@kauro/domain";
+import { DomainFailure, NotFoundFailure, abandonSetup, abandonWorkOf, limitWorkOf, requestClosure } from "@kauro/domain";
 import type { MoneyMinorUnits } from "@kauro/contracts";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { agencyView } from "../../api/projections.js";
 import { ALLOW_REASONS } from "../../commands/runtime.js";
 import { CommerceAccessDenied, runCommerceCommand, tenantContextOf, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
 import { AUTHORIZATION_POLICY_VERSION } from "../../ports/authorizer.js";
+import { withinCallBound } from "../call-bound.js";
 import { CLOSE_AGENCY, type CloseAgencyBody } from "../contracts.js";
 import type { AgencyClosureView } from "../views.js";
 import { commercialAdmissionSpecOf, type AgencyLifecycleCollaborators, type CommercialCommandHandler } from "./runtime.js";
@@ -37,6 +38,8 @@ import { applied, checkExpectedVersion, requireMembershipOf } from "./shared.js"
 export const CLOSURE_DELETION_DELAY_HOURS = 720;
 const HOUR_MS = 3_600_000;
 const CLIENT_PAGE = 100;
+/** The seconds a refused closure waits before it retries an inspector that did not answer within PROVIDER_CALL_TIMEOUT_MS. */
+const INSPECTOR_RETRY_AFTER_SECONDS = 5;
 
 /** The agencies a closure may request from: DRAFT (owner_abandons_setup), ACTIVE and RESTRICTED (owner_requests_closure). */
 const CLOSABLE: ReadonlySet<string> = new Set(["DRAFT", "ACTIVE", "RESTRICTED"]);
@@ -66,7 +69,12 @@ export function closeAgencyHandler(runtime: CommerceRequestRuntime, co: AgencyLi
           const assured = await co.assurance.verifyStepUp(uow, envelope.userId, body.assuranceProofRef as AssuranceProofId, now);
           if (assured.kind !== "FRESH") throw new DomainFailure("ASSURANCE_REQUIRED", `closing an agency needs a fresh step-up: ${assured.reason}`, { reason: assured.reason });
           const life = co.lifecycle(uow);
-          const agency = await uow.agencies.lock(agencyId);
+          // the agency's row FOR NO KEY UPDATE (never FOR UPDATE: the KEY SHARE of a reader's insert must not wait for it), then at once
+          // its exclusive half, before the first read of the inventory: a project or job started on a client already inspected would
+          // otherwise commit beside the closure and be missing from it (D10-TX-1, D10-AGY-6)
+          const locked = await life.lockAgencyRow(agencyId);
+          if (locked) await life.lockAgencyTransition(agencyId);
+          const agency = locked ? await uow.agencies.get(agencyId) : null;
           if (agency === null) throw new NotFoundFailure("agency");
           checkExpectedVersion(agency, body.expectedVersion);
           if (!CLOSABLE.has(agency.state)) {
@@ -78,7 +86,17 @@ export function closeAgencyHandler(runtime: CommerceRequestRuntime, co: AgencyLi
           for (;;) {
             const page: ReadonlyArray<EndClientRecord> = await uow.endClients.list(agencyId, { ...(after !== undefined ? { after } : {}), limit: CLIENT_PAGE });
             for (const client of page) {
-              const work = await co.activeWork.inspectClient(uow, client.clientId);
+              // bounded (D10-GAP-6a): an inspector that does not answer is no inventory, never zero work — the closure is refused, retriably
+              const inspected = await withinCallBound(co.providerTimer, () => co.activeWork.inspectClient(uow, client.clientId), {
+                call: "CMD043.inspectClient",
+                ...(co.onLateFailure !== undefined ? { onLateFailure: co.onLateFailure } : {}),
+                // the inspector still runs on the unit's connection: the unit gives it up, so the connection is destroyed, never returned to the pool
+                abandon: () => abandonWorkOf(uow, "the ActiveWorkInspector did not answer within its bound"),
+                // the whole unit is limited by the database, not per statement: the inspector runs several statements (D10-GAP-6a)
+                limit: (ms) => limitWorkOf(uow, ms),
+              });
+              if (inspected.timedOut) throw new DomainFailure("CAPACITY_UNAVAILABLE", "the agency's active work could not be inspected in time; nothing changed, retry with the same key", { retryAfterSeconds: INSPECTOR_RETRY_AFTER_SECONDS }, true);
+              const work = inspected.value;
               activeWork += work.openProjects + work.activeJobs;
             }
             if (page.length < CLIENT_PAGE) break;

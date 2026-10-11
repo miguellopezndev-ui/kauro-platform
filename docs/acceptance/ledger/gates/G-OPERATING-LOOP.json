@@ -1,0 +1,51 @@
+{
+ "gate": "G-OPERATING-LOOP",
+ "manual": "26",
+ "package": "B21",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "R2-112",
+   "package": "B21",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-120",
+   "package": "B21",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-121",
+   "package": "B21",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-122",
+   "package": "B21",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B21"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B21",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

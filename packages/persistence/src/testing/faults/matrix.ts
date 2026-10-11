@@ -20,7 +20,7 @@ import { toUtcInstant } from "@kauro/domain";
 import { controlledClock, epochMs, type ControlledClock, type InstantLike } from "./clock.js";
 import { bothOrders, concurrently, inOrder, lastSettledOrder, mustWait, producedIn, sequentially, settledOrderOf, type ActorOutcome, type HarnessConnection, type RaceRun, type RaceScenario, type WaitProbe, type Waiting } from "./interleave.js";
 import { FaultPoints, armCrashIn, crashedAt, terminateBackend } from "./points.js";
-import { consumedInstants, inScope, type OperationScope, type ScopeEvent } from "./scope.js";
+import { consumedInstants, currentScope, inScope, type OperationScope, type ScopeEvent } from "./scope.js";
 import type { SqlSession } from "../source-lifecycle.js";
 import type { Clock } from "@kauro/domain";
 
@@ -175,6 +175,23 @@ function settledOrder(outcome: ActorOutcome, what: string, evidence: Evidence): 
   return order;
 }
 
+/** The step clock of each operation a cell started (operationClock). */
+const stepClocks = new WeakMap<OperationScope, StepClock>();
+
+/**
+ * The step clock of the cell operation the caller runs in (the nearest enclosing ctx.operation, also through the async calls it makes),
+ * or undefined outside one. It is how a world's timer seam, bound for the whole test file, reads the controlled clock of the cell that is
+ * running: the read is recorded in that operation's scope like any other use of its step clock, so a deadline it crosses can be proven
+ * consumed (a read whose instant then reaches an instrumented call's arguments).
+ */
+export function operationClock(): StepClock | undefined {
+  for (let s = currentScope(); s !== undefined; s = s.parent) {
+    const found = stepClocks.get(s);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
 function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
   const points = new FaultPoints();
   const clock = controlledClock(options.clockStart);
@@ -221,10 +238,18 @@ function contextOf(cell: MatrixCell, options: CellOptions): FaultContext {
       evidence.deadlines.push({ at, what });
       return toUtcInstant(at);
     },
-    operation: (name, fn) => own(name, (scope) => fn({ id: scope.id, name, clock: stepClock(scope, name) })),
+    operation: (name, fn) =>
+      own(name, (scope) => {
+        const stepped = stepClock(scope, name);
+        stepClocks.set(scope, stepped);
+        return fn({ id: scope.id, name, clock: stepped });
+      }),
     withClock: (what, operation) => ctx.operation(what, (op) => operation(op.clock)),
     async mustWait(oracle, probe, operation, what, limitMs) {
-      const waiting = await own(`wait: ${what}`, () => mustWait(oracle, probe, operation, what, limitMs));
+      // the waited operation runs in an operation scope of this cell of its own, open until IT settles (the wait's scope closes once the
+      // wait is observed): what the operation does after its wait — the instant its product path judges a deadline at, its statements — is
+      // this cell's evidence, so a deadline crossed during the wait is consumed by the operation itself, never by a sink the cell feeds
+      const waiting = await own(`wait: ${what}`, () => mustWait(oracle, probe, (client) => own(`waited: ${what}`, () => operation(client)), what, limitMs));
       observedWaits += 1;
       return waiting;
     },

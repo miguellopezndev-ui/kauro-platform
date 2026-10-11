@@ -5,6 +5,7 @@
 // The sellers, allocations, entitlements and lines are the adapter-written fixtures of @kauro/persistence/testing, each written by the
 // role that owns it; the purchase behind R2-095 is B09's. The provider is B09's labelled contract fake (SIMULATED): nothing here is a
 // provider fact. Money is integer cents written in the test: 1000 bps of the service basis 52125 is 5212.5, rounded half up once to 5213.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { SalesAccountView } from "@kauro/application";
@@ -15,6 +16,8 @@ import { asPerson, candidateSeller, digest, paidProject, sellingAgency, terminat
 import { SimulatedCrash, asProblem, call, completed, freshKey, ids, outcome, replayTextOf, waitForApiLockWait, type Reply } from "./support.js";
 
 let pw: PaymentsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => pw.w.h.oracle);
 before(async () => {
   pw = await paymentsWorld();
 });

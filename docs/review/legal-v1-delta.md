@@ -1,0 +1,49 @@
+# Legal V1 delta (Payments V1 + D-19), on 0792dc9
+
+Spec: PAYMENTS-V1-REPLAN §8; owner decision 2026-10-07-PAYMENTS-V1; D-19 TODO. Texts stay Spanish (DPA_EN English). No personal data, placeholders kept.
+
+| # | File : section | Before -> after | Reason |
+|---|---|---|---|
+| 1 | TERMS_OF_SERVICE 8.1 | two means ("Transferencia bancaria en EE. UU. / ACH ... en Wise" + "PayPal / tarjeta") -> one means "cuando esté habilitada": "transferencia bancaria en EE. UU. (ACH o transferencia doméstica a los mismos datos)"; Kauro may not offer it; no card or other means; Wise no longer named | PayPal parked; wire = same USD details; no unconditional ACH claim; name only launch rails |
+| 2 | TERMS 8.1 auth comment | A8 refs only -> adds Payments V1 reference | traceability |
+| 3 | TERMS 8.2 | paid on provider capture (PayPal) or reconciled credit (ACH) -> paid only on a reconciled incoming credit with bank evidence, exact amount and currency; a credit confirmed after Order expiry follows the Quote expiry rules (s.6), else returned | PayPal removed; DV1-06 late rule; no new promise beyond returning |
+| 4 | TERMS 8.3 | "falla ... no produce un segundo cobro" -> "Kauro no pide un segundo pago mientras un pago enviado no esté conciliado" | mandate wording |
+| 5 | TERMS 10.4 | "los de ACH, como transferencia saliente" -> "los de transferencia bancaria, ... cuando la ejecución real esté comprobada" | D-ACH-21 / PV1 §4: never "refunded" without execution evidence; no ACH-specific claim |
+| 6 | TERMS 25.7 | added: Platform offers no card payment today (8.1); section states the legal right and applies only if such a payment ever exists | consumer sections coherent with no enabled consumer route |
+| 7 | TERMS 13.4 | added: "Una copia eliminada puede persistir unos días tras el borrado en el almacenamiento del proveedor, hasta su expiración automática; Kauro no la usa ni la restaura" | D-19; never promise 1 day |
+| 8 | DATA_PROCESSING_POLICY 6.2 (l.78-79) | "no recibe ni guarda números completos de tarjetas: el pago con tarjeta se hace en PayPal" -> "no recibe ni guarda números de tarjeta" | PayPal removed |
+| 9 | DATA_PROCESSING_POLICY 13.2 (l.241) | "a PayPal y a Wise" -> "a Wise" (Bancolombia, DIAN unchanged) | PayPal removed |
+| 10 | DPA 8.3 / Anexo III list | "(PayPal, Wise)" -> "El proveedor de pagos (Wise)"; "PayPal y Wise (responsables independientes)" -> "Wise (responsable independiente)" | PayPal removed |
+| 11 | DPA_EN 8.3 / Annex III list | same in English: "The payment provider (Wise)"; "Wise (independent controller ...)" | PayPal removed |
+| 12 | DPA 13.2 and DPA_EN 13.2 | added the D-19 sentence (ES / EN) | D-19 |
+| 13 | INTERNAL_DATA_MANUAL l.54, l.263 | PayPal removed from independent controllers and MFA list | PayPal removed |
+| 14 | CHECKLIST V-06 | marked SUPERSEDED (Payments V1), row kept; V-07 (Wise controller) unchanged | PayPal parked, not deleted |
+| 15 | CHECKLIST A-20 (new, section 7) | activation check: measure noncurrent-version expiry lag in the real account; texts' wording holds only if the lag is within a few days, else state the AWS-documented maximum or fix lifecycle; never promise 1 day | D-19 |
+
+Not changed (checked): PRIVACY_NOTICE, PIA_BEDROCK, LAWYER_LATER (no PayPal/ACH wording); CHECKLIST S-09 (sender-side fees, rail-neutral); ToS Annex A.
+Ambiguities: DV1-06 text is not in the repo; row 3 uses the mandate's summary only (honor at same price per quote expiry rules, else return). Row 7/12 wording "unos días" is final only after A-20 measures the lag.
+
+## Round 2 (Codex REJECT F-01 MAJOR, F-02 MINOR; owner Addendum)
+| # | File : section | Before -> after | Reason |
+|---|---|---|---|
+| 16 | TERMS 8.2 (replaces row 3) | summary sentence -> the seven DV1-06 safeguards inline (exact USD credit received + bank evidence; deadline and "enviar antes de", no bank-timing guarantee; bank booking time within the tolerance in the instructions; on-time honoured at same price if files/source, target, legal/fiscal treatment, scope valid and no other open/paid purchase; else not started, recorded and returned per s.10, new Quote; partial/over/other reference/payer under review and returned, no top-up; no second payment request). Source: dv1-06-for-legal.md (r8, 97b5bb8); no tolerance number, no new promise. Fee sentence kept as closing paragraph | F-01 |
+| 17 | TERMS 8.1 (amends row 1) | "la Plataforma ofrece ... cuando esté habilitada" -> "el único medio previsto es ...; Kauro no cobra ni acepta pagos por esta vía hasta que la ruta esté habilitada; solo se muestra cuando esté habilitada" | Owner Addendum: no implication of collecting before ENABLED |
+| 18 | CHECKLIST A-20 | added "Deadline: during the real-account qualification, before the deletion texts (ToS 13.4, DPA 13.2) are published" | F-02 |
+Note: 3.1 "cobra el precio acordado" describes the service flow and was left; flag if Codex wants it conditional.
+
+## Round 3 (Codex r2 REJECT F-01 MAJOR, F-02 MINOR; owner language rule 2026-10-07)
+| # | File : section | Before -> after | Reason |
+|---|---|---|---|
+| 19 | TERMS 8.2(4) | "sigan siendo válidos ..." -> English: the accepted Quote and its source or files, target, legal and fiscal treatment and delivery scope must remain **unchanged**; a scope amendment or source replacement under 6.5 after acceptance does not qualify; plus no other open or paid purchase | Codex F-01 (6.5 replacement must not slip through) |
+| 20 | TERMS 10.5 | same "unchanged" requirement for price honoured after expiry/deletion | consistency with 19 |
+| 21 | CHECKLIST A-20 | adds "Decision date 2026-10-07; completion deadline: during the real-account qualification and before the deletion texts (ToS 13.4, DPA 13.2) are published" (c49a6b6 withdrew an earlier 2026-10-10 calendar date that no owner decision set); quote translated to "may persist for a few days after deletion" | Codex F-02 |
+| 22 | Language: ToS, DATA_PROCESSING_POLICY (POL), PRIVACY_NOTICE, INTERNAL_DATA_MANUAL, PIA_BEDROCK | Spanish -> English master, meaning preserved (every clause, number, term and auth/law trace kept; Colombian statute names kept in Spanish with English text). Placeholders now English: [NIT], [registered address], [notice email], [effective date], [phone]. ToS 24.4: English master prevails, Spanish translation only where Colombian law requires it. AVISO abbreviation -> NOTICE | Owner rule: customers are US companies, no Spanish by default |
+| 23 | DPA.md + DPA_EN.md | merged into one English master `DPA.md` (the former DPA_EN content, which already carried the Payments V1 and D-19 edits); Spanish DPA deleted; DPA_EN.md removed | Owner rule |
+| 24 | CHECKLIST (header, S-16), LAWYER_LATER (L-11 reopened as r5, L-13, F-01..F-05) | language statements and file references updated; AVISO -> NOTICE; Spanish placeholders renamed | consequence of 22-23 |
+| 25 | docs/legal/es/ (new) | Spanish secondary copies of DATA_PROCESSING_POLICY.md, PRIVACY_NOTICE.md, INTERNAL_DATA_MANUAL.md (the pre-conversion Spanish text including rows 8-9, 13, 15's Spanish equivalents), each with a banner: "secondary translation of the English master; reachable only through the language selector; English prevails" | see below |
+
+Spanish copies kept and why: (a) POL = the habeas-data treatment policy that Ley 1581 de 2012 / Decreto 1074 art. 2.2.2.25.3.1 requires data subjects in Colombia to receive (owner named it); (b) MAN = its internal manual (Ley 1581 art. 17 lit. k; owner named it); (c) PRIVACY_NOTICE = the Aviso de Privacidad (Decreto 1074 arts. 2.2.2.25.3.2-3), the notice required at collection of data from Colombian data subjects; kept by the same reasoning, drop if the owner wants only (a)+(b). Not kept: ToS, DPA, PIA, CHECKLIST, LAWYER_LATER.
+Spanish-copy caveat: es/ copies do not carry rows 19-21 (not applicable to POL/NOTICE/MAN); they are as of c364a5b for the Payments V1 hunks.
+Open: ToS section 25 (Ley 1480 consumers, Colombian) and the consumer Quote are now English only; LAWYER_LATER L-11 records whether Colombian consumer law needs Spanish there.
+
+| 26 | LAWYER_LATER L-11, revision log row 21 | Codex r3 MINOR F-03/F-04: revision log no longer asserts the withdrawn 2026-10-10 date; L-11 risk names the Colombian-consumer exposure | post-ACCEPT_WITH_MINOR doc fix |

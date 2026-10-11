@@ -63,6 +63,49 @@ export const COMMERCE_FAILURE_REASONS = [
   "FINANCE_SCOPE_MISSING",
   "COMMITMENT_ISOLATION",
   "FISCAL_VALIDATION_REFUSED",
+  // Payments V1 bank-transfer route (docs/design/ACH-ROUTE.md r12; lane KIT). Safe machine tokens only; the lane that raises one owns its guard.
+  // the window the route version freezes (DV1-07) and the manual rail's refusal of the automated refund executor (DV1-08, FC-RAIL)
+  "TRANSFER_WINDOW_TOO_SHORT",
+  "MANUAL_RAIL_NO_AUTOMATED_OUTBOUND",
+  // outbound execution attempts and NEVER-RESEND (DV1-08)
+  "EXECUTION_ATTEMPT_OPEN",
+  "EXECUTION_FROZEN",
+  "NO_DECLARED_ATTEMPT",
+  "EXECUTION_PRECEDES_DECLARATION",
+  "NO_RECORDED_BOUNCE",
+  "RESEND_EXCEEDS_PAYABLE",
+  "REFUND_NOT_UNCERTAIN",
+  "NOT_EXECUTED_TOO_EARLY",
+  "COVERAGE_INCOMPLETE",
+  "UNEXPLAINED_DEBIT",
+  "POTENTIAL_MATCH_UNRESOLVED",
+  "CONTRADICTORY_EVIDENCE",
+  // the record predicates of a declared execution (E-ID, E-AMT, E-TIME, E-REF-CONFLICT)
+  "EXECUTION_ID_INVALID",
+  "EXECUTION_AMOUNT_MISMATCH",
+  "EXECUTION_REFERENCE_CONFLICT",
+  // destination proof (DV1-10, DV1-11)
+  "DESTINATION_NOT_CAPTURED",
+  "DESTINATION_INVALID",
+  "DESTINATION_UNPROVEN",
+  "DESTINATION_CONFLICT",
+  "RECIPIENT_ALIAS",
+  // the evidence gate outcomes of stored bank evidence (ACH-ROUTE §6): a rejection grants nothing (HASH_MISMATCH is the existing B06 reason)
+  "UNKNOWN_EVIDENCE",
+  "MALFORMED_EVIDENCE",
+  "UNAUTHENTICATED_EVIDENCE",
+  "EVIDENCE_UNAVAILABLE",
+  // the route configuration and instruction issuance of the bank-transfer route (lane L-ROUTE; ACH-ROUTE §7.1-§7.3, §7.29)
+  "ROUTE_VERSION_CHANGED",
+  "OPEN_ORDER_EXISTS",
+  "ROUTE_NOT_ENABLED",
+  "ROUTE_NOT_VERIFIED",
+  "DETAILS_EXPIRED",
+  "DETAILS_ACCOUNT_MISMATCH",
+  "GENERAL_ENABLE_CONDITION_UNMET",
+  "INSTRUCTIONS_EXPIRED",
+  // I3: an existing visible order whose instructions are not readable (bank order not open, details expired; coordinator ruling RR-2)
+  "INSTRUCTIONS_NOT_AVAILABLE",
 ] as const;
 
 export type CommerceFailureReason = (typeof COMMERCE_FAILURE_REASONS)[number];

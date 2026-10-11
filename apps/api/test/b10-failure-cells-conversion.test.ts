@@ -9,6 +9,7 @@
 //
 // The founding cohort's three slots serve this whole file: the cells that need a live reservation run first (TRG_PAR T2 and T3, TRG_CRASH
 // RETRY), the others run without one and assert that they have none.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { connectionPid, crashedAt, faultCell, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
@@ -26,6 +27,8 @@ import { prepareAllocation } from "./sales-support.js";
 import { call, completed, freshKey, ids, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => iw.h.oracle);
 before(async () => {
   iw = await integrationWorld();
   await installDbFaults();

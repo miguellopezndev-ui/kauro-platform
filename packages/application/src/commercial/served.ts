@@ -13,10 +13,12 @@
  * B10-STATEMENTS-PAYOUTS serves CMD051 CloseCommissionPeriod and CMD053 ReconcileCommissionPayout (the commission group's service routes),
  * CMD052 ApproveCommissionPayout (the owner's) and the read GetCommissionStatement, each command answering 200 with its view.
  * B10-AGENCY-LIFECYCLE serves CMD002 ActivateAgency and CMD043 CloseAgency. Both answer 200 with their COMPLETED envelope (the agency is the
- * aggregate they edit) and a Problem of their closed catalogue otherwise; neither reaches a provider, so neither answers 202.
+ * aggregate they edit) and a Problem of their closed catalogue otherwise; neither reaches a provider, so neither answers 202. CMD027 declares the 202 ACCEPTED envelope too: an included replacement whose
+ * re-binding does not answer within its bound (D10-GAP-6a).
  */
 import { HEADERS } from "../api/envelope.js";
 import { PROBLEM_RESPONSE, type DeclaredResponse, type RouteResponses } from "../api/response-contract.js";
+import { ACCEPTED_RESPONSE_SCHEMA_ID } from "../api/response-schemas.js";
 import type { KnownSchemaId } from "../ports/schema-validator.js";
 import { COMMERCIAL_COMMANDS } from "./contracts.js";
 import { COMMERCIAL_COMMAND_OUTCOMES, COMMERCIAL_READ_OUTCOMES } from "./outcomes.js";
@@ -40,6 +42,7 @@ export function commercialCommandRouteResponses(command: CommercialServedRouteCo
   const declared: Record<string, DeclaredResponse> = {
     [String(reply.status)]: Object.freeze({ contentType: HEADERS.contentType, schemaId: commercialCommandResponseSchemaId(command) as KnownSchemaId }),
   };
+  if (reply.accepted) declared["202"] = Object.freeze({ contentType: HEADERS.contentType, schemaId: ACCEPTED_RESPONSE_SCHEMA_ID });
   return Object.freeze({ operationId: COMMERCIAL_COMMANDS[command].name, declared: Object.freeze(declared), problem: PROBLEM_RESPONSE, outcomes: COMMERCIAL_COMMAND_OUTCOMES[command] });
 }
 

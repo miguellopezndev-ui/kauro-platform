@@ -74,6 +74,7 @@ import type {
   SourceReadHandlers,
   SupportHandlers,
   UnauthenticatedRequest,
+  RequestAuthority,
 } from "@kauro/application";
 import {
   HEADERS,
@@ -107,7 +108,8 @@ import {
 } from "@kauro/application";
 import type { Clock, CorrelationId, Environment, FailureReason, IdGenerator } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
-import { authenticationOf, type Authentication, type Authenticator } from "./authenticator.js";
+import { authenticationOf, type Authentication, type AuthenticationRequest, type Authenticator } from "./authenticator.js";
+import { requestAuthorityOf } from "./request-authority.js";
 import { sendProblem, singleValued } from "./http.js";
 import { registerSessionRoutes, type SessionRoutesOptions } from "./sessions.js";
 import { registerPublicRoutes, type PublicApiOptions } from "./public-routes.js";
@@ -239,6 +241,17 @@ export interface RouteKit {
   singleValued(headers: FastifyRequest["headers"]): Readonly<Record<string, string | undefined>>;
   readonly sink: (correlationId: string, error: unknown) => void;
   answerFrameworkError(error: unknown, request: FastifyRequest, reply: FastifyReply): FastifyReply;
+  /**
+   * The command boundary's authentication of a person (PV1R-01): the request-aware authenticator with the request's ACTUAL method, so an
+   * unsafe cookie request meets the Origin, Sec-Fetch-Site and session CSRF rule, and refused credentials (AMBIGUOUS_CREDENTIALS,
+   * ORIGIN_REJECTED, CSRF_TOKEN_INVALID) keep their typed refusal with its anonymous fact; no subject is the anonymous denial. Decided
+   * before any handler effect or journal reservation.
+   */
+  subjectOrRefusal(request: FastifyRequest, headers: Readonly<Record<string, string | undefined>>, action: string, refused: UnauthenticatedRequest): Promise<{ readonly kind: "SUBJECT"; readonly subject: Extract<Authentication, { kind: "SUBJECT" }>["subject"] } | { readonly kind: "PROBLEM"; readonly problem: Problem }>;
+  /** The same authenticator's answer for a request as it stands now (a re-authentication at a later guard instant). */
+  authentication(request: AuthenticationRequest): Promise<Authentication>;
+  /** The request's credential authority for an effect it authorizes (rule 16): the route releases it once its work returned. */
+  requestAuthority(request: FastifyRequest, headers: Readonly<Record<string, string | undefined>>, userId: string): RequestAuthority;
 }
 
 export type CommandReply<View> = CompletedResponse<View> | AcceptedResponse | Problem;
@@ -524,8 +537,17 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
     if (!isServedCommercialRead(handler.operationId)) throw new Error(`${handler.operationId} has a handler but is not a served B10 read (COMMERCIAL_SERVED_READ_IDS of @kauro/application)`);
     registerRead(app, options, handler.admission, commercialReadRouteResponses(handler.operationId), (request) => handler.execute(request), sink);
   }
-  options.paymentRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
-  options.commissionRoutes?.(app, { sendProblem, singleValued, sink, answerFrameworkError });
+  const kit: RouteKit = {
+    sendProblem,
+    singleValued,
+    sink,
+    answerFrameworkError,
+    subjectOrRefusal: (request, headers, action, refused) => subjectOrRefusal(options, request, headers, action, refused, sink),
+    authentication: (request) => authenticationOf(options.authenticator, request),
+    requestAuthority: (request, headers, userId) => requestAuthorityOf(options.authenticator, { method: request.method, headers }, userId),
+  };
+  options.paymentRoutes?.(app, kit);
+  options.commissionRoutes?.(app, kit);
   if (options.sessions !== undefined) {
     registerSessionRoutes(app, { ...options.sessions, validator: options.validator, refuseUnauthenticated: options.refuseUnauthenticated, refuseCredentials: refusalOfCredentials(options), sink });
   }
@@ -725,7 +747,9 @@ function registerCommand<Body, View>(
       const authenticated = await subjectOrRefusal(options, request, headers, spec.id as CommandId, { correlationId: admission.admission.correlationId, agencyId: admission.admission.agencyId }, sink);
       if (authenticated.kind === "PROBLEM") return sendProblem(reply, authenticated.problem);
       const subject = authenticated.subject;
-      const envelope: CommandEnvelope<Body> = envelopeOf(spec.id as CommandId, options.environment, admission.admission, subject);
+      // the request's credential, fenced by an effect inside its own unit of work and judged at its COMMIT (rule 16, PV1R-07 r4)
+      const authority = requestAuthorityOf(options.authenticator, { method: request.method, headers }, subject.identity.userId);
+      const envelope: CommandEnvelope<Body> = { ...envelopeOf(spec.id as CommandId, options.environment, admission.admission, subject), authority };
       let result: CommandResult<View>;
       try {
         result = await execute(envelope);

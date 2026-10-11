@@ -18,6 +18,8 @@
 export { startTemporaryPostgres, ROLES, TEST_CLOCK_OFFSET_SETTING, TEST_CLOCK_FUNCTION, TEST_CLOCK_COMMENT } from "./temporary-postgres.js";
 export type { TemporaryPostgres, StartOptions, LoginRole } from "./temporary-postgres.js";
 export { serverNow } from "./server-now.js";
+// DB-TLS gap 2: the one test minter of a connection environment (production code takes it from the validated configuration)
+export { mintTestDatabaseEnvironment as testDatabaseEnvironment, nameOfDatabaseEnvironment as databaseEnvironmentNameOf } from "../environment.js";
 export { start as startHarness, waitForLockWait, settlesOrWaits, backendPid, barrier, handled, CAPABILITY_PUBLICATION_PATH } from "./harness.js";
 export type { Harness, AgencyFixture, CapabilityPublicationState, LockObservation } from "./harness.js";
 export {
@@ -93,3 +95,5 @@ export { fundPlatformPool } from "./audit-fixtures.js";
 export type { FundedPoolOptions } from "./audit-fixtures.js";
 // the common fault harness (docs/design/FAULT-HARNESS.md): controlled clock, crash and pause points, interleavings, matrix cells
 export * from "./faults/index.js";
+export { B10_INVARIANTS, assertInvariants, invariantsAfterEach, invariantRows } from "./invariants.js";
+export type { Invariant } from "./invariants.js";

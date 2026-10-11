@@ -77,6 +77,10 @@ function spec<Body>(s: CommerceCommandSpec<Body>): CommerceCommandSpec<Body> {
 export interface CreatePaymentOrderBody {
   /** The terms the agency accepts: must equal the quote's termsHash (a mismatch is STALE_VERSION / HASH_MISMATCH [termsHash]). */
   readonly termsHash: string;
+  /** Payments V1 (lane L-ROUTE): "BANK_TRANSFER" issues bank-transfer instructions on the named route instead of a provider checkout. */
+  readonly routeKind?: "BANK_TRANSFER";
+  /** The bank route the instructions are issued on (required with routeKind). */
+  readonly routeId?: string;
 }
 export type CreatePaymentOrderResult = CreatePaymentOrderView;
 export const CREATE_PAYMENT_ORDER = spec<CreatePaymentOrderBody>({

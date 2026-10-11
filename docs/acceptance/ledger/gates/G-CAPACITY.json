@@ -1,0 +1,65 @@
+{
+ "gate": "G-CAPACITY",
+ "manual": "04",
+ "package": "B17",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "S033",
+   "package": "B17",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S077",
+   "package": "B17",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-014",
+   "package": "B02",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-015",
+   "package": "B02",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-016",
+   "package": "B02",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B02",
+  "B17"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B02",
+   "commit": null,
+   "reviewId": null
+  },
+  {
+   "package": "B17",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

@@ -3,6 +3,7 @@
 // over a connection the harness opened (test/fault-support.ts), so a race cell observes the command itself waiting on the holder's
 // lock, a crash cell dies at the COMMIT boundary, a partial cell fails after a statement of the unit completed. PostgreSQL 17 through
 // the runtime login roles; the superuser only reads. Nothing sleeps. Titles are the matrix's proposed titles.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before } from "node:test";
 import type { PayoutIntentView, PayoutReconciliationView, PeriodCloseView } from "@kauro/application";
@@ -30,6 +31,8 @@ import { asProblem, completed, freshKey, ids, outcome, sha, type Person, type Re
 import type { SqlStep } from "./fault-support.js";
 
 let sw: StatementsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => sw.h.oracle);
 before(async () => {
   sw = await statementsWorld();
 });

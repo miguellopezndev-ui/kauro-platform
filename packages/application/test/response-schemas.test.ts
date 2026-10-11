@@ -175,6 +175,14 @@ test("R23: the validator compiles the COMPLETED envelope of every served command
     ["GET", "/api/v1/public/identity-config", "getIdentityConfig", ["200"]],
     ["GET", "/api/v1/public/capability-publication", "getCapabilityPublication", ["200"]],
     ["POST", "/api/v1/public/inquiries", "createInquiry", ["201"]],
+    // PV1 (lane ACH-ROUTE): the bank-transfer route operations and the transfer-instructions read
+    ["POST", "/api/v1/operations/bank-routes", "configureBankRoute", ["201"]],
+    ["POST", "/api/v1/operations/bank-routes/{routeId}/verify", "verifyBankRoute", ["200"]],
+    ["POST", "/api/v1/operations/bank-routes/{routeId}/enable", "enableBankRoute", ["200"]],
+    ["POST", "/api/v1/operations/bank-routes/{routeId}/disable", "disableBankRoute", ["200"]],
+    ["POST", "/api/v1/operations/bank-routes/{routeId}/details", "replaceBankRouteDetails", ["200"]],
+    ["GET", "/api/v1/operations/bank-routes/{routeId}", "getBankRoute", ["200"]],
+    ["GET", "/api/v1/payment-orders/{orderId}/transfer-instructions", "getTransferInstructions", ["200"]],
   ]);
   for (const route of OPERATIONAL_ROUTES) {
     for (const [status, response] of Object.entries(route.responses)) {

@@ -17,6 +17,7 @@
 import type { UtcInstant } from "@kauro/contracts";
 import type {
   AgencyId,
+  ExecutionContext,
   CausationId,
   CorrelationId,
   CommerceUnitOfWork,
@@ -36,11 +37,12 @@ import type {
   IdempotencyIdentity,
   TenantContext,
 } from "@kauro/domain";
-import { DomainFailure, NotFoundFailure, baseServiceCents, quoteTermsHash, registryPricePolicy, termsMoney } from "@kauro/domain";
+import { DomainFailure, LiveQuoteChangedFailure, NotFoundFailure, baseServiceCents, quoteTermsHash, registryPricePolicy, termsMoney } from "@kauro/domain";
 import type { CommandEnvelope } from "../../api/envelope.js";
 import { quoteViewOf } from "../../commerce/request/checkout.js";
 import { providerServicesUnavailable, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
 import { applied } from "../agency/shared.js";
+import { withinCallBound, type Bounded } from "../call-bound.js";
 import type { CreateQuoteBody } from "../contracts.js";
 import type { CreateQuoteView } from "../views.js";
 import type { QuotedSubject } from "./create-quote.js";
@@ -58,7 +60,9 @@ export interface ReplacementContext {
   readonly membershipId: MembershipId;
 }
 
-export type SettledReplacement = { readonly kind: "REBOUND" } | { readonly kind: "REFUSED"; readonly blockers: ReadonlyArray<string> };
+/** What the payment service concluded; PENDING: its re-binding did not answer within its bound (nothing concluded, answer 202). */
+export type Concluded = { readonly kind: "REBOUND" } | { readonly kind: "REFUSED"; readonly blockers: ReadonlyArray<string> };
+export type SettledReplacement = Concluded | { readonly kind: "PENDING" };
 
 const refuse = (reason: NonNullable<DomainFailure["details"]["reason"]>, message: string, details: Partial<DomainFailure["details"]> = {}): DomainFailure =>
   new DomainFailure("PRECONDITION_FAILED", message, { reason, ...details });
@@ -110,7 +114,10 @@ export async function issueReplacement(
   if ((await c.rebindings.listForCapture(authorization.captureId)).length >= allowance) {
     throw refuse("REPLACEMENT_ALLOWANCE_SPENT", "the one included pre-execution source replacement is spent", { currentVersion: live.version, currentState: live.state });
   }
-  if ((await reads.pendingReplacementOf(agencyId, live.quoteId)) !== null) throw refuse("OPERATION_PENDING", "a replacement of the paid quote is still pending");
+  // retryable: the pending replacement settles or is withdrawn, and the retry then reads the allowance spent or free
+  if ((await reads.pendingReplacementOf(agencyId, live.quoteId)) !== null) {
+    throw new DomainFailure("PRECONDITION_FAILED", "a replacement of the paid quote is still pending", { reason: "OPERATION_PENDING" }, true);
+  }
 
   const paidSnapshot = await c.quotes.snapshot(live.quoteId);
   if (paidSnapshot === null) throw new DomainFailure("INTEGRITY_FAILURE", "the paid quote has no eligibility snapshot");
@@ -205,15 +212,77 @@ export async function settleReplacement(runtime: CommerceRequestRuntime, co: Quo
   const factory = co.request.payment;
   const rebinder = co.rebinder;
   if (factory === null || rebinder === null) throw providerServicesUnavailable();
-  return factory.run({ kind: "SERVICE", serviceId: co.request.paymentServiceId, correlationId: correlationId as CorrelationId }, async (svc: CommerceUnitOfWork): Promise<SettledReplacement> => {
+  // bounded by PROVIDER_CALL_TIMEOUT_MS (D10-GAP-6a): a re-binding that does not answer leaves the replacement ISSUED with its journal entry
+  // open (nothing is concluded), and the request answers the retriable 202 — the same key resumes and observes the re-binding by its identity
+  const service = { kind: "SERVICE", serviceId: co.request.paymentServiceId, correlationId: correlationId as CorrelationId } as const;
+  let bounded: Bounded<Concluded>;
+  try {
+    bounded = await withinCallBound(co.providerTimer, () =>
+      factory.run(service, async (svc: CommerceUnitOfWork): Promise<Concluded> => {
+        if ((await svc.adoptScope("PAYMENT_ORDER", ctx.orderId)) === null) throw new NotFoundFailure("payment_order");
+        const to = await svc.commerce.quotes.get(ctx.toQuoteId);
+        if (to === null) throw new NotFoundFailure("quote");
+        if (to.state === "ACCEPTED_FOR_CHECKOUT") return { kind: "REBOUND" };
+        if (to.state !== "ISSUED") return { kind: "REFUSED", blockers: ["NOT_A_REPLACEMENT"] };
+        const rebound = await rebinder.rebind(svc, { captureId: ctx.captureId, fromQuoteId: ctx.fromQuoteId, toQuoteId: ctx.toQuoteId, requestedByMembershipId: ctx.membershipId, causationId: ctx.entryId as unknown as CausationId, now: runtime.clock.now() });
+        return rebound.kind === "REBOUND" ? { kind: "REBOUND" } : { kind: "REFUSED", blockers: rebound.blockers };
+      }),
+      // no abandon: the re-binding is its own SERVICE unit of work and keeps running to its COMMIT or ROLLBACK, whose outcome the same key observes
+      { call: "CMD027.rebind", ...(co.onLateFailure !== undefined ? { onLateFailure: co.onLateFailure } : {}) },
+    );
+  } catch (e) {
+    // A re-binding that lost a race on the database's own guard (an abandoned unit of this very replacement committed first, or is committing
+    // while this one waited on its locks) failed on a state that is no failure: observe it by the replacement's identity, never repeat it.
+    if (e instanceof DomainFailure && (e.details.reason === "REPLACEMENT_NOT_ALLOWED" || e.code === "STALE_VERSION")) {
+      if (await reboundByIdentity(factory, service, ctx)) return { kind: "REBOUND" };
+      // a re-binder's stale write that is no re-binding of this replacement: the purchase changed under the request (an execution admission, a
+      // refund). CMD027's STALE_VERSION names the project's live quote as current, never the row the re-binder lost on (D10-GAP-25, ADV-11)
+      if (e.code === "STALE_VERSION") {
+        const changed = new LiveQuoteChangedFailure("the paid purchase changed while it was re-bound");
+        changed.cause = e;
+        throw changed;
+      }
+    }
+    throw e;
+  }
+  if (bounded.timedOut) return { kind: "PENDING" };
+  // The same recovery for a NORMAL refusal (Codex F1): an abandoned unit of this very replacement that committed between the retry's ordinary
+  // reads makes the rebinder answer REFUSED (ALLOWANCE_USED, PURCHASE_NOT_INTACT) over a purchase that IS re-bound. A refusal is never
+  // answered before the replacement's identity is observed. (completeReplacement repeats the observation under the quote's lock.)
+  if (bounded.value.kind === "REFUSED" && (await reboundByIdentity(factory, service, ctx))) return { kind: "REBOUND" };
+  return bounded.value;
+}
+
+/** The replacement was re-bound: accepted for checkout with a re-binding recorded for it, read in the payment service's own unit. */
+async function reboundByIdentity(factory: NonNullable<QuoteCollaborators["request"]["payment"]>, service: ExecutionContext, ctx: ReplacementContext): Promise<boolean> {
+  return factory.run(service, async (svc: CommerceUnitOfWork): Promise<boolean> => {
     if ((await svc.adoptScope("PAYMENT_ORDER", ctx.orderId)) === null) throw new NotFoundFailure("payment_order");
     const to = await svc.commerce.quotes.get(ctx.toQuoteId);
-    if (to === null) throw new NotFoundFailure("quote");
-    if (to.state === "ACCEPTED_FOR_CHECKOUT") return { kind: "REBOUND" };
-    if (to.state !== "ISSUED") return { kind: "REFUSED", blockers: ["NOT_A_REPLACEMENT"] };
-    const rebound = await rebinder.rebind(svc, { captureId: ctx.captureId, fromQuoteId: ctx.fromQuoteId, toQuoteId: ctx.toQuoteId, requestedByMembershipId: ctx.membershipId, causationId: ctx.entryId as unknown as CausationId, now: runtime.clock.now() });
-    return rebound.kind === "REBOUND" ? { kind: "REBOUND" } : { kind: "REFUSED", blockers: rebound.blockers };
+    return to !== null && to.state === "ACCEPTED_FOR_CHECKOUT" && (await svc.commerce.rebindings.findTo(ctx.toQuoteId)) !== null;
   });
+}
+
+/**
+ * The replacement quote and whether it was re-bound, from the durable facts under the quote's lock (Codex F1). A refused replacement still
+ * ISSUED is withdrawn, but only if it is still ISSUED once the lock is held: an abandoned re-binding that was committing has accepted it, and a
+ * replacement accepted for checkout with a re-binding recorded for it is REBOUND whatever the refusal said.
+ */
+export async function concludeReplacement(
+  c: CommerceUnitOfWork["commerce"],
+  ctx: Pick<ReplacementContext, "toQuoteId">,
+  settled: Concluded,
+  now: UtcInstant,
+): Promise<{ readonly quote: QuoteRecord; readonly rebound: boolean }> {
+  let quote = await c.quotes.get(ctx.toQuoteId);
+  if (quote === null) throw new NotFoundFailure("quote");
+  if (settled.kind === "REFUSED" && quote.state === "ISSUED") {
+    const locked = await c.quotes.lock(ctx.toQuoteId);
+    if (locked === null) throw new NotFoundFailure("quote");
+    quote = locked.state === "ISSUED" ? applied(await c.quotes.transition(ctx.toQuoteId, locked.version, { state: "WITHDRAWN" }, now)) : locked;
+  }
+  const rebound = settled.kind === "REBOUND" || (quote.state === "ACCEPTED_FOR_CHECKOUT" && (await c.rebindings.findTo(ctx.toQuoteId)) !== null);
+  if (rebound && quote.state !== "ACCEPTED_FOR_CHECKOUT") throw new DomainFailure("INTEGRITY_FAILURE", "a re-bound replacement is not accepted for checkout");
+  return { quote, rebound };
 }
 
 /**
@@ -224,7 +293,7 @@ export async function completeReplacement(
   runtime: CommerceRequestRuntime,
   co: QuoteCollaborators,
   ctx: ReplacementContext,
-  settled: SettledReplacement,
+  settled: Concluded,
   input: { readonly context: TenantContext; readonly identity: IdempotencyIdentity; readonly role: MembershipRole | null },
 ): Promise<{ readonly view: CreateQuoteView; readonly replayed: boolean }> {
   return runtime.unitOfWork.run(input.context, async (uow) => {
@@ -235,17 +304,10 @@ export async function completeReplacement(
     }
     const c = uow.commerce;
     const now: UtcInstant = runtime.clock.now();
-    let quote = await c.quotes.get(ctx.toQuoteId);
-    if (quote === null) throw new NotFoundFailure("quote");
-    if (settled.kind === "REFUSED" && quote.state === "ISSUED") {
-      const locked = await c.quotes.lock(ctx.toQuoteId);
-      if (locked === null) throw new NotFoundFailure("quote");
-      quote = applied(await c.quotes.transition(ctx.toQuoteId, locked.version, { state: "WITHDRAWN" }, now));
-    }
-    if (settled.kind === "REBOUND" && quote.state !== "ACCEPTED_FOR_CHECKOUT") throw new DomainFailure("INTEGRITY_FAILURE", "a re-bound replacement is not accepted for checkout");
+    const { quote, rebound } = await concludeReplacement(c, ctx, settled, now);
     const snapshot = await c.quotes.snapshot(ctx.toQuoteId);
     if (snapshot === null) throw new DomainFailure("INTEGRITY_FAILURE", "the replacement has no eligibility snapshot");
-    const revoked = settled.kind === "REBOUND" ? await c.authorizations.findByQuote(ctx.fromQuoteId) : null;
+    const revoked = rebound ? await c.authorizations.findByQuote(ctx.fromQuoteId) : null;
     const view: CreateQuoteView = {
       quote: await quoteViewOf(uow, co.request, quote, input.role, now),
       eligibility: {
@@ -259,8 +321,8 @@ export async function completeReplacement(
         replacedQuoteId: ctx.fromQuoteId,
         ...(revoked !== null ? { revokedAuthorizationId: revoked.authorizationId } : {}),
         approvalRequired: false,
-        outcome: settled.kind === "REBOUND" ? "REBOUND" : "WITHDRAWN",
-        ...(settled.kind === "REFUSED" ? { reason: settled.blockers[0] ?? "NOT_A_REPLACEMENT" } : {}),
+        outcome: rebound ? "REBOUND" : "WITHDRAWN",
+        ...(!rebound && settled.kind === "REFUSED" ? { reason: settled.blockers[0] ?? "NOT_A_REPLACEMENT" } : {}),
       },
     };
     const committed = await uow.journal.commit(ctx.entryId, { responseStatus: 201, responseBody: view, resourceKind: "quote", resourceId: ctx.toQuoteId });

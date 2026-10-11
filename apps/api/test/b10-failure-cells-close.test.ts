@@ -2,26 +2,32 @@
 // risk" -> "Tier 1"), each a cell of the common fault harness (docs/design/FAULT-HARNESS.md): the REAL route of CMD051 runs its REAL unit of
 // work over a connection the harness opened (test/fault-support.ts), so a race cell observes the close itself waiting on the holder's lock or
 // holding it until its COMMIT. PostgreSQL 17 through the runtime login roles; the superuser only reads. Nothing sleeps.
+import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { UtcInstant } from "@kauro/contracts";
 import type { PayoutIntentView, PeriodCloseView } from "@kauro/application";
 import { connectionPid, faultCell, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
-import { acquired, approvePayout, bankCash, claimedCents, closeMonth, closePeriod, drainCommissions, eligibleLines, itemsOf, openMonth, proposal, rows, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
+import { acquired, approvePayout, bankCash, claimedCents, closeInstant, closeMonth, closePeriod, drainCommissions, eligibleLines, itemsOf, openMonth, proposal, rows, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
 import { purchase } from "./commission-support.js";
 import { createCommissionService } from "../src/index.js";
 import { completed, ids, outcome, type Reply } from "./support.js";
 
 let sw: StatementsWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => sw.h.oracle);
 before(async () => {
   sw = await statementsWorld();
+  CLOSE_AT = await closeInstant(sw, CLOSE_FLOOR);
 });
 after(async () => {
   await sw.stop();
 });
 
 const WHOLE = { firstBps: 10_000, repeatBps: 10_000 } as const;
-const CLOSE_AT = "2026-10-07T17:00:00Z";
+const CLOSE_FLOOR = "2026-10-07T17:00:00Z";
+// the close instant of the cells: CLOSE_FLOOR, or the DATABASE clock + 1 h once real time has overtaken it (set in `before`; see closeInstant)
+let CLOSE_AT = CLOSE_FLOOR;
 let month = 0;
 const nextMonth = (): string => `2026-${String(++month).padStart(2, "0")}`;
 

@@ -50,6 +50,21 @@ import type {
   TaxDocumentRecord,
   UnitOfWork,
 } from "@kauro/domain";
+import type {
+  BankAccountRef,
+  BankCreditId,
+  BankIntegrationClass,
+  BankOutcome,
+  CreditPage,
+  DebitPage,
+  DestinationFingerprintRecord,
+  EvidenceClassification,
+  IncomingCredit,
+  OutboundEvidence,
+  ProviderId,
+  StatementPage,
+  UsdBankAccountDetails,
+} from "@kauro/domain";
 
 // --- payment processor --------------------------------------------------------------------------------------------------------
 
@@ -428,4 +443,64 @@ export interface PurchaseRebinder {
       readonly now: UtcInstant;
     },
   ): Promise<{ readonly kind: "REBOUND"; readonly rebindingId: PurchaseRebindingId; readonly authorizationId: CommercialAuthorizationId } | { readonly kind: "REFUSED"; readonly blockers: ReadonlyArray<ReplacementBlocker> }>;
+}
+
+// --- Payments V1 bank-transfer evidence (docs/design/ACH-ROUTE.md D-ACH-15, §6.1; DV1-01: provider-neutral; lane KIT) -----------------------------
+//
+// Read/classify only: the port type has no create, fund, cancel or resend method and their absence is part of the contract (D-ACH-20).
+// No call happens inside a database transaction. The vendor payload stays inside the adapter package (S-B).
+
+/**
+ * The exact decrypted stored bytes of a bank evidence artifact and its typed provenance (D-ACH-15): what the restricted store returns, not
+ * facts a caller supplies. VERIFIED_BANK_ARTIFACT is the provenance of independently verified statement or export evidence, never a draft,
+ * a screenshot or a customer claim; the store assigns it, a caller cannot self-assert it.
+ */
+export interface StoredBankEvidence extends Omit<StoredEvidence, "provider" | "normalized" | "authenticatedBy" | "integrationClass"> {
+  readonly provider: ProviderId;
+  readonly accountRef: BankAccountRef;
+  readonly normalizerVersion: string;
+  readonly bytes: Uint8Array;
+  readonly authenticatedBy: StoredEvidence["authenticatedBy"] | "VERIFIED_BANK_ARTIFACT";
+  readonly integrationClass: BankIntegrationClass;
+}
+
+/** The restricted store's read of a bank artifact: the application reads it outside any transaction and re-verifies the bytes by hash. */
+export interface BankEvidenceStore {
+  readonly integrationClass: BankIntegrationClass;
+  get(artifactRef: string): Promise<StoredBankEvidence | null>;
+}
+
+/** The port a bank-transfer adapter implements (D-ACH-15). */
+export interface BankTransferEvidencePort {
+  /** Route data, never a contract literal (DV1-01). */
+  readonly provider: ProviderId;
+  readonly environment: PaymentEnvironment;
+  readonly integrationClass: BankIntegrationClass;
+  getAccountDetails(account: BankAccountRef, deadline: UtcInstant): Promise<BankOutcome<UsdBankAccountDetails>>;
+  listIncomingCredits(input: { readonly accountRef: BankAccountRef; readonly since: string | null; readonly limit: number; readonly deadline: UtcInstant }): Promise<BankOutcome<CreditPage>>;
+  getCreditById(input: { readonly accountRef: BankAccountRef; readonly creditId: BankCreditId; readonly deadline: UtcInstant }): Promise<BankOutcome<IncomingCredit>>;
+  /** Pure, no store or network access: classifies authenticated, hash-verified stored bytes. */
+  classifyCredit(evidence: StoredBankEvidence): EvidenceClassification<IncomingCredit>;
+  classifyOutbound(evidence: StoredBankEvidence): EvidenceClassification<OutboundEvidence>;
+}
+
+/** The V1 subset (§6.1): the read/classify methods plus the pure statement classifier; listStatementDebits is LATER (the API rows). */
+export interface BankEvidenceReadPortV1 extends Pick<BankTransferEvidencePort, "provider" | "environment" | "integrationClass" | "getAccountDetails" | "listIncomingCredits" | "getCreditById" | "classifyCredit" | "classifyOutbound"> {
+  listStatementDebits(input: { readonly accountRef: BankAccountRef; readonly since: string | null; readonly limit: number; readonly deadline: UtcInstant }): Promise<BankOutcome<DebitPage>>;
+  /** Pure, no I/O: the only V1 statement path (SI1). */
+  classifyStatement(evidence: StoredBankEvidence): EvidenceClassification<StatementPage>;
+}
+
+/**
+ * The destination fingerprint (DV1-10, DV1-11): HMAC-SHA256 under a platform key that never leaves the secret store and never reaches an
+ * adapter, a log or an event. The plaintext numbers are keyed in memory and discarded. The behaviour (normalization destination-norm-v1,
+ * canonical encoding) is the refund lane's; this is the seam it implements.
+ */
+export interface DestinationFingerprinter {
+  /** The key version a new capture is made under. */
+  current(): { readonly keyId: string; readonly keyVersion: number; readonly normVersion: string };
+  fingerprint(
+    destination: { readonly routingNumber: string; readonly accountNumber: string; readonly holderName: string },
+    under: { readonly keyId: string; readonly keyVersion: number; readonly normVersion: string },
+  ): Promise<DestinationFingerprintRecord>;
 }
