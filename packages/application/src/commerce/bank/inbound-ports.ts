@@ -17,6 +17,8 @@ export interface BankCreditChangeInput {
   readonly feeCents?: bigint | null;
   readonly payerDigest?: string | null;
   readonly payeeDigest?: string | null;
+  readonly reference?: string | null;
+  readonly bookedAt?: string | null;
   readonly orderId?: string;
   readonly captureId?: string;
 }

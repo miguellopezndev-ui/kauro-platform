@@ -15,7 +15,7 @@
  * Sec-Fetch-Site and CSRF rule; typed credential refusals; none: the anonymous denial, AUTHENTICATION_REQUIRED). Every reply carries Cache-Control: no-store (the server's hook);
  * the instructions never carry an ETag.
  */
-import type { BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest } from "@kauro/application";
+import type { BankInboundHandlers, BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest } from "@kauro/application";
 import { HEADERS, OPERATIONAL_ROUTES, admitEmptyRequest, admitHeaders, admitOperationalBody, operationalRouteResponses, problemOf, readTransferInstructions, repeatedHeaderNames, type CommerceRequestRuntime } from "@kauro/application";
 import type { Clock, CorrelationId, Environment } from "@kauro/domain";
 import { DomainFailure, IDEMPOTENCY_KEY, isUuid } from "@kauro/domain";
@@ -24,6 +24,8 @@ import type { RouteKit } from "../server.js";
 
 export interface BankRouteRouteDependencies {
   readonly handlers: BankRouteHandlers;
+  /** The owner's inbound credit commands (lane PV1-INBOUND). */
+  readonly inbound?: BankInboundHandlers;
   readonly runtime: CommerceRequestRuntime;
   readonly bank: BankRouteCollaborators | null;
   readonly validator: SchemaValidator;
@@ -32,6 +34,7 @@ export interface BankRouteRouteDependencies {
   readonly refuseUnauthenticated: (action: string, request: UnauthenticatedRequest) => Promise<Problem>;
 }
 
+const REF_PATH = /^[A-Za-z0-9._:-]{1,128}$/;
 const UUID_PATH = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function routeOf(operationId: string) {
@@ -58,7 +61,7 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     const out: Record<string, string> = {};
     for (const name of path.match(/\{([a-zA-Z]+)\}/g)?.map((m) => m.slice(1, -1)) ?? []) {
       const value = params[name];
-      if (value === undefined || !UUID_PATH.test(value)) return invalid("PATH_ID_INVALID", correlationId);
+      if (value === undefined || !(name.endsWith("Ref") ? REF_PATH : UUID_PATH).test(value)) return invalid("PATH_ID_INVALID", correlationId);
       out[name] = value;
     }
     return out;
@@ -117,6 +120,13 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
   command("disableBankRoute", "CMD204", (req) => deps.handlers.disable(req as never));
   command("replaceBankRouteDetails", "CMD205", (req) => deps.handlers.replaceDetails(req as never));
 
+  const inbound = deps.inbound;
+  if (inbound !== undefined) {
+    command("enterBankCredit", "CMD210", (req) => inbound.enter(req as never));
+    command("confirmBankCredit", "CMD211", (req) => inbound.confirm(req as never));
+    command("attributeBankCredit", "CMD212", (req) => inbound.attribute(req as never));
+  }
+
   function read(operationId: string, run: (request: FastifyRequest<{ Params: Record<string, string> }>, correlationId: CorrelationId, path: Readonly<Record<string, string>>, headers: Readonly<Record<string, string | undefined>>) => Promise<FastifyReplyAnswer>): void {
     const route = routeOf(operationId);
     app.route<{ Params: Record<string, string> }>({
@@ -146,6 +156,17 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     const authority = kit.requestAuthority(request, headers, authenticated.subject.identity.userId);
     return await deps.handlers.get({ correlationId, subject: authenticated.subject, routeId: path["routeId"]!, authority });
   });
+
+  if (inbound !== undefined) {
+    const ownerRead = async <View>(headers: Readonly<Record<string, string | undefined>>, request: FastifyRequest<{ Params: Record<string, string> }>, action: string, correlationId: CorrelationId, run: (r: { correlationId: CorrelationId; subject: never; authority: never }) => Promise<FastifyReplyAnswer>): Promise<FastifyReplyAnswer> => {
+      const authenticated = await kit.subjectOrRefusal(request, headers, action, { correlationId, agencyId: null });
+      if (authenticated.kind === "PROBLEM") return authenticated;
+      const authority = kit.requestAuthority(request, headers, authenticated.subject.identity.userId);
+      return run({ correlationId, subject: authenticated.subject as never, authority: authority as never });
+    };
+    read("getBankCredit", (request, correlationId, path, headers) => ownerRead(headers, request, "READ_BANK_CREDIT", correlationId, (r) => inbound.getCredit({ ...r, creditId: path["creditId"]! })));
+    read("getBankOrderMatchKeys", (request, correlationId, path, headers) => ownerRead(headers, request, "READ_BANK_ORDER_MATCH_KEYS", correlationId, (r) => inbound.getMatchKeys({ ...r, orderId: path["orderId"]! })));
+  }
 
   read("getTransferInstructions", async (request, correlationId, path, headers) => {
     const selector = headers[HEADERS.agency];

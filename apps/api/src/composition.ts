@@ -20,16 +20,16 @@
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import type { LateFailureSink, BankDetailsClassifier, BankEvidenceStore, BankRouteCollaborators } from "@kauro/application";
-import { createBankRouteHandlers, realProviderCallTimer } from "@kauro/application";
+import type { LateFailureSink, BankEvidenceClassifier, BankEvidenceStore, BankInboundCollaborators } from "@kauro/application";
+import { createBankInboundHandlers, createBankRouteHandlers, realProviderCallTimer } from "@kauro/application";
 import type { AssuranceVerifier, AuditReadRuntime, AuditRuntime, B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators, ProviderCallTimer } from "@kauro/application";
 import { SESSION_POLICY_VERSION, UnrecordedBuyerTypeReader, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createCapabilityCommandHandlers, createQuoteHandlers, createStatementRequestHandlers, problemOf, recordOperatorDenial } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { UtcInstant } from "@kauro/contracts";
-import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
+import type { AuditUnitOfWorkFactory, Clock, CommerceUnitOfWorkFactory, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, capabilityGovernanceOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, type DatabaseEnvironment, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
+import { bankRoutesOf, bankCreditsOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, capabilityGovernanceOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, type DatabaseEnvironment, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import { commercialPrincipalReader } from "./commercial-principals.js";
 import type { ApiConfig, IdentityConfig, MigratorConfig } from "./config.js";
@@ -326,7 +326,7 @@ export interface ApiAssembly {
    * every route command and the transfer-instructions read answer CAPACITY_UNAVAILABLE EVIDENCE_UNAVAILABLE; the acceptance tests bind the
    * labelled CONTRACT_FAKE store and classifier of @kauro/application/testing (SIMULATED).
    */
-  readonly bank?: { readonly evidence: () => BankEvidenceStore | null; readonly classifier: () => BankDetailsClassifier | null };
+  readonly bank?: { readonly evidence: () => BankEvidenceStore | null; readonly classifier: () => BankEvidenceClassifier | null; readonly hold?: (point: string) => Promise<void> };
 }
 
 /**
@@ -334,6 +334,13 @@ export interface ApiAssembly {
  * the request side of the payments workflow (CMD028, CMD029, CMD031, CMD032 and the four B09 reads), the agency lifecycle of package B10
  * (CMD002, CMD043), the payment service's routes (CMD030, CMD033, CMD034) and the HTTP server over an open unit-of-work factory.
  */
+/** The inbound bank commands before a payment runtime is bound: every unit is refused as unavailable (the owner commands run on the payment pool). */
+const unavailableUnitOfWork = {
+  run: async () => {
+    throw new DomainFailure("CAPACITY_UNAVAILABLE", "the payment service's pool is not bound", { reason: "EVIDENCE_UNAVAILABLE" }, true);
+  },
+} as unknown as CommerceUnitOfWorkFactory;
+
 export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const clock = assembly.clock ?? systemClock;
   const ids = assembly.ids ?? createIdGenerator(clock, systemRandom);
@@ -394,8 +401,10 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     assembly.payments === undefined ? {} : { payment: assembly.payments.runtime.assembly.commerce, paymentServiceId: PAYMENT_SERVICE_ID, provider: assembly.payments.runtime.assembly.provider };
   // Payments V1 bank-transfer route (lane L-ROUTE): the route tables and the effect instant of the commerce unit of work, the late-bound
   // evidence store and classifier, the step-up verifier and the provider-call bound of the store read
-  const bank: BankRouteCollaborators = {
+  const bank: BankInboundCollaborators = {
     routes: (uow) => bankRoutesOf(uow),
+    credits: (uow) => bankCreditsOf(uow as never),
+    hold: assembly.bank?.hold ?? (() => Promise.resolve()),
     effectNow: (uow) => effectInstantOf(uow),
     evidence: assembly.bank?.evidence ?? (() => null),
     classifier: assembly.bank?.classifier ?? (() => null),
@@ -405,6 +414,9 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   };
   const commerceCollaborators: CommerceRequestCollaborators = { ...commerceEdition(), ...paymentService, bank, ...assembly.commerce };
   const bankRoutes = createBankRouteHandlers(commerceRuntime, bank);
+  // the owner's inbound credit commands run on the payment service's pool (migration 0057); without a payment runtime they are unavailable
+  const inboundRuntime: CommerceRequestRuntime = { ...commerceRuntime, unitOfWork: assembly.payments === undefined ? unavailableUnitOfWork : assembly.payments.runtime.assembly.commerce };
+  const bankInbound = createBankInboundHandlers(inboundRuntime, bank);
   const commerce = createCommerceRequestHandlers(commerceRuntime, commerceCollaborators);
   // package B10: the agency lifecycle (CMD002, CMD043) on the same runtime, over the lifecycle adapter of the persistence package, B06's
   // active-work inspector and the step-up verifier
@@ -466,7 +478,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     ids,
     paymentRoutes: (app, kit) => {
       registerPaymentRoutes(app, kit, { payments: assembly.payments ?? null, validator, clock, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
-      registerBankRouteRoutes(app, kit, { handlers: bankRoutes, runtime: commerceRuntime, bank, validator, clock, environment: assembly.environment, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
+      registerBankRouteRoutes(app, kit, { handlers: bankRoutes, inbound: bankInbound, runtime: commerceRuntime, bank, validator, clock, environment: assembly.environment, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
     },
     commissionRoutes: (app, kit) =>
       registerCommissionRoutes(app, kit, {

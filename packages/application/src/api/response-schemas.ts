@@ -963,6 +963,92 @@ export const BANK_ROUTE_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Ob
   }),
 ] satisfies ReadonlyArray<OperationalRoute>);
 
+// --- the inbound side of the bank-transfer route (Payments V1, lane PV1-INBOUND; ACH-ROUTE r12 §7.5-§7.12, §7.23) ------------------------------
+const BANK_CENTS = { type: "string", pattern: "^(0|[1-9][0-9]{0,15})$" } as const;
+const BANK_CREDIT_VIEW_SCHEMA: JsonSchema = closedObject(["creditId", "accountRef", "bankTransactionId", "state", "version", "source", "rail", "grossCents", "feeCents", "currency", "reference", "orderId", "captureId"], {
+  creditId: BANK_UUID,
+  accountRef: BANK_REF,
+  bankTransactionId: { type: "string", minLength: 1, maxLength: 128 },
+  state: { type: "string", enum: ["DRAFT_MANUAL", "OBSERVED", "MATCH_REVIEW", "MATCHED", "APPLIED", "RETURN_REVIEW"] },
+  version: { type: "integer", minimum: 1 },
+  source: { type: "string", enum: ["OWNER_MANUAL"] },
+  rail: { type: "string", enum: ["ACH", "DOMESTIC_WIRE"] },
+  grossCents: BANK_CENTS,
+  feeCents: { type: ["string", "null"], pattern: "^(0|[1-9][0-9]{0,15})$" },
+  currency: { type: "string", enum: ["USD"] },
+  reference: { type: ["string", "null"], minLength: 1, maxLength: 256 },
+  orderId: { type: ["string", "null"], pattern: BANK_UUID.pattern },
+  captureId: { type: ["string", "null"], pattern: BANK_UUID.pattern },
+});
+export const BANK_CREDIT_COMMAND_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1 },
+  replayed: { type: "boolean" },
+  data: closedObject(["credit"], { credit: BANK_CREDIT_VIEW_SCHEMA }),
+});
+export const BANK_CREDIT_READ_RESPONSE_SCHEMA: JsonSchema = closedObject(["credit"], { credit: BANK_CREDIT_VIEW_SCHEMA });
+export const BANK_MATCH_KEYS_RESPONSE_SCHEMA: JsonSchema = closedObject(["keys"], {
+  keys: closedObject(["orderId", "reference", "expectedAmountCents", "currency", "acceptedPayerDigest", "transferExpiresAt", "providerTimeToleranceMs", "accountRef"], {
+    orderId: BANK_UUID,
+    reference: { type: "string", minLength: 1, maxLength: 256 },
+    expectedAmountCents: BANK_CENTS,
+    currency: { type: "string", enum: ["USD"] },
+    acceptedPayerDigest: { type: ["string", "null"], pattern: BANK_HASH.pattern },
+    transferExpiresAt: BANK_UTC,
+    providerTimeToleranceMs: { type: "integer", minimum: 0 },
+    accountRef: BANK_REF,
+  }),
+});
+const creditCommand = (operationId: string, path: string, summary: string, status: "200" | "201", request: JsonSchema): OperationalRoute =>
+  Object.freeze({
+    operationId,
+    method: "POST" as const,
+    path,
+    summary,
+    authority: "ACH-ROUTE r12 §7.5-§7.9; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+    request: Object.freeze({ contentType: "application/json" as const, schema: request }),
+    responses: Object.freeze({ [status]: Object.freeze({ description: "The credit after the command (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: BANK_CREDIT_COMMAND_RESPONSE_SCHEMA }) }),
+  });
+export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
+  creditCommand("enterBankCredit", "/api/v1/operations/bank-accounts/{accountRef}/credits", "Enter a manual bank credit the owner read in the bank's own artifact (DRAFT_MANUAL: grants nothing until confirmed)", "201",
+    closedObject(["bankTransactionId", "rail", "grossCents", "currency", "reference", "bookedAt", "evidence", "authorizationRef"], {
+      bankTransactionId: { type: "string", minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" },
+      rail: { type: "string", enum: ["ACH", "DOMESTIC_WIRE"] },
+      grossCents: { type: "string", pattern: "^[1-9][0-9]{0,15}$" },
+      currency: { type: "string", enum: ["USD"] },
+      reference: { type: ["string", "null"], minLength: 1, maxLength: 256 },
+      bookedAt: BANK_UTC,
+      evidence: closedObject(["artifactRef", "evidenceHash"], { artifactRef: BANK_REF, evidenceHash: BANK_HASH }),
+      authorizationRef: BANK_UUID,
+    })),
+  creditCommand("confirmBankCredit", "/api/v1/operations/bank-credits/{creditId}/confirmations", "Confirm a manual credit: its stored artifact read, verified and compared with the draft (OBSERVED)", "200",
+    closedObject(["expectedVersion", "authorizationRef"], { expectedVersion: BANK_VERSION, authorizationRef: BANK_UUID })),
+  creditCommand("attributeBankCredit", "/api/v1/operations/bank-credits/{creditId}/attributions", "Attribute a credit waiting for review to an order with billing evidence (MATCHED; V1: the order's own payer only)", "200",
+    closedObject(["expectedVersion", "orderId", "billingEvidenceRef", "reasonCode", "authorizationRef"], {
+      expectedVersion: BANK_VERSION,
+      orderId: BANK_UUID,
+      billingEvidenceRef: BANK_REF,
+      reasonCode: { type: "string", minLength: 1, maxLength: 200 },
+      authorizationRef: BANK_UUID,
+    })),
+  Object.freeze({
+    operationId: "getBankCredit",
+    method: "GET" as const,
+    path: "/api/v1/operations/bank-credits/{creditId}",
+    summary: "A bank credit as the corporate owner sees it",
+    authority: "ACH-ROUTE r12 §7.5; KAURO_OWNER",
+    responses: Object.freeze({ "200": Object.freeze({ description: "The credit.", contentType: JSON_CONTENT_TYPE, schema: BANK_CREDIT_READ_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "getBankOrderMatchKeys",
+    method: "GET" as const,
+    path: "/api/v1/operations/bank-orders/{orderId}/match-keys",
+    summary: "The keys the matching compares a credit with: the order's frozen reference, amount, accepted payer and deadline",
+    authority: "ACH-ROUTE r12 §7.9; KAURO_OWNER",
+    responses: Object.freeze({ "200": Object.freeze({ description: "The match keys.", contentType: JSON_CONTENT_TYPE, schema: BANK_MATCH_KEYS_RESPONSE_SCHEMA }) }),
+  }),
+] satisfies ReadonlyArray<OperationalRoute>);
+
 export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
   Object.freeze({
     operationId: "getLiveness",
@@ -1008,6 +1094,7 @@ export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze
     }),
   }),
   ...BANK_ROUTE_OPERATIONAL_ROUTES,
+  ...BANK_INBOUND_OPERATIONAL_ROUTES,
 ] satisfies ReadonlyArray<OperationalRoute>);
 
 export function operationalResponseSchemaId(operationId: string, status: string): OperationalResponseSchemaId {
