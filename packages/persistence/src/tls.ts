@@ -58,12 +58,15 @@ const DNS_NAME = /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:
  * DNS name (pg gives the TLS layer no server name for an IP literal, so the name check would be against "localhost"), the password
  * is read from its file and the plain value is refused. In LOCAL, nothing is required. A refusal names the variable, never a value.
  */
+/** The pg environment variables pg falls back to; refused outside LOCAL and removed by the test kit (testing/hermetic-env.ts). */
+export const PG_ENVIRONMENT_VARIABLES = ["PGPASSWORD", "PGPASSFILE", "PGSSLMODE", "PGHOST", "PGHOSTADDR"] as const;
+
 export function connectionSecurityOf(environment: "LOCAL" | "SANDBOX" | "LIVE", input: ConnectionSecurityInput): { readonly password?: string; readonly tls?: DatabaseTls } {
   const local = environment === "LOCAL";
   // pg takes the password, the pgpass file, the TLS mode and the host from these when the connection settings leave them out: outside LOCAL they are refused (ADV-9)
   const processEnv = input.processEnv ?? process.env;
   if (!local) {
-    for (const variable of ["PGPASSWORD", "PGPASSFILE", "PGSSLMODE", "PGHOST", "PGHOSTADDR"]) {
+    for (const variable of PG_ENVIRONMENT_VARIABLES) {
       if ((processEnv[variable] ?? "") !== "") {
         throw new ConnectionSecurityError(variable, variable.startsWith("PGHOST")
           ? "must not be set outside LOCAL: pg would dial the host from it instead of the configured DNS name the certificate is verified against"
