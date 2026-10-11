@@ -17,7 +17,7 @@
  */
 import { randomBytes } from "node:crypto";
 import type { Client } from "pg";
-import { ContractFakePreparationCompletion } from "@kauro/application/testing";
+import { ContractFakeBuyerTypeReader, ContractFakePreparationCompletion } from "@kauro/application/testing";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type {
   AgencyId,
@@ -149,11 +149,29 @@ export interface CommissionWorld {
   ahead(seconds: number): CommissionService;
   /** A corporate person with an ACTIVE KAURO_OWNER grant (the payment world's). */
   readonly kora: UserId;
+  /**
+   * Present only with `commissionWorld({ bankEvidence: true })` (Payments V1 seam IN1): the bank-transfer rail over this world, exactly the
+   * three operations rail-parity cells use. The world's api then serves the request side (CMD028) with the CONTRACT_FAKE bank store bound.
+   */
+  readonly bank?: BankRail;
   stop(): Promise<void>;
 }
 
-export async function commissionWorld(options: { readonly clock?: Clock } = {}): Promise<CommissionWorld> {
-  const pw = await paymentWorld(options.clock !== undefined ? { clock: options.clock } : {});
+export interface BankRail {
+  /** A purchase of the agency paid by one exact bank credit through the real route commands (same quote fixtures, so the same cents as the provider rail). */
+  purchase(s: Selling, label: string): Promise<Purchase>;
+  /** The funds observation of the credit that paid the purchase (a credit version with fundsState), delivered to the bound inbound consumer. */
+  funds(p: Purchase, state: "HELD" | "AVAILABLE"): Promise<void>;
+  /** The purchase's refund through the manual rail (F2 + X1 + G2); answers the refund id. */
+  refunded(s: Selling, p: Purchase, serviceCents: bigint, taxCents?: bigint): Promise<string>;
+  /** The lane's fixtures (route, credit-version consumer hook). */
+  readonly fixtures: import("./bank-fixtures-support.js").BankFixtures;
+}
+
+export async function commissionWorld(options: { readonly clock?: Clock; readonly bankEvidence?: boolean } = {}): Promise<CommissionWorld> {
+  // bankEvidence (PV1 KIT-2, IN1): the api serves the request side so CMD028 can issue a BANK_TRANSFER order; the buyer type port is the contract fake
+  const bankBuyers = options.bankEvidence === true ? new ContractFakeBuyerTypeReader({ clock }) : undefined;
+  const pw = await paymentWorld({ ...(options.clock !== undefined ? { clock: options.clock } : {}), ...(bankBuyers !== undefined ? { requestSide: true, commercial: { buyerTypes: bankBuyers } } : {}) });
   const h = pw.w.h;
   const base = { host: "127.0.0.1", port: h.pg.port, database: ROLES.database } as const;
   const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs(), environment: testDatabaseEnvironment("LOCAL") });
@@ -170,7 +188,24 @@ export async function commissionWorld(options: { readonly clock?: Clock } = {}):
       onBackgroundFailure: (correlationId, error) => backgroundFailures.push({ correlationId, error }),
     });
   const service = serviceOf(pools.units);
-  return {
+  let bank: BankRail | undefined;
+  if (bankBuyers !== undefined) {
+    // loaded here, not at the top: bank-fixtures-support imports this module
+    const kit = await import("./bank-fixtures-support.js");
+    const constants = await import("./bank-constants-support.js");
+    const evidence = constants.bankEvidenceFake();
+    pw.w.bank.evidence = evidence;
+    const owner = await pw.w.person("bank-rail-owner");
+    await h.grantKauroOwner(owner.userId);
+    const fixtures = new kit.BankFixtures({ get cw() { return world; }, w: pw.w, owner, evidence, accountRef: constants.BANK_ACCOUNT, environment: constants.BANK_ENVIRONMENT, payeeDigest: constants.BANK_PAYEE_DIGEST, buyers: bankBuyers });
+    bank = {
+      fixtures,
+      purchase: (s, label) => kit.commissionBankPurchase(fixtures, world, bankBuyers, s, label),
+      funds: async (p, state) => void (await fixtures.fundsOf(p.captureId, state)),
+      refunded: (s, p, serviceCents, taxCents = 0n) => fixtures.refundedByManualRail(s, p, serviceCents, taxCents),
+    };
+  }
+  const world: CommissionWorld = {
     pw,
     h,
     pools,
@@ -181,11 +216,13 @@ export async function commissionWorld(options: { readonly clock?: Clock } = {}):
     backgroundFailures,
     ahead: (seconds) => serviceOf(new AheadUnits(pools.pools, seconds)),
     kora: pw.kora,
+    ...(bank !== undefined ? { bank } : {}),
     async stop() {
       await pools.close();
       await pw.stop();
     },
   };
+  return world;
 }
 
 // --- selling agencies, sellers and attribution ----------------------------------------------------------------------------------
@@ -592,6 +629,11 @@ export interface Purchase {
 }
 
 export interface CaptureOptions {
+  /**
+   * A capture that is NOT the provider fake's (Payments V1 bank transfer, bank-support.ts S1/IN1): the order's own route binding and the
+   * capture identity the credit gave. The provider fake is then never asked; everything else is the provider capture's path.
+   */
+  readonly bank?: { readonly route: { readonly provider: string; readonly environment: "SANDBOX" | "LIVE"; readonly merchantRef: string; readonly payeeDigest: Sha256Hex }; readonly providerCaptureId: string };
   /** The reconciliation's confirmation instant: the payment service's transaction stands there on the labelled TEST CLOCK. */
   readonly confirmedAt?: string;
   /** The provider's authenticated completion instant (default: one second before the database clock). */
@@ -620,12 +662,17 @@ async function defaultProviderCompletedAt(cw: CommissionWorld, orderId: PaymentO
  */
 export async function captureOf(cw: CommissionWorld, s: Selling, checkout: Checkout, options: CaptureOptions = {}): Promise<Purchase> {
   const { pw } = cw;
-  const route = pw.route;
+  const route = (options.bank?.route ?? pw.route) as typeof pw.route;
   const { quote } = checkout;
   // One second behind the database clock (the confirmation is server_now()), and never before the order's creation.
   const providerCompletedAt = (options.providerCompletedAt ?? await defaultProviderCompletedAt(cw, checkout.orderId)) as UtcInstant;
-  pw.paypal.approve(checkout.providerOrderId);
-  const providerCaptureId = pw.paypal.captureAtProvider(checkout.providerOrderId, { completedAt: providerCompletedAt });
+  let providerCaptureId: string;
+  if (options.bank === undefined) {
+    pw.paypal.approve(checkout.providerOrderId);
+    providerCaptureId = pw.paypal.captureAtProvider(checkout.providerOrderId, { completedAt: providerCompletedAt });
+  } else {
+    providerCaptureId = options.bank.providerCaptureId;
+  }
   const service: ServiceContext = { kind: "SERVICE", serviceId: "payment-service", correlationId: ids.next() as CorrelationId };
   const paid = await pw.pools.commerce.run(service, async (uow) => {
     if ((await uow.adoptScope("PAYMENT_ORDER", checkout.orderId)) === null) throw new Error("the payment service could not adopt the order's scope");
@@ -655,7 +702,16 @@ export async function captureOf(cw: CommissionWorld, s: Selling, checkout: Check
       evidenceHash: sha(`capture-evidence-${captureId}`),
     });
     await uow.scopes.record({ kind: "PROVIDER_CAPTURE", key: `${route.provider}|${route.environment}|${providerCaptureId}`, agencyId: s.agency.agencyId, orderId: checkout.orderId, captureId }, now);
-    const order = await uow.commerce.orders.lock(checkout.orderId);
+    let order = await uow.commerce.orders.lock(checkout.orderId);
+    if (options.bank !== undefined && order !== null && order.state === "INTENT_CREATED") {
+      // a bank order stays INTENT_CREATED (the bank state lives in bank_transfer_instructions; the vendored PaymentOrder machine is not extended):
+      // the fixture walks the listed edges to CAPTURED (CREATING, CREATED with the credit's identity as the order's provider reference)
+      for (const step of [{ state: "CREATING" }, { state: "CREATED", providerOrderId: checkout.providerOrderId }] as const) {
+        const moved = await uow.commerce.orders.transition(checkout.orderId, order!.version, step, now);
+        if (moved.kind !== "APPLIED") throw new Error("the bank order's fixture step was stale");
+        order = await uow.commerce.orders.lock(checkout.orderId);
+      }
+    }
     if (order === null || (await uow.commerce.orders.transition(checkout.orderId, order.version, { state: "CAPTURED" }, now)).kind !== "APPLIED") throw new Error("the order's capture was stale");
     if (options.afterCapture !== undefined) await options.afterCapture();
     await uow.commerce.authorizations.issue({

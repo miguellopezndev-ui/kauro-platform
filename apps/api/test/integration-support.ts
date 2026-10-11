@@ -10,7 +10,8 @@ import assert from "node:assert/strict";
 import type { LateFailure, ProviderCallTimer } from "@kauro/application";
 import { realProviderCallTimer } from "@kauro/application";
 import type { CapturePaymentView, CreatePaymentOrderView, CreateQuoteView, ExecuteRefundView, RequestRefundView, SalesAccountView, SellerTerminationView, AttributionView, PeriodCloseView, PayoutIntentView, PayoutReconciliationView, CommissionStatementView } from "@kauro/application";
-import { ContractFakeBuyerTypeReader } from "@kauro/application/testing";
+import { ContractFakeBuyerTypeReader, type BankEvidenceFake } from "@kauro/application/testing";
+import type { DestinationFingerprinter } from "@kauro/application";
 import { toUtcInstant } from "@kauro/domain";
 import type { ProjectId, UserId } from "@kauro/domain";
 import { FaultPoints, instrumentPort, operationClock, recordClaim, recordProspect, serverNow, type RecordedSeller } from "@kauro/persistence/testing";
@@ -22,6 +23,7 @@ import { bankCash, claimedCents, closePeriod, seller, approvePayout, reconcilePa
 import { approveThroughRoute, call, clock, completed, freshKey, ids, type Person, type PlanFixture } from "./support.js";
 import { createRevision, projectPointer } from "./source-support.js";
 import { paymentRoutes } from "./commerce-support.js";
+import { bankEvidenceFake, testDestinationFingerprinter } from "./bank-constants-support.js";
 
 export { claimsOn, linesOf, oracleRows, poolsOf, recordClaim, recordProspect };
 
@@ -44,6 +46,12 @@ export interface IntegrationWorld extends StatementsWorld {
   readonly buyers: ContractFakeBuyerTypeReader;
   /** The failures of collaborator calls after their bound elapsed (the late-failure sink of ApiAssembly.commercial), in order. */
   readonly lateFailures: LateFailure[];
+  /**
+   * Present only with `integrationWorld({ bankEvidence: true })` (Payments V1 seam S3): the CONTRACT_FAKE bank evidence port and its
+   * restricted store, bound to the api's bank collaborator (ApiAssembly.bank.evidence, read by the route commands and by every command
+   * that reads a stored artifact), and the test DestinationFingerprinter (key id 'test-key', version 1) the refund lane's commands take.
+   */
+  readonly bankEvidence?: { readonly evidence: BankEvidenceFake; readonly fingerprinter: DestinationFingerprinter };
 }
 
 /**
@@ -78,12 +86,18 @@ const cellProviderTimer: ProviderCallTimer = {
   },
 };
 
-/** `sessions: true` (opt-in, PV1 L-ROUTE r1 RR-4) binds the B11 session boundary; absent, the world is built exactly as before. */
-export async function integrationWorld(options: { readonly sessions?: boolean } = {}): Promise<IntegrationWorld> {
+/**
+ * `sessions: true` (opt-in, PV1 L-ROUTE r1 RR-4) binds the B11 session boundary; `bankEvidence: true` (opt-in, PV1 KIT-2 S3) binds the
+ * CONTRACT_FAKE bank store and the test fingerprinter; absent, the world is built exactly as before.
+ */
+export async function integrationWorld(options: { readonly sessions?: boolean; readonly bankEvidence?: boolean } = {}): Promise<IntegrationWorld> {
   const buyers = new ContractFakeBuyerTypeReader({ clock });
   const lateFailures: LateFailure[] = [];
   const sw = await statementsWorld({ commercial: { buyerTypes: buyers, providerTimer: cellProviderTimer, onLateFailure: (late) => void lateFailures.push(late) }, ...(options.sessions === true ? { sessions: true } : {}) });
-  return Object.assign(sw, { buyers, lateFailures });
+  if (options.bankEvidence !== true) return Object.assign(sw, { buyers, lateFailures });
+  const evidence = bankEvidenceFake();
+  sw.w.bank.evidence = evidence;
+  return Object.assign(sw, { buyers, lateFailures, bankEvidence: { evidence, fingerprinter: testDestinationFingerprinter } });
 }
 
 /** A selling agency with the BILLING member whose token the public payment commands run under. */
