@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { R2_DOMAIN_ALIASES } from "@kauro/contracts";
 import { APPLICATION_COPY, EN, message, nextStepLabel, placeholdersOf, stateCopy } from "../src/copy/en.ts";
 import { PUBLIC_COPY } from "../src/copy/public.ts";
+import { SCREEN_COPY } from "../src/copy/screens.ts";
 import { HEALTH_CHECK_CTA, HEALTH_CHECK_NAME, IN_HOUSE_SENTENCE, lintCatalogue, lintText, PERMITTED_AI_SENTENCE, withoutComments } from "../src/copy/lint.ts";
 import { SHARED_STATES, type NextStep } from "../src/client/states.ts";
 
@@ -31,7 +32,8 @@ test("B11 INT-1 seam, one copy catalogue (D-COPY-1, D-W5a-2): EN is the applicat
   const application = Object.keys(APPLICATION_COPY);
   const site = Object.keys(PUBLIC_COPY);
   assert.deepEqual(application.filter((id) => Object.hasOwn(PUBLIC_COPY, id)), [], "no id is defined by both catalogues");
-  assert.deepEqual(Object.keys(EN).sort(), [...application, ...site].sort());
+  assert.deepEqual(Object.keys(EN).sort(), [...application, ...site, ...Object.keys(SCREEN_COPY)].sort());
+  assert.deepEqual(Object.keys(SCREEN_COPY).filter((id) => Object.hasOwn(PUBLIC_COPY, id) || Object.hasOwn(APPLICATION_COPY, id)), [], "the screens' ids are their own");
   for (const [id, text] of Object.entries(PUBLIC_COPY)) assert.equal((EN as Readonly<Record<string, string>>)[id], text, id);
   // the names and sentences A3 fixes word for word are the public site's, and each stands once over both catalogues
   for (const sentence of [HEALTH_CHECK_CTA, IN_HOUSE_SENTENCE]) {
