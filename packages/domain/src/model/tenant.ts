@@ -34,6 +34,8 @@ export interface TenantContext {
   readonly agencyId: AgencyId;
   readonly userId: UserId;
   readonly correlationId: CorrelationId;
+  /** Payments V1: the command settles in the payment boundary, so its unit of work runs on the kauro_payment pool (runtimeRoleOf). */
+  readonly pool?: "PAYMENT";
 }
 
 export interface IdentityContext {
@@ -85,6 +87,8 @@ export interface OperatorContext {
   readonly kind: "OPERATOR";
   readonly userId: UserId;
   readonly correlationId: CorrelationId;
+  /** Payments V1 (inbound bank credits): the owner command is a money command of the payment boundary, so it runs on the kauro_payment pool (runtimeRoleOf). */
+  readonly pool?: "PAYMENT";
 }
 
 export type ExecutionContext = TenantContext | IdentityContext | SystemContext | AnonymousContext | ServiceContext | OperatorContext;
