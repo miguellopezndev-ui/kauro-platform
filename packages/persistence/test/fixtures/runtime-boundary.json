@@ -2663,6 +2663,38 @@
       "using": "kauro.acting_corporate_owner()",
       "check": null
     },
+    "core_documents/core_documents_control_put": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": null,
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "core_documents/core_documents_control_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))",
+      "check": null
+    },
+    "core_plan_bindings/core_plan_bindings_control_put": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": null,
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "core_plan_bindings/core_plan_bindings_control_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))",
+      "check": null
+    },
     "corporate_roles/corporate_roles_control": {
       "command": "ALL",
       "roles": [
