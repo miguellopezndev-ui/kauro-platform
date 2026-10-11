@@ -15,6 +15,7 @@
  * production source file (architecture.rules.json `testOnlySubpaths`). Tests of this package and of the entrypoints import
  * it; nothing is ever wired into a deployment.
  */
+import "./hermetic-env.js";
 export { startTemporaryPostgres, ROLES, TEST_CLOCK_OFFSET_SETTING, TEST_CLOCK_FUNCTION, TEST_CLOCK_COMMENT } from "./temporary-postgres.js";
 export type { TemporaryPostgres, StartOptions, LoginRole } from "./temporary-postgres.js";
 export { serverNow } from "./server-now.js";
