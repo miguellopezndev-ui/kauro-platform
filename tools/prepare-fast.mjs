@@ -15,7 +15,9 @@ const dependedOn = new Set(packages.flatMap(({ manifest }) =>
 const posix = (path) => path.replaceAll("\\", "/");
 const work = mkdtempSync(join(tmpdir(), "kauro-types-"));
 try {
-  const selected = packages.filter(({ manifest }) => dependedOn.has(manifest.name) || manifest.name === "@kauro/api" || manifest.name === "@kauro/web");
+  // the core wrappers are built too: K04 S045 (tools/test/vendor-cores.test.mjs) imports their dist
+  const wrappers = new Set(["@kauro/migration-core", "@kauro/intelligence-core"]);
+  const selected = packages.filter(({ manifest }) => dependedOn.has(manifest.name) || wrappers.has(manifest.name) || manifest.name === "@kauro/api" || manifest.name === "@kauro/web");
   for (const pkg of dependencyOrder(packages, selected)) {
     const web = pkg.manifest.name === "@kauro/web";
     const declarationsOnly = pkg.manifest.name === "@kauro/ui";

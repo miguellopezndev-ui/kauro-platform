@@ -25,7 +25,10 @@
   "packages/application/src/ports/**",
   "packages/application/src/testing/**",
   "packages/persistence/src/*",
-  "packages/persistence/src/testing/**"
+  "packages/persistence/src/testing/**",
+  "vendor/**",
+  "packages/migration-core/src/**",
+  "packages/intelligence-core/src/**"
  ],
  "packages": {
   "B06": ["packages/domain/**", "packages/authorization/**", "packages/persistence/**", "packages/application/src/commands/**", "packages/application/src/queries/**", "apps/api/src/**"],
