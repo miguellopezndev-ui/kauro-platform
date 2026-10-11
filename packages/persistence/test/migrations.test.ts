@@ -125,6 +125,9 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0054_lease_expiry_after_lock.sql",
     // Payments V1 KIT-2: bank_credits, treasury_refunds and the manual-rail timings of a route version (provisional structure for the lanes)
     "0055_bank_kit_fixtures.sql",
+    // package B10 lane OFFSET: offsets as claims that yield, the one lock order, noncash settlement (docs/design/B10-OFFSET.md)
+    "0056_offset_claims_yield.sql",
+    // "0057_seller_credit.sql", (pending)
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

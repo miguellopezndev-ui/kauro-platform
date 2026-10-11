@@ -103,7 +103,14 @@ export interface UnitOfWorkDependencies {
   readonly random?: RandomBytes;
   /** Default statement timeout of a unit of work in milliseconds (10 s). */
   readonly defaultStatementTimeoutMs?: number;
+  /** Test seam (G-ORD-2): runs at LOCK_ORDER_RETRY, after a KC027 rollback and before the retry's backoff. */
+  readonly lockOrderHold?: (point: "LOCK_ORDER_RETRY", attempt: number) => Promise<void>;
+  /** Backoff sleep of the lock-order retry; a timer by default. */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
+
+/** The retries of a KC027 refusal: its own budget, apart from maxRetries (G-ORD-2). */
+const LOCK_ORDER_RETRIES = 3;
 
 const ISOLATION_SQL: Readonly<Record<IsolationLevel, string>> = Object.freeze({
   READ_COMMITTED: "READ COMMITTED",
@@ -365,6 +372,11 @@ function assertBindableContext(context: ExecutionContext): void {
   }
 }
 
+function lockOrderRefusal(e: unknown): boolean {
+  const source = isDomainFailure(e) ? e.cause : e;
+  return isDatabaseError(source) && source.code === "KC027";
+}
+
 function transientSqlState(e: unknown): boolean {
   const source = isDomainFailure(e) ? e.cause : e;
   return isDatabaseError(source) && (source.code === SQLSTATE.SERIALIZATION_FAILURE || source.code === SQLSTATE.DEADLOCK_DETECTED);
@@ -451,11 +463,22 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
     const maxRetries = options.maxRetries ?? (isolation === "READ_COMMITTED" ? 0 : 2);
     if (!Number.isInteger(maxRetries) || maxRetries < 0 || maxRetries > 10) throw new RangeError("maxRetries must be an integer between 0 and 10");
     const statementTimeoutMs = Math.max(1, Math.floor(options.statementTimeoutMs ?? this.#defaultStatementTimeoutMs));
-    for (let attempt = 0; ; attempt++) {
+    let attempt = 0;
+    let lockOrder = 0;
+    for (;;) {
       try {
         return await this.#once(context, open, work, isolation, statementTimeoutMs);
       } catch (e) {
-        if (attempt < maxRetries && transientSqlState(e)) continue;
+        if (lockOrderRefusal(e) && lockOrder < LOCK_ORDER_RETRIES) {
+          lockOrder++;
+          await this.deps.lockOrderHold?.("LOCK_ORDER_RETRY", lockOrder);
+          await (this.deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))))(10 * lockOrder);
+          continue;
+        }
+        if (attempt < maxRetries && transientSqlState(e)) {
+          attempt++;
+          continue;
+        }
         throw e;
       }
     }
