@@ -36079,6 +36079,8 @@
               "SUPPORT_CALENDAR_UNAVAILABLE",
               "INQUIRY_RATE_LIMITED",
               "CLAIM_EXPIRED",
+              "COMMISSION_LINE_NOT_FOUND",
+              "LOCK_ORDER_CONTENTION",
               "CORPORATE_ROLE_MISSING",
               "SELF_APPROVAL_FORBIDDEN",
               "SERVICE_NOT_PERMITTED",

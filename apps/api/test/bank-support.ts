@@ -7,15 +7,16 @@
 // call these helpers; the failure-matrix template rules 1, 4 and 10 apply to every cell that uses them (both orders, observed waits, DB clock).
 import type { Sha256Hex } from "@kauro/contracts";
 import type { BankAccountRef, PaymentEnvironment } from "@kauro/domain";
-import { createBankEvidenceFake, fakeCreditBytes, fakeOutboundBytes, fakeStatementBytes, type BankEvidenceFake, type FakeCreditFields, type FakeOutboundFields, type FakeStatementFields } from "@kauro/application/testing";
+import { fakeCreditBytes, fakeOutboundBytes, fakeStatementBytes, type BankEvidenceFake, type FakeCreditFields, type FakeOutboundFields, type FakeStatementFields } from "@kauro/application/testing";
 import { connectionPid, openConnection, type FaultContext, type HarnessConnection, type Waiting } from "@kauro/persistence/testing";
-import { integrationWorld, type IntegrationWorld } from "./integration-support.js";
-import { clock } from "./support.js";
+import { BANK_ACCOUNT, BANK_ENVIRONMENT, BANK_PAYEE_DIGEST, ROUTE_TIMING, bankEvidenceFake } from "./bank-constants-support.js";
+import { BankFixtures, integrationBankPurchase, staleFinanceWorker, type CreditVersion, type StaleWorker } from "./bank-fixtures-support.js";
+import { integrationWorld, type Agent, type IntegrationWorld } from "./integration-support.js";
+import type { Purchase } from "./commission-support.js";
+import type { Reply } from "./support.js";
 
-export const BANK_ACCOUNT = "acct-contract-fake-1" as BankAccountRef;
-export const BANK_ENVIRONMENT: PaymentEnvironment = "SANDBOX";
-/** The payee digest of the fixture account: what a credit artifact must carry to be for this route. */
-export const BANK_PAYEE_DIGEST: Sha256Hex = "b".repeat(64);
+export { BANK_ACCOUNT, BANK_ENVIRONMENT, BANK_PAYEE_DIGEST };
+export type { CreditVersion, StaleWorker };
 
 /** The names a lane uses for `ctx.points.pause(...)` where its production code calls a registered hold; fixed here so the lanes agree. */
 export const BANK_HOLD_POINTS = {
@@ -70,6 +71,21 @@ export interface BankWorld {
   holdAttemptRow(attemptId: string, login?: BankLogin): Promise<HeldLock>;
   /** Runs `operation` on a fresh connection and proves, in pg_stat_activity, that it waits on `held` (template rule 1: never a sleep). */
   mustWaitOn<T>(ctx: Pick<FaultContext, "mustWait">, held: HeldLock, operation: (connection: HarnessConnection) => Promise<T>, what: string, login?: BankLogin): Promise<{ readonly waiting: Waiting<T>; readonly waiter: HarnessConnection }>;
+  // --- Payments V1 seams of the red-first lanes (KIT-2; apps/api/test/bank-fixtures-support.ts) ----------------------------------------
+  /** The fixtures the seams below are made of (the lane route, the credit/capture writers, the consumer hooks). */
+  readonly fixtures: BankFixtures;
+  /** S1: a purchase whose order was issued by CMD028 with routeKind BANK_TRANSFER and whose capture COMPLETED from one applied exact credit. */
+  paidByBankTransfer(agent: Agent, label: string): Promise<Purchase>;
+  /** S2: a credit in RETURN_REVIEW and a REQUESTED treasury refund of its whole gross (migration 0054 bank_credits / treasury_refunds). */
+  unassignedCredit(cents: bigint, label: string): Promise<{ readonly bankCreditId: string; readonly treasuryRefundId: string }>;
+  /** S4: a recipient-record artifact (kind RECIPIENT of the CONTRACT_FAKE store) for DP-RECIPIENT. */
+  storeRecipientRecord(record: { readonly recipientRef: string; readonly recipientVersion: string; readonly full: { readonly routingNumber: string; readonly accountNumber: string; readonly holderName: string } }): Promise<StoredBankArtifact>;
+  /** S5: stores an authenticated reversal version of a credit (by credit id or capture id) and hands it to `fixtures.creditVersionConsumer` (L-INBOUND binds it). */
+  reverseCredit(creditOrCaptureId: string, cents: bigint): Promise<Reply | void>;
+  /** S6: the manual execution window and coverage lag of the route version in force (the columns of bank_route_versions, migration 0054). */
+  routeTiming(): { readonly manualExecutionWindowMs: number; readonly coverageLagMs: number };
+  /** S7: a FINANCE dispatcher superseded by a rival at the lease: its pass can only report FENCED. */
+  staleFinanceWorker(): Promise<StaleWorker>;
   /** Releases every lock the world still holds and stops it. */
   stop(): Promise<void>;
 }
@@ -77,11 +93,13 @@ export interface BankWorld {
 export async function bankWorld(options: { readonly world?: IntegrationWorld; readonly sessions?: boolean } = {}): Promise<BankWorld> {
   // sessions: opt-in (PV1 L-ROUTE r1, RR-4), the B11 session boundary of the world built here; absent, unchanged
   const iw = options.world ?? (await integrationWorld(options.sessions === true ? { sessions: true } : {}));
-  const evidence = createBankEvidenceFake({ clock, environment: BANK_ENVIRONMENT, accountRef: BANK_ACCOUNT, payeeDigest: BANK_PAYEE_DIGEST });
+  // a world built with integrationWorld({ bankEvidence: true }) already carries (and has bound) its store: one store per world
+  const evidence = iw.bankEvidence?.evidence ?? bankEvidenceFake();
   // the api reads the bank route's details artifacts from this store (lane L-ROUTE; ApiAssembly.bank, bound at call time)
   iw.w.bank.evidence = evidence;
   const open = (login: BankLogin): Promise<HarnessConnection> => openConnection(iw.h.pg.clientConfig(login));
   const held = new Set<HeldLock>();
+  const fixtures = new BankFixtures({ cw: iw, w: iw.w, owner: iw.owner, evidence, accountRef: BANK_ACCOUNT, environment: BANK_ENVIRONMENT, payeeDigest: BANK_PAYEE_DIGEST, buyers: iw.buyers });
 
   async function hold(kind: HeldLockKind, login: BankLogin, take: (c: HarnessConnection) => Promise<unknown>): Promise<HeldLock> {
     const connection = await open(login);
@@ -125,6 +143,16 @@ export async function bankWorld(options: { readonly world?: IntegrationWorld; re
     storeCredit: (fields) => store(fakeCreditBytes(BANK_ACCOUNT, fields)),
     storeOutbound: (fields) => store(fakeOutboundBytes(BANK_ACCOUNT, fields)),
     storeStatement: (fields) => store(fakeStatementBytes(BANK_ACCOUNT, fields)),
+    fixtures,
+    paidByBankTransfer: (agent, label) => integrationBankPurchase(fixtures, iw, agent, label),
+    unassignedCredit: (cents, label) => fixtures.unassignedCredit(cents, label),
+    storeRecipientRecord: async (record) => {
+      const r = await fixtures.storeRecipientRecord(record);
+      return { artifactRef: r.artifactRef, evidenceHash: r.evidenceHash };
+    },
+    reverseCredit: (id, cents) => fixtures.reverseCredit(id, cents),
+    routeTiming: () => ROUTE_TIMING,
+    staleFinanceWorker: () => staleFinanceWorker(iw),
     holdOutboundStream: (login = "kauro_payment_test") =>
       hold("L1_OUTBOUND_STREAM", login, (c) => c.query("SELECT pg_advisory_xact_lock(kauro.bank_stream_lock_key($1, $2, 'OUTBOUND'))", [BANK_ENVIRONMENT, BANK_ACCOUNT])),
     holdInboundStream: (login = "kauro_payment_test") =>
