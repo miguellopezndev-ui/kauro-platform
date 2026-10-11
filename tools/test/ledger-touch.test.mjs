@@ -3,7 +3,7 @@
 // with the changes that reopen a package (a cited test or an own row) reported apart.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -73,6 +73,9 @@ function fixture({ external = false, globsLater = false } = {}) {
   git("init", "-q");
   git("config", "user.email", "t@example.invalid");
   git("config", "user.name", "t");
+  // ADV-7 corrupts a loose object: no automatic gc or maintenance may pack it first (main 9a3c426, windows: chmod ENOENT)
+  git("config", "gc.auto", "0");
+  git("config", "maintenance.auto", "false");
   const reg = "packages/contracts/registry";
   const program = [
     { id: "B00", title: "zero", dependsOn: [], caseIds: ["S001", "S002"] },
@@ -370,6 +373,18 @@ test("ADV-3: a changed shared file (package.json) touches every accepted package
   }
 });
 
+// Turn every pack of a fixture repository back into loose objects (a pack's objects are skipped while the pack is present).
+function unpackAll(dir) {
+  const packs = join(dir, ".git", "objects", "pack");
+  for (const name of readdirSync(packs).filter((n) => n.endsWith(".pack"))) {
+    const moved = join(dir, name);
+    renameSync(join(packs, name), moved);
+    rmSync(join(packs, name.replace(/\.pack$/u, ".idx")), { force: true });
+    execFileSync("git", ["-C", dir, "unpack-objects", "-q"], { input: readFileSync(moved) });
+    rmSync(moved);
+  }
+}
+
 test("ADV-7: a file at a revision is null only when the revision's tree has no such path — an unknown revision or a corrupt object is an error, never an absent file", async () => {
   const { fileAt } = await import("../acceptance-touch.mjs");
   assert.equal(typeof fileAt, "function", "acceptance-touch.mjs exports fileAt");
@@ -381,6 +396,8 @@ test("ADV-7: a file at a revision is null only when the revision's tree has no s
     // corrupt B00's sidecar blob at HEAD: the tree still lists it, reading it fails
     const blob = f.git("rev-parse", "HEAD:docs/acceptance/case-maps/B00.json");
     const object = join(f.dir, ".git", "objects", blob.slice(0, 2), blob.slice(2));
+    if (!existsSync(object)) unpackAll(f.dir);
+    assert.ok(existsSync(object), `blob ${blob} is a loose object before it is corrupted`);
     chmodSync(object, 0o644);
     writeFileSync(object, "not a zlib stream");
     assert.throws(() => fileAt(f.dir, "HEAD", "docs/acceptance/case-maps/B00.json"));
