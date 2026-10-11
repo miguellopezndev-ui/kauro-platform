@@ -34,11 +34,11 @@ export const BANK_CREDIT_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<BankCreditEven
   "bank_transfer_instruction.order_state_changed.v1": ["orderId", "agencyId", "previousState", "orderState", "cause"],
 });
 
-/** The payment service learns of a received and a matched credit; the owner of a credit in review. */
+/** The payment service learns of a received and a matched credit; the owner (NOTIFICATIONS) of every credit, import and order-state change. */
 export const BANK_CREDIT_EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: BankCreditEventType; readonly consumer: "PAYMENT_SERVICE" | "NOTIFICATIONS" }> = Object.freeze([
+  ...BANK_CREDIT_EVENT_TYPES.map((eventType) => Object.freeze({ eventType, consumer: "NOTIFICATIONS" as const })),
   Object.freeze({ eventType: "bank_credit.received.v1" as const, consumer: "PAYMENT_SERVICE" as const }),
   Object.freeze({ eventType: "bank_credit.matched.v1" as const, consumer: "PAYMENT_SERVICE" as const }),
-  Object.freeze({ eventType: "bank_credit.review_required.v1" as const, consumer: "NOTIFICATIONS" as const }),
 ]);
 
 /** The credit as the tables hold it (money as integer cents; the payer as a digest only). */

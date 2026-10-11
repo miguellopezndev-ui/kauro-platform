@@ -22,6 +22,16 @@ ALTER TABLE kauro.statement_imports
   ADD COLUMN agency_id uuid CHECK (agency_id IS NULL),
   ADD COLUMN version   bigint NOT NULL DEFAULT 1 CHECK (version = 1);
 
+-- a manual credit may carry any reference text the bank booked (a foreign or truncated one goes to review, never a CHECK failure)
+ALTER TABLE kauro.bank_credits DROP CONSTRAINT bank_credits_reference_check;
+ALTER TABLE kauro.bank_credits ADD CONSTRAINT bank_credits_reference_check CHECK (reference IS NULL OR char_length(reference) BETWEEN 1 AND 256);
+
+-- the order's accepted billing identity (sha256), frozen at issuance beside the reference: M1's payer key
+ALTER TABLE kauro.bank_transfer_instructions ADD COLUMN accepted_payer_digest text CHECK (accepted_payer_digest IS NULL OR kauro.is_sha256_hex(accepted_payer_digest));
+DROP TRIGGER bank_transfer_instructions_immutable ON kauro.bank_transfer_instructions;
+CREATE TRIGGER bank_transfer_instructions_immutable BEFORE UPDATE ON kauro.bank_transfer_instructions
+  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('order_id,agency_id,route_id,route_version,environment,account_ref,reference,amount_cents,currency,issued_at,created_at,accepted_payer_digest');
+
 -- --- the credit's guard ---------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION kauro.bank_credits_guard() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
@@ -59,6 +69,11 @@ CREATE POLICY domain_events_payment_bank ON kauro.domain_events FOR ALL TO kauro
 CREATE POLICY outbox_records_payment_bank ON kauro.outbox_records FOR ALL TO kauro_payment
   USING (EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = outbox_records.event_id AND e.agency_id IS NULL AND e.aggregate_kind IN ('bank_credit', 'statement_import')))
   WITH CHECK (EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = outbox_records.event_id AND e.agency_id IS NULL AND e.aggregate_kind IN ('bank_credit', 'statement_import')));
+
+-- the bank order state change of an instruction: the agency's event, published by the payment service in the agency it adopted
+CREATE POLICY domain_events_payment_bank_order ON kauro.domain_events FOR ALL TO kauro_payment
+  USING (agency_id = kauro.current_agency_id() AND aggregate_kind = 'bank_transfer_instruction')
+  WITH CHECK (agency_id = kauro.current_agency_id() AND aggregate_kind = 'bank_transfer_instruction' AND event_type = 'bank_transfer_instruction.order_state_changed.v1');
 
 -- --- the payment service's reads of the route and of an instruction by its reference (M1) ----------------------------------------------
 CREATE POLICY bank_routes_payment_read ON kauro.bank_routes FOR SELECT TO kauro_payment USING (true);
