@@ -100,3 +100,23 @@ CREATE POLICY command_journal_payment_owner ON kauro.command_journal FOR ALL TO 
   WITH CHECK (agency_id IS NULL AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text);
 CREATE POLICY security_events_payment_owner ON kauro.security_events FOR INSERT TO kauro_payment
   WITH CHECK (agency_id IS NULL AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text);
+
+-- --- step-up proof revocation -----------------------------------------------------------------------------------------------------------
+-- A step-up proof stays append-only evidence, with one exception: its validity can be ENDED early (a revocation of the step-up an owner
+-- command is waiting on is seen by that command's judgment at the effect instant). Only expires_at may change, only downwards (never to
+-- or before issued_at: the table's CHECK), and a proof is never deleted.
+CREATE OR REPLACE FUNCTION kauro.assurance_proofs_guard() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'IMMUTABLE_COLUMN: assurance_proofs is append-only (DELETE refused)' USING ERRCODE = 'KA004';
+  END IF;
+  IF NEW.expires_at > OLD.expires_at OR (NEW.proof_id, NEW.user_id, NEW.kind, NEW.method, NEW.issued_at, NEW.correlation_id, NEW.created_at) IS DISTINCT FROM (OLD.proof_id, OLD.user_id, OLD.kind, OLD.method, OLD.issued_at, OLD.correlation_id, OLD.created_at) THEN
+    RAISE EXCEPTION 'IMMUTABLE_COLUMN: assurance_proofs is append-only (UPDATE refused)' USING ERRCODE = 'KA004';
+  END IF;
+  RETURN NEW;
+END
+$$;
+DROP TRIGGER assurance_proofs_append_only ON kauro.assurance_proofs;
+CREATE TRIGGER assurance_proofs_append_only BEFORE UPDATE OR DELETE ON kauro.assurance_proofs FOR EACH ROW EXECUTE FUNCTION kauro.assurance_proofs_guard();

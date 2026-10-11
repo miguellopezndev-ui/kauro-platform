@@ -25,12 +25,12 @@ export type BankCreditEventType = (typeof BANK_CREDIT_EVENT_TYPES)[number];
 
 /** References, hashes and states only: never an amount's payer, a reference (a payment secret of the buyer) or an account number. */
 export const BANK_CREDIT_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<BankCreditEventType, ReadonlyArray<string>>> = Object.freeze({
-  "bank_credit.drafted.v1": ["creditId", "accountRef", "state", "evidenceHash"],
-  "bank_credit.received.v1": ["creditId", "accountRef", "state", "previousState", "evidenceHash"],
-  "bank_credit.matched.v1": ["creditId", "accountRef", "orderId", "state", "previousState", "decision"],
-  "bank_credit.review_required.v1": ["creditId", "accountRef", "state", "previousState", "reason"],
-  "bank_credit.applied.v1": ["creditId", "accountRef", "orderId", "captureId", "state", "previousState"],
-  "statement_import.recorded.v1": ["importId", "accountRef", "evidenceHash", "lines", "newLines"],
+  "bank_credit.drafted.v1": ["creditId", "state", "evidenceHash"],
+  "bank_credit.received.v1": ["creditId", "state", "previousState", "evidenceHash"],
+  "bank_credit.matched.v1": ["creditId", "orderId", "state", "previousState", "decision"],
+  "bank_credit.review_required.v1": ["creditId", "state", "previousState", "reason"],
+  "bank_credit.applied.v1": ["creditId", "orderId", "captureId", "state", "previousState"],
+  "statement_import.recorded.v1": ["importId", "evidenceHash", "lines", "newLines"],
   "bank_transfer_instruction.order_state_changed.v1": ["orderId", "agencyId", "previousState", "orderState", "cause"],
 });
 
