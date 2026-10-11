@@ -5546,6 +5546,22 @@
       ],
       "using": null,
       "check": "((agency_id = kauro.current_agency_id()) AND (EXISTS ( SELECT 1\n   FROM kauro.memberships m\n  WHERE ((m.agency_id = stage_receipts.agency_id) AND (m.membership_id = stage_receipts.submitted_by_membership_id) AND (m.user_id = kauro.current_user_id()) AND (m.state = 'ACTIVE'::text) AND (m.role = ANY (ARRAY['OWNER'::text, 'ADMIN'::text, 'OPERATOR'::text]))))))"
+    },
+    "bank_credits/bank_credits_service": {
+      "check": "true",
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true"
+    },
+    "treasury_refunds/treasury_refunds_service": {
+      "check": "true",
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true"
     }
   },
   "tables": {
@@ -6622,6 +6638,16 @@
       ],
       "kauro_meta.schema_migrations": [
         "SELECT"
+      ],
+      "kauro.bank_credits": [
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "kauro.treasury_refunds": [
+        "INSERT",
+        "SELECT",
+        "UPDATE"
       ]
     },
     "kauro_validator": {
