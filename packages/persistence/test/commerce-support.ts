@@ -632,9 +632,13 @@ export async function observedCapture(payment: Client, ag: AgencyFixture, order:
 
 /** CMD031 as the request handlers write it through RefundRepository.request: a REQUESTED customer refund with the agency's reason (a label). */
 export async function requestRefund(app: Client, ag: AgencyFixture, order: OrderFixture, captureId: string, proposed: { readonly serviceCents: number; readonly taxCents: number }, reason = "Client cancelled before execution"): Promise<string> {
+  return within(app, tenant(ag), (c) => requestRefundIn(c, ag, order, captureId, proposed, reason));
+}
+
+/** CMD031 inside a transaction the caller opened and bound to the agency (a race cell holds it open). */
+export async function requestRefundIn(c: Client, ag: AgencyFixture, order: OrderFixture, captureId: string, proposed: { readonly serviceCents: number; readonly taxCents: number }, reason = "Client cancelled before execution"): Promise<string> {
   const refundId = ids.next() as RefundId;
-  await within(app, tenant(ag), async (c) =>
-    asDatabase(async () => {
+  await asDatabase(async () => {
       const { commerce, scopes } = adapters(c, { kind: "USER", id: ag.ownerUserId });
       const now = clock.now();
       await commerce.refunds.request({
@@ -654,8 +658,7 @@ export async function requestRefund(app: Client, ag: AgencyFixture, order: Order
         requestedAt: now,
       });
       await scopes.record({ kind: "REFUND", key: refundId, agencyId: ag.agencyId as AgencyId, orderId: order.orderId as PaymentOrderId, refundId }, now);
-    }),
-  );
+  });
   return refundId;
 }
 

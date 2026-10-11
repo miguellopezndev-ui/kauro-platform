@@ -17,7 +17,9 @@ import type { CommerceWriteContext } from "../src/repositories/commerce-shared.j
 import { PgExecutionStore, type ExecutionWriteContext } from "../src/execution/store.js";
 import { start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 import { connectionPid, mustWait, openConnection } from "../src/testing/index.js";
-import { activateAgency, approvedSubject, createdOrder, fiscalProfile, grantKauroOwner, issuedQuote, observedCapture, qualifiedRoutes } from "./commerce-support.js";
+import { activateAgency, approvedSubject, bindCommerce, createdOrder, fiscalProfile, grantKauroOwner, issuedQuote, observedCapture, qualifiedRoutes, requestRefundIn, tenant, type ApprovedSubject, type OrderFixture, type QuoteFixture, type Routes } from "./commerce-support.js";
+import { PgAgencyLifecycleRepository } from "../src/index.js";
+import type { IdGenerator } from "@kauro/domain";
 import { project, sqlState } from "./support.js";
 
 let h: Harness;
@@ -29,38 +31,59 @@ let authorizationId: string;
 let projectId: string;
 let contractId: string;
 
+let app: Client;
+let control: Client;
+let assurance: Client;
+let validator: Client;
+let payment: Client;
+let routes: Routes;
+let profileId: string;
+let clientId: string;
+
+interface Purchase {
+  readonly projectId: string;
+  readonly subject: ApprovedSubject;
+  readonly quote: QuoteFixture;
+  readonly order: OrderFixture;
+  readonly captureId: string;
+  readonly authorizationId: string;
+}
+
+/** A paid purchase of the agency: project, approved subject, issued quote, order, capture and authorization. */
+async function purchaseOf(seed: string): Promise<Purchase> {
+  const made = await project(app, A, clientId, hubspotCapability, "HUBSPOT");
+  const subject = await approvedSubject({ app, control }, validator, assurance, A, made.projectId, seed);
+  const quote = await issuedQuote(app, A, subject, profileId, routes.issuerRef);
+  const order = await createdOrder(app, A, quote, routes, { payment });
+  const paid = await observedCapture(payment, A, order, routes, { amountCents: quote.totalCents, serviceCents: quote.serviceCents, taxCents: quote.taxCents, excessCents: 0 }, hubspotCapability);
+  return { projectId: made.projectId, subject, quote, order, captureId: paid.captureId, authorizationId: paid.authorizationId as string };
+}
+
 before(async () => {
   h = await start();
-  const app = await h.pg.connect("kauro_app_test");
-  const control = await h.pg.connect("kauro_control_test");
-  const assurance = await h.pg.connect("kauro_assurance_test");
-  const validator = await h.pg.connect("kauro_validator_test");
-  const payment = await h.pg.connect("kauro_payment_test");
-  try {
-    const alice = (await h.person("alice-lock-strength")) as UserId;
-    const kora = (await h.person("kora-lock-strength")) as UserId;
-    A = await h.createAgency(alice, "Lock strength A");
-    await activateAgency(app, A);
-    const client = await h.endClient(A, await h.processingAuthority(A), "Client A");
-    hubspotCapability = await h.offeredCapability("HUBSPOT");
-    const routes = await qualifiedRoutes(control);
-    await grantKauroOwner(control, kora);
-    const profile = await fiscalProfile(app, kora, A, routes.issuerRef, "EXEMPT_EXPORT");
-    const made = await project(app, A, client, hubspotCapability, "HUBSPOT");
-    const subject = await approvedSubject({ app, control }, validator, assurance, A, made.projectId, "lock-strength");
-    const quote = await issuedQuote(app, A, subject, profile, routes.issuerRef);
-    const order = await createdOrder(app, A, quote, routes, { payment });
-    const paid = await observedCapture(payment, A, order, routes, { amountCents: quote.totalCents, serviceCents: quote.serviceCents, taxCents: quote.taxCents, excessCents: 0 }, hubspotCapability);
-    quoteId = quote.quoteId;
-    captureId = paid.captureId;
-    authorizationId = paid.authorizationId as string;
-    projectId = made.projectId;
-    contractId = subject.contractId;
-  } finally {
-    for (const c of [app, control, assurance, validator, payment]) await c.end();
-  }
+  app = await h.pg.connect("kauro_app_test");
+  control = await h.pg.connect("kauro_control_test");
+  assurance = await h.pg.connect("kauro_assurance_test");
+  validator = await h.pg.connect("kauro_validator_test");
+  payment = await h.pg.connect("kauro_payment_test");
+  const alice = (await h.person("alice-lock-strength")) as UserId;
+  const kora = (await h.person("kora-lock-strength")) as UserId;
+  A = await h.createAgency(alice, "Lock strength A");
+  await activateAgency(app, A);
+  clientId = await h.endClient(A, await h.processingAuthority(A), "Client A");
+  hubspotCapability = await h.offeredCapability("HUBSPOT");
+  routes = await qualifiedRoutes(control);
+  await grantKauroOwner(control, kora);
+  profileId = await fiscalProfile(app, kora, A, routes.issuerRef, "EXEMPT_EXPORT");
+  const main = await purchaseOf("lock-strength");
+  quoteId = main.quote.quoteId;
+  captureId = main.captureId;
+  authorizationId = main.authorizationId;
+  projectId = main.projectId;
+  contractId = main.subject.contractId;
 });
 after(async () => {
+  for (const c of [app, control, assurance, validator, payment]) await c.end();
   await h.stop();
 });
 
@@ -178,4 +201,51 @@ test("RACE 11a (no defect): the row locks that stay FOR UPDATE — commission po
       WHERE NOT t.tgisinternal AND p.prokind = 'f' AND p.prosrc LIKE '%payout_lines_unpayable%' ORDER BY 1`,
   );
   assert.deepEqual(callers.rows, [{ relation: "payout_intents" }], "only the payout intent's insert awaits commission lines");
+});
+
+// --- CMD031 against CloseAgency's inventory: the refund request takes the agency's shared half ---------------------------------------------
+// CloseAgency takes the agency's exclusive half before it reads its inventory (D10-TX-1); a refund request that took no half of its own
+// committed beside the closure and was missing from the inventory the closure recorded (openRefundIds) while the CLOSING -> CLOSED guard
+// (0028 agencies_closure_residuals) still refused CLOSED for it. The refund insert takes the shared half, so the two are ordered: the
+// request first is in the inventory, the closure first leaves the request after it.
+async function refundCell(requestFirst: boolean): Promise<void> {
+  const p = await purchaseOf(requestFirst ? "refund-first" : "close-first");
+  const requester = await openConnection(h.pg.clientConfig("kauro_app_test"));
+  const closer = await openConnection(h.pg.clientConfig("postgres"));
+  const closure = () => new PgAgencyLifecycleRepository(closer, {} as IdGenerator);
+  const request = (c: Client) => requestRefundIn(c, A, p.order, p.captureId, { serviceCents: 1000, taxCents: 0 });
+  try {
+    await requester.query("BEGIN");
+    await bindCommerce(requester, tenant(A));
+    await closer.query("BEGIN");
+    if (requestFirst) {
+      const refundId = await request(requester);
+      const waiting = await mustWait(h.oracle, { waiter: closer, holder: connectionPid(requester) }, () => closure().closureObligations(A.agencyId as AgencyId, 0), "the closure's inventory behind the uncommitted refund request");
+      await requester.query("COMMIT");
+      const settled = await waiting.pending;
+      assert.equal(settled.status, "fulfilled");
+      if (settled.status !== "fulfilled") return;
+      assert.ok(settled.value.openRefundIds.includes(refundId as never), "the request committed first is in the closure's inventory");
+    } else {
+      const inventory = await closure().closureObligations(A.agencyId as AgencyId, 0);
+      const waiting = await mustWait(h.oracle, { waiter: requester, holder: connectionPid(closer) }, (c) => request(c), "the refund request behind the closure's exclusive half");
+      await closer.query("COMMIT");
+      const settled = await waiting.pending;
+      assert.equal(settled.status, "fulfilled", "the request proceeds once the closure ended");
+      if (settled.status !== "fulfilled") return;
+      assert.ok(!inventory.openRefundIds.includes(settled.value as never), "the request ordered after the closure is not in its inventory");
+      await requester.query("COMMIT");
+    }
+  } finally {
+    for (const c of [requester, closer]) await c.query("ROLLBACK").catch(() => undefined);
+    await requester.end();
+    await closer.end();
+  }
+}
+
+test("RACE CMD031 x CloseAgency, request first: the closure's inventory waits for the uncommitted refund request and lists it", async () => {
+  await refundCell(true);
+});
+test("RACE CMD031 x CloseAgency, closure first: the refund request waits for the closure's exclusive half and is ordered after its inventory", async () => {
+  await refundCell(false);
 });

@@ -71,6 +71,7 @@ export function defined<T extends object>(base: T, extra: Readonly<Record<string
 
 /** The transition subjects the commerce adapters read after their shared half (design §6.2). */
 export type CommerceTransitionSubject =
+  | "kauro.agencies"
   | "kauro.payment_routes"
   | "kauro.fiscal_issuers"
   | "kauro.fiscal_profiles"
