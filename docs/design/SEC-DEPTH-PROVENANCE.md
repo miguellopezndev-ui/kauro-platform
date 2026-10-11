@@ -294,9 +294,9 @@ Residual B-LIFETIME-2 (feeds none): `domain_events` event evidence of versions (
 
 ### 3c Planned enforcing triggers (the check requires each in its migration once that file exists)
 
-- planned `commercial_authorizations_first_assignment` BEFORE INSERT OR UPDATE ON `commercial_authorizations` in 0059 (columns: `job_ref` `consumed_at` `delivered_at`) B10/B12, SDP-36
-- planned `execution_capacity_birth` BEFORE INSERT ON `execution_capacity` in 0059 (columns: `*`) B9: the seed is its only birth
-- planned `leases_birth` BEFORE INSERT ON `leases` in 0060 (columns: `fence` `cancel_version` `heartbeat_at` `expires_at` `created_at` `updated_at` `deadline_at`) B2: deadline_at within its subject's deadline
+- planned `commercial_authorizations_first_assignment` BEFORE INSERT OR UPDATE ON `commercial_authorizations` in 0058 (columns: `job_ref` `consumed_at` `delivered_at`) B10/B12, SDP-36
+- planned `execution_capacity_birth` BEFORE INSERT ON `execution_capacity` in 0058 (columns: `*`) B9: the seed is its only birth
+- planned `leases_birth` BEFORE INSERT ON `leases` in 0059 (columns: `fence` `cancel_version` `heartbeat_at` `expires_at` `created_at` `updated_at` `deadline_at`) B2: deadline_at within its subject's deadline
 - planned `capture_facts_first_assignment` BEFORE INSERT OR UPDATE ON `capture_facts` in 0062 (columns: `provider_completed_at`) B12
 - planned `payment_orders_allocation_birth` BEFORE INSERT ON `payment_orders` in 0062 (columns: `allocated_cents`) B4
 - planned `founding_slot_reservations_first_assignment` BEFORE INSERT OR UPDATE ON `founding_slot_reservations` in 0064 (columns: `consumed_at` `consumed_by_authorization_id`) B8/B12
@@ -307,9 +307,9 @@ Residual B-LIFETIME-2 (feeds none): `domain_events` event evidence of versions (
 - planned `founding_slots_birth` BEFORE INSERT ON `founding_slots` in 0065 (columns: `*`) B11, SDP-35
 - planned `quotes_issuance_clock` BEFORE INSERT ON `quotes` in 0064 (columns: `issued_at` `expires_at` `price_policy_version` `replaces_quote_id`) B15, SDP-39
 - planned `founding_slot_reservations_eligibility` BEFORE INSERT ON `founding_slot_reservations` in 0064 (columns: `agency_id` `quote_id` `policy_version` `slot_no`) B13 (iii), SDP-40
-- planned `agency_execution_capacity_guard` BEFORE INSERT OR UPDATE ON `agency_execution_capacity` in 0059 (columns: `agency_id` `last_admitted_at` `live_jobs` `updated_at`) B9: redefined, also at birth
-- planned `execution_capacity_last_admission_guard` BEFORE UPDATE ON `execution_capacity` in 0059 (columns: `last_admission_at` `ledger_id` `updated_at`) B9/G11: redefined
-- planned `request_journal_guard` BEFORE INSERT OR UPDATE ON `request_journal` in 0061 (columns: `usage_state` `actual_cents` `reconciled_at` `state` `response_artifact_hash`) B3: redefined, usage frozen once RECONCILED
+- planned `agency_execution_capacity_guard` BEFORE INSERT OR UPDATE ON `agency_execution_capacity` in 0058 (columns: `agency_id` `last_admitted_at` `live_jobs` `updated_at`) B9: redefined, also at birth
+- planned `execution_capacity_last_admission_guard` BEFORE UPDATE ON `execution_capacity` in 0058 (columns: `last_admission_at` `ledger_id` `updated_at`) B9/G11: redefined
+- planned `request_journal_guard` BEFORE INSERT OR UPDATE ON `request_journal` in 0060 (columns: `usage_state` `actual_cents` `reconciled_at` `state` `response_artifact_hash`) B3: redefined, usage frozen once RECONCILED
 - planned `agency_recurrence_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `agency_recurrence` in 0063 (columns: `*`) B5b: redefined, every column
 - planned `qualifying_purchases_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `qualifying_purchases` in 0064 (columns: `*`) B8: redefined, every column at birth, no update
 
