@@ -553,6 +553,11 @@
           "unresolved_rows",
           "validator_version"
         ]
+      },
+      "kauro.commission_lines": {
+        "UPDATE": [
+          "created_at"
+        ]
       }
     },
     "kauro_assurance": {
@@ -5562,6 +5567,70 @@
         "kauro_payment"
       ],
       "using": "true"
+    },
+    "commission_lines/commission_lines_owner_lock": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": "false"
+    },
+    "commission_noncash_settlements/commission_noncash_settlements_commission": {
+      "command": "ALL",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "true",
+      "check": "true"
+    },
+    "commission_noncash_settlements/commission_noncash_settlements_owner_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": null
+    },
+    "commission_noncash_settlements/commission_noncash_settlements_seller_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(seller_id = kauro.current_seller_id())",
+      "check": null
+    },
+    "commission_offset_releases/commission_offset_releases_commission": {
+      "command": "ALL",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "true",
+      "check": "true"
+    },
+    "commission_offset_releases/commission_offset_releases_owner_hold": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "(kauro.acting_corporate_owner() AND (cause = 'HOLD_OPENED'::text))"
+    },
+    "commission_offset_releases/commission_offset_releases_owner_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": null
+    },
+    "commission_offset_releases/commission_offset_releases_seller_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(seller_id = kauro.current_seller_id())",
+      "check": null
     }
   },
   "tables": {
@@ -6044,6 +6113,13 @@
       ],
       "kauro.stage_receipts": [
         "SELECT"
+      ],
+      "kauro.commission_noncash_settlements": [
+        "SELECT"
+      ],
+      "kauro.commission_offset_releases": [
+        "INSERT",
+        "SELECT"
       ]
     },
     "kauro_assurance": {
@@ -6201,6 +6277,14 @@
         "SELECT"
       ],
       "kauro_meta.schema_migrations": [
+        "SELECT"
+      ],
+      "kauro.commission_noncash_settlements": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.commission_offset_releases": [
+        "INSERT",
         "SELECT"
       ]
     },
