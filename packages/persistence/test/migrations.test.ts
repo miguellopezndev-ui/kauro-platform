@@ -109,6 +109,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0046_bank_routes.sql",
     // PV1 L-ROUTE PV1R-07 r4: the session fence (lock-only privileges of kauro_app on the presented session; provisional number)
     "0047_session_fence.sql",
+    // B10-T1-b gaps D and L2: the commission effect COMMIT fenced by the dispatcher lease (lock-only privileges of kauro_commission; provisional number)
+    "0048_commission_dispatch_fence.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

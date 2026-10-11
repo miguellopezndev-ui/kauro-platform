@@ -15,10 +15,13 @@ import type { KauroPool, PgCommercialUnitOfWorkFactory, PoolErrorSink, RuntimeRo
 import { createCommercialUnitOfWorkFactory, createPool } from "@kauro/persistence";
 import type { DatabaseConnectionConfig } from "../config.js";
 
-/** Where an interleaving is fixed or a crash injected (tests only, like B09's hold points): after an effect, before its settlement. */
-export type CommissionHoldPoint = "DELIVERY_BEFORE_SETTLE";
+/**
+ * Where an interleaving is fixed or a crash injected (tests only, like B09's hold points): after the lease and before the batch claim
+ * (matrix row D), inside an effect's unit of work before its lease fence and COMMIT (row L2), and after an effect, before its settlement.
+ */
+export type CommissionHoldPoint = "BATCH_BEFORE_CLAIM" | "DELIVERY_BEFORE_COMMIT" | "DELIVERY_BEFORE_SETTLE";
 
-export type CommissionHold = (point: CommissionHoldPoint, subject: { readonly eventId: string; readonly ownerId: string }) => Promise<void>;
+export type CommissionHold = (point: CommissionHoldPoint, subject: { readonly eventId: string | null; readonly ownerId: string }) => Promise<void>;
 
 /** Everything the commission service's consumer, dispatcher and sweeps need. */
 export interface CommissionServiceAssembly {
