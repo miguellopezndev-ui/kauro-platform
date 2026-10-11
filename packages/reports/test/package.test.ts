@@ -254,6 +254,41 @@ describe("ADV-2, ADV-6: strings from the package are from the core's closed voca
     assert.deepEqual(codes(files), ["MANIFEST_MALFORMED"]);
   });
 
+  it("B13 ADV-10: an input sha256 that is not 64 lowercase hex digits is refused (each wrong shape on its own); the intact one is accepted", () => {
+    const wrong = ["a".repeat(63), "a".repeat(65), "A".repeat(64), "g".repeat(64), "", " " + "a".repeat(63)];
+    for (const hash of wrong) {
+      const files = loadPackage("D-salesforce");
+      const manifest = manifestOf(files);
+      (manifest["inputs"] as Record<string, unknown>[])[0]!["sha256"] = hash;
+      writeManifest(files, manifest);
+      assert.deepEqual(codes(files), ["MANIFEST_MALFORMED"], JSON.stringify(hash));
+    }
+    assert.doesNotThrow(() => readMigrationPackage(loadPackage("D-salesforce")));
+  });
+
+  it("B13 ADV-10: a well-formed configHash that differs between the manifest and the reconciliation is refused RECONCILIATION_MISMATCH, whichever side is forged; a malformed one is MANIFEST_MALFORMED", () => {
+    const other = "b".repeat(64);
+    const inManifest = loadPackage("D-salesforce");
+    const m = manifestOf(inManifest);
+    assert.notEqual(m["configHash"], other);
+    m["configHash"] = other;
+    writeManifest(inManifest, m);
+    assert.deepEqual(codes(inManifest), ["RECONCILIATION_MISMATCH"], "forged in the manifest only");
+    const inReconciliation = loadPackage("D-salesforce");
+    editJson(inReconciliation, R, (r) => {
+      assert.notEqual(r.configHash, other);
+      r.configHash = other;
+    });
+    assert.deepEqual(codes(inReconciliation), ["RECONCILIATION_MISMATCH"], "forged in the reconciliation only");
+    for (const bad of ["a".repeat(63), "A".repeat(64), 7]) {
+      const files = loadPackage("D-salesforce");
+      const manifest = manifestOf(files);
+      manifest["configHash"] = bad;
+      writeManifest(files, manifest);
+      assert.ok(codes(files).includes("MANIFEST_MALFORMED"), JSON.stringify(bad));
+    }
+  });
+
   it("R5: an artifact path with markup is refused, and the refusal does not quote it", () => {
     const files = loadPackage("D-salesforce");
     renameArtifact(files, "02_EXCEPTIONS/formula-risk.csv", "02_EXCEPTIONS/<svg onload=alert(1)>.csv");
