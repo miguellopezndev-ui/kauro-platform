@@ -55,6 +55,9 @@ export const SUITES = [
   { name: "web", cwd: "apps/web", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
   // package B13: the verified report model over Migration Core 3.0.0 packages
   { name: "reports", cwd: "packages/reports", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
+  // package B05: the Migration Core and Intelligence Core wrappers (core-native identity and canonical interop)
+  { name: "migration-core", cwd: "packages/migration-core", script: 'node --test "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
+  { name: "intelligence-core", cwd: "packages/intelligence-core", script: 'node --test "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
   { name: "tools", cwd: ".", script: null, args: ["tools/test/**/*.test.mjs"] },
 ];
 

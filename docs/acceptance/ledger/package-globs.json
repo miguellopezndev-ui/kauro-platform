@@ -28,7 +28,9 @@
   "packages/persistence/src/testing/**",
   "vendor/**",
   "packages/migration-core/src/**",
-  "packages/intelligence-core/src/**"
+  "packages/intelligence-core/src/**",
+  "packages/intelligence-core/wrapper-additions.json",
+  "packages/intelligence-core/tools/**"
  ],
  "packages": {
   "B06": ["packages/domain/**", "packages/authorization/**", "packages/persistence/**", "packages/application/src/commands/**", "packages/application/src/queries/**", "apps/api/src/**"],

@@ -6,8 +6,7 @@
  * kill drops it (late results are dropped).
  */
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { createRequire } from "node:module";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { RESULT_MARK, type IsolationObservers, type SandboxFailure, type SandboxRecord } from "../sandbox/observers.js";
@@ -73,13 +72,16 @@ export function coreChildCodePaths(): readonly string[] {
   const roots = new Set<string>();
   for (const specifier of ["@kauro/migration-core", "@kauro/domain", "@kauro/contracts"]) roots.add(packageRootOf(fileURLToPath(import.meta.resolve(specifier))));
   const wrapperRoot = packageRootOf(fileURLToPath(import.meta.resolve("@kauro/migration-core")));
-  const rawRoot = packageRootOf(createRequire(join(wrapperRoot, "package.json")).resolve("kauro-migration-core"));
-  // the raw core and its own dependencies sit side by side in its pnpm virtual-store node_modules directory
+  // the wrapper depends on the raw core through a workspace link; the raw core and its own dependencies sit side by side in its
+  // pnpm virtual-store node_modules directory, each dependency itself a link to another store directory: grant the real roots
+  const rawRoot = realpathSync.native(join(wrapperRoot, "node_modules", "kauro-migration-core"));
   roots.add(rawRoot);
-  roots.add(dirname(rawRoot));
-  const rawManifest = JSON.parse(readFileSync(join(rawRoot, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
-  const fromRaw = createRequire(join(rawRoot, "package.json"));
-  for (const dependency of Object.keys(rawManifest.dependencies ?? {})) roots.add(packageRootOf(fromRaw.resolve(dependency)));
+  const siblings = dirname(rawRoot);
+  roots.add(siblings);
+  for (const name of readdirSync(siblings)) {
+    const scoped = name.startsWith("@") ? readdirSync(join(siblings, name)).map((n) => join(siblings, name, n)) : [join(siblings, name)];
+    for (const entry of scoped) roots.add(realpathSync.native(entry));
+  }
   // the permission model checks the path Node opened, which may be the workspace link: grant the link directories too
   const own = packageRootOf(fileURLToPath(import.meta.url));
   for (const specifier of ["@kauro/migration-core", "@kauro/domain", "@kauro/contracts"]) {
