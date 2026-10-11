@@ -162,11 +162,13 @@ export async function recordProspect(h: Harness, options: { readonly by: Recorde
 }
 
 /** CMD046's writes by an ACTIVE seller: substantive claim evidence and the SUBMITTED claim under its agreement version in force. */
-export async function recordClaim(h: Harness, options: { readonly seller: RecordedSeller; readonly prospectId: string }): Promise<{ readonly claimId: string }> {
+export async function recordClaim(h: Harness, options: { readonly seller: RecordedSeller; readonly prospectId: string; readonly at?: string }): Promise<{ readonly claimId: string }> {
   const { seller } = options;
   const claimId = ids.next();
   const evidenceHash = sha(`claim-evidence-${claimId}`);
   await asRole(h, "kauro_app_test", { userId: seller.userId }, async (c) => {
+    // the labelled TEST CLOCK stands the whole claim (evidence, submission, review deadline) at one instant when given
+    if (options.at !== undefined) await c.query("SELECT set_config('kauro_test.clock_offset_seconds', extract(epoch FROM ($1::timestamptz - transaction_timestamp()))::text, true)", [options.at]);
     await c.query(
       `INSERT INTO kauro.claim_evidence (evidence_id, seller_id, prospect_id, evidence_hash, source_channel, first_meaningful_contact_at, qualified_need_hash, activity_kinds, recorded_at, created_at)
        VALUES ($1, $2, $3, $4, 'DISCOVERY_CALL', kauro.server_now() - interval '2 days', $5, ARRAY['DISCOVERY_CALL', 'QUALIFIED_NEED']::text[], kauro.server_now(), now())`,

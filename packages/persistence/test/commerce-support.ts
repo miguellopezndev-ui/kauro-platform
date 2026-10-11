@@ -466,7 +466,7 @@ export async function journalEntry(c: Client, ag: AgencyFixture, operation: stri
  * (CONFIRMED, CREATED with the provider order identity learned once, and its PROVIDER_ORDER scope row) — a provider fact the request
  * handlers cannot write (B09-F1).
  */
-export async function createdOrder(app: Client, ag: AgencyFixture, quote: QuoteFixture, routes: Routes, options: { readonly acceptQuote?: boolean; readonly payment?: Client } = {}): Promise<OrderFixture> {
+export async function createdOrder(app: Client, ag: AgencyFixture, quote: QuoteFixture, routes: Routes, options: { readonly acceptQuote?: boolean; readonly payment?: Client; readonly at?: string } = {}): Promise<OrderFixture> {
   const orderId = ids.next() as PaymentOrderId;
   const attemptId = ids.next() as PaymentAttemptId;
   const providerOrderId = `PO-${orderId.slice(-12)}`;
@@ -476,7 +476,7 @@ export async function createdOrder(app: Client, ag: AgencyFixture, quote: QuoteF
     asDatabase(async () => {
       const { commerce, scopes } = adapters(c, owner);
       const entryId = (await journalEntry(c, ag, "CMD028")) as JournalEntryId;
-      const now = clock.now();
+      const now = options.at ?? clock.now();
       if (options.acceptQuote !== false) applied(await commerce.quotes.transition(quote.quoteId as QuoteId, 2, { state: "ACCEPTED_FOR_CHECKOUT" }, now), "the quote's acceptance");
       await commerce.orders.insert({
         orderId,
@@ -501,7 +501,7 @@ export async function createdOrder(app: Client, ag: AgencyFixture, quote: QuoteF
   await within(app, tenant(ag), async (c) =>
     asDatabase(async () => {
       const { commerce } = adapters(c, owner);
-      const now = clock.now();
+      const now = options.at ?? clock.now();
       applied(await commerce.attempts.transition(attemptId, 1, { state: "DISPATCHING", lastObservedAt: now }, now), "the attempt's claim");
       applied(await commerce.orders.transition(orderId, 1, { state: "CREATING" }, now), "the order's claim");
     }),
@@ -510,7 +510,7 @@ export async function createdOrder(app: Client, ag: AgencyFixture, quote: QuoteF
   await within(options.payment, service(ag.agencyId), async (c) =>
     asDatabase(async () => {
       const { commerce, scopes } = adapters(c, PAYMENT_SERVICE);
-      const now = clock.now();
+      const now = options.at ?? clock.now();
       applied(await commerce.attempts.transition(attemptId, 2, { state: "CONFIRMED", lastObservedAt: now, evidenceHash: sha(`create-evidence-${orderId}`) }, now), "the attempt's result");
       applied(await commerce.orders.transition(orderId, 2, { state: "CREATED", providerOrderId, providerApprovalUrl: `https://www.sandbox.paypal.com/checkoutnow?token=${providerOrderId}` }, now), "the order's creation");
       await scopes.record({ kind: "PROVIDER_ORDER", key: `${PROVIDER}|${ENVIRONMENT}|${providerOrderId}`, agencyId, orderId }, now);

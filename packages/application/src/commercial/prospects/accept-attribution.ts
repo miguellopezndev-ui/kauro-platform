@@ -5,8 +5,8 @@
  *
  * One unit of work of the owner's OPERATOR context, in B06's pipeline order: access (the caller's own ACTIVE KAURO_OWNER grant, read
  * after its transition lock) → journal reserve (or the replay of the journaled 200) → the body, the first failure answering: the claim,
- * taken after the writer's half of its prospect's claims lock (NOT_FOUND for an unknown id) → expectedVersion (STALE_VERSION) → the claim
- * is SUBMITTED or DISPUTED (CLAIM_NOT_REVIEWABLE) → the owner-prepared allocation shareAllocationRef is on this claim's prospect and
+ * taken after the writer's half of its prospect's claims lock (NOT_FOUND for an unknown id) → expectedVersion (STALE_VERSION) → its review
+ * deadline not reached on the database clock (CLAIM_EXPIRED, under review or lapsed; also for every share's claim) → the claim is SUBMITTED or DISPUTED (CLAIM_NOT_REVIEWABLE) → the owner-prepared allocation shareAllocationRef is on this claim's prospect and
  * unfrozen (NOT_FOUND; ATTRIBUTION_EXISTS) → names a share for this claim and its shares sum to exactly 10 000 bps (SHARES_NOT_WHOLE) →
  * the agency has no frozen allocation (ATTRIBUTION_EXISTS: the pool does not become 10% for each seller) → the agency's buyer type,
  * read through BuyerTypeReader (unset: BUYER_TYPE_UNSET; IN_HOUSE: IN_HOUSE_NOT_ATTRIBUTABLE; D58) → no payment order of the agency
@@ -54,12 +54,20 @@ export function acceptAttributionHandler(runtime: CommerceRequestRuntime, co: Pr
         async body(uow, _causationId, now: UtcInstant) {
           const body = envelope.body;
           const attribution = co.attribution(uow);
+          const refuseLapsed = async (c: AttributionClaimRecord, named: boolean): Promise<void> => {
+            if ((REVIEWABLE.has(c.state) || c.state === "EXPIRED") && (await attribution.reviewDeadlineReached(c.claimId))) {
+              throw new DomainFailure("PRECONDITION_FAILED", "the claim's review deadline has passed", named ? { reason: "CLAIM_EXPIRED", currentVersion: c.version, currentState: c.state } : { reason: "CLAIM_EXPIRED" });
+            }
+          };
           // the global order (D10-GAP-20): the allocation's agency before the claims (a claim's acceptance takes the agency's foreign-key lock)
           const prepared = await attribution.getAllocation(body.shareAllocationRef as AttributionAllocationId);
           if (prepared !== null) await attribution.lockAgencies([prepared.agencyId]);
           const claim = await attribution.lockClaim(claimId);
           if (claim === null) throw new NotFoundFailure("claim");
           checkExpectedVersion(claim, body.expectedVersion);
+          // the review deadline at the database's instant of this statement (kauro.effect_now(), so after the agency and claim locks this unit waited on;
+          // the CLAIM_WINDOWS lapse's comparison): a claim under review or lapsed past it is CLAIM_EXPIRED whether or not the sweep has run yet
+          await refuseLapsed(claim, true);
           if (!REVIEWABLE.has(claim.state)) {
             throw new DomainFailure("PRECONDITION_FAILED", "the claim is not under review", { reason: "CLAIM_NOT_REVIEWABLE", currentVersion: claim.version, currentState: claim.state });
           }
@@ -86,12 +94,16 @@ export function acceptAttributionHandler(runtime: CommerceRequestRuntime, co: Pr
           // the beneficiaries' claims, then the prospect's other live claims the allocation rules against
           const beneficiaries = new Map<string, AttributionClaimRecord>();
           for (const share of allocation.shares) {
-            const shareClaim = share.claimId === claim.claimId ? claim : await attribution.lockClaim(share.claimId);
+            const shareClaim: AttributionClaimRecord | null = share.claimId === claim.claimId ? claim : await attribution.lockClaim(share.claimId);
+            if (shareClaim !== null && shareClaim.prospectId === claim.prospectId && shareClaim !== claim) await refuseLapsed(shareClaim, false);
             if (shareClaim === null || shareClaim.prospectId !== claim.prospectId || !REVIEWABLE.has(shareClaim.state)) {
               throw new DomainFailure("PRECONDITION_FAILED", "a share names a claim that is not under review on this prospect", { reason: "CLAIM_NOT_REVIEWABLE" });
             }
             beneficiaries.set(shareClaim.claimId, shareClaim);
           }
+          // judged again after the last lock taken before the writes (the share claims): a deadline crossed while this unit waited refuses it;
+          // the database judges every acceptance once more at COMMIT (0049 attribution_claims_accepted_in_window, KC021)
+          await refuseLapsed(claim, true);
           const competing = (await attribution.claimsOfProspect(claim.prospectId)).filter((c) => !beneficiaries.has(c.claimId) && REVIEWABLE.has(c.state));
           await attribution.freezeAllocation(allocation.allocationId, now);
           let accepted: AttributionClaimRecord = claim;

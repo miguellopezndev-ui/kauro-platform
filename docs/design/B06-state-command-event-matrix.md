@@ -1937,6 +1937,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
 | 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the claim's current version; the current safe version and state come back |
 | 409 | PRECONDITION_FAILED | CLAIM_NOT_REVIEWABLE | — | sometimes | COMMAND | the claim (or a claim the allocation names) is not SUBMITTED or DISPUTED |
+| 409 | PRECONDITION_FAILED | CLAIM_EXPIRED | — | sometimes | COMMAND | the claim's (or a share's claim's) review deadline is reached on the database clock, whether or not the CLAIM_WINDOWS sweep lapsed it |
 | 409 | PRECONDITION_FAILED | SHARES_NOT_WHOLE | — | — | COMMAND | the allocation's shares do not sum to exactly 10000 basis points, or name no share for this claim (KC003) |
 | 409 | PRECONDITION_FAILED | ATTRIBUTION_EXISTS | — | — | COMMAND | the agency already has a frozen allocation: the pool does not become 10% for each seller |
 | 409 | PRECONDITION_FAILED | BUYER_TYPE_UNSET | — | — | COMMAND | the agency's buyer type is not recorded (D58) |

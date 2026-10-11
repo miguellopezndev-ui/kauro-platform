@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { CreateQuoteView } from "@kauro/application";
 import { commercialSourceReadsOf, quoteReadsOf } from "@kauro/persistence";
-import { FaultPoints, faultCell, openConnection, connectionPid, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
+import { FaultPoints, faultCell, openConnection, connectionPid, type FaultContext, type HarnessConnection, invariantsAfterEach } from "@kauro/persistence/testing";
 import { agentOf, integrationWorld, oracleRows, planOf, quoted, type Agent, type IntegrationWorld } from "./integration-support.js";
 import { bindCells, contend, failureOf, open, sweepOn } from "./b10-cells-support.js";
 import { blockedBy } from "./b10-cells-6a-support.js";
@@ -21,6 +21,8 @@ import type { SqlStep } from "./fault-support.js";
 import { asProblem, call, clock, completed, freshKey, ids, outcome, sha, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => iw.h.oracle);
 before(async () => {
   iw = await integrationWorld();
   bindCells(iw);

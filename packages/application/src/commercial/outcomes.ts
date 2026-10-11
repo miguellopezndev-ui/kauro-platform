@@ -57,6 +57,7 @@ const COMMAND_SPECIFIC: Readonly<Record<"CMD002" | "CMD043" | "CMD045" | "CMD046
     outcome("COMMAND", "NOT_FOUND", null, "the claim, or the allocation on its prospect, is unknown"),
     STALE("claim"),
     outcome("COMMAND", "PRECONDITION_FAILED", "CLAIM_NOT_REVIEWABLE", "the claim (or a claim the allocation names) is not SUBMITTED or DISPUTED", { current: "SOMETIMES" }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "CLAIM_EXPIRED", "the claim's (or a share's claim's) review deadline is reached on the database clock, whether or not the CLAIM_WINDOWS sweep lapsed it", { current: "SOMETIMES" }),
     outcome("COMMAND", "PRECONDITION_FAILED", "SHARES_NOT_WHOLE", "the allocation's shares do not sum to exactly 10000 basis points, or name no share for this claim (KC003)"),
     outcome("COMMAND", "PRECONDITION_FAILED", "ATTRIBUTION_EXISTS", "the agency already has a frozen allocation: the pool does not become 10% for each seller"),
     outcome("COMMAND", "PRECONDITION_FAILED", "BUYER_TYPE_UNSET", "the agency's buyer type is not recorded (D58)"),

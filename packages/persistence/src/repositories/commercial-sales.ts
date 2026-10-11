@@ -488,7 +488,15 @@ export class PgSalesRepository implements SalesRepository {
     const seller = (await execute<{ user_id: string }>(this.db, "SELECT user_id FROM kauro.sellers WHERE seller_id = $1", [sellerId])).rows[0];
     let identityVerifiedWithMfa = false;
     if (seller !== undefined) {
-      await awaitSalesTransition(this.db, "kauro.identities", seller.user_id);
+      // an identity change in flight commits before this read, but the read holds nothing to COMMIT: the identity's reader half is held from
+      // the write on, by sellers_activation_guard (KC005), so a withdrawal between this read and the write is judged there, and one arriving
+      // after the write waits for the activation's COMMIT (0049 identities_assurance_transition_lock; SELLER_IDENT_RACE)
+      // A transaction-level wait inside a savepoint (ADV-5): rolling back to it releases the reader half at once, and a cancelled statement
+      // aborts the transaction, which releases it too; a session-level lock could outlive both on a pooled connection.
+      await execute(this.db, "SAVEPOINT kauro_identity_wait");
+      await execute(this.db, "SELECT pg_advisory_xact_lock_shared(kauro.transition_key('kauro.identities', $1))", [seller.user_id]);
+      await execute(this.db, "ROLLBACK TO SAVEPOINT kauro_identity_wait");
+      await execute(this.db, "RELEASE SAVEPOINT kauro_identity_wait");
       const identity = await execute<{ verified: boolean }>(
         this.db,
         "SELECT state = 'ACTIVE' AND email_verified_at IS NOT NULL AND mfa_enrolled_at IS NOT NULL AS verified FROM kauro.identities WHERE user_id = $1",

@@ -21698,7 +21698,7 @@
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 9 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 10 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -21740,6 +21740,13 @@
                 "current": "SOMETIMES",
                 "layer": "COMMAND",
                 "meaning": "the claim (or a claim the allocation names) is not SUBMITTED or DISPUTED"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "CLAIM_EXPIRED",
+                "current": "SOMETIMES",
+                "layer": "COMMAND",
+                "meaning": "the claim's (or a share's claim's) review deadline is reached on the database clock, whether or not the CLAIM_WINDOWS sweep lapsed it"
               },
               {
                 "code": "PRECONDITION_FAILED",
@@ -32741,6 +32748,7 @@
               "RECORD_LIKE_CONTENT",
               "SUPPORT_CALENDAR_UNAVAILABLE",
               "INQUIRY_RATE_LIMITED",
+              "CLAIM_EXPIRED",
               "CORPORATE_ROLE_MISSING",
               "SELF_APPROVAL_FORBIDDEN",
               "SERVICE_NOT_PERMITTED",

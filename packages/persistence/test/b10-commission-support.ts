@@ -196,8 +196,8 @@ export async function quoteOf(w: World, ag: Agency, subject: ApprovedSubject, qu
 }
 
 /** CreatePaymentOrder through B09's fixture (intent, claim and the provider's creation): an order ready for its capture. */
-export function orderOf(w: World, ag: Agency, quote: QuoteFixture): Promise<OrderFixture> {
-  return createdOrder(w.app, ag, quote, w.routes, { payment: w.payment });
+export function orderOf(w: World, ag: Agency, quote: QuoteFixture, options: { readonly at?: string } = {}): Promise<OrderFixture> {
+  return createdOrder(w.app, ag, quote, w.routes, { payment: w.payment, ...(options.at !== undefined ? { at: options.at } : {}) });
 }
 
 export interface Purchase {

@@ -156,6 +156,9 @@ async function claimWindows(rt: CommissionRuntime, limit: number): Promise<Sweep
         const now = await serverNow(uow);
         const locked = await attributionOf(uow).lockClaim(claim.claimId);
         if (locked === null || (locked.state !== "SUBMITTED" && locked.state !== "DISPUTED" && locked.state !== "ACCEPTED")) return "SETTLED";
+        // due-ness asked again under the claim's lock (CLAIM_LAPSE_ACCEPT): an acceptance that committed inside the review window while this
+        // pass waited starts the claim's acceptance window, so it is settled, never written EXPIRED (attribution_claims_lapse, 23514)
+        if (!(await attributionOf(uow).claimLapsed(claim.claimId))) return "SETTLED";
         const written = await attributionOf(uow).transitionClaim(claim.claimId, locked.version, { state: "EXPIRED" }, now);
         if (written.kind !== "APPLIED") throw new DomainFailure("STALE_VERSION", "the claim changed while it lapsed", {}, true);
         return "EXPIRED";

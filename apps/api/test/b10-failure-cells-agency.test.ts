@@ -10,7 +10,7 @@ import { after, before } from "node:test";
 import { LIMIT_MARGIN_MS, type AgencyClosureView, type CreateQuoteView } from "@kauro/application";
 import type { UserId } from "@kauro/domain";
 import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
-import { connectionPid, faultCell, openConnection, publishAgreementVersions, raceStatementTimeoutMs, recordReviewedFiscalProfile, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
+import { connectionPid, faultCell, openConnection, publishAgreementVersions, raceStatementTimeoutMs, recordReviewedFiscalProfile, type FaultContext, type HarnessConnection, invariantsAfterEach } from "@kauro/persistence/testing";
 import { createPurchaseRebinder } from "../src/index.js";
 import type { PurchaseRebinder } from "@kauro/application";
 import { agentOf, anotherClient, bought, integrationWorld, oracleRows, planOf, quoted, replacementPlanOf, type Agent, type IntegrationWorld } from "./integration-support.js";
@@ -20,6 +20,8 @@ import { blockedBy } from "./b10-cells-6a-support.js";
 import { call, completed, freshKey, outcome, routes, type Person, type PlanFixture, type Reply } from "./support.js";
 
 let iw: IntegrationWorld;
+// the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
+invariantsAfterEach(() => iw.h.oracle);
 before(async () => {
   iw = await integrationWorld();
   bindCells(iw);
