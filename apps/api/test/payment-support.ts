@@ -41,11 +41,11 @@ import {
   type WebhookVerifierFake,
 } from "@kauro/application/testing";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
-import type { AgencyId, CapabilityId, CausationId, CommerceUnitOfWork, CorrelationId, TargetInstanceRef, FiscalIssuerRef, FiscalProfileId, IdempotencyIdentity, JournalEntryId, MembershipId, PaymentAttemptId, PaymentEnvironment, PaymentOrderId, PlanId, ProjectId, RefundId, RevisionId, ServiceIdentity, UserId } from "@kauro/domain";
+import type { AgencyId, CapabilityId, CausationId, Clock, CommerceUnitOfWork, CorrelationId, TargetInstanceRef, FiscalIssuerRef, FiscalProfileId, IdempotencyIdentity, JournalEntryId, MembershipId, PaymentAttemptId, PaymentEnvironment, PaymentOrderId, PlanId, ProjectId, RefundId, RevisionId, ServiceIdentity, UserId } from "@kauro/domain";
 import { DomainFailure, NotFoundFailure, deliveryPhaseOf, toUtcInstant } from "@kauro/domain";
 import { ROLES, raceStatementTimeoutMs, activateAgency, checkoutOrder, paidPurchase, recordReviewedFiscalProfile, type AgencyFixture, type CheckoutOrder, type PaidPurchase, type QualifiedRoute, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import { assembleApi, createBearerTokenAuthenticator, createPaymentService, loadContractSchemas, openPaymentPools, storeProviderQuery, type DispatchPass, type PaymentConsumerName, type PaymentHoldCommand, type PaymentHoldPoint, type PaymentPools, type PaymentService } from "../src/index.js";
-import { approveThroughRoute, call, clock, ids, movableClock, sha, type Call, type MovableClock, type PlanFixture, type Reply, type World, type WorldOptions, world } from "./support.js";
+import { approveThroughRoute, call, clock, clock as processClock, ids, movableClock, sha, type Call, type MovableClock, type PlanFixture, type Reply, type World, type WorldOptions, world } from "./support.js";
 
 // --- hold points of the payment service ------------------------------------------------------------------------------------------
 
@@ -134,7 +134,8 @@ export interface PaymentWorld {
   stop(): Promise<void>;
 }
 
-export async function paymentWorld(options: { readonly requestSide?: boolean; readonly sessions?: boolean; readonly commissions?: WorldOptions["commissions"]; readonly commercial?: WorldOptions["commercial"]; readonly wrapUnitOfWork?: WorldOptions["wrapUnitOfWork"]; readonly wrapCommerce?: <F extends object>(inner: F) => F } = {}): Promise<PaymentWorld> {
+export async function paymentWorld(options: { readonly clock?: Clock; readonly requestSide?: boolean; readonly sessions?: boolean; readonly commissions?: WorldOptions["commissions"]; readonly commercial?: WorldOptions["commercial"]; readonly wrapUnitOfWork?: WorldOptions["wrapUnitOfWork"]; readonly wrapCommerce?: <F extends object>(inner: F) => F } = {}): Promise<PaymentWorld> {
+  const clock: Clock = options.clock ?? processClock;
   const providerClock = movableClock();
   const paypal = createPayPalContractFake({ clock: providerClock });
   const verifier = createWebhookVerifierFake({ clock });
