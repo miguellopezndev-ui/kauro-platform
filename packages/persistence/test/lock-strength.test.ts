@@ -14,6 +14,7 @@ import type { Client } from "pg";
 import type { AgencyId, CapabilityId, CaptureId, CommercialAuthorizationId, MembershipId, ProjectId, QuoteId, TargetContractId, UserId } from "@kauro/domain";
 import { PgAgencyRepository, PgCapabilityGovernanceRepository, PgCaptureFactRepository, PgCommercialAuthorizationRepository, PgMembershipRepository, PgProjectRepository, PgQuoteRepository, PgTargetContractRepository } from "../src/index.js";
 import type { CommerceWriteContext } from "../src/repositories/commerce-shared.js";
+import { PgExecutionStore, type ExecutionWriteContext } from "../src/execution/store.js";
 import { start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
 import { connectionPid, mustWait, openConnection } from "../src/testing/index.js";
 import { activateAgency, approvedSubject, createdOrder, fiscalProfile, grantKauroOwner, issuedQuote, observedCapture, qualifiedRoutes } from "./commerce-support.js";
@@ -77,11 +78,14 @@ interface Site {
 }
 
 const ctx = (c: Client) => ({ db: c }) as unknown as CommerceWriteContext;
+const executionStore = (c: Client) => new PgExecutionStore({ db: c } as unknown as ExecutionWriteContext);
 
 const SITES: readonly Site[] = [
   { name: "quote (CMD027 / CMD028)", kind: "kauro.quotes", key: () => quoteId, table: "quotes", pk: "quote_id", rowId: () => quoteId, lock: (c) => new PgQuoteRepository(ctx(c)).lock(quoteId as QuoteId) },
   { name: "capture fact", kind: "kauro.capture_facts", key: () => captureId, table: "capture_facts", pk: "capture_id", rowId: () => captureId, lock: (c) => new PgCaptureFactRepository(ctx(c)).lock(captureId as CaptureId) },
   { name: "commercial authorization", kind: "kauro.commercial_authorizations", key: () => authorizationId, table: "commercial_authorizations", pk: "authorization_id", rowId: () => authorizationId, lock: (c) => new PgCommercialAuthorizationRepository(ctx(c)).lock(authorizationId as CommercialAuthorizationId) },
+  { name: "commercial authorization (publication edge, execution store)", kind: "kauro.commercial_authorizations", key: () => authorizationId, table: "commercial_authorizations", pk: "authorization_id", rowId: () => authorizationId, lock: (c) => executionStore(c).lockAuthorizationRow(authorizationId as CommercialAuthorizationId) },
+  { name: "commercial authorization (tryLockAuthorization, execution store)", kind: "kauro.commercial_authorizations", key: () => authorizationId, table: "commercial_authorizations", pk: "authorization_id", rowId: () => authorizationId, lock: (c) => executionStore(c).tryLockAuthorization(authorizationId as CommercialAuthorizationId) },
   { name: "agency", kind: "kauro.agencies", key: () => A.agencyId, table: "agencies", pk: "agency_id", rowId: () => A.agencyId, lock: (c) => new PgAgencyRepository(c).lock(A.agencyId as AgencyId) },
   { name: "membership", kind: "kauro.memberships", key: () => `${A.agencyId}:${A.ownerUserId}`, table: "memberships", pk: "membership_id", rowId: () => A.ownerMembershipId, lock: (c) => new PgMembershipRepository(c).lock(A.ownerMembershipId as MembershipId) },
   { name: "project", kind: "kauro.projects", key: () => projectId, table: "projects", pk: "project_id", rowId: () => projectId, lock: (c) => new PgProjectRepository(c).lock(projectId as ProjectId) },
@@ -135,3 +139,43 @@ for (const s of SITES) {
     await cell(s, false);
   });
 }
+
+// --- the FOR UPDATE rows that stay: no reader of theirs takes a shared half, so no cycle can close on them ---------------------------------
+// A row lock keeps FOR UPDATE only where the matrix shows no inserter takes the subject's shared half before its KEY SHARE (rule 11a's
+// exception: CLOSE_HOLD_RACE, a hold inserted on a commission line takes no transition half). This cell fails the day a migration or a
+// repository starts awaiting one of these subjects, which then needs its own cell above and a NO KEY lock.
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const SRC = join(HERE, "..", "..", "src");
+
+function sourcesUnder(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? sourcesUnder(join(dir, e.name)) : e.name.endsWith(".ts") ? [join(dir, e.name)] : []));
+}
+
+test("RACE 11a (no defect): the row locks that stay FOR UPDATE — commission pools, periods, statements, claims, founding reservations, upload sessions, jobs — are the subject of no shared half; commission lines are awaited only by the payout intent, which references no line", async () => {
+  const awaited = new Set<string>();
+  const sql = readdirSync(join(HERE, "..", "..", "migrations")).filter((f) => f.endsWith(".sql"));
+  for (const f of sql) {
+    const text = readFileSync(join(HERE, "..", "..", "migrations", f), "utf8");
+    for (const m of text.matchAll(/(?:try_)?await_transition\(\s*'([a-z_.]+)'/g)) awaited.add(m[1] as string);
+  }
+  for (const f of sourcesUnder(SRC)) {
+    const text = readFileSync(f, "utf8");
+    for (const m of text.matchAll(/(?:try_)?await_transition\(\s*'(kauro\.[a-z_]+)'/g)) awaited.add(m[1] as string);
+    for (const m of text.matchAll(/(?:awaitTransition|await)\((?:uow, |this\.db, |db, )?"(kauro\.[a-z_]+)"/g)) awaited.add(m[1] as string);
+  }
+  for (const subject of ["commission_pools", "commission_periods", "commission_statements", "attribution_claims", "founding_slot_reservations", "upload_sessions", "processing_jobs", "refunds", "payment_orders", "payment_attempts", "tax_documents"]) {
+    assert.ok(!awaited.has(`kauro.${subject}`), `kauro.${subject} is awaited by a shared half: it needs a RACE cell and FOR NO KEY UPDATE`);
+  }
+  // the one reader of a commission line's shared half is the payout intent's insert (payout_lines_unpayable), which has no line to key-share
+  const refs = await h.oracle.query<{ n: number }>("SELECT count(*)::int AS n FROM pg_constraint WHERE contype = 'f' AND conrelid = 'kauro.payout_intents'::regclass AND confrelid = 'kauro.commission_lines'::regclass");
+  assert.equal(refs.rows[0]?.n, 0, "payout_intents references no commission line");
+  const callers = await h.oracle.query<{ relation: string }>(
+    `SELECT DISTINCT c.relname AS relation FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid JOIN pg_class c ON c.oid = t.tgrelid
+      WHERE NOT t.tgisinternal AND p.prokind = 'f' AND p.prosrc LIKE '%payout_lines_unpayable%' ORDER BY 1`,
+  );
+  assert.deepEqual(callers.rows, [{ relation: "payout_intents" }], "only the payout intent's insert awaits commission lines");
+});
