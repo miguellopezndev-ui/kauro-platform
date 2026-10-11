@@ -6,7 +6,7 @@
 import type { UtcInstant } from "@kauro/contracts";
 import type { FundsState } from "../commerce/records.js";
 import { addCalendarMonths, addHours, assertCanonicalInstant, bankingDayAfterMonthEnd, monthStartsAt, nextMonth, type BankingDays } from "./calendar.js";
-import type { CommissionPolicy } from "./policy.js";
+import { PROVIDER_TIME_PLAUSIBILITY_TOLERANCE_MS, type CommissionPolicy } from "./policy.js";
 import type { CompletionKind } from "./records.js";
 
 /**
@@ -39,13 +39,13 @@ export type AcquisitionRateDecision =
   | { readonly kind: "NONE"; readonly reason: "WINDOW_ENDED" };
 
 /**
- * A provider completion is plausible when it exists, is not after the purchase's own confirmation and not before its order's
- * creation (example 10: "missing, malformed or implausibly inconsistent" holds the cutoff decision).
+ * A provider completion is plausible when it exists, is not more than PROVIDER_TIME_PLAUSIBILITY_TOLERANCE_MS (D-15, 10 s, inclusive, symmetric) after the purchase's own
+ * confirmation nor that far before its order's creation (example 10: "missing, malformed or implausibly inconsistent" holds the cutoff decision).
  */
 export function providerTimePlausible(facts: Pick<AcquisitionRateFacts, "confirmedAt" | "orderCreatedAt" | "providerCompletedAt">): boolean {
   if (facts.providerCompletedAt === null) return false;
   const completed = assertCanonicalInstant(facts.providerCompletedAt, "providerCompletedAt");
-  return completed <= assertCanonicalInstant(facts.confirmedAt, "confirmedAt") && completed >= assertCanonicalInstant(facts.orderCreatedAt, "orderCreatedAt");
+  return completed <= assertCanonicalInstant(facts.confirmedAt, "confirmedAt") + PROVIDER_TIME_PLAUSIBILITY_TOLERANCE_MS && completed >= assertCanonicalInstant(facts.orderCreatedAt, "orderCreatedAt") - PROVIDER_TIME_PLAUSIBILITY_TOLERANCE_MS;
 }
 
 /**
