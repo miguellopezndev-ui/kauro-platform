@@ -231,6 +231,8 @@ const HANDLER_FILES: Readonly<Record<ServedCommandId, ReadonlyArray<string>>> = 
   CMD037: b08("cancel-job.ts"),
   CMD018: b08audit("create-target-contract.ts"),
   CMD019: b08audit("confirm-target-contract.ts"),
+  CMD040: b08audit("submit-stage-receipt.ts"),
+  CMD041: b08audit("continue-stage.ts"),
   CMD020: b08audit("start-audit.ts"),
   CMD021: b08audit("cancel-audit.ts"),
   CMD022: b08audit("create-plan.ts"),

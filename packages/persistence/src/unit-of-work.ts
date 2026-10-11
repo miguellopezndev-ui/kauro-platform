@@ -74,6 +74,7 @@ import { PgExecutionStore } from "./execution/store.js";
 import { PgExecutionDiscovery } from "./execution/discovery.js";
 import { PgAuditReads, type ResolvedDecisionPatch } from "./audit/reads.js";
 import { PgAuditDiscovery } from "./audit/discovery.js";
+import { PgImportStageStore } from "./repositories/import-stages.js";
 import { PgAuditStore } from "./audit/store.js";
 import { PgCommercialSourceReads } from "./source/commercial-reads.js";
 import { PgSourceStore } from "./source/store.js";
@@ -918,11 +919,14 @@ export class PgAuditUnitOfWork extends PgExecutionUnitOfWork implements AuditUni
   readonly audits: PgAuditStore;
   /** The control plane's discovery reads of audit work (mandate B08-CONTROL-AUDIT, D8-CAU-1). */
   readonly auditDiscovery: PgAuditDiscovery;
+  /** B17: the import stages and their receipts (CMD040, CMD041). */
+  readonly importStages: PgImportStageStore;
 
   constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {
     super(client, context, ids, clock);
     this.audits = new PgAuditStore({ db: client, ids, events: this.events, provenance: () => this.provenance() });
     this.auditDiscovery = new PgAuditDiscovery(client);
+    this.importStages = new PgImportStageStore(client);
   }
 }
 

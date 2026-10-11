@@ -843,6 +843,33 @@ APPLICABILITY.CMD019 = {
   "external uncertainty": "NOT_APPLICABLE: ConfirmTargetContract records the approver confirmation on the stored contract and calls no CRM or provider; the observation freshness is judged on the database clock",
 };
 
+// package B17 import-stage commands (CMD040, CMD041; registry cases CMD040-OK/-DENY/-RACE and CMD041-OK/-DENY/-RACE)
+const IMPORT_STAGE = "cmd040-cmd041-import-stage.test.ts";
+const S40 = (k) => [[IMPORT_STAGE, "CMD040-" + k]];
+const S41 = (k) => [[IMPORT_STAGE, "CMD041-" + k]];
+APPLICABILITY.CMD040 = {
+  "legitimate state": S40("OK"),
+  "wrong role": S40("DENY"),
+  "wrong agency": S40("DENY"),
+  "stale version": "NOT_APPLICABLE: SubmitStageReceipt carries no expectedVersion (registry fields: receiptUploadRef, sourcePackageHash) - the stage row lock orders two receipts and the loser is told STAGE_NOT_AWAITING_RECEIPT with the stage's current version and state, never STALE_VERSION",
+  "duplicate request": S40("RACE"),
+  "changed-body same key": S40("RACE"),
+  "invalid schema": S40("DENY"),
+  "lost response": S40("RACE"),
+  "external uncertainty": "NOT_APPLICABLE: SubmitStageReceipt validates the stored receipt artifact as data against the stage's membership and calls no CRM or provider; the stage deadline is judged on the database clock",
+};
+APPLICABILITY.CMD041 = {
+  "legitimate state": S41("OK"),
+  "wrong role": S41("DENY"),
+  "wrong agency": S41("DENY"),
+  "stale version": S41("DENY"),
+  "duplicate request": S41("RACE"),
+  "changed-body same key": S41("RACE"),
+  "invalid schema": S41("DENY"),
+  "lost response": S41("RACE"),
+  "external uncertainty": "NOT_APPLICABLE: ContinueStage records the approver's continuation on the stored stage and calls no CRM or provider; the workflow deadline is judged on the database clock",
+};
+
 // --- sources --------------------------------------------------------------------------------------------------------------------
 
 export async function loadMatrixSources() {
@@ -919,6 +946,9 @@ export async function loadMatrixSources() {
   // package B17 target-contract commands (CMD018, CMD019): they journal their response only and publish no domain event (GAP: no target_contract aggregate kind yet)
   published.CMD018 = [];
   published.CMD019 = [];
+  // package B17 import-stage commands (CMD040, CMD041): they journal their response only and publish no domain event (the ImportStage machine's events are null in the registry)
+  published.CMD040 = [];
+  published.CMD041 = [];
   // package B09's served commands (D-REQ-B7): their specs, catalogues and published events from the application's served lists
   const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS };
   const outcomes = { ...application.COMMAND_OUTCOMES };

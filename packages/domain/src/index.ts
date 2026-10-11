@@ -243,3 +243,5 @@ export * from "./model/audit/index.js";
 export * from "./model/target-contract.js";
 // capability governance (package B18: CMD058, CMD059)
 export * from "./model/capability-governance.js";
+// import stages and their receipts (package B17: CMD040, CMD041)
+export * from "./model/import-stage.js";

@@ -9,7 +9,7 @@
  * unsupported capabilities by stable finding codes.
  */
 import { RESPONSE_FIELD_VOCABULARY, VIEW_MEMBER_KIT, type ViewDefinition } from "../api/view-kit.js";
-import { AUDIT_GRANT_CLASSES, AUDIT_RESOURCE_ACTIONS, TARGET_CONTRACT_ACTIONS } from "./views.js";
+import { AUDIT_GRANT_CLASSES, AUDIT_RESOURCE_ACTIONS, IMPORT_STAGE_ACTIONS, TARGET_CONTRACT_ACTIONS } from "./views.js";
 import { COST_GRANT_STATES, DECISION_ARTIFACT_KINDS } from "@kauro/domain";
 
 const { ID, HASH, UTC } = RESPONSE_FIELD_VOCABULARY;
@@ -28,6 +28,8 @@ const AUDIT_ACTIONS_DESCRIPTION =
 export const AUDIT_COMMAND_RESPONSES = Object.freeze({
   CMD018: { status: 201, view: "TargetContractView" },
   CMD019: { status: 200, view: "TargetContractView" },
+  CMD040: { status: 200, view: "ImportStageView" },
+  CMD041: { status: 200, view: "ImportStageView" },
   CMD020: { status: 202, view: null },
   CMD021: { status: 200, view: "AuditView" },
   CMD022: { status: 201, view: "PlanView" },
@@ -59,6 +61,34 @@ export const AUDIT_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.free
       state: platform(true, { type: "string", enum: ["DRAFT", "CONFIRMED", "SUPERSEDED"] }, "DRAFT until the agency confirms this exact body, CONFIRMED afterwards, SUPERSEDED once a later contract replaced it."),
       objectCount: platform(true, { type: "integer", minimum: 0 }, "How many target objects the stored body describes."),
       permittedActions: platform(true, { type: "array", maxItems: TARGET_CONTRACT_ACTIONS.length, items: { type: "string", enum: [...TARGET_CONTRACT_ACTIONS] } }, "The commands the caller may issue on this contract, derived server-side from the caller's role and the contract's state; informative, never authority (B06 D-PERM-1)."),
+    },
+  },
+  {
+    name: "ImportStageView",
+    description:
+      "An import stage (B17: CMD040's answer and CMD041's): its dependency order, target object and operation, state, exact package and deadline, and the summary of its latest validated receipt; the stage's source identities and the receipt's source-to-target mapping stay in the stage and the receipt, never in the view.",
+    contract: "ImportStage",
+    withheld: {},
+    members: {
+      stageId: registry(true, NARROW_ID),
+      projectId: registry(true, NARROW_ID),
+      sequence: registry(true),
+      objectApiName: registry(true),
+      operation: registry(true),
+      state: registry(true),
+      parentStageIds: registry(true),
+      packageHash: registry(true),
+      receiptRequired: registry(true),
+      expiresAt: registry(true),
+      version: platform(true, { type: "integer", minimum: 1 }, "The stage's version (CMD041's expectedVersion): every receipt revision and the continuation advance it."),
+      receiptRevision: platform(false, { type: "integer", minimum: 1 }, "The latest validated receipt revision of the stage: a correction is a new revision, never an overwrite."),
+      receiptResult: platform(false, { type: "string", enum: ["COMPLETE", "PARTIAL_ACCOUNTED", "NEEDS_CORRECTION"] }, "What the latest receipt concluded: every identity matched, a fully accounted partition with explicit failures, or unresolved identities that block the child edges needing them."),
+      identityMappingHash: platform(false, HASH, "The KAURO_STAGE_IDENTITY_MAPPING_V1 digest of the latest validated receipt: what CMD041's validatedReceiptHash names."),
+      matchedRows: platform(false, { type: "integer", minimum: 0 }, "Source identities mapped unambiguously to a target identity."),
+      failedRows: platform(false, { type: "integer", minimum: 0 }, "Source identities the receipt reports as explicitly failed."),
+      unresolvedRows: platform(false, { type: "integer", minimum: 0 }, "Source identities missing, named twice or mapped to a target identity another source also claims."),
+      continuedAt: platform(false, UTC, "When the approver recorded the continuation (the database's instant); absent before."),
+      permittedActions: platform(true, { type: "array", maxItems: IMPORT_STAGE_ACTIONS.length, items: { type: "string", enum: [...IMPORT_STAGE_ACTIONS] } }, "The commands the caller may issue on this stage, derived server-side from the caller's role and the stage's state; informative, never authority (B06 D-PERM-1)."),
     },
   },
   {
