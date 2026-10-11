@@ -155,3 +155,6 @@ export {
   isTransferReference,
   transferWindowOf,
 } from "./bank-route.js";
+
+export type { DestinationInput, NormalizedDestination, DestinationNormalization, FingerprintParameters } from "./destination.js";
+export { normalizeDestination, canonicalDestinationMessage, DESTINATION_FINGERPRINT_DOMAIN, HOLDER_NAME_MAX_CODE_POINTS } from "./destination.js";
