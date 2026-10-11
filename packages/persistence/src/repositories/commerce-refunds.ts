@@ -47,7 +47,7 @@ import {
   type VersionedWrite,
 } from "@kauro/domain";
 import { execute, instant, int, optionalInstant, optionalText, type Queryable } from "../sql.js";
-import { cents, defined, optionalCents, publishVersion, staleOf, type CommerceWriteContext } from "./commerce-shared.js";
+import { awaitCommerceTransition, cents, defined, optionalCents, publishVersion, staleOf, type CommerceWriteContext } from "./commerce-shared.js";
 
 type Candidate = Readonly<Record<string, string | number | bigint | boolean | null | undefined>>;
 
@@ -265,6 +265,8 @@ export class PgRefundRepository implements RefundRepository {
    * second open customer request of the capture fails refunds_one_requested_per_origin (PRECONDITION_FAILED REFUND_REQUEST_OPEN).
    */
   async request(refund: NewRefundRequest): Promise<RefundRecord> {
+    // the agency's shared half first: a closure holding the exclusive half reads its inventory with this request in it or ahead of it
+    await awaitCommerceTransition(this.ctx.db, "kauro.agencies", refund.agencyId);
     const r = await execute<RefundRow>(this.ctx.db, `${REQUEST_INSERT} RETURNING ${REFUND_COLUMNS}`, requestParams(refund));
     const row = r.rows[0];
     if (!row) throw new DomainFailure("NOT_FOUND", "the order of the refund is not visible in this context");
@@ -279,6 +281,7 @@ export class PgRefundRepository implements RefundRepository {
    * published; a filing never aborts the transaction that records the capture (B09-F3). The REFUND scope row is the caller's.
    */
   async fileServerRequest(refund: NewRefundRequest): Promise<{ readonly filed: boolean; readonly record: RefundRecord }> {
+    await awaitCommerceTransition(this.ctx.db, "kauro.agencies", refund.agencyId);
     const r = await execute<RefundRow>(this.ctx.db, `${REQUEST_INSERT} ON CONFLICT (agency_id, capture_id, origin) WHERE state = 'REQUESTED' DO NOTHING RETURNING ${REFUND_COLUMNS}`, requestParams(refund));
     const row = r.rows[0];
     if (row) {

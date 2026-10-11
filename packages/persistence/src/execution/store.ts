@@ -283,8 +283,17 @@ export class PgExecutionStore implements ExecutionStore {
   }
 
   async tryLockAuthorization(authorizationId: CommercialAuthorizationId): Promise<boolean> {
-    const r = await execute<{ authorization_id: string }>(this.db, "SELECT authorization_id FROM kauro.commercial_authorizations WHERE authorization_id = $1 FOR UPDATE SKIP LOCKED", [authorizationId]);
+    const r = await execute<{ authorization_id: string }>(this.db, "SELECT authorization_id FROM kauro.commercial_authorizations WHERE authorization_id = $1 FOR NO KEY UPDATE SKIP LOCKED", [authorizationId]);
     return r.rows.length === 1;
+  }
+
+  /**
+   * The authorization row before its exclusive half (the DELIVERED edge of a publication). FOR NO KEY UPDATE (rule 11a): a job inserted
+   * for the authorization takes its shared half and then a KEY SHARE through processing_jobs_authorization_subject_fk, which a FOR UPDATE
+   * here would make wait for a writer that itself waits for that shared half (40P01).
+   */
+  async lockAuthorizationRow(authorizationId: CommercialAuthorizationId): Promise<void> {
+    await execute(this.db, "SELECT state FROM kauro.commercial_authorizations WHERE authorization_id = $1 FOR NO KEY UPDATE", [authorizationId]);
   }
 
   async lockGlobalLedger(): Promise<void> {
@@ -848,7 +857,7 @@ export class PgExecutionStore implements ExecutionStore {
     if (job.state !== "VERIFYING" || job.cancelVersion !== 0) {
       return { kind: "REFUSED", reason: job.cancelVersion !== 0 ? "JOB_CANCELLED" : "JOB_NOT_VERIFYING", job, packageVersion: await this.getPackage(publication.packageVersionId) };
     }
-    await execute(this.db, "SELECT state FROM kauro.commercial_authorizations WHERE authorization_id = $1 FOR UPDATE", [job.authorizationId]);
+    await this.lockAuthorizationRow(job.authorizationId);
     await this.awaitTransition({ kind: "APPROVAL", key: job.approvalId });
     const revisionId = await this.revisionOf(job);
     await this.awaitTransition({ kind: "REVISION", key: revisionId });
