@@ -989,7 +989,10 @@ function commerceUnitOfWork(b06: UnitOfWork, s: InMemoryCommerceStore, clock: Cl
 
   const scopeKey = (kind: string, key: string): string => `${kind}|${key}`;
 
+  const base = b06 as UnitOfWork & { effectInstant(): Promise<UtcInstant>; beforeCommit(check: () => Promise<void>): void };
   const uow = {
+    effectInstant: () => base.effectInstant(),
+    beforeCommit: (check: () => Promise<void>) => base.beforeCommit(check),
     get context() {
       return b06.context;
     },

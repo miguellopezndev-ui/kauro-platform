@@ -20,6 +20,7 @@ import { DomainFailure, NotFoundFailure } from "@kauro/domain";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { ALLOW_REASONS } from "../../commands/runtime.js";
 import { CommerceAccessDenied, operatorContextOf, runCommerceCommand, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
+import { assureStepUpAtCommit } from "../../ports/assurance-and-admission.js";
 import { AUTHORIZATION_POLICY_VERSION } from "../../ports/authorizer.js";
 import { applied } from "../agency/shared.js";
 import { commercialAdmissionSpecOf, type CommercialCommandHandler } from "../agency/runtime.js";
@@ -46,7 +47,7 @@ export function activateSellerHandler(runtime: CommerceRequestRuntime, co: Selle
         async body(uow, _causationId: CausationId, now: UtcInstant) {
           const body = envelope.body;
           // the owner's own fresh step-up (a new execution only; the proof is the owner's and recorded by the step-up verifier)
-          const assured = await co.assurance.verifyStepUp(uow, envelope.userId, body.assuranceProofRef as AssuranceProofId, now);
+          const assured = await assureStepUpAtCommit(uow, co.assurance, envelope.userId, body.assuranceProofRef as AssuranceProofId, runtime.clock);
           if (assured.kind !== "FRESH") throw new DomainFailure("ASSURANCE_REQUIRED", `activating a seller needs a fresh step-up: ${assured.reason}`, { reason: assured.reason });
           const sales = co.sales(uow);
           const seller = await sales.lockSeller(sellerId);

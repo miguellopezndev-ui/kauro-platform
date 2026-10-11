@@ -20,6 +20,7 @@ import { DomainFailure, NotFoundFailure } from "@kauro/domain";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { ALLOW_REASONS } from "../../commands/runtime.js";
 import { CommerceAccessDenied, operatorContextOf, runCommerceCommand, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
+import { assureStepUpAtCommit } from "../../ports/assurance-and-admission.js";
 import { AUTHORIZATION_POLICY_VERSION } from "../../ports/authorizer.js";
 import { applied, checkExpectedVersion } from "../agency/shared.js";
 import { commercialAdmissionSpecOf, type CommercialCommandHandler } from "../agency/runtime.js";
@@ -62,7 +63,7 @@ export function approveCommissionPayoutHandler(runtime: CommerceRequestRuntime, 
         },
         async body(uow, _causationId: CausationId, now: UtcInstant) {
           const body = envelope.body;
-          const assured = await co.assurance.verifyStepUp(uow, envelope.userId, body.authorizationRef as AssuranceProofId, now);
+          const assured = await assureStepUpAtCommit(uow, co.assurance, envelope.userId, body.authorizationRef as AssuranceProofId, runtime.clock);
           if (assured.kind !== "FRESH") throw new DomainFailure("ASSURANCE_REQUIRED", `approving a payout needs a fresh step-up: ${assured.reason}`, { reason: assured.reason });
           const statements = co.statements(uow);
           const statement = await statements.lockStatement(statementId);
@@ -91,7 +92,7 @@ export function approveCommissionPayoutHandler(runtime: CommerceRequestRuntime, 
           }
           // the step-up judged again at the effect, after every lock this unit waited on (statement, cash, lines): a proof that expired
           // during a wait authorizes nothing (B10G-R7; the database repeats it at the write, kauro.effect_now(), migration 0038)
-          const atEffect = await co.assurance.verifyStepUp(uow, envelope.userId, body.authorizationRef as AssuranceProofId, runtime.clock.now());
+          const atEffect = await assureStepUpAtCommit(uow, co.assurance, envelope.userId, body.authorizationRef as AssuranceProofId, runtime.clock);
           if (atEffect.kind !== "FRESH") throw new DomainFailure("ASSURANCE_REQUIRED", `approving a payout needs a step-up still fresh at its effect: ${atEffect.reason}`, { reason: atEffect.reason });
           const intentId = uow.ids.next() as PayoutIntentId;
           const authorized = await statements.authorizeIntent({

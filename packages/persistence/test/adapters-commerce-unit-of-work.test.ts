@@ -300,3 +300,19 @@ test("SQLSTATE translation: a second live quote of a project (23505 quotes_one_l
   const f = failureOfSqlState(SQLSTATE.UNIQUE_VIOLATION, "quotes_one_live_per_project");
   assert.deepEqual([f?.code, f?.retryable], ["STALE_VERSION", true]);
 });
+
+test("STEPUP-AT-COMMIT: the effect instant is rounded UP to the millisecond, never down — an instant read after the database's own microsecond instant is never earlier than it (a proof never passes up to one millisecond late)", async () => {
+  const { h, A } = env;
+  await h.commerce.run(h.tenant(A.agencyId, A.ownerUserId), async (uow) => {
+    const query = (uow as unknown as { client: { query(sql: string): Promise<{ rows: Array<{ micros: string }> }> } }).client;
+    const { effectNowOf } = await import("@kauro/domain");
+    let wholeMillisecond = 0;
+    for (let i = 0; i < 60; i++) {
+      const dbMicros = BigInt((await query.query("SELECT floor(extract(epoch from kauro.effect_now()) * 1000000)::text AS micros")).rows[0]!.micros);
+      const atMicros = BigInt(Date.parse(await effectNowOf(uow))) * 1000n;
+      assert.ok(atMicros >= dbMicros, `the effect instant (${atMicros} us) is not earlier than the database's instant read before it (${dbMicros} us)`);
+      if (dbMicros % 1000n === 0n) wholeMillisecond++;
+    }
+    assert.ok(wholeMillisecond < 60, "the database instants carry sub-millisecond precision");
+  });
+});

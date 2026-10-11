@@ -8,7 +8,8 @@
  * the actor that obtained it.
  */
 import type { CommandId, UtcInstant } from "@kauro/contracts";
-import type { AgencyId, AssuranceProofId, FailureReason, UnitOfWork, UserId } from "@kauro/domain";
+import type { AgencyId, AssuranceProofId, Clock, FailureReason, UnitOfWork, UserId } from "@kauro/domain";
+import { DomainFailure, beforeCommitOf, effectNowOf } from "@kauro/domain";
 
 export const STEP_UP_FRESHNESS_SECONDS = 900;
 
@@ -41,4 +42,34 @@ export type Admission =
 export interface AbuseLimiter {
   /** Decides before the command runs; the structural limits (one DRAFT agency per creator) are additionally enforced by the database. */
   admit(operation: CommandId, subject: AdmissionSubject, now: UtcInstant): Promise<Admission>;
+}
+
+/**
+ * The step-up judged at the database's effect instant (or the process clock if later) and again at COMMIT (STEPUP-AT-COMMIT; the PV1R-01/03 pattern of the bank-transfer
+ * route). The proof is read first (the verifier's own I/O), THEN the unit's effect clock is read and the proof's window (`freshUntil`,
+ * exclusive) is judged at that last instant, so a proof that crossed its boundary while the read waited is not FRESH. A FRESH outcome
+ * registers the same judgment (proof read again, clock read again) immediately before COMMIT, in the same transaction: a proof that
+ * expires between this check and the commit rolls the whole unit back with ASSURANCE_REQUIRED (STEP_UP_STALE), nothing committed. A
+ * non-FRESH outcome is returned for the caller to refuse in its own words; no commit check is registered for it.
+ * Fails closed (INTEGRITY_FAILURE) on a unit of work with no effect clock or no commit hook.
+ */
+export async function assureStepUpAtCommit(uow: UnitOfWork, assurance: AssuranceVerifier, userId: UserId, proofRef: AssuranceProofId | undefined, clock: Clock): Promise<AssuranceOutcome> {
+  // the judged instant is the LATER of the database's effect clock and the process clock (fail closed on skew: either clock past the
+  // proof's window makes it stale; in a deployment the two agree to the skew)
+  const instant = async (): Promise<UtcInstant> => new Date(Math.max(Date.parse(await effectNowOf(uow)), clock.nowMs())).toISOString() as UtcInstant;
+  const judge = async (): Promise<AssuranceOutcome> => {
+    const outcome = await assurance.verifyStepUp(uow, userId, proofRef, await instant());
+    const at = await instant();
+    // no await below this line: the judgment is at this one instant
+    if (outcome.kind !== "FRESH") return outcome;
+    if (outcome.freshUntil === undefined || !(Date.parse(at) < Date.parse(outcome.freshUntil))) return { kind: "STALE", reason: "STEP_UP_STALE" };
+    return outcome;
+  };
+  const outcome = await judge();
+  if (outcome.kind !== "FRESH") return outcome;
+  beforeCommitOf(uow, async () => {
+    const atCommit = await judge();
+    if (atCommit.kind !== "FRESH") throw new DomainFailure("ASSURANCE_REQUIRED", `the step-up is no longer fresh at the commit: ${atCommit.reason}`, { reason: atCommit.reason });
+  });
+  return outcome;
 }

@@ -229,3 +229,34 @@ test("access and assurance are two decisions (R7): access never reads a proof â€
   const foreignContext = await f.uow.run({ kind: "TENANT", agencyId: AGENCY, userId: approver.userId, correlationId }, (uow) => f.authorizer.authorize(uow, { command: "CMD009", identity: operator, agencyId: AGENCY }));
   assert.deepEqual(foreignContext, { kind: "DENY", code: "AUTHENTICATION_REQUIRED", reason: "SUBJECT_UNAUTHENTICATED", policyVersion: AUTHORIZATION_POLICY_VERSION });
 });
+
+// STEPUP-AT-COMMIT: the step-up is judged at the database's clock after the proof read and again immediately before COMMIT.
+test("step-up at COMMIT: a proof that expires between the assurance check and the COMMIT rolls the unit back with ASSURANCE_REQUIRED STEP_UP_STALE; one still fresh at the commit commits; the boundary is exclusive", async () => {
+  const f = fixture();
+  const approver = facts("commit-approver");
+  member(f.store, AGENCY, approver, "OWNER");
+  const context = { kind: "TENANT" as const, agencyId: AGENCY, userId: approver.userId, correlationId: "c-commit" as CorrelationId };
+  const proof = async (lifetimeMs: number): Promise<AssuranceProofId> => {
+    const p = ids.next() as AssuranceProofId;
+    f.store.proofs.set(p, { proofId: p, userId: approver.userId, kind: "STEP_UP", method: "TOTP", issuedAt: clock.now(), expiresAt: new Date(clock.nowMs() + lifetimeMs).toISOString() });
+    return p;
+  };
+  const assureThen = async (ref: AssuranceProofId, advanceMs: number): Promise<string> => {
+    try {
+      await f.uow.run(context, async (uow) => {
+        const request: AuthorizationRequest = { command: "CMD025", identity: approver, agencyId: AGENCY, assuranceProofRef: ref };
+        const access = await f.authorizer.authorize(uow, request);
+        assert.equal(access.kind, "ALLOW");
+        if (access.kind !== "ALLOW") return;
+        assert.equal((await f.authorizer.assure(uow, request, access)).kind, "ALLOW", "fresh at the check");
+        clock.advance(advanceMs); // time passes between the check and the commit
+      });
+      return "COMMITTED";
+    } catch (e) {
+      return `${(e as { code?: string }).code} ${(e as { details?: { reason?: string } }).details?.reason}`;
+    }
+  };
+  assert.equal(await assureThen(await proof(10_000), 9_999), "COMMITTED", "one millisecond before the expiry commits");
+  assert.equal(await assureThen(await proof(10_000), 10_000), "ASSURANCE_REQUIRED STEP_UP_STALE", "at the expiry instant the proof is no longer fresh (exclusive)");
+  assert.equal(await assureThen(await proof(600_000), 901_000), "ASSURANCE_REQUIRED STEP_UP_STALE", "past the freshness window at the commit");
+});

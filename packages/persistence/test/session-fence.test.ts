@@ -42,13 +42,13 @@ interface Session {
   readonly hash: Sha256Hex;
 }
 /** A live session of a fresh person, opened through the product's store; `lastSeenAgoMs` back-dates it (a touch is due past 60 s). */
-async function session(label: string, lastSeenAgoMs = 0): Promise<Session> {
+async function session(label: string, lastSeenAgoMs = 0, idleMs = IDLE_S * 1000): Promise<Session> {
   const subject = `fence-${label}-${++seq}-${Date.now()}`;
   const { userId } = await person(app, subject);
   const hash = sha(`secret-${subject}`) as Sha256Hex;
   const at = Date.now() - lastSeenAgoMs;
   await store.open(
-    { sessionId: ids.next(), userId: userId as UserId, provider: "identity-platform", subjectHash: sha(subject) as Sha256Hex, emailVerifiedAt: toUtcInstant(at), mfaAt: toUtcInstant(at), createdAt: toUtcInstant(at), lastSeenAt: toUtcInstant(at), idleExpiresAt: toUtcInstant(at + IDLE_S * 1000), absoluteExpiresAt: toUtcInstant(at + 12 * 3_600_000) },
+    { sessionId: ids.next(), userId: userId as UserId, provider: "identity-platform", subjectHash: sha(subject) as Sha256Hex, emailVerifiedAt: toUtcInstant(at), mfaAt: toUtcInstant(at), createdAt: toUtcInstant(at), lastSeenAt: toUtcInstant(at), idleExpiresAt: toUtcInstant(at + idleMs), absoluteExpiresAt: toUtcInstant(at + 12 * 3_600_000) },
     hash,
     `corr-${seq}` as CorrelationId,
   );
@@ -330,6 +330,25 @@ test("T3 RACE PV1R-07 r4 (timeout, resume behind a fence past 5 s): 57014, sessi
     const retry = await store.resume(s.hash, now, IDLE_S, TOUCH_S);
     assert.ok(retry !== null && retry.revokedAt === null, "the retry resumes the live session");
     assert.ok((await rowOf(s)).lastSeen > before.lastSeen, "the retry touches it (last-seen moved forward)");
+  } finally {
+    await c.end().catch(() => undefined);
+  }
+});
+
+test("STEPUP-AT-COMMIT F7 EXPIRY (revoke behind a fence past the session's idle deadline): a session that expired during the wait is ENDED, never REVOKED, and the row stays unrevoked", async () => {
+  const s = await session("f7", 0, 1_500);
+  const c = await appTx(s);
+  try {
+    assert.ok((await fence(c, s)) !== null, "the fence holds the live row");
+    const pid = await pidOf(c);
+    const revoking = settle(store.revoke(s.hash, now, "LOGOUT"));
+    assert.deepEqual((await waitersOf(pid)).map((w) => w.usename), ["kauro_assurance_test"], "the revoke waits behind the fence");
+    await pause(1_700); // the session's idle deadline passes during the wait
+    await c.query("COMMIT");
+    const done = await revoking;
+    assert.equal(done.status, "fulfilled");
+    assert.equal((done as PromiseFulfilledResult<{ outcome: string }>).value.outcome, "ENDED", "judged at the instant read after the lock, the session is past its deadline");
+    assert.equal((await rowOf(s)).revokedAt, null, "an ended session is not revoked");
   } finally {
     await c.end().catch(() => undefined);
   }

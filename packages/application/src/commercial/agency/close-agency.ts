@@ -27,6 +27,7 @@ import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { agencyView } from "../../api/projections.js";
 import { ALLOW_REASONS } from "../../commands/runtime.js";
 import { CommerceAccessDenied, runCommerceCommand, tenantContextOf, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
+import { assureStepUpAtCommit } from "../../ports/assurance-and-admission.js";
 import { AUTHORIZATION_POLICY_VERSION } from "../../ports/authorizer.js";
 import { withinCallBound } from "../call-bound.js";
 import { CLOSE_AGENCY, type CloseAgencyBody } from "../contracts.js";
@@ -66,7 +67,7 @@ export function closeAgencyHandler(runtime: CommerceRequestRuntime, co: AgencyLi
           if (membership === null) throw new DomainFailure("INTEGRITY_FAILURE", "a closure was authorized without a membership");
           const body = envelope.body;
           // the owner's fresh step-up (a new execution only; the proof is the owner's own and recorded by the step-up verifier)
-          const assured = await co.assurance.verifyStepUp(uow, envelope.userId, body.assuranceProofRef as AssuranceProofId, now);
+          const assured = await assureStepUpAtCommit(uow, co.assurance, envelope.userId, body.assuranceProofRef as AssuranceProofId, runtime.clock);
           if (assured.kind !== "FRESH") throw new DomainFailure("ASSURANCE_REQUIRED", `closing an agency needs a fresh step-up: ${assured.reason}`, { reason: assured.reason });
           const life = co.lifecycle(uow);
           // the agency's row FOR NO KEY UPDATE (never FOR UPDATE: the KEY SHARE of a reader's insert must not wait for it), then at once

@@ -10,6 +10,7 @@ import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { AgencyClosureView, CreatePaymentOrderView, RequestRefundView } from "@kauro/application";
+import { toUtcInstant } from "@kauro/domain";
 import type { AgencyId, CaptureId, FiscalProfileId, MembershipId, PaymentOrderId, PlanId, RefundId, TaxDocumentId, UserId } from "@kauro/domain";
 import {
   activateAgency,
@@ -601,4 +602,29 @@ test("RACE (D10-AGY-6, D10-TX-1; the job-start analogue of the ADV-7 cell, ADV-8
   );
   assert.equal(await w.count("processing_jobs", "agency_id = $1", [s.agency.agencyId]), 0, "no job exists beside the closure's inventory");
   assert.equal((await agencyRow(s.agency.agencyId))?.state, "CLOSING");
+});
+
+test("STEPUP-AT-COMMIT RACE (EXPIRY): a step-up proof that expires while the closure waits on the agency's exclusive half — fresh when the body checked it — is refused ASSURANCE_REQUIRED STEP_UP_STALE at the commit and nothing changes (the agency ACTIVE, no closure); the same closure with a proof still fresh at its commit is 200", async () => {
+  const { w } = pw;
+  const s = await sellingAgency("cmd043-commit-expiry");
+  const serverMs = async (): Promise<number> => (await w.h.oracle.query<{ t: Date }>("SELECT kauro.server_now() AS t")).rows[0]!.t.getTime();
+  // issued 15 min - 4 s ago: fresh now (inside the 900 s window), expires 4 s from now
+  const shortLived = await w.h.recordStepUp(s.owner.userId as UserId, { issuedAt: toUtcInstant((await serverMs()) - 15 * 60_000 + 4_000) });
+  const holder = await w.h.pg.connect("postgres");
+  const before = await footprint(s.agency.agencyId);
+  try {
+    await holder.query("BEGIN");
+    // the agency's SHARED transition half: the access phase and the body's step-up check pass beside it, the closure's exclusive half waits
+    await holder.query("SELECT pg_advisory_xact_lock_shared(kauro.transition_key('kauro.agencies', $1))", [s.agency.agencyId]);
+    const closing = close(s, { proof: shortLived });
+    await waitForApiLockWait(w, "transition_key('kauro.agencies'");
+    await new Promise((resolve) => setTimeout(resolve, 4_500)); // the proof's expiry passes while the closure waits (a bounded wait, not a poll)
+    await holder.query("COMMIT");
+    assert.equal(outcome(w, await closing), "403 ASSURANCE_REQUIRED STEP_UP_STALE", "judged again at the commit, the proof is past its expiry");
+  } finally {
+    await holder.end();
+  }
+  assert.deepEqual(await footprint(s.agency.agencyId), before, "nothing committed: the agency, its obligations, no closure, event or journal entry as they were");
+  assert.equal((await agencyRow(s.agency.agencyId))?.state, "ACTIVE");
+  assert.equal(completed<AgencyClosureView>(await close(s, { proof: await w.stepUp(s.owner) }), 200).data.agency.state, "CLOSING", "a proof fresh at the commit closes the agency");
 });
