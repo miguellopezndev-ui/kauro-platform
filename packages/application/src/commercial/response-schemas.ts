@@ -380,7 +380,7 @@ export const COMMERCIAL_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object
       incidentId: platform(true, ID, "The incident."),
       severity: platform(true, enumOf(["S1", "S2", "S3", "S4", "FALSE_POSITIVE"]), "The recorded severity, or FALSE_POSITIVE for a monitoring false positive."),
       state: platform(true, enumOf(["DETECTED", "CLOSED"]), "The incident phase at birth."),
-      affectedScopeRefs: platform(true, { type: "array", maxItems: 20, items: NARROW_LABEL }, "The safe scope identifiers the incident affects."),
+      affectedScopeRefs: platform(true, { type: "array", maxItems: 20, items: { type: "string", minLength: 1, maxLength: 80 } }, "The safe scope identifiers the incident affects."),
       communicationState: platform(true, enumOf(["NOT_REQUIRED", "REVIEW_REQUIRED"]), "Customer communication is reviewed by the owner for S1 and S2; nothing is sent automatically."),
       openResponsibilities: platform(true, { type: "array", maxItems: 3, items: enumOf(["CONTAINMENT", "RECOVERY", "COMMUNICATION"]) }, "The responsibilities still to be evidenced separately."),
       startedAt: platform(true, UTC, "The instant the database recorded the incident."),

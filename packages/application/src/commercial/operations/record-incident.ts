@@ -49,6 +49,7 @@ export function recordIncidentHandler(
         command: { id: spec.id, journalScope: "OPERATOR_IDENTITY" },
         envelope,
         context,
+        replayVersion: () => 1,
         async access(uow) {
           const decision = await co.authorizer.authorizeCorporateOwner(uow, { identity: envelope.subject.identity });
           if (decision.kind === "DENY") throw CommerceAccessDenied.of("CMD056", decision);

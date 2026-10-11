@@ -62,8 +62,8 @@ export class PgOperationsRepository implements OperationsRepository {
     const falsePositive = input.severity === "FALSE_POSITIVE";
     const inserted = await execute<IncidentRow>(
       this.db,
-      `INSERT INTO kauro.incidents (incident_id, kind, severity, state, affected_scopes, summary, recorded_by_user_id, recorded_by_service)
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)
+      `INSERT INTO kauro.incidents (incident_id, kind, severity, state, affected_scopes, summary, ${input.by.kind === "USER" ? "recorded_by_user_id" : "recorded_by_service"})
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
        RETURNING incident_id, kind, severity, state, affected_scopes, communication_state,
          to_char(started_at AT TIME ZONE 'UTC', ${CANONICAL_FORMAT}) AS started_at, to_char(review_at AT TIME ZONE 'UTC', ${CANONICAL_FORMAT}) AS review_at`,
       [
@@ -73,8 +73,7 @@ export class PgOperationsRepository implements OperationsRepository {
         falsePositive ? "CLOSED" : "DETECTED",
         JSON.stringify(input.affectedScopes),
         input.summary,
-        input.by.kind === "USER" ? input.by.userId : null,
-        input.by.kind === "SERVICE" ? input.by.serviceId : null,
+        input.by.kind === "USER" ? input.by.userId : input.by.serviceId,
       ],
     );
     const row = inserted.rows[0]!;
@@ -128,8 +127,8 @@ export class PgOperationsRepository implements OperationsRepository {
     }
     const r = await execute<{ recovery_id: string; candidate_id: string; deletion_journal_hash: string; authorization_ref: string; authorized_at: string }>(
       this.db,
-      `INSERT INTO kauro.recoveries (recovery_id, candidate_id, deletion_journal_hash, authorization_ref, authorized_by_user_id, authorized_at)
-       VALUES ($1, $2, $3, $4, $5, kauro.server_now())
+      `INSERT INTO kauro.recoveries (recovery_id, candidate_id, deletion_journal_hash, authorization_ref, authorized_by_user_id)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING recovery_id, candidate_id, deletion_journal_hash, authorization_ref, to_char(authorized_at AT TIME ZONE 'UTC', ${CANONICAL_FORMAT}) AS authorized_at`,
       [input.recoveryId, input.candidate.candidateId, input.candidate.deletionJournalHash, input.authorizationRef, input.by],
     );

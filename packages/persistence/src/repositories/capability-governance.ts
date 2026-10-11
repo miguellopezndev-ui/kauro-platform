@@ -121,10 +121,10 @@ export class PgCapabilityGovernanceRepository implements CapabilityGovernanceRep
     if (!next) return this.stale(input.capabilityId);
     const r = await execute<RestrictionRow>(
       this.db,
-      `INSERT INTO kauro.capability_restrictions (restriction_id, capability_id, incident_ref, prior_state, revision_after, recorded_by_user_id, recorded_by_service)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO kauro.capability_restrictions (restriction_id, capability_id, incident_ref, prior_state, revision_after, ${input.by.kind === "USER" ? "recorded_by_user_id" : "recorded_by_service"})
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING restriction_id, capability_id, incident_ref, prior_state, revision_after, to_char(created_at AT TIME ZONE 'UTC', ${CANONICAL_FORMAT}) AS created_at`,
-      [input.restrictionId, input.capabilityId, input.incidentRef, input.priorState, Number(next.revision), input.by.kind === "USER" ? input.by.userId : null, input.by.kind === "SERVICE" ? input.by.serviceId : null],
+      [input.restrictionId, input.capabilityId, input.incidentRef, input.priorState, Number(next.revision), input.by.kind === "USER" ? input.by.userId : input.by.serviceId],
     );
     const row = r.rows[0]!;
     return { kind: "APPLIED", record: {

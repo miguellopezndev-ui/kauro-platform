@@ -558,6 +558,33 @@
         "UPDATE": [
           "created_at"
         ]
+      },
+      "kauro.incidents": {
+        "INSERT": [
+          "affected_scopes",
+          "incident_id",
+          "kind",
+          "recorded_by_user_id",
+          "severity",
+          "state",
+          "summary"
+        ]
+      },
+      "kauro.recoveries": {
+        "INSERT": [
+          "authorization_ref",
+          "authorized_by_user_id",
+          "candidate_id",
+          "deletion_journal_hash",
+          "recovery_id"
+        ]
+      },
+      "kauro.restore_candidates": {
+        "UPDATE": [
+          "revision",
+          "state",
+          "updated_at"
+        ]
       }
     },
     "kauro_assurance": {
@@ -720,6 +747,34 @@
           "state",
           "updated_at",
           "version"
+        ]
+      },
+      "kauro.capabilities": {
+        "UPDATE": [
+          "revision",
+          "state",
+          "updated_at"
+        ]
+      },
+      "kauro.capability_restrictions": {
+        "INSERT": [
+          "capability_id",
+          "incident_ref",
+          "prior_state",
+          "recorded_by_service",
+          "restriction_id",
+          "revision_after"
+        ]
+      },
+      "kauro.incidents": {
+        "INSERT": [
+          "affected_scopes",
+          "incident_id",
+          "kind",
+          "recorded_by_service",
+          "severity",
+          "state",
+          "summary"
         ]
       }
     },
@@ -5631,6 +5686,158 @@
       ],
       "using": "(seller_id = kauro.current_seller_id())",
       "check": null
+    },
+    "capabilities/capabilities_operations_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "true",
+      "check": null
+    },
+    "capabilities/capabilities_operations_restrict": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "true",
+      "check": "(state = 'SUSPENDED'::text)"
+    },
+    "capability_restrictions/capability_restrictions_operations_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "true",
+      "check": null
+    },
+    "capability_restrictions/capability_restrictions_operations_record": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": null,
+      "check": "((recorded_by_service = 'operations-service'::text) AND (recorded_by_user_id IS NULL))"
+    },
+    "command_journal/command_journal_operations": {
+      "command": "ALL",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "((agency_id IS NULL) AND (actor_kind = 'SERVICE'::text) AND (actor_id = 'operations-service'::text))",
+      "check": "((agency_id IS NULL) AND (actor_kind = 'SERVICE'::text) AND (actor_id = 'operations-service'::text))"
+    },
+    "incident_responsibilities/incident_responsibilities_operations_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "true",
+      "check": null
+    },
+    "incident_responsibilities/incident_responsibilities_operations_record": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": null,
+      "check": "true"
+    },
+    "incident_responsibilities/incident_responsibilities_owner_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": null
+    },
+    "incident_responsibilities/incident_responsibilities_owner_record": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "kauro.acting_corporate_owner()"
+    },
+    "incidents/incidents_operations_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": "true",
+      "check": null
+    },
+    "incidents/incidents_operations_record": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_commission"
+      ],
+      "using": null,
+      "check": "((recorded_by_service = 'operations-service'::text) AND (recorded_by_user_id IS NULL))"
+    },
+    "incidents/incidents_owner_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": null
+    },
+    "incidents/incidents_owner_record": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "(kauro.acting_corporate_owner() AND (recorded_by_user_id = kauro.current_user_id()) AND (recorded_by_service IS NULL))"
+    },
+    "recoveries/recoveries_control_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "true",
+      "check": null
+    },
+    "recoveries/recoveries_owner_authorize": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "(kauro.acting_corporate_owner() AND (authorized_by_user_id = kauro.current_user_id()))"
+    },
+    "recoveries/recoveries_owner_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": null
+    },
+    "restore_candidates/restore_candidates_control": {
+      "command": "ALL",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "true",
+      "check": "true"
+    },
+    "restore_candidates/restore_candidates_owner_authorize": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": "kauro.acting_corporate_owner()"
+    },
+    "restore_candidates/restore_candidates_owner_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": null
     }
   },
   "tables": {
@@ -6120,6 +6327,19 @@
       "kauro.commission_offset_releases": [
         "INSERT",
         "SELECT"
+      ],
+      "kauro.incident_responsibilities": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.incidents": [
+        "SELECT"
+      ],
+      "kauro.recoveries": [
+        "SELECT"
+      ],
+      "kauro.restore_candidates": [
+        "SELECT"
       ]
     },
     "kauro_assurance": {
@@ -6285,6 +6505,19 @@
       ],
       "kauro.commission_offset_releases": [
         "INSERT",
+        "SELECT"
+      ],
+      "kauro.capabilities": [
+        "SELECT"
+      ],
+      "kauro.capability_restrictions": [
+        "SELECT"
+      ],
+      "kauro.incident_responsibilities": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.incidents": [
         "SELECT"
       ]
     },
@@ -6526,6 +6759,13 @@
         "SELECT"
       ],
       "kauro_meta.schema_migrations": [
+        "SELECT"
+      ],
+      "kauro.recoveries": [
+        "SELECT"
+      ],
+      "kauro.restore_candidates": [
+        "INSERT",
         "SELECT"
       ]
     },
