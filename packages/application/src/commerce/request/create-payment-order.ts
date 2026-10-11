@@ -107,7 +107,7 @@ export function createPaymentOrderHandler(runtime: CommerceRequestRuntime, co: C
           if (body.termsHash !== quote.termsHash) throw new StaleVersionFailure(quote.version, quote.state, { reason: "HASH_MISMATCH", mismatch: ["termsHash"] });
           const openOrder = await c.orders.findOpenForProject(quote.projectId);
           const paid = await quoteIsPaid(uow, co, quote);
-          const facts = await checkoutFactsOf(uow, co, quote, read, { openOrder, paid }, now);
+          const facts = await checkoutFactsOf(uow, co, quote, read, { openOrder, paid }, now, runtime.clock);
           // without a bound adapter no merchant route can be named: its blocker then stands for the unbound adapter, answered last
           const first = checkoutBlockers(facts).find((b) => !(co.provider === null && b === "PAYMENT_ROUTE_UNQUALIFIED"));
           if (first !== undefined) throw await checkoutFailure(uow, first, quote, openOrder?.state ?? null);

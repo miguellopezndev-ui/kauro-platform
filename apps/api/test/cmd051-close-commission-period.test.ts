@@ -26,6 +26,7 @@ import {
   lineStates,
   openMonth,
   periodIdOf,
+  routes,
   periodRow,
   proposal,
   readStatement,
@@ -36,7 +37,7 @@ import {
   type StatementsWorld,
   drainCommissions,
 } from "./statements-support.js";
-import { asProblem, completed, freshKey, ids, outcome, replayTextOf, sha } from "./support.js";
+import { asProblem, call, completed, freshKey, ids, outcome, replayTextOf, sha } from "./support.js";
 
 let sw: StatementsWorld;
 // the B10 state oracle after every test of this file (B10-KIT-SUITES section 2)
@@ -385,4 +386,29 @@ test("RACE: an identical retry replays the 200 with the same statements, the sam
   completed<PeriodCloseView>(await closePeriod(sw, january, crashBody, { key: crashKey }), 200);
   assert.equal((await periodRow(sw, january)).state, "CLOSED");
   assert.equal((await statementsOfSeller(sw, v.sellerId)).length, 1);
+});
+
+test("STEPUP-AT-COMMIT DENY (cross-site cookie at the service route): a browser request that fails the Origin, Sec-Fetch-Site or session CSRF rule is answered as an unauthenticated request and writes no row into the victim's security log; the same-origin request with the session's own CSRF token is the wrong principal (SERVICE_NOT_PERMITTED, one DENY fact of that person)", async () => {
+  const sx = await statementsWorld({ sessions: true });
+  try {
+    const idf = sx.w.identity();
+    const session = await idf.signIn(sx.owner);
+    const victimRows = async (): Promise<number> => (await sx.w.securityEvents("CMD051")).filter((f) => f.actorId === sx.owner.userId).length;
+    const before = await victimRows();
+    const browser = (extra: Record<string, string>, csrf: string | null): Promise<Awaited<ReturnType<typeof closePeriod>>> =>
+      call(sx.w, { url: routes.close(ids.next()), agency: null, token: null, key: freshKey("cmd051-xsite"), body: { ledgerCutoffHash: sha("xsite") }, headers: { cookie: session.cookie, ...(csrf === null ? {} : { "x-kauro-csrf": csrf }), ...extra } });
+    for (const [what, expected, reply] of [
+      ["no Origin", "401 AUTHENTICATION_REQUIRED -", await browser({}, session.view.csrfToken)],
+      ["another origin", "401 AUTHENTICATION_REQUIRED -", await browser({ origin: "https://evil.example" }, session.view.csrfToken)],
+      ["a cross-site fetch", "401 AUTHENTICATION_REQUIRED -", await browser({ origin: idf.origin, "sec-fetch-site": "cross-site" }, session.view.csrfToken)],
+      ["no CSRF token", "401 AUTHENTICATION_REQUIRED -", await browser({ origin: idf.origin }, null)],
+    ] as const) {
+      assert.equal(outcome(sx.w, reply), expected, what);
+      assert.equal(await victimRows(), before, `${what}: nothing is written into the victim's security log`);
+    }
+    assert.equal(outcome(sx.w, await browser({ origin: idf.origin, "sec-fetch-site": "same-origin" }, session.view.csrfToken)), "403 NOT_AUTHORIZED SERVICE_NOT_PERMITTED");
+    assert.equal(await victimRows(), before + 1, "the same-origin wrong-principal request is recorded once");
+  } finally {
+    await sx.stop();
+  }
 });

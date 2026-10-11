@@ -9,6 +9,7 @@
  * No unit of work stays open across a model call, a cloud job creation, a payment API call or full-data processing (07): the
  * seven B06 commands are database-only and run in exactly one unit of work each.
  */
+import type { UtcInstant } from "@kauro/contracts";
 import { DomainFailure } from "../model/errors.js";
 import type { AgencyId, MembershipId, UserId } from "../model/ids.js";
 import type { ExecutionContext } from "../model/tenant.js";
@@ -138,6 +139,22 @@ export function beforeCommitOf(uow: object, check: () => Promise<void>): void {
   const candidate = uow as Partial<PreCommitChecks>;
   if (typeof candidate.beforeCommit !== "function") throw new DomainFailure("INTEGRITY_FAILURE", "this unit of work cannot re-judge its facts at COMMIT");
   candidate.beforeCommit(check);
+}
+
+/**
+ * A unit of work that reads the database's effect instant (kauro.effect_now(): the server's instant of the statement, after every lock the
+ * caller waited on), rounded UP to the millisecond so an instant never reads earlier than the database's (a deadline is never judged late
+ * by the rounding).
+ */
+export interface EffectClock {
+  effectInstant(): Promise<UtcInstant>;
+}
+
+/** The effect instant of `uow`. Fails closed: a unit of work with no database clock cannot judge a deadline at its effect (INTEGRITY_FAILURE). */
+export async function effectNowOf(uow: object): Promise<UtcInstant> {
+  const candidate = uow as Partial<EffectClock>;
+  if (typeof candidate.effectInstant !== "function") throw new DomainFailure("INTEGRITY_FAILURE", "this unit of work has no effect clock to judge its facts at");
+  return candidate.effectInstant();
 }
 
 export function abandonWorkOf(uow: object, reason: string): void {

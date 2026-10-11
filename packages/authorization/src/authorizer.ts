@@ -29,7 +29,7 @@
 import type { CommandId } from "@kauro/contracts";
 import { COMMANDS } from "@kauro/contracts";
 import type { AllowDecision, AuthorizationDecision, AuthorizationRequest, Authorizer, AssuranceVerifier, ReadAuthorizationRequest } from "@kauro/application";
-import { AUTHORIZATION_POLICY_VERSION, B06_COMMANDS } from "@kauro/application";
+import { AUTHORIZATION_POLICY_VERSION, B06_COMMANDS, assureStepUpAtCommit } from "@kauro/application";
 import type { AgencyId, Clock, FailureReason, MembershipRecord, UnitOfWork } from "@kauro/domain";
 import { isAgencyCommandRole, isUuidV5, isVerifiedIdentity, roleSatisfies } from "@kauro/domain";
 
@@ -131,7 +131,7 @@ export function createAuthorizer(deps: AuthorizerDependencies): Authorizer {
     async assure(uow: UnitOfWork, request: AuthorizationRequest, access: AllowDecision): Promise<AuthorizationDecision> {
       // 8. step-up (08 "High-impact actions require recent step-up"; D-ASSUR-1)
       if (!STEP_UP_COMMANDS.has(request.command)) return access;
-      const outcome = await deps.assurance.verifyStepUp(uow, request.identity.userId, request.assuranceProofRef, deps.clock.now());
+      const outcome = await assureStepUpAtCommit(uow, deps.assurance, request.identity.userId, request.assuranceProofRef, deps.clock);
       if (outcome.kind !== "FRESH") return deny("ASSURANCE_REQUIRED", outcome.reason);
       return { ...access, assuranceClass: "STEP_UP" };
     },

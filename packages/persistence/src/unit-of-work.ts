@@ -287,6 +287,19 @@ export class PgUnitOfWork implements UnitOfWork {
     this.#beforeCommit.push(check);
   }
 
+  /**
+   * The effect instant of this unit of work (kauro.effect_now(): the server's instant of this statement, read AFTER the locks the caller
+   * took, so a deadline that passed while it waited counts; ACH-ROUTE §7.24 I2Δ, R2/I1/I2/I3 EXPIRY cells). Rounded UP to the millisecond
+   * (never down): the instant a caller compares with a deadline of millisecond precision is never earlier than the database's own, so a
+   * proof or window never passes up to one millisecond late (STEPUP-AT-COMMIT).
+   */
+  async effectInstant(): Promise<UtcInstant> {
+    const r = await execute<{ at: string }>(this.client, "SELECT to_char(date_trunc('milliseconds', kauro.effect_now() + interval '999 microseconds') AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS at");
+    const at = r.rows[0]?.at;
+    if (at === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the server answered no effect instant");
+    return at as UtcInstant;
+  }
+
   /** Runs the registered pre-commit checks in registration order (the factory, once the work returned). */
   async runBeforeCommit(): Promise<void> {
     for (const check of this.#beforeCommit.splice(0)) await check();
@@ -610,7 +623,7 @@ export function bankRoutesOf(uow: UnitOfWork): PgBankRoutes {
 
 /** The effect instant of a commerce unit of work of this package (read after its locks). */
 export function effectInstantOf(uow: UnitOfWork): Promise<UtcInstant> {
-  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the effect instant is read in a commerce unit of work of @kauro/persistence");
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the effect instant is read in a commerce unit of work of @kauro/persistence");
   return uow.effectInstant();
 }
 
@@ -659,17 +672,6 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
     this.paymentSweeps = new PgPaymentSweeps(client);
     this.requestReads = new PgCommerceRequestReads(client);
     this.bankRoutes = new PgBankRoutes(client);
-  }
-
-  /**
-   * The effect instant of this unit of work (kauro.effect_now(): the server's instant of this statement, read AFTER the locks the caller
-   * took, so a deadline that passed while it waited counts; ACH-ROUTE §7.24 I2Δ, R2/I1/I2/I3 EXPIRY cells).
-   */
-  async effectInstant(): Promise<UtcInstant> {
-    const r = await execute<{ at: string }>(this.client, "SELECT to_char(kauro.effect_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS at");
-    const at = r.rows[0]?.at;
-    if (at === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the server answered no effect instant");
-    return at as UtcInstant;
   }
 
   protected override onJournalEntry(entryId: JournalEntryId): void {

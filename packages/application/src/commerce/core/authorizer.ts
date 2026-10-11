@@ -17,7 +17,7 @@
  */
 import type { AssuranceProofId, Clock, RefundPolicyId, UserId } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, isUuidV5, isUuidV7, isVerifiedIdentity, serviceHoldsRole } from "@kauro/domain";
-import type { AssuranceVerifier } from "../../ports/assurance-and-admission.js";
+import { assureStepUpAtCommit, type AssuranceVerifier } from "../../ports/assurance-and-admission.js";
 import type { CommerceAuthorizer, CommerceDenial } from "../ports.js";
 
 export interface CommerceAuthorizerDependencies {
@@ -66,7 +66,7 @@ export function createCommerceAuthorizer(deps: CommerceAuthorizerDependencies): 
           return deny("ASSURANCE_REQUIRED", "POLICY_NOT_APPLICABLE");
         }
       }
-      const outcome = await deps.assurance.verifyStepUp(uow, request.userId as UserId, isUuidV7(ref) ? (ref as AssuranceProofId) : undefined, deps.clock.now());
+      const outcome = await assureStepUpAtCommit(uow, deps.assurance, request.userId as UserId, isUuidV7(ref) ? (ref as AssuranceProofId) : undefined, deps.clock);
       if (outcome.kind !== "FRESH") return deny("ASSURANCE_REQUIRED", outcome.reason);
       return { kind: "ALLOW", assuranceClass: "STEP_UP", proofRef: outcome.proofId, policyVersion: COMMERCE_POLICY_VERSION };
     },

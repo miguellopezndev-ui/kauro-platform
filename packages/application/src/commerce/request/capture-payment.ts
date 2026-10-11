@@ -121,7 +121,7 @@ export function capturePaymentHandler(runtime: CommerceRequestRuntime, co: Comme
           // provider capture starts, checkout is blocked")
           if (quote.state !== "ACCEPTED_FOR_CHECKOUT") throw new DomainFailure("PRECONDITION_FAILED", "the quote no longer governs checkout", { reason: "QUOTE_NOT_ACTIVE" });
           if (instantMs(now) >= instantMs(quote.expiresAt)) throw new DomainFailure("PRECONDITION_FAILED", "the price expired before the capture started", { reason: "QUOTE_EXPIRED" });
-          const facts = await checkoutFactsOf(uow, co, quote, read, { openOrder: null, paid: false }, now);
+          const facts = await checkoutFactsOf(uow, co, quote, read, { openOrder: null, paid: false }, now, runtime.clock);
           const first = checkoutBlockers(facts)[0];
           if (first !== undefined) throw await blockerFailureOf(uow, first, quote);
           if (co.provider === null || co.payment === null || co.provider.provider !== order.provider || co.provider.environment !== order.environment) throw providerServicesUnavailable();

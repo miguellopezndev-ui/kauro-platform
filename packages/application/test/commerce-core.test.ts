@@ -701,7 +701,7 @@ function assurance(fresh: ReadonlySet<string>, stale: ReadonlySet<string>): Assu
     calls,
     async verifyStepUp(_uow, userId, proofRef, now): Promise<AssuranceOutcome> {
       calls.push({ userId, proofRef });
-      if (proofRef !== undefined && fresh.has(proofRef)) return { kind: "FRESH", proofId: proofRef, issuedAt: now };
+      if (proofRef !== undefined && fresh.has(proofRef)) return { kind: "FRESH", proofId: proofRef, issuedAt: now, freshUntil: new Date(Date.parse(now) + 900_000).toISOString() as never };
       if (proofRef !== undefined && stale.has(proofRef)) return { kind: "STALE", reason: "STEP_UP_STALE" };
       return { kind: "MISSING", reason: "STEP_UP_MISSING" };
     },
@@ -774,5 +774,31 @@ test("CommerceAuthorizer.assureOperator — D-REF-B4: a standing policy that cov
   assert.deepEqual(staleDecision.kind === "DENY" ? [staleDecision.code, staleDecision.reason] : staleDecision.kind, ["ASSURANCE_REQUIRED", "STEP_UP_STALE"]);
   const missing = await assure("not-a-proof-reference");
   assert.deepEqual(missing.kind === "DENY" ? [missing.code, missing.reason] : missing.kind, ["ASSURANCE_REQUIRED", "STEP_UP_MISSING"]);
-  assert.deepEqual(verifier.calls.map((c) => [c.userId, c.proofRef]), [[w.owner.userId, fresh], [w.owner.userId, stale], [w.owner.userId, undefined]], "the operator's own proof, never another person's");
+  assert.deepEqual(verifier.calls.map((c) => [c.userId, c.proofRef]), [[w.owner.userId, fresh], [w.owner.userId, fresh], [w.owner.userId, stale], [w.owner.userId, undefined]], "the operator's own proof, never another person's (the fresh one read again for the judgment at the COMMIT)");
+});
+
+// STEPUP-AT-COMMIT defect 4 (B09 provider path): the revision's deadline is judged at an instant sampled AFTER the availability read.
+test("revisionForCheckout with the process clock: a source deadline that passes while the availability read waits expires the revision (EXPIRED), judged after the read, not at the instant sampled before it", async () => {
+  const { revisionForCheckout, fixedClock } = await import("../src/index.js");
+  const clock = fixedClock();
+  const before = clock.now();
+  const deadline = new Date(clock.nowMs() + 1_000).toISOString();
+  const quote = { agencyId: "a", projectId: "p", revisionHash: "h", sourceAvailableUntil: deadline } as never;
+  const sources = {
+    availabilityOf: async () => {
+      clock.advance(2_000); // the read waits past the deadline
+      return { state: "SEALED", effectiveDeadline: deadline };
+    },
+  };
+  const sealed = { state: "SEALED" } as never;
+  // the instant sampled before the read still sits before the deadline: the old judgment passes it
+  assert.deepEqual(await revisionForCheckout({} as never, { sources } as never, quote, sealed, before), sealed, "judged at the earlier sample the revision looks available");
+  const clock2 = fixedClock();
+  const sources2 = {
+    availabilityOf: async () => {
+      clock2.advance(2_000);
+      return { state: "SEALED", effectiveDeadline: new Date(Date.UTC(2026, 8, 19, 12, 0, 1)).toISOString() };
+    },
+  };
+  assert.deepEqual(await revisionForCheckout({} as never, { sources: sources2 } as never, quote, sealed, clock2.now(), clock2), { state: "EXPIRED" }, "judged after the read the deadline has passed");
 });

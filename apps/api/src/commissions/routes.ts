@@ -153,11 +153,15 @@ function registerServiceCommand(
       try {
         const identity = run === null || deps.serviceAuthenticator === null ? null : await deps.serviceAuthenticator.authenticate(headers);
         if (identity === null || run === null) {
-          // a person's token is not a service identity: the wrong principal, recorded in the person's stream
-          const person = await deps.persons.authenticate(headers);
-          if (person) {
+          // a person's token is not a service identity: the wrong principal, recorded in the person's stream — but only for a credential the
+          // shared command boundary accepts for THIS request's actual method (PV1R-01): an unsafe cookie request that fails the Origin,
+          // Sec-Fetch-Site or session CSRF rule (or whose credentials are ambiguous) authenticates nobody here and is answered as an
+          // unauthenticated request (the anonymous fact) before any write, so a cross-site page cannot write a refusal into the victim's
+          // security log (STEPUP-AT-COMMIT). The service route declares no typed credential refusals, so none is answered.
+          const authentication = await kit.authentication({ method: request.method, headers });
+          if (authentication.kind === "SUBJECT") {
             const failure = new DomainFailure("NOT_AUTHORIZED", `${spec.id} denied: SERVICE_NOT_PERMITTED`, { reason: "SERVICE_NOT_PERMITTED" });
-            return kit.sendProblem(r, await deps.refusePerson(spec.id, person.identity.userId, correlationId, failure));
+            return kit.sendProblem(r, await deps.refusePerson(spec.id, authentication.subject.identity.userId, correlationId, failure));
           }
           return kit.sendProblem(r, await deps.refuseUnauthenticated(spec.id, { correlationId, agencyId: null }));
         }

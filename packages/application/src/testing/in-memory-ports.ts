@@ -164,6 +164,7 @@ export function createInMemoryPorts(clock: Clock, ids: IdGenerator, initial: InM
       const working = structuredClone(holder.store);
       const uow = createUnitOfWork(working, context, clock, ids);
       const out = await work(uow);
+      await (uow as UnitOfWork & { runBeforeCommit(): Promise<void> }).runBeforeCommit();
       holder.store = working;
       return out;
     },
@@ -285,7 +286,18 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
     return { kind: "APPLIED", record: change(row) };
   };
 
-  const uow: UnitOfWork = {
+  const beforeCommit: Array<() => Promise<void>> = [];
+  const uow: UnitOfWork & { effectInstant(): Promise<UtcInstant>; beforeCommit(check: () => Promise<void>): void; runBeforeCommit(): Promise<void> } = {
+    // the in-memory unit's database clock is its clock (rounded up to the millisecond, as the pg adapter's effect instant is)
+    async effectInstant() {
+      return clock.now();
+    },
+    beforeCommit(check) {
+      beforeCommit.push(check);
+    },
+    async runBeforeCommit() {
+      for (const check of beforeCommit.splice(0)) await check();
+    },
     get context() {
       return context;
     },
