@@ -272,7 +272,7 @@ test("bothOrders runs one race under both orders with one call — each actor ho
 
 test("duplicates and retries of one request id: concurrent copies settle with exactly one winner; sequential retries report every attempt", async () => {
   const requestId = ids.next();
-  const insert = () => h.controlPool.raw.query("INSERT INTO fault_probe.items (id) VALUES ($1)", [requestId]);
+  const insert = () => h.controlPool.query("INSERT INTO fault_probe.items (id) VALUES ($1)", [requestId]);
   const copies = partition(await concurrently(4, insert));
   assert.equal(copies.fulfilled.length, 1);
   assert.equal(copies.rejected.length, 3);

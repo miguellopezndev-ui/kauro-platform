@@ -45,7 +45,7 @@ test("R3: agency A's runtime role cannot occupy the next version of B's client; 
 test("R4: a client created through CMD009 journals its label; the control pool reads the journal's metadata of that entry but never its response", async () => {
   const key = freshKey("r4-confidential");
   const created = completed<EndClientView>(await call(w, { url: routes.createClient(w.A.agencyId), token: w.operator.token, agency: null, key, body: { displayName: "Confidential End Client Label", processingAuthorityRef: w.authorityA } }), 201);
-  const c = await w.h.controlPool.raw.connect();
+  const c = await w.h.controlPool.connectUnverified();
   try {
     const meta = await c.query("SELECT state, operation, response_status, resource_kind FROM kauro.command_journal WHERE resource_id = $1", [created.data.clientId]);
     assert.deepEqual(meta.rows, [{ state: "COMMITTED", operation: "CMD009", response_status: 201, resource_kind: "end_client" }]);

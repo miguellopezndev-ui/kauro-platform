@@ -1,0 +1,553 @@
+{
+ "gate": "G-COMMERCIAL",
+ "manual": "17",
+ "package": "B10",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "R2-079",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-080",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-086",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-087",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-088",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-089",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-090",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-091",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-092",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-093",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-094",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-095",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-096",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-097",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-098",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-099",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-100",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-101",
+   "package": "B10",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-102",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-103",
+   "package": "B10",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-104",
+   "package": "B10",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-105",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-106",
+   "package": "B20",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-107",
+   "package": "B20",
+   "claimed": "PLANNED_POST_B19",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-127",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-136",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-137",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-138",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-139",
+   "package": "B10",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-141",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD002-OK",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD002-DENY",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD002-RACE",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD027-OK",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD027-DENY",
+   "package": "B10",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD027-RACE",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD043-OK",
+   "package": "B10",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD043-DENY",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD043-RACE",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD045-OK",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD045-DENY",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD045-RACE",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD046-OK",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD046-DENY",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD046-RACE",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD047-OK",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD047-DENY",
+   "package": "B10",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD047-RACE",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD048-OK",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD048-DENY",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD048-RACE",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD049-OK",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD049-DENY",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD049-RACE",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD050-OK",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD050-DENY",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD050-RACE",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD051-OK",
+   "package": "B10",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD051-DENY",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD051-RACE",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD052-OK",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD052-DENY",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD052-RACE",
+   "package": "B10",
+   "claimed": "EXECUTED_LOCAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD053-OK",
+   "package": "B10",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD053-DENY",
+   "package": "B10",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "CMD053-RACE",
+   "package": "B10",
+   "claimed": "PARTIAL",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B10",
+  "B20"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B10",
+   "commit": null,
+   "reviewId": null
+  },
+  {
+   "package": "B20",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

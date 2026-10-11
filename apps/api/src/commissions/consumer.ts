@@ -18,6 +18,7 @@
  * Every effect is idempotent by its durable identity (ledger-effects.ts): a replay answers DUPLICATE and writes nothing.
  */
 import type { CommerceEventDelivery } from "@kauro/application";
+import type { UtcInstant } from "@kauro/contracts";
 import type { AgencyId, CaptureId, EventId, QualifyingPurchaseId } from "@kauro/domain";
 import { COMMERCE_EVENT_SUBSCRIPTIONS, COMMERCIAL_EVENT_SUBSCRIPTIONS, DomainFailure } from "@kauro/domain";
 import { attributionOf, commissionWorkOf, recurrenceOf, type PgCommercialUnitOfWork } from "@kauro/persistence";
@@ -29,7 +30,20 @@ export interface CommissionsConsumer {
   readonly consumer: typeof COMMISSIONS_CONSUMER;
   /** The event types COMMISSIONS is registered for (B09's COMMERCE_EVENT_SUBSCRIPTIONS and B10's COMMERCIAL_EVENT_SUBSCRIPTIONS). */
   readonly eventTypes: ReadonlyArray<string>;
-  handle(delivery: CommerceEventDelivery): Promise<ConsumerOutcome>;
+  /**
+   * Applies one delivery in one SERVICE unit of work. With a `fence` the unit's last statement proves the dispatcher still holds its lease
+   * under that fence (B10 matrix row L2): otherwise it raises PRECONDITION_FAILED (reason LEASE_FENCED) and nothing commits. Without one (a replay outside a
+   * dispatcher) the effect is idempotent by its durable identity and needs none.
+   */
+  handle(delivery: CommerceEventDelivery, fence?: DispatchFence): Promise<ConsumerOutcome>;
+}
+
+/** The lease a dispatcher's effect commits under: its resource, owner and fence, and the dispatcher's own clock (B06 D-LEASE-1). */
+export interface DispatchFence {
+  readonly resourceId: string;
+  readonly ownerId: string;
+  readonly fence: number;
+  readonly now: () => UtcInstant;
 }
 
 function text(delivery: CommerceEventDelivery, key: string): string {
@@ -62,8 +76,17 @@ export function commissionsConsumer(rt: CommissionRuntime): CommissionsConsumer 
   return {
     consumer: COMMISSIONS_CONSUMER,
     eventTypes,
-    handle(delivery) {
+    handle(delivery, fence) {
       return inAgency(rt, delivery.agencyId, delivery.eventId, async (uow): Promise<ConsumerOutcome> => {
+        const outcome = await applyEffect(uow);
+        if (fence !== undefined) {
+          if (rt.hold !== null) await rt.hold("DELIVERY_BEFORE_COMMIT", { eventId: delivery.eventId, ownerId: fence.ownerId });
+          await commissionWorkOf(uow).holdDispatchLease(fence.resourceId, fence.ownerId, fence.fence, fence.now());
+        }
+        return outcome;
+      });
+
+      async function applyEffect(uow: PgCommercialUnitOfWork): Promise<ConsumerOutcome> {
         const agencyId = delivery.agencyId;
         // every COMMISSIONS delivery takes the open periods first (design 10; D10-STMT-4, B10G-R5): a close holds its period FOR UPDATE, so
         // a delivery commits before the close reads (and its record is delivered, or the close refuses INPUTS_UNRECONCILED) or after the
@@ -99,7 +122,7 @@ export function commissionsConsumer(rt: CommissionRuntime): CommissionsConsumer 
           default:
             return "NOT_APPLICABLE";
         }
-      });
+      }
     },
   };
 }

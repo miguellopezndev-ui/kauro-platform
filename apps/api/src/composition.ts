@@ -20,14 +20,16 @@
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import type { AssuranceVerifier, AuditReadRuntime, AuditRuntime, B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators } from "@kauro/application";
+import type { LateFailureSink, BankDetailsClassifier, BankEvidenceStore, BankRouteCollaborators } from "@kauro/application";
+import { createBankRouteHandlers, realProviderCallTimer } from "@kauro/application";
+import type { AssuranceVerifier, AuditReadRuntime, AuditRuntime, B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators, ProviderCallTimer } from "@kauro/application";
 import { SESSION_POLICY_VERSION, UnrecordedBuyerTypeReader, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createQuoteHandlers, createStatementRequestHandlers, problemOf, recordOperatorDenial } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { UtcInstant } from "@kauro/contracts";
 import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
+import { bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, type DatabaseEnvironment, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import { commercialPrincipalReader } from "./commercial-principals.js";
 import type { ApiConfig, IdentityConfig, MigratorConfig } from "./config.js";
@@ -41,6 +43,7 @@ import { createApiServer, type ApiServerOptions, type HttpLimits } from "./serve
 import type { PaymentService } from "./payments/index.js";
 import { createPurchaseRebinder } from "./payments/rebinder.js";
 import { registerPaymentRoutes } from "./payments/routes.js";
+import { registerBankRouteRoutes } from "./payments/bank-route-routes.js";
 import { PAYMENT_SERVICE_ID } from "./payments/runtime.js";
 import { registerCommissionRoutes, type CommissionRoutesBinding } from "./commissions/routes.js";
 
@@ -101,16 +104,17 @@ export interface DatabaseDependencies {
  * Applies every pending migration as `migrator` on its own bounded connection (R37), closed afterwards: the LOCAL migrations on
  * start and the one-shot migration job (migration-job.ts). `password` is handed to that connection only; nothing keeps it.
  */
-export function applyMigrationsWith(migrator: MigratorConfig, password: string | undefined): Promise<ApplyResult> {
-  const { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs, passwordFile: _passwordFile, ...connection } = migrator;
+export function applyMigrationsWith(environment: DatabaseEnvironment, migrator: MigratorConfig, password: string | undefined): Promise<ApplyResult> {
+  const { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs, passwordFile: _passwordFile, tlsCaFile, ...connection } = migrator;
+  // the migrator's credential is its own (N7): applyMigrationsAs applies connectionSecurityOf and requires it explicitly outside LOCAL (DB-TLS-R4, ADV-9)
   return applyMigrationsAs(
-    { ...connection, ...(password === undefined ? {} : { password }), applicationName: `${API_APPLICATION_NAME}-migrator` },
+    { ...connection, environment, ...(password === undefined ? {} : { password }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), applicationName: `${API_APPLICATION_NAME}-migrator` },
     { connectTimeoutMs, statementTimeoutMs, lockTimeoutMs },
   );
 }
 
 /** What opening the database needs from the configuration (the session boundary's login, when it is bound). */
-export type DatabaseConfig = Pick<ApiConfig, "database" | "migrateOnStart"> & { readonly identity?: Pick<IdentityConfig, "assuranceDatabase"> | null };
+export type DatabaseConfig = Pick<ApiConfig, "databaseEnvironment" | "database" | "migrateOnStart"> & { readonly identity?: Pick<IdentityConfig, "assuranceDatabase"> | null };
 
 /**
  * Opens the database side of the process: applies pending migrations as the migrator when configured (its own connection,
@@ -124,9 +128,10 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   const shipped = listMigrations();
   const codeSchemaVersion = shipped.reduce((max, f) => Math.max(max, f.version), 0);
   let migrations: ApplyResult | null = null;
-  if (config.migrateOnStart !== null) migrations = await applyMigrationsWith(config.migrateOnStart, deps.migratorPassword);
-  const { poolMax, statementTimeoutMs, ...connection } = config.database;
-  const pool = createPool({ ...connection, max: poolMax, applicationName: API_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+  if (config.migrateOnStart !== null) migrations = await applyMigrationsWith(config.databaseEnvironment, config.migrateOnStart, deps.migratorPassword);
+  const { poolMax, statementTimeoutMs, tlsCaFile, password, passwordFile, ...connection } = config.database;
+  // createPool applies connectionSecurityOf itself (DB-TLS-R4): TLS, DNS host and the password file outside LOCAL
+  const pool = createPool({ ...connection, environment: config.databaseEnvironment, ...(password === undefined ? {} : { password }), ...(passwordFile === undefined ? {} : { passwordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), max: poolMax, applicationName: API_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
   try {
     const { client, connection: verified } = await pool.acquire();
     client.release();
@@ -140,16 +145,17 @@ export async function openDatabase(config: DatabaseConfig, deps: DatabaseDepende
   let assurancePool: KauroPool | null = null;
   const boundary = config.identity?.assuranceDatabase;
   if (boundary !== undefined) {
-    const { poolMax: boundaryMax, ...login } = boundary;
-    assurancePool = createPool({ host: connection.host, port: connection.port, database: connection.database, ...login, max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
+    const { poolMax: boundaryMax, user: boundaryUser, password: boundaryPassword, passwordFile: boundaryPasswordFile } = boundary;
     try {
+      // the password file is read inside the try: a failure closes the runtime pool opened above, never leaks it (ADV-7)
+      assurancePool = createPool({ environment: config.databaseEnvironment, host: connection.host, port: connection.port, database: connection.database, user: boundaryUser, ...(boundaryPassword === undefined ? {} : { password: boundaryPassword }), ...(boundaryPasswordFile === undefined ? {} : { passwordFile: boundaryPasswordFile }), ...(tlsCaFile === undefined ? {} : { tlsCaFile }), passwordNames: { password: "KAURO_DB_ASSURANCE_PASSWORD", passwordFile: "KAURO_DB_ASSURANCE_PASSWORD_FILE" }, max: boundaryMax, applicationName: SESSIONS_APPLICATION_NAME, ...(deps.onPoolError !== undefined ? { onError: deps.onPoolError } : {}) });
       const { client, connection: verified } = await assurancePool.acquire();
       client.release();
       if (verified.role !== "kauro_assurance") {
         throw new Error(`the session boundary's login must be a member of kauro_assurance; ${verified.loginRole} is a member of ${verified.role} (B06 D-EVID-1, B11 D-AUTH-1)`);
       }
     } catch (e) {
-      await assurancePool.end();
+      await assurancePool?.end();
       await pool.end();
       throw e;
     }
@@ -299,7 +305,7 @@ export interface ApiAssembly {
    * the statement and payout operations (CMD052 judges the proof at its request and again at its effect); absent, the platform's. The
    * fault cells bind the platform's own verifier through an instrumented proxy, so the instant the product judges a proof at is evidence.
    */
-  readonly commercial?: { readonly buyerTypes?: BuyerTypeReader; readonly assurance?: AssuranceVerifier };
+  readonly commercial?: { readonly buyerTypes?: BuyerTypeReader; readonly assurance?: AssuranceVerifier; /** The bound of the collaborator calls of CMD027 and CMD043 (realProviderCallTimer when absent; fault cells bind a clock-driven one). */ readonly providerTimer?: ProviderCallTimer; /** Where the failure of a collaborator call after its bound elapsed goes (stderr when absent). */ readonly onLateFailure?: LateFailureSink };
   /**
    * CMD027 CreateQuote's collaborators that replace the edition's (package B10, mandate B10-COMMANDS-QUOTE): the recorded buyer type (the
    * edition records none, so a quote is refused BUYER_TYPE_UNSET until B11 binds it), the re-binder of a paid purchase (the payment service's
@@ -314,6 +320,13 @@ export interface ApiAssembly {
    * The acceptance tests bind the labelled contract fakes of @kauro/application/testing here, never the production wiring.
    */
   readonly commissions?: CommissionRoutesBinding;
+  /**
+   * The bank-transfer route (Payments V1, lane L-ROUTE): the restricted evidence store its owner-supplied details artifacts are read from
+   * and the account-details classifier of the bound integration, each read at call time (a world binds its store after start-up). Absent,
+   * every route command and the transfer-instructions read answer CAPACITY_UNAVAILABLE EVIDENCE_UNAVAILABLE; the acceptance tests bind the
+   * labelled CONTRACT_FAKE store and classifier of @kauro/application/testing (SIMULATED).
+   */
+  readonly bank?: { readonly evidence: () => BankEvidenceStore | null; readonly classifier: () => BankDetailsClassifier | null };
 }
 
 /**
@@ -355,7 +368,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   if (assembly.sessions !== undefined) {
     const bound = assembly.sessions;
     assertIdentityConfig(assembly.environment, bound.identityConfig);
-    const service = createSessionService({ unitOfWork: runtime.unitOfWork, clock, ids, random: assembly.random ?? systemRandom, verifier: bound.verifier, store: bound.store });
+    const service = createSessionService({ unitOfWork: runtime.unitOfWork, clock, ids, random: assembly.random ?? systemRandom, verifier: bound.verifier, store: bound.store, fence: { lockPresented: (uow, secretSha256, userId) => sessionFenceOf(uow).lockPresented(secretSha256, userId) } });
     authenticator = createSessionAuthenticator(assembly.authenticator, service, bound.appOrigins);
     sessions = { service, authenticator, appOrigins: bound.appOrigins, identityConfig: bound.identityConfig };
   }
@@ -379,11 +392,23 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   };
   const paymentService: Partial<CommerceRequestCollaborators> =
     assembly.payments === undefined ? {} : { payment: assembly.payments.runtime.assembly.commerce, paymentServiceId: PAYMENT_SERVICE_ID, provider: assembly.payments.runtime.assembly.provider };
-  const commerceCollaborators: CommerceRequestCollaborators = { ...commerceEdition(), ...paymentService, ...assembly.commerce };
+  // Payments V1 bank-transfer route (lane L-ROUTE): the route tables and the effect instant of the commerce unit of work, the late-bound
+  // evidence store and classifier, the step-up verifier and the provider-call bound of the store read
+  const bank: BankRouteCollaborators = {
+    routes: (uow) => bankRoutesOf(uow),
+    effectNow: (uow) => effectInstantOf(uow),
+    evidence: assembly.bank?.evidence ?? (() => null),
+    classifier: assembly.bank?.classifier ?? (() => null),
+    assurance: createAssuranceVerifier(),
+    timer: assembly.commercial?.providerTimer ?? realProviderCallTimer,
+    random: assembly.random ?? systemRandom,
+  };
+  const commerceCollaborators: CommerceRequestCollaborators = { ...commerceEdition(), ...paymentService, bank, ...assembly.commerce };
+  const bankRoutes = createBankRouteHandlers(commerceRuntime, bank);
   const commerce = createCommerceRequestHandlers(commerceRuntime, commerceCollaborators);
   // package B10: the agency lifecycle (CMD002, CMD043) on the same runtime, over the lifecycle adapter of the persistence package, B06's
   // active-work inspector and the step-up verifier
-  const commercial = createAgencyLifecycleHandlers(commerceRuntime, { lifecycle: agencyLifecycleOf, activeWork: collaborators.activeWork, assurance: createAssuranceVerifier() });
+  const commercial = createAgencyLifecycleHandlers(commerceRuntime, { lifecycle: agencyLifecycleOf, activeWork: collaborators.activeWork, assurance: createAssuranceVerifier(), ...(assembly.commercial?.providerTimer !== undefined ? { providerTimer: assembly.commercial.providerTimer } : {}), ...(assembly.commercial?.onLateFailure !== undefined ? { onLateFailure: assembly.commercial.onLateFailure } : {}) });
   // package B10: the prospect, claim and attribution commands (CMD045, CMD046, CMD047) in the caller's OPERATOR context, over the sales and
   // attribution adapters, the commercial authorizer's principals (the seller row and the owner grant, read after their transition locks)
   const prospects = createProspectHandlers(commerceRuntime, {
@@ -404,6 +429,8 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     recurrence: recurrenceOf,
     reads: quoteReadsOf,
     rebinder: assembly.payments?.rebinder ?? createPurchaseRebinder({ lineage: sourceLineageReader }),
+    ...(assembly.commercial?.providerTimer !== undefined ? { providerTimer: assembly.commercial.providerTimer } : {}),
+    ...(assembly.commercial?.onLateFailure !== undefined ? { onLateFailure: assembly.commercial.onLateFailure } : {}),
     ...assembly.quotes,
   });
   // package B10: the statement and payout operations (mandate B10-STATEMENTS-PAYOUTS). ApproveCommissionPayout (CMD052) and the statement
@@ -435,7 +462,10 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     validator,
     clock,
     ids,
-    paymentRoutes: (app, kit) => registerPaymentRoutes(app, kit, { payments: assembly.payments ?? null, validator, clock, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) }),
+    paymentRoutes: (app, kit) => {
+      registerPaymentRoutes(app, kit, { payments: assembly.payments ?? null, validator, clock, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
+      registerBankRouteRoutes(app, kit, { handlers: bankRoutes, runtime: commerceRuntime, bank, validator, clock, environment: assembly.environment, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
+    },
     commissionRoutes: (app, kit) =>
       registerCommissionRoutes(app, kit, {
         binding: assembly.commissions ?? null,

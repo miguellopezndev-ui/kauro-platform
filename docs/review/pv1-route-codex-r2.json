@@ -1,0 +1,597 @@
+{
+  "verdict": "REJECT",
+  "summary": "PV1R-01, PV1R-04 and PV1R-05 are fixed. PV1R-02 and PV1R-03 remain partially fixed: their new final checks can themselves wait across expiry while retaining an earlier clock sample. The fix also introduces an I3 wait after instruction/details expiry checks, allowing expired instructions to be disclosed. No reviewer omissions are added; the disclosed separate-lane issues are excluded.",
+  "verify_observed": "Supplied receipts report Linux focused verification on 90b6833: exit 0, matrix 8/8, persistence 30/30, API 42/42, ach-route-cells 79/79, no failures. The referenced Linux log and verify.log are unavailable in this checkout, so those counts were not independently observed. Read evidence.md first and checked source, test assertions, harness placement and documented revert proofs; did not repeat builder runs. Six dependency-free source probes reproduced instruction expiry, details expiry, pre-commit proof expiry, pre-commit details expiry, session idle expiry and session absolute expiry gaps. These executed the actual extracted functions with controlled collaborators, not PostgreSQL integration tests.",
+  "omissions": 0,
+  "cases": [
+    {
+      "id": "PV1R-01",
+      "claimed_status": "FIXED",
+      "agree": true,
+      "note": "All seven routes use request-aware authentication. Tests cover all five command boundaries and both reads; documented reversion produces six failures."
+    },
+    {
+      "id": "PV1R-02",
+      "claimed_status": "FIXED",
+      "agree": false,
+      "note": "Route-lock expiry/revocation scenarios are repaired, but expiry during the newly added final authentication's own store wait still admits I3."
+    },
+    {
+      "id": "PV1R-03",
+      "claimed_status": "FIXED",
+      "agree": false,
+      "note": "The eight cited scenarios are covered, but the pre-commit callback samples time before its awaited proof read. Expiry during that final read is still accepted."
+    },
+    {
+      "id": "PV1R-04",
+      "claimed_status": "FIXED",
+      "agree": true,
+      "note": "Exact per-column sets and the scratch-schema mutation self-test replace the global presence assertion."
+    },
+    {
+      "id": "PV1R-05",
+      "claimed_status": "FIXED",
+      "agree": true,
+      "note": "All four event names, including both manual_return_recorded transitions, have truthful planned L-REFUND ownership and generated matrix rows."
+    },
+    {
+      "id": "RELAXED 0",
+      "claimed_status": "RELAXED 0",
+      "agree": true,
+      "note": "The inspected fix diff does not weaken existing expectations."
+    },
+    {
+      "id": "adversary-codexr1",
+      "claimed_status": "PASS_WITH_MINOR",
+      "agree": false,
+      "note": "The adversary's final-wait assertions overlook waits inside authentication and inside the pre-commit assurance check."
+    }
+  ],
+  "findings": [
+    {
+      "id": "PV1R-01",
+      "severity": "BLOCKING",
+      "family": "revocation",
+      "title": "Owner POST authentication bypass and lost credential refusals are fixed",
+      "file": "apps/api/src/payments/bank-route-routes.ts",
+      "line": 101,
+      "reproduction": "Checked the complete original scope: bank POSTs now call kit.subjectOrRefusal before handlers; both reads use the same boundary; I3 reauthentication passes request.method. server.ts:582 preserves the method and :590 preserves typed refusals. ach-route-cells.test.ts:2000 exercises each of CMD201–205 with four Origin/fetch-site refusals, two CSRF refusals and credential ambiguity, asserting no journal reservation and unchanged footprint; :2029 covers ambiguity and positive controls on both reads. The fix-proof document records six failures when server.ts, bank-route-routes.ts and composition.ts are reverted.",
+      "acceptance_criterion": "Every cookie-authenticated owner POST must satisfy the unsafe-request Origin, fetch-site and session CSRF requirements before any command effect or journal reservation. Invalid requests must retain the prescribed refusal reason and leave no route, version, participant, event, outbox or committed journal footprint. Credential ambiguity must retain its prescribed refusal on both command and read routes.",
+      "failing_test": "Existing PV1R-01 tests in ach-route-cells.test.ts cover all five valid prepared commands with missing/foreign Origin, cross-site/same-site fetch, missing/wrong CSRF and cookie plus bearer; assert exact refusal, unchanged footprint and absent journal. Both reads assert AMBIGUOUS_CREDENTIALS and cookie-only success. Documented fix reversion yields 0 pass / 6 fail, beginning with configure returning 201 instead of ORIGIN_REJECTED.",
+      "scope": [
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 101,
+          "why": "Shared POST boundary now delegates to request-aware authentication; covered by five command tests."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 112,
+          "why": "CMD201 configure; covered by its refusal matrix and positive control."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 113,
+          "why": "CMD202 verify; covered by its refusal matrix and positive control."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 114,
+          "why": "CMD203 enable; covered by its refusal matrix and positive control."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 115,
+          "why": "CMD204 disable; covered by its refusal matrix and positive control."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 116,
+          "why": "CMD205 details replacement; covered by its refusal matrix and positive control."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 142,
+          "why": "Owner GET preserves credential ambiguity; covered by the reads test."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 150,
+          "why": "Initial I3 authentication preserves credential ambiguity; covered by the reads test."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 156,
+          "why": "I3 callback passes the actual method through kit.authentication."
+        },
+        {
+          "file": "apps/api/src/sessions.ts",
+          "line": 103,
+          "why": "Legacy GET-substituting adapter remains unchanged but has no remaining bank-route caller."
+        },
+        {
+          "file": "packages/application/src/sessions/protocol.ts",
+          "line": 151,
+          "why": "Existing ambiguity and unsafe-request rules are reached by the integration tests."
+        },
+        {
+          "file": "apps/api/src/server.ts",
+          "line": 572,
+          "why": "Existing shared boundary preserves method and typed refusal; now exposed through RouteKit."
+        },
+        {
+          "file": "apps/api/src/server.ts",
+          "line": 536,
+          "why": "RouteKit supplies both shared authentication operations."
+        },
+        {
+          "file": "apps/api/src/composition.ts",
+          "line": 464,
+          "why": "Bank registrations no longer receive the legacy authenticator directly."
+        }
+      ],
+      "status": "FIXED",
+      "reviewer_omission": false
+    },
+    {
+      "id": "PV1R-02",
+      "severity": "BLOCKING",
+      "family": "revocation",
+      "title": "Final I3 authentication can still admit a session that expires during its own wait",
+      "file": "packages/application/src/commerce/bank/instructions.ts",
+      "line": 316,
+      "reproduction": "Verified the original route-lock counterexample is repaired: ach-route-cells.test.ts:2049 proves the real FOR SHARE wait and exercises live, revoked and expired sessions; the documented reversion returns 200 instead of 401. However, the added final callback awaits kit.authentication, which reaches SessionService.resume. service.ts:203 samples now before awaiting the session store and :205 judges liveness at that retained sample. Delay the final resume's pool acquisition/store completion from just before idle or absolute expiry until just after it, leaving revocation and route/order eligibility unchanged. Both the store predicates and service liveness decision use the earlier time, so the callback returns true and I3 discloses secrets. Source probes executing the actual resume method returned user at time 1001 for sessions expiring at 1000 after sampling 999. The submitted cell does not hold this final authentication wait. This verifies the original session-expiry acceptance criterion, rather than adding a separate finding.",
+      "acceptance_criterion": "An I3 session that expires or is revoked before the projection finishes acquiring and checking its guards must receive the authentication refusal without account digits, routing digits or payment reference. This must hold for waits after the artifact read as well as during it.",
+      "failing_test": "Retain the existing PV1R-02 route-lock cell. Add separate idle-expiry and absolute-expiry cases that allow initial authentication and the first I3 reauthentication to finish, hold the final authentication's actual session-store operation after its clock sample, cross session expiry, and release within normal timeouts. Assert the held I3 returns 401 AUTHENTICATION_REQUIRED with no account/routing digits or reference and agrees with the next request. Include a session whose expiry remains beyond release. The expiry cases currently disclose instructions.",
+      "scope": [
+        {
+          "file": "packages/application/src/commerce/bank/instructions.ts",
+          "line": 299,
+          "why": "Original pre-route authentication remains; existing artifact-read cells cover this placement."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/instructions.ts",
+          "line": 301,
+          "why": "Real route share-lock wait is covered by the new PV1R-02 cell."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/instructions.ts",
+          "line": 306,
+          "why": "Order/deadline guards now precede a second authentication call."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/instructions.ts",
+          "line": 316,
+          "why": "New final authentication itself awaits an operation capable of crossing session expiry; this wait is untested."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 155,
+          "why": "Both I3 checks use the asynchronous request-aware callback."
+        },
+        {
+          "file": "apps/api/src/sessions.ts",
+          "line": 95,
+          "why": "Cookie authentication awaits SessionService.resume."
+        },
+        {
+          "file": "packages/application/src/sessions/service.ts",
+          "line": 202,
+          "why": "I3's final resume judges session liveness using the clock sample taken before its store wait."
+        },
+        {
+          "file": "packages/persistence/src/web-sessions.ts",
+          "line": 91,
+          "why": "Final authentication can wait for its separate authentication-boundary connection."
+        },
+        {
+          "file": "packages/persistence/src/web-sessions.ts",
+          "line": 135,
+          "why": "Resume uses the supplied pre-wait instant for idle and absolute expiry predicates."
+        },
+        {
+          "file": "packages/persistence/src/repositories/bank-routes.ts",
+          "line": 181,
+          "why": "Original SELECT FOR SHARE counterexample is correctly exercised by the database-waiter cell."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 1824,
+          "why": "Earlier session-expiry test holds the artifact read, not authentication's own store wait."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 1862,
+          "why": "Earlier session-revocation test holds the artifact read."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 2049,
+          "why": "New live/revoked/expired route-lock coverage is non-vacuous but does not cover expiry during final authentication."
+        }
+      ],
+      "status": "PARTIALLY_FIXED",
+      "reviewer_omission": false
+    },
+    {
+      "id": "PV1R-03",
+      "severity": "BLOCKING",
+      "family": "time",
+      "title": "Pre-commit expiry checks still sample time before their final proof-read wait",
+      "file": "packages/application/src/commerce/bank/route-config.ts",
+      "line": 216,
+      "reproduction": "Checked all four registrations, both details-validity paths, runtime journal/security writes and the factory rollback path. points.ts:256 places the existing hold inside work, before unit-of-work.ts:483 runs the registered checks. Tests at ach-route-cells.test.ts:2149, :2164, :2216 and :2232 cover the stated eight scenarios, with documented 0 pass / 8 fail on reversion. The remaining gap is inside judgedAtCommit: it samples effectNow and checks details before await assureAt. The actual assurance verifier then awaits identities.getOwnProof before comparing freshness against the supplied earlier instant. Let the command reach this final proof read with t=expiry-1 ms; hold its SQL response/completion until expiry+1 ms, then release within statement timeout. A proof-only case is judged FRESH, and a details-only case never rechecks details. runBeforeCommit therefore returns and the factory proceeds to COMMIT after expiry. Source probes executing the actual callback and actual assurance verifier reproduced both cases without a refusal. The submitted tests hold before this callback, not during its last I/O.",
+      "acceptance_criterion": "Every owner command requiring step-up must have unexpired authority at its committed effect. Verification and enabling must also reject details that have expired before that effect. Crossing either required boundary during later work must leave the entire command footprint and journal uncommitted.",
+      "failing_test": "For verify, enable, disable and replace-details, prepare valid state and proof, allow handler/journal/security writes and the pre-commit effect clock read to finish, then hold the actual final getOwnProof SQL completion. Cross proof expiry and release; assert STEP_UP_STALE and unchanged route/version/participant/event/outbox/ALLOW footprint with no journal entry. Repeat details-only expiry for verify and enable while proof remains fresh, asserting DETAILS_EXPIRED. Include controls releasing before expiry. These cases currently permit COMMIT; the existing eight submitted tests do not inject this wait.",
+      "scope": [
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 202,
+          "why": "Shared assurance helper awaits proof verification using an already supplied instant."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 214,
+          "why": "New pre-commit callback checks details and samples time before its final assurance I/O."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 329,
+          "why": "Verify's original checks and its :334 callback registration are covered before the callback, but not during its proof read."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 371,
+          "why": "Enable now resamples after evidence retrieval; submitted evidence-read tests cover this repaired scenario."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 378,
+          "why": "Enable registers the same vulnerable pre-commit proof/details callback before route and participant writes."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 418,
+          "why": "Disable registers the same vulnerable pre-commit proof callback."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/route-config.ts",
+          "line": 450,
+          "why": "Replace-details registers the same vulnerable pre-commit proof callback."
+        },
+        {
+          "file": "packages/authorization/src/assurance.ts",
+          "line": 19,
+          "why": "Actual verifier awaits getOwnProof, then compares expiry against the retained caller sample."
+        },
+        {
+          "file": "packages/persistence/src/repositories/tenancy.ts",
+          "line": 129,
+          "why": "The final proof verification includes an awaited SQL read; delayed completion is the remaining counterexample."
+        },
+        {
+          "file": "packages/application/src/commerce/request/runtime.ts",
+          "line": 310,
+          "why": "Handler, ALLOW fact and journal writes occur inside work and are correctly rolled back when a callback refuses."
+        },
+        {
+          "file": "packages/persistence/src/unit-of-work.ts",
+          "line": 278,
+          "why": "Registers checks on the transaction."
+        },
+        {
+          "file": "packages/persistence/src/unit-of-work.ts",
+          "line": 286,
+          "why": "Awaits each callback; no later validity decision follows successful callback completion."
+        },
+        {
+          "file": "packages/persistence/src/unit-of-work.ts",
+          "line": 483,
+          "why": "Runs checks after work and proceeds to COMMIT at :487 when they return."
+        },
+        {
+          "file": "packages/domain/src/ports/unit-of-work.ts",
+          "line": 131,
+          "why": "New callback contract is fail-closed for unsupported units, but does not establish freshness after waits inside a callback."
+        },
+        {
+          "file": "packages/domain/src/ports/index.ts",
+          "line": 5,
+          "why": "Exports the new pre-commit capability used by all four commands."
+        },
+        {
+          "file": "packages/persistence/migrations/0046_bank_routes.sql",
+          "line": 216,
+          "why": "Unchanged deferred constraints enforce event footprints, not expiry after the final proof read."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 358,
+          "why": "Original verify expiry coverage remains earlier than final proof verification."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 541,
+          "why": "Original enable expiry coverage crosses a route wait."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 2149,
+          "why": "Covers proof expiry during enable evidence retrieval."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 2164,
+          "why": "Covers details expiry during enable evidence retrieval."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 2216,
+          "why": "Four proof-expiry cells hold before pre-commit checking starts, leaving its internal I/O uncovered."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 2232,
+          "why": "Two details-expiry cells likewise hold before the callback, not during its proof read."
+        }
+      ],
+      "status": "PARTIALLY_FIXED",
+      "reviewer_omission": false
+    },
+    {
+      "id": "PV1R-04",
+      "severity": "MAJOR",
+      "family": "evidence",
+      "title": "KIT CHECK vocabulary evidence now establishes exact per-column sets",
+      "file": "packages/persistence/test/bank-kit-migrations.test.ts",
+      "line": 208,
+      "reproduction": "Checked ENUM_COLUMNS against every original migration scope entry. enumChecks at :164 reads each individual constraint; vocabularyGaps at :186 rejects extras, omissions, duplicates, unmapped columns and absent/multiple mapped checks. The exact-set test at :208 and scratch-schema mutation self-test at :213 use that same comparison. Mutations add BOGUS to each mapped constraint and remove each token where a nonempty set remains, including tokens retained elsewhere. The red-evidence document records substitution of the old global search yielding [] instead of the expected BOGUS diagnostic. The schema itself remains unchanged and conforming.",
+      "acceptance_criterion": "The CHECK-vocabulary conformance claim must establish each mapped column's exact intended permitted set, including explicitly limited subsets. An extra value or missing legitimate value in any individual constraint must make the check fail, even when that token occurs in another table or constraint.",
+      "failing_test": "Existing PV1R-04 mutation self-test creates conforming scratch copies, adds BOGUS to every mapped CHECK, removes legitimate values individually and asserts exact per-column diagnostics. It asserts that masked removals were exercised. The documented old-comparator substitution fails the added-token assertion; current exact comparison passes according to supplied evidence.",
+      "scope": [
+        {
+          "file": "packages/persistence/test/bank-kit-migrations.test.ts",
+          "line": 119,
+          "why": "Exact-set claim now matches the implemented per-column comparison."
+        },
+        {
+          "file": "packages/persistence/test/bank-kit-migrations.test.ts",
+          "line": 164,
+          "why": "Replaces concatenation with independent constraint parsing."
+        },
+        {
+          "file": "packages/persistence/test/bank-kit-migrations.test.ts",
+          "line": 186,
+          "why": "Checks both missing and extra values and exactly one mapped constraint."
+        },
+        {
+          "file": "packages/persistence/test/bank-kit-migrations.test.ts",
+          "line": 213,
+          "why": "Mutation self-test establishes sensitivity to the original counterexamples."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 108,
+          "why": "Attempt kind, state and source kind independently mapped and mutation-tested."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 136,
+          "why": "Destination-proof set independently mapped and mutation-tested."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 171,
+          "why": "Refund-destination source kind independently mapped and mutation-tested."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 201,
+          "why": "Execution-offer command set independently mapped and mutation-tested."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 214,
+          "why": "Gate outcomes independently mapped and mutation-tested."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 218,
+          "why": "Outcome case kinds cannot be supplied by another constraint."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 244,
+          "why": "Coverage-stream set independently mapped and mutation-tested."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 258,
+          "why": "Statement-line kinds independently mapped and mutation-tested."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 294,
+          "why": "Debit correlations independently mapped and mutation-tested."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 307,
+          "why": "Freeze source kinds and explicitly restricted freeze reasons independently mapped and mutation-tested."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 318,
+          "why": "Bank-review-case kinds independently mapped and mutation-tested."
+        },
+        {
+          "file": "packages/persistence/migrations/0045_bank_transfer_kit.sql",
+          "line": 324,
+          "why": "Bank-review-case source kinds independently mapped and mutation-tested."
+        }
+      ],
+      "status": "FIXED",
+      "reviewer_omission": false
+    },
+    {
+      "id": "PV1R-05",
+      "severity": "MAJOR",
+      "family": "evidence",
+      "title": "Refund ownership and generated matrix gate are repaired",
+      "file": "tools/matrix.mjs",
+      "line": 289,
+      "reproduction": "Checked all five candidate manual Refund transitions against the four new EDGE_OWNERS entries and generated matrix rows. Entries name L-REFUND, explicitly say planned/not implemented and contain no command. tools/test/matrix.test.mjs:91 independently imports the candidate Refund machine, checks every event and both manual_return_recorded transitions; :115 checks generator completion and actual matrix-check exit status. The documented revert proof reports 1 pass / 7 fail without the owner fix, and supplied focused receipts report matrix 8/8 and exit 0. The raw Linux log was unavailable.",
+      "acceptance_criterion": "Before merge, every candidate Refund transition must have a truthful authority/ownership and execution-status entry consistent with the registry and committed matrix. Matrix checking must complete successfully, and the candidate must pass that required verify gate. Future lane ownership must not be represented as implemented execution.",
+      "failing_test": "Existing PV1R-05 tests enumerate all candidate Refund events, require valid truthful ownership, explicitly require two manual_return_recorded transitions, run generateMatrix and spawn node tools/matrix.mjs check, asserting exit 0 without missing-owner diagnostics or TypeError. Documented reversion fails ownership enumeration and generator completion.",
+      "scope": [
+        {
+          "file": "packages/domain/src/commerce/machines.ts",
+          "line": 110,
+          "why": "manual_execution_declared has planned L-REFUND ownership."
+        },
+        {
+          "file": "packages/domain/src/commerce/machines.ts",
+          "line": 115,
+          "why": "manual_execution_window_lapsed has planned L-REFUND ownership."
+        },
+        {
+          "file": "packages/domain/src/commerce/machines.ts",
+          "line": 116,
+          "why": "SUBMITTING manual_return_recorded is represented and independently counted."
+        },
+        {
+          "file": "packages/domain/src/commerce/machines.ts",
+          "line": 117,
+          "why": "UNCERTAIN manual_return_recorded is represented and independently counted."
+        },
+        {
+          "file": "packages/domain/src/commerce/machines.ts",
+          "line": 118,
+          "why": "owner_attested_no_effect has planned L-REFUND ownership."
+        },
+        {
+          "file": "tools/matrix.mjs",
+          "line": 273,
+          "why": "Refund catalogue now includes all four missing event names."
+        },
+        {
+          "file": "tools/matrix.mjs",
+          "line": 932,
+          "why": "Source validation is exercised by enumeration and the matrix gate."
+        },
+        {
+          "file": "tools/matrix.mjs",
+          "line": 1025,
+          "why": "Generator has owner entries for every candidate transition."
+        },
+        {
+          "file": "docs/design/B06-state-command-event-matrix.md",
+          "line": 352,
+          "why": "Regenerated Refund section contains all five manual transition rows with planned status."
+        },
+        {
+          "file": "docs/design/B06-state-command-event-matrix.md",
+          "line": 1471,
+          "why": "Regenerated payment outcome rows reflect the source catalogue and are checked by the same gate."
+        },
+        {
+          "file": "package.json",
+          "line": 24,
+          "why": "Required verify matrix gate is exercised by the submitted subprocess test and supplied receipt."
+        },
+        {
+          "file": "tools/test/matrix.test.mjs",
+          "line": 91,
+          "why": "Candidate machine enumeration covers every Refund event and both analogous completion transitions."
+        },
+        {
+          "file": "tools/test/matrix.test.mjs",
+          "line": 115,
+          "why": "Checks generator success and actual matrix-check exit status."
+        }
+      ],
+      "status": "FIXED",
+      "reviewer_omission": false
+    },
+    {
+      "id": "PV1R-06",
+      "severity": "BLOCKING",
+      "family": "time",
+      "title": "New final authentication wait lets I3 disclose expired instructions",
+      "file": "packages/application/src/commerce/bank/instructions.ts",
+      "line": 316,
+      "reproduction": "The fix adds await stillAuthenticated after effectNow and both details/instruction deadline comparisons at :309–311. Use a live session whose own expiry is well beyond the instruction deadline. Let I3 complete its route/order guards and sample t=deadline-1 ms, then delay the newly added final authentication's session-store connection acquisition or completion until deadline+1 ms. Authentication succeeds, and there is no subsequent instruction/details time judgment before constructing the secret-bearing view. Repeat with details.validUntil as the crossed boundary while transferExpiresAt remains later. Source probes executing actual readTransferInstructions returned READ with account digits and reference at 1001 after each boundary of 1000, despite the only effect clock read returning 999. This wait is newly introduced by 031c0e2 and makes the I3 expiry outcome false.",
+      "acceptance_criterion": "I3 must not disclose account digits, routing digits or payment reference when the instruction deadline or required details validity expires during its final authentication wait. The response must carry the prescribed expiry refusal, including when the session itself remains live.",
+      "failing_test": "In a sessions-enabled bankWorld, prepare an enabled eligible route and AWAITING_TRANSFER order with a short future instruction deadline and a long-lived session. Permit initial authentication, first I3 reauthentication, route/order guards and effect-time judgment to finish; hold the actual final session authentication operation, cross the instruction deadline and release. Assert 409 PRECONDITION_FAILED INSTRUCTIONS_EXPIRED and no account/routing digits or reference. Separately cross details.validUntil with a later instruction deadline and assert INSTRUCTIONS_NOT_AVAILABLE without secrets. Include before-expiry release controls. Both crossing cases currently return instructions.",
+      "scope": [
+        {
+          "file": "packages/application/src/commerce/bank/instructions.ts",
+          "line": 309,
+          "why": "Effect instant is sampled before the newly added final authentication wait."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/instructions.ts",
+          "line": 310,
+          "why": "Details validity is judged before that wait and never judged afterward."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/instructions.ts",
+          "line": 311,
+          "why": "Instruction expiry is judged before that wait and never judged afterward."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/instructions.ts",
+          "line": 316,
+          "why": "New awaited authentication introduces a blocking operation after both expiry decisions."
+        },
+        {
+          "file": "packages/application/src/commerce/bank/instructions.ts",
+          "line": 317,
+          "why": "Secret-bearing view is built after the wait without a later deadline decision."
+        },
+        {
+          "file": "apps/api/src/payments/bank-route-routes.ts",
+          "line": 155,
+          "why": "Production callback awaits request-aware authentication and its session-store I/O."
+        },
+        {
+          "file": "apps/api/src/server.ts",
+          "line": 542,
+          "why": "RouteKit.authentication forwards the asynchronous authenticator operation."
+        },
+        {
+          "file": "apps/api/src/sessions.ts",
+          "line": 95,
+          "why": "Cookie authentication awaits session resumption even when the session remains live."
+        },
+        {
+          "file": "packages/persistence/src/web-sessions.ts",
+          "line": 91,
+          "why": "Session authentication includes a separate pool acquisition capable of delaying the final check."
+        },
+        {
+          "file": "packages/persistence/src/web-sessions.ts",
+          "line": 135,
+          "why": "Session-store work supplies additional I/O after I3's expiry decisions."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 1199,
+          "why": "Existing instruction-expiry cell holds evidence retrieval, before the newly added final wait."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 1526,
+          "why": "Existing details-validity cell also crosses during artifact retrieval."
+        },
+        {
+          "file": "apps/api/test/ach-route-cells.test.ts",
+          "line": 2049,
+          "why": "New route-lock cell checks session termination but does not cross instruction/details expiry during final authentication."
+        }
+      ],
+      "status": "OPEN",
+      "reviewer_omission": false
+    }
+  ]
+}

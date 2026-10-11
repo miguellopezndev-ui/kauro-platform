@@ -14,7 +14,7 @@ import { after, before, test } from "node:test";
 import { openConnection } from "@kauro/persistence/testing";
 import { bindFamily, memberCell, portHooks, Refused, runMember, type Member, type Receipt } from "./b10-cells-support.js";
 import { approvePayout, bankCash, claimedCents, closeMonth, eligibleLines, rows, seller, statementsOfSeller, statementsWorld, type StatementsWorld } from "./statements-support.js";
-import { completed, outcome, type Person, type Reply } from "./support.js";
+import { completed, ids, outcome, type Person, type Reply } from "./support.js";
 import type { UserId } from "@kauro/domain";
 import type { AssuranceVerifier } from "@kauro/application";
 import { createAssuranceVerifier } from "@kauro/authorization";
@@ -254,6 +254,53 @@ test("the footprint is EXACT the other way: a crash-before that leaves a row no 
   };
   await assert.rejects(run(crash("TPL_RESIDUE", "[tplresidue]", "crash-before", INTENT_INSERT, { act: residue })), /kauro\.commission_statements gained exactly the rows the units before the target committed/);
 });
+test("the footprint's identity match passes a declared UPDATE: the removed row is the previous version (same key) of the row an earlier unit updated", async () => {
+  const update: M["act"] = async (_ctx, f, key) => {
+    await sw.h.oracle.query("BEGIN");
+    try {
+      await sw.h.oracle.query("SET LOCAL session_replication_role = replica");
+      await sw.h.oracle.query("UPDATE kauro.commission_statements SET updated_at = updated_at + interval '1 second' WHERE statement_id = $1", [f.statementId]);
+      await sw.h.oracle.query("COMMIT");
+    } catch (e) {
+      await sw.h.oracle.query("ROLLBACK");
+      throw e;
+    }
+    return approve(f, key);
+  };
+  const earlier: M["earlier"] = async (f) => ({ commission_statements: (await rows<{ j: Record<string, unknown> }>(sw, "SELECT row_to_json(x) AS j FROM kauro.commission_statements x WHERE statement_id = $1", [f.statementId])).map((x) => x.j) });
+  await run(crash("TPL_FOOT_UPDATE", "[tplfootupd]", "crash-before", INTENT_INSERT, { act: update, earlier }));
+});
+test("the footprint matches removed rows by IDENTITY: an unrelated deletion hidden behind a legitimate, declared insertion of the same table is refused (B10-KIT-PR1-01)", async () => {
+  // the forged act's earlier unit (committed as the superuser, triggers off) deletes a pre-existing outbox record A no earlier unit updates,
+  // and inserts a new record B that `earlier` declares exactly: one row gained as declared, one row lost; the count check alone passed it
+  const victim = (await rows<{ outbox_id: string; j: Record<string, unknown> }>(sw, "SELECT outbox_id, row_to_json(x) AS j FROM kauro.outbox_records x ORDER BY created_at, outbox_id LIMIT 1"))[0];
+  assert.ok(victim !== undefined, "the world has an outbox record before the act");
+  const inserted = ids.next() as string;
+  const forged: M["act"] = async (_ctx, f, key) => {
+    await sw.h.oracle.query("BEGIN");
+    try {
+      await sw.h.oracle.query("SET LOCAL session_replication_role = replica");
+      await sw.h.oracle.query("DELETE FROM kauro.outbox_records WHERE outbox_id = $1", [victim.outbox_id]);
+      await sw.h.oracle.query("INSERT INTO kauro.outbox_records SELECT (json_populate_record(NULL::kauro.outbox_records, $1::json)).*", [JSON.stringify({ ...victim.j, outbox_id: inserted })]);
+      await sw.h.oracle.query("COMMIT");
+    } catch (e) {
+      await sw.h.oracle.query("ROLLBACK");
+      throw e;
+    }
+    return approve(f, key);
+  };
+  const earlier: M["earlier"] = async () => ({ outbox_records: (await rows<{ j: Record<string, unknown> }>(sw, "SELECT row_to_json(x) AS j FROM kauro.outbox_records x WHERE outbox_id = $1", [inserted])).map((x) => x.j) });
+  try {
+    await assert.rejects(run(crash("TPL_FOOT_DELETE", "[tplfootdel]", "crash-before", INTENT_INSERT, { act: forged, earlier })), /kauro\.outbox_records lost a row that is not the previous version of a row an earlier unit updated/);
+  } finally {
+    // the world as it was: the victim back, the forged copy gone
+    await sw.h.oracle.query("BEGIN");
+    await sw.h.oracle.query("SET LOCAL session_replication_role = replica");
+    await sw.h.oracle.query("DELETE FROM kauro.outbox_records WHERE outbox_id = $1", [inserted]);
+    await sw.h.oracle.query("INSERT INTO kauro.outbox_records SELECT (json_populate_record(NULL::kauro.outbox_records, $1::json)).* ON CONFLICT DO NOTHING", [JSON.stringify(victim.j)]);
+    await sw.h.oracle.query("COMMIT");
+  }
+});
 test("5.3 forged: a target ordinal no unit of the act has is refused as another phase, even though unit 1 carries the witness (the target is found by its ordinal, never by its witness)", async () => {
   await assert.rejects(run(member({ code: "TPL_CRB_ORDINAL", tag: "[tplcrbo]", point: { kind: "crash-before", unit: { ...unit1(INTENT_INSERT), ordinal: 2 } } })), /target unit is another phase — unit 2/);
 });
@@ -287,6 +334,41 @@ test("5.5 twice: an honest member passes (B waits on A's journal row, its last s
 });
 test("5.5 forged: a `blocks` receipt that is not B's last dispatched statement is refused", async () => {
   await assert.rejects(run(twice("TPL_TWICE_BLOCKS", "[tpltwiceb]", CASH_LOCK)), /B's last dispatched statement in its target unit is cash_lock/);
+});
+
+test("5.5 forged: a `holdAfter` receipt whose identity params are not the member's is refused (the paused statement must carry the identity; B10-KIT-PR1-02)", async () => {
+  const m = twice("TPL_TWICE_HOLDID", "[tpltwicehi]", JOURNAL);
+  const p = m.point as Extract<M["point"], { kind: "twice" }>;
+  await assert.rejects(run({ ...m, point: { ...p, holder: { ...p.holder, holdAfter: { ...STMT_LOCK, identity: () => () => false } } } }), /TPL_TWICE_HOLDID: A paused after stmt_lock in its target unit 1 with the member's identity params/);
+});
+test("5.5 forged: a holder paused at the right label in ANOTHER unit than its declared target is refused (B10-KIT-PR1-02)", async () => {
+  // A approves another statement first (unit 1, the declared target: it carries the cash-lock witness), then the member's (unit 2), where it
+  // pauses after the member's statement lock (`when`: the first approval's lock is not instrumented); B approves the member's only
+  let other: Fix | null = null;
+  let mine: Fix | null = null;
+  let first = true;
+  const m = twice("TPL_TWICE_HOLDUNIT", "[tpltwicehu]", JOURNAL);
+  const p = m.point as Extract<M["point"], { kind: "twice" }>;
+  const forged: M = {
+    ...m,
+    fixture: async (label) => {
+      other = await fixture(`${label}-other`);
+      const f = await fixture(label);
+      mine = f;
+      // cash for both approvals
+      await bankCash(sw, (await claimedCents(sw)) + 2n * PAYABLE);
+      return f;
+    },
+    act: async (_ctx, f) => {
+      if (first) {
+        first = false;
+        await approve(other!, other!.key);
+      }
+      return approve(f, f.key);
+    },
+    point: { ...p, holder: { unit: unit1(CASH_LOCK), holdAfter: { ...STMT_LOCK, when: (params) => params[0] === mine?.statementId } } },
+  };
+  await assert.rejects(run(forged), /TPL_TWICE_HOLDUNIT: A paused after stmt_lock in its target unit 1 with the member's identity params/);
 });
 
 // 5.6 membership --------------------------------------------------------------------------------------------------------------------
@@ -328,6 +410,37 @@ test("5.6 forged: a revocation that never blocks the act (it locks nothing the a
 });
 test("5.6 forged: a member whose declared refusal is not the act's is refused (the act that waited must be refused as the member declares)", async () => {
   await assert.rejects(run(membershipMember("TPL_REV_REFUSAL", "[tplrevr]", { refusal: (e) => e instanceof Refused && e.code === "NOT_THE_REFUSAL" })), /TPL_REV_REFUSAL: the act that waited is refused as the member declares/);
+});
+test("5.6 forged: a `holdAfter` receipt whose identity params are not the member's is refused (the paused statement must carry the identity; B10-KIT-PR1-02)", async () => {
+  await assert.rejects(run(membershipMember("TPL_REV_HOLDID", "[tplrevhi]", { holdAfter: { ...STMT_LOCK, identity: () => () => false } })), /TPL_REV_HOLDID: the act paused after stmt_lock with the member's identity params/);
+});
+test("5.6 forged: phase three refuses as declared but leaves an unrelated durable write: its footprint (zero change) is refused (B10-KIT-PR1-03)", async () => {
+  const phase3 = new Set<string>();
+  const honest = membershipMember("TPL_REV_RESIDUE", "[tplrevres]");
+  const m: M = {
+    ...honest,
+    fixture: async (label, after?: Fix) => {
+      const f = await honest.fixture(label, after);
+      if (after !== undefined) phase3.add(f.statementId);
+      return f;
+    },
+    // the act after the revocation commits a change of its statement's row (superuser, triggers off) before it is refused NOT_AUTHORIZED
+    act: async (_ctx, f, key) => {
+      if (phase3.has(f.statementId)) {
+        await sw.h.oracle.query("BEGIN");
+        try {
+          await sw.h.oracle.query("SET LOCAL session_replication_role = replica");
+          await sw.h.oracle.query("UPDATE kauro.commission_statements SET updated_at = updated_at + interval '1 second' WHERE statement_id = $1", [f.statementId]);
+          await sw.h.oracle.query("COMMIT");
+        } catch (e) {
+          await sw.h.oracle.query("ROLLBACK");
+          throw e;
+        }
+      }
+      return approve(f, key);
+    },
+  };
+  await assert.rejects(run(m), /TPL_REV_RESIDUE refused after the revocation \(every act after it\): kauro\.commission_statements gained exactly the rows/);
 });
 
 // 5.7 step-up expiry (last: it moves the api's process clock past a proof's expiry) -----------------------------------------------

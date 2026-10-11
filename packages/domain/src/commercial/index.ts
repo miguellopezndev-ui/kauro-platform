@@ -14,7 +14,7 @@ export type * from "./records.js";
 export { HOLD_REASONS } from "./records.js";
 
 export type { CommissionPolicy } from "./policy.js";
-export { COMPENSATION_PLANNING_GUARD_BPS, commissionPolicyFrom, registryCommissionPolicy } from "./policy.js";
+export { COMPENSATION_PLANNING_GUARD_BPS, PROVIDER_TIME_PLAUSIBILITY_TOLERANCE_MS, PROVIDER_TIME_PLAUSIBILITY_TOLERANCE_VERSION, commissionPolicyFrom, registryCommissionPolicy } from "./policy.js";
 
 export type { BankingDays } from "./calendar.js";
 export { addCalendarMonths, addHours, assertCanonicalInstant, bankingDayAfterMonthEnd, monthStartsAt, nextMonth, zoneIsKnown } from "./calendar.js";

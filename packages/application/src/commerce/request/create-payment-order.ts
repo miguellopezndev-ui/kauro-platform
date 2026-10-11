@@ -44,11 +44,13 @@ import {
   commerceIdentityOf,
   providerServicesUnavailable,
   recordCommerceDenial,
+  resultOf,
   tenantContextOf,
   type CommerceRequestCollaborators,
   type CommerceRequestRuntime,
 } from "./runtime.js";
 import { unboundPaymentService, unboundProvider, type CommerceCommandHandler } from "./unbound.js";
+import { isBankTransferRequest, issueBankTransfer } from "../bank/instructions.js";
 
 /** The failure CMD028 answers for its first checkout blocker (the quote's and the agency's current state where the catalogue says so). */
 async function checkoutFailure(uow: CommerceUnitOfWork, blocker: CheckoutBlocker, quote: QuoteRecord, openOrderState: string | null): Promise<DomainFailure> {
@@ -75,6 +77,11 @@ export function createPaymentOrderHandler(runtime: CommerceRequestRuntime, co: C
     spec,
     admission: admissionSpecOf(spec),
     async execute(envelope: CommandEnvelope<CreatePaymentOrderBody>): Promise<CommandResult<CreatePaymentOrderView>> {
+      // Payments V1 (lane L-ROUTE): the bank-transfer route issues instructions in one unit of work, no provider effect
+      if ((envelope.body.routeKind === undefined) !== (envelope.body.routeId === undefined)) {
+        return resultOf(new DomainFailure("INVALID_REQUEST", "request refused: SCHEMA_VIOLATION", { reason: "SCHEMA_VIOLATION", fields: [{ field: envelope.body.routeKind === undefined ? "routeKind" : "routeId", code: "REQUIRED" }] }), envelope.correlationId);
+      }
+      if (isBankTransferRequest(envelope.body)) return issueBankTransfer(runtime, co, envelope);
       const context = tenantContextOf(envelope);
       const agencyId = context.agencyId;
       const adapter = co.provider ?? unboundProvider();

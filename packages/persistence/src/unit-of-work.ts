@@ -30,7 +30,7 @@
  * each context to the verified pool of its runtime group (one login per group).
  */
 import { randomBytes } from "node:crypto";
-import type { Id } from "@kauro/contracts";
+import type { Id, UtcInstant } from "@kauro/contracts";
 import {
   DomainFailure,
   actorOf,
@@ -67,6 +67,8 @@ import {
 } from "@kauro/domain";
 import type { PoolClient } from "pg";
 import { serverInstantOf } from "./source/rows.js";
+import { PgBankRoutes } from "./repositories/bank-routes.js";
+import { PgSessionFence } from "./session-fence.js";
 import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
 import { PgExecutionDiscovery } from "./execution/discovery.js";
@@ -186,8 +188,12 @@ export class PgUnitOfWork implements UnitOfWork {
    * over the decision artifacts, read through decisionArtifactResolver by the api composition.
    */
   readonly auditReads: PgAuditReads;
+  /** The session fence (migration 0047, PV1R-07 r4): the presented session locked FOR SHARE inside this unit's own transaction, read through sessionFenceOf(uow). */
+  readonly sessionFence: PgSessionFence;
   #adoptedAgencyId: AgencyId | null = null;
   #resolvedMembershipId: MembershipId | null = null;
+  #abandoned: Error | null = null;
+  readonly #beforeCommit: Array<() => Promise<void>> = [];
 
   constructor(
     protected readonly client: PoolClient,
@@ -197,6 +203,7 @@ export class PgUnitOfWork implements UnitOfWork {
   ) {
     this.context = context;
     this.ids = ids;
+    this.sessionFence = new PgSessionFence(client);
     this.agencies = new PgAgencyRepository(client);
     this.memberships = new PgMembershipRepository(client);
     this.invitations = new PgInvitationRepository(client);
@@ -252,6 +259,38 @@ export class PgUnitOfWork implements UnitOfWork {
     return userIdOf(this.context);
   }
 
+  /**
+   * AbandonableWork: the caller gave up a call it started on this unit's connection (a bound elapsed). The unit can no longer commit; the
+   * factory destroys the connection instead of rolling it back through the queue the abandoned call blocks and instead of returning it.
+   */
+  abandonWork(reason: string): void {
+    this.#abandoned ??= new Error(`work given up inside the unit of work: ${reason}`);
+  }
+
+  /**
+   * AbandonableWork: the database ends this session when the transaction has lived `ms` more (SET LOCAL transaction_timeout, PostgreSQL 17:
+   * set inside a transaction it arms the timer from now, 0 disarms it). Unlike statement_timeout it does not restart with each statement.
+   */
+  async limitWork(ms: number | null): Promise<void> {
+    if (this.#abandoned !== null) return;
+    if (ms !== null && (!Number.isInteger(ms) || ms < 1)) throw new RangeError("a work limit is a positive integer of milliseconds");
+    await execute(this.client, ms === null ? "SET LOCAL transaction_timeout = 0" : `SET LOCAL transaction_timeout = '${ms}ms'`);
+  }
+
+  get abandonedWork(): Error | null {
+    return this.#abandoned;
+  }
+
+  /** PreCommitChecks (PV1R-03): `check` runs after the work returned, immediately before COMMIT, in this transaction; a throw rolls it back. */
+  beforeCommit(check: () => Promise<void>): void {
+    this.#beforeCommit.push(check);
+  }
+
+  /** Runs the registered pre-commit checks in registration order (the factory, once the work returned). */
+  async runBeforeCommit(): Promise<void> {
+    for (const check of this.#beforeCommit.splice(0)) await check();
+  }
+
   get resolvedMembershipId(): MembershipId | null {
     return this.#resolvedMembershipId;
   }
@@ -285,14 +324,24 @@ export class PgUnitOfWork implements UnitOfWork {
  * through the columns granted to kauro_control. Every context starts without a finance scope: only the commerce unit of work of
  * an OPERATOR adopts one (kauro.finance_agency_id; decisions D-CTX-B1, D-CTX-B2, D-SCOPE-B1 of docs/design/B09-payments-fiscal.md).
  */
-async function bindContext(client: PoolClient, context: ExecutionContext): Promise<void> {
+async function bindContext(client: PoolClient, context: ExecutionContext): Promise<BackendIdentity | null> {
   const agencyId = context.kind === "TENANT" ? context.agencyId : context.kind === "SYSTEM" ? (context.agencyId ?? "") : "";
   const userId = userIdOf(context) ?? "";
-  await execute(
+  // the same round trip names the backend (ADV-13): its pid and the exact start instant, which together fence a later signal to this session
+  const bound = await execute(
     client,
-    "SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true), set_config('kauro.finance_agency_id', '', true)",
+    `SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true), set_config('kauro.finance_agency_id', '', true),
+            pg_backend_pid() AS backend_pid, (SELECT extract(epoch FROM backend_start)::text FROM pg_stat_get_activity(pg_backend_pid())) AS backend_start`,
     [agencyId, userId],
   );
+  const row = bound.rows?.[0] as { backend_pid?: unknown; backend_start?: unknown } | undefined;
+  return typeof row?.backend_pid === "number" && typeof row.backend_start === "string" ? { pid: row.backend_pid, startedAt: row.backend_start } : null;
+}
+
+/** A backend of the server: its pid and its start instant (epoch seconds, microsecond text). A pid alone can be recycled once the backend exits. */
+export interface BackendIdentity {
+  readonly pid: number;
+  readonly startedAt: string;
 }
 
 /** A SYSTEM context binds only an agency id the platform minted (UUIDv7): anything else would be a malformed tenant setting. */
@@ -422,13 +471,21 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
       throw new DomainFailure("INTEGRITY_FAILURE", `a ${context.kind} context runs under ${expectedRole}, this pool is ${connection.role} (08 Database isolation)`);
     }
     let destroy: Error | undefined;
+    let unit: U | undefined;
+    // the backend this unit runs on, named in the context-binding round trip: an abandoned unit's backend is ended explicitly once its client
+    // is destroyed (ADV-8), fenced by pid AND start instant (ADV-13)
+    let backend: BackendIdentity | null = null;
     try {
       await execute(client, `BEGIN ISOLATION LEVEL ${ISOLATION_SQL[isolation]}`);
       await execute(client, `SET LOCAL statement_timeout = '${statementTimeoutMs}ms'`);
-      await bindContext(client, context);
+      backend = await bindContext(client, context);
       const ids = new TrackingIdGenerator(createIdGenerator(this.deps.clock, this.#random));
       const uow = open(client, ids);
+      unit = uow;
       const out = await work(uow);
+      // the checks a command registered for its committed instant (PV1R-03), after every wait of its work and immediately before COMMIT
+      if (uow.abandonedWork === null) await uow.runBeforeCommit();
+      if (uow.abandonedWork !== null) throw new DomainFailure("INTEGRITY_FAILURE", `a unit of work whose work was given up cannot commit; correlation ${context.correlationId}`);
       // COMMIT inside an aborted transaction block does not fail: the server answers with the ROLLBACK tag and a WARNING.
       // A handler that caught a database refusal and carried on would otherwise "succeed" having persisted nothing.
       const commit = await execute(client, "COMMIT");
@@ -439,16 +496,77 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
     } catch (e) {
       // ROLLBACK after a failed COMMIT or BEGIN is a harmless no-op on the server (a WARNING, never an error); a failure here
       // means the connection itself is gone, and it is destroyed rather than returned to the pool.
-      try {
-        await client.query("ROLLBACK");
-      } catch (rollbackError) {
-        destroy = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+      const abandoned = unit?.abandonedWork ?? null;
+      if (abandoned !== null) {
+        // work the caller gave up is still running on this connection: ROLLBACK would queue behind it, and the connection must never serve
+        // another unit of work with that work alive on it. The server rolls the transaction back when the connection ends.
+        destroy = abandoned;
+      } else {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackError) {
+          destroy = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+        }
       }
       throw asFailure(e, context.correlationId);
     } finally {
       client.release(destroy);
+      if (unit?.abandonedWork != null && backend !== null) await endAbandonedBackend(pool, backend);
     }
   }
+}
+
+/** The longest an abandoned unit's answer waits for its backend to be ended: the answer never waits on a busy pool. */
+export const END_BACKEND_WAIT_MS = 1_000;
+
+/**
+ * ADV-8: destroying the client of an abandoned unit closes the socket, but a backend blocked in a lock wait does not read its socket, so
+ * it would keep every lock of the abandoned transaction until its statement ends (the lock is granted, or statement_timeout fires). A
+ * pooled side connection of the same login role cancels the statement and then terminates the backend, so the locks go at once.
+ *
+ * ADV-13: the signal is fenced by the backend's pid AND its start instant (pg_stat_activity), so a pid the operating system recycled for
+ * another session is never signalled; and it is skipped entirely when the side connection is not in hand within END_BACKEND_WAIT_MS (a
+ * connection that arrives later is released unused, never run late against a pid that may be someone else's by then). Assumes a DIRECT
+ * connection: behind a transaction pooler the pid is not the backend's (D10-GAP-6a; B14 obligation).
+ * Best effort: the backend ends by itself at the latest when its statement does, so a failure here is never the unit's failure.
+ */
+export async function endAbandonedBackend(pool: KauroPool, backend: BackendIdentity): Promise<void> {
+  // a pool that cannot open a side connection does not own the connections it hands out (a test harness routes its own connection through a
+  // stand-in pool): the unit never ends a backend it does not own
+  const connectUnverified = (pool as { readonly connectUnverified?: KauroPool["connectUnverified"] }).connectUnverified;
+  if (typeof connectUnverified !== "function") return;
+  let expired = false;
+  const ended = Promise.resolve()
+    .then(() => connectUnverified.call(pool))
+    .then(
+      async (side) => {
+        if (expired) {
+          side.release();
+          return;
+        }
+        const ignore = (): void => undefined; // an error of the side connection while it is held is not the unit's failure
+        side.on("error", ignore);
+        try {
+          await side.query(
+            "SELECT pg_cancel_backend(pid), pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid = $1 AND extract(epoch FROM backend_start)::text = $2",
+            [backend.pid, backend.startedAt],
+          );
+        } catch {
+          // best effort
+        } finally {
+          side.off("error", ignore);
+          side.release();
+        }
+      },
+      () => undefined,
+    );
+  let timer: NodeJS.Timeout | undefined;
+  const bound = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, END_BACKEND_WAIT_MS);
+  });
+  await Promise.race([ended, bound]);
+  clearTimeout(timer);
+  expired = true;
 }
 
 export function createUnitOfWorkFactory(pool: KauroPool, deps: UnitOfWorkDependencies): PgUnitOfWorkFactory {
@@ -475,6 +593,24 @@ export function commercialInspectionsOf(uow: UnitOfWork): PgCommercialInspection
 export function purchasedSubjectsOf(uow: UnitOfWork): PgPurchasedSubjects {
   if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the purchased subject is read in a commerce unit of work of @kauro/persistence");
   return uow.purchasedSubjects;
+}
+
+/** The session fence of a unit of work of this package: the presented session locked FOR SHARE in the unit's own transaction (PV1R-07 r4). */
+export function sessionFenceOf(uow: UnitOfWork): PgSessionFence {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the session fence is taken in a unit of work of @kauro/persistence");
+  return uow.sessionFence;
+}
+
+/** The bank-transfer route's tables in a commerce unit of work of this package (lane L-ROUTE). */
+export function bankRoutesOf(uow: UnitOfWork): PgBankRoutes {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the bank routes are read in a commerce unit of work of @kauro/persistence");
+  return uow.bankRoutes;
+}
+
+/** The effect instant of a commerce unit of work of this package (read after its locks). */
+export function effectInstantOf(uow: UnitOfWork): Promise<UtcInstant> {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the effect instant is read in a commerce unit of work of @kauro/persistence");
+  return uow.effectInstant();
 }
 
 /** The periodic pass's queries of a commerce unit of work of this package (D-PROTO-B4; stage-2 mandate M3). */
@@ -506,6 +642,8 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   readonly paymentSweeps: PgPaymentSweeps;
   /** The request side's reads (implementation mandate M4, D-REQ-B2): shared halves, order, capture and policy queries. */
   readonly requestReads: PgCommerceRequestReads;
+  /** The bank-transfer route's tables (migration 0046, lane L-ROUTE), read through bankRoutesOf(uow). */
+  readonly bankRoutes: PgBankRoutes;
   #scopeAgencyId: AgencyId | null = null;
   #financeAgencyId: AgencyId | null = null;
   #causation: CausationId | null = null;
@@ -519,6 +657,18 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
     this.purchasedSubjects = new PgPurchasedSubjects(client);
     this.paymentSweeps = new PgPaymentSweeps(client);
     this.requestReads = new PgCommerceRequestReads(client);
+    this.bankRoutes = new PgBankRoutes(client);
+  }
+
+  /**
+   * The effect instant of this unit of work (kauro.effect_now(): the server's instant of this statement, read AFTER the locks the caller
+   * took, so a deadline that passed while it waited counts; ACH-ROUTE §7.24 I2Δ, R2/I1/I2/I3 EXPIRY cells).
+   */
+  async effectInstant(): Promise<UtcInstant> {
+    const r = await execute<{ at: string }>(this.client, "SELECT to_char(kauro.effect_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS at");
+    const at = r.rows[0]?.at;
+    if (at === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the server answered no effect instant");
+    return at as UtcInstant;
   }
 
   protected override onJournalEntry(entryId: JournalEntryId): void {

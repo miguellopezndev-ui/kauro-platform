@@ -283,6 +283,12 @@ export const EDGE_OWNERS = {
     reconciliation_completed: { command: "CMD034", event: "refund.completed.v1" },
     reconciliation_proves_no_effect: { command: "CMD034", event: "refund.approved.v1" },
     reconciliation_proves_refusal: { command: "CMD034", event: "refund.failed.v1" },
+    // Payments V1 manual bank-transfer rail (DV1-08, ACH-ROUTE r12; PV1R-05): planned, not implemented — no served command performs these
+    // edges yet; lane L-REFUND owns them (never credited to a command until its handler is served and publishes the event)
+    manual_execution_declared: { owner: "L-REFUND", why: "planned, not implemented: the owner's declared execution of a BANK_TRANSFER refund (X1), its attempt DECLARED in the same transaction; no served command performs it yet", event: "refund.submitting.v1" },
+    manual_execution_window_lapsed: { owner: "L-REFUND", why: "planned, not implemented: the declared BANK_TRANSFER attempt passes its manual execution window on the database clock (X2) and an UNCERTAIN_EFFECT case opens; no served sweep performs it yet", event: "refund.uncertain.v1" },
+    manual_return_recorded: { owner: "L-REFUND", why: "planned, not implemented: classified execution evidence satisfies every record predicate of the DECLARED (G2) or UNCERTAIN (G2, X3 EXECUTED) BANK_TRANSFER attempt; both edges, from SUBMITTING and from UNCERTAIN; no served command performs them yet", event: "refund.completed.v1" },
+    owner_attested_no_effect: { owner: "L-REFUND", why: "planned, not implemented: the owner attests NOT_EXECUTED for an UNCERTAIN BANK_TRANSFER attempt with the lag, coverage and no-potential-debit predicates (X3); no served command performs it yet", event: "refund.failed.v1" },
   },
   ReconciliationCase: {
     "(initial OPEN)": { command: "CMD034", event: "reconciliation_case.opened.v1", note: "CMD029 and CMD030 open cases the same way" },

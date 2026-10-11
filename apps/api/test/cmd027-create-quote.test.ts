@@ -7,7 +7,7 @@
 // own selling agency (ACTIVE, a reviewed fiscal profile, plans approved through CMD025). The founding cohort has three slots for the whole
 // cluster, so the tests that take them run in an order that leaves each the slots it needs. Nothing sleeps: interleavings are held at
 // named points and every wait is observed in pg_stat_activity.
-import { invariantsAfterEach } from "@kauro/persistence/testing";
+import { invariantsAfterEach, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { CapturePaymentView, CreatePaymentOrderView, CreateQuoteView, RequestRefundView } from "@kauro/application";
@@ -760,12 +760,14 @@ test("RACE: an identical retry replays the 201 with the same quote, the same key
   const [replyOne, replyTwo] = await Promise.all([one, two]);
   const viewOne = issuedView(replyOne);
   const viewTwo = issuedView(replyTwo);
-  const chain = await rows<{ quote_id: string; state: string; superseded_by_quote_id: string | null }>("SELECT quote_id, state, superseded_by_quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY created_at", [plan.projectId]);
-  assert.deepEqual(chain.map((q) => [q.state, q.superseded_by_quote_id]), [
-    ["SUPERSEDED", viewOne.quote.quoteId],
-    ["SUPERSEDED", viewTwo.quote.quoteId],
-    ["ISSUED", null],
-  ], "each quote superseded exactly once; one live quote");
+  // compared by its supersession links in quote-id order, never by created_at (a host clock can step back, ADV-17)
+  const chain = await rows<{ quote_id: string; state: string; superseded_by_quote_id: string | null }>("SELECT quote_id, state, superseded_by_quote_id FROM kauro.quotes WHERE project_id = $1 ORDER BY quote_id", [plan.projectId]);
+  const links = [
+    [issued.data.quote.quoteId, "SUPERSEDED", viewOne.quote.quoteId],
+    [viewOne.quote.quoteId, "SUPERSEDED", viewTwo.quote.quoteId],
+    [viewTwo.quote.quoteId, "ISSUED", null],
+  ].sort((x, y) => (String(x[0]) < String(y[0]) ? -1 : 1));
+  assert.deepEqual(chain.map((q) => [q.quote_id, q.state, q.superseded_by_quote_id]), links, "each quote superseded exactly once; one live quote");
   assert.equal(viewOne.supersededQuoteId, issued.data.quote.quoteId);
   assert.equal(viewTwo.supersededQuoteId, viewOne.quote.quoteId);
   assert.equal(await w.count("quotes", "project_id = $1 AND state IN ('DRAFT', 'ISSUED', 'ACCEPTED_FOR_CHECKOUT')", [plan.projectId]), 1);
@@ -1080,8 +1082,8 @@ test("RACE (replacement): a crash before the replacement's intent commits leaves
  */
 async function standAhead(s: Selling, seconds: number) {
   const { w } = pw;
-  const pool = createPool({ host: "127.0.0.1", port: w.h.pg.port, database: ROLES.database, user: ROLES.appLogin, max: 1, applicationName: "kauro-test-api-ahead", idleTimeoutMs: 600_000 });
-  const c = await pool.raw.connect();
+  const pool = createPool({ environment: testDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: w.h.pg.port, database: ROLES.database, user: ROLES.appLogin, max: 1, applicationName: "kauro-test-api-ahead", idleTimeoutMs: 600_000 });
+  const c = await pool.connectUnverified();
   let serverNow: string;
   try {
     await c.query("SELECT set_config($1, $2, false)", [TEST_CLOCK_OFFSET_SETTING, String(seconds)]);

@@ -5,7 +5,7 @@
  * `@kauro/application/testing` (architecture rule `testOnlySubpaths`), no composition root binds it, and every record it
  * produces names the token `contract-fake-migration-core` and reports `evidenceClass: "SIMULATED"` (21 "Evidence classes":
  * SIMULATED demonstrates a local contract with fakes; it is never EXECUTED_LOCAL). The real thin adapter over
- * kauro-migration-core 2.0.3 is `b05/cores`'.
+ * kauro-migration-core 3.0.0 is `b05/cores`'.
  *
  * What it models (manual 04 "executePlan", "verifyPackage"; D8-VER-1):
  * - `execute` reaches the source, the scratch store and the artifact writer only through the `HostIo` it is handed — never

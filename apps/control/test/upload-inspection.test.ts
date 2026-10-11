@@ -334,7 +334,7 @@ test("D-LOCK-2: a cancellation that holds the revision row makes the inspection'
   const dispatched = env.plane.drain(env.plane.consumers.uploadInspection, clock.now());
   await copying.reached;
   // the requester's cancellation takes the revision row, then the upload (D-LOCK-1), and holds its transaction open
-  const c = await env.h.appPool.raw.connect();
+  const c = await env.h.appPool.connectUnverified();
   try {
     await c.query("BEGIN");
     await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [t.ag.agencyId, t.ag.ownerUserId]);

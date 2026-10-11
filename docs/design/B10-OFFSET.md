@@ -42,7 +42,7 @@ r3 (design r2 findings):
 | (r4) OFF-R3-01 direct CREDIT insert lock inversion | every guarded INSERT guard takes the prefix rows its FKs will lock (statement row, then the line row, KEY SHARE) **before** the subject, so the FK's later KEY SHARE is already held; audit of all four guarded INSERTs (§4, §5.1); RACE C14, C15, T30, S59 |
 | (r4) OFF-R3-02 cutoff misses funds | V2 hashes each close line's capture's latest funds observation (id, capture version, funds state); `observeFunds` takes the capture's line rows and subjects first (D10-GAP-24), so the close's locks hold them still (§2.8); S60, S61 |
 | (r4) OFF-R6 PARTIAL | U-ST S62 and U-NC S63 (zero credit either order); RELEASED tests assert the order's credit and the conserved total (line cash + credit = entitlement); PARTIAL cells now inject a failure at a later write (Y24, C16, S64-S68) or are N/A for one INSERT; every pair in §7 is a cell or a written non-interaction proof |
-| rule 16 (lock-set family, third round) | added to FAILURE-MATRIX-TEMPLATE.md; §5.1 sweeps every guarded aggregate: offsets, releases, credit entries, CREDIT items, noncash settlements, cutoff |
+| rule 17 (lock-set family, third round) | added to FAILURE-MATRIX-TEMPLATE.md; §5.1 sweeps every guarded aggregate: offsets, releases, credit entries, CREDIT items, noncash settlements, cutoff |
 
 ### 0.1 Revision r5: adversary findings (internal adversary on 744dd25)
 
@@ -389,7 +389,7 @@ lock is taken no statement can turn the flag off, and no custom setting is read.
 - (vi) Privileges and RLS (r8, ADV-1). kauro_commission: SELECT, INSERT and UPDATE on commission_lines (0030:640-641), policy FOR ALL
   USING (true) (0030:605): its locks are unfiltered. kauro_app (CMD052 in the OPERATOR context; B12's owner hold commands later): SELECT
   only (0030:634) and FOR SELECT policies under FORCE RLS (0030:602-604); a row-locking clause needs UPDATE on one column and the UPDATE
-  policy's USING, so r7 raised 42501. 0045 grants the narrowest lock-only path (template rule 16; §9 OFF-C11): `GRANT UPDATE (created_at)
+  policy's USING, so r7 raised 42501. 0045 grants the narrowest lock-only path (template rule 17; §9 OFF-C11): `GRANT UPDATE (created_at)
   ON kauro.commission_lines TO kauro_app` (created_at is immutable, 0030:263-264) and `CREATE POLICY commission_lines_owner_lock ON
   kauro.commission_lines FOR UPDATE TO kauro_app USING (kauro.acting_corporate_owner()) WITH CHECK (false)`: the acting owner can lock the
   lines it reads and update none (WITH CHECK false; column immutable); a seller or agency session locks none. RLS filters a row before
@@ -466,7 +466,7 @@ its INSERT and, as a close-time writer, inherits K09's boundary. Lock sets (§5.
   it; `openHold` :585 -> the hold step; line UPDATE :613, its fence re-entrant); eligibility (sweeps.ts:214 `lockLine`, the FOR UPDATE call;
   instant :218; :220 line UPDATE -> `commission_lines_line_fence`, subject non-blocking).
 
-### 5.1 Rule 16 sweep: every guarded aggregate, its lock, its writers, its RACE cells
+### 5.1 Rule 17 sweep: every guarded aggregate, its lock, its writers, its RACE cells
 
 | aggregate | lock taken before any read of it | writers (incl. direct INSERT grants) | RACE cells (both orders) |
 |---|---|---|---|
@@ -518,7 +518,7 @@ Roles: kauro_commission units (service commands, consumer, sweeps) lock unfilter
 | S77 | CMD052 as K01 without a holder; then the acting owner (kauro_app, OPERATOR) runs `UPDATE kauro.commission_lines SET created_at = created_at WHERE line_id = L`: column privilege (0045 grant), UPDATE policy USING (`acting_corporate_owner()`), BEFORE triggers 0030:261, :262, :263-264, :265, :429 all pass, no OF-state trigger fires, then WITH CHECK (false); a seller session and an agency session call `take_commission_line_subject` | a FOR UPDATE holder of the line (kauro_commission) | owner locks and approves; the UPDATE: 42501, updated_at and version unchanged; seller/agency: KC022 at once, no wait | WITH CHECK (false) replaced by true or omitted: the UPDATE commits (updated_at advances); grant/policy removed: 42501 at the lock; set comparison removed: silent no-lock |
 | S79 | CMD052 on S2: St(S2), Cash, call [.., L7 ..]; CMD053 FAILED on S1: St(S1), :130 Cash, call [.., L7 ..] | each other, both orders | the second waits at Cash, never 40P01 | CMD053's call moved before :130 -> 40P01 |
 
-### 5.3 Template rules 13, 15, 16 over the whole lane (r8)
+### 5.3 Template rules 13, 15, 17 over the whole lane (r8)
 
 - Census (measured on e3da3e7). Line row locks in src: commercial-ledger.ts:486 (pool's lines FOR UPDATE), :564 (`lockLine`), :579
   (`transitionLine` HELD). `lockLine` callers: close-period.ts:148, :201; correct-statement.ts:90, :160; reconcile-payout.ts:134, :144;
@@ -903,7 +903,7 @@ lane kit first): holders HK and HB (§5.2), the waiter's ungranted locktype prob
   UPDATE holder, projects (S74) and agencies (S76), and neither holder takes a B10 lock.
 - OFF-C11 (r8, ADV-1): kauro_app locks commission lines through the lock-only path, not a SECURITY DEFINER. Authority: 08 "Database
   isolation" ("SECURITY DEFINER functions require a specific justification, fixed search_path, minimal owner privileges and no public
-  execute grant"); template rule 16 ("grant the narrowest lock-only path (column SELECT of the judged columns, UPDATE on one immutable
+  execute grant"); template rule 17 ("grant the narrowest lock-only path (column SELECT of the judged columns, UPDATE on one immutable
   column, an UPDATE policy WITH CHECK (false)) before any SECURITY DEFINER"). Predicate measured on the schema: a lock-only path exists
   (`created_at` immutable, 0030:263-264; RLS FORCE with per-role policies, 0030:602-605), so no specific justification for a definer
   exists. Also verified: a definer cannot test the invoker's visibility, because `kauro.current_seller_id()` and

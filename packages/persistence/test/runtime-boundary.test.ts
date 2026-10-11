@@ -50,8 +50,18 @@ test("N11/B06 work: every runtime role's table and column privileges and every r
       assert.equal(privileges.includes("SELECT") || privileges.includes("UPDATE") || privileges.includes("DELETE"), false, `${role} reads or rewrites a whole table`);
     }
   }
-  // the web sessions belong to the authentication boundary alone: the request handlers hold nothing on them (B11 D-AUTH-1)
-  for (const role of ["kauro_app", "kauro_control", "kauro_validator", "kauro_ingress"]) {
+  // the web sessions belong to the authentication boundary; the request handlers hold only the lock-only path of 0047 on the session their
+  // own transaction presents (B11 D-AUTH-1 as amended, PV1R-07 r4): column SELECT of the judged columns, UPDATE of the immutable session_id,
+  // an UPDATE policy whose WITH CHECK is false, no table privilege
+  assert.equal(expected.tables["kauro_app"]?.["kauro.web_sessions"], undefined, "kauro_app table privilege on web_sessions");
+  assert.deepEqual(expected.columns["kauro_app"]?.["kauro.web_sessions"], {
+    SELECT: ["absolute_expires_at", "idle_expires_at", "revoked_at", "secret_sha256", "user_id"],
+    UPDATE: ["session_id"],
+  });
+  assert.equal(expected.policies["web_sessions/web_sessions_request_lock"]?.check, "false");
+  assert.deepEqual(expected.policies["web_sessions/web_sessions_request_lock"]?.roles, ["kauro_app"]);
+  assert.deepEqual(expected.policies["web_sessions/web_sessions_request_read"]?.roles, ["kauro_app"]);
+  for (const role of ["kauro_control", "kauro_validator", "kauro_ingress"]) {
     assert.equal(expected.tables[role]?.["kauro.web_sessions"], undefined, `${role} on web_sessions`);
     assert.equal(expected.columns[role]?.["kauro.web_sessions"], undefined, `${role} columns of web_sessions`);
   }

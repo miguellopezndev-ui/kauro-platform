@@ -87,7 +87,7 @@ function fact(over: Partial<Fact> & Pick<Fact, "action" | "outcome" | "reason_co
 
 /** A transaction of the runtime role under the owner of agency A's tenant context (the owner's own membership writes). */
 async function ownerTransaction(): Promise<PoolClient> {
-  const c = await w.h.appPool.raw.connect();
+  const c = await w.h.appPool.connectUnverified();
   try {
     await c.query("BEGIN");
     await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [w.A.agencyId, w.owner.userId]);
@@ -443,7 +443,7 @@ test("N1: the identity a disable restricts cannot lift it — its own runtime se
   await w.h.oracle.query("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1", [member.userId]);
   const body = { displayName: "N1 client", processingAuthorityRef: w.authorityA };
   assert.equal(outcome(w, await call(w, { url: routes.createClient(w.A.agencyId), token: member.token, agency: null, body })), "403 NOT_AUTHORIZED IDENTITY_DISABLED");
-  const session = await w.h.appPool.raw.connect();
+  const session = await w.h.appPool.connectUnverified();
   try {
     await session.query("BEGIN");
     await session.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [w.A.agencyId, member.userId]);

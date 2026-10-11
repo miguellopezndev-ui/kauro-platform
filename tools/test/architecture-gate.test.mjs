@@ -252,3 +252,90 @@ test("B11 D-SEC-2: a test or node-side file may import a workspace devDependency
     rmSync(dirty, { recursive: true, force: true });
   }
 });
+
+// B05 D5-1/D5-6 (S046): the raw cores are importable only by their wrapper, at the root; the wrappers are server code.
+const MC_WRAPPER = {
+  "packages/migration-core/package.json": pkg("@kauro/migration-core", { "kauro-migration-core": "3.0.0" }),
+  "packages/migration-core/src/index.ts": 'export * from "kauro-migration-core";',
+};
+const IC_WRAPPER = {
+  "packages/intelligence-core/package.json": pkg("@kauro/intelligence-core", { "kauro-intelligence-core": "0.6.0", "kauro-migration-core": "3.0.0" }),
+  "packages/intelligence-core/src/index.ts": 'export * from "kauro-intelligence-core";',
+};
+const CONTRACTS = { "packages/contracts/package.json": pkg("@kauro/contracts"), "packages/contracts/src/index.ts": "export const x = 1;" };
+const ADAPTER = (body, deps = { "@kauro/migration-core": "workspace:*", "@kauro/intelligence-core": "workspace:*" }) => ({
+  "packages/data-plane/package.json": pkg("@kauro/data-plane", deps),
+  "packages/data-plane/src/cores/index.ts": body,
+});
+const WRAPPED = 'import { runMigration } from "@kauro/migration-core";\nimport { interpret } from "@kauro/intelligence-core";\nexport const a = [runMigration, interpret];';
+
+function gated(files) {
+  const root = tree(files);
+  try {
+    return run(root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test("A01 S046 DENY: a deep import into a raw core or a wrapper, or a raw core imported outside its wrapper, is rejected while the wrapper root import passes", () => {
+  const ok = gated({ ...CONTRACTS, ...MC_WRAPPER, ...IC_WRAPPER, ...ADAPTER(WRAPPED) });
+  assert.equal(ok.code, 0, ok.out);
+  const deepRaw = gated({ ...CONTRACTS, ...MC_WRAPPER, ...IC_WRAPPER, ...ADAPTER(WRAPPED), "packages/migration-core/src/internal.ts": 'import { x } from "kauro-migration-core/dist/src/ingest/csv.js";\nexport const y = x;' });
+  assert.equal(deepRaw.code, 1, deepRaw.out);
+  assert.match(deepRaw.out, /packages\/migration-core\/src\/internal\.ts:1: \[raw-core\] deep import into the raw core kauro-migration-core\/dist\/src\/ingest\/csv\.js/);
+  const deepWrapper = gated({ ...CONTRACTS, ...MC_WRAPPER, ...IC_WRAPPER, ...ADAPTER('import { y } from "@kauro/migration-core/dist/src/index.js";\nimport { z } from "@kauro/intelligence-core/src/index.js";\nexport const a = [y, z];') });
+  assert.equal(deepWrapper.code, 1, deepWrapper.out);
+  assert.match(deepWrapper.out, /\[deep-import\] deep import into @kauro\/migration-core\/dist\/src\/index\.js/);
+  assert.match(deepWrapper.out, /\[private\] private module import @kauro\/intelligence-core\/src\/index\.js/);
+  const outside = gated({ ...CONTRACTS, ...MC_WRAPPER, ...IC_WRAPPER, ...ADAPTER('import { runMigration } from "kauro-migration-core";\nexport const a = runMigration;', { "kauro-migration-core": "3.0.0" }) });
+  assert.equal(outside.code, 1, outside.out);
+  assert.match(outside.out, /packages\/data-plane\/src\/cores\/index\.ts:1: \[raw-core\] kauro-migration-core is imported outside its wrapper @kauro\/migration-core/);
+  const crossWrapper = gated({ ...CONTRACTS, ...MC_WRAPPER, ...IC_WRAPPER, "packages/intelligence-core/src/other.ts": 'import { runMigration } from "kauro-migration-core";\nexport const q = runMigration;' });
+  assert.equal(crossWrapper.code, 1, crossWrapper.out);
+  assert.match(crossWrapper.out, /packages\/intelligence-core\/src\/other\.ts:1: \[raw-core\] kauro-migration-core is imported outside its wrapper @kauro\/migration-core/);
+});
+
+test("A02 S046 DENY: ui or web importing a wrapper or raw core is rejected as server-only, and domain importing persistence still fails in the same tree", () => {
+  const r = gated({
+    ...CONTRACTS,
+    ...MC_WRAPPER,
+    ...IC_WRAPPER,
+    "packages/persistence/package.json": pkg("@kauro/persistence", { "@kauro/contracts": "workspace:*" }),
+    "packages/persistence/src/index.ts": 'import { x } from "@kauro/contracts"; export const db = x;',
+    "packages/domain/package.json": pkg("@kauro/domain", { "@kauro/contracts": "workspace:*", "@kauro/persistence": "workspace:*" }),
+    "packages/domain/src/index.ts": 'import { db } from "@kauro/persistence"; export const d = db;',
+    "packages/ui/package.json": pkg("@kauro/ui", { "@kauro/migration-core": "workspace:*" }),
+    "packages/ui/src/Widget.tsx": 'import { runMigration } from "@kauro/migration-core";\nexport const w = runMigration;',
+    "apps/web/package.json": pkg("@kauro/web", { "@kauro/contracts": "workspace:*", "kauro-intelligence-core": "0.6.0", "@kauro/intelligence-core": "workspace:*" }),
+    "apps/web/src/page.tsx": 'import { interpret } from "kauro-intelligence-core";\nimport { x } from "@kauro/contracts";\nimport { interpret as i2 } from "@kauro/intelligence-core";\nexport const p = [interpret, i2, x];',
+  });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /packages\/ui\/src\/Widget\.tsx:1: \[client-bundle\] server-only package @kauro\/migration-core imported from a client bundle/);
+  assert.match(r.out, /apps\/web\/src\/page\.tsx:1: \[client-bundle\] server-only package kauro-intelligence-core imported from a client bundle/);
+  assert.match(r.out, /apps\/web\/src\/page\.tsx:3: \[client-bundle\] server-only package @kauro\/intelligence-core imported from a client bundle/);
+  assert.match(r.out, /\[layer\] domain package @kauro\/domain may not import adapter package @kauro\/persistence/);
+  assert.match(r.out, /\[layer\] ui package @kauro\/ui may not import core package @kauro\/migration-core/);
+});
+
+test("A03 S046 DENY: production source importing kauro-intelligence-core/benchmark is rejected", () => {
+  const files = { ...CONTRACTS, ...MC_WRAPPER, ...IC_WRAPPER, ...ADAPTER(WRAPPED) };
+  const bad = gated({ ...files, "packages/intelligence-core/src/bench.ts": 'import { surface } from "kauro-intelligence-core/benchmark";\nexport const b = surface;' });
+  assert.equal(bad.code, 1, bad.out);
+  assert.match(bad.out, /packages\/intelligence-core\/src\/bench\.ts:1: \[raw-core\] production source imports kauro-intelligence-core\/benchmark/);
+  const viaWrapper = gated({ ...files, "packages/data-plane/src/cores/bench.ts": 'import { surface } from "@kauro/intelligence-core/benchmark";\nexport const b = surface;' });
+  assert.equal(viaWrapper.code, 1, viaWrapper.out);
+  assert.match(viaWrapper.out, /packages\/data-plane\/src\/cores\/bench\.ts:1: \[deep-import\] deep import into @kauro\/intelligence-core\/benchmark/);
+});
+
+test("A04 S046 OK: the checked-in tree with both wrappers passes, and the same cores-adapter tree with one injected deep core import fails", () => {
+  const real = spawnSync(process.execPath, [gate], { encoding: "utf8" });
+  assert.equal(real.status, 0, real.stdout + real.stderr);
+  assert.match(real.stdout, /no violation/);
+  const files = { ...CONTRACTS, ...MC_WRAPPER, ...IC_WRAPPER, ...ADAPTER(WRAPPED) };
+  const clean = gated(files);
+  assert.equal(clean.code, 0, clean.out);
+  const injected = gated({ ...files, "packages/migration-core/src/index.ts": 'export * from "kauro-migration-core";\nexport { y } from "kauro-migration-core/dist/src/y.js";' });
+  assert.equal(injected.code, 1, injected.out);
+  assert.match(injected.out, /\[raw-core\] deep import into the raw core/);
+});

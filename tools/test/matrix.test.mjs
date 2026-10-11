@@ -81,3 +81,47 @@ test("B08-COMMANDS-AUDIT: the four audit commands are served, their events are r
   assert.deepEqual(checkSources(sources, unpublished), ["Plan: validation_admitted says CMD024 publishes plan.validated.v1, which its handler never publishes"]);
   assert.deepEqual(checkSources({ ...sources, intakes: {} }), ["the source intake SubmitSelectionManifest is not a served intake"]);
 });
+
+// PV1R-05 (Codex r1 on db5f0e3): the Payments V1 Refund edges (DV1-08, ACH-ROUTE r12) are enumerated from the candidate's own machine,
+// independently of the matrix tool's machine list, and each must have a truthful owner entry; the matrix check itself must complete.
+// Truthful: an edge no served command performs names its owner lane with its reason ({ owner, why, event }), never a command; an edge
+// that names a command names one the registry has, and if that command is served its handler publishes the edge's event.
+const MANUAL_REFUND_EDGES = ["manual_execution_declared", "manual_execution_window_lapsed", "manual_return_recorded", "owner_attested_no_effect"];
+
+test("PV1R-05 every Refund transition event of the candidate machine (@kauro/domain COMMERCE_PLATFORM_MACHINES) has a truthful owner entry: a registry command whose served handler publishes its event, or an owner lane with its reason; no Refund source diagnostic", async () => {
+  const domain = await import(new URL("../../packages/domain/dist/src/index.js", import.meta.url).href);
+  const refund = domain.COMMERCE_PLATFORM_MACHINES.find((m) => m.contract === "Refund");
+  assert.ok(refund !== undefined, "the candidate declares the Refund machine");
+  const events = [...new Set(refund.transitions.map((t) => t.event))];
+  for (const e of MANUAL_REFUND_EDGES) assert.ok(events.includes(e), `the candidate's Refund machine lists ${e}`);
+  assert.equal(refund.transitions.filter((t) => t.event === "manual_return_recorded").length, 2, "manual_return_recorded is two edges (SUBMITTING and UNCERTAIN)");
+  const table = EDGE_OWNERS.Refund;
+  assert.deepEqual(events.filter((e) => !(e in table)), [], "every Refund event has an entry in EDGE_OWNERS.Refund");
+  for (const e of events) {
+    const o = table[e];
+    if (o.command !== undefined) {
+      assert.ok(sources.commands.has(o.command), `Refund ${e}: ${o.command} is a registry command`);
+      if (sources.served.has(o.command) && o.event !== null) assert.ok(sources.published[o.command].includes(o.event), `Refund ${e}: served ${o.command} publishes ${o.event}`);
+      if (MANUAL_REFUND_EDGES.includes(e)) assert.ok(sources.served.has(o.command), `Refund ${e}: a manual edge credited to ${o.command} must be served (else name its owner lane)`);
+    } else {
+      assert.equal(typeof o.owner, "string", `Refund ${e}: names an owner`);
+      assert.ok(typeof o.why === "string" && o.why.length > 0, `Refund ${e}: states why`);
+    }
+    assert.ok(o.event === null || sources.eventTypes.has(o.event), `Refund ${e}: event ${o.event} is registered or null`);
+  }
+  assert.deepEqual(checkSources(sources).filter((f) => f.startsWith("Refund")), [], "no Refund source diagnostic");
+});
+
+test("PV1R-05 pnpm run matrix completes: the generator renders every machine without an exception and `node tools/matrix.mjs check` exits 0 with no missing-owner diagnostic", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const { fileURLToPath } = await import("node:url");
+  let rendered = "";
+  assert.doesNotThrow(() => {
+    rendered = generateMatrix(sources);
+  }, "generateMatrix renders the candidate's machines");
+  assert.ok(rendered.includes("### Refund"), "the Refund machine is rendered");
+  const run = spawnSync(process.execPath, ["tools/matrix.mjs", "check"], { cwd: fileURLToPath(new URL("../..", import.meta.url)), encoding: "utf8" });
+  const output = `${run.stdout}\n${run.stderr}`;
+  assert.doesNotMatch(output, /has no owner|TypeError/, "no missing-owner diagnostic and no generator exception");
+  assert.equal(run.status, 0, `the matrix check exits 0:\n${output.slice(0, 2000)}`);
+});

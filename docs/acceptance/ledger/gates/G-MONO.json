@@ -1,0 +1,43 @@
+{
+ "gate": "G-MONO",
+ "manual": "07",
+ "package": "B05",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "S045",
+   "package": "B05",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S046",
+   "package": "B05",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "S047",
+   "package": "B05",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B05"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B05",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

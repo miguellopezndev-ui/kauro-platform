@@ -1,0 +1,35 @@
+{
+ "gate": "G-INTEGRATION",
+ "manual": "10",
+ "package": "B15",
+ "evidenceRule": "Exact subject, public consumer, independent truth, complete result, meaningful negative control and reviewer acceptance.",
+ "cases": [
+  {
+   "case": "R2-061",
+   "package": "B15",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  },
+  {
+   "case": "R2-133",
+   "package": "B15",
+   "claimed": "NOT_EXECUTED",
+   "demonstrated": null,
+   "reviewId": null,
+   "commit": null
+  }
+ ],
+ "casePackages": [
+  "B15"
+ ],
+ "acceptedSubjects": [
+  {
+   "package": "B15",
+   "commit": null,
+   "reviewId": null
+  }
+ ],
+ "status": "OPEN"
+}

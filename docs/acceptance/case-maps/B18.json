@@ -1,0 +1,99 @@
+{
+ "package": "B18",
+ "generatedBy": "node tools/ledger.mjs sidecars --write",
+ "source": {
+  "file": null,
+  "registry": "packages/contracts/registry/program.json",
+  "note": "no case map yet: no evidence claimed"
+ },
+ "rows": [
+  {
+   "case": "S079",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S080",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "S088",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-113",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "R2-114",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD058-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD058-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD058-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD059-OK",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD059-DENY",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  },
+  {
+   "case": "CMD059-RACE",
+   "class": "NOT_EXECUTED",
+   "test": [],
+   "commit": null,
+   "reviewId": null,
+   "inheritedTo": []
+  }
+ ]
+}

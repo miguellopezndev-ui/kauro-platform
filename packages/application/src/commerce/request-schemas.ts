@@ -38,7 +38,9 @@ function schema(command: string, required: ReadonlyArray<string>, properties: Re
 
 export const COMMERCE_REQUEST_SCHEMAS = Object.freeze({
   /** CreatePaymentOrder: the accepted terms, named by their hash (10 "Checkout names quoteId and its immutable version"). */
-  CMD028: schema("CMD028", ["termsHash"], { termsHash: HASH }),
+  // Payments V1 (lane L-ROUTE): routeKind BANK_TRANSFER with routeId names the bank-transfer route (the handler refuses one without the
+  // other as SCHEMA_VIOLATION); absent, the provider checkout
+  CMD028: schema("CMD028", ["termsHash"], { termsHash: HASH, routeKind: { type: "string", enum: ["BANK_TRANSFER"] }, routeId: { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" } }),
   /** CapturePayment: the browser's echo of the provider approval — compared with the stored order, never evidence of payment. */
   CMD029: schema("CMD029", ["providerApprovalRef"], { providerApprovalRef: PROVIDER_REF }),
   /** ReceivePaymentWebhook: the normalized inbox command built by the ingress after signature verification. */

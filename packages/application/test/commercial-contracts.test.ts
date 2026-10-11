@@ -189,7 +189,7 @@ test("the commercial contracts: every request schema carries exactly the registr
   assert.ok(viewNames.every((n) => !(n in bundle.$defs) && !(n in shared)), "no B10 view shadows a registry or an earlier package's definition");
   assert.deepEqual(Object.keys(COMMERCIAL_COMMAND_RESPONSES), [...B10_COMMANDS]);
   assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.status), [200, 201, 200, 201, 201, 200, 200, 200, 200, 200, 200, 200]);
-  assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.accepted), B10_COMMANDS.map(() => false));
+  assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.accepted), B10_COMMANDS.map((c) => c === "CMD027"));
   assert.deepEqual(Object.keys(roots).sort(), [...B10_COMMANDS.map((c) => commercialCommandResponseSchemaId(c)), commercialReadResponseSchemaId("GetCommissionStatement")].sort());
   assert.deepEqual(COMMERCIAL_READ_ROUTES.GetCommissionStatement, {
     path: "/api/v1/sales/statements/{statementId}",

@@ -3,7 +3,7 @@
  * D8-STG-2, D8-STG-4; 04 "Resources"; 09 "Derived data and worker scratch"; S035; mandate B08-WORKER-HOST).
  *
  * It is `ScratchStore` of `@kauro/application` (`ports/core-ports.ts`), which is field for field the host-injected contract of
- * kauro-migration-core 2.0.3 (`src/scratch/scratch-store.ts`, contract version "1.0.0"), so the thin adapter of `b05/cores` hands
+ * kauro-migration-core 3.0.0 (`src/scratch/scratch-store.ts`, contract version "1.0.0"), so the thin adapter of `b05/cores` hands
  * it to the core unchanged; its accounting (per family, per pass, framing measured as a difference, ordinals not clocks) follows
  * the core's own filesystem backend. What the attempt adds:
  *
@@ -40,7 +40,7 @@ import type {
 } from "@kauro/application";
 import { AttemptEnvelopeFailure, type AttemptFailureCause } from "./failure.js";
 
-/** kauro-migration-core 2.0.3's scratch contract version, which this store implements. */
+/** kauro-migration-core 3.0.0's scratch contract version, which this store implements. */
 export const SCRATCH_STORE_CONTRACT_VERSION = "1.0.0";
 export const ATTEMPT_SCRATCH_DIRECTORY_PREFIX = "kauro-attempt-scratch-";
 /** The family the writer's spools are accounted under. */

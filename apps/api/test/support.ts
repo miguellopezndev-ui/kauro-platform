@@ -34,8 +34,9 @@ import { createHash, randomBytes } from "node:crypto";
 import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
-import type { ApprovePlanView, AssuranceVerifier, AuthenticatedSubject, B06Collaborators, B07Collaborators, BuyerTypeReader, CommerceRequestCollaborators, CoreServices, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator, QuoteCollaborators, SessionView } from "@kauro/application";
-import { ContractFakeIdentityIssuer, ContractFakeObjectStorage, ContractFakeSessionVault } from "@kauro/application/testing";
+import type { ApprovePlanView, AssuranceVerifier, AuthenticatedSubject, B06Collaborators, B07Collaborators, BuyerTypeReader, LateFailureSink, ProviderCallTimer, CommerceRequestCollaborators, CoreServices, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator, QuoteCollaborators, SessionView } from "@kauro/application";
+import { ContractFakeIdentityIssuer, ContractFakeObjectStorage, ContractFakeSessionVault, contractFakeBankDetailsClassifier } from "@kauro/application/testing";
+import type { BankEvidenceStore } from "@kauro/application";
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
   AgencyId,
@@ -65,7 +66,7 @@ import type {
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
 import { PgWebSessionStore } from "@kauro/persistence";
-import { ROLES, raceStatementTimeoutMs, serverNow, startHarness, waitForLockWait, type AgencyFixture, type Harness } from "@kauro/persistence/testing";
+import { ROLES, raceStatementTimeoutMs, serverNow, startHarness, waitForLockWait, type AgencyFixture, type Harness, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import {
   API_APPLICATION_NAME,
   activeWorkInspector,
@@ -419,6 +420,8 @@ export interface World {
   readonly storage: ContractFakeObjectStorage;
   readonly vault: ContractFakeSessionVault;
   readonly internalErrors: Array<{ correlationId: string; error: unknown }>;
+  /** The bank-transfer route's restricted evidence store, bound after start-up (bank-support.ts bankWorld binds its CONTRACT_FAKE store). */
+  readonly bank: { evidence: BankEvidenceStore | null };
   /** Agency A (DRAFT) and its people. */
   readonly A: AgencyFixture;
   readonly owner: Person;
@@ -551,8 +554,8 @@ export interface WorldOptions {
    * contract fakes of @kauro/application/testing; test/commerce-support.ts). Absent: the edition's, as a deployment runs.
    */
   readonly commerce?: (h: Harness) => Partial<CommerceRequestCollaborators>;
-  /** Package B10: the platform ports the api binds beside the edition's (ApiAssembly.commercial: the buyer type reader, test/sales-support.ts; the statements' step-up verifier, test/b10-family-templates.test.ts). */
-  readonly commercial?: { readonly buyerTypes?: BuyerTypeReader; readonly assurance?: AssuranceVerifier };
+  /** Package B10: the platform ports the api binds beside the edition's (ApiAssembly.commercial: the buyer type reader; test/sales-support.ts). */
+  readonly commercial?: { readonly buyerTypes?: BuyerTypeReader; readonly assurance?: AssuranceVerifier; readonly providerTimer?: ProviderCallTimer; readonly onLateFailure?: LateFailureSink };
   /** Package B10 (CMD027 CreateQuote): the collaborators the api binds beyond the edition's (the buyer type fake, the replacement hold, a re-binder). */
   readonly quotes?: (h: Harness) => Partial<QuoteCollaborators>;
   /**
@@ -611,6 +614,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const h = await startHarness();
   const db = await openDatabase({
     database: { host: "127.0.0.1", port: h.pg.port, database: ROLES.database, user: ROLES.appLogin, poolMax: 6, statementTimeoutMs: raceStatementTimeoutMs() },
+    databaseEnvironment: testDatabaseEnvironment("LOCAL"),
     migrateOnStart: null,
     ...(options.sessions === true ? { identity: { assuranceDatabase: { user: ROLES.assuranceLogin, poolMax: 2 } } } : {}),
   });
@@ -665,8 +669,10 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const { artifacts: _artifacts, patchCompiler: _patchCompiler, disclosures: _disclosures, ...withoutPlanServices } = configured;
   const collaborators: Partial<B06Collaborators> = options.realPlanServices === true ? withoutPlanServices : configured;
 
+  const bank: { evidence: BankEvidenceStore | null } = { evidence: null };
   const app = assembleApi({
     environment: "LOCAL",
+    bank: { evidence: () => bank.evidence, classifier: () => contractFakeBankDetailsClassifier },
     unitOfWork: (options.wrapUnitOfWork ?? ((f) => f))(instrumentedFactory(db.unitOfWork, holds, stats)),
     database: db,
     authenticator: createBearerTokenAuthenticator(tokens),
@@ -757,6 +763,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     storage,
     vault,
     internalErrors,
+    bank,
     A,
     owner,
     admin,
@@ -899,12 +906,12 @@ export async function world(options: WorldOptions = {}): Promise<World> {
 
     async stepUp(person, freshness = "FRESH") {
       // recorded by the step-up verifier (kauro_assurance), never by the request-handler role whose gate the proof satisfies
-      const issuedMs = Date.parse(await serverNow(h.assurancePool.raw)) - 1000 - (freshness === "FRESH" ? 0 : 20 * 60_000);
+      const issuedMs = Date.parse(await serverNow(h.assurancePool)) - 1000 - (freshness === "FRESH" ? 0 : 20 * 60_000);
       return h.recordStepUp(person.userId, { issuedAt: toUtcInstant(issuedMs) });
     },
 
     async asTenant(agency, fn) {
-      const c = await h.appPool.raw.connect();
+      const c = await h.appPool.connectUnverified();
       try {
         await c.query("BEGIN");
         await c.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [agency.agencyId, agency.ownerUserId]);

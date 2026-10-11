@@ -441,32 +441,58 @@ export function registerFamily(members: ReadonlyArray<Member<never, never>>, opt
 
 // --- the footprint (section 4, r2 R8) ------------------------------------------------------------------------------------------------
 
-type Snapshot = ReadonlyMap<string, ReadonlySet<string>>;
+interface Snapshot {
+  readonly rows: ReadonlyMap<string, ReadonlySet<string>>;
+  /** Each table's primary-key columns: a row's durable identity, by which a removed row is matched to the update that replaced it. */
+  readonly keys: ReadonlyMap<string, ReadonlyArray<string>>;
+}
 async function snapshot(tables: ReadonlyArray<string>): Promise<Snapshot> {
-  const out = new Map<string, Set<string>>();
+  const rows = new Map<string, Set<string>>();
+  const keys = new Map<string, string[]>();
   for (const t of new Set([...tables, ...ALWAYS])) {
     if (!/^[a-z_]+$/.test(t)) throw new Error(`footprint table ${t} is not a kauro table name`);
     const r = await familyOf().oracle.query<{ j: string }>(`SELECT row_to_json(x)::text AS j FROM kauro.${t} x`);
-    out.set(t, new Set(r.rows.map((row) => row.j)));
+    rows.set(t, new Set(r.rows.map((row) => row.j)));
+    const k = await familyOf().oracle.query<{ col: string }>(
+      "SELECT a.attname AS col FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey::int2[]) WHERE i.indrelid = ('kauro.' || $1)::regclass AND i.indisprimary ORDER BY array_position(i.indkey::int2[], a.attnum)",
+      [t],
+    );
+    keys.set(t, k.rows.map((row) => row.col));
   }
-  return out;
+  return { rows, keys };
 }
 const canonical = (row: Record<string, unknown>): string => JSON.stringify(row);
+/** A row's durable identity: its primary-key values (null when the table has none: then no removal can be matched). */
+const identityOf = (key: ReadonlyArray<string>, row: Record<string, unknown>): string | null => (key.length === 0 ? null : JSON.stringify(key.map((c) => row[c] ?? null)));
 /**
  * The footprint rule: after a fault the footprint is the one before plus EXACTLY the rows the units before the target committed (a row an
  * earlier unit changed shows as its new version; its old version is the only row that may leave). The target unit's writes are absent.
+ * A removed row is matched by IDENTITY (its primary key) to a declared earlier row it is the previous version of, once: a deletion of an
+ * unrelated row never hides behind a legitimate insertion (B10-KIT-PR1-01).
  */
 async function assertFootprint(what: string, before: Snapshot, tables: ReadonlyArray<string>, earlier: RowSet): Promise<void> {
   const after = await snapshot(tables);
-  for (const [t, rows] of after) {
-    const was = before.get(t) ?? new Set<string>();
+  for (const [t, rows] of after.rows) {
+    const was = before.rows.get(t) ?? new Set<string>();
     const added = [...rows].filter((j) => !was.has(j)).map((j) => canonical(JSON.parse(j) as Record<string, unknown>)).sort();
-    const removed = [...was].filter((j) => !rows.has(j));
-    const expected = (earlier[t] ?? []).map((row) => canonical(JSON.parse(JSON.stringify(row)) as Record<string, unknown>)).sort();
+    const removed = [...was].filter((j) => !rows.has(j)).map((j) => JSON.parse(j) as Record<string, unknown>);
+    const declared = (earlier[t] ?? []).map((row) => JSON.parse(JSON.stringify(row)) as Record<string, unknown>);
+    const expected = declared.map(canonical).sort();
     assert.deepEqual(added, expected, `${what}: kauro.${t} gained exactly the rows the units before the target committed`);
-    assert.ok(removed.length <= added.length, `${what}: kauro.${t} lost ${removed.length} row(s) no earlier unit replaced`);
+    const key = after.keys.get(t) ?? [];
+    const updatable = new Map<string, number>();
+    for (const row of declared) {
+      const id = identityOf(key, row);
+      if (id !== null) updatable.set(id, (updatable.get(id) ?? 0) + 1);
+    }
+    for (const row of removed) {
+      const id = identityOf(key, row);
+      const left = id === null ? 0 : (updatable.get(id) ?? 0);
+      assert.ok(left > 0, `${what}: kauro.${t} lost a row that is not the previous version of a row an earlier unit updated (${key.length === 0 ? "the table has no primary key to match it by" : `key ${key.join(",")} = ${id}`})`);
+      updatable.set(id!, left - 1);
+    }
   }
-  for (const t of Object.keys(earlier)) assert.ok(after.has(t), `${what}: the earlier rows of ${t} are outside the member's footprint tables`);
+  for (const t of Object.keys(earlier)) assert.ok(after.rows.has(t), `${what}: the earlier rows of ${t} are outside the member's footprint tables`);
 }
 
 // --- routing of the act ---------------------------------------------------------------------------------------------------------------
@@ -507,6 +533,16 @@ function targetUnit<F>(log: ReadonlyArray<UnitLog>, unit: UnitTarget<F>, f: F, c
     throw new Error(`${code}: target unit is another phase — unit ${unit.ordinal} (${unit.phase}) does not carry its witness ${unit.witness.label} with the member's identity (units: ${log.map((x) => `${x.ordinal}:${x.role ?? "?"}:${x.statements.length}`).join(", ")})`);
   }
   return u;
+}
+/**
+ * The statement a holder is paused after (`db.<holdAfter>.after`): the last statement the act dispatched (it is stopped right after it). It
+ * must carry the receipt's label and the member's identity params and, when the member declares one, belong to its target unit
+ * (B10-KIT-PR1-02: a valid witness elsewhere proves nothing about the paused statement).
+ */
+function pausedAt<F>(log: ReadonlyArray<UnitLog>, holdAfter: Receipt<F>, f: F, what: string, ordinal?: number): void {
+  const unit = log[log.length - 1];
+  const held = unit?.statements[unit.statements.length - 1];
+  assert.ok(unit !== undefined && held !== undefined && held.label === holdAfter.label && holdAfter.identity(f)(held.params) && (ordinal === undefined || unit.ordinal === ordinal), `${what} (paused in unit ${unit?.ordinal ?? "none"} after ${held?.label ?? "no step"})`);
 }
 /** The statements of a unit carrying a receipt's label with the member's identity params. */
 const receipts = <F>(u: UnitLog, r: Receipt<F>, f: F): LoggedStatement[] => u.statements.filter((s) => s.label === r.label && r.identity(f)(s.params));
@@ -766,6 +802,7 @@ async function twice<F>(ctx: FaultContext, m: Member<F, unknown>, point: Extract
     const a = settledOf(ctx.operation(`${m.code} A (holder)`, () => routedAct(ctx, m, f, keyOf(m as Member<unknown, unknown>), ca.conns, [point.holder.holdAfter], { target: point.holder.unit.ordinal, log: logA })));
     await pause.reachedBy(a.then((r) => (r.status === "fulfilled" ? r.value : Promise.reject(r.reason))));
     targetUnit(logA, point.holder.unit, f, `${m.code} A`);
+    pausedAt(logA, point.holder.holdAfter, f, `${m.code}: A paused after ${point.holder.holdAfter.label} in its target unit ${point.holder.unit.ordinal} with the member's identity params`, point.holder.unit.ordinal);
     let blocked: LoggedStatement | undefined;
     const waiting = await ctx.mustWait(fam.oracle, { waiter: cb.first, holder: connectionPid(ca.conns[Object.keys(m.roles)[0] as RouteRole]!) }, (conn) => routedAct(ctx, m, f, keyOf(m as Member<unknown, unknown>), cb.conns, [point.waiter.blocks], { target: point.waiter.unit.ordinal, log: logB }, conn), `${m.code}: B while A holds after ${point.holder.holdAfter.label}`);
     const unitB = logB.find((u) => u.ordinal === point.waiter.unit.ordinal);
@@ -816,8 +853,10 @@ async function membership<F>(ctx: FaultContext, m: Member<F, unknown>, point: Ex
   const rc2 = await fam.open("kauro_control_test");
   try {
     const pause = ctx.points.pause(`db.${point.holdAfter.label}.after`);
-    const act = settledOf(ctx.operation(`${m.code} holding the membership`, () => routedAct(ctx, m, f2, keyOf(m as Member<unknown, unknown>), c2.conns, [point.holdAfter], {})));
+    const log2: UnitLog[] = [];
+    const act = settledOf(ctx.operation(`${m.code} holding the membership`, () => routedAct(ctx, m, f2, keyOf(m as Member<unknown, unknown>), c2.conns, [point.holdAfter], { log: log2 })));
     await pause.reachedBy(act.then((r) => (r.status === "fulfilled" ? r.value : Promise.reject(r.reason))));
+    pausedAt(log2, point.holdAfter, f2, `${m.code}: the act paused after ${point.holdAfter.label} with the member's identity params`);
     const revocation = settledOf(
       (async () => {
         await rc2.query("BEGIN");
@@ -835,10 +874,13 @@ async function membership<F>(ctx: FaultContext, m: Member<F, unknown>, point: Ex
     });
     // (3) every act after the revocation is refused
     const f3 = await m.fixture(`${label}-3`, f2);
+    const before3 = await snapshot(m.tables);
     const c3 = await connectionsOf(m as Member<unknown, unknown>);
     try {
       await ctx.fenced(`${m.code}: an act after the revocation`, () => routedAct(ctx, m, f3, keyOf(m as Member<unknown, unknown>), c3.conns, [], {}), point.refusal);
       await m.failed(f3, undefined);
+      // the refused act changes nothing durable (B10-KIT-PR1-03): no earlier unit, so the footprint is the one before, exactly
+      await assertFootprint(`${m.code} refused after the revocation (every act after it)`, before3, m.tables, {});
     } finally {
       await c3.end();
     }

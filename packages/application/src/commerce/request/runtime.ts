@@ -42,6 +42,7 @@ import type {
   UserId,
 } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, IdempotencyConflictFailure, actorOf, commandRequestDigest } from "@kauro/domain";
+import { judgedUnderHold } from "../../api/authority.js";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { problemOf, type Problem } from "../../api/problems.js";
 import type { ReadRequest, ReadResult, ReadSpec } from "../../queries/reads.js";
@@ -55,6 +56,7 @@ import type { ProtocolPoint } from "../core/provider-effects.js";
 import type { PurchasedSubjectReader } from "../core/subject.js";
 import type { DurableOperation } from "../protocol.js";
 import type { CommerceReadOperationId } from "../response-schemas.js";
+import type { BankRouteCollaborators } from "../bank/ports.js";
 
 // --- the ports the request side reads through ------------------------------------------------------------------------------------
 
@@ -94,6 +96,8 @@ export interface CommerceRequestCollaborators {
   readonly sources: SourceAvailabilityReader | null;
   /** Test-only hold of the provider-effect protocol (never bound by a deployment; D-REQ-B6). */
   readonly protocolHold?: ProtocolHold;
+  /** The bank-transfer route (Payments V1, lane L-ROUTE); absent or null: CMD028 BANK_TRANSFER answers EVIDENCE_UNAVAILABLE. */
+  readonly bank?: BankRouteCollaborators | null;
 }
 
 /** What every request-side handler and read needs beside its collaborators. */
@@ -299,6 +303,10 @@ export async function runCommerceCommand<Body, View>(runtime: CommerceRequestRun
       if (reservation.kind === "REPLAY") {
         const status = reservation.entry.responseStatus;
         if ((status !== 200 && status !== 201) || reservation.entry.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "journaled entry is COMMITTED without a complete response");
+        // rule 16 (adversary r6 ADV-2): a replay hands out the journaled response, secrets included, so the cookie session that asks is judged
+        // exactly as the fresh path judges it: its row locked FOR SHARE first in this unit (its COMMIT is the release), THEN the clock, THEN
+        // the judgment; a credential that ended is refused 401 and the stored body is not returned
+        await judgedUnderHold(envelope.authority, uow, runtime.clock);
         return new Replayed(status, reservation.entry.responseBody);
       }
       if (reservation.kind === "CONFLICT") throw new IdempotencyConflictFailure();
