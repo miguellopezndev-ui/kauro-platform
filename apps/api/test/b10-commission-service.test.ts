@@ -19,7 +19,6 @@ import { AuthorizationDeliveryCompletionSource } from "@kauro/persistence";
 import { DISPATCH_LEASE_SECONDS, PAYMENT_APPLICATION_NAME, commissionLeaseResource, createCommissionService } from "../src/index.js";
 import {
   acceptAttribution,
-  acquisitionInstants,
   adjustmentsOf,
   approvedPlan,
   approvedRefund,
@@ -87,7 +86,7 @@ async function sweep(service: CommissionWorld["service"], name: Parameters<Commi
 
 async function acquired(label: string, options: { readonly acceptedAt?: string; readonly sellers?: number; readonly shares?: ReadonlyArray<number> } = {}) {
   const s = await sellingAgency(cw, label);
-  const a = await claimsOn(cw, label, options.sellers ?? 1, options.acceptedAt === undefined ? undefined : acquisitionInstants(options.acceptedAt).submittedAt);
+  const a = await claimsOn(cw, label, options.sellers ?? 1);
   const allocationId = await acceptAttribution(cw, s.agency.agencyId, a, options.shares ?? [10_000], options.acceptedAt ?? null);
   return { s, a, allocationId };
 }
@@ -131,7 +130,7 @@ async function reversed(p: Purchase): Promise<void> {
 
 test("R2-094: after a first confirmation at 2028-02-29T15:00:00Z, a subsequent capture completed at the provider at 2029-02-28T14:59:59Z accrues a 400-bps line and one completed at 2029-02-28T15:00:00Z accrues no acquisition line", async () => {
   const { s } = await acquired("r094", { acceptedAt: "2028-02-20T12:00:00Z" });
-  const first = await purchase(cw, s, "r094-first", { orderAt: acquisitionInstants("2028-02-20T12:00:00Z").orderAt, confirmedAt: "2028-02-29T15:00:00Z", providerCompletedAt: "2028-02-29T14:55:00Z" });
+  const first = await purchase(cw, s, "r094-first", { confirmedAt: "2028-02-29T15:00:00Z", providerCompletedAt: "2028-02-29T14:55:00Z" });
   const inside = await purchase(cw, s, "r094-inside", { providerCompletedAt: "2029-02-28T14:59:59Z", confirmedAt: "2029-03-01T15:00:00Z" });
   const atEnd = await purchase(cw, s, "r094-end", { providerCompletedAt: "2029-02-28T15:00:00Z", confirmedAt: "2029-03-01T16:00:00Z" });
   await dispatch();
@@ -153,7 +152,7 @@ let example3: { readonly s: Selling; readonly sellers: ReadonlyArray<{ readonly 
 
 test("R2-098 (example 3): a purchase completed at the provider at or after the window end accrues no acquisition line, and no assistance line without a prior agreement, while the seller's earned lines of the window stay on their path to payment", async () => {
   const { s, a } = await acquired("ex3", { acceptedAt: "2027-01-02T12:00:00Z", sellers: 2, shares: [6_000, 4_000] });
-  const first = await purchase(cw, s, "ex3-first", { orderAt: acquisitionInstants("2027-01-02T12:00:00Z").orderAt, confirmedAt: "2027-01-10T15:00:00Z", providerCompletedAt: "2027-01-10T14:50:00Z" });
+  const first = await purchase(cw, s, "ex3-first", { confirmedAt: "2027-01-10T15:00:00Z", providerCompletedAt: "2027-01-10T14:50:00Z" });
   await dispatch();
   const lines = await linesOf(cw, first.authorizationId);
   // the first pool, 9713, split 6000/4000 by largest remainder: 5827.8 → 5828 and 3885.2 → 3885 (worked example 8's rule)
@@ -353,7 +352,7 @@ test("R2-137 (examples 9 and 10): P confirmed first keeps sequence 1 and its 100
 test("R2-138: two subsequent captures completed at the provider one second before and exactly at the local twelve-month endpoint, both notified a day later, accrue 400 bps for the first and no acquisition line for the second", async () => {
   // example 11: the first confirmation at 09:00 in America/Bogota; the window ends at 09:00 twelve calendar months later
   const { s } = await acquired("r138", { acceptedAt: "2027-09-01T12:00:00Z" });
-  await purchase(cw, s, "r138-first", { orderAt: acquisitionInstants("2027-09-01T12:00:00Z").orderAt, confirmedAt: "2027-09-12T14:00:00Z", providerCompletedAt: "2027-09-12T13:55:00Z" });
+  await purchase(cw, s, "r138-first", { confirmedAt: "2027-09-12T14:00:00Z", providerCompletedAt: "2027-09-12T13:55:00Z" });
   const before = await purchase(cw, s, "r138-before", { providerCompletedAt: "2028-09-12T13:59:59Z", confirmedAt: "2028-09-13T13:59:59Z" });
   const atEnd = await purchase(cw, s, "r138-end", { providerCompletedAt: "2028-09-12T14:00:00Z", confirmedAt: "2028-09-13T14:00:00Z" });
   await dispatch();
@@ -599,6 +598,55 @@ test("example 19: a tax-inclusive 112000-cent capture of a 100000-cent service l
   assert.deepEqual(poolShape(await poolsOf(cw, p.authorizationId)), [{ source: "ACQUISITION", rateKind: "FIRST", rateBps: 1000, basis: "50000", pool: "5000" }]);
   const [line] = await linesOf(cw, p.authorizationId);
   assert.deepEqual((await adjustmentsOf(cw, line!.line_id)).map((x) => [x.reason, x.direction, x.amount_cents, x.new_cumulative_entitlement_cents, x.new_basis_cents]), [["REFUND", "DECREASE", "5000", "5000", "50000"]]);
+});
+
+/**
+ * The bank-transfer rail over this commission world (lane L-INBOUND, PAYMENTS-V1 §7.26): a purchase paid by one exact bank credit through
+ * L-ROUTE's I2 and L-INBOUND's C5/C6/M1-M2/P1, its funds observation (a credit version with fundsState) and its refund through the manual
+ * rail (L-REFUND's F2/X1/G2). KIT seam IN1 (missing on a6e64be): commissionWorld({ bankEvidence }) wiring the CONTRACT_FAKE bank store
+ * into this world's api and payment runtime, exposing `cw.bank` with exactly these three operations.
+ */
+interface BankRail {
+  purchase(s: Selling, label: string): Promise<Purchase>;
+  funds(p: Purchase, state: "HELD" | "AVAILABLE"): Promise<void>;
+  refunded(s: Selling, p: Purchase, serviceCents: bigint, taxCents?: bigint): Promise<string>;
+}
+function bankRail(): BankRail {
+  const rail = (cw as unknown as { bank?: BankRail }).bank;
+  if (rail === undefined) throw new Error("SEAM IN1 missing on KIT: commissionWorld({ bankEvidence }) exposing cw.bank { purchase, funds, refunded } over the CONTRACT_FAKE bank store (L-ROUTE I2 + L-INBOUND C5/C6/P1 + L-REFUND F2/X1/G2)");
+  return rail;
+}
+
+test("OK rail parity: an exact bank-transfer capture accrues, holds and adjusts commission exactly as a provider capture of the same cents", async () => {
+  const rail = bankRail();
+  const { s: sp } = await acquired("rail-provider");
+  const { s: sb } = await acquired("rail-bank");
+  const provider = await purchase(cw, sp, "rail-provider");
+  const bank = await rail.purchase(sb, "rail-bank");
+  assert.deepEqual([bank.serviceCents, bank.taxCents, bank.totalCents], [provider.serviceCents, provider.taxCents, provider.totalCents], "the same cents on both rails");
+  await dispatch();
+  // accrues: one first-purchase pool on the allocated service, the same rate, basis and pool
+  const pp = poolShape(await poolsOf(cw, provider.authorizationId));
+  assert.deepEqual(pp, [{ source: "ACQUISITION", rateKind: "FIRST", rateBps: 1000, basis: SERVICE.toString(), pool: FIRST_POOL }]);
+  assert.deepEqual(poolShape(await poolsOf(cw, bank.authorizationId)), pp, "the bank capture accrues exactly as the provider capture");
+  const [pLine] = await linesOf(cw, provider.authorizationId);
+  const [bLine] = await linesOf(cw, bank.authorizationId);
+  // holds: funds held at the provider / at the receiving bank -> the same FUNDS_HELD hold of the same cents
+  await fundsAtProvider(provider, "DELAYED");
+  await rail.funds(bank, "HELD");
+  await dispatch();
+  const holdOf = async (lineId: string) => (await oracleRows<{ reason: string; amount_cents: string; state: string }>(cw, "SELECT reason, amount_cents::text, state FROM kauro.commission_holds WHERE line_id = $1", [lineId])).map((h) => [h.reason, h.amount_cents, h.state]);
+  assert.deepEqual(await holdOf(pLine!.line_id), [["FUNDS_HELD", FIRST_POOL, "OPEN"]]);
+  assert.deepEqual(await holdOf(bLine!.line_id), await holdOf(pLine!.line_id), "held exactly alike");
+  assert.deepEqual([(await lineState(bLine!.line_id)).state, (await lineState(pLine!.line_id)).state], ["HELD", "HELD"]);
+  // adjusts: a 50,000-cent service refund decreases both bases and entitlements by the same cents
+  await refunded(sp, provider, 50_000n);
+  await rail.refunded(sb, bank, 50_000n);
+  await dispatch();
+  const adj = async (lineId: string) => (await adjustmentsOf(cw, lineId)).map((x) => [x.reason, x.direction, x.amount_cents, x.new_cumulative_entitlement_cents, x.new_basis_cents]);
+  // basis 97,125 - 50,000 = 47,125; the line's entitlement follows its pool round_half_up_bps(47125, 1000) = 4713 (split per share)
+  assert.deepEqual((await adj(pLine!.line_id)).map((x) => [x[0], x[1], x[4]]), [["REFUND", "DECREASE", "47125"]]);
+  assert.deepEqual(await adj(bLine!.line_id), await adj(pLine!.line_id), "adjusted exactly alike");
 });
 
 // --- the window sweeps (they stand up to a year ahead: last) -----------------------------------------------------------------
