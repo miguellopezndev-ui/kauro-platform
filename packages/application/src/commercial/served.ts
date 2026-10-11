@@ -25,7 +25,7 @@ import { COMMERCIAL_COMMAND_OUTCOMES, COMMERCIAL_READ_OUTCOMES } from "./outcome
 import { COMMERCIAL_COMMAND_RESPONSES, commercialCommandResponseSchemaId, commercialReadResponseSchemaId, type CommercialReadOperationId, type CommercialServedCommandId } from "./response-schemas.js";
 
 /** The B10 commands the api serves. */
-export const COMMERCIAL_SERVED_COMMAND_IDS = Object.freeze(["CMD002", "CMD027", "CMD043", "CMD045", "CMD046", "CMD047", "CMD048", "CMD049", "CMD050", "CMD051", "CMD052", "CMD053"] as const satisfies ReadonlyArray<CommercialServedCommandId>);
+export const COMMERCIAL_SERVED_COMMAND_IDS = Object.freeze(["CMD002", "CMD027", "CMD043", "CMD045", "CMD046", "CMD047", "CMD048", "CMD049", "CMD050", "CMD051", "CMD052", "CMD053", "CMD058", "CMD059"] as const satisfies ReadonlyArray<CommercialServedCommandId>);
 export type CommercialServedRouteCommandId = (typeof COMMERCIAL_SERVED_COMMAND_IDS)[number];
 
 export function isServedCommercialCommand(id: string): id is CommercialServedRouteCommandId {
@@ -68,6 +68,9 @@ export const COMMERCIAL_COMMAND_EVENTS: Readonly<Record<CommercialServedRouteCom
   CMD051: [],
   CMD052: [],
   CMD053: [],
+  // the capability row is a platform record: CMD058 and CMD059 publish no domain event (the versions and restrictions tables are their evidence)
+  CMD058: [],
+  CMD059: [],
   CMD027: [
     "quote.drafted.v1",
     "quote.issued.v1",

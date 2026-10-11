@@ -29,9 +29,11 @@ import type {
   SalesAccountView,
   SellerTerminationView,
   SellerView,
+  CapabilityVersionView,
+  CapabilityRestrictionView,
 } from "./views.js";
 
-export type CommercialCommandId = "CMD002" | "CMD027" | "CMD043" | "CMD045" | "CMD046" | "CMD047" | "CMD048" | "CMD049" | "CMD050" | "CMD051" | "CMD052" | "CMD053";
+export type CommercialCommandId = "CMD002" | "CMD027" | "CMD043" | "CMD045" | "CMD046" | "CMD047" | "CMD048" | "CMD049" | "CMD050" | "CMD051" | "CMD052" | "CMD053" | "CMD058" | "CMD059";
 
 export type CommercialPrincipalKind = "AGENCY_MEMBER" | "SELLER" | "SELLER_OR_OWNER" | "CORPORATE_OPERATOR" | "COMMERCIAL_SERVICE";
 
@@ -43,7 +45,7 @@ export interface CommercialCommandSpec<Body> {
   readonly method: "POST";
   readonly path: string;
   /** The catalogue role (commands.json through @kauro/contracts, brand-mapped: KAURO_OWNER). */
-  readonly role: "AGENCY_OWNER" | "AGENCY_BILLING" | "ACTIVE_SELLER_OR_OWNER" | "ACTIVE_SELLER" | "KAURO_OWNER" | "COMMISSION_SERVICE" | "FINANCE_SERVICE";
+  readonly role: "AGENCY_OWNER" | "AGENCY_BILLING" | "ACTIVE_SELLER_OR_OWNER" | "ACTIVE_SELLER" | "KAURO_OWNER" | "OPERATIONS_SERVICE_OR_OWNER" | "COMMISSION_SERVICE" | "FINANCE_SERVICE";
   readonly principal: CommercialPrincipalKind;
   /**
    * The database role of the command's unit of work: kauro_app for a request handler (TENANT for an agency member, OPERATOR for a
@@ -368,6 +370,53 @@ export const RECONCILE_COMMISSION_PAYOUT = spec<ReconcileCommissionPayoutBody>({
   stepUp: false,
 });
 
+// --- CMD058 ChangeCapability, CMD059 RestrictCapability (package B18; gate G-RELEASE) -----------------------------------------------
+
+export interface ChangeCapabilityBody {
+  readonly expectedVersion: number;
+  readonly profileHash: string;
+  readonly qualificationEvidenceRefs: ReadonlyArray<string>;
+}
+export type ChangeCapabilityResult = CapabilityVersionView;
+export const CHANGE_CAPABILITY = spec<ChangeCapabilityBody>({
+  id: "CMD058",
+  name: "ChangeCapability",
+  method: "POST",
+  path: "/api/v1/operations/capabilities/{capabilityId}/versions",
+  role: "KAURO_OWNER",
+  principal: "CORPORATE_OPERATOR",
+  runtimeRole: "kauro_app",
+  scope: "CORPORATE",
+  aggregateParam: "capabilityId",
+  scopeKind: null,
+  expectedVersionRequired: true,
+  authorityHashFields: [],
+  fields: ["expectedVersion", "profileHash", "qualificationEvidenceRefs"],
+  stepUp: false,
+});
+
+export interface RestrictCapabilityBody {
+  readonly expectedVersion: number;
+  readonly incidentRef: string;
+}
+export type RestrictCapabilityResult = CapabilityRestrictionView;
+export const RESTRICT_CAPABILITY = spec<RestrictCapabilityBody>({
+  id: "CMD059",
+  name: "RestrictCapability",
+  method: "POST",
+  path: "/api/v1/operations/capabilities/{capabilityId}/restrict",
+  role: "OPERATIONS_SERVICE_OR_OWNER",
+  principal: "CORPORATE_OPERATOR",
+  runtimeRole: "kauro_app",
+  scope: "CORPORATE",
+  aggregateParam: "capabilityId",
+  scopeKind: null,
+  expectedVersionRequired: true,
+  authorityHashFields: [],
+  fields: ["expectedVersion", "incidentRef"],
+  stepUp: false,
+});
+
 export const COMMERCIAL_COMMANDS = Object.freeze({
   CMD002: ACTIVATE_AGENCY,
   CMD027: CREATE_QUOTE,
@@ -381,4 +430,6 @@ export const COMMERCIAL_COMMANDS = Object.freeze({
   CMD051: CLOSE_COMMISSION_PERIOD,
   CMD052: APPROVE_COMMISSION_PAYOUT,
   CMD053: RECONCILE_COMMISSION_PAYOUT,
+  CMD058: CHANGE_CAPABILITY,
+  CMD059: RESTRICT_CAPABILITY,
 } as const);

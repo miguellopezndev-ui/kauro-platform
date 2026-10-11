@@ -23,3 +23,4 @@ export * from "./prospects/index.js";
 export * from "./sellers/index.js";
 export * from "./quotes/index.js";
 export * from "./statements/index.js";
+export * from "./capabilities/index.js";

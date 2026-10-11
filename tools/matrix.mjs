@@ -662,6 +662,37 @@ APPLICABILITY.CMD053 = {
   "external uncertainty": [[RECONCILE_PAYOUT, "DENY: a user token or the commission service is a wrong service identity (403) and an intent of another statement a foreign scope (404); then one missing prerequisite at a time — evidence of another reference, destination or amount PAYOUT_EVIDENCE_MISMATCH, SUBMITTED-only evidence PAYOUT_NOT_SETTLED"]],
 };
 
+// package B18's capability commands (docs/design: registry CMD058, CMD059; gate G-RELEASE): the corporate owner's, none reaches a provider
+const CAPABILITIES = "cmd058-cmd059-capabilities.test.ts";
+const CMD058_OK = "CMD058-OK: the owner records a PROSPECTIVE version";
+const CMD058_DENY = "CMD058-DENY: an agency member and a stranger are refused (403)";
+const CMD058_RACE = "CMD058-RACE: an identical retry replays the 200";
+const CMD059_OK = "CMD059-OK: the owner restricts the offered CLEAN capability";
+const CMD059_DENY = "CMD059-DENY: an agency member and a stranger are refused (403)";
+const CMD059_RACE = "CMD059-RACE: an identical retry replays the 200";
+APPLICABILITY.CMD058 = {
+  "legitimate state": [[CAPABILITIES, CMD058_OK]],
+  "wrong role": [[CAPABILITIES, CMD058_DENY]],
+  "wrong agency": [[CAPABILITIES, CMD058_DENY]],
+  "stale version": [[CAPABILITIES, CMD058_DENY], [CAPABILITIES, CMD058_RACE]],
+  "duplicate request": [[CAPABILITIES, CMD058_RACE]],
+  "changed-body same key": [[CAPABILITIES, CMD058_RACE]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[CAPABILITIES, CMD058_RACE]],
+  "external uncertainty": "NOT_APPLICABLE: a version reaches no provider; the prospective version, the advanced revision and the journal entry are rows of one database transaction",
+};
+APPLICABILITY.CMD059 = {
+  "legitimate state": [[CAPABILITIES, CMD059_OK]],
+  "wrong role": [[CAPABILITIES, CMD059_DENY]],
+  "wrong agency": [[CAPABILITIES, CMD059_DENY]],
+  "stale version": [[CAPABILITIES, CMD059_DENY], [CAPABILITIES, CMD059_RACE]],
+  "duplicate request": [[CAPABILITIES, CMD059_RACE]],
+  "changed-body same key": [[CAPABILITIES, CMD059_RACE]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[CAPABILITIES, CMD059_RACE]],
+  "external uncertainty": "NOT_APPLICABLE: a restriction reaches no provider; the SUSPENDED edge, the restriction evidence and the journal entry are rows of one database transaction, and routing the work of a paid project to recovery or refund is the recovery commands' own step",
+};
+
 // package B09's served payment commands (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8 CMD030, CMD033, CMD034)
 const WEBHOOK = "cmd030-payment-webhook.test.ts";
 const EXECUTE = "cmd033-execute-refund.test.ts";

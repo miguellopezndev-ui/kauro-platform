@@ -43,6 +43,7 @@ const CALENDAR_VERSION = Object.freeze({ type: "string", pattern: "^[A-Za-z0-9][
 const BOOLEAN = Object.freeze({ type: "boolean" });
 const NARROW_MONEY = Object.freeze({ maxLength: 16 });
 const enumOf = (values: ReadonlyArray<string>): JsonSchema => ({ type: "string", enum: [...values] });
+const CAPABILITY_STATES = ["DESIGN", "IMPLEMENTED_UNACCEPTED", "QUALIFIED_INTERNAL", "AVAILABLE_LIMITED", "AVAILABLE", "SUSPENDED"] as const;
 
 /**
  * Member names no commercial response may declare, with the authority that forbids them. The B06 list applies too (tokens, secrets,
@@ -370,6 +371,37 @@ export const COMMERCIAL_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object
       version: platform(true, VERSION, "Intent version."),
     },
   },
+  {
+    name: "CapabilityVersionView",
+    description: "CMD058: the PROSPECTIVE version recorded for a capability. The capability state is shown and never moved by the command.",
+    contract: null,
+    withheld: {},
+    members: {
+      capabilityId: platform(true, ID, "The capability."),
+      version: platform(true, VERSION, "The capability version (revision) the new prospective version reached."),
+      status: platform(true, enumOf(["PROSPECTIVE"]), "A recorded version is PROSPECTIVE: it is not offered."),
+      state: platform(true, enumOf(CAPABILITY_STATES), "The capability state, unchanged by the command."),
+      profileHash: platform(true, HASH, "The profile hash of the version."),
+      qualificationEvidenceCount: platform(true, COUNT, "How many qualification evidence hashes the version cites."),
+      createdAt: platform(true, UTC, "The instant the database recorded the version."),
+    },
+  },
+  {
+    name: "CapabilityRestrictionView",
+    description: "CMD059: the capability after its restriction. New admission is closed; no project row was changed.",
+    contract: null,
+    withheld: {},
+    members: {
+      capabilityId: platform(true, ID, "The restricted capability."),
+      version: platform(true, VERSION, "The capability version (revision) after the restriction."),
+      state: platform(true, enumOf(["SUSPENDED"]), "The capability state after the restriction."),
+      priorState: platform(true, enumOf(CAPABILITY_STATES), "The state the capability left."),
+      restrictionId: platform(true, ID, "The restriction evidence record."),
+      incidentRef: platform(true, ID, "The incident the restriction names."),
+      restrictedAt: platform(true, UTC, "The instant the database recorded the restriction."),
+      newAdmissionBlocked: platform(true, BOOLEAN, "New admission of the capability is closed."),
+    },
+  },
 ] satisfies ReadonlyArray<ViewDefinition>);
 
 /** The success reply of each B10 command: status and the view its COMPLETED envelope carries. B10 answers synchronously, except CMD027's replacement whose re-binding timed out (ACCEPTED). */
@@ -387,6 +419,8 @@ export const COMMERCIAL_COMMAND_RESPONSES = Object.freeze({
   CMD051: { status: 200, view: "PeriodCloseView", accepted: false },
   CMD052: { status: 200, view: "PayoutIntentView", accepted: false },
   CMD053: { status: 200, view: "PayoutReconciliationView", accepted: false },
+  CMD058: { status: 200, view: "CapabilityVersionView", accepted: false },
+  CMD059: { status: 200, view: "CapabilityRestrictionView", accepted: false },
 } as const);
 export type CommercialServedCommandId = keyof typeof COMMERCIAL_COMMAND_RESPONSES;
 

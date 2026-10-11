@@ -241,3 +241,5 @@ export * from "./model/execution/index.js";
 export * from "./model/audit/index.js";
 // target contracts (package B17: CMD018, CMD019)
 export * from "./model/target-contract.js";
+// capability governance (package B18: CMD058, CMD059)
+export * from "./model/capability-governance.js";

@@ -203,10 +203,10 @@ registry machine; initial DESIGN; terminal SUSPENDED; unlisted edges: REJECT_UNL
 | IMPLEMENTED_UNACCEPTED | internal_qualification_accepted | QUALIFIED_INTERNAL | B17: integrated capacity and target qualification | — (no event type registered: the owning package registers it with the edge) | database |
 | QUALIFIED_INTERNAL | limited_production_gates_accepted | AVAILABLE_LIMITED | B19: commercial production activation | — (no event type registered: the owning package registers it with the edge) | database |
 | AVAILABLE_LIMITED | operating_maturity_accepted | AVAILABLE | B20: operating maturity | — (no event type registered: the owning package registers it with the edge) | database |
-| IMPLEMENTED_UNACCEPTED | material_counterexample | SUSPENDED | CMD059 RestrictCapability (B18) | — (no event type registered: the owning package registers it with the edge) | database |
-| QUALIFIED_INTERNAL | material_counterexample | SUSPENDED | CMD059 RestrictCapability (B18) | — (no event type registered: the owning package registers it with the edge) | database |
-| AVAILABLE_LIMITED | material_counterexample | SUSPENDED | CMD059 RestrictCapability (B18) | — (no event type registered: the owning package registers it with the edge) | database |
-| AVAILABLE | material_counterexample | SUSPENDED | CMD059 RestrictCapability (B18) | — (no event type registered: the owning package registers it with the edge) | database |
+| IMPLEMENTED_UNACCEPTED | material_counterexample | SUSPENDED | CMD059 RestrictCapability (B18) | — (no event type registered: the owning package registers it with the edge) | route |
+| QUALIFIED_INTERNAL | material_counterexample | SUSPENDED | CMD059 RestrictCapability (B18) | — (no event type registered: the owning package registers it with the edge) | route |
+| AVAILABLE_LIMITED | material_counterexample | SUSPENDED | CMD059 RestrictCapability (B18) | — (no event type registered: the owning package registers it with the edge) | route |
+| AVAILABLE | material_counterexample | SUSPENDED | CMD059 RestrictCapability (B18) | — (no event type registered: the owning package registers it with the edge) | route |
 
 ### CostGrant
 
@@ -540,6 +540,8 @@ settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh st
 | CMD051 CloseCommissionPeriod | POST /api/v1/sales/commission-periods/{periodId}/close | COMMISSION_SERVICE | STORED_OPERATION | — | CommissionLine statement_closed |  | — |
 | CMD052 ApproveCommissionPayout | POST /api/v1/sales/statements/{statementId}/approve-payout | KAURO_OWNER | CORPORATE | fresh |  |  | — |
 | CMD053 ReconcileCommissionPayout | POST /api/v1/sales/statements/{statementId}/reconcile-payout | FINANCE_SERVICE | STORED_OPERATION | — | CommissionLine settled_payout_evidence; CommissionLine payout_blocked |  | — |
+| CMD058 ChangeCapability | POST /api/v1/operations/capabilities/{capabilityId}/versions | KAURO_OWNER | CORPORATE | — |  |  | — |
+| CMD059 RestrictCapability | POST /api/v1/operations/capabilities/{capabilityId}/restrict | OPERATIONS_SERVICE_OR_OWNER | CORPORATE | — | Capability material_counterexample |  | — |
 
 ## 2a. The source-lifecycle routes (B07)
 
@@ -2251,6 +2253,75 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | PAYOUT_EVIDENCE_UNAVAILABLE | — | — | COMMAND | the payout evidence verifier did not answer within its bound or failed: nothing changed and the same key retries (D10-GAP-6) |
 
+### CMD058 ChangeCapability
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the capability is unknown |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the capability current version; the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | CAPABILITY_NOT_ACCEPTED | — | always | COMMAND | the capability has no independent acceptance (DESIGN or IMPLEMENTED_UNACCEPTED): a version never promotes it to a sellable state |
+| 409 | PRECONDITION_FAILED | CAPABILITY_PROFILE_UNCHANGED | — | — | COMMAND | the profile hash is one the capability or one of its versions already holds |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD059 RestrictCapability
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the capability is unknown |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the capability current version; the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | CAPABILITY_NOT_RESTRICTABLE | — | always | COMMAND | the capability is already SUSPENDED or still in DESIGN: there is nothing to restrict |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
 ## 4. Contract-test applicability (manual 10)
 
 "For each command, tests cover the legitimate state, wrong role, wrong agency, stale version, duplicate request, changed-body
@@ -2831,6 +2902,34 @@ the check proves every citation resolves to an existing test.
 | invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
 | lost response | `cmd053-reconcile-commission-payout.test.ts` :: "RACE: an identical retry replays the 200, the same key with other evidence is 409 IDEMPOTENCY_CONFLICT, two reconciliations of one intent yield one settlement with the wait observed, and a crash before COMMIT…" |
 | external uncertainty | `cmd053-reconcile-commission-payout.test.ts` :: "DENY: a user token or the commission service is a wrong service identity (403) and an intent of another statement a foreign scope (404); then one missing prerequisite at a time — evidence of another reference, destination or amount PAYOUT_EVIDENCE_MISMATCH, SUBMITTED-only evidence PAYOUT_NOT_SETTLED…" |
+
+### CMD058 ChangeCapability
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd058-cmd059-capabilities.test.ts` :: "CMD058-OK: the owner records a PROSPECTIVE version…" |
+| wrong role | `cmd058-cmd059-capabilities.test.ts` :: "CMD058-DENY: an agency member and a stranger are refused (403)…" |
+| wrong agency | `cmd058-cmd059-capabilities.test.ts` :: "CMD058-DENY: an agency member and a stranger are refused (403)…" |
+| stale version | `cmd058-cmd059-capabilities.test.ts` :: "CMD058-DENY: an agency member and a stranger are refused (403)…"<br>`cmd058-cmd059-capabilities.test.ts` :: "CMD058-RACE: an identical retry replays the 200…" |
+| duplicate request | `cmd058-cmd059-capabilities.test.ts` :: "CMD058-RACE: an identical retry replays the 200…" |
+| changed-body same key | `cmd058-cmd059-capabilities.test.ts` :: "CMD058-RACE: an identical retry replays the 200…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd058-cmd059-capabilities.test.ts` :: "CMD058-RACE: an identical retry replays the 200…" |
+| external uncertainty | NOT_APPLICABLE: a version reaches no provider; the prospective version, the advanced revision and the journal entry are rows of one database transaction |
+
+### CMD059 RestrictCapability
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd058-cmd059-capabilities.test.ts` :: "CMD059-OK: the owner restricts the offered CLEAN capability…" |
+| wrong role | `cmd058-cmd059-capabilities.test.ts` :: "CMD059-DENY: an agency member and a stranger are refused (403)…" |
+| wrong agency | `cmd058-cmd059-capabilities.test.ts` :: "CMD059-DENY: an agency member and a stranger are refused (403)…" |
+| stale version | `cmd058-cmd059-capabilities.test.ts` :: "CMD059-DENY: an agency member and a stranger are refused (403)…"<br>`cmd058-cmd059-capabilities.test.ts` :: "CMD059-RACE: an identical retry replays the 200…" |
+| duplicate request | `cmd058-cmd059-capabilities.test.ts` :: "CMD059-RACE: an identical retry replays the 200…" |
+| changed-body same key | `cmd058-cmd059-capabilities.test.ts` :: "CMD059-RACE: an identical retry replays the 200…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd058-cmd059-capabilities.test.ts` :: "CMD059-RACE: an identical retry replays the 200…" |
+| external uncertainty | NOT_APPLICABLE: a restriction reaches no provider; the SUSPENDED edge, the restriction evidence and the journal entry are rows of one database transaction, and routing the work of a paid project to recovery or refund is the recovery commands' own step |
 
 ## 5. The manual-10 reads (re-check finding N16)
 

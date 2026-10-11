@@ -36,6 +36,7 @@ import {
 import { commerceWorld, type CommerceWorld } from "./commerce-support.js";
 
 const B10_COMMANDS = ["CMD002", "CMD027", "CMD043", "CMD045", "CMD046", "CMD047", "CMD048", "CMD049", "CMD050", "CMD051", "CMD052", "CMD053"] as const;
+const ALL_COMMANDS = [...B10_COMMANDS, "CMD058", "CMD059"] as const;
 const require = createRequire(import.meta.url);
 const bundle = JSON.parse(readFileSync(require.resolve("@kauro/contracts/schemas.json"), "utf8")) as RegistryBundle;
 
@@ -57,7 +58,7 @@ test("every B10 command spec matches its catalogue entry: name, method, path, ro
     else assert.ok(spec.path.includes(`{${spec.aggregateParam}}`), id);
     assert.equal(spec.expectedVersionRequired, catalogue.fields.some((f) => f.name === "expectedVersion"), id);
   }
-  assert.deepEqual(Object.keys(COMMERCIAL_COMMANDS), [...B10_COMMANDS]);
+  assert.deepEqual(Object.keys(COMMERCIAL_COMMANDS), [...B10_COMMANDS, "CMD058", "CMD059"], "B10 twelve and B18 two capability commands");
   assert.equal(COMMERCIAL_COMMANDS.CMD045.aggregateParam, null, "a prospect is registered before it has an identity");
 });
 
@@ -187,10 +188,10 @@ test("the commercial contracts: every request schema carries exactly the registr
   assert.equal(new Set(viewNames).size, viewNames.length, "a view is defined once");
   assert.deepEqual(Object.keys(defs), viewNames);
   assert.ok(viewNames.every((n) => !(n in bundle.$defs) && !(n in shared)), "no B10 view shadows a registry or an earlier package's definition");
-  assert.deepEqual(Object.keys(COMMERCIAL_COMMAND_RESPONSES), [...B10_COMMANDS]);
-  assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.status), [200, 201, 200, 201, 201, 200, 200, 200, 200, 200, 200, 200]);
-  assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.accepted), B10_COMMANDS.map((c) => c === "CMD027"));
-  assert.deepEqual(Object.keys(roots).sort(), [...B10_COMMANDS.map((c) => commercialCommandResponseSchemaId(c)), commercialReadResponseSchemaId("GetCommissionStatement")].sort());
+  assert.deepEqual(Object.keys(COMMERCIAL_COMMAND_RESPONSES), [...B10_COMMANDS, "CMD058", "CMD059"]);
+  assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.status), [200, 201, 200, 201, 201, 200, 200, 200, 200, 200, 200, 200, 200, 200]);
+  assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.accepted), ALL_COMMANDS.map((c) => c === "CMD027"));
+  assert.deepEqual(Object.keys(roots).sort(), [...ALL_COMMANDS.map((c) => commercialCommandResponseSchemaId(c)), commercialReadResponseSchemaId("GetCommissionStatement")].sort());
   assert.deepEqual(COMMERCIAL_READ_ROUTES.GetCommissionStatement, {
     path: "/api/v1/sales/statements/{statementId}",
     scope: "CORPORATE",
