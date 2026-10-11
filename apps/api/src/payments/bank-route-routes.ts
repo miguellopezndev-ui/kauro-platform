@@ -162,7 +162,8 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
       const authenticated = await kit.subjectOrRefusal(request, headers, action, { correlationId, agencyId: null });
       if (authenticated.kind === "PROBLEM") return authenticated;
       const authority = kit.requestAuthority(request, headers, authenticated.subject.identity.userId);
-      return run({ correlationId, subject: authenticated.subject as never, authority: authority as never });
+      const answer = await run({ correlationId, subject: authenticated.subject as never, authority: authority as never });
+      return answer.kind === "READ" ? { kind: "READ", view: { data: answer.view } } : answer;
     };
     read("getBankCredit", (request, correlationId, path, headers) => ownerRead(headers, request, "READ_BANK_CREDIT", correlationId, (r) => inbound.getCredit({ ...r, creditId: path["creditId"]! })));
     read("getBankOrderMatchKeys", (request, correlationId, path, headers) => ownerRead(headers, request, "READ_BANK_ORDER_MATCH_KEYS", correlationId, (r) => inbound.getMatchKeys({ ...r, orderId: path["orderId"]! })));

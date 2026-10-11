@@ -986,9 +986,8 @@ export const BANK_CREDIT_COMMAND_RESPONSE_SCHEMA: JsonSchema = closedObject(["ki
   replayed: { type: "boolean" },
   data: closedObject(["credit"], { credit: BANK_CREDIT_VIEW_SCHEMA }),
 });
-export const BANK_CREDIT_READ_RESPONSE_SCHEMA: JsonSchema = closedObject(["credit"], { credit: BANK_CREDIT_VIEW_SCHEMA });
-export const BANK_MATCH_KEYS_RESPONSE_SCHEMA: JsonSchema = closedObject(["keys"], {
-  keys: closedObject(["orderId", "reference", "expectedAmountCents", "currency", "acceptedPayerDigest", "transferExpiresAt", "providerTimeToleranceMs", "accountRef"], {
+export const BANK_CREDIT_READ_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], { data: closedObject(["credit"], { credit: BANK_CREDIT_VIEW_SCHEMA }) });
+export const BANK_MATCH_KEYS_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], { data: closedObject(["keys"], { keys: closedObject(["orderId", "reference", "expectedAmountCents", "currency", "acceptedPayerDigest", "transferExpiresAt", "providerTimeToleranceMs", "accountRef"], {
     orderId: BANK_UUID,
     reference: { type: "string", minLength: 1, maxLength: 256 },
     expectedAmountCents: BANK_CENTS,
@@ -997,8 +996,7 @@ export const BANK_MATCH_KEYS_RESPONSE_SCHEMA: JsonSchema = closedObject(["keys"]
     transferExpiresAt: BANK_UTC,
     providerTimeToleranceMs: { type: "integer", minimum: 0 },
     accountRef: BANK_REF,
-  }),
-});
+  }) }) });
 const creditCommand = (operationId: string, path: string, summary: string, status: "200" | "201", request: JsonSchema): OperationalRoute =>
   Object.freeze({
     operationId,

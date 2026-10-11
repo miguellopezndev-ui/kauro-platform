@@ -339,7 +339,7 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
           if (credit.version !== body.expectedVersion) throw stale(credit);
           const notOverridable = (): DomainFailure => new DomainFailure("PRECONDITION_FAILED", "the owner cannot attribute this credit in V1", { reason: "ATTRIBUTION_NOT_OVERRIDABLE", currentVersion: credit.version, currentState: credit.state });
           if (credit.state !== "MATCH_REVIEW") throw notOverridable();
-          const instruction = await repo.instruction(body.orderId, true);
+          const instruction = await repo.instruction(body.orderId);
           if (instruction === null) throw new NotFoundFailure("payment order");
           if (instruction.accountRef !== credit.accountRef || instruction.environment !== credit.environment || credit.currency !== "USD") throw notOverridable();
           const route = await co.routes(uow).version(instruction.routeId, instruction.routeVersion);
