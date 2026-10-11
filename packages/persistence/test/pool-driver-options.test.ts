@@ -8,10 +8,7 @@ import pg from "pg";
 import { createPool as openPool } from "../src/index.js";
 import { testDatabaseEnvironment } from "../src/testing/index.js";
 
-const CA_TEXT = "-----BEGIN CERTIFICATE-----
-AAAA
------END CERTIFICATE-----
-";
+const CA_TEXT = "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n";
 const login = { host: "db.example.test", port: 1, database: "kauro", user: "u", max: 1, applicationName: "pool-driver-options" } as const;
 
 test("DB-TLS ADV-2 (3ecd979): the options the driver pool actually receives carry verified TLS and the password (not the connectionSecurity copy); no PG needed", async () => {
