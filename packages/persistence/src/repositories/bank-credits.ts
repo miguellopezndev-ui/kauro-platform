@@ -261,6 +261,37 @@ export class PgBankCredits {
     return instructionOf(row);
   }
 
+  /** The environments an account ref is a route of (one in practice; the caller refuses an ambiguous ref). */
+  async environmentsOfAccount(accountRef: string): Promise<ReadonlyArray<"SANDBOX" | "LIVE">> {
+    const r = await execute<{ environment: "SANDBOX" | "LIVE" }>(this.db, "SELECT environment FROM kauro.bank_routes WHERE account_ref = $1 ORDER BY environment", [accountRef]);
+    return r.rows.map((x) => x.environment);
+  }
+
+  /** The accepted billing identity (sha256) the order's instructions froze at issuance, null when none was frozen. */
+  async acceptedPayerDigestOf(orderId: string): Promise<Sha256Hex | null> {
+    const r = await execute<{ d: string | null }>(this.db, "SELECT accepted_payer_digest AS d FROM kauro.bank_transfer_instructions WHERE order_id = $1", [orderId]);
+    return (r.rows[0]?.d ?? null) as Sha256Hex | null;
+  }
+
+  // --- route-scope review cases -----------------------------------------------------------------------------------------------------
+
+  /** Opens the credit's review case of `kind`; false when one is already open for it (the unique index of migration 0045). */
+  async openCreditCase(caseId: string, kind: "MATCH_REVIEW" | "PROVIDER_TIME_UNVERIFIED", credit: Pick<BankCreditRecord, "creditId" | "environment" | "accountRef" | "evidenceHash">, detailCode: string): Promise<boolean> {
+    const r = await execute(
+      this.db,
+      `INSERT INTO kauro.bank_review_cases (case_id, kind, environment, account_ref, source_kind, source_id, detail_code, evidence_hash)
+       VALUES ($1, $2, $3, $4, 'BANK_CREDIT', $5, $6, $7) ON CONFLICT DO NOTHING`,
+      [caseId, kind, credit.environment, credit.accountRef, credit.creditId, detailCode, credit.evidenceHash],
+    );
+    return (r.rowCount ?? 0) > 0;
+  }
+
+  /** Resolves the open review cases of the credit (its owner attribution or return decided them). */
+  async resolveCreditCases(creditId: string): Promise<number> {
+    const r = await execute(this.db, "UPDATE kauro.bank_review_cases SET state = 'RESOLVED', resolved_at = kauro.server_now() WHERE source_kind = 'BANK_CREDIT' AND source_id = $1 AND state = 'OPEN'", [creditId]);
+    return r.rowCount ?? 0;
+  }
+
   /** Runs `work` under a savepoint rolled back once it settled: every lock it took is released, nothing it wrote survives. */
   async released<T>(work: () => Promise<T>): Promise<T> {
     await execute(this.db, "SAVEPOINT kauro_bank_inbound_released");
