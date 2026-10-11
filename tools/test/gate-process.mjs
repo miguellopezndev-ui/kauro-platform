@@ -12,9 +12,11 @@ export async function interruptedWorker(script, args, root, pidFile, signal, env
   const confirmed = new Set(); // ids observed dead: the OS may reuse them, so cleanup must never signal them again
   try {
     const deadline = Date.now() + 20_000;
-    while (!existsSync(pidFile) && Date.now() < deadline) await delay(25);
-    assert.ok(existsSync(pidFile), 'hung worker must start before interrupting the gate');
-    // The worker writes "<pid> <ppid>": its own pid and the node --test runner that spawned it.
+    // The worker writes "<pid> <ppid>": its own pid and the node --test runner that spawned it. The file exists before its bytes do
+    // (writeFileSync creates, then writes), so wait for both ids: an early read skipped the runner (main 23307af, ubuntu).
+    const ready = () => existsSync(pidFile) && /^\d+\s+\d+\s*$/.test(readFileSync(pidFile, 'utf8'));
+    while (!ready() && Date.now() < deadline) await delay(25);
+    assert.ok(ready(), 'hung worker must start and write both ids before interrupting the gate');
     pids = readFileSync(pidFile, 'utf8').trim().split(/\s+/).map(Number);
     gate.kill(signal);
     const result = await Promise.race([closed, delay(5000).then(() => assert.fail('gate did not exit'))]);

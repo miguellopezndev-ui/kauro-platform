@@ -9,16 +9,26 @@ import * as persistence from "../src/index.js";
 import { testDatabaseEnvironment } from "../src/testing/index.js";
 
 let dir: string;
+// the CI job exports PGPASSWORD/PGHOST for its database; these cases judge the code's defaults, so the pg variables are unset here
+const PG_VARIABLES = ["PGPASSWORD", "PGPASSFILE", "PGSSLMODE", "PGHOST", "PGHOSTADDR"] as const;
+const savedEnv = new Map<string, string | undefined>();
 let ca: string;
 let pw: string;
 before(() => {
+  for (const v of PG_VARIABLES) {
+    savedEnv.set(v, process.env[v]);
+    delete process.env[v];
+  }
   dir = mkdtempSync(join(tmpdir(), "kauro-sec-"));
   ca = join(dir, "ca.pem");
   pw = join(dir, "pw");
   writeFileSync(ca, "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n");
   writeFileSync(pw, "file-secret\n");
 });
-after(() => rmSync(dir, { recursive: true, force: true }));
+after(() => {
+  rmSync(dir, { recursive: true, force: true });
+  for (const [v, value] of savedEnv) if (value !== undefined) process.env[v] = value;
+});
 
 const refusedBy = (variable: string, leak = "zzz-never") => (e: unknown) => e instanceof ConnectionSecurityError && e.message.startsWith(`${variable}:`) && !e.message.includes(leak);
 

@@ -483,6 +483,46 @@
         "UPDATE": [
           "session_id"
         ]
+      },
+      "kauro.capabilities": {
+        "UPDATE": [
+          "revision",
+          "state",
+          "updated_at"
+        ]
+      },
+      "kauro.capability_restrictions": {
+        "INSERT": [
+          "capability_id",
+          "incident_ref",
+          "prior_state",
+          "recorded_by_user_id",
+          "restriction_id",
+          "revision_after"
+        ]
+      },
+      "kauro.capability_versions": {
+        "INSERT": [
+          "capability_id",
+          "profile_hash",
+          "qualification_evidence_hashes",
+          "recorded_by_user_id",
+          "status",
+          "version_no"
+        ]
+      },
+      "kauro.target_artifacts": {
+        "INSERT": [
+          "agency_id",
+          "artifact_id",
+          "content_hash",
+          "created_by_membership_id",
+          "document",
+          "instance_id",
+          "kind",
+          "mode",
+          "project_id"
+        ]
       }
     },
     "kauro_assurance": {
@@ -5388,6 +5428,62 @@
       ],
       "using": "((secret_sha256 = kauro.current_session_sha256()) AND (user_id = kauro.current_user_id()))",
       "check": null
+    },
+    "capabilities/capabilities_owner_update": {
+      "check": "kauro.acting_corporate_owner()",
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()"
+    },
+    "capability_restrictions/capability_restrictions_owner_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()"
+    },
+    "capability_restrictions/capability_restrictions_owner_record": {
+      "check": "(kauro.acting_corporate_owner() AND (recorded_by_user_id = kauro.current_user_id()))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null
+    },
+    "capability_versions/capability_versions_owner_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()"
+    },
+    "capability_versions/capability_versions_owner_record": {
+      "check": "(kauro.acting_corporate_owner() AND (recorded_by_user_id = kauro.current_user_id()))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null
+    },
+    "target_artifacts/target_artifacts_tenant_intake": {
+      "check": "((agency_id = kauro.current_agency_id()) AND (EXISTS ( SELECT 1\n   FROM kauro.memberships m\n  WHERE ((m.agency_id = target_artifacts.agency_id) AND (m.membership_id = target_artifacts.created_by_membership_id) AND (m.user_id = kauro.current_user_id()) AND (m.state = 'ACTIVE'::text) AND (m.role = ANY (ARRAY['OWNER'::text, 'ADMIN'::text, 'OPERATOR'::text, 'APPROVER'::text]))))))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null
+    },
+    "target_artifacts/target_artifacts_tenant_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
     }
   },
   "tables": {
@@ -5854,6 +5950,15 @@
         "SELECT"
       ],
       "kauro_meta.schema_migrations": [
+        "SELECT"
+      ],
+      "kauro.capability_restrictions": [
+        "SELECT"
+      ],
+      "kauro.capability_versions": [
+        "SELECT"
+      ],
+      "kauro.target_artifacts": [
         "SELECT"
       ]
     },
