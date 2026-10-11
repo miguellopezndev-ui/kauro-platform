@@ -120,6 +120,7 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0051_b18_capabilities.sql",
     // package B17: CMD040 SubmitStageReceipt and CMD041 ContinueStage (import stages, append-only receipt revisions, the STAGE_RECEIPT artifact kind)
     "0052_b17_import_stage_receipts.sql",
+    "0053_b09_tax_follows_service.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
