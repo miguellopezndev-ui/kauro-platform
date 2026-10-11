@@ -14,7 +14,7 @@ import { COMMERCE_COMMAND_EVENTS } from "@kauro/application";
 import type { Sha256Hex } from "@kauro/contracts";
 import type { PlanId, ProjectId, RevisionId, UserId } from "@kauro/domain";
 import { toUtcInstant } from "@kauro/domain";
-import { issueQuote, type IssuedQuote } from "@kauro/persistence/testing";
+import { deliverThroughExecution, issueQuote, type IssuedQuote } from "@kauro/persistence/testing";
 import { accepted, paymentRoutes, read, readData } from "./commerce-support.js";
 import { approvedPlan, deliver, dispatch, execute, paymentWorld, postWebhook, reconcile, rows, storeQuery, type PaymentWorld } from "./payment-support.js";
 import { approveThroughRoute, call, completed, freshKey, ids, outcome, sha, type Person, type PlanFixture, type Reply } from "./support.js";
@@ -289,30 +289,11 @@ test("S058: wrong amount, currency, payee, environment or signature — no autho
 // --- S059 --------------------------------------------------------------------------------------------------------------------------
 
 /**
- * B08's execution-control edges of an entitlement — consumed by a job, then its package delivered (ACTIVE → CONSUMED → DELIVERED,
- * the listed CommercialAuthorization edges) — which B08's own migration grants its execution-control role (design §15; integration
- * obligation "B08"). B08 is not on this branch: the migration owner writes the two versions and their events here, a LATER (B08)
- * precondition of the revocation after delivery and never evidence of B08's behaviour.
+ * B08's execution-control edges of an entitlement - consumed by a job, then its package delivered (ACTIVE to CONSUMED to DELIVERED) -
+ * driven through the production execution writers (queueJob, admitJob, launch, stage, verify, publish; SEC-DEPTH-PROVENANCE D1).
  */
-async function deliveredByTheExecutionPackage(authorizationId: string, agencyId: string): Promise<void> {
-  const { oracle } = pw.w.h;
-  const event = (version: number, type: string) =>
-    oracle.query(
-      `INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at)
-       VALUES ($1, 'commercial_authorization', $2, $3, $4, $5, 'SERVICE', 'execution-control', $6, $7, '{}'::jsonb, $8, '1', now())`,
-      [ids.next(), authorizationId, version, agencyId, type, ids.next(), ids.next(), sha("{}")],
-    );
-  await oracle.query("BEGIN");
-  try {
-    await oracle.query("UPDATE kauro.commercial_authorizations SET state = 'CONSUMED', version = 2, job_ref = $2, consumed_at = now(), updated_at = now() WHERE authorization_id = $1", [authorizationId, ids.next()]);
-    await event(2, "commercial_authorization.consumed.v1");
-    await oracle.query("UPDATE kauro.commercial_authorizations SET state = 'DELIVERED', version = 3, delivered_at = now(), updated_at = now() WHERE authorization_id = $1", [authorizationId]);
-    await event(3, "commercial_authorization.delivered.v1");
-    await oracle.query("COMMIT");
-  } catch (e) {
-    await oracle.query("ROLLBACK");
-    throw e;
-  }
+async function deliveredByTheExecutionPackage(authorizationId: string): Promise<void> {
+  await deliverThroughExecution(pw.w.h, pw.w.A, authorizationId);
 }
 
 test("S059: a reversal before the local capture observation is recorded, allocated and reversed; after delivery it revokes POST_DELIVERY; no second charge", async () => {
@@ -338,7 +319,7 @@ test("S059: a reversal before the local capture observation is recorded, allocat
   pw.paypal.approve(paid.providerOrderId);
   const captured = completed<CapturePaymentView>(await capture(paid.orderId, paid.providerOrderId), 200);
   const authorizationId = captured.data.commercialAuthorization!.authorizationId;
-  await deliveredByTheExecutionPackage(authorizationId, pw.w.A.agencyId);
+  await deliveredByTheExecutionPackage(authorizationId);
   const providerCaptureId = (await capturesOf(paid.orderId))[0]!.provider_capture_id;
   const captureCalls = await captureCallsOf(paid.orderId);
   pw.paypal.updateCapture(providerCaptureId, { status: "REVERSED" });
@@ -348,8 +329,8 @@ test("S059: a reversal before the local capture observation is recorded, allocat
   const revoked = await rows<{ event_type: string; actor_id: string }>(pw, "SELECT event_type, actor_id FROM kauro.domain_events WHERE aggregate_id = $1 ORDER BY aggregate_version", [authorizationId]);
   assert.deepEqual(revoked.map((e) => [e.event_type, e.actor_id]), [
     ["commercial_authorization.issued.v1", "payment-service"],
-    ["commercial_authorization.consumed.v1", "execution-control"],
-    ["commercial_authorization.delivered.v1", "execution-control"],
+    ["commercial_authorization.consumed.v1", "control-plane"],
+    ["commercial_authorization.delivered.v1", "control-plane"],
     ["commercial_authorization.revoked.v1", "payment-service"],
   ]);
   // no second charge: the order stays CAPTURED with its allocation, no new order, attempt or provider capture
