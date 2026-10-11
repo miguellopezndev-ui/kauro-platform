@@ -127,6 +127,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0055_bank_kit_fixtures.sql",
     // package B10 lane OFFSET: offsets as claims that yield, the one lock order, noncash settlement (docs/design/B10-OFFSET.md)
     "0056_offset_claims_yield.sql",
+    // Payments V1 PV1-INBOUND: credit and statement-import aggregates, guards, the owner pipeline on the payment pool
+    "0057_bank_inbound.sql",
     // "0057_seller_credit.sql", (pending)
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));

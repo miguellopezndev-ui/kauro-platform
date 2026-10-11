@@ -141,6 +141,18 @@ export {
 export type { ServiceRole, ServiceIdentity } from "./principals.js";
 export { SERVICE_ROLE_TABLE, serviceHoldsRole, CORPORATE_ROLES, isCorporateCommandRole, COMMERCE_POLICY_VERSION } from "./principals.js";
 
+export type { BankCreditRail, BankCreditEventType, BankCreditRecord, StatementImportRecord, MatchKeys, MatchDecision } from "./bank-credit.js";
+export {
+  BANK_CREDIT_RAILS,
+  BANK_CREDIT_AGGREGATE_KINDS,
+  BANK_CREDIT_EVENT_TYPES,
+  BANK_CREDIT_EVENT_PAYLOAD_ALLOWLIST,
+  BANK_CREDIT_EVENT_SUBSCRIPTIONS,
+  matchDecision,
+  bankOrderStateAfterReceipt,
+  creditOnTime,
+} from "./bank-credit.js";
+
 export type { BankRouteState, BankRouteRollout, BankRouteEventType, TransferWindow, BankRouteDetails, BankRouteRecord, BankRouteVersionRecord, BankTransferInstructionRecord } from "./bank-route.js";
 export {
   BANK_ROUTE_STATES,

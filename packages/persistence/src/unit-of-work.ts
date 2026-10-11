@@ -68,6 +68,7 @@ import {
 import type { PoolClient } from "pg";
 import { serverInstantOf } from "./source/rows.js";
 import { PgBankRoutes } from "./repositories/bank-routes.js";
+import { PgBankCredits } from "./repositories/bank-credits.js";
 import { PgSessionFence } from "./session-fence.js";
 import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
@@ -642,6 +643,12 @@ export function sessionFenceOf(uow: UnitOfWork): PgSessionFence {
   return uow.sessionFence;
 }
 
+/** The inbound credit tables in a commerce unit of work of this package (lane PV1-INBOUND). */
+export function bankCreditsOf(uow: UnitOfWork): PgBankCredits {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the bank credits are read in a commerce unit of work of @kauro/persistence");
+  return uow.bankCredits;
+}
+
 /** The bank-transfer route's tables in a commerce unit of work of this package (lane L-ROUTE). */
 export function bankRoutesOf(uow: UnitOfWork): PgBankRoutes {
   if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the bank routes are read in a commerce unit of work of @kauro/persistence");
@@ -685,6 +692,8 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   readonly requestReads: PgCommerceRequestReads;
   /** The bank-transfer route's tables (migration 0046, lane L-ROUTE), read through bankRoutesOf(uow). */
   readonly bankRoutes: PgBankRoutes;
+  /** The inbound credit, statement and order-state tables (migration 0057, lane PV1-INBOUND), read through bankCreditsOf(uow). */
+  readonly bankCredits: PgBankCredits;
   #scopeAgencyId: AgencyId | null = null;
   #financeAgencyId: AgencyId | null = null;
   #causation: CausationId | null = null;
@@ -699,6 +708,7 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
     this.paymentSweeps = new PgPaymentSweeps(client);
     this.requestReads = new PgCommerceRequestReads(client);
     this.bankRoutes = new PgBankRoutes(client);
+    this.bankCredits = new PgBankCredits(client);
   }
 
   protected override onJournalEntry(entryId: JournalEntryId): void {
