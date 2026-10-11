@@ -55,10 +55,10 @@
    "title": "Payment routing: ACH USD (Wise Business) first, PayPal Business second",
    "effective": "2026-10-05",
    "location": "docs/authority/amendments/A8_PAYMENT_ROUTING.md",
-   "sha256": "a1c34b3f8b4603f9bccdda76a518795e2a2f7d45dde4081057beff86a018b1fb",
+   "sha256": "0236441764d4e55af300405aec3080471596d084b071c14314728fff3ad61858",
    "application": "PROSPECTIVE",
    "changesRegistry": false,
-   "note": "PayPal work already built is kept; ACH activates by configuration once KYC verifies"
+   "note": "PayPal work already built is kept; ACH activates by configuration once KYC verifies. Text amended 2026-10-07 by owner decision Payments V1 (586714a: PayPal DEFERRED, ACH/USD via Wise = V1 target)"
   },
   {
    "id": "A9",
