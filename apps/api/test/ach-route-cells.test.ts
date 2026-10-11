@@ -1419,7 +1419,7 @@ const INSTRUCTIONS_NOT_AVAILABLE = "409 PRECONDITION_FAILED INSTRUCTIONS_NOT_AVA
 /** What I3 answers a foreign agency's member for another agency's order (observed on a50db87; ACH-02: no existence signal). */
 const FOREIGN_I3 = "404 NOT_FOUND -";
 const iso = (ms: number): string => new Date(ms).toISOString();
-const QUOTE_LOCK: SqlStep = { label: "quote_lock", match: /FROM kauro\.quotes WHERE quote_id = \$1 FOR UPDATE/ };
+const QUOTE_LOCK: SqlStep = { label: "quote_lock", match: /FROM kauro\.quotes WHERE quote_id = \$1 FOR NO KEY UPDATE/ };
 
 /**
  * One issuance whose effect instant is `effectAt` on the step clock, read after a route-lock wait (the I2D form): the clock stands at

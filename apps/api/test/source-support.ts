@@ -97,7 +97,7 @@ export const sourceRoutes = {
 export const LOCKS = {
   revision: "SELECT revision_id, agency_id, project_id, version::text AS version, state, manifest_hash",
   upload: "SELECT upload_id, agency_id, project_id, revision_id, version::text AS version, state, declared_format",
-  project: "FROM kauro.projects WHERE project_id = $1 FOR UPDATE",
+  project: "FROM kauro.projects WHERE project_id = $1 FOR NO KEY UPDATE",
   fileTransition: "await_transition('kauro.source_files'",
 };
 
