@@ -123,6 +123,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0053_b09_tax_follows_service.sql",
     // FCG-B06-LEASE-1: claim_lease / heartbeat_lease / checkpoint_lease judge expiry at the database clock after the row lock (provisional number)
     "0054_lease_expiry_after_lock.sql",
+    // Payments V1 KIT-2: bank_credits, treasury_refunds and the manual-rail timings of a route version (provisional structure for the lanes)
+    "0055_bank_kit_fixtures.sql",
     // package B10 lane OFFSET: offsets as claims that yield, the one lock order, noncash settlement (docs/design/B10-OFFSET.md)
     "0056_offset_claims_yield.sql",
     // "0057_seller_credit.sql", (pending)
