@@ -9,7 +9,7 @@
  * SIGKILLed at the deadline, on CANCELLED or FENCED; late results are dropped. The adapter never sets attestationPolicy.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { closeSync, existsSync, mkdirSync, openSync, readSync, readdirSync, realpathSync, rmSync, statSync, writeSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, rmSync, statSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Id, RowCounts, Sha256Hex } from "@kauro/contracts";
@@ -45,7 +45,8 @@ import { ATTEMPT_SCRATCH_DIRECTORY_PREFIX, attemptScratchDirectoryOf } from "../
 import { AttemptByteLedger } from "./attempt-byte-ledger.js";
 import type { CoreChildHandle, CoreChildResult } from "./core-child-runner.js";
 import { runCoreChild } from "./core-child-runner.js";
-import type { CoreTaskPayload, CoreTaskRecord } from "./child-task.js";
+import { EFFECT_FAMILIES, type CoreTaskPayload, type CoreTaskRecord } from "./child-task.js";
+import type { MigrationEffects } from "@kauro/intelligence-core";
 import { Operation, OperationEnded, type CoreTimers } from "./operation.js";
 
 export const MIGRATION_CORE_VERSION = "3.0.0";
@@ -78,6 +79,84 @@ export interface MigrationCoreAdapterOptions {
   readonly pollIntervalMs?: number;
   readonly heapMegabytes?: number;
   readonly hooks?: CoreAdapterHooks;
+}
+
+/** One full-dataset validation (B05 D5-15): a Migration Core document over the revision's sealed generations. */
+export interface FullValidationRequest {
+  readonly revisionHash: string;
+  /**
+   * The Migration Core document (toMigrationConfig over the revision's profile). Its file paths are the input paths the profile
+   * step profiled (coreInputPathOf, M21: profile, compile and execute paths are equal for one revision), so the document runs as
+   * it is, unrewritten: the run truth's files are the document's, and effectsFromMigrationRun maps rows to mappings by that path.
+   */
+  readonly configDocument: unknown;
+  /** The coreConfigHash the document must hash to, or null when none is bound yet. */
+  readonly expectedConfigHash: string | null;
+  readonly source: SourceReader;
+  /** limits.effectsResidentBytes is required here. */
+  readonly limits: ExecutionLimits;
+  readonly cancellation: CancellationChannel;
+  /** Live bytes of the attempt's other scratch (the host AttemptScratchStore), charged against the same budget. */
+  readonly liveScratchBytes: () => number;
+  readonly deadlineAt?: string;
+}
+
+export interface FullValidationOutcome {
+  readonly coreVersion: string;
+  /** The loader hash of the document the run consumed (MC's own). */
+  readonly coreConfigHash: string;
+  /** The staged manifest's sha256 as Migration Core wrote it. */
+  readonly packageDigest: string;
+  /** digestOf the verifier's report, packageDir excluded. */
+  readonly reportDigest: string;
+  readonly packageVerified: boolean;
+  readonly problems: readonly string[];
+  readonly reconciliation: Extract<CoreTaskRecord, { kind: "FULL_VALIDATION" }>["reconciliation"];
+  readonly effects: MigrationEffects;
+}
+
+/** A full validation's effects file passed limits.effectsResidentBytes: refused before parsing, a cause of its own (M22b). */
+export class EffectsResidentLimitExceeded extends Error {
+  readonly terminalCause = "EFFECTS_RESIDENT_LIMIT" as const;
+  readonly byteLength: number;
+  readonly limit: number;
+  constructor(byteLength: number, limit: number) {
+    super(`EFFECTS_RESIDENT_LIMIT: the effects file holds ${byteLength} bytes, the resident bound is ${limit}`);
+    this.name = "EffectsResidentLimitExceeded";
+    this.byteLength = byteLength;
+    this.limit = limit;
+  }
+}
+
+/** A full validation the core refused before or at its configuration (a MigrationError code, CONFIG_BINDING_MISMATCH, INPUT_NOT_IN_REVISION). */
+export class FullValidationRefused extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
+    super(`${code}: ${message}`);
+    this.name = "FullValidationRefused";
+    this.code = code;
+  }
+}
+
+type EffectFamily = (typeof EFFECT_FAMILIES)[number];
+
+/** The effects NDJSON the child wrote, back into MigrationEffects (one head line, then one line per element of each family). */
+function parseEffects(text: string): MigrationEffects {
+  const lists: Record<EffectFamily, unknown[]> = { records: [], fields: [], associations: [], duplicateClusters: [], unmapped: [], leftoverFiles: [] };
+  type Head = { configHash: string; identity: MigrationEffects["identity"] };
+  let head: Head | null = null;
+  for (const line of text.split("\n")) {
+    if (line === "") continue;
+    const entry = JSON.parse(line) as Record<string, unknown>;
+    const keys = Object.keys(entry);
+    const key = keys[0];
+    if (keys.length !== 1 || key === undefined) throw new AttemptEnvelopeFailure("CORRUPT_INTERMEDIATE", "EFFECTS_SHAPE", "an effects line holds other than one member");
+    if (key === "head" && head === null) head = entry[key] as Head;
+    else if ((EFFECT_FAMILIES as readonly string[]).includes(key) && head !== null) lists[key as EffectFamily].push(entry[key]);
+    else throw new AttemptEnvelopeFailure("CORRUPT_INTERMEDIATE", "EFFECTS_SHAPE", `unexpected effects line ${key}`);
+  }
+  if (head === null) throw new AttemptEnvelopeFailure("CORRUPT_INTERMEDIATE", "EFFECTS_SHAPE", "the effects file has no head");
+  return { configHash: head.configHash, identity: head.identity, ...lists } as unknown as MigrationEffects;
 }
 
 /** The platform target mode and the core's: one enum-only bridge (D5-7). */
@@ -541,6 +620,57 @@ export class MigrationCoreAdapter implements ExecutionEnvelopePort, ProfilePort,
         return error(e.reason);
       }
       throw e;
+    } finally {
+      op.close();
+      if (call !== null) this.#cleanup(call);
+    }
+  }
+
+  // --- full-dataset validation (D5-15) -------------------------------------------------------------------------------------
+
+  async fullValidate(request: FullValidationRequest): Promise<FullValidationOutcome> {
+    const residentLimit = request.limits.effectsResidentBytes;
+    if (residentLimit === undefined || !Number.isSafeInteger(residentLimit) || residentLimit <= 0) throw new TypeError("full validation needs limits.effectsResidentBytes");
+    const deadline = request.deadlineAt !== undefined ? isUtcMs(request.deadlineAt) : this.#timers.nowMs() + request.limits.wallClockMs;
+    const op = new Operation(this.#timers, deadline, request.cancellation, this.#o.pollIntervalMs ?? 1000);
+    let call: Call | null = null;
+    try {
+      call = this.#openCall(`full-validation-${randomUUID()}`, request.limits.scratchBudgetBytes);
+      const refs = await op.race(this.#o.inputs.resolve(request.revisionHash));
+      const inputPaths = new Set(refs.filter((r) => r.byteLength > 0).map((r) => coreInputPathOf(r.objectName, r.generation)));
+      const files = (request.configDocument as { files?: ReadonlyArray<{ path?: unknown }> }).files ?? [];
+      for (const file of files) if (typeof file.path !== "string" || !inputPaths.has(file.path)) throw new FullValidationRefused("INPUT_NOT_IN_REVISION", "the configuration names a file the revision does not hold");
+      const configText = JSON.stringify(request.configDocument);
+      await this.#materialize(call, op, request.source, refs, request.liveScratchBytes);
+      const effectsPath = join(call.callDir, "effects.ndjson");
+      const quota = request.limits.scratchBudgetBytes - call.ledger.live - request.liveScratchBytes();
+      const res = await this.#child(call, op, { mode: "full-validation", configText, expectedConfigHash: request.expectedConfigHash, profileFiles: [], effectsPath }, quota);
+      const record = this.#recordOf(res);
+      if (record.kind === "REFUSED") throw new FullValidationRefused(record.refusal.code, record.refusal.message);
+      if (record.kind === "ENVELOPE") throw new AttemptEnvelopeFailure(record.cause === "SCRATCH_EXHAUSTED" ? "SCRATCH_EXHAUSTED" : "CORRUPT_INTERMEDIATE", "FULL_VALIDATION", "the full validation child failed");
+      const value = record.value;
+      if (value.kind === "CONFIG_MISMATCH") throw new FullValidationRefused("CONFIG_BINDING_MISMATCH", "the configuration does not hash to the bound coreConfigHash");
+      if (value.kind !== "FULL_VALIDATION") throw new Error("the core child answered no full validation");
+      // the resident bound, from the file's length on disk before a byte of it is parsed
+      if (value.effects.path !== effectsPath) throw new AttemptEnvelopeFailure("CORRUPT_INTERMEDIATE", "EFFECTS_PATH", "the child named another effects file");
+      const byteLength = statSync(effectsPath).size;
+      if (byteLength !== value.effects.byteLength) throw new AttemptEnvelopeFailure("CORRUPT_INTERMEDIATE", "EFFECTS_LENGTH", "the effects file is not the length the child recorded");
+      if (byteLength > residentLimit) throw new EffectsResidentLimitExceeded(byteLength, residentLimit);
+      const bytes = readFileSync(effectsPath);
+      rmSync(effectsPath, { force: true });
+      if (createHash("sha256").update(bytes).digest("hex") !== value.effects.sha256) throw new AttemptEnvelopeFailure("CORRUPT_INTERMEDIATE", "EFFECTS_DIGEST", "the effects file does not hash to the child's record");
+      const effects = parseEffects(bytes.toString("utf8"));
+      if (effects.configHash !== value.configHash) throw new AttemptEnvelopeFailure("CORRUPT_INTERMEDIATE", "EFFECTS_CONFIG", "the effects name another configuration");
+      return {
+        coreVersion: value.coreVersion,
+        coreConfigHash: value.configHash,
+        packageDigest: value.manifestSha256,
+        reportDigest: value.reportDigest,
+        packageVerified: value.packageVerified,
+        problems: value.problems,
+        reconciliation: value.reconciliation,
+        effects,
+      };
     } finally {
       op.close();
       if (call !== null) this.#cleanup(call);
