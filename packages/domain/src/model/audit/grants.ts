@@ -38,3 +38,24 @@ export function auditAbsoluteDeadlineOf(startedAt: UtcInstant): string {
 export function interpretationDeadlineOf(interpretingAt: UtcInstant, absoluteDeadlineAt: UtcInstant): string {
   return new Date(Math.min(Date.parse(interpretingAt) + AUDIT_POLICY.interpretationSeconds * 1000, Date.parse(absoluteDeadlineAt))).toISOString();
 }
+
+/** Micro-dollars per cent (package B05 D5-11: the Intelligence Core admits and settles in micros, the grants hold cents). */
+export const MICROS_PER_CENT = 10_000n;
+
+/** ceil(micros / 10,000): the cents a maximum of `micros` reserves, or a charge of `micros` costs (D5-11). */
+export function centsOfMicros(micros: bigint): bigint {
+  if (micros < 0n) throw new RangeError("a charge in micros is non-negative");
+  return (micros + MICROS_PER_CENT - 1n) / MICROS_PER_CENT;
+}
+
+/** COMMITTED posts min(ceil(charge / 10,000), reserved) cents; what lies above the admitted maximum is a liability, never spend (D5-11). */
+export function postedCentsOf(chargeMicros: bigint, reservedCents: bigint): bigint {
+  const c = centsOfMicros(chargeMicros);
+  return c < reservedCents ? c : reservedCents;
+}
+
+/** The excess of a charge over the admitted maximum, in micros (0 when within): the rounding slack never absorbs it (D5-11). */
+export function excessMicrosOf(chargeMicros: bigint, maxChargeMicros: bigint): bigint {
+  const e = chargeMicros - maxChargeMicros;
+  return e > 0n ? e : 0n;
+}
