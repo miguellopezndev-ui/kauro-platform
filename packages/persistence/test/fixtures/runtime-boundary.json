@@ -295,6 +295,22 @@
           "updated_at"
         ]
       },
+      "kauro.outbound_execution_attempts": {
+        "SELECT": [
+          "agency_id",
+          "amount_cents",
+          "attempt_id",
+          "currency",
+          "declared_at",
+          "kind",
+          "reference",
+          "refund_id",
+          "source_kind",
+          "state",
+          "treasury_refund_id",
+          "version"
+        ]
+      },
       "kauro.package_verifications": {
         "SELECT": [
           "agency_id",
@@ -412,6 +428,14 @@
           "candidate_id",
           "deletion_journal_hash",
           "recovery_id"
+        ]
+      },
+      "kauro.refund_destinations": {
+        "SELECT": [
+          "account_last4",
+          "holder_name",
+          "refund_id",
+          "treasury_refund_id"
         ]
       },
       "kauro.refunds": {
@@ -1312,6 +1336,22 @@
           "withdrawn_at"
         ]
       },
+      "kauro.bank_route_versions": {
+        "SELECT": [
+          "coverage_lag_ms",
+          "manual_execution_window_ms",
+          "route_id",
+          "route_version"
+        ]
+      },
+      "kauro.bank_routes": {
+        "SELECT": [
+          "account_ref",
+          "current_version",
+          "environment",
+          "route_id"
+        ]
+      },
       "kauro.bank_transfer_instructions": {
         "UPDATE": [
           "order_state",
@@ -2102,6 +2142,14 @@
       ],
       "using": "kauro.acting_corporate_owner()"
     },
+    "bank_route_versions/bank_route_versions_payment_timing": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true"
+    },
     "bank_route_versions/bank_route_versions_tenant_read": {
       "check": null,
       "command": "SELECT",
@@ -2117,6 +2165,14 @@
         "kauro_app"
       ],
       "using": "kauro.acting_corporate_owner()"
+    },
+    "bank_routes/bank_routes_payment_timing": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true"
     },
     "bank_routes/bank_routes_tenant_lock": {
       "check": "false",
@@ -3186,6 +3242,14 @@
       ],
       "using": "((agency_id = kauro.current_agency_id()) AND (aggregate_kind = ANY (ARRAY['quote'::text, 'payment_order'::text, 'payment_attempt'::text, 'capture'::text, 'commercial_authorization'::text, 'refund'::text, 'tax_document'::text, 'reconciliation_case'::text])))"
     },
+    "domain_events/domain_events_payment_outbound": {
+      "check": "((aggregate_kind = 'outbound_execution_attempt'::text) AND ((agency_id IS NULL) OR (agency_id = kauro.current_agency_id())) AND (split_part(event_type, '.'::text, 1) = 'outbound'::text))",
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "((aggregate_kind = 'outbound_execution_attempt'::text) AND ((agency_id IS NULL) OR (agency_id = kauro.current_agency_id())))"
+    },
     "domain_events/domain_events_payment_treasury": {
       "check": "((agency_id IS NULL) AND (aggregate_kind = 'treasury_refund'::text) AND (split_part(event_type, '.'::text, 1) = 'treasury_refund'::text))",
       "command": "ALL",
@@ -3886,6 +3950,14 @@
       ],
       "using": null
     },
+    "outbound_execution_attempts/outbound_execution_attempts_owner_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()"
+    },
     "outbound_execution_attempts/outbound_execution_attempts_service": {
       "check": "true",
       "command": "ALL",
@@ -3950,6 +4022,14 @@
         "kauro_payment"
       ],
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id = kauro.current_agency_id()))))"
+    },
+    "outbox_records/outbox_records_payment_outbound": {
+      "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.aggregate_kind = 'outbound_execution_attempt'::text) AND ((e.agency_id IS NULL) OR (e.agency_id = kauro.current_agency_id())))))",
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.aggregate_kind = 'outbound_execution_attempt'::text) AND ((e.agency_id IS NULL) OR (e.agency_id = kauro.current_agency_id())))))"
     },
     "outbox_records/outbox_records_payment_treasury": {
       "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'treasury_refund'::text))))",
@@ -4762,6 +4842,14 @@
       "using": null
     },
     "recoveries/recoveries_owner_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()"
+    },
+    "refund_destinations/refund_destinations_owner_read": {
       "check": null,
       "command": "SELECT",
       "roles": [

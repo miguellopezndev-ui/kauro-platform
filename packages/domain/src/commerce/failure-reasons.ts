@@ -108,6 +108,8 @@ export const COMMERCE_FAILURE_REASONS = [
   "INSTRUCTIONS_NOT_AVAILABLE",
   // an idempotency key of a bank owner command reused with another request body (lane L-REFUND; the journal conflict named, never a new effect)
   "BODY_CONFLICT",
+  // a manual-rail refund or treasury refund COMPLETED without the RECORDED attempt that is its execution evidence (lane L-REFUND; SQLSTATE KP014)
+  "EXECUTION_EVIDENCE_MISSING",
 ] as const;
 
 export type CommerceFailureReason = (typeof COMMERCE_FAILURE_REASONS)[number];

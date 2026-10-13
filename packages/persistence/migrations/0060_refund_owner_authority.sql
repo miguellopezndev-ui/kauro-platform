@@ -275,3 +275,106 @@ CREATE POLICY command_journal_bank_owner ON kauro.command_journal FOR ALL TO kau
          AND EXISTS (SELECT 1 FROM kauro.bank_owner_acts a WHERE a.txid = pg_catalog.txid_current() AND a.user_id::text = command_journal.actor_id))
   WITH CHECK (actor_kind = 'USER' AND agency_id IS NULL AND operation IN ('CMD032', 'CMD220', 'CMD221', 'CMD222', 'CMD223', 'CMD224', 'CMD225', 'CMD226', 'CMD227', 'CMD228', 'CMD229')
          AND EXISTS (SELECT 1 FROM kauro.bank_owner_acts a WHERE a.txid = pg_catalog.txid_current() AND a.user_id::text = command_journal.actor_id));
+
+-- =====================================================================================================================================
+-- Slice 2: X1 DeclareRefundExecution, G2/G4 RecordExecution (Koffer, G1, outcome) and the X2 EXECUTION_WINDOW sweep (docs/design/ACH-ROUTE.md
+-- r12 §7.21-§7.22d, §7.28; DV1-08, DV1-11). The attempt is an aggregate of the OutboundExecutionAttempt machine (bank_machine_edges): its
+-- declaration frozen, what its record learned set once, one event per version; a manual-rail refund is never COMPLETED without the RECORDED
+-- execution that proves it.
+-- =====================================================================================================================================
+
+-- --- 6. the attempt aggregate ------------------------------------------------------------------------------------------------------------
+-- the listed edges of a bank machine (kauro.bank_machine_edges; TG_ARGV[0] the machine)
+CREATE OR REPLACE FUNCTION kauro.enforce_bank_machine_edge() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NEW.state IS DISTINCT FROM OLD.state AND NOT EXISTS (
+    SELECT 1 FROM kauro.bank_machine_edges m WHERE m.machine = TG_ARGV[0] AND m.from_state = OLD.state AND m.to_state = NEW.state
+  ) THEN
+    RAISE EXCEPTION 'UNLISTED_TRANSITION: % % -> % is not a listed edge', TG_ARGV[0], OLD.state, NEW.state USING ERRCODE = 'KA008';
+  END IF;
+  RETURN NEW;
+END
+$$;
+DROP TRIGGER IF EXISTS outbound_execution_attempts_transition ON kauro.outbound_execution_attempts;
+CREATE TRIGGER outbound_execution_attempts_transition BEFORE UPDATE OF state ON kauro.outbound_execution_attempts
+  FOR EACH ROW WHEN (OLD.state IS DISTINCT FROM NEW.state) EXECUTE FUNCTION kauro.enforce_bank_machine_edge('OutboundExecutionAttempt');
+-- frozen at declaration (DV1-08); the fingerprint's key id, key version and normalizer version are not frozen here (a key rotation re-keys them)
+DROP TRIGGER IF EXISTS outbound_execution_attempts_immutable ON kauro.outbound_execution_attempts;
+CREATE TRIGGER outbound_execution_attempts_immutable BEFORE UPDATE ON kauro.outbound_execution_attempts
+  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('attempt_id,environment,account_ref,kind,source_kind,agency_id,capture_id,refund_id,bank_credit_id,treasury_refund_id,parent_bounce_id,attempt_number,reference,amount_cents,currency,declared_at,declared_by,destination_fingerprint,recipient_ref,recipient_version,created_at');
+-- what the record learned is learned once
+DROP TRIGGER IF EXISTS outbound_execution_attempts_learned_once ON kauro.outbound_execution_attempts;
+CREATE TRIGGER outbound_execution_attempts_learned_once BEFORE UPDATE ON kauro.outbound_execution_attempts
+  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_reassignment('bank_execution_id,destination_proof,evidence_hash,recorded_at');
+INSERT INTO kauro.aggregate_kinds (aggregate_kind, table_name, id_column, owner_package) VALUES ('outbound_execution_attempt', 'outbound_execution_attempts', 'attempt_id', 'B09')
+  ON CONFLICT DO NOTHING;
+DROP TRIGGER IF EXISTS outbound_execution_attempts_event_per_version ON kauro.outbound_execution_attempts;
+CREATE CONSTRAINT TRIGGER outbound_execution_attempts_event_per_version AFTER UPDATE OF version ON kauro.outbound_execution_attempts
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('outbound_execution_attempt', 'attempt_id');
+ALTER TABLE kauro.event_types NO FORCE ROW LEVEL SECURITY;
+INSERT INTO kauro.event_types (event_type) VALUES
+  ('outbound.declared.v1'), ('outbound.uncertain.v1'), ('outbound.recorded.v1'),
+  ('treasury_refund.submitting.v1'), ('treasury_refund.uncertain.v1'), ('treasury_refund.completed.v1')
+  ON CONFLICT DO NOTHING;
+ALTER TABLE kauro.event_types FORCE ROW LEVEL SECURITY;
+-- the payment service's attempt events (agency NULL for a BANK_CREDIT source, the adopted agency for a CAPTURE source) and their outbox
+DROP POLICY IF EXISTS domain_events_payment_outbound ON kauro.domain_events;
+CREATE POLICY domain_events_payment_outbound ON kauro.domain_events FOR ALL TO kauro_payment
+  USING (aggregate_kind = 'outbound_execution_attempt' AND (agency_id IS NULL OR agency_id = kauro.current_agency_id()))
+  WITH CHECK (aggregate_kind = 'outbound_execution_attempt' AND (agency_id IS NULL OR agency_id = kauro.current_agency_id()) AND split_part(event_type, '.', 1) = 'outbound');
+DROP POLICY IF EXISTS outbox_records_payment_outbound ON kauro.outbox_records;
+CREATE POLICY outbox_records_payment_outbound ON kauro.outbox_records FOR ALL TO kauro_payment
+  USING (EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = outbox_records.event_id AND e.aggregate_kind = 'outbound_execution_attempt' AND (e.agency_id IS NULL OR e.agency_id = kauro.current_agency_id())))
+  WITH CHECK (EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = outbox_records.event_id AND e.aggregate_kind = 'outbound_execution_attempt' AND (e.agency_id IS NULL OR e.agency_id = kauro.current_agency_id())));
+
+-- --- 7. the route timing the payment service judges (X2: declared_at + the window of the route version in force) --------------------------
+DROP POLICY IF EXISTS bank_routes_payment_timing ON kauro.bank_routes;
+CREATE POLICY bank_routes_payment_timing ON kauro.bank_routes FOR SELECT TO kauro_payment USING (true);
+DROP POLICY IF EXISTS bank_route_versions_payment_timing ON kauro.bank_route_versions;
+CREATE POLICY bank_route_versions_payment_timing ON kauro.bank_route_versions FOR SELECT TO kauro_payment USING (true);
+GRANT SELECT (route_id, environment, account_ref, current_version) ON kauro.bank_routes TO kauro_payment;
+GRANT SELECT (route_id, route_version, manual_execution_window_ms, coverage_lag_ms) ON kauro.bank_route_versions TO kauro_payment;
+
+-- --- 8. the owner queue: the corporate owner reads the send details of the attempts (never the offers, never the evidence) ------------------
+DROP POLICY IF EXISTS outbound_execution_attempts_owner_read ON kauro.outbound_execution_attempts;
+CREATE POLICY outbound_execution_attempts_owner_read ON kauro.outbound_execution_attempts FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner());
+DROP POLICY IF EXISTS refund_destinations_owner_read ON kauro.refund_destinations;
+CREATE POLICY refund_destinations_owner_read ON kauro.refund_destinations FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner());
+-- (agency_id, version: the event binding of the foundation reads them as the caller; a tenant sees no row, KA006)
+GRANT SELECT (attempt_id, agency_id, version, kind, state, source_kind, refund_id, treasury_refund_id, reference, amount_cents, currency, declared_at) ON kauro.outbound_execution_attempts TO kauro_app;
+GRANT SELECT (refund_id, treasury_refund_id, account_last4, holder_name) ON kauro.refund_destinations TO kauro_app;
+
+-- --- 9. never COMPLETED without execution evidence ---------------------------------------------------------------------------------------
+-- a manual-rail refund (one with a captured destination) completes only with a RECORDED RETURN attempt whose execution id it cites
+CREATE OR REPLACE FUNCTION kauro.refunds_manual_completion_evidence() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF EXISTS (SELECT 1 FROM kauro.refund_destinations d WHERE d.refund_id = OLD.refund_id) AND NOT EXISTS (
+    SELECT 1 FROM kauro.outbound_execution_attempts a
+     WHERE a.refund_id = OLD.refund_id AND a.kind = 'RETURN' AND a.state = 'RECORDED' AND a.bank_execution_id = NEW.provider_refund_id
+  ) THEN
+    RAISE EXCEPTION 'EXECUTION_EVIDENCE_MISSING: refund % completes only with the recorded execution it cites', OLD.refund_id USING ERRCODE = 'KP014';
+  END IF;
+  RETURN NEW;
+END
+$$;
+DROP TRIGGER IF EXISTS refunds_manual_completion_evidence ON kauro.refunds;
+CREATE TRIGGER refunds_manual_completion_evidence BEFORE UPDATE OF state ON kauro.refunds
+  FOR EACH ROW WHEN (NEW.state = 'COMPLETED' AND OLD.state IS DISTINCT FROM 'COMPLETED') EXECUTE FUNCTION kauro.refunds_manual_completion_evidence();
+-- a treasury refund completes only with a RECORDED attempt of its own
+CREATE OR REPLACE FUNCTION kauro.treasury_refunds_completion_evidence() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM kauro.outbound_execution_attempts a WHERE a.treasury_refund_id = OLD.treasury_refund_id AND a.state = 'RECORDED') THEN
+    RAISE EXCEPTION 'EXECUTION_EVIDENCE_MISSING: treasury refund % completes only with a recorded execution', OLD.treasury_refund_id USING ERRCODE = 'KP014';
+  END IF;
+  RETURN NEW;
+END
+$$;
+DROP TRIGGER IF EXISTS treasury_refunds_completion_evidence ON kauro.treasury_refunds;
+CREATE TRIGGER treasury_refunds_completion_evidence BEFORE UPDATE OF state ON kauro.treasury_refunds
+  FOR EACH ROW WHEN (NEW.state = 'COMPLETED' AND OLD.state IS DISTINCT FROM 'COMPLETED') EXECUTE FUNCTION kauro.treasury_refunds_completion_evidence();

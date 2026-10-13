@@ -45,6 +45,8 @@ export const SQLSTATE = Object.freeze({
   FISCAL_VALIDATION_REFUSED: "KP011",
   REFUND_TAX_INCONSISTENT: "KP012",
   REPLACEMENT_REFUSED: "KP013",
+  // Payments V1 (migration 0060, lane L-REFUND): a manual-rail refund or treasury refund completed without its recorded execution
+  EXECUTION_EVIDENCE_MISSING: "KP014",
   // package B10 (migrations 0028..0031; docs/design/B10-commercial-domain.md §12): each stage-2 lane adds the KC codes its adapters
   // surface. B10-ADAPTERS-RECURRENCE: the designation's writes and the founding reservation's release (0028)
   DESIGNATION_REWRITE: "KC001",
@@ -127,6 +129,8 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KP012: { code: "PRECONDITION_FAILED", reason: "REFUND_TAX_INCONSISTENT" },
   // the included source replacement is used, execution started, or the purchase is not intact (D-QUOTE-B6)
   KP013: { code: "PRECONDITION_FAILED", reason: "REPLACEMENT_NOT_ALLOWED" },
+  // never met by a handler that records the execution before the completion (ACH-ROUTE §7.22: never REFUNDED without execution evidence)
+  KP014: { code: "INTEGRITY_FAILURE", reason: "EXECUTION_EVIDENCE_MISSING" },
   // package B10 (D10-ERR-1): a designation or a qualifying purchase is written by the designation trigger alone and never rewritten;
   // a founding reservation is released only once its quote ended, naming how, with its slot freed (a race with a checkout meets it)
   KC001: { code: "INTEGRITY_FAILURE", reason: "DESIGNATION_REWRITE" },

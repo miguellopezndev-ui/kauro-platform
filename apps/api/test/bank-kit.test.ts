@@ -78,7 +78,8 @@ test("RACE hold point L3: a held attempt row blocks a writer of that row (observ
       ctx,
       held,
       async (c) => {
-        const r = await c.query("UPDATE kauro.outbound_execution_attempts SET state = 'UNCERTAIN', version = version + 1 WHERE attempt_id = $1", [attemptId]);
+        // the state alone: a version bump needs its domain event at COMMIT (0060 outbound_execution_attempts_event_per_version)
+        const r = await c.query("UPDATE kauro.outbound_execution_attempts SET state = 'UNCERTAIN' WHERE attempt_id = $1", [attemptId]);
         return r.rowCount;
       },
       "a writer of an attempt row while L3 is held",
@@ -86,7 +87,7 @@ test("RACE hold point L3: a held attempt row blocks a writer of that row (observ
     await held.release();
     assert.deepEqual(await waiting.pending, { status: "fulfilled", value: 1 });
     const row = await bw.iw.h.oracle.query<{ state: string; version: string }>("SELECT state, version::text FROM kauro.outbound_execution_attempts WHERE attempt_id = $1", [attemptId]);
-    assert.deepEqual(row.rows, [{ state: "UNCERTAIN", version: "2" }]);
+    assert.deepEqual(row.rows, [{ state: "UNCERTAIN", version: "1" }]);
   } finally {
     await held.release();
     await inbound.release();

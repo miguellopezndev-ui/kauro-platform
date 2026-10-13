@@ -13,6 +13,7 @@ import { canonicalBytes, isSha256Hex, rawDigest } from "@kauro/contracts";
 import { COMMERCE_AGGREGATE_KINDS, COMMERCE_CONSUMERS, COMMERCE_EVENT_PAYLOAD_ALLOWLIST, COMMERCE_EVENT_SUBSCRIPTIONS, COMMERCE_EVENT_TYPES } from "../commerce/events.js";
 import { BANK_ROUTE_AGGREGATE_KINDS, BANK_ROUTE_EVENT_PAYLOAD_ALLOWLIST, BANK_ROUTE_EVENT_SUBSCRIPTIONS, BANK_ROUTE_EVENT_TYPES } from "../commerce/bank-route.js";
 import { TREASURY_REFUND_AGGREGATE_KINDS, TREASURY_REFUND_EVENT_PAYLOAD_ALLOWLIST, TREASURY_REFUND_EVENT_SUBSCRIPTIONS, TREASURY_REFUND_EVENT_TYPES } from "../commerce/treasury-refund.js";
+import { OUTBOUND_ATTEMPT_AGGREGATE_KINDS, OUTBOUND_ATTEMPT_EVENT_PAYLOAD_ALLOWLIST, OUTBOUND_ATTEMPT_EVENT_SUBSCRIPTIONS, OUTBOUND_ATTEMPT_EVENT_TYPES } from "../commerce/execution-attempt.js";
 import { COMMERCIAL_EVENT_PAYLOAD_ALLOWLIST, COMMERCIAL_EVENT_SUBSCRIPTIONS, COMMERCIAL_EVENT_TYPES } from "../commercial/events.js";
 import { EXECUTION_AGGREGATE_KINDS, EXECUTION_CONSUMERS, EXECUTION_EVENT_PAYLOAD_ALLOWLIST, EXECUTION_EVENT_SUBSCRIPTIONS, EXECUTION_EVENT_TYPES } from "./execution/events.js";
 import { AUDIT_AGGREGATE_KINDS, AUDIT_AUTHORITY_EVENT_TYPES, AUDIT_CONSUMERS, AUDIT_EVENT_PAYLOAD_ALLOWLIST, AUDIT_EVENT_SUBSCRIPTIONS } from "./audit/events.js";
@@ -104,6 +105,8 @@ export const EVENT_TYPES = [
   ...BANK_ROUTE_EVENT_TYPES,
   // Payments V1 route-scope treasury refunds (commerce/treasury-refund.ts; migration 0060, lane L-REFUND)
   ...TREASURY_REFUND_EVENT_TYPES,
+  // Payments V1 outbound execution attempts (commerce/execution-attempt.ts; migration 0060 slice 2, lane L-REFUND)
+  ...OUTBOUND_ATTEMPT_EVENT_TYPES,
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -115,7 +118,7 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * 0012; B09: the commerce kinds, registered by migrations 0013..0017; B08: processing_job and package_version, registered by
  * migrations 0021 and 0022, and audit and cost_grant, registered by migration 0023; B11: support_case, registered by migration 0026).
  */
-export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS, "support_case", ...BANK_ROUTE_AGGREGATE_KINDS, ...TREASURY_REFUND_AGGREGATE_KINDS] as const;
+export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS, "support_case", ...BANK_ROUTE_AGGREGATE_KINDS, ...TREASURY_REFUND_AGGREGATE_KINDS, ...OUTBOUND_ATTEMPT_AGGREGATE_KINDS] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 
 /** Keys each event type may carry (07: references and safe counts only). */
@@ -194,6 +197,8 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   ...BANK_ROUTE_EVENT_PAYLOAD_ALLOWLIST,
   // Payments V1 treasury refunds (commerce/treasury-refund.ts): references and hashes only
   ...TREASURY_REFUND_EVENT_PAYLOAD_ALLOWLIST,
+  // Payments V1 outbound execution attempts (commerce/execution-attempt.ts): references, hashes, tokens, instants and counts only
+  ...OUTBOUND_ATTEMPT_EVENT_PAYLOAD_ALLOWLIST,
 });
 
 /**
@@ -262,6 +267,8 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   ...BANK_ROUTE_EVENT_SUBSCRIPTIONS,
   // Payments V1 treasury refunds (commerce/treasury-refund.ts): the owner is notified
   ...TREASURY_REFUND_EVENT_SUBSCRIPTIONS,
+  // Payments V1 outbound execution attempts (commerce/execution-attempt.ts): the owner is notified
+  ...OUTBOUND_ATTEMPT_EVENT_SUBSCRIPTIONS,
 ]);
 
 export function consumersOf(eventType: EventType): ReadonlyArray<Consumer> {

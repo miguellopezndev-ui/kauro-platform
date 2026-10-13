@@ -158,6 +158,8 @@ export {
 
 export type { TreasuryRefundEventType } from "./treasury-refund.js";
 export { TREASURY_REFUND_AGGREGATE_KINDS, TREASURY_REFUND_EVENT_TYPES, TREASURY_REFUND_EVENT_PAYLOAD_ALLOWLIST, TREASURY_REFUND_EVENT_SUBSCRIPTIONS } from "./treasury-refund.js";
+export type { OutboundAttemptEventType } from "./execution-attempt.js";
+export { OUTBOUND_ATTEMPT_AGGREGATE_KINDS, OUTBOUND_ATTEMPT_EVENT_TYPES, OUTBOUND_ATTEMPT_EVENT_PAYLOAD_ALLOWLIST, OUTBOUND_ATTEMPT_EVENT_SUBSCRIPTIONS, outboundReference } from "./execution-attempt.js";
 
 export type { DestinationInput, NormalizedDestination, DestinationNormalization, FingerprintParameters } from "./destination.js";
 export { normalizeDestination, canonicalDestinationMessage, DESTINATION_FINGERPRINT_DOMAIN, HOLDER_NAME_MAX_CODE_POINTS } from "./destination.js";

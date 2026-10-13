@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
-import { AGGREGATE_KINDS, AUDIT_AGGREGATE_KINDS, BANK_ROUTE_AGGREGATE_KINDS, COMMERCE_AGGREGATE_KINDS, EXECUTION_AGGREGATE_KINDS, TREASURY_REFUND_AGGREGATE_KINDS, type AggregateKind, type UserId } from "@kauro/domain";
+import { AGGREGATE_KINDS, AUDIT_AGGREGATE_KINDS, BANK_ROUTE_AGGREGATE_KINDS, COMMERCE_AGGREGATE_KINDS, EXECUTION_AGGREGATE_KINDS, TREASURY_REFUND_AGGREGATE_KINDS, OUTBOUND_ATTEMPT_AGGREGATE_KINDS, type AggregateKind, type UserId } from "@kauro/domain";
 import { RUNTIME_ROLES } from "../src/index.js";
 import { ROLES, sealSourceRevision, startHarness, type AgencyFixture, type Harness } from "../src/testing/index.js";
 import { constraintOf, event, ids, plan, project, sha, sourceSessions, sqlState, supportCase, tx, type PlanFixture } from "./support.js";
@@ -37,10 +37,10 @@ let carolInA: string;
  */
 // package B08's kinds (processing_job, package_version; audit, cost_grant) bind through the same unchanged function and are walked by
 // its own schema tests (execution-migrations.test.ts, execution-adapters.test.ts; audit-migrations.test.ts, audit-adapters.test.ts)
-type WalkedKind = Exclude<AggregateKind, (typeof COMMERCE_AGGREGATE_KINDS)[number] | (typeof EXECUTION_AGGREGATE_KINDS)[number] | (typeof AUDIT_AGGREGATE_KINDS)[number] | (typeof BANK_ROUTE_AGGREGATE_KINDS)[number] | (typeof TREASURY_REFUND_AGGREGATE_KINDS)[number]>;
+type WalkedKind = Exclude<AggregateKind, (typeof COMMERCE_AGGREGATE_KINDS)[number] | (typeof EXECUTION_AGGREGATE_KINDS)[number] | (typeof AUDIT_AGGREGATE_KINDS)[number] | (typeof BANK_ROUTE_AGGREGATE_KINDS)[number] | (typeof TREASURY_REFUND_AGGREGATE_KINDS)[number] | (typeof OUTBOUND_ATTEMPT_AGGREGATE_KINDS)[number]>;
 const WALKED_KINDS: ReadonlyArray<WalkedKind> = AGGREGATE_KINDS.filter(
   (k): k is WalkedKind =>
-    !(COMMERCE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(EXECUTION_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(AUDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_ROUTE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(TREASURY_REFUND_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k),
+    !(COMMERCE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(EXECUTION_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(AUDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_ROUTE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(TREASURY_REFUND_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(OUTBOUND_ATTEMPT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k),
 );
 const ofA = new Map<WalkedKind, { readonly id: string; readonly version: number }>();
 
@@ -80,6 +80,8 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   bank_transfer_instruction: ["bank_transfer_instructions", "order_id"],
   // Payments V1 treasury refund of an unassigned credit (0060, lane L-REFUND; walked by apps/api/test/ach-refund-cells.test.ts)
   treasury_refund: ["treasury_refunds", "treasury_refund_id"],
+  // Payments V1 outbound execution attempt (0060 slice 2, lane L-REFUND; walked by apps/api/test/refund-generic-cells.test.ts)
+  outbound_execution_attempt: ["outbound_execution_attempts", "attempt_id"],
 });
 
 // every runtime login of this branch: B06 five, package B09's payment service and package B10's commission service
