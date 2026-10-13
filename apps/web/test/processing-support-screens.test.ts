@@ -194,7 +194,8 @@ test("UI52/CMD044: the form warns against secrets and CRM rows, shows the SECURE
   const route = `/agencies/${AGENCY}/projects/${PROJECT}/sources`;
   const refusedAnswer = problem(422, "CONTENT_REFUSED", { reason: "SECRET_LIKE_CONTENT", nextActions: [{ action: "SECURE_UPLOAD", href: route }] });
   const refused = harness(async () => respond(422, refusedAnswer));
-  const form = fastRunner().openForm("CMD044");
+  // the form opened earlier, with its own entropy: a key minted again at submit time would differ
+  const form = new OperationRunner({ now: () => Date.parse("2026-10-13T12:00:00Z"), randomBytes: (n) => new Uint8Array(n).fill(9), wait: async () => undefined }).openForm("CMD044");
   const input = { category: "BILLING", summary: `my key is ${SECRET_TEXT} please help` } as const;
   const outcome = await createSupportCase(refused.client, fastRunner(), form, PROJECT, input, new Set());
   assert.equal(outcome.kind, "PROBLEM");
