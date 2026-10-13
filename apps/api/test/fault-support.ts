@@ -272,7 +272,7 @@ export class FaultRouting {
   /** The statement_timeout of the routed units (null: the harness-derived race allowance): explicit timeout cells shorten it. */
   statementTimeoutMs: number | null = null;
   /**
-   * The step clock of the operation a cell runs: while set, every SERVICE unit of work the routed units and the payment service's traced units
+   * The step clock of the operation a cell runs: while set, every SERVICE unit of work the routed units and the payment service's units (traced or not)
    * open positions its transaction on it (clock.onServer) before its work, instead of standing at `stand`. A cell sets it inside its operation
    * (`ctx.operation(name, (op) => ...)`, `faults.clock = op.clock`) and clears it after.
    */
@@ -326,7 +326,21 @@ export class FaultRouting {
         // role they need, exactly as the api's request units do (wrap): the lane L-INBOUND's service steps and owner commands
         if (prop === "run" && this.#als.getStore() !== undefined) return (Reflect.get(this.wrap(target), "run") as (...a: unknown[]) => unknown);
         const route = this.#pay.getStore();
-        if (prop !== "run" || route === undefined) return (value as (...a: unknown[]) => unknown).bind(target);
+        if (prop !== "run") return (value as (...a: unknown[]) => unknown).bind(target);
+        if (route === undefined) {
+          // outside onPayment the units run unchanged, except that while a cell's step clock is set a SERVICE unit positions its
+          // transaction on it (the payment service's steps a cell runs on the step clock without routing them: withClock)
+          return (context: unknown, work: (uow: object) => Promise<unknown>, ...rest: unknown[]) =>
+            (value as (...a: unknown[]) => Promise<unknown>).call(
+              target,
+              context,
+              async (uow: object) => {
+                if ((context as { kind?: string }).kind === "SERVICE" && this.clock !== null) await this.clock.onServer((uow as { client: SqlSession }).client);
+                return work(uow);
+              },
+              ...rest,
+            );
+        }
         const traced = {
           run: (context: unknown, work: (uow: object) => Promise<unknown>, ...rest: unknown[]) =>
             (value as (...a: unknown[]) => Promise<unknown>).call(
@@ -351,6 +365,11 @@ export class FaultRouting {
   async passPoint(name: string): Promise<void> {
     const route = this.#als.getStore();
     if (route !== undefined) await route.points.pass(name);
+  }
+
+  /** Whether a routed invocation (`on` / `onRoles`) is running: only its units are repositioned on the step clock (repositioned). */
+  get routed(): boolean {
+    return this.#als.getStore() !== undefined;
   }
 
   /** The api's request factory, or the routed one inside `on`. */

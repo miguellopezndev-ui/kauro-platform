@@ -174,10 +174,33 @@ export interface OwnerCall {
   readonly key?: string;
   readonly agency?: string | null;
 }
+/**
+ * The owner's step-up proof for a call. Under a cell's step clock (onClock) the command judges the proof's freshness at its repositioned
+ * effect instant, so the proof is issued on that controlled clock (one second before it, a STALE one twenty minutes before), read from a
+ * transaction the clock positions; otherwise on the database clock now (World.stepUp).
+ */
+async function proofFor(owner: Person, freshness: "FRESH" | "STALE"): Promise<string> {
+  const { iw } = L();
+  const clock = iw.faults.clock;
+  // only a routed invocation repositions the owner command on the step clock; an unrouted one judges at the database clock now
+  if (clock === null || !iw.faults.routed) return iw.w.stepUp(owner, freshness);
+  const c = await openPay();
+  let at: string;
+  try {
+    await c.query("BEGIN");
+    await clock.onServer(c);
+    at = (await c.query<{ at: string }>(`SELECT to_char(kauro.server_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at`)).rows[0]!.at;
+    await c.query("ROLLBACK");
+  } finally {
+    await c.end();
+  }
+  const issuedMs = Date.parse(at) - 1000 - (freshness === "FRESH" ? 0 : 20 * 60_000);
+  return iw.h.recordStepUp(owner.userId as UserId, { issuedAt: new Date(issuedMs).toISOString() as never });
+}
 async function ownerCall(url: string, body: Record<string, unknown>, o: OwnerCall, label: string): Promise<Reply> {
   const { iw } = L();
   const owner = o.owner ?? L().owner;
-  return call(iw.w, { url, token: owner.token, agency: o.agency ?? null, key: o.key ?? freshKey(label), body: { ...body, authorizationRef: o.proof ?? (await iw.w.stepUp(owner, o.stepUp ?? "FRESH")) } });
+  return call(iw.w, { url, token: owner.token, agency: o.agency ?? null, key: o.key ?? freshKey(label), body: { ...body, authorizationRef: o.proof ?? (await proofFor(owner, o.stepUp ?? "FRESH")) } });
 }
 export const ownerGet = (url: string, owner: Person = L().owner): Promise<Reply> => call(L().iw.w, { method: "GET", url, token: owner.token, agency: null, key: null, contentType: null });
 
@@ -352,8 +375,16 @@ export async function finance(): Promise<ReadonlyArray<{ readonly eventType: str
   return out;
 }
 /** E1: one pass of the payment service's sweeps (TRANSFER_EXPIRY is a registered bank sweep). */
+/**
+ * One sweep pass (E1 Kexpiry among the bank sweeps). The pass reports a failed unit to the service's background-failure sink and goes on;
+ * the first failure recorded during THIS pass is thrown here, so a cell sees a sweep that failed (a PARTIAL fault, a timeout) as failed.
+ */
 export const expirySweep = async (): Promise<void> => {
+  const sink = L().iw.pw.backgroundFailures;
+  const before = sink.length;
   await L().iw.pw.service.runSweepPass();
+  const failed = sink.slice(before)[0];
+  if (failed !== undefined) throw failed.error;
 };
 /** A credit taken from confirmation to its final state: match, then apply if MATCHED. */
 export async function settleCredit(creditId: string): Promise<CreditRow> {

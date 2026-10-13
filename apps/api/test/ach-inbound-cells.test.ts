@@ -894,6 +894,7 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
       const part = (o.amountCents * 2n) / 5n;
       const c = await confirmed(o.route.accountRef, exactFor(o, { grossCents: part, bookedAt: new Date(Date.now() - 60_000).toISOString() }));
       await matchService(c.creditId);
+      await sweptBefore(ctx, o);
       ctx.clock.set(plusMs(o.transferExpiresAt, 1));
       const apply = (): Promise<unknown> => onClockRaw(ctx, () => applyService(c.creditId));
       const sweep = (): Promise<unknown> => onClockRaw(ctx, () => expirySweep());
@@ -911,6 +912,7 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
   cell(t("RACE", "TIMEOUT", "lock and COMMIT timeout"), "race", async (ctx) => {
     const { iw } = L();
     const o = await awaitingOrder("e1-timeout");
+    await sweptBefore(ctx, o);
     ctx.clock.set(plusMs(o.transferExpiresAt, 1));
     iw.faults.statementTimeoutMs = LOCK_TIMEOUT_MS;
     try {
@@ -942,6 +944,7 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
     "crash-before-commit",
     async (ctx) => {
       const o = await awaitingOrder("e1-crb");
+      await sweptBefore(ctx, o);
       pastDeadline(ctx, o);
       const before = await fpOrder(o);
       ctx.points.crash("uow.before-commit");
@@ -956,6 +959,7 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
     "crash-after-commit",
     async (ctx) => {
       const o = await awaitingOrder("e1-cra");
+      await sweptBefore(ctx, o);
       pastDeadline(ctx, o);
       ctx.points.crash("uow.after-commit");
       await onClock(ctx, "Kexpiry answer lost", () => expirySweep()).catch(() => undefined);
@@ -992,7 +996,10 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
     const holder = await openConnection(L().iw.h.pg.clientConfig("kauro_payment_test"));
     try {
       await holder.query("BEGIN");
-      await holder.query("SELECT 1 FROM kauro.payment_orders WHERE order_id = $1 FOR NO KEY UPDATE", [o.orderId]);
+      // the payment login sees an order only in its agency (RLS): adopt it, and prove the row was locked (zero rows lock nothing)
+      await holder.query("SELECT set_config('kauro.agency_id', $1, true)", [o.a.s.agency.agencyId]);
+      const locked = await holder.query("SELECT 1 FROM kauro.payment_orders WHERE order_id = $1 FOR NO KEY UPDATE", [o.orderId]);
+      assert.equal(locked.rowCount, 1, "the holder holds the order's row lock");
       const waiter = await openPay();
       const waiting = await ctx.mustWait(L().iw.h.oracle, { waiter, holder: (await holder.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid }, (cc) => routed(ctx, cc, () => retire(o, freshKey("retire"))), "the retirement waits at the order lock");
       await ctx.revoked("the billing member's identity", () => q("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1", [o.a.billing.userId]));
@@ -1009,6 +1016,7 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
     const o = await awaitingOrder("e1-partial");
     const part = o.amountCents / 2n;
     await paid(o, { grossCents: part });
+    await sweptBefore(ctx, o);
     ctx.clock.set(plusMs(o.transferExpiresAt, 1));
     const before = await fpOrder(o);
     const steps: ReadonlyArray<SqlStep> = [{ label: "order_update", match: /UPDATE kauro\.(payment_orders|bank_transfer_instructions)/ }, { label: "refund_insert", match: /INSERT INTO kauro\.refunds/ }, ...LATER_WRITES.slice(0, 2)];
@@ -1127,6 +1135,28 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
   });
 }
 
+/**
+ * Cell isolation of a sweep: the open bank orders of earlier cells that are due before `o` are expired first, by one sweep pass at the
+ * latest of their deadlines (read by the oracle), so the cell's pass takes `o` first: its held unit (holdAndWait) or its armed fault is
+ * o's, never an earlier cell's leftover order's. o is not due then: its deadline is later by at least the time its own issuance took
+ * (agent, route, plan, quote and I2, each its own transaction), while a sweep unit reads its candidates within its first statements.
+ * The pass is proven not to have touched o.
+ */
+async function sweptBefore(ctx: FaultContext, o: Order): Promise<void> {
+  const [due] = await q<{ at: string | null }>(
+    "SELECT max(transfer_expires_at) AS at FROM kauro.bank_transfer_instructions WHERE order_state IN ('AWAITING_TRANSFER', 'PARTIALLY_RECEIVED') AND order_id <> $1 AND transfer_expires_at < $2",
+    [o.orderId, o.transferExpiresAt],
+  );
+  if (due?.at == null) return;
+  const open = await orderState(o.orderId);
+  const latest = new Date(due.at).toISOString();
+  const now = Date.parse(ctx.clock.at(0));
+  assert.ok(now < Date.parse(o.transferExpiresAt), "the cell isolates its order before the clock reaches its deadline");
+  // the clock never moves backwards: one already past the leftovers' deadlines sweeps them where it stands
+  if (now < Date.parse(latest)) ctx.clock.set(latest);
+  await withClock(ctx, () => expirySweep());
+  assert.equal(await orderState(o.orderId), open, "the isolating pass left the cell's own order as it was");
+}
 /** `fn` on a fresh routed connection with the controlled clock (no new operation scope: inside holdAndWait's own). */
 async function onClockRaw<T>(ctx: FaultContext, fn: () => Promise<T>): Promise<T> {
   return withClock(ctx, fn);
@@ -1229,8 +1259,10 @@ function retire(o: Order, key: string): Promise<Reply> {
     for (const first of ["sweep holds", "apply holds", "unswept"]) {
       const o = await awaitingOrder(`p1d-race-${first}`);
       const bookedAt = plusMs(o.transferExpiresAt, -60_000);
+      await sweptBefore(ctx, o);
       ctx.clock.set(plusMs(o.transferExpiresAt, HOUR));
-      const c = await withClock(ctx, () => confirmed(o.route.accountRef, exactFor(o, { bookedAt })));
+      // C6 is the owner's command: routed, so its confirmation instant is the clock's (late), not the database's real one
+      const c = await onClock(ctx, `C6 of the late-confirmed credit (${first})`, () => confirmed(o.route.accountRef, exactFor(o, { bookedAt })));
       await withClock(ctx, () => matchService(c.creditId));
       if (first === "unswept") await withClock(ctx, () => applyService(c.creditId));
       else {
