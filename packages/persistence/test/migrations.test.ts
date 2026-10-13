@@ -137,6 +137,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0060_runtime_hardening.sql",
     // package B05 L3m: the durable send and the settlement of a model dispatch, dispatch liabilities, the pool's liability gate (provisional number)
     "0061_b05_dispatch_settlement.sql",
+    // package B11 lane A1: the agency's buyer type, recorded once by SetBuyerType (provisional number)
+    "0062_agency_buyer_types.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
@@ -383,10 +385,10 @@ test("registered aggregate kinds are exactly the domain AGGREGATE_KINDS, B06's s
         ["project", "projects", "project_id"],
       ],
     );
-    // B11 W4 registers its own kind in its own migration (0026, D11-SYNC-1), owned by B11
+    // B11 W4 registers its own kind in its own migration (0026, D11-SYNC-1), owned by B11; B11 lane A1 the agency's buyer type (0062)
     assert.deepEqual(
       r.rows.filter((x) => x.owner_package === "B11").map((x) => [x.aggregate_kind, x.table_name, x.id_column]),
-      [["support_case", "support_cases", "case_id"]],
+      [["agency_buyer_type", "agency_buyer_types", "agency_id"], ["support_case", "support_cases", "case_id"]],
     );
     // D-EVT-1 over the registry: every registered kind's table carries require_event_for_version(kind, id column), and every such
     // trigger names a registered kind with that table and column — the event-per-version rule and the binding agree on each kind
