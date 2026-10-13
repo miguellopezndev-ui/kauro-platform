@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ApiClient, type FetchInit, type FetchedResponse, type FetchLike } from "../src/client/api-client.ts";
-import type { Problem } from "../src/api/generated.ts";
+import { OPERATIONS, type Problem } from "../src/api/generated.ts";
 
 const AGENCY = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5f70";
 const CLIENT = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5f71";
@@ -234,4 +234,22 @@ test("D-PRIV-1: an observer is told of every classified answer without changing 
   assert.equal(answer.kind, "REPLY", "the caller still gets its answer");
   assert.equal(reported.length, 1, "the observer's failure is reported, not swallowed");
   assert.ok(reported[0] instanceof RangeError);
+});
+
+test("D-GEN-1: every generated descriptor lists exactly the parameters of its path template, and every journaled command declares its Idempotency-Key", () => {
+  // the commands that are not journaled by the api (sign-in and logout, the step-up, the public inquiry, the two document intakes): a closed list
+  const NOT_JOURNALED = ["SubmitDecisionArtifact", "SubmitSelectionManifest", "createInquiry", "createStepUp", "openSession", "revokeCurrentSession"];
+  const journalless: string[] = [];
+  for (const descriptor of Object.values(OPERATIONS)) {
+    const templated = [...descriptor.path.matchAll(/\{([A-Za-z]+)\}/g)].map((match) => match[1]);
+    assert.deepEqual([...descriptor.pathParameters], templated, `${descriptor.operationId}: ${descriptor.path}`);
+    if (descriptor.method !== "get" && descriptor.idempotency !== "REQUIRED") journalless.push(descriptor.operationId);
+    if (descriptor.idempotency === "REQUIRED") assert.ok(descriptor.headers.includes("Idempotency-Key"), `${descriptor.operationId} sends its key`);
+  }
+  assert.deepEqual(journalless.sort(), NOT_JOURNALED);
+  for (const id of ["configureBankRoute", "verifyBankRoute", "enableBankRoute", "disableBankRoute", "replaceBankRouteDetails"] as const) {
+    assert.equal(OPERATIONS[id].idempotency, "REQUIRED", id);
+    assert.ok(OPERATIONS[id].headers.includes("Idempotency-Key"), id);
+  }
+  assert.ok(OPERATIONS.getTransferInstructions.headers.includes("X-Kauro-Agency"));
 });

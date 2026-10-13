@@ -151,6 +151,14 @@ export function stateOfProblem(problem: Problem): StateDecision {
 const CHECKING: Entry = { state: "PENDING", next: "REQUERY" };
 const INTEGRITY: Entry = { state: "INTEGRITY_FAILURE", next: "CONTACT_SUPPORT", showsSupportReference: true };
 
+/**
+ * A read that never left the browser: the api client refused to build its request (a descriptor that does not fit the call is a
+ * defect of this build, not a reply). It is shown as an integrity failure with the support step, never as an endless LOADING.
+ */
+export function readRefused(): StateDecision {
+  return decide(INTEGRITY, "READ_REFUSED");
+}
+
 /** What a screen shows while a fetch is in flight: the previous private view is cleared and the fetch is shown. */
 export function loading(): StateDecision {
   return decide({ state: "LOADING", next: "NONE" }, "LOADING");

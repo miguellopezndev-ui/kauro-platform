@@ -13,7 +13,7 @@ import { EN } from "../src/copy/en.ts";
 import { canCreateOrder, createPaymentOrder, instructionsRead, offersReupload, paymentModel, quoteGate } from "../src/screens/payments/model.ts";
 import { PaymentDetails } from "../src/screens/payments/payment-view.tsx";
 import { QuoteDetails } from "../src/screens/payments/quote-view.tsx";
-import { harness, order, ORDER, problem, QUOTE, quote, respond } from "./support/fixtures.ts";
+import { AGENCY, harness, order, ORDER, problem, QUOTE, quote, respond } from "./support/fixtures.ts";
 
 const NOW = Date.parse("2026-10-14T00:00:00Z");
 const noop = (): void => undefined;
@@ -207,4 +207,17 @@ test("UI24: expired or unavailable bank details are stated and never shown; the 
   assert.equal(instructionsRead({ kind: "NO_ANSWER", reason: "NETWORK", status: null }).kind, "UNAVAILABLE");
   assert.ok(renderPayment({ instructions: { kind: "LOADING" } }).includes("Fetching the current information."));
   assert.equal(ORDER.length, 36);
+});
+
+test("UI24: the bank details are read for the order in the address under the active agency, and the call never throws before its request", async () => {
+  const { client, sent } = harness(() => respond(200, { instructions: { ...INSTRUCTIONS, reference: "K0123456789ABCDEFGHJKMN", sendBy: "2026-10-16T12:00:00.000Z", transferExpiresAt: "2026-10-20T12:00:00.000Z" } }));
+  // exactly the call PaymentScreen makes (containers.tsx): the order id from the address, no key, the agency from the shell's context
+  const answer = await client.call("getTransferInstructions", { path: { orderId: ORDER } });
+  assert.equal(sent.length, 1, "the request left the browser");
+  assert.equal(sent[0]?.url, `/api/v1/payment-orders/${ORDER}/transfer-instructions`);
+  assert.equal(sent[0]?.init.method, "GET");
+  const headers = sent[0]?.init.headers as Readonly<Record<string, string>>;
+  assert.equal(headers["X-Kauro-Agency"], AGENCY);
+  assert.equal(headers["Idempotency-Key"], undefined);
+  assert.equal(answer.kind, "REPLY");
 });

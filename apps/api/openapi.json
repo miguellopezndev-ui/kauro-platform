@@ -3928,6 +3928,7 @@
             "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "NONE",
         "requestBody": {
           "required": true,
           "content": {
@@ -9021,9 +9022,17 @@
         "x-kauro-operational": true,
         "parameters": [
           {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "KAURO_OWNER",
         "requestBody": {
           "required": true,
           "content": {
@@ -9082,9 +9091,21 @@
         "x-kauro-operational": true,
         "parameters": [
           {
+            "name": "routeId",
+            "in": "path",
+            "required": true,
+            "description": "Path id (a UUID).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
           }
         ],
+        "x-kauro-idempotency": "NONE",
+        "x-kauro-role": "KAURO_OWNER",
         "responses": {
           "200": {
             "description": "The route.",
@@ -9133,9 +9154,27 @@
         "x-kauro-operational": true,
         "parameters": [
           {
+            "name": "routeId",
+            "in": "path",
+            "required": true,
+            "description": "Path id (a UUID).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "KAURO_OWNER",
         "requestBody": {
           "required": true,
           "content": {
@@ -9194,9 +9233,27 @@
         "x-kauro-operational": true,
         "parameters": [
           {
+            "name": "routeId",
+            "in": "path",
+            "required": true,
+            "description": "Path id (a UUID).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "KAURO_OWNER",
         "requestBody": {
           "required": true,
           "content": {
@@ -9255,9 +9312,27 @@
         "x-kauro-operational": true,
         "parameters": [
           {
+            "name": "routeId",
+            "in": "path",
+            "required": true,
+            "description": "Path id (a UUID).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "KAURO_OWNER",
         "requestBody": {
           "required": true,
           "content": {
@@ -9316,9 +9391,27 @@
         "x-kauro-operational": true,
         "parameters": [
           {
+            "name": "routeId",
+            "in": "path",
+            "required": true,
+            "description": "Path id (a UUID).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "KAURO_OWNER",
         "requestBody": {
           "required": true,
           "content": {
@@ -12610,9 +12703,23 @@
         "x-kauro-operational": true,
         "parameters": [
           {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "description": "Path id (a UUID).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/AgencySelector"
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
           }
         ],
+        "x-kauro-idempotency": "NONE",
         "responses": {
           "200": {
             "description": "The account details of the route version the order was issued on, with the exact amount, reference and send-by instant of the order.",
@@ -19863,6 +19970,7 @@
             "$ref": "#/components/parameters/InquiryOrigin"
           }
         ],
+        "x-kauro-idempotency": "NONE",
         "requestBody": {
           "required": true,
           "content": {
@@ -30663,6 +30771,7 @@
             "$ref": "#/components/parameters/CorrelationId"
           }
         ],
+        "x-kauro-idempotency": "NONE",
         "requestBody": {
           "required": true,
           "content": {
@@ -31142,6 +31251,7 @@
             "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "NONE",
         "responses": {
           "204": {
             "description": "Ended (or already ended): Set-Cookie clears the session cookie and Clear-Site-Data names cache, cookies and storage.",

@@ -105,6 +105,8 @@ export {
   mediaTypeOf,
   responseIntegrityProblem,
 } from "./api/response-contract.js";
+export type { OperationalWire } from "./api/operational-wire.js";
+export { OPERATIONAL_WIRE } from "./api/operational-wire.js";
 export type { RawRequest, RequestHead, StructuralAdmission, AdmissionOutcome, DocumentRoute, DocumentAdmission, DocumentAdmissionOutcome } from "./api/admission.js";
 export { admitHeaders, admitStructure, admitDocument, admitOperationalBody, admitEmptyRequest, envelopeOf, correlationIdOf, repeatedHeaderNames, unauthenticatedProblem } from "./api/admission.js";
 export type {

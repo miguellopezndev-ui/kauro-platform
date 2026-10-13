@@ -75,7 +75,7 @@ export function PaymentScreen({ agencyId, orderId }: { readonly agencyId: string
   const order = state.kind === "ANSWERED" && state.answer.kind === "REPLY" ? state.answer.body.data.order : null;
   const showsInstructions = order?.paymentStatus === "NOT_STARTED";
   const details = useRead((signal) => (showsInstructions ? client.call("getTransferInstructions", { path: { orderId }, signal }) : Promise.resolve({ kind: "NO_ANSWER", reason: "ABORTED", status: null } as const)), `${orderId}:${showsInstructions ? "details" : "none"}:${state.kind === "ANSWERED" ? "r" : "l"}`);
-  const instructions: InstructionsRead = !showsInstructions ? { kind: "NOT_SHOWN" } : details.state.kind === "LOADING" ? { kind: "LOADING" } : instructionsRead(details.state.answer);
+  const instructions: InstructionsRead = !showsInstructions ? { kind: "NOT_SHOWN" } : details.state.kind === "LOADING" ? { kind: "LOADING" } : details.state.kind === "ERROR" ? { kind: "UNAVAILABLE", decision: details.state.decision } : instructionsRead(details.state.answer);
   if (state.kind === "LOADING") return <StatePanel decision={state.decision} />;
   if (order === null) return <PaymentUnread decision={state.decision} onRefresh={refresh} />;
   return (
