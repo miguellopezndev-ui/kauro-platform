@@ -1049,6 +1049,8 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
     assert.equal(l["BANK_CASH:DEBIT"] ?? 0n, 0n, `${what}: no incoming credit makes BANK_CASH`);
   };
   const appliedFor = async (label: string) => {
+    // the earlier cells' due FINANCE deliveries are booked first: a pass then holds THIS source's first ledger line, never another's
+    await finance();
     const o = await awaitingOrder(label);
     const { credit } = await paid(o, { feeCents: fee });
     assert.equal(credit.state, "APPLIED");
@@ -1249,8 +1251,8 @@ function retire(o: Order, key: string): Promise<Reply> {
   cell(`DENY ACH-M-SI1-RETRY (replay and rejected evidence): ${label}`, "retry", async (ctx) => {
     const { bw } = L();
     const { route, a } = await stmt("si1-retry");
-    const first = await ctx.attempt(() => importSI2(route.accountRef, a, { key: "si1-retry-key-1" }));
-    const again = await ctx.attempt(() => importSI2(route.accountRef, a, { key: "si1-retry-key-1" }));
+    const first = await ctx.attempt(() => importSI2(route.accountRef, a, { key: "si1-retry-key-0001" }));
+    const again = await ctx.attempt(() => importSI2(route.accountRef, a, { key: "si1-retry-key-0001" }));
     assert.equal(replayedBody(again.text), replayedBody(first.text), "same digest, same result");
     for (const [expected, bytes, auth] of [
       ["422 INTEGRITY_FAILURE UNKNOWN_EVIDENCE", JSON.stringify({ format: "other-bank/9", kind: "STATEMENT" }), undefined],
