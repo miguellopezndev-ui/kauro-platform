@@ -250,6 +250,11 @@ export interface ApiServerOptions {
    * with the same transport pieces as the payment routes. Every route declares its replies and passes the send guard.
    */
   readonly commissionRoutes?: (app: FastifyInstance, kit: RouteKit) => void;
+  /**
+   * Registers the agency app's operational commands (package B11 lane A1: CMD101 SetBuyerType; agency-app-routes.ts) with the same
+   * transport pieces as the payment routes. Every route declares its replies and passes the send guard.
+   */
+  readonly agencyRoutes?: (app: FastifyInstance, kit: RouteKit) => void;
 }
 
 /** The transport pieces a route registered outside this module answers with (package B09's payment routes). */
@@ -565,6 +570,7 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
   };
   options.paymentRoutes?.(app, kit);
   options.commissionRoutes?.(app, kit);
+  options.agencyRoutes?.(app, kit);
   if (options.sessions !== undefined) {
     registerSessionRoutes(app, { ...options.sessions, validator: options.validator, refuseUnauthenticated: options.refuseUnauthenticated, refuseCredentials: refusalOfCredentials(options), sink });
   }

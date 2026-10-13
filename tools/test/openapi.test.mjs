@@ -37,8 +37,10 @@ test("the committed document is the generated one, byte for byte, and matches ev
     [
       "GET /api/v1/agencies ListAgencies",
       "GET /api/v1/agencies/{agencyId} GetAgency",
+      "GET /api/v1/agencies/{agencyId}/buyer-type GetBuyerType",
       "GET /api/v1/agencies/{agencyId}/clients ListClients",
       "GET /api/v1/agencies/{agencyId}/members ListMembers",
+      "GET /api/v1/agencies/{agencyId}/projects ListProjects",
       "GET /api/v1/audits/{auditId} GetAudit",
       "GET /api/v1/jobs/{jobId} GetJob",
       "GET /api/v1/operations/bank-routes/{routeId} getBankRoute",
@@ -65,6 +67,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /readyz getReadiness",
       "POST /api/v1/agencies CreateAgency",
       "POST /api/v1/agencies/{agencyId}/activate ActivateAgency",
+      "POST /api/v1/agencies/{agencyId}/buyer-type setBuyerType",
       "POST /api/v1/agencies/{agencyId}/clients CreateClient",
       "POST /api/v1/agencies/{agencyId}/closure-requests CloseAgency",
       "POST /api/v1/agencies/{agencyId}/invitations InviteMember",
@@ -177,6 +180,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
     "POST /api/v1/operations/bank-routes/{routeId}/details replaceBankRouteDetails",
     "GET /api/v1/operations/bank-routes/{routeId} getBankRoute",
     "GET /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions",
+    "POST /api/v1/agencies/{agencyId}/buyer-type setBuyerType",
   ]);
   // the public routes take no credential (an explicit empty security requirement) and the inquiry names the Origin it demands
   for (const [path, method] of [["/api/v1/public/capability-publication", "get"], ["/api/v1/public/inquiries", "post"]]) assert.deepEqual(expected.paths[path][method].security, [], path);

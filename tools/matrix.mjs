@@ -1303,7 +1303,7 @@ export function generateMatrix(s) {
   line("| Read | Route | Scope | List | Reply view | Action token | Authority |");
   line("| --- | --- | --- | --- | --- | --- | --- |");
   for (const spec of Object.values(s.reads)) {
-    line(`| ${spec.operationId} | GET ${cell(spec.path)} | ${spec.scope} | ${spec.paginated ? "limit, cursor" : "—"} | ${s.readViews[spec.operationId].view} | ${spec.action} | ${cell(spec.authority)} |`);
+    line(`| ${spec.operationId} | GET ${cell(spec.path)} | ${spec.scope} | ${spec.paginated ? (spec.filter !== undefined ? `filter (${spec.filter.values.join(", ")}; default ${spec.filter.default}), limit, cursor` : "limit, cursor") : "—"} | ${s.readViews[spec.operationId].view} | ${spec.action} | ${cell(spec.authority)} |`);
   }
   line();
   for (const spec of Object.values(s.reads)) {

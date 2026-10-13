@@ -340,6 +340,10 @@ export function generateOpenApi(sources) {
       ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope.", schema: ID })),
       ...(spec.scope === "AGENCY_HEADER" ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
       ...(spec.paginated ? [{ $ref: "#/components/parameters/PageLimit" }, { $ref: "#/components/parameters/PageCursor" }] : []),
+      // a list's closed filter (B11 lane A1, ListProjects): its values and the one an absent member means
+      ...(spec.filter !== undefined
+        ? [{ name: "filter", in: "query", required: false, description: "The list's filter; a value not listed is SCHEMA_VIOLATION (ENUM). The cursor is bound to it.", schema: { type: "string", enum: [...spec.filter.values], default: spec.filter.default } }]
+        : []),
       { $ref: "#/components/parameters/CorrelationId" },
     ];
     paths[spec.path] = {

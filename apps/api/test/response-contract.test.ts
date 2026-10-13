@@ -195,6 +195,9 @@ test("R23: every served route declares its replies (the route inventory the Open
       // the support reads (B11 W4), registered with the manual-10 reads (createReadHandlers)
       ["GET", "/api/v1/projects/:projectId/support-cases", "ListSupportCases", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListSupportCases" } }],
       ["GET", "/api/v1/support-cases/:caseId", "GetSupportCase", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetSupportCase" } }],
+      // the agency app's reads (B11 lane A1), registered with the manual-10 reads (createReadHandlers)
+      ["GET", "/api/v1/agencies/:agencyId/buyer-type", "GetBuyerType", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetBuyerType" } }],
+      ["GET", "/api/v1/agencies/:agencyId/projects", "ListProjects", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListProjects" } }],
       // the source reads (B07 design §9.1)
       ["GET", "/api/v1/revisions/:revisionId/selection-manifests/:selectionManifestId", "GetSelectionManifest", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetSelectionManifest" } }],
       ["GET", "/api/v1/revisions/:revisionId", "GetRevision", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetRevision" } }],
@@ -258,6 +261,8 @@ test("R23: every served route declares its replies (the route inventory the Open
       // the commission group's service routes of package B10 (mandate B10-STATEMENTS-PAYOUTS), served in every edition, synchronous
       ["POST", "/api/v1/sales/commission-periods/:periodId/close", "CloseCommissionPeriod", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD051" } }],
       ["POST", "/api/v1/sales/statements/:statementId/reconcile-payout", "ReconcileCommissionPayout", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD053" } }],
+      // the agency app's operational command (B11 lane A1): CMD101 SetBuyerType, 201 recorded, 200 the same value again
+      ["POST", "/api/v1/agencies/:agencyId/buyer-type", "setBuyerType", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:setBuyerType:200" }, 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:setBuyerType:201" } }],
     ].map(([m, u, o, d]) => [m, u, o, d, { contentType: "application/problem+json", schemaId: "Problem" }]),
   );
   // another server over the same real unit of work: an undeclared route is refused at registration, before any request
