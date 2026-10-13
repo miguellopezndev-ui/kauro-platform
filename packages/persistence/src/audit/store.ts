@@ -477,8 +477,8 @@ export class PgAuditStore implements AuditStore {
     if (audit === null) throw new NotFoundFailure("audit");
     const inserted = await execute<Row>(
       this.db,
-      `INSERT INTO kauro.model_tasks (model_task_id, agency_id, audit_id, grant_id, step_fence, task_key, candidate_manifest_hash, policy_hash, minimized_request_hash, provider_profile_id, maximum_cost_cents)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (audit_id, task_key) DO NOTHING RETURNING ${MODEL_TASK_COLUMNS}`,
+      `INSERT INTO kauro.model_tasks (model_task_id, agency_id, audit_id, grant_id, step_fence, task_key, candidate_manifest_hash, policy_hash, minimized_request_hash, provider_profile_id, maximum_cost_cents, core_run_id, core_request_key)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT (audit_id, task_key) DO NOTHING RETURNING ${MODEL_TASK_COLUMNS}`,
       [
         task.modelTaskId,
         audit.agencyId,
@@ -491,14 +491,25 @@ export class PgAuditStore implements AuditStore {
         task.minimizedRequestHash,
         task.providerProfileId,
         task.maximumCostCents.toString(),
+        task.core?.runId ?? null,
+        task.core?.requestKey ?? null,
       ],
     );
     if (inserted.rows[0]) return modelTaskRecord(inserted.rows[0]);
     // the same task planned again (a redelivered INTERPRET): its candidate set and policy are its idempotency identity
-    const stored = await execute<Row>(this.db, `SELECT ${MODEL_TASK_COLUMNS} FROM kauro.model_tasks WHERE audit_id = $1 AND task_key = $2`, [task.auditId, task.taskKey]);
-    const existing = modelTaskRecord(one(stored.rows, "the planned model task"));
+    const stored = await execute<Row>(
+      this.db,
+      `SELECT ${MODEL_TASK_COLUMNS}, core_run_id AS core_run, core_request_key AS core_key FROM kauro.model_tasks WHERE audit_id = $1 AND task_key = $2`,
+      [task.auditId, task.taskKey],
+    );
+    const row = one(stored.rows, "the planned model task");
+    const existing = modelTaskRecord(row);
     if (existing.candidateManifestHash !== task.candidateManifestHash || existing.policyHash !== task.policyHash) {
       throw new DomainFailure("INTEGRITY_FAILURE", `model task ${task.taskKey} of audit ${task.auditId} was planned over another candidate set or policy`);
+    }
+    // ADR-B05-IJR-1: a core task is one request key of one run and one outbound content; planned again it must be that same one
+    if (task.core !== undefined && (row["core_run"] !== task.core.runId || row["core_key"] !== task.core.requestKey || existing.minimizedRequestHash !== task.minimizedRequestHash)) {
+      throw new DomainFailure("INTEGRITY_FAILURE", `model task ${task.taskKey} of audit ${task.auditId} was planned for another core request or minimized request`);
     }
     return existing;
   }
@@ -566,14 +577,20 @@ export class PgAuditStore implements AuditStore {
     }
     const lease = await this.claimTaskLease(task, dispatch.ownerId);
     if (lease.ownerId !== (dispatch.ownerId as string)) return { kind: "HELD", lease };
-    // an attempt at the lease's current fence answers as it stands (sent, uncertain or merely reserved): no second intent per fence
-    const current = await execute<{ request_id: string }>(this.db, "SELECT request_id FROM kauro.request_journal WHERE task_id = $1 AND fence = $2", [modelTaskId, lease.fence]);
-    if (current.rows[0]) {
-      const request = await this.#requests.get(current.rows[0].request_id as RequestId);
-      if (request === null) throw new DomainFailure("INTEGRITY_FAILURE", "the current attempt is not visible");
-      return { kind: "IN_FLIGHT", request, lease };
+    if (core !== undefined) {
+      const answered = await this.#coreAttemptAnswer(modelTaskId, lease);
+      if (answered !== null) return answered;
+    } else {
+      // an attempt at the lease's current fence answers as it stands (sent, uncertain or merely reserved): no second intent per fence
+      const current = await execute<{ request_id: string }>(this.db, "SELECT request_id FROM kauro.request_journal WHERE task_id = $1 AND fence = $2", [modelTaskId, lease.fence]);
+      if (current.rows[0]) {
+        const request = await this.#requests.get(current.rows[0].request_id as RequestId);
+        if (request === null) throw new DomainFailure("INTEGRITY_FAILURE", "the current attempt is not visible");
+        return { kind: "IN_FLIGHT", request, lease };
+      }
     }
-    // the intent reserves on the audit's grant under the grant's row lock (the database's reservation, KA083)
+    // the intent reserves on the audit's grant under the grant's row lock (the database's reservation, KA083); a core admission's row
+    // is bound to its model task and the task's attempts are bounded by the database (0064 K-2, K-3)
     const request = await this.#requests.reserve({
       requestId: dispatch.requestId,
       taskId,
@@ -588,6 +605,37 @@ export class PgAuditStore implements AuditStore {
       ...(core === undefined ? {} : { core: { runId: core.runId, reservationId: core.reservationId, requestKey: core.requestKey, maxChargeMicros: core.maxChargeMicros } }),
     });
     return { kind: "RESERVED", request, lease };
+  }
+
+  /**
+   * ADR-B05-IJR-1 K-5, steps (4) and (5) of a core admission, under the MODEL_TASK lease this owner holds (claim_lease's row lock): one
+   * IC request key is one model task and each IC invocation one request row, so the next invocation of the same owner lands at the same
+   * fence. (4) a response stored while this admission waited on the lease is compiled first (rule 16: re-read after the wait); (5) the
+   * task's live attempt (RESERVED or DISPATCHING, any fence: one authorized concurrent dispatch, 06 l.104) answers IN_FLIGHT; null: the
+   * intent reserves.
+   */
+  async #coreAttemptAnswer(modelTaskId: ModelTaskId, lease: LeaseRecord): Promise<DispatchOutcome | null> {
+    const afterWait = await execute<{ request_id: string }>(
+      this.db,
+      "SELECT request_id FROM kauro.request_journal WHERE task_id = $1 AND state IN ('RESPONSE_STORED', 'CONSUMED') ORDER BY fence DESC LIMIT 1",
+      [modelTaskId],
+    );
+    if (afterWait.rows[0]) {
+      const request = await this.#requests.get(afterWait.rows[0].request_id as RequestId);
+      if (request === null) throw new DomainFailure("INTEGRITY_FAILURE", "the stored response's request is not visible");
+      return { kind: "STORED_RESPONSE", request };
+    }
+    const live = await execute<{ request_id: string }>(
+      this.db,
+      "SELECT request_id FROM kauro.request_journal WHERE task_id = $1 AND core_run_id IS NOT NULL AND state IN ('RESERVED', 'DISPATCHING')",
+      [modelTaskId],
+    );
+    if (live.rows[0]) {
+      const request = await this.#requests.get(live.rows[0].request_id as RequestId);
+      if (request === null) throw new DomainFailure("INTEGRITY_FAILURE", "the live attempt is not visible");
+      return { kind: "IN_FLIGHT", request, lease };
+    }
+    return null;
   }
 
   async appendJournal(append: JournalAppend): Promise<JournalAppendOutcome> {

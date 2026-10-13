@@ -141,6 +141,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0062_audit_clock_at_commit.sql",
     // FCG-B06-LEASE-1b: claim_lease judges its caller's deadline at the database clock after the row lock (provisional number)
     "0063_lease_deadline_after_lock.sql",
+    // package B05 IJR: one IC request key is one model task, each IC invocation one request row (ADR-B05-IJR-1; provisional number)
+    "0064_b05_model_task_request_key.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
