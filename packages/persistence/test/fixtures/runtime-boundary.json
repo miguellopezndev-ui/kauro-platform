@@ -1563,6 +1563,22 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
+    "agency_buyer_types/agency_buyer_types_owner_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()",
+      "check": null
+    },
+    "agency_buyer_types/agency_buyer_types_tenant": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
     "agency_closures/agency_closures_tenant_read": {
       "check": null,
       "command": "SELECT",
@@ -5959,6 +5975,10 @@
         "UPDATE"
       ],
       "kauro.agency_agreement_acceptances": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.agency_buyer_types": [
         "INSERT",
         "SELECT"
       ],
