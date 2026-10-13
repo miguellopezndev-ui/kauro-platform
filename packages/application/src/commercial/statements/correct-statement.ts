@@ -56,7 +56,7 @@ export function correctCommissionStatement(rt: StatementServiceRuntime, request:
       if (predecessor.state !== "ISSUED" && predecessor.state !== "DISPUTED") {
         throw new DomainFailure("PRECONDITION_FAILED", "only an ISSUED or DISPUTED statement is corrected", { reason: "UNLISTED_TRANSITION", currentVersion: predecessor.version, currentState: predecessor.state });
       }
-      const { issued, corrected, successorId } = await supersedeStatement(rt, uow, predecessor, now);
+      const { issued, corrected, successorId } = await supersedeStatement(rt, uow, predecessor, now, "CMD051");
       const calendar = await statements.getCalendar(issued.record.calendarVersionId);
       const view: StatementCorrectionView = {
         correctedStatementId: corrected.statementId,
@@ -72,7 +72,7 @@ export function correctCommissionStatement(rt: StatementServiceRuntime, request:
  * Steps 2 and 3 of the correction, under the predecessor's row lock taken by the caller (ISSUED or DISPUTED): the successor recomposed over
  * the predecessor's lines and ISSUED, the predecessor CORRECTED. CMD053 calls it too, on a FAILED or RETURNED payout (D10-GAP-12).
  */
-export async function supersedeStatement(rt: StatementServiceRuntime, uow: CommerceUnitOfWork, predecessor: CommissionStatementRecord, now: UtcInstant) {
+export async function supersedeStatement(rt: StatementServiceRuntime, uow: CommerceUnitOfWork, predecessor: CommissionStatementRecord, now: UtcInstant, command: "CMD051" | "CMD053") {
   const statements = rt.statements(uow);
   const ledger = rt.ledger(uow);
   const period = await statements.getPeriod(predecessor.periodId);
@@ -86,10 +86,8 @@ export async function supersedeStatement(rt: StatementServiceRuntime, uow: Comme
   for (const i of predecessorItems) if (i.lineId !== undefined && i.lineId !== null) itemized.add(i.lineId);
   const named = new Set<string>([...itemized, ...predecessor.inputLineIds]);
   const locked = new Map<string, CommissionLineRecord>();
-  for (const lineId of [...named].sort()) {
-    const line = await ledger.lockLine(lineId as CommissionLineId);
-    if (line !== null) locked.set(lineId, line);
-  }
+  for (const line of await ledger.lockLines([...named] as CommissionLineId[])) locked.set(line.lineId, line);
+  await rt.hold?.(command, "LINES_LOCKED");
   // a line owned by another statement (PAYABLE through it, or PAID through it: 0037 keeps the owner) is never payable through the
   // successor nor taken over by it (B10G-R1, B10G-R8, D10-GAP-13): it is recomposed in its own state, so only what is reported of it
   // (its offsets, its recovery, the predecessor's own adjustments of it) is carried (D10-GAP-15)
@@ -113,6 +111,10 @@ export async function supersedeStatement(rt: StatementServiceRuntime, uow: Comme
     // a line PAYABLE through the predecessor awaits this very payout: itemized again, as the ELIGIBLE line it was composed from
     lines: lines.map((l) => (payableBefore.has(l.lineId) ? { ...l, state: "ELIGIBLE" as const } : l)),
     adjustments: inputs.adjustments.filter((a) => included.has(a.commissionLineId) && (!reported.has(a.adjustmentId) || own.has(a.adjustmentId))),
+    // seller credit only for this composition’s lines, net of what the predecessor itself itemized (it is CORRECTED below, the successor itemizes it again)
+    credit: inputs.credit
+      .filter((c) => included.has(c.lineId))
+      .map((c) => ({ ...c, itemizedCents: c.itemizedCents - predecessorItems.filter((i) => i.kind === "CREDIT" && i.lineId === c.lineId).reduce((t, i) => t + i.payableCents, 0n) })),
   };
   const composed = composeStatement({ sellerId: predecessor.sellerId, periodStartsAt: BEGINNING, cutoffAt: now, rows });
   // every line of the predecessor may have gone on to another statement, or ended (PAID, ADJUSTED or VOID with nothing to report): the
@@ -147,7 +149,7 @@ export async function supersedeStatement(rt: StatementServiceRuntime, uow: Comme
       label: predecessor.label,
       statementDate: predecessor.statementDate,
       payDueOn: predecessor.payDueOn,
-      cutoffHash: commissionCutoffHash({ periodId: period.periodId, cutoffAt: now, lines, adjustments: rows.adjustments, holds: inputs.holds.filter((h) => included.has(h.lineId)) }),
+      cutoffHash: commissionCutoffHash({ periodId: period.periodId, cutoffAt: now, lines, adjustments: rows.adjustments, holds: inputs.holds.filter((h) => included.has(h.lineId)), offsets: rows.offsets, credit: rows.credit, funds: rows.funds }),
       correctsStatementId: predecessor.statementId,
     },
     items: composed.items.map((item) => ({ ...item, itemId: uow.ids.next() as StatementItemId, statementId: successorId })),

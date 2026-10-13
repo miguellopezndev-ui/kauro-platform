@@ -833,6 +833,8 @@ export interface CommissionOffsetRecord {
   readonly amountCents: bigint;
   readonly agreementId: SellerAgreementId;
   readonly recordedAt: UtcInstant;
+  /** Cents of the claim released (commission_offset_releases): the live claim is amountCents - releasedCents (OFF-R1). */
+  readonly releasedCents: bigint;
 }
 
 // --- periods, statements and payouts (§7; migration 0031) ------------------------------------------------------------------------

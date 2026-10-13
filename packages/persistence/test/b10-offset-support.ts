@@ -49,9 +49,13 @@ export async function openOffsetWorld(label: string): Promise<OffsetWorld> {
 export const closeOffsetWorld = (ow: OffsetWorld): Promise<void> => closeWorld(ow.w);
 
 /** A refund lowering a capture's basis, recomputed and applied as the COMMISSIONS consumer does, a paid line walked to ADJUSTED. */
-export async function refundTo(ow: OffsetWorld, ag: Agency, p: Purchase, basisCents: bigint, agreementVersion: string): Promise<void> {
+export const refundTo = (ow: OffsetWorld, ag: Agency, p: Purchase, basisCents: bigint, agreementVersion: string): Promise<void> =>
+  within(ow.w.commission, service(ag.agencyId), (c) => refundIn(c, p, basisCents, agreementVersion));
+
+/** The refund of `refundTo` inside the commission service transaction `c` (the COMMISSIONS consumer runs in the agency of its event). */
+export async function refundIn(c: Client, p: Purchase, basisCents: bigint, agreementVersion: string): Promise<void> {
   const sourceEventId = ids.next();
-  await within(ow.w.commission, service(ag.agencyId), async (c) => {
+  {
     const ledger = new PgCommissionLedgerRepository(c, ids);
     for (const { pool, lines } of await ledger.lockPoolsOfCapture(p.captureId as never)) {
       const recomputed = recomputePool({ basisCents: pool.basisCents, rateBps: pool.rateBps, lines: lines.map((l) => ({ lineId: l.lineId, sellerId: l.sellerId, shareBps: l.shareBps, cumulativeCents: l.cumulativeEntitlementCents })) }, { kind: "REFUND_COMPLETED", serviceBasisAfterCents: basisCents });
@@ -71,7 +75,7 @@ export async function refundTo(ow: OffsetWorld, ag: Agency, p: Purchase, basisCe
         if (line.state === "PAID" || line.state === "ADJUSTED") assert.equal((await ledger.transitionLine(line.lineId, line.version, { state: "ADJUSTED" }, clock.now())).kind, "APPLIED");
       }
     }
-  });
+  }
 }
 
 export interface SellerWith {
@@ -193,7 +197,7 @@ export interface Raced<A, B> {
  * Both orders of a race are fixed by running one side first: a runs its work and stays open (uncommitted); b starts on another session and is
  * observed either finishing or waiting on a lock; a commits; the outcome of b is reported (21 "Concurrency and crash matrix").
  */
-export async function ordered<A, B>(ow: OffsetWorld, a: Op<A>, b: Op<B>): Promise<Raced<A, B>> {
+export async function ordered<A, B>(ow: OffsetWorld, a: Op<A>, b: Op<B>, options: { readonly holdMs?: number } = {}): Promise<Raced<A, B>> {
   const ca = await ow.w.h.pg.connect(a.role);
   const cb = await ow.w.h.pg.connect(b.role);
   try {
@@ -211,6 +215,7 @@ export async function ordered<A, B>(ow: OffsetWorld, a: Op<A>, b: Op<B>): Promis
     const pidB = await backendPid(cb);
     const pb = handled(within(cb, b.ctx, b.run));
     const observed = await settlesOrWaits(ow.w.h.oracle, pidB, pb, "the second transaction");
+    if (options.holdMs !== undefined && observed.kind === "WAITING") await new Promise((resolve) => setTimeout(resolve, options.holdMs));
     release.open();
     const first = await pa;
     if (observed.kind === "WAITING") return { first, second: await observed.pending, waited: true };

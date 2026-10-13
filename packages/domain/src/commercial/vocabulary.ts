@@ -76,9 +76,9 @@ export const COMMERCIAL_VOCABULARY = Object.freeze({
   statementLabels: ["VERIFIED_CALENDAR", "SIMULATED"],
   statementStates: ["DRAFT", "ISSUED", "DISPUTED", "APPROVED", "PAID", "CORRECTED"],
   /** A statement item (D10-STMT-2): a line, an adjustment it reports, a partial hold, an offset, an owner recovery item. */
-  statementItemKinds: ["LINE", "ADJUSTMENT", "HOLD", "OFFSET", "RECOVERY"],
+  statementItemKinds: ["LINE", "ADJUSTMENT", "HOLD", "OFFSET", "RECOVERY", "CREDIT"],
   /** What an item does (D10-STMT-2): a LINE is payable, awaiting its final completion or its funds, or held; a RECOVERY is one action. */
-  statementItemDispositions: ["PAYABLE", "AWAITING_FINAL_COMPLETION", "AWAITING_FUNDS", "HELD", "REPORTED", "REPAYMENT_REVIEW", "WRITE_OFF", "DISPUTE"],
+  statementItemDispositions: ["PAYABLE", "AWAITING_FINAL_COMPLETION", "AWAITING_FUNDS", "HELD", "REPORTED", "REPAYMENT_REVIEW", "WRITE_OFF", "DISPUTE", "CREDIT"],
   /** The owner's resolutions of a negative balance without signed offset terms (D10-NEG-1; example 7): a RECOVERY item's disposition. */
   recoveryActions: ["REPAYMENT_REVIEW", "WRITE_OFF", "DISPUTE"],
   payoutIntentStates: ["AUTHORIZED", "SUBMITTED", "UNCERTAIN", "SETTLED", "FAILED", "RETURNED"],
