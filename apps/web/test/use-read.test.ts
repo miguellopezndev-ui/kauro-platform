@@ -2,17 +2,18 @@
 // ERROR state with a decision, never a LOADING that no answer will ever replace.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import * as UseRead from "../src/screens/shared/use-read.ts";
-
-type Settle = (load: (signal: AbortSignal) => Promise<never>, signal: AbortSignal) => Promise<{ readonly kind: string; readonly decision: { readonly state: string } } | null>;
+import type { ApiAnswer } from "../src/client/answer.ts";
+import { settleRead } from "../src/screens/shared/use-read.ts";
 
 test("a read whose load rejects settles as an ERROR state, not as LOADING forever", async () => {
-  const settle = (UseRead as Record<string, unknown>)["settleRead"] as Settle | undefined;
-  assert.equal(typeof settle, "function", "use-read exports settleRead");
-  const state = await settle!(() => Promise.reject(new RangeError("path parameter orderId of x is missing or malformed")), new AbortController().signal);
+  const reject = (): Promise<ApiAnswer<never>> => Promise.reject(new RangeError("path parameter orderId of x is missing or malformed"));
+  const state = await settleRead(reject, new AbortController().signal);
   assert.equal(state?.kind, "ERROR");
   assert.notEqual(state?.decision.state, "LOADING");
+  assert.equal(state?.decision.state, "INTEGRITY_FAILURE");
   const controller = new AbortController();
   controller.abort();
-  assert.equal(await settle!(() => Promise.reject(new Error("late")), controller.signal), null, "an unmounted read drops even a rejection");
+  assert.equal(await settleRead(reject, controller.signal), null, "an unmounted read drops even a rejection");
+  const answered = await settleRead(async () => ({ kind: "NO_ANSWER", reason: "NETWORK", status: null }) as ApiAnswer<never>, new AbortController().signal);
+  assert.equal(answered?.kind, "ANSWERED");
 });

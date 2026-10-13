@@ -210,7 +210,7 @@ test("UI24: expired or unavailable bank details are stated and never shown; the 
 });
 
 test("UI24: the bank details are read for the order in the address under the active agency, and the call never throws before its request", async () => {
-  const { client, sent } = harness(() => respond(200, { instructions: INSTRUCTIONS }));
+  const { client, sent } = harness(() => respond(200, { instructions: { ...INSTRUCTIONS, reference: "K0123456789ABCDEFGHJKMN", sendBy: "2026-10-16T12:00:00.000Z", transferExpiresAt: "2026-10-20T12:00:00.000Z" } }));
   // exactly the call PaymentScreen makes (containers.tsx): the order id from the address, no key, the agency from the shell's context
   const answer = await client.call("getTransferInstructions", { path: { orderId: ORDER } });
   assert.equal(sent.length, 1, "the request left the browser");
