@@ -450,6 +450,12 @@ export async function holdAndWait<H, W>(ctx: FaultContext, what: string, holder:
     const settledHolder = running.then<PromiseSettledResult<H>, PromiseSettledResult<H>>((value) => ({ status: "fulfilled", value }), (reason: unknown) => ({ status: "rejected", reason }));
     await reach(pause, running, what);
     const waiting = await ctx.mustWait(L().iw.h.oracle, { waiter: wc, holder: connectionPid(hc) }, (c) => routed(ctx, c, waiter), what);
+    // a TIMEOUT cell (a statement timeout injected on the waiter) keeps the holder until the waiter timed out: releasing at once would let it win the lock
+    if (L().iw.faults.statementTimeoutMs !== null) {
+      const waited = await waiting.pending;
+      pause.release();
+      return { held: await settledHolder, waited };
+    }
     pause.release();
     return { held: await settledHolder, waited: await waiting.pending };
   } finally {

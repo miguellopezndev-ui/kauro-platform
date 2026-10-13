@@ -81,6 +81,8 @@ after(async () => {
   await stopLane();
 });
 
+/** The command envelope of a replay differs from the first answer only by `replayed` (the route lane envelope): everything else is the committed body. */
+const replayedBody = (text: string): string => { try { const j = JSON.parse(text) as Record<string, unknown>; delete j["replayed"]; return JSON.stringify(j); } catch { return text; } };
 const LOCK_TIMEOUT_MS = Math.floor(LOCK_WAIT_OBSERVATION_MS / 4);
 const HOUR = 3_600_000;
 function cell(title: string, fault: FaultKind, body: (ctx: FaultContext) => Promise<void>, at?: string): void {
@@ -332,7 +334,7 @@ for (const row of OWNER_ROWS) {
     // (1) identical replay
     const replay = await ctx.attempt(() => s.run({ key }));
     assert.equal(replay.status, first.status, "same key, same body: the same answer");
-    assert.equal(replay.text, first.text, "the same body");
+    assert.equal(replayedBody(replay.text), replayedBody(first.text), "the same body (the replayed flag aside)");
     assert.deepEqual(sameButJournal(await fpOf(s), fp), fp, "the replay writes nothing");
     // (2) same key, other body
     assert.equal(code(await ctx.attempt(() => s.run({ key, variant: true }))), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
@@ -472,7 +474,7 @@ for (const row of OWNER_ROWS) {
   cell(t("RACE", "TIMEOUT", "read past its bound"), "timeout", async (ctx) => {
     const a = await draft("c4-timeout");
     const deadline = ctx.deadline(ctx.clock.at(PROVIDER_CALL_TIMEOUT_MS), "the evidence read's bound");
-    const r = await withStoreHook(a.artifact.artifactRef, async () => void ctx.clock.past(deadline), () => onClock(ctx, "C6 whose read outlives its bound", () => confirmC6(a.credit.creditId)));
+    const r = await withStoreHook(a.artifact.artifactRef, async () => { ctx.clock.past(deadline); await new Promise((r) => setTimeout(r, 120)); }, () => onClock(ctx, "C6 whose read outlives its bound", () => confirmC6(a.credit.creditId)));
     assert.equal(code(r), "503 CAPACITY_UNAVAILABLE EVIDENCE_UNAVAILABLE", "unread evidence cannot mint money");
     assert.equal(await a.state(), "DRAFT_MANUAL");
     assert.equal(await count("SELECT 1 FROM kauro.capture_facts WHERE provider_capture_id LIKE $1", [`%${a.f.bankTransactionId}%`]), 0);
@@ -524,7 +526,7 @@ for (const row of OWNER_ROWS) {
     const key = freshKey("c4-retry");
     const first = await ctx.attempt(() => confirmC6(ok.credit.creditId, 1, { key }));
     const again = await ctx.attempt(() => confirmC6(ok.credit.creditId, 1, { key }));
-    assert.equal(again.text, first.text, "the same verified envelope classifies identically");
+    assert.equal(replayedBody(again.text), replayedBody(first.text), "the same verified envelope classifies identically");
     const cases: ReadonlyArray<readonly [string, (accountRef: string, f: CreditFacts) => Promise<{ artifactRef: string; evidenceHash: string }>]> = [
       ["422 INTEGRITY_FAILURE UNKNOWN_EVIDENCE", async (acct) => { const p = await bw.evidence.put({ bytes: new TextEncoder().encode(JSON.stringify({ format: "other-bank/9", kind: "CREDIT" })), accountRef: acct as never }); return { artifactRef: p.artifactRef, evidenceHash: p.sha256 }; }],
       ["422 INTEGRITY_FAILURE MALFORMED_EVIDENCE", async (acct, f) => { const p = await bw.evidence.put({ bytes: new TextEncoder().encode(`{"format":"contract-fake-bank-evidence/1","kind":"CREDIT","accountRef":"${acct}","credit":{"creditId":"${f.bankTransactionId}"`), accountRef: acct as never }); return { artifactRef: p.artifactRef, evidenceHash: p.sha256 }; }],
@@ -981,7 +983,7 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
     const key = freshKey("retire");
     const first = await retire(o2, key);
     assert.equal(first.status, 200, first.text);
-    assert.equal((await retire(o2, key)).text, first.text, "the same retirement key replays");
+    assert.equal(replayedBody((await retire(o2, key)).text), replayedBody(first.text), "the same retirement key replays");
     assert.equal(code(await retire(o2, freshKey("retire-2"))), "409 PRECONDITION_FAILED ORDER_NOT_CAPTURABLE", "a retired checkout retires once");
   });
 
@@ -1173,7 +1175,7 @@ function retire(o: Order, key: string): Promise<Reply> {
     const store = L().bw.evidence as unknown as { get: (ref: string) => Promise<unknown> };
     const real = store.get;
     store.get = async (ref: string) => {
-      if (ref === a.artifactRef) ctx.clock.past(deadline);
+      if (ref === a.artifactRef) { ctx.clock.past(deadline); await new Promise((r) => setTimeout(r, 120)); }
       return real.call(L().bw.evidence, ref);
     };
     try {
@@ -1202,7 +1204,7 @@ function retire(o: Order, key: string): Promise<Reply> {
     const { route, a } = await stmt("si1-retry");
     const first = await ctx.attempt(() => importSI2(route.accountRef, a, { key: "si1-retry-key-1" }));
     const again = await ctx.attempt(() => importSI2(route.accountRef, a, { key: "si1-retry-key-1" }));
-    assert.equal(again.text, first.text, "same digest, same result");
+    assert.equal(replayedBody(again.text), replayedBody(first.text), "same digest, same result");
     for (const [expected, bytes, auth] of [
       ["422 INTEGRITY_FAILURE UNKNOWN_EVIDENCE", JSON.stringify({ format: "other-bank/9", kind: "STATEMENT" }), undefined],
       ["422 INTEGRITY_FAILURE MALFORMED_EVIDENCE", `{"format":"contract-fake-bank-evidence/1","kind":"STATEMENT","accountRef":"${route.accountRef}","credits":[`, undefined],
