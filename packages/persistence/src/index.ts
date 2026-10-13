@@ -41,6 +41,7 @@ export { createExecutionUnitOfWorkFactory, PgExecutionUnitOfWorkFactory, PgExecu
 export { PgExecutionStore, PgExecutionReads, PgExecutionDiscovery, EXECUTION_CAPACITY_DOMAIN } from "./execution/index.js";
 export type { ExecutionWriteContext, CheckoutCapacity } from "./execution/index.js";
 // audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; docs/design/B08-audit-approval-jobs.md §9, §10)
+export { PgCoreDocumentStore } from "./repositories/core-documents.js";
 export { createAuditUnitOfWorkFactory, PgAuditUnitOfWorkFactory, PgAuditUnitOfWork, auditReadsOf, decisionArtifactResolver } from "./unit-of-work.js";
 export { PgAuditStore, PgAuditReads, PgAuditDiscovery, modelTaskJournalOf } from "./audit/index.js";
 export type { AuditWriteContext, ResolvedDecisionPatch, ModelTaskJournalBinding, PgModelTaskJournal } from "./audit/index.js";
@@ -134,6 +135,8 @@ export { agencyLifecycleOf } from "./commercial-agency-access.js";
 // package B18: capability governance (CMD058, CMD059)
 export { PgCapabilityGovernanceRepository } from "./repositories/capability-governance.js";
 export { capabilityGovernanceOf } from "./capability-governance-access.js";
+export { operationsOf } from "./operations-recovery-access.js";
+export { PgOperationsRepository } from "./repositories/operations-recovery.js";
 // CMD027's reads (mandate B10-COMMANDS-QUOTE; design §3.4, §3.5): the sealed revision's billable population, the project's live quote
 export { PgQuoteReads, quoteReadsOf } from "./commercial-quote-access.js";
 // the commission service's work lists (mandate B10-COMMISSION-SERVICE; docs/design/B10-commercial-domain.md §14; D10-SVC-1, D10-SVC-2):

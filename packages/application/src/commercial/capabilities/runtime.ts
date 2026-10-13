@@ -5,10 +5,13 @@
  */
 import type { CapabilityGovernanceRepository, UnitOfWork } from "@kauro/domain";
 import type { CommercialAuthorizer } from "../authorizer.js";
+import type { OperationsServiceRuntime } from "../operations/runtime.js";
 
 export interface CapabilityCommandCollaborators {
   /** The capability governance records of a unit of work (@kauro/persistence capabilityGovernanceOf). */
   readonly governance: (uow: UnitOfWork) => CapabilityGovernanceRepository;
   /** The corporate owner's access decision (createCommercialAuthorizer over the grant). */
   readonly authorizer: CommercialAuthorizer;
+  /** The operations service's units (decision B18-OPS-1): present when the deployment binds the service pools; CMD059 then also admits the service. */
+  readonly service?: OperationsServiceRuntime;
 }

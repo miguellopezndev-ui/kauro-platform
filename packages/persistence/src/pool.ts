@@ -295,7 +295,7 @@ export class KauroPool {
     if (row.rolcreatedb) refuse("CREATEDB");
     if (row.owns_database) refuse("the database owner");
     // SEC-DEPTH A2 / P2: a runtime login outside the guard-execution boundary can neither create temporary or schema objects nor
-    // run in a session that skips triggers (replica mode); migration 0057 removes the grants, this refuses a login that still has them
+    // run in a session that skips triggers (replica mode); migration 0060 removes the grants, this refuses a login that still has them
     if (row.database_temporary) refuse("granted TEMPORARY on the database");
     if (row.database_create) refuse("granted CREATE on the database");
     if (row.schema_create) refuse("granted CREATE on a schema");

@@ -1,5 +1,5 @@
 // SEC-DEPTH-PROVENANCE section C, file R (rows R1 hardening A and R2 P2 boundary), real PostgreSQL 17. The migration under test is
-// the one the design calls 0050 (runtime hardening); on this branch it is migrations/0057_runtime_hardening.sql (provisional number).
+// the one the design calls 0050 (runtime hardening); on this branch it is migrations/0060_runtime_hardening.sql (provisional number).
 // The release titles apply the migrations before it to a fresh cluster, tamper with the cluster as the superuser, and apply it.
 import assert from "node:assert/strict";
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";

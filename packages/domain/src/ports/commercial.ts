@@ -618,6 +618,8 @@ export interface CommissionLedgerRepository {
   applyBasisChange(poolId: CommissionPoolId, basisCents: bigint, poolCents: bigint, adjustments: ReadonlyArray<NewCommissionAdjustment>): Promise<{ readonly applied: boolean; readonly adjustments: ReadonlyArray<CommissionAdjustmentRecord> }>;
   getLine(lineId: CommissionLineId): Promise<CommissionLineRecord | null>;
   lockLine(lineId: CommissionLineId): Promise<CommissionLineRecord | null>;
+  /** G-ORD-1: the whole set of lines row-locked in ONE call (kauro.commission_lock_line_rows, UPDATE); a missing line is KC022, a second ordered call in the transaction KC027. */
+  lockLines(lineIds: ReadonlyArray<CommissionLineId>, subject?: "EXCLUSIVE" | "SHARE"): Promise<ReadonlyArray<CommissionLineRecord>>;
   linesOfSeller(sellerId: SellerId): Promise<ReadonlyArray<CommissionLineRecord>>;
   transitionLine(lineId: CommissionLineId, expectedVersion: number, change: CommissionLineChange, now: UtcInstant): Promise<VersionedWrite<CommissionLineRecord>>;
   adjustmentsOfLine(lineId: CommissionLineId): Promise<ReadonlyArray<CommissionAdjustmentRecord>>;
@@ -651,7 +653,7 @@ export interface CommissionLedgerRepository {
    * Offsets a negative position against a later unpaid line of the same seller (commission_offsets; D10-NEG-2): refused KC017 without
    * the SIGNED_FUTURE_OFFSET terms of the negative line's agreement, and never beyond either amount.
    */
-  recordOffset(offset: CommissionOffsetRecord): Promise<CommissionOffsetRecord>;
+  recordOffset(offset: Omit<CommissionOffsetRecord, "releasedCents">): Promise<CommissionOffsetRecord>;
   offsetsOfSeller(sellerId: SellerId): Promise<ReadonlyArray<CommissionOffsetRecord>>;
 }
 

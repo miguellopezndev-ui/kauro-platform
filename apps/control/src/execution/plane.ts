@@ -17,6 +17,7 @@ import {
   type InterpretPort,
   type ObjectStoragePort,
   type PackageVerifierPort,
+  type CoreDocumentStore,
   type PlanCompilerPort,
   type ProfilePort,
   type ValidatePort,
@@ -56,6 +57,8 @@ export interface ControlExecutionOptions {
   readonly profile: ProfilePort;
   readonly interpret: InterpretPort;
   readonly compiler: PlanCompilerPort;
+  /** The stored core documents the PROFILE step writes (D5-14); optional until the composition binds the persistence implementation. */
+  readonly documents?: CoreDocumentStore;
   readonly validate: ValidatePort;
   /** The validator's write path: a second verified pool whose login is a member of kauro_validator (D8-ROLE-1; `openValidatorReceipts`). */
   readonly receipts: ValidationReceipts;
@@ -124,6 +127,7 @@ export function assembleExecutionPlane(options: ControlExecutionOptions, storage
       profile: options.profile,
       interpret: options.interpret,
       compiler: options.compiler,
+      ...(options.documents === undefined ? {} : { documents: options.documents }),
       validator,
       limits: options.limits,
       scratchRoot: auditScratch,

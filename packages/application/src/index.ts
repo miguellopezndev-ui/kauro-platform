@@ -206,3 +206,6 @@ export { receiveInquiry, inquiryContentOf, inquiryKeysOf, UNKNOWN_CLIENT_NETWORK
 export * from "./commercial/index.js";
 // B08 audit package (docs/design/B08-audit-approval-jobs.md)
 export * from "./audit/index.js";
+
+// B05 L3: the Intelligence core behind InterpretPort and PlanCompilerPort (kauro-intelligence-core through its wrapper).
+export * from "./adapters/cores/intelligence/index.js";

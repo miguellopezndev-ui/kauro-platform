@@ -10,7 +10,7 @@
  *                           TERMINATED) are refused with the same reason, so a refusal reveals nothing about a seller's state.
  *  authorizeCorporateOwner  the same identity checks → the caller's own ACTIVE KAURO_OWNER grant, read after its transition lock.
  *  authorizeCommercialService the verified service identity holds the command's role in the code-owned SERVICE_ROLE_TABLE
- *                           (COMMISSION_SERVICE or FINANCE_SERVICE) and was issued for this deployment's environment.
+ *                           (COMMISSION_SERVICE, FINANCE_SERVICE or, since package B18, OPERATIONS_SERVICE) and was issued for this deployment's environment.
  *
  * Only reasons that B06 and B09 already define are used (D10-CTX-1): a seller who may not act is CORPORATE_ROLE_MISSING, like an owner
  * without a grant; the design's own SELLER_NOT_ACTIVE reason belongs to the B10 domain model and is mapped by the command lanes that
@@ -23,8 +23,8 @@ import { COMMERCE_POLICY_VERSION, isUuidV5, isVerifiedIdentity, serviceHoldsRole
 import type { CommerceDenial, OperatorDecision, ServiceDecision } from "../commerce/ports.js";
 import type { CommercialPrincipalReader } from "./ports.js";
 
-/** The two technical roles a commercial service command is admitted under (08 "a service account has only its technical role"). */
-export type CommercialServiceRole = "COMMISSION_SERVICE" | "FINANCE_SERVICE";
+/** The technical roles a commercial service command is admitted under (08 "a service account has only its technical role"). */
+export type CommercialServiceRole = "COMMISSION_SERVICE" | "FINANCE_SERVICE" | "OPERATIONS_SERVICE";
 
 /** An admitted active seller: the caller's own identity and the seller row the decision was made on. */
 export type SellerDecision = { readonly kind: "ALLOW"; readonly userId: string; readonly sellerId: string; readonly policyVersion: string } | CommerceDenial;

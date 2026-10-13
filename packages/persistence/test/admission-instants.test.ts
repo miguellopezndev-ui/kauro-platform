@@ -217,7 +217,7 @@ test("the ledger lock refuses the same clock tick and exposes EXECUTE only to co
       }, "KA082", `a direct write of last_admission_at = ${value} is refused`);
     }
     // depth is no provenance: an oracle-created SECURITY INVOKER trigger (one level deeper, with the runtime role's own authority;
-    // the runtime role has no TEMPORARY privilege since 0057) still cannot write a future instant or move an agency ahead
+    // the runtime role has no TEMPORARY privilege since 0060) still cannot write a future instant or move an agency ahead
     const nested = async (sql: string, message: string): Promise<void> => {
       const probe = await nestedAsInvoker(env.h.oracle, "kauro_control", sql);
       try {
@@ -266,7 +266,7 @@ test("the consumption guard refuses admission evidence from a different transact
       // same-transaction half of the proof is the consumption guard above (admitted_at = server_now()), so the job-side guard
       // alone is not expected to refuse committed rows replayed in another transaction.
     ] as const) {
-      // the copy lives in an oracle-created probe table of schema depth_probe (the runtime role has no TEMPORARY privilege since 0057)
+      // the copy lives in an oracle-created probe table of schema depth_probe (the runtime role has no TEMPORARY privilege since 0060)
       // with the REAL deferred guard attached; the runtime role writes the copied row, so the cross-transaction assertion is unchanged
       await h0.query("CREATE SCHEMA IF NOT EXISTS depth_probe");
       await h0.query("GRANT USAGE ON SCHEMA depth_probe TO kauro_control");

@@ -474,7 +474,7 @@ test("CMD051 through the adapters: the cutoff hash KAURO_COMMISSION_CUTOFF_V1 ov
   const hashOf = () =>
     statementsIn(async (statements) => {
       const inputs = await statements.periodInputs(period as never, cutoffAt);
-      return commissionCutoffHash({ periodId: period as never, cutoffAt, lines: inputs.lines, adjustments: inputs.adjustments, holds: inputs.holds });
+      return commissionCutoffHash({ periodId: period as never, cutoffAt, lines: inputs.lines, adjustments: inputs.adjustments, holds: inputs.holds, offsets: inputs.offsets, credit: inputs.credit, funds: inputs.funds });
     });
   const h1 = await hashOf();
   assert.match(h1, /^[0-9a-f]{64}$/);
@@ -508,7 +508,7 @@ test("CMD051 through the adapters: the cutoff hash KAURO_COMMISSION_CUTOFF_V1 ov
     const current = (await statements.lockPeriod(period as never))!;
     assert.equal(current.state, "OPEN");
     const inputs = await statements.periodInputs(period as never, cutoffAt);
-    const hash = commissionCutoffHash({ periodId: period as never, cutoffAt, lines: inputs.lines, adjustments: inputs.adjustments, holds: inputs.holds });
+    const hash = commissionCutoffHash({ periodId: period as never, cutoffAt, lines: inputs.lines, adjustments: inputs.adjustments, holds: inputs.holds, offsets: inputs.offsets, credit: inputs.credit, funds: inputs.funds });
     assert.equal(typeof inputs.undeliveredBeforeCutoff, "number", "the commission service reads its COMMISSIONS records since migration 0034 (D10-STMT-4): the count, never zero for want of a read");
     const done = await statements.closePeriod(period as never, current.version, hash, clock.now());
     assert.equal(done.kind, "APPLIED");

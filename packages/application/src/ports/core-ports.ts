@@ -382,6 +382,7 @@ export interface ModelTaskJournalPort {
 // --- InterpretPort (planCandidates / interpret; kauro-intelligence-core `run`) ---------------------------------------------------
 
 export interface PlanCandidatesRequest {
+  readonly agencyId: AgencyId;
   readonly revisionHash: Sha256Hex;
   readonly sourceProfileHash: Sha256Hex;
   readonly targetContractHash: Sha256Hex | null;
@@ -397,6 +398,9 @@ export interface CandidateManifest {
 export interface InterpretRequest {
   readonly auditAttemptId: Id;
   readonly agencyId: AgencyId;
+  /** The audit's project and sealed revision: the tenant of the run is {agencyId, clientId: projectId} (D5-13). */
+  readonly projectId: ProjectId;
+  readonly revisionId: Id;
   readonly candidateManifest: CandidateManifest;
   readonly journal: ModelTaskJournalPort;
   /** The AUDIT grant's remaining cents; interpretation reserves under it and never spends past it (D8-GRANT-1, D8-GRANT-2). */

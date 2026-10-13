@@ -280,7 +280,9 @@ export async function publishJob(h: Harness, agency: AgencyFixture, jobId: strin
       corePackageHash: job.corePackageHash,
       validationReceiptHash: job.validationReceiptHash,
       artifacts: copies.map((c) => ({ role: c.role, objectName: c.objectName, generation: c.generation, sha256: c.sha256, byteLength: c.byteLength })),
-      counts: { artifacts: copies.length },
+      // the store records the manifest's digest and never reads its contents: a fixed, labelled RowCounts stands in for the one
+      // the control plane issues (ROWCOUNTS-PRODUCER, apps/control pipeline.ts issuedDeliveryManifestOf)
+      counts: FIXTURE_ISSUED_COUNTS,
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
       manifestVersion: "1",
@@ -321,3 +323,6 @@ export async function endJob(h: Harness, agency: AgencyFixture, jobId: string, r
     return job;
   });
 }
+
+/** A labelled fixture RowCounts for publications a fixture makes as JOB_EXECUTION (the store never reads the manifest's contents). */
+const FIXTURE_ISSUED_COUNTS = Object.freeze({ physicalSourceRows: 10, logicalSourceRecords: 10, billableSourceUnits: 10, associationEdges: 0, emittedRepresentatives: 10, mergedNonSurvivors: 0, rejected: 0, withheld: 0, unresolved: 0, emittedArtifactRows: 10 });

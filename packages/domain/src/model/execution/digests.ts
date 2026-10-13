@@ -9,9 +9,10 @@
  * manifest object's bytes, which are exactly the canonical wrapper the worker host writes (@kauro/application ports/worker-host.ts
  * stagedManifestBytesOf; D8-STG-5): the domain test pins both to the same vector.
  */
-import type { Sha256Hex } from "@kauro/contracts";
+import type { RowCounts, Sha256Hex } from "@kauro/contracts";
 import { DOMAINS, canonicalBytes, rawDigest, structuredDigest } from "@kauro/contracts";
 import { isUuid } from "../ids.js";
+import { EXECUTION_POLICY } from "./policy.js";
 import type { JobExecutionSubject } from "./records.js";
 
 export const EXECUTION_DIGEST_DOMAINS = Object.freeze({
@@ -121,7 +122,8 @@ export interface DeliveryPackageManifest {
   readonly corePackageHash: Sha256Hex;
   readonly validationReceiptHash: Sha256Hex;
   readonly artifacts: ReadonlyArray<DeliveryManifestArtifact>;
-  readonly counts: unknown;
+  /** The issued RowCounts (deliveryRowCountsOf): the sealed revision's populations and the validation receipt's execution counts. */
+  readonly counts: RowCounts;
   readonly createdAt: string;
   readonly expiresAt: string;
   readonly manifestVersion: string;
@@ -133,6 +135,51 @@ export function deliveryManifestHashOf(manifest: DeliveryPackageManifest): Sha25
     .map((a) => ({ role: a.role, objectName: a.objectName, generation: a.generation, sha256: a.sha256, byteLength: a.byteLength }))
     .sort((a, b) => (a.objectName < b.objectName ? -1 : a.objectName > b.objectName ? 1 : 0));
   return structuredDigest(DOMAINS.DELIVERY_MANIFEST, 1, { ...manifest, artifacts });
+}
+
+/** Microseconds since the epoch of an exact UTC instant (up to six fractional digits). */
+function microsOf(instant: string): bigint {
+  const m = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?Z$/.exec(instant);
+  if (m === null || m[1] === undefined) throw new RangeError(`not an ISO-8601 UTC instant: ${instant}`);
+  return BigInt(Date.parse(`${m[1]}Z`)) * 1000n + BigInt((m[2] ?? "").padEnd(6, "0"));
+}
+
+/** PackageManifest.expiresAt: the first package's soft deadline (+ 604,800 s), never past the PAID_ORDINARY hard cap (D8-RET-1). */
+export function packageExpiryOf(createdAt: string, captureCompletedAt: string): string {
+  const soft = microsOf(createdAt) + BigInt(EXECUTION_POLICY.paidOrdinarySoftSeconds) * 1_000_000n;
+  const hard = microsOf(captureCompletedAt) + BigInt(EXECUTION_POLICY.paidOrdinaryHardSeconds) * 1_000_000n;
+  const at = soft < hard ? soft : hard;
+  const ms = Number(at / 1000n);
+  const micros = Number(at % 1_000_000n);
+  return `${new Date(ms).toISOString().slice(0, 19)}.${String(micros).padStart(6, "0")}Z`;
+}
+
+/**
+ * The registry PackageManifest JOB_EXECUTION issues (D8-PUB-2): the bindings of the job's authority chain, its delivery copies, the
+ * issued RowCounts (ROWCOUNTS-PRODUCER: deliveryRowCountsOf, never a stand-in) and its expiry; deliveryManifestHashOf names it.
+ */
+export function issuedDeliveryManifestOf(input: {
+  readonly packageId: string;
+  readonly subject: JobExecutionSubject;
+  readonly copies: ReadonlyArray<DeliveryManifestArtifact>;
+  readonly counts: RowCounts;
+  readonly createdAt: string;
+  readonly captureCompletedAt: string;
+}): DeliveryPackageManifest {
+  const { subject } = input;
+  return {
+    packageId: input.packageId,
+    revisionHash: subject.revisionHash,
+    planHash: subject.planHash,
+    targetContractHash: subject.targetContractHash,
+    corePackageHash: subject.corePackageHash,
+    validationReceiptHash: subject.validationReceiptHash,
+    artifacts: input.copies.map((c) => ({ role: c.role, objectName: c.objectName, generation: c.generation, sha256: c.sha256, byteLength: c.byteLength })),
+    counts: input.counts,
+    createdAt: input.createdAt,
+    expiresAt: packageExpiryOf(input.createdAt, input.captureCompletedAt),
+    manifestVersion: "1",
+  };
 }
 
 // --- names (the database checks the same shapes, migrations 0021 and 0022) ------------------------------------------------------
