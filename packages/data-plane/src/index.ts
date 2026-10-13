@@ -50,4 +50,4 @@ export {
   type CoreAdapterHooks,
   type MigrationCoreAdapterOptions,
 } from "./cores/migration-core-adapter.js";
-export { SYSTEM_TIMERS, type CoreTimers } from "./cores/operation.js";
+export { coreTimersOf, type CoreTimers } from "./cores/operation.js";

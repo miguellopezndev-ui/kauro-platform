@@ -46,7 +46,7 @@ import { AttemptByteLedger } from "./attempt-byte-ledger.js";
 import type { CoreChildHandle, CoreChildResult } from "./core-child-runner.js";
 import { runCoreChild } from "./core-child-runner.js";
 import type { CoreTaskPayload, CoreTaskRecord } from "./child-task.js";
-import { Operation, OperationEnded, SYSTEM_TIMERS, type CoreTimers } from "./operation.js";
+import { Operation, OperationEnded, type CoreTimers } from "./operation.js";
 
 export const MIGRATION_CORE_VERSION = "3.0.0";
 export const CORE_RUN_DIRECTORY = "kauro-core-run";
@@ -73,7 +73,8 @@ export interface MigrationCoreAdapterOptions {
   readonly documents?: CoreDocumentPort;
   /** sha256 of the vendored kauro-migration-core tarball actually consumed (ValidationReceipt.corePackageHash). */
   readonly corePackageHash: Sha256Hex;
-  readonly timers?: CoreTimers;
+  /** The deadline and poll timers, on the composition's injected clock (coreTimersOf; CK3: no process clock in the cores). */
+  readonly timers: CoreTimers;
   readonly pollIntervalMs?: number;
   readonly heapMegabytes?: number;
   readonly hooks?: CoreAdapterHooks;
@@ -163,7 +164,7 @@ export class MigrationCoreAdapter implements ExecutionEnvelopePort, ProfilePort,
 
   constructor(options: MigrationCoreAdapterOptions) {
     this.#o = options;
-    this.#timers = options.timers ?? SYSTEM_TIMERS;
+    this.#timers = options.timers;
     attemptScratchDirectoryOf(options.scratchRoot, options.attemptId);
   }
 

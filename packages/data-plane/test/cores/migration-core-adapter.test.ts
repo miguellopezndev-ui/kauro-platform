@@ -20,7 +20,10 @@ import {
   rowCountsOf,
   type CoreAdapterHooks,
 } from "../../src/index.js";
-import { OperationEnded } from "../../src/cores/operation.js";
+import { OperationEnded, coreTimersOf } from "../../src/cores/operation.js";
+
+/** The wall clock of a test (CK3 scans product code only). */
+const WALL_TIMERS = coreTimersOf({ nowMs: () => Date.now() });
 import { attemptFixture, manualChannel, sha } from "../support/attempt.js";
 import { CONTACTS_CSV, ManualTimers, configDocument, gate, hostIoOf, inputRef, memorySource, memoryWriter, resolverOf, settle, tempRoot } from "../support/core-config.js";
 
@@ -47,7 +50,7 @@ function build(options: { n?: number; hooks?: CoreAdapterHooks; document?: Recor
     inputs: resolverOf(refs),
     corePackageHash: sha("core"),
     pollIntervalMs: options.manual === true ? 1000 : 50,
-    ...(options.manual === true ? { timers } : {}),
+    timers: options.manual === true ? timers : WALL_TIMERS,
     ...(options.hooks === undefined ? {} : { hooks: options.hooks }),
   });
   const subject: ExecutionSubject = {
@@ -550,7 +553,7 @@ test("M16a RACE (profile bounds): a hung read or child is killed at the deadline
 test("M16b RACE (validate bounds): without controls the adapter rejects; with them a hung read or child is killed at the deadline, cancellation ends it, and a retry uses a new callId directory with equal core hashes", async () => {
   const b = build();
   const documents = { planBinding: () => Promise.resolve({ configDocument: b.subject.configDocument, coreConfigHash: b.subject.configHash }) };
-  const adapter = new MigrationCoreAdapter({ attemptId: b.fixture.attemptId, scratchRoot: b.t.root, inputs: resolverOf(b.refs), documents, corePackageHash: sha("core"), pollIntervalMs: 50 });
+  const adapter = new MigrationCoreAdapter({ attemptId: b.fixture.attemptId, scratchRoot: b.t.root, inputs: resolverOf(b.refs), documents, corePackageHash: sha("core"), timers: WALL_TIMERS, pollIntervalMs: 50 });
   try {
     const io = hostIoOf({ source: source() });
     const base = { revisionHash: sha("revision"), planBody: {} as never, planHash: sha("plan"), targetContractHash: sha("target"), scratch: io.scratch, cancellation: manualChannel() };
