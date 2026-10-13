@@ -122,7 +122,8 @@ export interface DeliveryPackageManifest {
   readonly corePackageHash: Sha256Hex;
   readonly validationReceiptHash: Sha256Hex;
   readonly artifacts: ReadonlyArray<DeliveryManifestArtifact>;
-  readonly counts: unknown;
+  /** The issued RowCounts (deliveryRowCountsOf): the sealed revision's populations and the validation receipt's execution counts. */
+  readonly counts: RowCounts;
   readonly createdAt: string;
   readonly expiresAt: string;
   readonly manifestVersion: string;
