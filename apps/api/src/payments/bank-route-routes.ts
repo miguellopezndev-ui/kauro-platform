@@ -130,6 +130,7 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     command("enterBankCredit", "CMD210", (req) => inbound.enter(req as never));
     command("confirmBankCredit", "CMD211", (req) => inbound.confirm(req as never));
     command("attributeBankCredit", "CMD212", (req) => inbound.attribute(req as never));
+    command("importBankStatement", "CMD213", (req) => inbound.importStatement(req as never));
     command("retireBankCheckout", "CMD214", (req) => inbound.retire(req as never), true);
   }
 
