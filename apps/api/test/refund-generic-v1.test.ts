@@ -266,8 +266,10 @@ test("DENY B09-TAX-ROUNDING (KP012 remainder after a failed booked refund): once
   // R3, a service-0 refund, is approved with whatever tax KP012 requires of it now; it then fails at the provider
   const r3 = await requestOn(a, p.projectId, "tax-r3");
   const t3 = refundTaxFor(allocation, await committed(p.captureId), 0n, RULE);
+  assert.equal(t3, 0n, "a refund with no service carries no tax (KP012)");
+  // an all-zero refund is no refund: it is refused (400 REFUND_COMPONENT_INVALID) and the open request is reused by R4
   const r3Approved = await approveAs(r3, 0n, t3);
-  assert.ok(r3Approved.status === 200 || r3Approved.status === 409, `R3 (0 service, ${t3} tax) is approved or refused with a catalogued reason: ${r3Approved.text}`);
+  assert.ok(r3Approved.status === 200 || r3Approved.status === 409 || (r3Approved.status === 400 && r3Approved.text.includes("REFUND_COMPONENT_INVALID")), `R3 (0 service, ${t3} tax) is approved or refused with a catalogued reason: ${r3Approved.text}`);
   // R4 books every remaining service cent with the tax KP012 gives it (the still-open R3 request itself when R3 was refused)
   const r4 = r3Approved.status === 200 ? await requestOn(a, p.projectId, "tax-r4") : r3;
   const s4 = S - (await committed(p.captureId)).serviceCents;
