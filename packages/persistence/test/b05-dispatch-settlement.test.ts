@@ -1342,10 +1342,12 @@ test("L22 OK migration on a live pool: 00NN applied by the migration runner as t
   const all = listMigrations(MIGRATIONS_DIR);
   const target = all.find((m) => m.name === "b05_dispatch_settlement");
   assert.ok(target, "00NN is the dispatch-settlement migration");
-  assert.equal(all[all.length - 1], target, "00NN is the last migration");
+  // the cluster at 00NN-1 is every migration before the dispatch-settlement one, by name (later migrations exist and are not applied)
+  const at = all.indexOf(target);
+  assert.ok(at > 0, "00NN has a predecessor");
   const dir = mkdtempSync(join(tmpdir(), "kauro-l22-"));
   try {
-    for (const m of all.slice(0, -1)) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
+    for (const m of all.slice(0, at)) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
     const at58 = await openDispatchEnv({ migrationsDir: dir });
     try {
       const e2 = at58;
