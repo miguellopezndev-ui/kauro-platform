@@ -1402,7 +1402,8 @@ test("DENY ACH-M-FC-API (provider API LATER): with the route OWNER_MANUAL no cre
   await paid(o);
   await L().iw.pw.service.runSweepPass();
   await dispatch2();
-  assert.deepEqual(bw.evidence.calls.slice(calls).map((c) => c.operation), [], "no listIncomingCredits, getCreditById or listStatementDebits call");
+  // the owner's own artifact store (BankEvidenceStore PUT/GET of the credit the cell entered) is no provider read: the provider's port is
+  assert.deepEqual(bw.evidence.calls.slice(calls).filter((c) => c.port === "BankEvidenceReadPortV1").map((c) => c.operation), [], "no listIncomingCredits, getCreditById or listStatementDebits call");
   assert.deepEqual(await coverageOf(o.route.accountRef), [], "no coverage without an imported statement");
   const st = await statementArtifact(o.route.accountRef, { from: new Date(Date.now() - 3 * HOUR).toISOString(), to: new Date(Date.now() - 60_000).toISOString(), credits: [], debits: [] });
   dataOf<{ import: ImportView }>(await importSI2(o.route.accountRef, st), 201, "an imported statement");
@@ -1543,7 +1544,11 @@ test("ACH-13 OK: fees are versioned data with source and access date; null fee d
   await paid(zero, { feeCents: 0n });
   const unknown = await awaitingOrder("ach13-null");
   await paid(unknown, { feeCents: null });
-  const fee = async (o: Order) => (await q<{ f: string | null }>("SELECT provider_fee_cents::text AS f FROM kauro.capture_facts WHERE order_id = $1", [o.orderId]))[0]?.f ?? "absent";
+  // a capture whose fee is unknown reads null; no capture at all reads "absent" (null is a value here, never coalesced away)
+  const fee = async (o: Order) => {
+    const [cap] = await q<{ f: string | null }>("SELECT provider_fee_cents::text AS f FROM kauro.capture_facts WHERE order_id = $1", [o.orderId]);
+    return cap === undefined ? "absent" : cap.f;
+  };
   assert.deepEqual([await fee(zero), await fee(unknown)], ["0", null], "observed zero is 0, unknown is null");
   const route = await anyRoute("ach13-conflict");
   const bad = await L().bw.evidence.put({ bytes: (await import("@kauro/application/testing")).fakeCreditBytes(route.accountRef, { creditId: "ach13-bad", currency: "USD", grossCents: 1000n, netCents: 900n, feeCents: 50n, payeeDigest: "b".repeat(64) as never, observedAt: new Date().toISOString(), status: "COMPLETED", rail: "ACH" }), accountRef: route.accountRef as never });
@@ -1568,7 +1573,9 @@ test("ACH-20 OK: an imported statement covers its interval once by bank transact
 
 test("ACH-21 OK (R2 15 expiry race): a credit booked by the deadline plus the route's provider-time tolerance and confirmed later is honored whether or not the expiry sweep ran, only with every subject guard valid and no other purchase; otherwise it is recorded and returned", async () => {
   // the instants are crossed in the matrix cells ACH-M-P1D-RACE / -EXPIRY / -REVOCATION; here the case's end state on the server's clock
-  const o = await awaitingOrder("ach21", { lifetimeMs: 4 * 86_400_000 + 1000, windowMs: 4 * 86_400_000 });
+  // on the server's real clock the confirmation precedes the booking by about the order's lifetime: the route's provider-time tolerance
+  // covers it (bookedAt <= confirmedAt + tolerance), so PROVIDER-TIME holds and the deadline rule alone decides
+  const o = await awaitingOrder("ach21", { lifetimeMs: 4 * 86_400_000 + 1000, windowMs: 4 * 86_400_000, toleranceMs: 5 * 86_400_000 });
   const { credit } = await paid(o, { bookedAt: plusMs(o.transferExpiresAt, -1) });
   assert.equal(credit.state, "APPLIED");
   assert.deepEqual([(await fpOrder(o)).orderState, (await fpOrder(o)).authorizations], ["CAPTURED", 1]);
