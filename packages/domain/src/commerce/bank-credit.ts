@@ -102,15 +102,68 @@ export function matchDecision(credit: Pick<BankCreditRecord, "reference" | "curr
   return { kind: "MATCHED" };
 }
 
-/** The bank order state a received credit of `receivedCents` (in total, this credit included) leads to (BANK_ORDER_EXTENSION). */
-export function bankOrderStateAfterReceipt(current: string, expectedCents: bigint, receivedCents: bigint, onTime: boolean): string {
-  if (current === "EXPIRED") return onTime && receivedCents === expectedCents ? "CAPTURED" : "EXPIRED";
-  if (current !== "AWAITING_TRANSFER" && current !== "PARTIALLY_RECEIVED") return current;
-  if (receivedCents === expectedCents) return "CAPTURED";
-  if (receivedCents > expectedCents) return "RECEIVED_REVIEW";
-  return "PARTIALLY_RECEIVED";
+/** What P1 judges at its effect instant, under the instruction's row lock (ACH-ROUTE §7.10 P1, §7.24 P1Δ, DV1-06). */
+export interface BankApplyFacts {
+  /** The bank order state the instruction holds now, and why an EXPIRED one expired. */
+  readonly orderState: string;
+  readonly expiryCause: "DEADLINE" | "RETIRED" | null;
+  readonly transferExpiresAt: string;
+  readonly issuedAt: string;
+  /** The route version's named provider-time tolerance (data, never a constant). */
+  readonly toleranceMs: number;
+  /** The bank's booking instant of the credit, and the instant the database stamped at its confirmation. */
+  readonly bookedAt: string | null;
+  readonly confirmedAt: string | null;
+  /** The database clock after the last lock wait. */
+  readonly effectNow: string;
+  readonly routeEnabled: boolean;
+  /** Another quote of the same project holds a live entitlement (another purchase). */
+  readonly anotherPurchase: boolean;
 }
 
+export type BankApplyBlocker = "CHECKOUT_RETIRED" | "ORDER_NOT_CAPTURABLE" | "PROVIDER_TIME_UNVERIFIED" | "TRANSFER_DEADLINE_PASSED" | "ROUTE_NOT_ENABLED" | "ANOTHER_PURCHASE";
+
+export interface BankApplyJudgment {
+  /** The first reason the credit cannot carry authority, null when only the purchased subject's guards remain to be judged. */
+  readonly blocker: BankApplyBlocker | null;
+  /** The effect instant is at or after the transfer deadline (the order cannot stay open). */
+  readonly pastDeadline: boolean;
+  /** issuedAt - tolerance <= bookedAt <= confirmedAt + tolerance; otherwise a PROVIDER_TIME_UNVERIFIED review case is opened. */
+  readonly providerTimeVerified: boolean;
+}
+
+/**
+ * DV1-06: a credit carries authority only when it was booked by the deadline plus the route version's tolerance (DEADLINE), its booking
+ * instant is credible against the instructions' issuance and its own confirmation (PROVIDER-TIME), the route is still enabled, the
+ * checkout was not retired, no other purchase of the project holds the entitlement, and — judged by the caller's subject guards —
+ * the purchased subject still binds. Whether the sweep already expired the order does not change the answer.
+ */
+export function judgeBankApply(f: BankApplyFacts): BankApplyJudgment {
+  const tol = f.toleranceMs;
+  const booked = f.bookedAt === null ? null : Date.parse(f.bookedAt);
+  const providerTimeVerified = booked !== null && f.confirmedAt !== null && booked >= Date.parse(f.issuedAt) - tol && booked <= Date.parse(f.confirmedAt) + tol;
+  const pastDeadline = Date.parse(f.effectNow) >= Date.parse(f.transferExpiresAt);
+  let blocker: BankApplyBlocker | null = null;
+  if (f.orderState === "EXPIRED" && f.expiryCause === "RETIRED") blocker = "CHECKOUT_RETIRED";
+  else if (f.orderState !== "AWAITING_TRANSFER" && f.orderState !== "PARTIALLY_RECEIVED" && f.orderState !== "EXPIRED") blocker = "ORDER_NOT_CAPTURABLE";
+  else if (!providerTimeVerified) blocker = "PROVIDER_TIME_UNVERIFIED";
+  else if (!creditOnTime(f.bookedAt!, f.transferExpiresAt, tol)) blocker = "TRANSFER_DEADLINE_PASSED";
+  else if (!f.routeEnabled) blocker = "ROUTE_NOT_ENABLED";
+  else if (f.anotherPurchase) blocker = "ANOTHER_PURCHASE";
+  return { blocker, pastDeadline, providerTimeVerified };
+}
+
+/**
+ * The bank order state after a credit was applied: CAPTURED only by the one exact capture that issued the purchase's authority; an
+ * order already CAPTURED or under review stays; one whose deadline passed (or already EXPIRED) is EXPIRED; otherwise an amount still
+ * owed is PARTIALLY_RECEIVED and anything else (the sum of partials, an excess, a capture without authority) is RECEIVED_REVIEW.
+ */
+export function bankOrderStateAfterApply(current: string, o: { readonly authorized: boolean; readonly pastDeadline: boolean; readonly expectedCents: bigint; readonly receivedCents: bigint }): string {
+  if (o.authorized) return "CAPTURED";
+  if (current === "CAPTURED" || current === "RECEIVED_REVIEW" || current === "EXPIRED") return current;
+  if (o.pastDeadline) return "EXPIRED";
+  return o.receivedCents < o.expectedCents ? "PARTIALLY_RECEIVED" : "RECEIVED_REVIEW";
+}
 /** A credit booked at or before the deadline plus the route version's named provider-time tolerance arrived on time (P1Δ). */
 export function creditOnTime(bookedAt: string, transferExpiresAt: string, toleranceMs: number): boolean {
   return Date.parse(bookedAt) <= Date.parse(transferExpiresAt) + toleranceMs;
