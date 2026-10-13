@@ -14,7 +14,22 @@ export const AUDIT_DIGEST_DOMAINS = Object.freeze({
   DECISION_ARTIFACT: "KAURO_DECISION_ARTIFACT_V1",
   MODEL_TASK_JOURNAL_EVENT: "KAURO_MODEL_TASK_JOURNAL_EVENT_V1",
   MODEL_TASK_CHECKPOINT: "KAURO_MODEL_TASK_CHECKPOINT_V1",
+  DISPATCH_SETTLEMENT: "KAURO_DISPATCH_SETTLEMENT_V1",
 } as const);
+
+/**
+ * The identity of one settlement of a core reservation (package B05 D5-11): the same (run, reservation, state, charge, usage flag) is
+ * the same settlement (a replay); anything else on a final settlement is a conflict. Micros are decimal strings in the canonical form.
+ */
+export function dispatchSettlementHashOf(s: { readonly runId: string; readonly reservationId: string; readonly state: string; readonly chargeMicros: bigint; readonly usageKnown: boolean }): Sha256Hex {
+  return rawDigest(
+    canonicalBytes({
+      domain: AUDIT_DIGEST_DOMAINS.DISPATCH_SETTLEMENT,
+      version: 1,
+      payload: { runId: s.runId, reservationId: s.reservationId, state: s.state, chargeMicros: s.chargeMicros.toString(), usageKnown: s.usageKnown },
+    }),
+  );
+}
 
 /** The content identity of a decision document of a kind: the same document of the same kind is the same artifact. */
 export function decisionArtifactHashOf(kind: DecisionArtifactKind, document: Readonly<Record<string, unknown>>): Sha256Hex {

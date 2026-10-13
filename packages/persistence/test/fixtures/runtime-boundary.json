@@ -872,6 +872,11 @@
           "version"
         ]
       },
+      "kauro.dispatch_liabilities": {
+        "UPDATE": [
+          "state"
+        ]
+      },
       "kauro.model_task_journal": {
         "INSERT": [
           "agency_id",
@@ -991,6 +996,11 @@
           "state",
           "validation_receipt_hash",
           "version"
+        ]
+      },
+      "kauro.pool_liability_gates": {
+        "UPDATE": [
+          "pool_grant_id"
         ]
       },
       "kauro.processing_attempts": {
@@ -2976,6 +2986,14 @@
       ],
       "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))"
     },
+    "dispatch_liabilities/dispatch_liabilities_control": {
+      "check": "true",
+      "command": "ALL",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "true"
+    },
     "domain_events/domain_events_commerce_request_handlers": {
       "check": "(((aggregate_kind <> ALL (ARRAY['quote'::text, 'payment_order'::text, 'payment_attempt'::text, 'capture'::text, 'commercial_authorization'::text, 'refund'::text, 'tax_document'::text, 'reconciliation_case'::text])) AND (split_part(event_type, '.'::text, 1) <> ALL (ARRAY['quote'::text, 'payment_order'::text, 'payment_attempt'::text, 'capture'::text, 'commercial_authorization'::text, 'refund'::text, 'tax_document'::text, 'reconciliation_case'::text]))) OR (EXISTS ( SELECT 1\n   FROM kauro.commerce_event_bindings b\n  WHERE ((b.event_type = domain_events.event_type) AND (b.aggregate_kind = domain_events.aggregate_kind) AND (((b.request_handler = 'TENANT'::text) AND (domain_events.agency_id = kauro.current_agency_id())) OR ((b.request_handler = 'OPERATOR'::text) AND kauro.in_finance_scope(domain_events.agency_id)))))))",
       "command": "INSERT",
@@ -4053,6 +4071,14 @@
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "pool_liability_gates/pool_liability_gates_control": {
+      "check": "true",
+      "command": "ALL",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "true"
     },
     "price_eligibility_snapshots/price_eligibility_snapshots_commission_read": {
       "check": null,
@@ -6445,6 +6471,10 @@
         "INSERT",
         "SELECT"
       ],
+      "kauro.dispatch_liabilities": [
+        "INSERT",
+        "SELECT"
+      ],
       "kauro.domain_events": [
         "INSERT",
         "SELECT"
@@ -6517,6 +6547,10 @@
         "UPDATE"
       ],
       "kauro.plan_validations": [
+        "SELECT"
+      ],
+      "kauro.pool_liability_gates": [
+        "INSERT",
         "SELECT"
       ],
       "kauro.processing_attempts": [

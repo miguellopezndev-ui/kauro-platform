@@ -242,6 +242,12 @@ export const AUDIT_CONSTRAINT_FAILURES: Readonly<Record<string, { readonly sqlSt
   cost_grants_audit_ceiling: { sqlState: "23514", code: "BUDGET_EXHAUSTED", reason: "GRANT_CEILING" },
   audits_one_per_subject: { sqlState: "23505", code: "PRECONDITION_FAILED", reason: "AUDIT_EXISTS" },
   audits_one_live_per_agency: { sqlState: "23505", code: "ADMISSION_LIMITED", reason: "AUDIT_CONCURRENCY_LIMITED", retryable: true },
+  // B05 D5-11 (migration 0059): the pool's liability gate and the dispatch-time expiry clauses
+  pool_liability_open: { sqlState: "KA083", code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
+  grant_expired_at_dispatch: { sqlState: "KA083", code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
+  pool_expired_at_dispatch: { sqlState: "KA083", code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
+  pool_liability_gate_absent: { sqlState: "KA006", code: "INTEGRITY_FAILURE", reason: "LIFECYCLE_BINDING_MISSING" },
+  pool_liability_gate_scope: { sqlState: "KA006", code: "INTEGRITY_FAILURE", reason: "COMMITMENT_ISOLATION" },
 });
 
 /**

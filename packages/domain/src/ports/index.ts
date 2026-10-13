@@ -37,7 +37,8 @@ export type {
   SecurityEventRepository,
 } from "./repositories.js";
 export type { LeaseStore, LeaseRecord, LeaseClaim, ClaimOutcome, LeaseResourceKind } from "./lease-store.js";
-export type { RequestJournal, RequestJournalRecord, RequestReservation } from "./request-journal.js";
+export type { RequestJournal, RequestJournalRecord, RequestReservation, NonAcceptanceEvidence } from "./request-journal.js";
+export { NON_ACCEPTANCE_EVIDENCES } from "./request-journal.js";
 export type {
   InboxDelivery,
   IngressOutcome,
@@ -206,6 +207,9 @@ export type {
   NewModelTask,
   DispatchIntent,
   DispatchOutcome,
+  CoreAdmission,
+  DispatchSettlement,
+  SettlementOutcome,
   JournalAppend,
   JournalAppendOutcome,
   NewDecisionArtifact,
