@@ -277,7 +277,8 @@ export class FaultRouting {
   statementTimeoutMs: number | null = null;
   /**
    * The step clock of the operation a cell runs: while set, every SERVICE unit of work the routed units and the payment service's traced units
-   * open positions its transaction on it (clock.onServer) before its work, instead of standing at `stand`. A cell sets it inside its operation
+   * open positions its transaction on it (clock.onServer) before its work, instead of standing at `stand`; so does an untraced SERVICE unit
+   * of the payment service (lane L-REFUND: a sweep pass run at the cell's instant). A cell sets it inside its operation
    * (`ctx.operation(name, (op) => ...)`, `faults.clock = op.clock`) and clears it after.
    */
   clock: StepClockOf | null = null;
@@ -337,6 +338,20 @@ export class FaultRouting {
         const value: unknown = Reflect.get(target, prop, target);
         if (typeof value !== "function") return value;
         const route = this.#pay.getStore();
+        // outside onPayment and outside a routed invocation: the payment service's own SERVICE unit, positioned on a cell's step clock while
+        // one is set (lane L-REFUND: a sweep pass the cell runs at its controlled instant), unchanged otherwise
+        if (prop === "run" && route === undefined && this.clock !== null) {
+          return (context: unknown, work: (uow: object) => Promise<unknown>, ...rest: unknown[]) =>
+            (value as (...a: unknown[]) => Promise<unknown>).call(
+              target,
+              context,
+              async (uow: object) => {
+                if ((context as { kind?: string }).kind === "SERVICE" && this.clock !== null) await this.clock.onServer((uow as { client: SqlSession }).client);
+                return work(uow);
+              },
+              ...rest,
+            );
+        }
         if (prop !== "run" || route === undefined) return (value as (...a: unknown[]) => unknown).bind(target);
         const traced = {
           run: (context: unknown, work: (uow: object) => Promise<unknown>, ...rest: unknown[]) =>
