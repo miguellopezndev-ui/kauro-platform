@@ -184,7 +184,7 @@ test("R23: the validator compiles the COMPLETED envelope of every served command
     ["GET", "/api/v1/operations/bank-routes/{routeId}", "getBankRoute", ["200"]],
     ["GET", "/api/v1/payment-orders/{orderId}/transfer-instructions", "getTransferInstructions", ["200"]],
     // PV1 (lane PV1-INBOUND): the retirement, the owner's manual credit commands, the statement import and the two owner reads
-    ["POST", "/api/v1/payment-orders/{orderId}/retirements", "retireBankCheckout", ["200"]],
+    ["POST", "/api/v1/payment-orders/{orderId}/retirements", "retireBankCheckout", ["201"]],
     ["POST", "/api/v1/operations/bank-accounts/{accountRef}/credits", "enterBankCredit", ["201"]],
     ["POST", "/api/v1/operations/bank-credits/{creditId}/confirmations", "confirmBankCredit", ["200"]],
     ["POST", "/api/v1/operations/bank-credits/{creditId}/attributions", "attributeBankCredit", ["200"]],

@@ -252,7 +252,7 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/operations/bank-credits/:creditId/confirmations", "confirmBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:confirmBankCredit:200" } }],
       ["POST", "/api/v1/operations/bank-credits/:creditId/attributions", "attributeBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:attributeBankCredit:200" } }],
       ["POST", "/api/v1/operations/bank-accounts/:accountRef/statement-imports", "importBankStatement", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:importBankStatement:201" } }],
-      ["POST", "/api/v1/payment-orders/:orderId/retirements", "retireBankCheckout", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:retireBankCheckout:200" } }],
+      ["POST", "/api/v1/payment-orders/:orderId/retirements", "retireBankCheckout", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:retireBankCheckout:201" } }],
       ["GET", "/api/v1/operations/bank-routes/:routeId", "getBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankRoute:200" } }],
       ["GET", "/api/v1/operations/bank-credits/:creditId", "getBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankCredit:200" } }],
       ["GET", "/api/v1/operations/bank-orders/:orderId/match-keys", "getBankOrderMatchKeys", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankOrderMatchKeys:200" } }],

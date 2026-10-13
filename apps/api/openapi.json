@@ -10571,7 +10571,7 @@
     "/api/v1/payment-orders/{orderId}/retirements": {
       "post": {
         "operationId": "retireBankCheckout",
-        "summary": "Retire an open bank checkout (EXPIRED, cause RETIRED): no further instructions; a later credit is recorded and returned",
+        "summary": "Record the retirement of an open bank checkout; the payment service applies it (EXPIRED, cause RETIRED): no further instructions; a later credit is recorded and returned",
         "description": "Authority: ACH-ROUTE r12 §7.12 (E1 retirement), D-ACH-05; the agency's billing member (X-Kauro-Agency); Idempotency-Key (the agency's journal)",
         "x-kauro-operational": true,
         "parameters": [
@@ -10590,8 +10590,8 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "The bank order after the retirement (COMPLETED envelope; an identical replay answers the journaled reply).",
+          "201": {
+            "description": "The retirement as recorded (COMPLETED envelope; an identical replay answers the journaled reply); the payment service's expiry pass applies it.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -10603,7 +10603,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/retireBankCheckoutResponse200"
+                  "$ref": "#/components/schemas/retireBankCheckoutResponse201"
                 }
               }
             }
@@ -44317,8 +44317,8 @@
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:request:op:retireBankCheckout"
       },
-      "retireBankCheckoutResponse200": {
-        "title": "retireBankCheckout 200",
+      "retireBankCheckoutResponse201": {
+        "title": "retireBankCheckout 201",
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -44345,45 +44345,38 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "order"
+              "retirement"
             ],
             "properties": {
-              "order": {
+              "retirement": {
                 "type": "object",
                 "additionalProperties": false,
                 "required": [
                   "orderId",
-                  "bankState",
-                  "expiryCause",
-                  "version"
+                  "state",
+                  "requestedAt"
                 ],
                 "properties": {
                   "orderId": {
                     "type": "string",
                     "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
                   },
-                  "bankState": {
+                  "state": {
                     "type": "string",
                     "enum": [
-                      "EXPIRED"
+                      "RECORDED"
                     ]
                   },
-                  "expiryCause": {
+                  "requestedAt": {
                     "type": "string",
-                    "enum": [
-                      "RETIRED"
-                    ]
-                  },
-                  "version": {
-                    "type": "integer",
-                    "minimum": 1
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
                   }
                 }
               }
             }
           }
         },
-        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:retireBankCheckout:200"
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:retireBankCheckout:201"
       },
       "verifyBankRouteRequest": {
         "title": "verifyBankRoute request",
