@@ -111,7 +111,8 @@ function admitIn(uow: AuditUnitOfWork, x: Adm) {
       taskKey: sha(`task-${x.core.reservationId}`),
       candidateManifestHash: x.run.manifest as never,
       policyHash: sha("model-policy"),
-      minimizedRequestHash: sha(`minimized-${x.core.reservationId}`),
+      minimizedRequestHash: sha(`request-${x.core.reservationId}`),
+      core: { runId: x.core.runId, requestKey: x.core.requestKey },
       providerProfileId: ids.next() as Id,
       maximumCostCents: 40n,
     });
@@ -286,12 +287,17 @@ test("S14 (GDR) RACE (crash after the DISPATCHING commit): GRANT_RECONCILIATION 
     const movedRun = await interpreting("s14-moved", pool);
     const moved = await sentAndLost(movedRun, "s14-moved");
     standAt(130);
-    const takeover = await a.control(movedRun.ag.agencyId, async (uow) =>
-      uow.audits.beginDispatch(moved.taskId, { requestId: ids.next() as RequestId, ownerId: ids.next() as LeaseOwnerId, requestHash: sha("s14-takeover"), reservedCents: 10n, stepFence: movedRun.stepFence, core: { ...admissionOf(movedRun, 100_000n).core } }),
-    );
-    assert.deepEqual(takeover.kind === "RESERVED" ? [takeover.kind, takeover.request.fence] : [takeover.kind], ["RESERVED", 2]);
+    // ADR-B05-IJR-1 K-2/K-5: the new owner's admission of the same request key (the same model task) takes the lease over (fence 2) but
+    // reserves nothing while the lost send is DISPATCHING (06 l.102: a replacement worker first looks for reconciliation evidence)
+    const takeoverOwner = ids.next() as LeaseOwnerId;
+    const takeoverOf = () => ({ requestId: ids.next() as RequestId, ownerId: takeoverOwner, requestHash: sha(`request-${moved.core.reservationId}`), reservedCents: 10n, stepFence: movedRun.stepFence, core: { ...admissionOf(movedRun, 100_000n).core, requestKey: moved.core.requestKey } });
+    const takeover = await a.control(movedRun.ag.agencyId, async (uow) => uow.audits.beginDispatch(moved.taskId, takeoverOf()));
+    assert.deepEqual(takeover.kind === "IN_FLIGHT" ? [takeover.kind, takeover.request.requestId, takeover.lease.fence] : [takeover.kind], ["IN_FLIGHT", moved.requestId, 2]);
     assert.deepEqual((await sweep()).failed, []);
     assert.deepEqual(await request(moved), ["UNCERTAIN", "UNKNOWN", null, null], "the fence moved");
+    // once the lost send is UNCERTAIN the new owner's next admission reserves at its fence
+    const reserved = await a.control(movedRun.ag.agencyId, async (uow) => uow.audits.beginDispatch(moved.taskId, takeoverOf()));
+    assert.deepEqual(reserved.kind === "RESERVED" ? [reserved.kind, reserved.request.fence] : [reserved.kind], ["RESERVED", 2]);
     assert.deepEqual(await money(movedRun.grantId), ["AUTHORIZED", 35, 0], "25 held for the lost send, 10 for the new owner's intent");
     assert.deepEqual(await request(live), ["DISPATCHING", "UNKNOWN", null, null], "the live owner's lease expired but stands at its fence: not moved");
     // the interpretation deadline passed (on the server clock)
