@@ -1712,9 +1712,27 @@
         "x-kauro-operational": true,
         "parameters": [
           {
+            "name": "agencyId",
+            "in": "path",
+            "required": true,
+            "description": "Path id (a UUID).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "AGENCY_OWNER",
         "requestBody": {
           "required": true,
           "content": {
