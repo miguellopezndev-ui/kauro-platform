@@ -197,7 +197,8 @@ async function proofFor(owner: Person, freshness: "FRESH" | "STALE"): Promise<st
   const issuedMs = Date.parse(at) - 1000 - (freshness === "FRESH" ? 0 : 20 * 60_000);
   return iw.h.recordStepUp(owner.userId as UserId, { issuedAt: new Date(issuedMs).toISOString() as never });
 }
-async function ownerCall(url: string, body: Record<string, unknown>, o: OwnerCall, label: string): Promise<Reply> {
+/** One owner command call with its step-up (a lane outside L-INBOUND drives its own owner route with it: PV1-SETTLE CMD215). */
+export async function ownerCall(url: string, body: Record<string, unknown>, o: OwnerCall, label: string): Promise<Reply> {
   const { iw } = L();
   const owner = o.owner ?? L().owner;
   return call(iw.w, { url, token: owner.token, agency: o.agency ?? null, key: o.key ?? freshKey(label), body: { ...body, authorizationRef: o.proof ?? (await proofFor(owner, o.stepUp ?? "FRESH")) } });

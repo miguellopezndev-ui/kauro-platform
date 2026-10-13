@@ -30,9 +30,11 @@ export const BANK_HOLD_POINTS = {
   DECLARE_LOCKED: "bank:declare-locked",
   /** Inside SI2 with L1 and the identity locks taken, before the lines are written. */
   STATEMENT_LOCKED: "bank:statement-locked",
+  /** Inside CMD215 with L1, INBOUND and the payout cash lock taken, before the owner's re-judgement and the settlement row (PV1-SETTLE). */
+  SETTLEMENT_LOCKED: "bank:settlement-locked",
 } as const;
 
-export type HeldLockKind = "L1_OUTBOUND_STREAM" | "INBOUND_STREAM" | "L3_ATTEMPT_ROW";
+export type HeldLockKind = "L1_OUTBOUND_STREAM" | "INBOUND_STREAM" | "L3_ATTEMPT_ROW" | "PAYOUT_CASH";
 
 /** A lock a cell holds, in an open transaction, until it releases it. */
 export interface HeldLock {
