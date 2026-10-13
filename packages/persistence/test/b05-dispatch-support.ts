@@ -37,8 +37,8 @@ export interface DispatchEnv {
   readonly capability: string;
 }
 
-export async function openDispatchEnv(): Promise<DispatchEnv> {
-  const h = await start();
+export async function openDispatchEnv(options: { readonly migrationsDir?: string } = {}): Promise<DispatchEnv> {
+  const h = await start(options);
   const app = await h.pg.connect("kauro_app_test");
   const control = await h.pg.connect("kauro_control_test");
   const validator = await h.pg.connect("kauro_validator_test");
@@ -52,10 +52,20 @@ export async function closeDispatchEnv(env: DispatchEnv): Promise<void> {
 }
 
 let poolSeq = 0;
-/** A platform pool expiring earlier than every pool funded before it (twenty days out, an hour less each time). */
-export async function freshPool(env: DispatchEnv, ceilingCents = 5_000n): Promise<string> {
+/**
+ * A platform pool expiring earlier than every AUTHORIZED unexpired pool of the cluster (twenty days out, an hour less each time; a
+ * minute before the earliest live one when a test funded a short pool), so StartAudit draws on it. `expiresInSeconds` asks for a short
+ * pool explicitly (it must still be the earliest).
+ */
+export async function freshPool(env: DispatchEnv, ceilingCents = 5_000n, expiresInSeconds?: number): Promise<string> {
   poolSeq += 1;
-  return fundPlatformPool(env.control, { ceilingCents, expiresInSeconds: 20 * 86_400 - poolSeq * 3_600 });
+  const r = await env.h.oracle.query<{ s: number | null }>(
+    "SELECT extract(epoch FROM min(expires_at) - kauro.server_now())::float8 AS s FROM kauro.cost_grants WHERE grant_kind = 'PLATFORM_MONTHLY' AND state = 'AUTHORIZED' AND expires_at > kauro.server_now()",
+  );
+  const earliest = r.rows[0]?.s ?? null;
+  const seconds = expiresInSeconds ?? Math.min(20 * 86_400 - poolSeq * 3_600, earliest === null ? Infinity : Math.floor(earliest) - 60);
+  assert.ok(seconds > 60 && (earliest === null || seconds < earliest), `a pool expiring in ${seconds} s is the earliest (the earliest live one expires in ${earliest} s)`);
+  return fundPlatformPool(env.control, { ceilingCents, expiresInSeconds: seconds });
 }
 
 /** One audit INTERPRETING with its INTERPRET step claimed, on a fresh agency, funded from `pool` (its AUDIT grant). */
@@ -70,12 +80,15 @@ export interface Run {
 }
 
 let agencySeq = 0;
-/** A fresh agency with a CLEAN project sealed an hour ago and a confirmed target: StartAudit's input, not yet started. */
-export async function preparedAudit(env: DispatchEnv, tag: string): Promise<{ readonly ag: AgencyFixture; readonly input: NewAudit }> {
+/**
+ * A fresh agency (or `existing`, for a second audit of one agency once its first is no longer live) with a CLEAN project sealed an
+ * hour ago and a confirmed target: StartAudit's input, not yet started.
+ */
+export async function preparedAudit(env: DispatchEnv, tag: string, existing?: AgencyFixture): Promise<{ readonly ag: AgencyFixture; readonly input: NewAudit }> {
   const { h } = env;
   agencySeq += 1;
   const name = `${tag}-${agencySeq}`;
-  const ag = await h.createAgency(await h.person(`${name}-owner`), name);
+  const ag = existing ?? (await h.createAgency(await h.person(`${name}-owner`), name));
   const endClient = await h.endClient(ag, await h.processingAuthority(ag), `${name} client`);
   const { projectId } = await project(env.app, ag, endClient, env.capability, "CLEAN");
   const source = await sealedSource({ app: env.app, control: env.control }, ag, projectId, name, "SEALED", new Date(Date.now() - 3_600_000));
@@ -84,9 +97,9 @@ export async function preparedAudit(env: DispatchEnv, tag: string): Promise<{ re
   return { ag, input: newAudit(ag, subject) };
 }
 
-export async function interpretingRun(env: DispatchEnv, tag: string, pool: string): Promise<Run> {
+export async function interpretingRun(env: DispatchEnv, tag: string, pool: string, existing?: AgencyFixture): Promise<Run> {
   const { h } = env;
-  const { ag, input } = await preparedAudit(env, tag);
+  const { ag, input } = await preparedAudit(env, tag, existing);
   const name = `${tag}-${input.auditId}`;
   const started = await h.audit.run(h.tenant(ag.agencyId as AgencyId, ag.ownerUserId as UserId), (uow) => uow.audits.startAudit(input));
   assert.equal(started.pool.grantId, pool, "the scenario's pool funds its audit (the earliest expiry)");

@@ -253,7 +253,7 @@ BEGIN
   IF is_task THEN
     SELECT x.state, x.fence INTO a FROM kauro.audits x WHERE x.agency_id = m.agency_id AND x.audit_id = m.audit_id FOR SHARE;
   END IF;
-  SELECT c.agency_id, c.state, c.expires_at, c.ceiling_cents, c.reserved_cents, c.reconciled_spend_cents INTO g
+  SELECT c.agency_id, c.grant_kind, c.state, c.expires_at, c.ceiling_cents, c.reserved_cents, c.reconciled_spend_cents, c.pool_grant_id INTO g
     FROM kauro.cost_grants c WHERE c.grant_id = NEW.cost_grant_id FOR UPDATE;
   IF cardinality(NEW.upstream_request_ids) > 0 THEN
     IF EXISTS (
@@ -284,6 +284,17 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'AUDIT_FENCE: a dispatch of model task % is the MODEL_TASK lease''s current fence', NEW.task_id USING ERRCODE = 'KA080';
     END IF;
+  END IF;
+  -- an expiry by its name (D5-19): the funding grant's own (an AUDIT grant's, or the pool's when the pool funds directly), then an AUDIT
+  -- grant's pool's (0023:143 caps the grant by its pool; a forged cap still meets this clause)
+  IF g.state = 'AUTHORIZED' AND g.expires_at <= judged THEN
+    IF g.grant_kind = 'PLATFORM_MONTHLY' THEN
+      RAISE EXCEPTION 'POOL_EXPIRED: the pool funding request % expired before its reservation', NEW.request_id USING ERRCODE = 'KA083', CONSTRAINT = 'pool_expired_at_dispatch';
+    END IF;
+    RAISE EXCEPTION 'GRANT_EXPIRED: the grant of request % expired before its reservation', NEW.request_id USING ERRCODE = 'KA083', CONSTRAINT = 'grant_expired_at_dispatch';
+  END IF;
+  IF g.grant_kind = 'AUDIT' AND NOT EXISTS (SELECT 1 FROM kauro.cost_grants p WHERE p.grant_id = g.pool_grant_id AND p.expires_at > judged) THEN
+    RAISE EXCEPTION 'POOL_EXPIRED: the pool funding request % expired before its reservation', NEW.request_id USING ERRCODE = 'KA083', CONSTRAINT = 'pool_expired_at_dispatch';
   END IF;
   IF g.state IS NULL OR g.state <> 'AUTHORIZED' OR g.expires_at <= judged OR (g.agency_id IS NOT NULL AND g.agency_id IS DISTINCT FROM NEW.agency_id)
      OR g.reserved_cents + g.reconciled_spend_cents + NEW.reserved_cents > g.ceiling_cents THEN

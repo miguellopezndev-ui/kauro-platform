@@ -35,7 +35,7 @@ import {
   type Run,
   withConnections,
 } from "./b05-dispatch-support.js";
-import { clock, sha, sqlState } from "./support.js";
+import { clock, ids, sha, sqlState } from "./support.js";
 
 let env: DispatchEnv;
 before(async () => {
@@ -978,6 +978,595 @@ test("L16c DENY gate absent (forged, rule 12): with the pool's gate row deleted 
     const out = await settle(s, "COMMITTED", 250_000n);
     assert.equal(out.kind === "RECORDED" ? out.liabilityMicros : out.kind, 5_000n);
     assert.deepEqual(await liabilities(env, P), [{ request_id: s.requestId, excess: "5000", state: "OPEN" }]);
+  } finally {
+    await owner.end();
+  }
+});
+
+// --- PORT-CONTRACT reservations (PgRequestJournal.reserve; no product caller names an upstream or funds from the pool) ---------------
+
+/** A reservation of a task that is no model task, funded by `grantId`, naming `upstreams` (PgRequestJournal.reserve). */
+function portReservation(agencyId: string, grantId: string, cents: number, upstreams: ReadonlyArray<RequestId>) {
+  return { requestId: ids.next() as RequestId, taskId: ids.next() as never, agencyId: agencyId as never, requestHash: sha(`port-${grantId}-${cents}-${ids.next()}`), fence: 1, reservedCents: String(cents) as never, costGrantId: grantId, upstreamRequestIds: upstreams, reservedAt: clock.now() };
+}
+
+/** A CONSUMED port request funded by `grantId` (reserved, sent, answered with known usage, consumed). */
+async function consumedPort(agencyId: string, grantId: string, cents = 40): Promise<RequestId> {
+  return env.h.audit.run(controlOf(agencyId), async (uow) => {
+    const r = portReservation(agencyId, grantId, cents, []);
+    await uow.requestJournal.reserve(r);
+    await uow.requestJournal.markDispatching(r.requestId, 1, null, clock.now());
+    await uow.requestJournal.storeResponse(r.requestId, 1, sha(`port-response-${r.requestId}`), { usageState: "KNOWN", actualCents: "30" as never }, clock.now());
+    assert.equal((await uow.requestJournal.markConsumed(r.requestId, 1, clock.now()))?.state, "CONSUMED");
+    return r.requestId;
+  });
+}
+
+/** A core admission of `run` answered with known usage and consumed (an upstream a dependent may name). */
+async function consumedCore(run: Run, maxChargeMicros: bigint, cents: string): Promise<Admission> {
+  const a = await admit(env, run, maxChargeMicros);
+  await answered(a, cents);
+  await journal(a, (j) => j.markConsumed(a.requestId, 1, clock.now()));
+  return a;
+}
+
+/** Two AUDIT grants of one agency on one pool: the first audit (G1's) cancelled after `before` ran on it, the second INTERPRETING. */
+async function twoGrants(tag: string, pool: string, before: (run: Run) => Promise<Admission>): Promise<{ first: Run; second: Run; u: Admission }> {
+  const first = await interpretingRun(env, `${tag}-first`, pool);
+  const u = await before(first);
+  await cancel(first);
+  const second = await interpretingRun(env, `${tag}-second`, pool, first.ag);
+  return { first, second, u };
+}
+
+const unresolved = (e: unknown) => failureOf(e)[0] === "PRECONDITION_FAILED" && failureOf(e)[1] === "UPSTREAM_UNRESOLVED" && refusedBy("KA009")(e);
+
+test("L11 [PORT-CONTRACT: PgRequestJournal.reserve; no product caller, beginDispatch store.ts:527-536 funds only from the AUDIT grant] RACE (pool-funded reservations): two concurrent PgRequestJournal.reserve calls on requests funded directly by the pool take its row FOR UPDATE at the grant position before their same-grant upstreams and never upgrade a lower lock; one waits, both land within the ceiling, 40P01 never", async () => {
+  const agency = await env.h.createAgency(await env.h.person("l11-owner"), "l11");
+  await withConnections(env, 2, async ([x, y]) => {
+    await bothOrders<{ pool: string; u1: RequestId; u2: RequestId }>({
+      oracle: env.h.oracle,
+      actors: [
+        { name: "D1", client: x!, begin: (c) => bindCommerce(c, service(agency.agencyId)), act: (c, st) => rawJournal(c).reserve(portReservation(agency.agencyId, st.pool, 90, [st.u1, st.u2])) },
+        { name: "D2", client: y!, begin: (c) => bindCommerce(c, service(agency.agencyId)), act: (c, st) => rawJournal(c).reserve(portReservation(agency.agencyId, st.pool, 90, [st.u2, st.u1])) },
+      ],
+      async setup() {
+        const pool = await freshPool(env, 300n);
+        return { pool, u1: await consumedPort(agency.agencyId, pool), u2: await consumedPort(agency.agencyId, pool) };
+      },
+      async verify({ state, outcomes }) {
+        assert.equal(outcomes["D1"]?.committed, true);
+        assert.equal(outcomes["D2"]?.committed, true);
+        // 40 + 40 held by the upstreams, 90 + 90 by the dependents: 260 within the 300 ceiling
+        assert.deepEqual(await money(env, state.pool), { reserved: 260, spent: 0, state: "AUTHORIZED" });
+      },
+    });
+  });
+  // a third that would pass the ceiling is refused, whichever order
+  const pool = await freshPool(env, 200n);
+  const u = await consumedPort(agency.agencyId, pool, 100);
+  await env.h.audit.run(controlOf(agency.agencyId), (uow) => uow.requestJournal.reserve(portReservation(agency.agencyId, pool, 90, [u])));
+  await assert.rejects(env.h.audit.run(controlOf(agency.agencyId), (uow) => uow.requestJournal.reserve(portReservation(agency.agencyId, pool, 20, [u]))), (e: unknown) => failureOf(e)[1] === "NO_FUNDED_GRANT");
+  assert.deepEqual(await money(env, pool), { reserved: 190, spent: 0, state: "AUTHORIZED" });
+});
+
+test("L14 [NON-REGRESSION: same-grant orders serialize on the funding grant under r4's rules too; PORT-CONTRACT: the dependents are PgRequestJournal.reserve calls naming upstreams, no product caller, store.ts:535 passes []] RACE (pool/upstream ring, both orders): with same-agency grants G1 and G2 on pool P and a CONSUMED upstream U funded by G1, an excess settlement of U held after its request lock and a dependent reservation on G1 naming U held after its grant lock, the same with GRANT_RECONCILIATION posting the excess, and a pool-funded dependent on P naming a P-funded upstream, complete without 40P01; Codex r3's setup (U funded by G2, dependent on G1) is refused KA009 without waiting; ledger amounts and the liability equal the hand-computed values and an admission (beginDispatch) committing after the liability is refused NO_FUNDED_GRANT", async () => {
+  type S = { pool: string; first: Run; second: Run; u: Admission };
+  await withConnections(env, 2, async ([x, y]) => {
+    for (const posting of ["SET", "REC"] as const) {
+      await bothOrders<S>({
+        oracle: env.h.oracle,
+        actors: [
+          {
+            name: posting,
+            client: x!,
+            begin: (c, st) => bindCommerce(c, service(st.first.ag.agencyId)),
+            act: async (c, st) => {
+              if (posting === "SET") return rawStore(c).settleDispatch(settlementOf(st.u, "COMMITTED", 250_000n));
+              await lockGrantRow(c, st.first.grantId);
+              return rawStore(c).reconcileRequestMicros(st.u.requestId, 250_000n);
+            },
+          },
+          { name: "PRT", client: y!, begin: (c, st) => bindCommerce(c, service(st.first.ag.agencyId)), act: (c, st) => rawJournal(c).reserve(portReservation(st.first.ag.agencyId, st.first.grantId, 20, [st.u.requestId])) },
+        ],
+        async setup() {
+          const pool = await freshPool(env);
+          const { first, second, u } = await twoGrants(`l14-${posting.toLowerCase()}`, pool, (run) => consumedCore(run, 245_000n, "25"));
+          return { pool, first, second, u };
+        },
+        async verify({ order, state, outcomes }) {
+          assert.equal(outcomes[posting]?.committed, true, "the posting commits in both orders");
+          if (order[0] === posting) {
+            assert.ok(refusedBy("KA083", "pool_liability_open")(rejection(outcomes["PRT"]?.act)), "after the liability the dependent reserves nothing");
+            assert.deepEqual(await money(env, state.first.grantId), { reserved: 0, spent: 25, state: "AUTHORIZED" });
+          } else {
+            assert.equal(outcomes["PRT"]?.committed, true, "the dependent that held the grant first commits");
+            assert.deepEqual(await money(env, state.first.grantId), { reserved: 20, spent: 25, state: "AUTHORIZED" });
+          }
+          for (const o of Object.values(outcomes)) assert.ok(o.act.status === "fulfilled" || pgErr(o.act.reason).code !== "40P01");
+          assert.deepEqual(await liabilities(env, state.pool), [{ request_id: state.u.requestId, excess: "5000", state: "OPEN" }]);
+          const late = admissionOf(state.second, 50_000n);
+          await assert.rejects(env.h.audit.run(controlOf(state.second.ag.agencyId), (uow) => admitWith(uow.audits as never, late)), (e: unknown) => failureOf(e)[1] === "NO_FUNDED_GRANT");
+        },
+      });
+    }
+    // a pool-funded dependent on P naming a P-funded upstream V, against the posting of V's usage (both on P first)
+    const agency = await env.h.createAgency(await env.h.person("l14-pool-owner"), "l14 pool");
+    await bothOrders<{ pool: string; v: RequestId }>({
+      oracle: env.h.oracle,
+      actors: [
+        { name: "REC", client: x!, begin: (c) => bindCommerce(c, service(agency.agencyId)), act: (c, st) => rawStore(c).reconcileRequestMicros(st.v, 300_000n) },
+        { name: "PRT", client: y!, begin: (c) => bindCommerce(c, service(agency.agencyId)), act: (c, st) => rawJournal(c).reserve(portReservation(agency.agencyId, st.pool, 20, [st.v])) },
+      ],
+      async setup() {
+        const pool = await freshPool(env, 1_000n);
+        return { pool, v: await consumedPort(agency.agencyId, pool, 40) };
+      },
+      async verify({ state, outcomes }) {
+        assert.equal(outcomes["REC"]?.committed, true);
+        assert.equal(outcomes["PRT"]?.committed, true);
+        // V: 40 reserved -> 30 posted (300,000 micros); the dependent's 20 reserved
+        assert.deepEqual(await money(env, state.pool), { reserved: 20, spent: 30, state: "AUTHORIZED" });
+        assert.deepEqual(await liabilities(env, state.pool), [], "a request without a core admission owes no liability");
+      },
+    });
+  });
+  // Codex r3's setup: U funded by G2, the dependent on G1: refused KA009 without waiting while U's settlement holds G2 and U
+  const pool = await freshPool(env);
+  const { first, second } = await twoGrants("l14-r3", pool, (run) => consumedCore(run, 245_000n, "25"));
+  const u2 = await consumedCore(second, 245_000n, "25");
+  await withConnections(env, 2, async ([holder, c]) => {
+    await holder!.query("BEGIN");
+    await bindCommerce(holder!, service(second.ag.agencyId));
+    await rawStore(holder!).settleDispatch(settlementOf(u2, "COMMITTED", 250_000n));
+    const d = portReservation(first.ag.agencyId, first.grantId, 20, [u2.requestId]);
+    const obs = await settlesOrWaits(env.h.oracle, connectionPid(c!), unit(c!, first.ag.agencyId, (cc) => rawJournal(cc).reserve(d)), "a dependent on G1 naming an upstream of G2");
+    assert.equal(obs.kind, "SETTLED", "refused without waiting");
+    assert.ok(obs.kind === "SETTLED" && unresolved(rejection(obs.outcome)));
+    await holder!.query("COMMIT");
+    assert.equal(await requestCount(d.requestId), 0);
+  });
+});
+
+test("L14a [PORT-CONTRACT: PgRequestJournal.reserve; the dependent D has no product caller] RACE (cross-grant upstream, D15 regression proof, both orders): a dependent reservation funded by pool P (or by G1 on P, Codex r3's setup) naming a CONSUMED upstream U funded by AUDIT grant G2 on P, while GRANT_RECONCILIATION closing G2 (or an excess settlement of U) is held at a FaultPoint after locking U, is refused KA009 before any upstream lock and without waiting; the other transaction then completes (G2 closed through the pool, or the liability committed); no transaction ends 40P01 and ledger amounts equal the hand-computed values", async () => {
+  for (const holderKind of ["CLOSE", "SET"] as const) {
+    for (const dependentFirst of [false, true]) {
+      const pool = await freshPool(env);
+      // G2 is the cancelled first audit's grant (U's); G1 the second audit's
+      const { first, second, u } = await twoGrants(`l14a-${holderKind.toLowerCase()}`, pool, (run) => consumedCore(run, 250_000n, "25"));
+      const g2 = first.grantId;
+      const g1 = second.grantId;
+      const dependents = [portReservation(first.ag.agencyId, pool, 20, [u.requestId]), portReservation(first.ag.agencyId, g1, 20, [u.requestId])];
+      await withConnections(env, 2, async ([holder, c]) => {
+        const refuse = async (label: string) => {
+          for (const d of dependents) {
+            const obs = await settlesOrWaits(env.h.oracle, connectionPid(c!), unit(c!, first.ag.agencyId, (cc) => rawJournal(cc).reserve(d)), `${label}: a dependent naming U of G2`);
+            assert.equal(obs.kind, "SETTLED", `${label}: refused without waiting`);
+            assert.ok(obs.kind === "SETTLED" && unresolved(rejection(obs.outcome)), `${label}: KA009`);
+            assert.equal(await requestCount(d.requestId), 0);
+          }
+        };
+        if (dependentFirst) await refuse("before the holder");
+        await holder!.query("BEGIN");
+        await bindCommerce(holder!, service(first.ag.agencyId));
+        await lockGrantRow(holder!, g2);
+        await holder!.query("SELECT 1 FROM kauro.request_journal WHERE request_id = $1 FOR UPDATE", [u.requestId]);
+        if (!dependentFirst) await refuse("behind the holder's lock of U");
+        if (holderKind === "CLOSE") {
+          await rawStore(holder!).reconcileRequestMicros(u.requestId, 250_000n);
+          assert.equal((await closeOn(holder!, g2)).kind, "APPLIED");
+        } else {
+          await rawStore(holder!).settleDispatch(settlementOf(u, "COMMITTED", 260_000n));
+        }
+        await holder!.query("COMMIT");
+      });
+      if (holderKind === "CLOSE") {
+        assert.deepEqual(await money(env, g2), { reserved: 0, spent: 25, state: "CLOSED" }, "G2 closed through the pool");
+        // the pool holds the second audit's 150 and the closed grant's 25 spent
+        assert.deepEqual(await money(env, pool), { reserved: 150, spent: 25, state: "AUTHORIZED" });
+        assert.deepEqual(await liabilities(env, pool), []);
+      } else {
+        assert.deepEqual(await money(env, g2), { reserved: 0, spent: 25, state: "AUTHORIZED" });
+        assert.deepEqual(await liabilities(env, pool), [{ request_id: u.requestId, excess: "10000", state: "OPEN" }], "the liability committed");
+      }
+      assert.deepEqual(await money(env, g1), { reserved: 0, spent: 0, state: "AUTHORIZED" });
+    }
+  }
+});
+
+test("L15 [PORT-CONTRACT: PgRequestJournal.reserve; no product caller names an upstream] DENY cross-grant upstream: a reservation naming an upstream funded by another grant (same agency, same pool, or the pool itself) is refused KA009 before any upstream lock and moves no cent, while every same-grant upstream case of S089 still commits", async () => {
+  const pool = await freshPool(env);
+  const { first, second, u } = await twoGrants("l15", pool, (run) => consumedCore(run, 250_000n, "25"));
+  const v = await consumedPort(first.ag.agencyId, pool, 40);
+  const same = await consumedCore(second, 100_000n, "10");
+  const before = { pool: await money(env, pool), g1: await money(env, second.grantId), g2: await money(env, first.grantId) };
+  await withConnections(env, 2, async ([holder, c]) => {
+    // the upstreams' rows held FOR UPDATE: a refusal before any upstream lock never waits on them
+    await holder!.query("BEGIN");
+    await holder!.query("SELECT 1 FROM kauro.request_journal WHERE request_id = ANY ($1::uuid[]) FOR UPDATE", [[u.requestId, v, same.requestId]]);
+    const cases: ReadonlyArray<readonly [string, string, RequestId]> = [
+      ["G1 naming U of G2 (same agency, same pool)", second.grantId, u.requestId],
+      ["G1 naming V of the pool itself", second.grantId, v],
+      ["the pool naming U of G2", pool, u.requestId],
+      ["G2 naming V of the pool", first.grantId, v],
+    ];
+    for (const [label, grant, up] of cases) {
+      const d = portReservation(first.ag.agencyId, grant, 10, [up]);
+      const obs = await settlesOrWaits(env.h.oracle, connectionPid(c!), unit(c!, first.ag.agencyId, (cc) => rawJournal(cc).reserve(d)), label);
+      assert.equal(obs.kind, "SETTLED", `${label}: no wait`);
+      assert.ok(obs.kind === "SETTLED" && unresolved(rejection(obs.outcome)), `${label}: KA009`);
+      assert.equal(await requestCount(d.requestId), 0);
+    }
+    await holder!.query("ROLLBACK");
+  });
+  assert.deepEqual({ pool: await money(env, pool), g1: await money(env, second.grantId), g2: await money(env, first.grantId) }, before, "no cent moved");
+  // same-grant upstreams still commit (S089: adapters-journals-outbox.test.ts runs unchanged)
+  await env.h.audit.run(controlOf(first.ag.agencyId), (uow) => uow.requestJournal.reserve(portReservation(first.ag.agencyId, pool, 10, [v])));
+  await env.h.audit.run(controlOf(second.ag.agencyId), (uow) => uow.requestJournal.reserve(portReservation(second.ag.agencyId, second.grantId, 10, [same.requestId])));
+  assert.deepEqual((await money(env, second.grantId)).reserved, before.g1.reserved + 10);
+});
+
+// --- the commit order (L21), the migration on a live pool (L22) --------------------------------------------------------------------
+
+/** The one product backend paused inside its transaction (a unit of work held at its FaultPoint before COMMIT). */
+async function pausedProductPid(): Promise<number> {
+  const r = await env.h.oracle.query("SELECT pid FROM pg_stat_activity WHERE state = 'idle in transaction' AND application_name IN ('kauro-test-control', 'kauro-test-api') AND pid <> pg_backend_pid()");
+  assert.equal(r.rows.length, 1, "exactly one paused product transaction");
+  return r.rows[0].pid as number;
+}
+
+/** Polls the oracle (bounded) until the database clock shifted by `offsetSeconds` is at or past `instant`. */
+async function untilPast(offsetSeconds: number, instant: Date): Promise<void> {
+  for (let i = 0; i < 400; i++) {
+    const r = await env.h.oracle.query("SELECT clock_timestamp() + make_interval(secs => $1) >= $2::timestamptz + interval '250 milliseconds' AS past", [offsetSeconds, instant]);
+    if (r.rows[0].past === true) return;
+    await new Promise((res) => setTimeout(res, 25));
+  }
+  throw new Error(`the shifted clock never reached ${instant.toISOString()}`);
+}
+
+/** The test clock offset that puts the database clock `beforeMs` before `instant` now. */
+const offsetBefore = (instant: Date, beforeMs: number): number => (instant.getTime() - beforeMs - Date.now()) / 1000;
+const at = (offsetSeconds: number): Date => new Date(Date.now() + offsetSeconds * 1000);
+
+async function interpretationDeadlineOf(run: Run): Promise<Date> {
+  return (await env.h.oracle.query("SELECT interpretation_deadline_at AS at FROM kauro.audits WHERE audit_id = $1", [run.auditId])).rows[0].at as Date;
+}
+
+/**
+ * A DISPATCHING edge or an admission whose COMMIT waits on the pool's gate (SIMULATED holder FOR UPDATE) across `instant`: the work runs
+ * at the clock `beforeMs` before it, the holder rolls back after the instant passed, and the outcome says whether the work itself
+ * completed (so a refusal is the COMMIT's).
+ */
+async function gateWaitAcross(pool: string, agencyId: string, instant: Date, work: (c: Client) => Promise<unknown>): Promise<{ outcome: PromiseSettledResult<unknown>; workDone: boolean }> {
+  return withConnections(env, 2, async ([holder, c]) => {
+    const offset = offsetBefore(instant, 1_500);
+    let workDone = false;
+    await holder!.query("BEGIN");
+    await holder!.query("SELECT 1 FROM kauro.pool_liability_gates WHERE pool_grant_id = $1 FOR UPDATE", [pool]);
+    const waiting = await mustWait(
+      env.h.oracle,
+      { waiter: c!, holder: connectionPid(holder!) },
+      (cc) =>
+        unit(
+          cc,
+          agencyId,
+          async (x) => {
+            const out = await work(x);
+            workDone = true;
+            return out;
+          },
+          at(offset),
+        ),
+      "the COMMIT behind the gate across the instant",
+    );
+    await untilPast(offset, instant);
+    await holder!.query("ROLLBACK");
+    return { outcome: await waiting.pending, workDone };
+  });
+}
+
+test("L21 DENY commit order (sabotage): request_journal carries exactly two deferred constraint triggers, request_journal_commit_gate_reserve (AFTER INSERT) and request_journal_commit_gate_dispatch (AFTER UPDATE OF state WHEN OLD.state = 'RESERVED' AND NEW.state = 'DISPATCHING'), both executing kauro.request_journal_commit_gate, and dispatch_liabilities exactly one, dispatch_liabilities_commit_gate; each function takes the gate in its first statement, before any liability read or effect_now() judgement; the five gate constraint names are each raised by one clause of the live schema and mapped once in sqlstate.ts; with a test-only body that judges the time before the gate (every effect_now() of the body read once in DECLARE), a DISPATCHING edge whose gate wait (SIMULATED holder) crosses the interpretation deadline commits, and with the shipped body it is refused KA081 with nothing sent", async () => {
+  const deferred = async (table: string) =>
+    (
+      await env.h.oracle.query(
+        `SELECT t.tgname AS name, p.proname AS fn, pg_get_triggerdef(t.oid) AS def FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid
+          WHERE t.tgrelid = $1::regclass AND t.tgconstraint <> 0 AND t.tgdeferrable AND t.tginitdeferred ORDER BY t.tgname`,
+        [table],
+      )
+    ).rows as Array<{ name: string; fn: string; def: string }>;
+  const rj = await deferred("kauro.request_journal");
+  assert.deepEqual(rj.map((t) => [t.name, t.fn]), [
+    ["request_journal_commit_gate_dispatch", "request_journal_commit_gate"],
+    ["request_journal_commit_gate_reserve", "request_journal_commit_gate"],
+  ]);
+  assert.match(rj[0]!.def, /AFTER UPDATE OF state ON kauro\.request_journal .*WHEN \(\(\(old\.state = 'RESERVED'::text\) AND \(new\.state = 'DISPATCHING'::text\)\)\)/);
+  assert.match(rj[1]!.def, /AFTER INSERT ON kauro\.request_journal /);
+  assert.deepEqual((await deferred("kauro.dispatch_liabilities")).map((t) => [t.name, t.fn]), [["dispatch_liabilities_commit_gate", "dispatch_liabilities_commit_gate"]]);
+  // the gate in each function's first statement, before any liability read or effect_now()
+  for (const [fn, mode] of [["request_journal_commit_gate", "FOR KEY SHARE"], ["dispatch_liabilities_commit_gate", "FOR UPDATE"]] as const) {
+    const src = (await env.h.oracle.query("SELECT prosrc FROM pg_proc WHERE proname = $1 AND pronamespace = 'kauro'::regnamespace", [fn])).rows[0].prosrc as string;
+    const body = src.slice(src.indexOf("BEGIN") + "BEGIN".length);
+    const firstStatement = body.slice(0, body.indexOf(";"));
+    assert.ok(firstStatement.includes("kauro.pool_liability_gates") && firstStatement.includes(mode), `${fn}: the first statement takes the gate ${mode}`);
+    const after = body.slice(body.indexOf(";"));
+    assert.ok(!firstStatement.includes("effect_now") && !firstStatement.includes("dispatch_liabilities d"), `${fn}: nothing judged in the gate statement`);
+    if (fn === "request_journal_commit_gate") assert.ok(after.indexOf("dispatch_liabilities") < after.indexOf("effect_now"), "the liability read, then the clock");
+  }
+  // the five names: raised by the live schema, mapped once
+  const live = (await env.h.oracle.query("SELECT string_agg(prosrc, ' ') AS src FROM pg_proc WHERE pronamespace = 'kauro'::regnamespace")).rows[0].src as string;
+  const { readFileSync } = await import("node:fs");
+  const { fileURLToPath } = await import("node:url");
+  const sqlstateSource = readFileSync(fileURLToPath(new URL("../../src/sqlstate.ts", import.meta.url)), "utf8");
+  for (const name of ["pool_liability_open", "grant_expired_at_dispatch", "pool_expired_at_dispatch", "pool_liability_gate_absent", "pool_liability_gate_scope"]) {
+    assert.ok(live.includes(`CONSTRAINT = '${name}'`), `${name} raised by the live schema`);
+    assert.equal(sqlstateSource.split(`  ${name}: {`).length - 1, 1, `${name} mapped once in sqlstate.ts`);
+  }
+  // sabotage: a test-only body that reads the clock before the gate
+  const owner = await env.h.pg.connect("kauro_owner");
+  const shipped = (await env.h.oracle.query("SELECT pg_get_functiondef('kauro.request_journal_commit_gate()'::regprocedure) AS def")).rows[0].def as string;
+  const edgeAcross = async (tag: string) => {
+    const pool = await freshPool(env);
+    const run = await interpretingRun(env, tag, pool);
+    const deadline = await interpretationDeadlineOf(run);
+    // admitted ten seconds before the deadline (its lease claimed at that clock, so the lease outlives the edge's clock)
+    const e = admissionOf(run, 50_000n);
+    assert.equal((await withConnections(env, 1, ([c]) => unit(c!, run.ag.agencyId, (x) => admitWith(rawStore(x), e), at(offsetBefore(deadline, 10_000))))).kind, "RESERVED");
+    const r = await gateWaitAcross(pool, run.ag.agencyId, deadline, (c) => rawJournal(c).markDispatching(e.requestId, 1, "provider-l21", clock.now()));
+    return { ...r, e };
+  };
+  try {
+    // every judgement of the body reads the instant captured before the gate (DECLARE runs before the first statement)
+    const [head, ...rest] = shipped.split("BEGIN");
+    const sabotaged = head!.replace("  pool_expires timestamptz;\n", "  pool_expires timestamptz;\n  early timestamptz := kauro.effect_now();\n") + "BEGIN" + rest.join("BEGIN").replaceAll("kauro.effect_now()", "early");
+    assert.notEqual(sabotaged, shipped, "the sabotage applies");
+    await owner.query(sabotaged);
+    const s = await edgeAcross("l21-sabotaged");
+    assert.equal(s.outcome.status, "fulfilled", `judged before the gate, the edge commits past the deadline (${s.outcome.status === "rejected" ? String((s.outcome as PromiseRejectedResult).reason) + JSON.stringify(pgErr((s.outcome as PromiseRejectedResult).reason)) : ""})`);
+    assert.equal((await requestRow(env, s.e.requestId)).state, "DISPATCHING");
+  } finally {
+    await owner.query(shipped);
+    await owner.end();
+  }
+  const r = await edgeAcross("l21-shipped");
+  assert.ok(r.workDone, "the edge's statement passed before the deadline");
+  assert.ok(refusedBy("KA081")(rejection(r.outcome)), "the shipped body refuses it at COMMIT");
+  assert.equal((await requestRow(env, r.e.requestId)).state, "RESERVED", "nothing sent");
+});
+
+test("L22 OK migration on a live pool: 00NN applied by the migration runner as the owner to a cluster at 00NN-1 that holds a PLATFORM_MONTHLY pool, an AUDIT grant and a RESERVED request gives that pool exactly one gate row, leaves cost_grants and pool_liability_gates with FORCE ROW LEVEL SECURITY, and the pool's next admission and DISPATCHING edge commit; a pool funded after the migration gets its row from the birth trigger", async () => {
+  const { mkdtempSync, copyFileSync, rmSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const { MIGRATIONS_DIR, applyMigrations, listMigrations } = await import("../src/migrations/runner.js");
+  const all = listMigrations(MIGRATIONS_DIR);
+  const target = all.find((m) => m.name === "b05_dispatch_settlement");
+  assert.ok(target, "00NN is the dispatch-settlement migration");
+  assert.equal(all[all.length - 1], target, "00NN is the last migration");
+  const dir = mkdtempSync(join(tmpdir(), "kauro-l22-"));
+  try {
+    for (const m of all.slice(0, -1)) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
+    const at58 = await openDispatchEnv({ migrationsDir: dir });
+    try {
+      const e2 = at58;
+      assert.equal((await e2.h.oracle.query("SELECT to_regclass('kauro.pool_liability_gates') AS t")).rows[0].t, null, "the cluster is at 00NN-1");
+      const pool = await freshPool(e2);
+      const run = await interpretingRun(e2, "l22", pool);
+      // a RESERVED request on the pool, as 00NN-1 writes it (no step fence, no core admission)
+      const requestId = ids.next();
+      await within(e2.control, service(run.ag.agencyId), (c) =>
+        c.query(
+          `INSERT INTO kauro.request_journal (request_id, task_id, agency_id, request_hash, fence, state, usage_state, reserved_cents, cost_grant_id, upstream_request_ids, reserved_at, updated_at)
+           VALUES ($1, $2, $3, $4, 1, 'RESERVED', 'UNKNOWN', 10, $5, '{}', now(), now())`,
+          [requestId, ids.next(), run.ag.agencyId, sha(`l22-${requestId}`), pool],
+        ),
+      );
+      copyFileSync(join(MIGRATIONS_DIR, target.file), join(dir, target.file));
+      const owner = await e2.h.pg.connect("kauro_owner");
+      try {
+        const applied = await applyMigrations(owner, { dir });
+        assert.deepEqual(applied.applied.map((m) => m.file), [target.file]);
+      } finally {
+        await owner.end();
+      }
+      assert.deepEqual((await e2.h.oracle.query("SELECT count(*)::int AS n FROM kauro.pool_liability_gates WHERE pool_grant_id = $1", [pool])).rows[0], { n: 1 }, "one gate row");
+      assert.deepEqual(
+        (await e2.h.oracle.query("SELECT relname, relforcerowsecurity AS forced FROM pg_class WHERE oid IN ('kauro.cost_grants'::regclass, 'kauro.pool_liability_gates'::regclass) ORDER BY relname")).rows,
+        [
+          { relname: "cost_grants", forced: true },
+          { relname: "pool_liability_gates", forced: true },
+        ],
+      );
+      // the pool's next admission and DISPATCHING edge commit
+      const a = await admit(e2, run, 50_000n);
+      await dispatch(e2, a);
+      assert.equal((await e2.h.audit.run(controlOf(run.ag.agencyId), (uow) => uow.requestJournal.markDispatching(requestId as RequestId, 1, null, clock.now())))?.state, "DISPATCHING");
+      const later = await freshPool(e2);
+      assert.deepEqual((await e2.h.oracle.query("SELECT count(*)::int AS n FROM kauro.pool_liability_gates WHERE pool_grant_id = $1", [later])).rows[0], { n: 1 }, "the birth trigger");
+    } finally {
+      await closeDispatchEnv(at58);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("L17 RACE (deadline at COMMIT, every session on one test-clock offset): a reservation or a markDispatching begun before the interpretation deadline, the grant's or pool's expiry or the lease's expiry whose last lock wait (audit share, lease share, grant row; [PORT-CONTRACT: PgRequestJournal.reserve] an upstream request) is held across that instant by a real product actor paused at a FaultPoint and then crashed (no state or fence change) is refused at COMMIT (KA081; KA083 for a grant or pool; KA080 for the lease) with nothing reserved or sent; the liability-gate wait variant is SIMULATED (a raw harness session holds the gate FOR UPDATE across the instant) and is refused the same way after the gate is granted; recorded instants stay the transaction's", async () => {
+  // The judgement after each lock wait is the reservation's or the edge's own trigger (judged := effect_now() after its locks), and the
+  // commit gate judges again at COMMIT; a product holder's wait refuses in the statement after the wait, the gate wait at COMMIT.
+  const acrossHolder = async <T>(
+    tag: string,
+    instantOf: (run: Run, a: Admission) => Promise<Date>,
+    hold: (run: Run, a: Admission, points: FaultPoints) => { point: string; run: Promise<unknown> },
+    work: (c: Client, run: Run, a: Admission) => Promise<T>,
+    poolSeconds?: number,
+  ) => {
+    const pool = await freshPool(env, 5_000n, poolSeconds);
+    const run = await interpretingRun(env, tag, pool);
+    const a = await admit(env, run, 50_000n);
+    const instant = await instantOf(run, a);
+    const offset = offsetBefore(instant, 1_500);
+    const points = new FaultPoints();
+    const held = hold(run, a, points);
+    const pause = points.pause(held.point);
+    await pause.reachedBy(held.run);
+    const outcome = await withConnections(env, 1, async ([c]) => {
+      const waiting = await mustWait(env.h.oracle, { waiter: c!, holder: await pausedProductPid() }, (cc) => unit(cc, run.ag.agencyId, (x) => work(x, run, a), at(offset)), `${tag}: the last lock wait across the instant`);
+      await untilPast(offset, instant);
+      pause.crash();
+      await assert.rejects(held.run, crashedAt(held.point));
+      return waiting.pending;
+    });
+    return { run, a, outcome, pool };
+  };
+  // (1) the interpretation deadline across the audit share: the owner's cancellation holds the audit FOR UPDATE and crashes
+  {
+    const { run, outcome } = await acrossHolder(
+      "l17-deadline",
+      (run) => interpretationDeadlineOf(run),
+      (run, _a, points) => ({
+        point: "l17-cancel.before-commit",
+        run: crashableFactory(env.h.audit, points, "l17-cancel").run(env.h.tenant(run.ag.agencyId as never, run.ag.ownerUserId as never), (uow) => uow.audits.cancelAudit(run.auditId as never, 3, { actor: { kind: "USER", userId: run.ag.ownerUserId as never }, reasonCode: "AGENCY_CANCELLED" })),
+      }),
+      (c, run) => admitWith(rawStore(c), admissionOf(run, 50_000n)),
+    );
+    assert.ok(refusedBy("KA081")(rejection(outcome)), "the deadline judged after the audit share");
+    assert.deepEqual(await money(env, run.grantId), { reserved: 5, spent: 0, state: "AUTHORIZED" }, "nothing reserved beyond the first admission");
+    assert.equal((await env.h.oracle.query("SELECT state FROM kauro.audits WHERE audit_id = $1", [run.auditId])).rows[0].state, "INTERPRETING", "the crashed cancellation changed nothing");
+  }
+  // (2) the lease's expiry across the lease share: another owner's beginDispatch holds the lease row (HELD) and crashes
+  {
+    const { a, outcome } = await acrossHolder(
+      "l17-lease",
+      async (_run, a) => (await env.h.oracle.query("SELECT expires_at FROM kauro.leases WHERE resource_kind = 'MODEL_TASK' AND resource_id = $1", [a.taskId])).rows[0].expires_at as Date,
+      (run, a, points) => ({
+        point: "l17-held.before-commit",
+        run: crashableFactory(env.h.audit, points, "l17-held").run(controlOf(run.ag.agencyId), (uow) => uow.audits.beginDispatch(a.taskId, { requestId: ids.next() as RequestId, ownerId: ids.next() as never, requestHash: sha("l17-held"), reservedCents: 5n, stepFence: run.stepFence })),
+      }),
+      (c, _run, a) => rawJournal(c).markDispatching(a.requestId, 1, "provider-l17", clock.now()),
+    );
+    assert.ok(refusedBy("KA080")(rejection(outcome)), "the lease's expiry judged after the lease share");
+    assert.equal((await requestRow(env, a.requestId)).state, "RESERVED", "nothing sent");
+  }
+  // (3) SIMULATED gate waits: an admission across the interpretation deadline, an edge across the lease's expiry, refused at COMMIT
+  {
+    const pool = await freshPool(env);
+    const run = await interpretingRun(env, "l17-gate-deadline", pool);
+    const b = admissionOf(run, 50_000n);
+    const r = await gateWaitAcross(pool, run.ag.agencyId, await interpretationDeadlineOf(run), (c) => admitWith(rawStore(c), b));
+    assert.ok(r.workDone && refusedBy("KA081")(rejection(r.outcome)), "refused at COMMIT after the gate");
+    assert.equal(await requestCount(b.requestId), 0);
+    const e = await admit(env, run, 50_000n);
+    const leaseEnd = (await env.h.oracle.query("SELECT expires_at FROM kauro.leases WHERE resource_kind = 'MODEL_TASK' AND resource_id = $1", [e.taskId])).rows[0].expires_at as Date;
+    const r2 = await gateWaitAcross(pool, run.ag.agencyId, leaseEnd, (c) => rawJournal(c).markDispatching(e.requestId, 1, "provider-l17-gate", clock.now()));
+    assert.ok(r2.workDone && refusedBy("KA080")(rejection(r2.outcome)), "the lease judged at COMMIT after the gate");
+    assert.equal((await requestRow(env, e.requestId)).state, "RESERVED");
+  }
+  // recorded instants stay the transaction's: an admission that committed before an instant records its reservation at its own clock
+  {
+    const pool = await freshPool(env);
+    const run = await interpretingRun(env, "l17-instants", pool);
+    const deadline = await interpretationDeadlineOf(run);
+    const b = admissionOf(run, 50_000n);
+    const offset = offsetBefore(deadline, 60_000);
+    const startedAt = await withConnections(env, 1, ([c]) => unit(c!, run.ag.agencyId, async (x) => ((await admitWith(rawStore(x), b)), (await x.query("SELECT kauro.server_now() AS t")).rows[0].t as Date), at(offset)));
+    const row = (await env.h.oracle.query("SELECT reserved_at FROM kauro.request_journal WHERE request_id = $1", [b.requestId])).rows[0].reserved_at as Date;
+    assert.ok(row.getTime() <= startedAt.getTime() && row.getTime() < deadline.getTime(), "reserved_at is the transaction's instant");
+  }
+  // (4) the grant's expiry (an AUDIT grant capped by a pool that ends inside the interpretation window): the grant row held by a
+  // settlement that crashes; an upstream request held by a usage write that crashes [PORT-CONTRACT]; and the gate wait
+  {
+    const { run, outcome } = await acrossHolder(
+      "l17-grant",
+      async (run) => (await env.h.oracle.query("SELECT expires_at FROM kauro.cost_grants WHERE grant_id = $1", [run.grantId])).rows[0].expires_at as Date,
+      (run, a, points) => ({ point: "l17-set.before-commit", run: crashableFactory(env.h.audit, points, "l17-set").run(controlOf(run.ag.agencyId), (uow) => uow.audits.settleDispatch(settlementOf(a, "RELEASED", 0n))) }),
+      (c, run) => admitWith(rawStore(c), admissionOf(run, 50_000n)),
+      900,
+    );
+    assert.ok(refusedBy("KA083", "grant_expired_at_dispatch")(rejection(outcome)), "the grant's expiry judged after the grant row");
+    assert.deepEqual(await money(env, run.grantId), { reserved: 5, spent: 0, state: "AUTHORIZED" });
+    const u = await consumedCore(run, 50_000n, "5");
+    const instant = (await env.h.oracle.query("SELECT expires_at FROM kauro.cost_grants WHERE grant_id = $1", [run.grantId])).rows[0].expires_at as Date;
+    const offset = offsetBefore(instant, 1_500);
+    const points = new FaultPoints();
+    const usage = crashableFactory(env.h.audit, points, "l17-usage").run(controlOf(run.ag.agencyId), (uow) => uow.requestJournal.reconcileUsage(u.requestId, "5" as never, clock.now()));
+    const pause = points.pause("l17-usage.before-commit");
+    await pause.reachedBy(usage);
+    const d = portReservation(run.ag.agencyId, run.grantId, 5, [u.requestId]);
+    const out = await withConnections(env, 1, async ([c]) => {
+      const waiting = await mustWait(env.h.oracle, { waiter: c!, holder: await pausedProductPid() }, (cc) => unit(cc, run.ag.agencyId, (x) => rawJournal(x).reserve(d), at(offset)), "the dependent behind the upstream row");
+      await untilPast(offset, instant);
+      pause.crash();
+      await assert.rejects(usage, crashedAt("l17-usage.before-commit"));
+      return waiting.pending;
+    });
+    assert.ok(refusedBy("KA083", "grant_expired_at_dispatch")(rejection(out)), "judged after the upstream share");
+    assert.equal(await requestCount(d.requestId), 0);
+    const b = admissionOf(run, 50_000n);
+    const r = await gateWaitAcross(run.pool, run.ag.agencyId, instant, (c) => admitWith(rawStore(c), b));
+    assert.ok(r.workDone && refusedBy("KA083", "grant_expired_at_dispatch")(rejection(r.outcome)), "the grant judged at COMMIT after the gate");
+    assert.equal(await requestCount(b.requestId), 0);
+  }
+});
+
+test("S19b DENY pool clause alone (forged, rule 12): in the temporary cluster the migration owner disables the AUDIT grant's cap (cost_grants_workflow, cost_grants_immutable and its version bump cost_grants_version, ALTER TABLE ... DISABLE TRIGGER, re-enabled after) and gives the grant an expires_at after its pool's; after the pool expires and before the grant does, markDispatching is refused KA083 pool_expired_at_dispatch in the edge's statement and, with that BEFORE clause also disabled, at COMMIT, with nothing sent; [PORT-CONTRACT: PgRequestJournal.reserve] a reservation funded by the pool itself after the pool's expiry is refused pool_expired_at_dispatch", async () => {
+  const pool = await freshPool(env, 5_000n, 600);
+  const run = await interpretingRun(env, "s19b", pool);
+  const poolEnd = (await env.h.oracle.query("SELECT expires_at FROM kauro.cost_grants WHERE grant_id = $1", [pool])).rows[0].expires_at as Date;
+  const owner = await env.h.pg.connect("kauro_owner");
+  try {
+    await owner.query("BEGIN");
+    await owner.query("ALTER TABLE kauro.cost_grants DISABLE TRIGGER cost_grants_workflow");
+    await owner.query("ALTER TABLE kauro.cost_grants DISABLE TRIGGER cost_grants_immutable");
+    await owner.query("ALTER TABLE kauro.cost_grants DISABLE TRIGGER cost_grants_version");
+    await owner.query("ALTER TABLE kauro.cost_grants NO FORCE ROW LEVEL SECURITY");
+    await owner.query("UPDATE kauro.cost_grants SET expires_at = $2::timestamptz + interval '1 day' WHERE grant_id = $1", [run.grantId, poolEnd]);
+    await owner.query("SET CONSTRAINTS ALL IMMEDIATE");
+    await owner.query("ALTER TABLE kauro.cost_grants FORCE ROW LEVEL SECURITY");
+    await owner.query("ALTER TABLE kauro.cost_grants ENABLE TRIGGER cost_grants_version");
+    await owner.query("ALTER TABLE kauro.cost_grants ENABLE TRIGGER cost_grants_immutable");
+    await owner.query("ALTER TABLE kauro.cost_grants ENABLE TRIGGER cost_grants_workflow");
+    await owner.query("COMMIT");
+    assert.ok(((await env.h.oracle.query("SELECT expires_at FROM kauro.cost_grants WHERE grant_id = $1", [run.grantId])).rows[0].expires_at as Date).getTime() > poolEnd.getTime(), "the forged grant outlives its pool");
+    // admitted before the pool's end (the lease claimed at that clock), sent after it
+    const before = (poolEnd.getTime() - 30_000 - Date.now()) / 1000;
+    const after = (poolEnd.getTime() + 1_000 - Date.now()) / 1000;
+    const a = admissionOf(run, 50_000n);
+    await withConnections(env, 1, async ([c]) => {
+      assert.equal((await unit(c!, run.ag.agencyId, (x) => admitWith(rawStore(x), a), at(before))).kind, "RESERVED");
+      // in the edge's statement
+      await assert.rejects(unit(c!, run.ag.agencyId, (x) => rawJournal(x).markDispatching(a.requestId, 1, "provider-s19b", clock.now()), at(after)), refusedBy("KA083", "pool_expired_at_dispatch"));
+      assert.equal((await requestRow(env, a.requestId)).state, "RESERVED");
+      // with the edge's pool clause disabled (test-only body), at COMMIT
+      const shipped = (await env.h.oracle.query("SELECT pg_get_functiondef('kauro.request_journal_model_task_send()'::regprocedure) AS def")).rows[0].def as string;
+      const clause = /\n\s*IF g\.pool_expires_at IS NULL OR g\.pool_expires_at <= judged THEN\n[^\n]*\n\s*END IF;/;
+      assert.match(shipped, clause);
+      try {
+        await owner.query(shipped.replace(clause, ""));
+        let statementPassed = false;
+        await assert.rejects(
+          unit(
+            c!,
+            run.ag.agencyId,
+            async (x) => {
+              const r = await rawJournal(x).markDispatching(a.requestId, 1, "provider-s19b", clock.now());
+              statementPassed = r?.state === "DISPATCHING";
+              return r;
+            },
+            at(after),
+          ),
+          refusedBy("KA083", "pool_expired_at_dispatch"),
+        );
+        assert.ok(statementPassed, "the statement passed: the refusal is the COMMIT's");
+      } finally {
+        await owner.query(shipped);
+      }
+      assert.equal((await requestRow(env, a.requestId)).state, "RESERVED", "nothing sent");
+      // [PORT-CONTRACT] a reservation funded by the pool itself after the pool's expiry
+      const d = portReservation(run.ag.agencyId, pool, 10, []);
+      await assert.rejects(unit(c!, run.ag.agencyId, (x) => rawJournal(x).reserve(d), at(after)), refusedBy("KA083", "pool_expired_at_dispatch"));
+      assert.equal(await requestCount(d.requestId), 0);
+    });
   } finally {
     await owner.end();
   }

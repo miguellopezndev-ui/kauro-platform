@@ -211,8 +211,8 @@ const EDGE_EVIDENCE: Readonly<Partial<Record<CapabilityPublicationState, string>
   AVAILABLE: "operating-maturity",
 });
 
-export async function start(): Promise<Harness> {
-  const pg = await startTemporaryPostgres();
+export async function start(options: { readonly migrationsDir?: string } = {}): Promise<Harness> {
+  const pg = await startTemporaryPostgres(options.migrationsDir === undefined ? {} : { migrationsDir: options.migrationsDir });
   const base = { environment: mintTestDatabaseEnvironment("LOCAL"), host: "127.0.0.1", port: pg.port, database: ROLES.database, max: 4 } as const;
   const appPool = createPool({ ...base, user: ROLES.appLogin, applicationName: "kauro-test-api" });
   const controlPool = createPool({ ...base, user: ROLES.controlLogin, applicationName: "kauro-test-control" });
