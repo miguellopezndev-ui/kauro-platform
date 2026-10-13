@@ -45,7 +45,7 @@ import {
 import { execute, instant, int, optionalInstant, optionalText, type Queryable } from "../sql.js";
 import { cents, defined, optionalCents, publishVersion, staleOf, type CommerceWriteContext } from "./commerce-shared.js";
 
-/** The states of an order whose checkout is still open (payment_orders_one_open_per_project). */
+/** The states of an order whose checkout is still open (payment_orders_one_open_per_project), unless its expired bank order released it (0057). */
 export const OPEN_ORDER_STATES: ReadonlyArray<PaymentOrderState> = ["INTENT_CREATED", "CREATING", "CREATED", "APPROVED", "CAPTURING", "CAPTURE_UNCERTAIN"];
 /** The states of a live attempt (payment_attempts_one_live_order, payment_attempts_one_live_refund). */
 export const LIVE_ATTEMPT_STATES: ReadonlyArray<PaymentAttemptState> = ["PREPARED", "DISPATCHING", "PROVIDER_PENDING", "UNCERTAIN"];
@@ -174,7 +174,7 @@ export class PgPaymentOrderRepository implements PaymentOrderRepository {
   }
 
   async findOpenForProject(projectId: ProjectId): Promise<PaymentOrderRecord | null> {
-    const r = await execute<OrderRow>(this.ctx.db, `SELECT ${ORDER_COLUMNS} FROM kauro.payment_orders WHERE project_id = $1 AND state = ANY ($2::text[])`, [projectId, [...OPEN_ORDER_STATES]]);
+    const r = await execute<OrderRow>(this.ctx.db, `SELECT ${ORDER_COLUMNS} FROM kauro.payment_orders WHERE project_id = $1 AND state = ANY ($2::text[]) AND bank_slot_released_at IS NULL`, [projectId, [...OPEN_ORDER_STATES]]);
     return r.rows[0] ? orderRecord(r.rows[0]) : null;
   }
 

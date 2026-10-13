@@ -16,7 +16,10 @@ ALTER TABLE kauro.bank_credits
   ADD COLUMN payer_digest  text CHECK (payer_digest IS NULL OR kauro.is_sha256_hex(payer_digest)),
   ADD COLUMN payee_digest  text CHECK (payee_digest IS NULL OR kauro.is_sha256_hex(payee_digest)),
   ADD COLUMN artifact_ref  text CHECK (artifact_ref IS NULL OR kauro.is_provider_ref(artifact_ref)),
-  ADD COLUMN created_by    uuid;
+  ADD COLUMN created_by    uuid,
+  -- the instant the credit became money the platform recognizes (OBSERVED), stamped by the database: P1's provider-time predicate
+  -- (DV1-06: bookedAt <= confirmedAt + the route version's tolerance)
+  ADD COLUMN confirmed_at  timestamptz;
 
 ALTER TABLE kauro.statement_imports
   ADD COLUMN agency_id uuid CHECK (agency_id IS NULL),
@@ -28,6 +31,25 @@ ALTER TABLE kauro.bank_credits ADD CONSTRAINT bank_credits_reference_check CHECK
 
 -- the order's accepted billing identity (sha256), frozen at issuance beside the reference: M1's payer key
 ALTER TABLE kauro.bank_transfer_instructions ADD COLUMN accepted_payer_digest text CHECK (accepted_payer_digest IS NULL OR kauro.is_sha256_hex(accepted_payer_digest));
+-- why an EXPIRED bank order expired: its transfer deadline (E1; a later on-time credit may still be honored, DV1-06) or its explicit
+-- retirement by the agency's billing member (CMD214; a later credit is return-only). Set once, with the edge to EXPIRED.
+ALTER TABLE kauro.bank_transfer_instructions ADD COLUMN expiry_cause text CHECK (expiry_cause IS NULL OR expiry_cause IN ('DEADLINE', 'RETIRED'));
+CREATE OR REPLACE FUNCTION kauro.bank_transfer_instructions_expiry_cause() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NEW.expiry_cause IS DISTINCT FROM OLD.expiry_cause AND (OLD.expiry_cause IS NOT NULL OR NEW.order_state <> 'EXPIRED' OR OLD.order_state = 'EXPIRED') THEN
+    RAISE EXCEPTION 'IMMUTABLE_COLUMN: bank_transfer_instructions.expiry_cause is set once, with the edge to EXPIRED' USING ERRCODE = 'KA004';
+  END IF;
+  IF NEW.order_state = 'EXPIRED' AND OLD.order_state <> 'EXPIRED' AND NEW.expiry_cause IS NULL THEN
+    RAISE EXCEPTION 'CONTEXT: an expiry names its cause' USING ERRCODE = 'KA006';
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER bank_transfer_instructions_expiry_cause BEFORE UPDATE ON kauro.bank_transfer_instructions
+  FOR EACH ROW EXECUTE FUNCTION kauro.bank_transfer_instructions_expiry_cause();
+GRANT UPDATE (expiry_cause) ON kauro.bank_transfer_instructions TO kauro_payment;
 DROP TRIGGER bank_transfer_instructions_immutable ON kauro.bank_transfer_instructions;
 CREATE TRIGGER bank_transfer_instructions_immutable BEFORE UPDATE ON kauro.bank_transfer_instructions
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('order_id,agency_id,route_id,route_version,environment,account_ref,reference,amount_cents,currency,issued_at,created_at,accepted_payer_digest');
@@ -43,10 +65,25 @@ BEGIN
   IF NEW.state <> OLD.state AND NOT EXISTS (SELECT 1 FROM kauro.bank_machine_edges e WHERE e.machine = 'BankCredit' AND e.from_state = OLD.state AND e.to_state = NEW.state) THEN
     RAISE EXCEPTION 'UNLISTED_TRANSITION: BankCredit % -> % is not a listed transition', OLD.state, NEW.state USING ERRCODE = 'KA005';
   END IF;
+  IF OLD.state = 'DRAFT_MANUAL' AND NEW.state = 'OBSERVED' THEN
+    NEW.confirmed_at := kauro.effect_now();
+  ELSIF NEW.confirmed_at IS DISTINCT FROM OLD.confirmed_at THEN
+    RAISE EXCEPTION 'IMMUTABLE_COLUMN: bank_credits.confirmed_at is stamped once, at the confirmation' USING ERRCODE = 'KA004';
+  END IF;
   RETURN NEW;
 END
 $$;
 CREATE TRIGGER bank_credits_guard BEFORE UPDATE ON kauro.bank_credits FOR EACH ROW EXECUTE FUNCTION kauro.bank_credits_guard();
+-- a credit born OBSERVED (a statement line) is confirmed by its import; a draft is not yet
+CREATE OR REPLACE FUNCTION kauro.bank_credits_confirmed_at() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  NEW.confirmed_at := CASE WHEN NEW.state = 'DRAFT_MANUAL' THEN NULL ELSE kauro.effect_now() END;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER bank_credits_confirmed_at BEFORE INSERT ON kauro.bank_credits FOR EACH ROW EXECUTE FUNCTION kauro.bank_credits_confirmed_at();
 CREATE TRIGGER bank_credits_immutable BEFORE UPDATE ON kauro.bank_credits
   FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('bank_credit_id,environment,account_ref,bank_transaction_id,rail,currency,gross_cents,evidence_hash,created_at,created_by,agency_id');
 
@@ -79,6 +116,10 @@ CREATE POLICY domain_events_payment_bank_order ON kauro.domain_events FOR ALL TO
 CREATE POLICY bank_routes_payment_read ON kauro.bank_routes FOR SELECT TO kauro_payment USING (true);
 CREATE POLICY bank_route_versions_payment_read ON kauro.bank_route_versions FOR SELECT TO kauro_payment USING (true);
 GRANT SELECT ON kauro.bank_routes, kauro.bank_route_versions TO kauro_payment;
+-- P1's share lock of the route (a disable in flight is ordered before or after the apply; the tenant lock's pattern of 0046): the
+-- row lock only, never a write (WITH CHECK (false))
+CREATE POLICY bank_routes_payment_lock ON kauro.bank_routes FOR UPDATE TO kauro_payment USING (true) WITH CHECK (false);
+GRANT UPDATE (version) ON kauro.bank_routes TO kauro_payment;
 -- the lookup by (environment, account, reference) happens before any agency is adopted: the reference names the order, never a guess
 CREATE POLICY bank_transfer_instructions_payment_lookup ON kauro.bank_transfer_instructions FOR SELECT TO kauro_payment USING (true);
 
@@ -120,3 +161,49 @@ END
 $$;
 DROP TRIGGER assurance_proofs_append_only ON kauro.assurance_proofs;
 CREATE TRIGGER assurance_proofs_append_only BEFORE UPDATE OR DELETE ON kauro.assurance_proofs FOR EACH ROW EXECUTE FUNCTION kauro.assurance_proofs_guard();
+
+-- --- the project's checkout slot of an expired bank order (D-ACH-05, D-ACH-10) --------------------------------------------------------
+-- The vendored PaymentOrder machine is not extended: a bank order's payment_orders row stays INTENT_CREATED and its bank state is the
+-- instruction's order_state. An EXPIRED bank order stops instructions and payment claims, so it releases the project's one open checkout
+-- (payment_orders_one_open_per_project): bank_slot_released_at is set once, in the unit that expires the bank order (E1, P1 past the
+-- deadline, CMD214), and only while that order's bank state is EXPIRED. It is not a version of the order (no event).
+ALTER TABLE kauro.payment_orders ADD COLUMN bank_slot_released_at timestamptz;
+CREATE OR REPLACE FUNCTION kauro.payment_orders_bank_slot_guard() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NEW.bank_slot_released_at IS DISTINCT FROM OLD.bank_slot_released_at THEN
+    IF OLD.bank_slot_released_at IS NOT NULL OR NOT EXISTS (SELECT 1 FROM kauro.bank_transfer_instructions b WHERE b.order_id = NEW.order_id AND b.order_state = 'EXPIRED') THEN
+      RAISE EXCEPTION 'IMMUTABLE_COLUMN: payment_orders.bank_slot_released_at is set once, for an EXPIRED bank order' USING ERRCODE = 'KA004';
+    END IF;
+  END IF;
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER payment_orders_bank_slot_guard BEFORE UPDATE OF bank_slot_released_at ON kauro.payment_orders
+  FOR EACH ROW EXECUTE FUNCTION kauro.payment_orders_bank_slot_guard();
+DROP TRIGGER payment_orders_version ON kauro.payment_orders;
+CREATE TRIGGER payment_orders_version BEFORE UPDATE ON kauro.payment_orders FOR EACH ROW EXECUTE FUNCTION kauro.enforce_version_bump('allocated_cents,bank_slot_released_at');
+DROP INDEX kauro.payment_orders_one_open_per_project;
+CREATE UNIQUE INDEX payment_orders_one_open_per_project ON kauro.payment_orders (agency_id, project_id)
+  WHERE state IN ('INTENT_CREATED', 'CREATING', 'CREATED', 'APPROVED', 'CAPTURING', 'CAPTURE_UNCERTAIN') AND bank_slot_released_at IS NULL;
+GRANT UPDATE (bank_slot_released_at) ON kauro.payment_orders TO kauro_payment;
+
+-- --- CMD214: the agency's billing member retires its open bank checkout (§7.12 E1, retirement half) ----------------------------------
+-- The retirement is a person-authorized command of the payment boundary: its tenant unit runs on the payment service's pool (the
+-- instruction's state, the order's lock and its slot are the payment service's columns, never kauro_app's). The B06 authorizer reads
+-- the member's own live membership in the bound agency; its journal entry and security facts are the member's, in that agency.
+CREATE POLICY memberships_payment_member_read ON kauro.memberships FOR SELECT TO kauro_payment
+  USING (agency_id = kauro.current_agency_id() AND user_id = kauro.current_user_id());
+GRANT SELECT ON kauro.memberships TO kauro_payment;
+CREATE POLICY command_journal_payment_member ON kauro.command_journal FOR ALL TO kauro_payment
+  USING (agency_id IS NOT NULL AND agency_id = kauro.current_agency_id() AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text)
+  WITH CHECK (agency_id IS NOT NULL AND agency_id = kauro.current_agency_id() AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text);
+CREATE POLICY security_events_payment_member ON kauro.security_events FOR INSERT TO kauro_payment
+  WITH CHECK (
+    agency_id IS NOT NULL AND agency_id = kauro.current_agency_id() AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text
+    AND EXISTS (
+      SELECT 1 FROM kauro.memberships m
+      WHERE m.agency_id = security_events.agency_id AND m.user_id = kauro.current_user_id() AND m.state IN ('INVITED', 'ACTIVE', 'SUSPENDED')
+    )
+  );

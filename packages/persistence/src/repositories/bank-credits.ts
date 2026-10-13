@@ -239,14 +239,25 @@ export class PgBankCredits {
     return r.rows[0] ? instructionOf(r.rows[0]) : null;
   }
 
-  /** The instructions whose deadline passed and whose bank order state is still open (E1's candidates), oldest first. */
-  async expiredCandidates(now: UtcInstant, limit: number): Promise<ReadonlyArray<BankTransferInstructionRecord>> {
+  /**
+   * The instructions whose deadline passed and whose bank order state is still open (E1's candidates), oldest first; after `after` (the
+   * last candidate a pass took, by deadline then order id) when given, so a pass never takes an order twice.
+   */
+  async expiredCandidates(now: UtcInstant, limit: number, after: { readonly transferExpiresAt: string; readonly orderId: string } | null = null): Promise<ReadonlyArray<BankTransferInstructionRecord>> {
     const r = await execute<InstructionRow>(
       this.db,
-      `SELECT ${INSTRUCTION_COLUMNS} FROM kauro.bank_transfer_instructions WHERE order_state IN ('AWAITING_TRANSFER', 'PARTIALLY_RECEIVED') AND transfer_expires_at <= $1 ORDER BY transfer_expires_at, order_id LIMIT $2`,
-      [now, limit],
+      `SELECT ${INSTRUCTION_COLUMNS} FROM kauro.bank_transfer_instructions WHERE order_state IN ('AWAITING_TRANSFER', 'PARTIALLY_RECEIVED') AND transfer_expires_at <= $1${after === null ? "" : " AND (transfer_expires_at, order_id) > ($3::timestamptz, $4::uuid)"} ORDER BY transfer_expires_at, order_id LIMIT $2`,
+      after === null ? [now, limit] : [now, limit, after.transferExpiresAt, after.orderId],
     );
     return r.rows.map(instructionOf);
+  }
+
+  /**
+   * Releases the project's open checkout of an order whose bank state is EXPIRED (payment_orders.bank_slot_released_at, migration 0057):
+   * set once, in the unit that expired it, under the order's lock; a second call changes nothing.
+   */
+  async releaseBankSlot(orderId: string): Promise<void> {
+    await execute(this.db, "UPDATE kauro.payment_orders SET bank_slot_released_at = kauro.effect_now() WHERE order_id = $1 AND bank_slot_released_at IS NULL", [orderId]);
   }
 
   /** The bank order state's next version (one event per version is the caller's); STALE-free: the caller holds the order's lock. */
@@ -259,6 +270,37 @@ export class PgBankCredits {
     const row = r.rows[0];
     if (!row) throw new DomainFailure("STALE_VERSION", "the bank order changed concurrently", {}, true);
     return instructionOf(row);
+  }
+
+  /** Sets the bank order's state to EXPIRED with its cause (one version; the caller holds the instruction's row lock and publishes the event). */
+  async expireOrder(orderId: string, expectedVersion: number, cause: "DEADLINE" | "RETIRED"): Promise<BankTransferInstructionRecord> {
+    const r = await execute<InstructionRow>(
+      this.db,
+      `UPDATE kauro.bank_transfer_instructions SET order_state = 'EXPIRED', expiry_cause = $3, version = version + 1 WHERE order_id = $1 AND version = $2 RETURNING ${INSTRUCTION_COLUMNS}`,
+      [orderId, expectedVersion, cause],
+    );
+    const row = r.rows[0];
+    if (!row) throw new DomainFailure("STALE_VERSION", "the bank order changed concurrently", {}, true);
+    return instructionOf(row);
+  }
+
+  /** Why an EXPIRED bank order expired (its deadline or its retirement), null while it has not. */
+  async expiryCauseOf(orderId: string): Promise<"DEADLINE" | "RETIRED" | null> {
+    const r = await execute<{ c: "DEADLINE" | "RETIRED" | null }>(this.db, "SELECT expiry_cause AS c FROM kauro.bank_transfer_instructions WHERE order_id = $1", [orderId]);
+    return r.rows[0]?.c ?? null;
+  }
+
+  /** The instant the database stamped when the credit was confirmed (OBSERVED), null for a draft. */
+  async confirmedAtOf(creditId: string): Promise<UtcInstant | null> {
+    const r = await execute<{ t: Date | null }>(this.db, "SELECT confirmed_at AS t FROM kauro.bank_credits WHERE bank_credit_id = $1", [creditId]);
+    const t = r.rows[0]?.t ?? null;
+    return t === null ? null : instant(t);
+  }
+
+  /** Whether another quote of the project holds a live (not REVOKED) entitlement: another purchase of the same project. */
+  async anotherLivePurchase(agencyId: string, projectId: string, quoteId: string): Promise<boolean> {
+    const r = await execute(this.db, "SELECT 1 FROM kauro.commercial_authorizations WHERE agency_id = $1 AND project_id = $2 AND quote_id <> $3 AND state <> 'REVOKED' LIMIT 1", [agencyId, projectId, quoteId]);
+    return r.rows.length > 0;
   }
 
   /** The environments an account ref is a route of (one in practice; the caller refuses an ambiguous ref). */
