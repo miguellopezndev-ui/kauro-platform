@@ -156,5 +156,8 @@ export {
   transferWindowOf,
 } from "./bank-route.js";
 
+export type { TreasuryRefundEventType } from "./treasury-refund.js";
+export { TREASURY_REFUND_AGGREGATE_KINDS, TREASURY_REFUND_EVENT_TYPES, TREASURY_REFUND_EVENT_PAYLOAD_ALLOWLIST, TREASURY_REFUND_EVENT_SUBSCRIPTIONS } from "./treasury-refund.js";
+
 export type { DestinationInput, NormalizedDestination, DestinationNormalization, FingerprintParameters } from "./destination.js";
 export { normalizeDestination, canonicalDestinationMessage, DESTINATION_FINGERPRINT_DOMAIN, HOLDER_NAME_MAX_CODE_POINTS } from "./destination.js";

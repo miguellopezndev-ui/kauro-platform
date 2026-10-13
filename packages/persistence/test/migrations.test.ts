@@ -127,7 +127,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0055_bank_kit_fixtures.sql",
     // package B10 lane OFFSET: offsets as claims that yield, the one lock order, noncash settlement (docs/design/B10-OFFSET.md)
     "0056_offset_claims_yield.sql",
-    // "0057_seller_credit.sql", (pending)
+    // Payments V1 L-REFUND: the corporate owner's step-up approval of a manual-rail refund applied by the payment service (bank_owner_authority, owner acts, treasury refund approval; provisional number)
+    "0057_refund_owner_authority.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
@@ -188,9 +189,14 @@ test("runtime roles are neither owners nor superusers and have no BYPASSRLS; the
     }
     // SECURITY DEFINER requires specific justification (08): the one function is the registration of a bank route's payment route
     // (migration 0046, coordinator decision #2 of lane L-ROUTE: payment_routes stays closed to every runtime role; the function checks the
-    // caller's ACTIVE KAURO_OWNER grant and writes CONFIGURED rows only), with a pinned search_path
-    const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef");
-    assert.deepEqual(definers.rows, [{ proname: "register_bank_payment_route", proconfig: ["search_path=pg_catalog, pg_temp"] }]);
+    // caller's ACTIVE KAURO_OWNER grant and writes CONFIGURED rows only), and the owner authority of a manual-rail refund (migration 0057,
+    // lane L-REFUND: the payment service never reads identities, grants or proofs; the function judges them and records the act), each with a
+    // pinned search_path
+    const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef ORDER BY p.proname");
+    assert.deepEqual(definers.rows, [
+      { proname: "bank_owner_authority", proconfig: ["search_path=pg_catalog, pg_temp"] },
+      { proname: "register_bank_payment_route", proconfig: ["search_path=pg_catalog, pg_temp"] },
+    ]);
     // request handlers never hold DELETE on any table
     const deletes = await su.query<{ table_name: string }>(
       "SELECT table_name FROM information_schema.role_table_grants WHERE grantee = 'kauro_app' AND privilege_type = 'DELETE' AND table_schema = 'kauro'",
@@ -335,7 +341,7 @@ test("R20: the initial-state seed equals the registry machines (and the platform
     const births = machineOf(["enforce_initial_state", "enforce_initial_state_of", "enforce_observed_birth"]);
     for (const d of defs.rows) if (/EXECUTE FUNCTION kauro\.enforce_membership_initial_state\(\)/.test(d.def)) births.set(d.relname, "Membership");
     assert.deepEqual([...births.entries()].sort(), [...edges.entries()].sort());
-    assert.equal(edges.size, 40, "every seeded machine guards its table's edges (B06 seven, B07 four, B09 twelve, B08 five, B10 eleven, B11 one)");
+    assert.equal(edges.size, 41, "every seeded machine guards its table's edges (B06 seven, B07 four, B09 twelve, B08 five, B10 eleven, B11 one; Payments V1 the treasury refund of an unassigned credit, machine Refund)");
     for (const d of defs.rows) {
       if (/enforce_initial_state|enforce_membership_initial_state|enforce_observed_birth/.test(d.def)) assert.match(d.def, /BEFORE INSERT ON/, d.def);
     }
