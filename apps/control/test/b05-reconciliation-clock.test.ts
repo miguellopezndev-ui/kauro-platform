@@ -144,10 +144,14 @@ test("L19b (RCK) RACE (reconciliation clock, EXHAUSTED grant, one test-clock off
     // R: the reconciler locks the grant, reads its instant, then waits on q's row (grantUsage FOR UPDATE OF r)
     const pass1 = sweep();
     await waitForLockWait(w.h.oracle, CONTROL_APP, GRANT_USAGE);
+    // the shifted database clock passes the expiry while R waits: wait the measured remainder (at most the 12 s of K), then check
+    const remainder = (await w.h.oracle.query<{ ms: number }>("SELECT extract(epoch FROM ($2::timestamptz + interval '250 milliseconds') - (clock_timestamp() + make_interval(secs => $1))) * 1000 AS ms", [K, expiresAt])).rows[0]!.ms;
+    assert.ok(remainder <= 13_250, `the expiry is at most K's 12 s ahead (${remainder} ms)`);
+    await new Promise((res) => setTimeout(res, Math.max(0, Math.ceil(remainder))));
     for (let i = 0; ; i++) {
       const past = (await w.h.oracle.query("SELECT clock_timestamp() + make_interval(secs => $1) >= $2::timestamptz + interval '250 milliseconds' AS past", [K, expiresAt])).rows[0].past;
       if (past === true) break;
-      assert.ok(i < 400, "the shifted clock reaches the expiry");
+      assert.ok(i < 40, "the shifted clock reaches the expiry");
       await new Promise((res) => setTimeout(res, 25));
     }
     pause.crash();
