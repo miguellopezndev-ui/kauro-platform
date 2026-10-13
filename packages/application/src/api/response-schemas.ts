@@ -1013,6 +1013,22 @@ export const RETIRED_CHECKOUT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind"
   replayed: { type: "boolean" },
   data: closedObject(["order"], { order: closedObject(["orderId", "bankState", "expiryCause", "version"], { orderId: BANK_UUID, bankState: { type: "string", enum: ["EXPIRED"] }, expiryCause: { type: "string", enum: ["RETIRED"] }, version: { type: "integer", minimum: 1 } }) }),
 });
+const STATEMENT_COUNT = { type: "integer", minimum: 0 } as const;
+export const STATEMENT_IMPORT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1 },
+  replayed: { type: "boolean" },
+  data: closedObject(["import"], {
+    import: closedObject(["importId", "coverage", "lines", "newLines", "orphans", "balanced"], {
+      importId: BANK_UUID,
+      coverage: { type: "array", minItems: 2, maxItems: 2, items: closedObject(["stream", "from", "to"], { stream: { type: "string", enum: ["INBOUND", "OUTBOUND"] }, from: BANK_UTC, to: BANK_UTC }) },
+      lines: STATEMENT_COUNT,
+      newLines: STATEMENT_COUNT,
+      orphans: STATEMENT_COUNT,
+      balanced: { type: "boolean" },
+    }),
+  }),
+});
 export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
   Object.freeze({
     operationId: "retireBankCheckout",
@@ -1044,6 +1060,15 @@ export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = 
       reasonCode: { type: "string", minLength: 1, maxLength: 200 },
       authorizationRef: BANK_UUID,
     })),
+  Object.freeze({
+    operationId: "importBankStatement",
+    method: "POST" as const,
+    path: "/api/v1/operations/bank-accounts/{accountRef}/statement-imports",
+    summary: "Import a statement the owner stored: its coverage per stream, its lines once by bank line id, debit links and orphan exceptions",
+    authority: "ACH-ROUTE r12 §7.23 (SI1, SI2), §7.28; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["artifactRef", "evidenceHash", "authorizationRef"], { artifactRef: BANK_REF, evidenceHash: BANK_HASH, authorizationRef: BANK_UUID }) }),
+    responses: Object.freeze({ "201": Object.freeze({ description: "The import (COMPLETED envelope; an identical replay answers the journaled reply). BALANCED only with zero orphan debits.", contentType: JSON_CONTENT_TYPE, schema: STATEMENT_IMPORT_RESPONSE_SCHEMA }) }),
+  }),
   Object.freeze({
     operationId: "getBankCredit",
     method: "GET" as const,

@@ -10,20 +10,24 @@
  *             hash-verified, classified (fail closed) and compared field by field with the draft; the body then re-takes the INBOUND stream
  *             lock and the credit identity lock Lc, re-judges the owner and the step-up at the effect instant and confirms the draft as the
  *             verified artifact states it (it never rereads: the bytes verified are the bytes confirmed) -> OBSERVED.
+ *   statement (CMD213) SI1+SI2: the owner's statement artifact is read, hash-verified and classified outside every lock; the body takes L1
+ *             (OUTBOUND) then INBOUND, re-judges the owner and step-up, judges the coverage at the effect instant and records its coverage
+ *             per stream, its lines by the bank's line identity (an identical line adds nothing, a changed one is PROVIDER_INCONSISTENCY),
+ *             links debits to RECORDED attempts by execution id and opens RECORD_REQUIRED / UNDECLARED_OUTBOUND for the orphans.
  *   attribute (CMD212) M2: the owner attributes a MATCH_REVIEW credit to an order with billing evidence; in V1 the payer must be the order's
  *             accepted billing identity and the payee the route's (a foreign payer is return-only) -> MATCHED.
  *
  * Every version check answers STALE_VERSION (no reason); the command ids are the lane's operational ids of the command journal.
  */
 import type { CommandId, UtcInstant } from "@kauro/contracts";
-import type { AgencyId, BankCreditRecord, CausationId, CommerceUnitOfWork, CorrelationId, OperatorContext, PaymentOrderId, UserId } from "@kauro/domain";
+import type { AgencyId, BankCreditRecord, CausationId, CommerceUnitOfWork, CorrelationId, OperatorContext, PaymentOrderId, StatementPage, UserId } from "@kauro/domain";
 import { BANK_CREDIT_RAILS, DomainFailure, NotFoundFailure, PROVIDER_CALL_TIMEOUT_MS, StaleVersionFailure, actorOf } from "@kauro/domain";
 import { judgedUnderHold, type RequestAuthority } from "../../api/authority.js";
 import type { AuthenticatedSubject, CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { problemOf, type Problem } from "../../api/problems.js";
 import type { StoredBankEvidence } from "../ports.js";
 import { CommerceAccessDenied, operatorContextOf, recordCommerceDenial, runCommerceCommand, tenantContextOf, type CommerceRequestRuntime, type RunnableCommand } from "../request/runtime.js";
-import { BANK_HOLD_GATE_READ, type BankCreditRepository, type BankInboundCollaborators } from "./inbound-ports.js";
+import { BANK_HOLD_GATE_READ, BANK_HOLD_STATEMENT_LOCKED, type BankCreditRepository, type BankInboundCollaborators } from "./inbound-ports.js";
 import { STEP_UP_ALLOW, assuredAt, evidenceUnavailable, integrationClassOf, judgedAtCommit, type BankRouteRequest } from "./route-config.js";
 
 // --- requests and views ---------------------------------------------------------------------------------------------------------------
@@ -50,6 +54,24 @@ export interface AttributeBankCreditBody {
   readonly authorizationRef: string;
 }
 
+/** CMD213's body: the owner's stored statement artifact. */
+export interface ImportStatementBody {
+  readonly artifactRef: string;
+  readonly evidenceHash: string;
+  readonly authorizationRef: string;
+}
+/** One import: its coverage per stream, its lines (all, and first seen), its orphan debits; BALANCED only with zero orphans. */
+export interface StatementImportView {
+  readonly importId: string;
+  readonly coverage: ReadonlyArray<{ readonly stream: "INBOUND" | "OUTBOUND"; readonly from: string; readonly to: string }>;
+  readonly lines: number;
+  readonly newLines: number;
+  readonly orphans: number;
+  readonly balanced: boolean;
+}
+export interface StatementImportCommandView {
+  readonly import: StatementImportView;
+}
 /** CMD214's body: why the checkout is retired. */
 export interface RetireBankCheckoutBody {
   readonly reasonCode: string;
@@ -205,6 +227,8 @@ export interface BankInboundHandlers {
   attribute(request: BankRouteRequest<AttributeBankCreditBody>): Promise<CommandResult<BankCreditCommandView>>;
   getCredit(request: InboundReadRequest & { readonly creditId: string }): Promise<InboundReadAnswer<BankCreditCommandView>>;
   getMatchKeys(request: InboundReadRequest & { readonly orderId: string }): Promise<InboundReadAnswer<BankMatchKeysView>>;
+  /** CMD213 SI1+SI2: the owner imports a statement's coverage, its lines and their exceptions. */
+  importStatement(request: BankRouteRequest<ImportStatementBody>): Promise<CommandResult<StatementImportCommandView>>;
   /** CMD214: the agency's billing member retires its open bank checkout (E1's retirement half). */
   retire(request: BankRouteRequest<RetireBankCheckoutBody> & { readonly agencyId: AgencyId }): Promise<CommandResult<RetiredCheckoutView>>;
 }
@@ -389,6 +413,135 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
       });
     },
 
+    async importStatement(request) {
+      const id = BANK_INBOUND_COMMAND_IDS.statement;
+      const envelope = inboundEnvelopeOf(id, request);
+      const context = paymentOperatorContextOf(envelope);
+      const accountRef = request.path["accountRef"]!;
+      let environment: "SANDBOX" | "LIVE" | null = null;
+      let read: { readonly page: StatementPage; readonly normalizerVersion: string } | null = null;
+      let deferred: DomainFailure | null = null;
+      return runCommerceCommand<ImportStatementBody, StatementImportCommandView>(runtime, {
+        command: inboundCommandOf(id),
+        envelope,
+        context,
+        replayVersion: () => 1,
+        async access(uow) {
+          const repo = co.credits(uow);
+          const environments = await repo.environmentsOfAccount(accountRef);
+          environment = environments.includes(envelope.environment as "SANDBOX" | "LIVE") ? (envelope.environment as "SANDBOX" | "LIVE") : (environments[0] ?? null);
+          // the decision first, in a unit-local scope (its share locks released): SI2 re-judges the owner under L1
+          await repo.released(() => authorizeOwner(uow, envelope, id));
+          if (environment === null) return;
+          // SI1: the artifact is read, hash-verified and classified outside every lock (no stream lock is held yet); never cached
+          try {
+            read = await readStatement(co, accountRef, environment, envelope.body);
+          } catch (e) {
+            if (!(e instanceof DomainFailure)) throw e;
+            deferred = e;
+          }
+        },
+        async body(uow, causationId) {
+          const body = envelope.body;
+          const repo = co.credits(uow);
+          if (environment === null) throw new NotFoundFailure("bank account");
+          // §7.28: L1 (the OUTBOUND stream) first, then the INBOUND stream; the credit and execution identity locks per line below
+          await repo.lockStream(environment, accountRef, "OUTBOUND");
+          await repo.lockStream(environment, accountRef, "INBOUND");
+          await co.hold(BANK_HOLD_STATEMENT_LOCKED);
+          // the owner is judged again under the lock (a withdrawal while the command read or waited is seen)
+          await authorizeOwner(uow, envelope, id);
+          if (deferred !== null) throw deferred;
+          const verified = read;
+          if (verified === null) throw new DomainFailure("INTEGRITY_FAILURE", "the statement was not verified");
+          const page = verified.page;
+          const at = await assuredAt(co, uow, envelope.userId, body.authorizationRef, null);
+          judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, null, envelope.authority, runtime.clock);
+          // freshness under the lock, at the effect instant: a coverage never ends after it, nor starts before the account's route
+          if (Date.parse(page.coverageEnd) > Date.parse(at)) throw new DomainFailure("PRECONDITION_FAILED", "the statement's coverage ends after the effect instant", { reason: "COVERAGE_END_IN_FUTURE" });
+          const floor = await repo.coverageFloorOf(environment, accountRef);
+          if (floor === null || Date.parse(page.coverageStart) < Date.parse(floor)) throw new DomainFailure("PRECONDITION_FAILED", "the statement's coverage starts before the account's route version", { reason: "COVERAGE_OUTSIDE_ROUTE_VERSION" });
+          if ((await repo.importOfArtifact(environment, accountRef, page.evidenceHash)) !== null) throw new DomainFailure("PRECONDITION_FAILED", "the artifact is already imported", { reason: "STATEMENT_ALREADY_IMPORTED" });
+          const importId = uow.ids.next();
+          await repo.insertImport({ importId, environment, accountRef, artifactRef: body.artifactRef, evidenceHash: page.evidenceHash, normalizerVersion: verified.normalizerVersion, idempotencyKey: envelope.idempotencyKey, importedBy: envelope.userId });
+          for (const stream of ["INBOUND", "OUTBOUND"] as const) await repo.insertCoverage(importId, stream, page.coverageStart, page.coverageEnd);
+          const inconsistent = (): DomainFailure => new DomainFailure("PRECONDITION_FAILED", "a line is already recorded with other money fields", { reason: "PROVIDER_INCONSISTENCY" });
+          let newLines = 0;
+          let orphans = 0;
+          for (const c of page.credits) {
+            // the credit identity lock Lc shared with C6: one credit identity per bank transaction, never a second credit
+            const credit = await repo.creditByTransaction(environment, accountRef, c.creditId, true);
+            if (credit !== null && credit.state !== "DRAFT_MANUAL" && (c.grossCents === null || credit.grossCents !== c.grossCents || credit.currency !== c.currency)) throw inconsistent();
+            const w = await repo.recordLine({ ...lineBase(importId, environment, accountRef, page.evidenceHash), lineKind: "CREDIT", lineId: uow.ids.next(), bankLineId: c.creditId, bankExecutionId: null, amountCents: c.grossCents, feeCents: c.feeCents, currency: c.currency, reference: c.reference, status: c.status, executedAt: null, bookedAt: c.bookedAt, observedAt: c.observedAt });
+            if (w.kind === "DIFFERENT") throw inconsistent();
+            if (w.kind === "NEW") newLines++;
+          }
+          for (const d of page.debits) {
+            const w = await repo.recordLine({
+              ...lineBase(importId, environment, accountRef, page.evidenceHash),
+              lineKind: "DEBIT",
+              lineId: uow.ids.next(),
+              bankLineId: d.debitId,
+              bankExecutionId: d.bankExecutionId,
+              amountCents: d.amountCents,
+              feeCents: d.feeCents,
+              currency: d.currency,
+              reference: d.reference,
+              status: d.status,
+              executedAt: d.executedAt,
+              bookedAt: d.bookedAt,
+              observedAt: d.observedAt,
+              destinationAccountDigest: d.destination.accountDigest,
+              destinationAccountLast4: d.destination.accountLast4,
+              destinationRoutingDigest: d.destination.routingDigest,
+              recipientRef: d.destination.recipientRef,
+              recipientVersion: d.destination.recipientVersion,
+            });
+            if (w.kind === "DIFFERENT") throw inconsistent();
+            if (w.kind === "NEW") newLines++;
+            let linked = w.linkedAttemptId;
+            // a debit links only by its bank execution id, to a RECORDED attempt (its execution identity lock)
+            if (linked === null && d.bankExecutionId !== null) {
+              const attempt = await repo.recordedAttemptOf(environment, accountRef, d.bankExecutionId);
+              if (attempt !== null) {
+                await repo.linkLine(w.lineId, attempt);
+                linked = attempt;
+              }
+            }
+            if (linked !== null) continue;
+            orphans++;
+            // a Kauro refund reference with no declaration at all is an execution before any declaration (§7.28 SI2-UNDECLARED)
+            const undeclared = d.reference !== null && REFUND_REFERENCE.test(d.reference) && !(await repo.attemptDeclaredWith(d.reference));
+            await repo.openLineCase(uow.ids.next(), undeclared ? "UNDECLARED_OUTBOUND" : "RECORD_REQUIRED", { environment, accountRef, lineId: w.lineId, evidenceHash: page.evidenceHash }, undeclared ? "DEBIT_BEFORE_DECLARATION" : "DEBIT_NOT_RECORDED");
+          }
+          const lines = page.credits.length + page.debits.length;
+          await uow.events.publish({
+            aggregateKind: "statement_import" as never,
+            aggregateId: importId as never,
+            aggregateVersion: 1,
+            agencyId: null,
+            eventType: "statement_import.recorded.v1" as never,
+            actor: actorOf(uow.context as OperatorContext),
+            causationId,
+            correlationId: envelope.correlationId,
+            payload: { importId, evidenceHash: page.evidenceHash, lines, newLines },
+          });
+          const view: StatementImportView = {
+            importId,
+            coverage: [
+              { stream: "INBOUND", from: page.coverageStart, to: page.coverageEnd },
+              { stream: "OUTBOUND", from: page.coverageStart, to: page.coverageEnd },
+            ],
+            lines,
+            newLines,
+            orphans,
+            balanced: orphans === 0,
+          };
+          return { status: 201, view: { import: view }, version: 1, resourceKind: "statement_import", resourceId: importId, allowFact: STEP_UP_ALLOW };
+        },
+      });
+    },
+
     getCredit: (request) => ownerRead(request, "READ_BANK_CREDIT", async (uow) => {
       const credit = await co.credits(uow).credit(request.creditId);
       if (credit === null) throw new NotFoundFailure("bank credit");
@@ -501,6 +654,38 @@ async function verifyDraft(co: BankInboundCollaborators, repo: BankCreditReposit
   void repo;
   return { netCents: c.netCents, feeCents: c.feeCents, payerDigest: c.payerDigest, payeeDigest: c.payeeDigest };
 }
+
+/** SI1: the owner's statement artifact, read under the provider-call bound, hash-verified and classified (fail closed); never cached. */
+async function readStatement(co: BankInboundCollaborators, accountRef: string, environment: string, body: ImportStatementBody): Promise<{ readonly page: StatementPage; readonly normalizerVersion: string }> {
+  const classifier = co.classifier();
+  const evidence = await readStoredArtifact(co, body.artifactRef, body.evidenceHash);
+  if (classifier === null) throw evidenceUnavailable();
+  const classified = classifier.classifyStatement(evidence);
+  // the bytes are judged first (their digest, format and authentication), then whose statement they are
+  if (classified.kind === "REJECTED") throw new DomainFailure("INTEGRITY_FAILURE", `the statement evidence was refused: ${classified.code}`, { reason: classified.code });
+  // then: another account's or environment's artifact is not evidence of this account
+  if (evidence.accountRef !== accountRef || evidence.environment !== environment) throw new DomainFailure("INTEGRITY_FAILURE", "the artifact is not a statement of this account", { reason: "UNKNOWN_EVIDENCE" });
+  const page = classified.value;
+  if (page.accountRef !== accountRef || page.evidenceHash !== body.evidenceHash || !(Date.parse(page.coverageStart) < Date.parse(page.coverageEnd))) {
+    throw new DomainFailure("INTEGRITY_FAILURE", "the statement does not state a coverage of this account", { reason: "MALFORMED_EVIDENCE" });
+  }
+  return { page, normalizerVersion: evidence.normalizerVersion };
+}
+
+/** The reference a Kauro refund execution carries (`kauro-refund-<refundId>-<n>`, migration 0045 outbound_execution_attempts). */
+const REFUND_REFERENCE = /^kauro-refund-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9]{1,9}$/;
+
+const lineBase = (importId: string, environment: "SANDBOX" | "LIVE", accountRef: string, evidenceHash: string) => ({
+  importId,
+  environment,
+  accountRef,
+  evidenceHash,
+  destinationAccountDigest: null,
+  destinationAccountLast4: null,
+  destinationRoutingDigest: null,
+  recipientRef: null,
+  recipientVersion: null,
+});
 
 export { integrationClassOf };
 export type { UtcInstant };

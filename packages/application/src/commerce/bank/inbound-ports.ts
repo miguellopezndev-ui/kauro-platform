@@ -42,6 +42,44 @@ export interface NewBankCreditInput {
   readonly createdBy: string | null;
 }
 
+export interface NewStatementImportInput {
+  readonly importId: string;
+  readonly environment: "SANDBOX" | "LIVE";
+  readonly accountRef: string;
+  readonly artifactRef: string;
+  readonly evidenceHash: string;
+  readonly normalizerVersion: string;
+  readonly idempotencyKey: string;
+  readonly importedBy: string;
+}
+
+/** One statement line as the classified artifact states it (destination: digests, last digits and provider references only). */
+export interface NewStatementLineInput {
+  readonly lineId: string;
+  readonly importId: string;
+  readonly environment: "SANDBOX" | "LIVE";
+  readonly accountRef: string;
+  readonly lineKind: "CREDIT" | "DEBIT";
+  readonly bankLineId: string;
+  readonly bankExecutionId: string | null;
+  readonly amountCents: bigint | null;
+  readonly feeCents: bigint | null;
+  readonly currency: string;
+  readonly reference: string | null;
+  readonly status: string;
+  readonly executedAt: string | null;
+  readonly bookedAt: string | null;
+  readonly observedAt: string;
+  readonly destinationAccountDigest: string | null;
+  readonly destinationAccountLast4: string | null;
+  readonly destinationRoutingDigest: string | null;
+  readonly recipientRef: string | null;
+  readonly recipientVersion: string | null;
+  readonly evidenceHash: string;
+}
+
+export type StatementLineWriteResult = { readonly kind: "NEW" | "SAME"; readonly lineId: string; readonly linkedAttemptId: string | null } | { readonly kind: "DIFFERENT" };
+
 /** The credit tables in the caller's unit of work (persistence PgBankCredits). */
 export interface BankCreditRepository {
   lockStream(environment: string, accountRef: string, stream: BankStreamName): Promise<void>;
@@ -60,6 +98,17 @@ export interface BankCreditRepository {
   environmentsOfAccount(accountRef: string): Promise<ReadonlyArray<"SANDBOX" | "LIVE">>;
   openCreditCase(caseId: string, kind: "MATCH_REVIEW" | "PROVIDER_TIME_UNVERIFIED", credit: Pick<BankCreditRecord, "creditId" | "environment" | "accountRef" | "evidenceHash">, detailCode: string): Promise<boolean>;
   resolveCreditCases(creditId: string): Promise<number>;
+  // statement imports (SI2)
+  importOfArtifact(environment: string, accountRef: string, evidenceHash: string): Promise<string | null>;
+  /** The earliest instant a statement of the account may cover (its first route version less that version's provider-time tolerance). */
+  coverageFloorOf(environment: string, accountRef: string): Promise<UtcInstant | null>;
+  insertImport(i: NewStatementImportInput): Promise<void>;
+  insertCoverage(importId: string, stream: BankStreamName, from: string, to: string): Promise<void>;
+  recordLine(l: NewStatementLineInput): Promise<StatementLineWriteResult>;
+  recordedAttemptOf(environment: string, accountRef: string, bankExecutionId: string): Promise<string | null>;
+  attemptDeclaredWith(reference: string): Promise<boolean>;
+  linkLine(lineId: string, attemptId: string): Promise<void>;
+  openLineCase(caseId: string, kind: "RECORD_REQUIRED" | "UNDECLARED_OUTBOUND", line: { readonly environment: string; readonly accountRef: string; readonly lineId: string; readonly evidenceHash: string }, detailCode: string): Promise<boolean>;
   /** Runs `work` under a savepoint rolled back once it settled: every lock it took is released, nothing it wrote survives. */
   released<T>(work: () => Promise<T>): Promise<T>;
 }
