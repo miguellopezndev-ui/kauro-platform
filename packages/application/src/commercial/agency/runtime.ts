@@ -11,6 +11,7 @@ import type { AssuranceVerifier } from "../../ports/assurance-and-admission.js";
 import type { CommandSpec } from "../../ports/command-handler.js";
 import type { ActiveWorkInspector } from "../../ports/work-inspectors.js";
 import type { CommercialCommandSpec } from "../contracts.js";
+import type { ServiceCommandRequest } from "../statements/service.js";
 import type { LateFailureSink } from "../call-bound.js";
 import type { ProviderCallTimer } from "../ports.js";
 
@@ -32,6 +33,11 @@ export interface CommercialCommandHandler<Body, View> {
   readonly spec: CommercialCommandSpec<Body>;
   readonly admission: CommandSpec<Body>;
   execute(envelope: CommandEnvelope<Body>): Promise<CommandResult<View>>;
+  /**
+   * Present when the catalogue role is OPERATIONS_SERVICE_OR_OWNER (spec.service): the same route, called with a verified service identity,
+   * runs here in a SERVICE unit of work of the commission group; a person's call runs `execute`. Absent when no service pools are bound.
+   */
+  readonly service?: (request: ServiceCommandRequest<Body>) => Promise<CommandResult<View>>;
 }
 
 /**

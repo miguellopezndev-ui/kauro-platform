@@ -270,6 +270,31 @@ export interface StatementCorrectionView {
   readonly statement: CommissionStatementView;
 }
 
+// --- CMD056 RecordIncident, CMD057 AuthorizeRecovery (package B16) ---------------------------------------------------------------
+
+/** CMD056: the incident as recorded. A false positive is CLOSED with no responsibility and its severity says so; an actual one is DETECTED. */
+export interface IncidentView {
+  readonly incidentId: string;
+  readonly severity: "S1" | "S2" | "S3" | "S4" | "FALSE_POSITIVE";
+  readonly state: "DETECTED" | "CLOSED";
+  readonly affectedScopeRefs: ReadonlyArray<string>;
+  readonly communicationState: "NOT_REQUIRED" | "REVIEW_REQUIRED";
+  /** The responsibilities opened and still to be evidenced (CONTAINMENT, RECOVERY and, for S1 and S2, COMMUNICATION). */
+  readonly openResponsibilities: ReadonlyArray<"CONTAINMENT" | "RECOVERY" | "COMMUNICATION">;
+  readonly startedAt: UtcInstant;
+  /** The next accountable checkpoint (the database's instant plus the severity's hours). */
+  readonly reviewAt: UtcInstant;
+}
+
+/** CMD057: the recovery authorized for a restore candidate. The restore itself is run and released by the control plane after its checks. */
+export interface RecoveryAuthorizationView {
+  readonly recoveryId: string;
+  readonly restoreCandidateRef: string;
+  readonly state: "AUTHORIZED";
+  readonly authorizedAt: UtcInstant;
+  readonly version: number;
+}
+
 // --- CMD058 ChangeCapability, CMD059 RestrictCapability (package B18) ------------------------------------------------------------
 
 /** The capability states a view names (registry Capability machine). */
