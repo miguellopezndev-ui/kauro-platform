@@ -15,6 +15,7 @@ import {
   type EventProvenance,
   type LeaseOwnerId,
   type ModelTaskId,
+  type NewAudit,
   type RequestId,
   type UserId,
 } from "@kauro/domain";
@@ -23,7 +24,9 @@ import { PgEventPublisher } from "../src/event-publisher.js";
 import { fundPlatformPool } from "../src/testing/audit-fixtures.js";
 import { controlOf } from "../src/testing/execution-fixtures.js";
 import { start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
-import { newAudit, type AuditEnv } from "./audit-support.js";
+import { PgRequestJournal } from "../src/request-journal.js";
+import { openConnection } from "../src/testing/index.js";
+import { newAudit } from "./audit-support.js";
 import { clock, ids, project, sealedSource, sha, targetContract } from "./support.js";
 
 export interface DispatchEnv {
@@ -67,7 +70,8 @@ export interface Run {
 }
 
 let agencySeq = 0;
-export async function interpretingRun(env: DispatchEnv, tag: string, pool: string): Promise<Run> {
+/** A fresh agency with a CLEAN project sealed an hour ago and a confirmed target: StartAudit's input, not yet started. */
+export async function preparedAudit(env: DispatchEnv, tag: string): Promise<{ readonly ag: AgencyFixture; readonly input: NewAudit }> {
   const { h } = env;
   agencySeq += 1;
   const name = `${tag}-${agencySeq}`;
@@ -77,7 +81,13 @@ export async function interpretingRun(env: DispatchEnv, tag: string, pool: strin
   const source = await sealedSource({ app: env.app, control: env.control }, ag, projectId, name, "SEALED", new Date(Date.now() - 3_600_000));
   const target = await targetContract(env.app, ag, projectId, name);
   const subject = { projectId, revisionId: source.revisionId, revisionHash: source.manifestHash, contractId: target.contractId, targetContractHash: target.bodyHash };
-  const input = newAudit(ag, subject);
+  return { ag, input: newAudit(ag, subject) };
+}
+
+export async function interpretingRun(env: DispatchEnv, tag: string, pool: string): Promise<Run> {
+  const { h } = env;
+  const { ag, input } = await preparedAudit(env, tag);
+  const name = `${tag}-${input.auditId}`;
   const started = await h.audit.run(h.tenant(ag.agencyId as AgencyId, ag.ownerUserId as UserId), (uow) => uow.audits.startAudit(input));
   assert.equal(started.pool.grantId, pool, "the scenario's pool funds its audit (the earliest expiry)");
   const profile = await h.audit.run(controlOf(ag.agencyId), (uow) => uow.audits.claimStep(input.auditId, "PROFILE", ids.next() as AuditStepId));
@@ -149,8 +159,8 @@ export function settlementOf(a: Admission, state: "COMMITTED" | "AMBIGUOUS" | "R
 }
 
 /** PgAuditStore on a raw control-plane transaction (the caller binds the agency and opens the transaction). */
-export function rawStore(c: Client): PgAuditStore {
-  const provenance = (): EventProvenance => ({ actor: { kind: "SERVICE", serviceId: "control-plane" }, causationId: ids.next() as EventProvenance["causationId"], correlationId: ids.next() as EventProvenance["correlationId"] });
+export function rawStore(c: Client, actor: EventProvenance["actor"] = { kind: "SERVICE", serviceId: "control-plane" } as EventProvenance["actor"]): PgAuditStore {
+  const provenance = (): EventProvenance => ({ actor, causationId: ids.next() as EventProvenance["causationId"], correlationId: ids.next() as EventProvenance["correlationId"] });
   return new PgAuditStore({ db: c, ids, events: new PgEventPublisher(c, ids, clock), provenance });
 }
 
@@ -176,4 +186,24 @@ export async function liabilities(env: DispatchEnv, pool: string): Promise<Array
   return (await env.h.oracle.query("SELECT request_id, excess_micros::text AS excess, state FROM kauro.dispatch_liabilities WHERE pool_id = $1 ORDER BY opened_at, request_id", [pool])).rows;
 }
 
-export type { AuditEnv };
+/** The request journal on a raw transaction. */
+export function rawJournal(c: Client): PgRequestJournal {
+  return new PgRequestJournal(c);
+}
+
+/** `n` harness connections of a login (openConnection: each may be an observed waiter), ended after `fn`. */
+export async function withConnections<T>(env: DispatchEnv, n: number, fn: (cs: Client[]) => Promise<T>, role: "kauro_control_test" | "kauro_app_test" = "kauro_control_test"): Promise<T> {
+  const cs: Client[] = [];
+  try {
+    for (let i = 0; i < n; i++) cs.push(await openConnection(env.h.pg.clientConfig(role)));
+    return await fn(cs);
+  } finally {
+    for (const c of cs) await c.end().catch(() => undefined);
+  }
+}
+
+/** The pool's liability-gate setting of a transaction (kauro.liability_gate_pool / _mode; '' read as missing). */
+export async function gateSetting(c: Client): Promise<{ pool: string | null; mode: string | null }> {
+  const r = await c.query("SELECT nullif(current_setting('kauro.liability_gate_pool', true), '') AS pool, nullif(current_setting('kauro.liability_gate_mode', true), '') AS mode");
+  return r.rows[0];
+}

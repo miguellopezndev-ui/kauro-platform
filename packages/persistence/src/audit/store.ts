@@ -694,12 +694,15 @@ export class PgAuditStore implements AuditStore {
     if (row.max === null) return 0n;
     const excess = excessMicrosOf(chargeMicros, BigInt(row.max));
     if (excess === 0n) return 0n;
-    await execute(
+    // a request owes one liability: an estimate's (COMMITTED, usage not known) stands when provider evidence arrives later
+    const r = await execute(
       this.db,
-      "INSERT INTO kauro.dispatch_liabilities (request_id, grant_id, pool_id, excess_micros, opened_at) VALUES ($1, $2, kauro.liability_gate_pool_of($2), $3, kauro.server_now())",
+      `INSERT INTO kauro.dispatch_liabilities (request_id, grant_id, pool_id, excess_micros, opened_at)
+       SELECT $1, $2, kauro.liability_gate_pool_of($2), $3, kauro.server_now()
+        WHERE NOT EXISTS (SELECT 1 FROM kauro.dispatch_liabilities WHERE request_id = $1)`,
       [row.request_id, row.cost_grant_id, excess.toString()],
     );
-    return excess;
+    return (r.rowCount ?? 0) === 1 ? excess : 0n;
   }
 
   async reconcileRequestMicros(requestId: RequestId, chargeMicros: bigint): Promise<CostGrantRecord> {

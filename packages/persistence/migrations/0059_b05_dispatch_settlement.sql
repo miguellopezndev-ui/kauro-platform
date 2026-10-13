@@ -290,11 +290,12 @@ BEGIN
     RAISE EXCEPTION 'NO_FUNDED_GRANT: request % reserves % cents on no AUTHORIZED, unexpired grant of its scope with room under its ceiling', NEW.request_id, NEW.reserved_cents USING ERRCODE = 'KA083';
   END IF;
   pool := kauro.liability_gate_pool_of(NEW.cost_grant_id);
+  -- the gate's scope first (a unit that opened a liability on the pool asks the other mode: KA006, not the liability it wrote itself)
+  PERFORM kauro.liability_gate_register(pool, 'KEY_SHARE');
   -- an early refusal only: the binding one is at COMMIT under the gate
   IF EXISTS (SELECT 1 FROM kauro.dispatch_liabilities d WHERE d.pool_id = pool AND d.state = 'OPEN') THEN
     RAISE EXCEPTION 'POOL_LIABILITY_OPEN: pool % carries an open liability; request % reserves nothing', pool, NEW.request_id USING ERRCODE = 'KA083', CONSTRAINT = 'pool_liability_open';
   END IF;
-  PERFORM kauro.liability_gate_register(pool, 'KEY_SHARE');
   UPDATE kauro.cost_grants SET reserved_cents = reserved_cents + NEW.reserved_cents WHERE grant_id = NEW.cost_grant_id;
   RETURN NEW;
 END
