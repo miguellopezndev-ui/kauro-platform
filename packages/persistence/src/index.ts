@@ -135,6 +135,8 @@ export { agencyLifecycleOf } from "./commercial-agency-access.js";
 // package B18: capability governance (CMD058, CMD059)
 export { PgCapabilityGovernanceRepository } from "./repositories/capability-governance.js";
 export { capabilityGovernanceOf } from "./capability-governance-access.js";
+export { operationsOf } from "./operations-recovery-access.js";
+export { PgOperationsRepository } from "./repositories/operations-recovery.js";
 // CMD027's reads (mandate B10-COMMANDS-QUOTE; design §3.4, §3.5): the sealed revision's billable population, the project's live quote
 export { PgQuoteReads, quoteReadsOf } from "./commercial-quote-access.js";
 // the commission service's work lists (mandate B10-COMMISSION-SERVICE; docs/design/B10-commercial-domain.md §14; D10-SVC-1, D10-SVC-2):

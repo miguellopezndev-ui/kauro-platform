@@ -10,6 +10,7 @@
 import type { Capability, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { VersionedWrite } from "../ports/repositories.js";
 import type { CapabilityId, UserId } from "./ids.js";
+import type { OperationsActor } from "./operations-recovery.js";
 
 /** Reasons of CMD058 and CMD059 (appended to the closed FAILURE_REASONS of model/errors.ts). */
 export const CAPABILITY_FAILURE_REASONS = [
@@ -61,5 +62,5 @@ export interface CapabilityGovernanceRepository {
   /** Appends the prospective version numbered revision + 1 and advances the revision (compare-and-swap on the revision the caller read). */
   recordVersion(input: { readonly capabilityId: CapabilityId; readonly expectedRevision: number; readonly profileHash: Sha256Hex; readonly evidenceHashes: ReadonlyArray<Sha256Hex>; readonly by: UserId }): Promise<VersionedWrite<CapabilityVersionRecord>>;
   /** Suspends the capability (a listed edge), advances the revision and appends the restriction evidence; STALE when the revision moved. */
-  restrict(input: { readonly restrictionId: string; readonly capabilityId: CapabilityId; readonly expectedRevision: number; readonly incidentRef: string; readonly priorState: Capability["state"]; readonly by: UserId }): Promise<VersionedWrite<CapabilityRestrictionRecord>>;
+  restrict(input: { readonly restrictionId: string; readonly capabilityId: CapabilityId; readonly expectedRevision: number; readonly incidentRef: string; readonly priorState: Capability["state"]; readonly by: OperationsActor }): Promise<VersionedWrite<CapabilityRestrictionRecord>>;
 }

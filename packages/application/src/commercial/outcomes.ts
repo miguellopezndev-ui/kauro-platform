@@ -8,6 +8,7 @@
 import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "../api/outcome-kit.js";
 import { CREATE_QUOTE_OUTCOMES } from "./quotes/outcomes.js";
 import type { CommercialServedRouteCommandId } from "./served.js";
+import { AUTHORIZE_RECOVERY_OUTCOMES, OPERATIONS_SERVICE_ACCESS, RECORD_INCIDENT_OUTCOMES } from "./operations/outcomes.js";
 import { CHANGE_CAPABILITY_OUTCOMES, RESTRICT_CAPABILITY_OUTCOMES } from "./capabilities/outcomes.js";
 import { ACTIVATE_SELLER_OUTCOMES, ASSIGN_ACCOUNT_OUTCOMES, CORPORATE_OWNER_ACCESS, TERMINATE_SELLER_OUTCOMES } from "./sellers/outcomes.js";
 import type { CommercialReadOperationId } from "./response-schemas.js";
@@ -99,8 +100,11 @@ export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteC
   CMD052: closedCatalogue("CMD052", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...APPROVE_COMMISSION_PAYOUT_OUTCOMES]),
   CMD053: closedCatalogue("CMD053", [...EVERY_SERVICE_ROUTE, ...PATH_IDS, ...COMMISSION_SERVICE_ACCESS, ...RECONCILE_COMMISSION_PAYOUT_OUTCOMES]),
   // the capability commands (package B18): the corporate owner, the path id, the command-layer outcomes of capabilities/outcomes
+  // the operations commands (package B16/B18): CMD056 admits the owner or the operations service, CMD057 the owner with a step-up
+  CMD056: closedCatalogue("CMD056", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...OPERATIONS_SERVICE_ACCESS, ...RECORD_INCIDENT_OUTCOMES]),
+  CMD057: closedCatalogue("CMD057", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...AUTHORIZE_RECOVERY_OUTCOMES]),
   CMD058: closedCatalogue("CMD058", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...CHANGE_CAPABILITY_OUTCOMES]),
-  CMD059: closedCatalogue("CMD059", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...RESTRICT_CAPABILITY_OUTCOMES]),
+  CMD059: closedCatalogue("CMD059", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...OPERATIONS_SERVICE_ACCESS, ...RESTRICT_CAPABILITY_OUTCOMES]),
 });
 
 /** The closed problem catalogue of each served B10 read route (GetCommissionStatement: no query, the path id, the seller's or owner's access). */

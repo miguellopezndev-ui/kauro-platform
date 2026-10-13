@@ -81,6 +81,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/operations/bank-routes/{routeId}/verify verifyBankRoute",
       "POST /api/v1/operations/capabilities/{capabilityId}/restrict RestrictCapability",
       "POST /api/v1/operations/capabilities/{capabilityId}/versions ChangeCapability",
+      "POST /api/v1/operations/incidents RecordIncident",
+      "POST /api/v1/operations/recoveries AuthorizeRecovery",
       "POST /api/v1/payment-orders/{orderId}/capture CapturePayment",
       "POST /api/v1/payment-orders/{orderId}/reconcile ReconcilePayment",
       "POST /api/v1/payments/webhooks/{provider} ReceivePaymentWebhook",
