@@ -1,4 +1,4 @@
--- 0057 (provisional number; the coordinator renumbers at merge) — B05 L3: the core documents and the plan bindings (D5-14, D5-16).
+-- 0058 (provisional number; the coordinator renumbers at merge) — B05 L3: the core documents and the plan bindings (D5-14, D5-16).
 --
 -- core_documents: the Migration Core source profile and target contract a revision's derived data retains, stored verbatim under the hash the
 -- core itself names them by (CORE_NATIVE, D5-3); only the core's own loader judges the content at the reader. Append-only: a document is

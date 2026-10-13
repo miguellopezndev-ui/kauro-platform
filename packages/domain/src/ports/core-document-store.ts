@@ -1,5 +1,5 @@
 /**
- * Stored core documents and plan bindings (package B05 L3; D5-14, D5-16; migration 0057). A document is stored verbatim under the hash the
+ * Stored core documents and plan bindings (package B05 L3; D5-14, D5-16; migration 0058). A document is stored verbatim under the hash the
  * core itself names it by (CORE_NATIVE, D5-3) and judged only by the core's own loader at the reader. Every write is idempotent: the same
  * content again is the same row; other content under the same key is an INTEGRITY_FAILURE, never an overwrite. The application's
  * CoreDocumentStore has the same members, written structurally.

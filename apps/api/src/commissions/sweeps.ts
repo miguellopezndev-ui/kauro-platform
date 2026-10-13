@@ -211,7 +211,7 @@ async function eligibility(rt: CommissionRuntime, limit: number): Promise<SweepR
   }
   // funds the provider released: their holds released
   for (const hold of await list(rt, (uow) => commissionWorkOf(uow).releasableFundsHolds(limit))) {
-    await item(rt, items, hold.holdId, () => inAgency(rt, hold.agencyId, null, async (uow) => ((await releaseFundsHold(uow, hold.holdId, hold.version, await serverNow(uow))) ? "RELEASED" : "SETTLED")));
+    await item(rt, items, hold.holdId, () => inAgency(rt, hold.agencyId, null, async (uow) => ((await releaseFundsHold(uow, hold.holdId, hold.lineId, hold.version, await serverNow(uow))) ? "RELEASED" : "SETTLED")));
   }
   // lines that fell due while the provider holds their funds
   for (const line of await list(rt, (uow) => commissionWorkOf(uow).dueLinesOnHeldFunds(limit))) {

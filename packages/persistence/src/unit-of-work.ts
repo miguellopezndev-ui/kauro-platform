@@ -947,7 +947,7 @@ export class PgAuditUnitOfWork extends PgExecutionUnitOfWork implements AuditUni
   readonly auditDiscovery: PgAuditDiscovery;
   /** B17: the import stages and their receipts (CMD040, CMD041). */
   readonly importStages: PgImportStageStore;
-  /** B05 L3: the stored core documents and plan bindings (migration 0057). */
+  /** B05 L3: the stored core documents and plan bindings (migration 0058). */
   readonly coreDocuments: PgCoreDocumentStore;
 
   constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {

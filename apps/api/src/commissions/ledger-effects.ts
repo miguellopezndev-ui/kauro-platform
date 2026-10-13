@@ -378,7 +378,9 @@ export async function observeFunds(
 }
 
 /** Releases an OPEN funds hold whose capture's funds became AVAILABLE (CommissionHold OPEN → RELEASED, the ELIGIBILITY sweep). */
-export async function releaseFundsHold(uow: PgCommercialUnitOfWork, holdId: CommissionHoldId, version: number, now: UtcInstant): Promise<boolean> {
+export async function releaseFundsHold(uow: PgCommercialUnitOfWork, holdId: CommissionHoldId, lineId: CommissionLineId, version: number, now: UtcInstant): Promise<boolean> {
+  // G-ORD-1 (K08): the line row and its subject first, the hold row (level 3) after
+  await ledgerOf(uow).lockLines([lineId], "EXCLUSIVE");
   const written = await ledgerOf(uow).resolveHold(holdId, version, "RELEASED", now);
   return written.kind === "APPLIED";
 }

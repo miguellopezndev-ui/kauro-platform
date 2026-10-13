@@ -1,5 +1,5 @@
 /**
- * Stored core documents and plan bindings over `pg` (package B05 L3; D5-14, D5-16; migration 0057). A write is idempotent: the same
+ * Stored core documents and plan bindings over `pg` (package B05 L3; D5-14, D5-16; migration 0058). A write is idempotent: the same
  * content again is the same row; other content under the same key is an INTEGRITY_FAILURE and nothing is overwritten. The agency of a
  * write is the unit of work's current agency (the database refuses any other); a read of a missing key answers null.
  */

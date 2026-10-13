@@ -1,4 +1,4 @@
-// Stored core documents and plan bindings (package B05 L3; D5-14, D5-16; migration 0057; cases B01-B03, I14) on real PostgreSQL 17, through
+// Stored core documents and plan bindings (package B05 L3; D5-14, D5-16; migration 0058; cases B01-B03, I14) on real PostgreSQL 17, through
 // the control plane's login (kauro_control_test): idempotent writes, a conflicting write is an INTEGRITY_FAILURE and overwrites nothing, an
 // agency cannot see or write another agency's rows, an unbound session reads a binding by its plan hash, and nothing is ever updated or deleted.
 import assert from "node:assert/strict";
