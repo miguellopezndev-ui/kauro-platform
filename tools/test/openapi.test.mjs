@@ -38,8 +38,10 @@ test("the committed document is the generated one, byte for byte, and matches ev
     [
       "GET /api/v1/agencies ListAgencies",
       "GET /api/v1/agencies/{agencyId} GetAgency",
+      "GET /api/v1/agencies/{agencyId}/buyer-type GetBuyerType",
       "GET /api/v1/agencies/{agencyId}/clients ListClients",
       "GET /api/v1/agencies/{agencyId}/members ListMembers",
+      "GET /api/v1/agencies/{agencyId}/projects ListProjects",
       "GET /api/v1/audits/{auditId} GetAudit",
       "GET /api/v1/jobs/{jobId} GetJob",
       "GET /api/v1/operations/bank-credits/{creditId} getBankCredit",
@@ -68,6 +70,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /readyz getReadiness",
       "POST /api/v1/agencies CreateAgency",
       "POST /api/v1/agencies/{agencyId}/activate ActivateAgency",
+      "POST /api/v1/agencies/{agencyId}/buyer-type setBuyerType",
       "POST /api/v1/agencies/{agencyId}/clients CreateClient",
       "POST /api/v1/agencies/{agencyId}/closure-requests CloseAgency",
       "POST /api/v1/assurance/step-ups createStepUp",
@@ -179,13 +182,15 @@ test("the committed document is the generated one, byte for byte, and matches ev
     "POST /api/v1/operations/bank-routes/{routeId}/disable disableBankRoute",
     "POST /api/v1/operations/bank-routes/{routeId}/details replaceBankRouteDetails",
     "GET /api/v1/operations/bank-routes/{routeId} getBankRoute",
-    "GET /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions",    "POST /api/v1/payment-orders/{orderId}/retirements retireBankCheckout",
+    "GET /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions",
+    "POST /api/v1/payment-orders/{orderId}/retirements retireBankCheckout",
     "POST /api/v1/operations/bank-accounts/{accountRef}/credits enterBankCredit",
     "POST /api/v1/operations/bank-credits/{creditId}/confirmations confirmBankCredit",
     "POST /api/v1/operations/bank-credits/{creditId}/attributions attributeBankCredit",
     "POST /api/v1/operations/bank-accounts/{accountRef}/statement-imports importBankStatement",
     "GET /api/v1/operations/bank-credits/{creditId} getBankCredit",
     "GET /api/v1/operations/bank-orders/{orderId}/match-keys getBankOrderMatchKeys",
+    "POST /api/v1/agencies/{agencyId}/buyer-type setBuyerType",
   ]);
   // the public routes take no credential (an explicit empty security requirement) and the inquiry names the Origin it demands
   for (const [path, method] of [["/api/v1/public/capability-publication", "get"], ["/api/v1/public/inquiries", "post"]]) assert.deepEqual(expected.paths[path][method].security, [], path);
@@ -416,4 +421,55 @@ test("B08-COMMANDS-AUDIT: the audit routes are documented from their contracts â
   const envelope = committed.components.schemas.DecisionArtifactDocument;
   assert.equal(envelope.additionalProperties, false, "the envelope is closed");
   assert.deepEqual([...envelope.required].sort(), ["document", "kind"]);
+});
+
+test("operational routes: every path parameter, Idempotency-Key and agency selector the api admits is declared, and every operational POST has a wire entry", () => {
+  const UUID = sources.application.RESPONSE_FIELD_VOCABULARY.UUID_PATTERN;
+  const refsOf = (op) => (op.parameters ?? []).map((p) => p.$ref ?? `${p.in}:${p.name}`);
+  const opOf = (id) => {
+    const route = sources.operationalRoutes.find((r) => r.operationId === id);
+    assert.ok(route, id);
+    return expected.paths[route.path][route.method.toLowerCase()];
+  };
+  // what apps/api/src/payments/bank-route-routes.ts admits: a UUID path id (UUID_PATH, PATH_ID_INVALID), a required Idempotency-Key on the five
+  // commands (IDEMPOTENCY_KEY_MISSING), the cookie CSRF token on an unsafe request, and the agency selector on the transfer-instructions read
+  const commands = { configureBankRoute: [], verifyBankRoute: ["routeId"], enableBankRoute: ["routeId"], disableBankRoute: ["routeId"], replaceBankRouteDetails: ["routeId"] };
+  for (const [id, names] of Object.entries(commands)) {
+    const op = opOf(id);
+    const refs = refsOf(op);
+    for (const name of names) {
+      const parameter = op.parameters.find((p) => p.in === "path" && p.name === name);
+      assert.ok(parameter, `${id} declares path parameter ${name}`);
+      assert.equal(parameter.required, true);
+      assert.equal(parameter.schema.pattern, UUID);
+    }
+    assert.ok(refs.includes("#/components/parameters/IdempotencyKey"), `${id} declares the Idempotency-Key`);
+    assert.ok(refs.includes("#/components/parameters/CsrfToken"), `${id} declares the CSRF token`);
+    assert.equal(op["x-kauro-idempotency"], "REQUIRED", id);
+    assert.equal(op["x-kauro-role"], "KAURO_OWNER", id);
+  }
+  const route = opOf("getBankRoute");
+  assert.ok(route.parameters.some((p) => p.in === "path" && p.name === "routeId" && p.schema.pattern === UUID), "getBankRoute declares routeId");
+  assert.ok(!refsOf(route).includes("#/components/parameters/IdempotencyKey"));
+  assert.equal(route["x-kauro-idempotency"], "NONE");
+  assert.equal(route["x-kauro-role"], "KAURO_OWNER");
+  const instructions = opOf("getTransferInstructions");
+  assert.ok(instructions.parameters.some((p) => p.in === "path" && p.name === "orderId" && p.schema.pattern === UUID), "getTransferInstructions declares orderId");
+  assert.ok(refsOf(instructions).includes("#/components/parameters/AgencySelector"), "getTransferInstructions declares X-Kauro-Agency");
+  assert.ok(!refsOf(instructions).includes("#/components/parameters/IdempotencyKey"));
+  // the rule for the whole family: the declared path parameters are exactly the template's, and every POST has a wire entry the document follows
+  const wire = sources.application.OPERATIONAL_WIRE;
+  assert.equal(typeof wire, "object", "OPERATIONAL_WIRE is exported");
+  for (const r of sources.operationalRoutes) {
+    const op = expected.paths[r.path][r.method.toLowerCase()];
+    const templated = [...r.path.matchAll(/\{([A-Za-z]+)\}/g)].map((m) => m[1]);
+    assert.deepEqual((op.parameters ?? []).filter((p) => p.in === "path").map((p) => p.name), templated, `${r.operationId} path parameters`);
+    if (r.method === "POST") assert.ok(wire[r.operationId], `${r.operationId} has a wire entry`);
+    const entry = wire[r.operationId];
+    if (entry === undefined) continue;
+    assert.equal(refsOf(op).includes("#/components/parameters/IdempotencyKey"), entry.idempotency === "REQUIRED", `${r.operationId} Idempotency-Key`);
+    assert.equal(refsOf(op).includes("#/components/parameters/AgencySelector"), entry.agencySelector, `${r.operationId} agency selector`);
+    assert.equal(refsOf(op).includes("#/components/parameters/CsrfToken"), entry.csrf, `${r.operationId} CSRF token`);
+  }
+  for (const id of Object.keys(wire)) assert.ok(sources.operationalRoutes.some((r) => r.operationId === id), `${id} names an operational route`);
 });

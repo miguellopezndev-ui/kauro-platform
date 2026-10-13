@@ -155,7 +155,13 @@ export const COMMAND_OUTCOMES: Readonly<Record<ServedCommandId, ReadonlyArray<Pr
 // --- the manual-10 reads (re-check finding N16) -----------------------------------------------------------------------------
 
 /** The reads this module catalogues itself: B06's five manual-10 reads and B11's two support reads (W4). */
-type B06ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | "ListSupportCases" | "GetSupportCase";
+type B06ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | "ListSupportCases" | "GetSupportCase" | "GetBuyerType" | "ListProjects";
+
+/** The dashboard's closed query (B11 lane A1): limit and cursor as every list's, and filter, one of the five R2 filters. */
+const DASHBOARD_QUERY: ReadonlyArray<ProblemOutcome> = Object.freeze([
+  outcome("ADMISSION", "INVALID_REQUEST", "SCHEMA_VIOLATION", "the query is not filter (active, awaiting_agency, delivered, failed or archived; default active), limit (1..100, default 25) and cursor, or a member was repeated or malformed", { fieldCodes: ["UNKNOWN_FIELD", "TYPE", "FORMAT", "RANGE", "ENUM"] }),
+  ...PAGINATED.filter((o) => o.reason !== "SCHEMA_VIOLATION"),
+]);
 
 const READ_SPECIFIC: Readonly<Record<B06ReadOperationId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   ListAgencies: [...PAGINATED],
@@ -165,6 +171,8 @@ const READ_SPECIFIC: Readonly<Record<B06ReadOperationId, ReadonlyArray<ProblemOu
   GetProject: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the project")],
   ListSupportCases: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, ...PAGINATED, NOT_VISIBLE("the project")],
   GetSupportCase: [...PATH_IDS, ...TENANT_READ, ...AGENCY_HEADER, NO_QUERY, NOT_VISIBLE("the case")],
+  GetBuyerType: [...PATH_IDS, ...TENANT_READ, NO_QUERY],
+  ListProjects: [...PATH_IDS, ...TENANT_READ, ...DASHBOARD_QUERY],
 });
 
 function readCatalogueOf(operationId: B06ReadOperationId): ReadonlyArray<ProblemOutcome> {
@@ -194,6 +202,8 @@ export const READ_OUTCOMES: Readonly<Record<ReadOperationId, ReadonlyArray<Probl
   PreviewTable: SOURCE_ROUTE_OUTCOMES.PreviewTable,
   ListSupportCases: readCatalogueOf("ListSupportCases"),
   GetSupportCase: readCatalogueOf("GetSupportCase"),
+  GetBuyerType: readCatalogueOf("GetBuyerType"),
+  ListProjects: readCatalogueOf("ListProjects"),
   GetJob: EXECUTION_ROUTE_OUTCOMES.GetJob,
   GetAudit: AUDIT_ROUTE_OUTCOMES.GetAudit,
 });
@@ -272,6 +282,16 @@ export const OPERATIONAL_OUTCOMES: Readonly<Record<string, ReadonlyArray<Problem
     outcome("COMMAND", "CONTENT_REFUSED", "RECORD_LIKE_CONTENT", "the description looks like customer records: nothing is stored or counted, and the next action is the secure upload (D-PUB-4)"),
     outcome("COMMAND", "ADMISSION_LIMITED", "INQUIRY_RATE_LIMITED", "the client-address hash has 5 accepted inquiries in the trailing hour, or the e-mail hash has 3 in the trailing day; retryAfterSeconds says when the first leaves the window (D-PUB-3)"),
     ...PLATFORM_OUTCOMES,
+  ]),
+  // the agency app (B11 lane A1): CMD101 SetBuyerType, a command of the shared pipeline served as an operational route
+  setBuyerType: closedCatalogue("setBuyerType", [
+    ...EVERY_ROUTE,
+    ...COOKIE_CSRF,
+    ...PATH_IDS,
+    ...TENANT,
+    NOT_VISIBLE("the agency"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "AGENCY_NOT_OPEN", "the agency is not DRAFT or ACTIVE (closing or closed): no buyer type is recorded", { current: "ALWAYS" }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "BUYER_TYPE_ALREADY_SET", "the agency's buyer type is already recorded with the other value; current.state names the recorded one, which is never overwritten", { current: "ALWAYS" }),
   ]),
 });
 

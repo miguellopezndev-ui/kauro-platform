@@ -29,7 +29,7 @@
 import type { CommandId } from "@kauro/contracts";
 import { COMMANDS } from "@kauro/contracts";
 import type { AllowDecision, AuthorizationDecision, AuthorizationRequest, Authorizer, AssuranceVerifier, ReadAuthorizationRequest } from "@kauro/application";
-import { AUTHORIZATION_POLICY_VERSION, B06_COMMANDS, assureStepUpAtCommit } from "@kauro/application";
+import { AGENCY_APP_COMMANDS, AUTHORIZATION_POLICY_VERSION, B06_COMMANDS, assureStepUpAtCommit } from "@kauro/application";
 import type { AgencyId, Clock, FailureReason, MembershipRecord, UnitOfWork } from "@kauro/domain";
 import { isAgencyCommandRole, isUuidV5, isVerifiedIdentity, roleSatisfies } from "@kauro/domain";
 
@@ -95,7 +95,8 @@ function allowMember(uow: UnitOfWork, membership: MembershipRecord): Authorizati
 }
 
 export function createAuthorizer(deps: AuthorizerDependencies): Authorizer {
-  const roleOf = new Map<string, string>(COMMANDS.map((c) => [c.id, c.role]));
+  // the registry's commands, and the agency app's commands that are not registry commands (B11 lane A1: CMD101 SetBuyerType, AGENCY_OWNER)
+  const roleOf = new Map<string, string>([...COMMANDS.map((c) => [c.id, c.role] as const), ...Object.values(AGENCY_APP_COMMANDS).map((c) => [c.id, c.role] as const)]);
   return {
     async authorize(uow: UnitOfWork, request: AuthorizationRequest): Promise<AuthorizationDecision> {
       const commandRole = roleOf.get(request.command);

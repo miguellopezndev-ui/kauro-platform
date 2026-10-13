@@ -1,5 +1,5 @@
 /**
- * The inbound side of the bank-transfer route over `pg` (migration 0062, lane PV1-INBOUND; docs/design/ACH-ROUTE.md r12 §7.5-§7.12,
+ * The inbound side of the bank-transfer route over `pg` (migration 0063, lane PV1-INBOUND; docs/design/ACH-ROUTE.md r12 §7.5-§7.12,
  * §7.23, §7.28): credits, the account's stream locks, an instruction found by its reference, the bank order state, statement imports,
  * their coverage and lines, the route-scope review cases and CMD214's checkout retirements. Every statement runs in the caller's unit of
  * work under its policies: the request pool (kauro_app) for the owner's commands and CMD214's record (D-ACH-16, D-INB-CTX-1/2), the
@@ -318,7 +318,7 @@ export class PgBankCredits {
   }
 
   /**
-   * Releases the project's open checkout of an order whose bank state is EXPIRED (payment_orders.bank_slot_released_at, migration 0062):
+   * Releases the project's open checkout of an order whose bank state is EXPIRED (payment_orders.bank_slot_released_at, migration 0063):
    * set once, in the unit that expired it, under the order's lock; a second call changes nothing.
    */
   async releaseBankSlot(orderId: string): Promise<void> {
@@ -355,7 +355,7 @@ export class PgBankCredits {
     return r.rows[0]?.c ?? null;
   }
 
-  // --- CMD214's checkout retirements (migration 0062, D-INB-CTX-2) ----------------------------------------------------------------
+  // --- CMD214's checkout retirements (migration 0063, D-INB-CTX-2) ----------------------------------------------------------------
 
   /** The order's retirement as recorded (and, once the payment service consumed it, its outcome); `lock` takes its row lock. */
   async retirementOf(orderId: string, lock = false): Promise<BankCheckoutRetirementRecord | null> {

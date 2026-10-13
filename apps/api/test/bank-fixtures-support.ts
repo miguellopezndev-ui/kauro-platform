@@ -74,7 +74,7 @@ export class BankFixtures {
     return this.host.cw.h.oracle;
   }
 
-  /** A seeded credit row is born with its version-1 event in one transaction (bank_credits_event_per_version, migration 0062). */
+  /** A seeded credit row is born with its version-1 event in one transaction (bank_credits_event_per_version, migration 0063). */
   private async seedCredit(sql: string, params: ReadonlyArray<unknown>, creditId: string, eventType: "bank_credit.review_required.v1" | "bank_credit.applied.v1"): Promise<void> {
     await this.oracle.query("BEGIN");
     try {

@@ -211,7 +211,8 @@ test("N16: every read answers only the outcomes of its catalogue — each listed
       assert.throws(() => checkReply(w.validator, contract, problem.status, "application/problem+json", problem), (e: unknown) => e instanceof ResponseContractViolation, `${operationId} ${code}`);
     }
   }
-  // the five manual-10 reads, the two support reads (B11 W4), the seven source reads (B07 design §9.1), GetJob and GetAudit (B08 design §12)
-  assert.ok(Object.keys(READ_OUTCOMES).length === 16 && (w.A.agencyId as AgencyId).length > 0);
+  // the five manual-10 reads, the two support reads (B11 W4), the seven source reads (B07 design §9.1), GetJob and GetAudit (B08 design §12),
+  // GetBuyerType and ListProjects (B11 lane A1)
+  assert.ok(Object.keys(READ_OUTCOMES).length === 18 && (w.A.agencyId as AgencyId).length > 0);
   assert.ok(READ_OUTCOMES.GetUploadSession.some((o) => o.reason === "ROLE_INSUFFICIENT"));
 });

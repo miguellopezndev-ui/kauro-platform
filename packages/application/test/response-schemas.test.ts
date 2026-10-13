@@ -191,6 +191,8 @@ test("R23: the validator compiles the COMPLETED envelope of every served command
     ["POST", "/api/v1/operations/bank-accounts/{accountRef}/statement-imports", "importBankStatement", ["201"]],
     ["GET", "/api/v1/operations/bank-credits/{creditId}", "getBankCredit", ["200"]],
     ["GET", "/api/v1/operations/bank-orders/{orderId}/match-keys", "getBankOrderMatchKeys", ["200"]],
+    // B11 lane A1: CMD101 SetBuyerType (201 recorded, 200 the same value again)
+    ["POST", "/api/v1/agencies/{agencyId}/buyer-type", "setBuyerType", ["200", "201"]],
   ]);
   for (const route of OPERATIONAL_ROUTES) {
     for (const [status, response] of Object.entries(route.responses)) {

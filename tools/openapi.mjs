@@ -340,6 +340,10 @@ export function generateOpenApi(sources) {
       ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope.", schema: ID })),
       ...(spec.scope === "AGENCY_HEADER" ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
       ...(spec.paginated ? [{ $ref: "#/components/parameters/PageLimit" }, { $ref: "#/components/parameters/PageCursor" }] : []),
+      // a list's closed filter (B11 lane A1, ListProjects): its values and the one an absent member means
+      ...(spec.filter !== undefined
+        ? [{ name: "filter", in: "query", required: false, description: "The list's filter; a value not listed is SCHEMA_VIOLATION (ENUM). The cursor is bound to it.", schema: { type: "string", enum: [...spec.filter.values], default: spec.filter.default } }]
+        : []),
       { $ref: "#/components/parameters/CorrelationId" },
     ];
     paths[spec.path] = {
@@ -627,12 +631,21 @@ Failure: ${command.failure}`,
     if (route.path.startsWith("/api/v1/public/")) operation.security = [];
     // an unsafe route the session cookie authenticates carries the CSRF token; the fit inquiry names the Origin it demands
     const unsafe = route.method === "POST";
+    // the wire record (B11 P0, D-GEN-1) says which headers the api demands of the route; the path parameters are the template's own, a UUID
+    const wire = application.OPERATIONAL_WIRE[route.operationId];
     if (route.path.startsWith("/api/v1/")) {
       operation.parameters = [
+        ...pathParameters(route.path).map((name) => ({ name, in: "path", required: true, description: "Path id (a UUID).", schema: ID })),
+        ...(wire?.idempotency === "REQUIRED" ? [{ $ref: "#/components/parameters/IdempotencyKey" }] : []),
+        ...(wire?.agencySelector === true ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
         { $ref: "#/components/parameters/CorrelationId" },
-        ...(unsafe && cookieRoutes.has(route.operationId) ? [{ $ref: "#/components/parameters/CsrfToken" }] : []),
+        ...(unsafe && (wire?.csrf ?? cookieRoutes.has(route.operationId)) ? [{ $ref: "#/components/parameters/CsrfToken" }] : []),
         ...(route.operationId === "createInquiry" ? [{ $ref: "#/components/parameters/InquiryOrigin" }] : []),
       ];
+    }
+    if (wire !== undefined) {
+      operation["x-kauro-idempotency"] = wire.idempotency;
+      if (wire.role !== null) operation["x-kauro-role"] = wire.role;
     }
     if (route.request !== undefined) {
       const requestId = application.operationalRequestSchemaId(route.operationId);

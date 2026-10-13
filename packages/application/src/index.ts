@@ -23,6 +23,8 @@ export type { CursorBinding, CursorPosition } from "./api/cursor.js";
 export { sealCursor, openCursor, isCursorKey, CURSOR_PATTERN, CURSOR_SORT, CURSOR_SNAPSHOT_POLICY } from "./api/cursor.js";
 export type { ReadSpec, ReadQuery, ReadHead, ReadAdmission, ReadRequest, ReadResult, ReadHandler, ReadHandlers, ReadRuntime } from "./queries/reads.js";
 export { READ_ROUTES, admitRead, admitReadQuery, runRead, createReadHandlers } from "./queries/reads.js";
+export type { ProjectDashboardItem } from "./queries/reads.js";
+export * from "./agency/buyer-type.js";
 export type { StrictJsonOptions, StrictJsonReason } from "./api/strict-json.js";
 export { parseStrictJson, StrictJsonError } from "./api/strict-json.js";
 export type { CompiledSchemaSet, SchemaBundleInput } from "./api/json-schema.js";
@@ -105,6 +107,8 @@ export {
   mediaTypeOf,
   responseIntegrityProblem,
 } from "./api/response-contract.js";
+export type { OperationalWire } from "./api/operational-wire.js";
+export { OPERATIONAL_WIRE } from "./api/operational-wire.js";
 export type { RawRequest, RequestHead, StructuralAdmission, AdmissionOutcome, DocumentRoute, DocumentAdmission, DocumentAdmissionOutcome } from "./api/admission.js";
 export { admitHeaders, admitStructure, admitDocument, admitOperationalBody, admitEmptyRequest, envelopeOf, correlationIdOf, repeatedHeaderNames, unauthenticatedProblem } from "./api/admission.js";
 export type {

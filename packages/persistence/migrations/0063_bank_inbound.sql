@@ -1,4 +1,4 @@
--- 0062 — Payments V1, lane PV1-INBOUND (the inbound credit commands C5, C6, M1, M2, P1, E1, SI2; PROVISIONAL number, renumbered at merge).
+-- 0063 — Payments V1, lane PV1-INBOUND (the inbound credit commands C5, C6, M1, M2, P1, E1, SI2; PROVISIONAL number, renumbered at merge).
 --
 -- Authority: docs/design/ACH-ROUTE.md r12 §7.5-§7.12 (C5, C4/C6, M1, M2, P1, E1), §7.23 (SI2), §7.24 (P1Δ), §7.28 (lock order), DV1-01
 -- (no provider name in a table, column or event type) and the failure-mode matrix rows ACH-04..22. It builds on 0055's kauro.bank_credits
