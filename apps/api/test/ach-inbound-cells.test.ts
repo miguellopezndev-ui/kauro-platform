@@ -1462,7 +1462,9 @@ function retire(o: Order, key: string): Promise<Reply> {
       const bookedAt = plusMs(o.transferExpiresAt, -60_000);
       ctx.clock.set(plusMs(o.transferExpiresAt, HOUR));
       await withClock(ctx, () => expirySweep());
-      const c = await withClock(ctx, () => confirmed(o.route.accountRef, exactFor(o, { bookedAt })));
+      // the owner confirms an hour after the deadline, on the step clock (kauro_app's units are repositioned on it): a step-up of that instant
+      const proof = await L().iw.h.recordStepUp(L().owner.userId as never, { issuedAt: ctx.clock.at(0) as never });
+      const c = await withClock(ctx, () => confirmed(o.route.accountRef, exactFor(o, { bookedAt }), { proof }));
       await withClock(ctx, () => matchService(c.creditId));
       await ctx.revoked(what, async () => {
         if (what === "route revoked") await disableRoute(o.route);

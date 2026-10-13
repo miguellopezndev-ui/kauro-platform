@@ -48,7 +48,9 @@ Estimate: 3-4 h of build plus focused cells. The test contract of the lane's cel
 - **Record (CMD214, TENANT unit on `kauro_app`).** Order: membership pre-check in a released savepoint, then the order's row lock, then
   the member's access decision (judged after that wait), then the instruction read. If the instruction is open (AWAITING_TRANSFER or
   PARTIALLY_RECEIVED) and has no retirement yet, the unit inserts one `kauro.bank_checkout_retirements` row: order, agency, requesting
-  user, reason, `requested_at` (DB clock), `consumed_at` NULL. Answer: 202 `{ retirement: { orderId, state: "RECORDED", requestedAt } }`.
+  user, reason, `requested_at` (DB clock), `consumed_at` NULL. Answer: 201 `{ retirement: { orderId, state: "RECORDED", requestedAt } }` (built as 201, not 202: in this API a 202 is the
+  ACCEPTED envelope of an operation with a status path and a null view, and the journal stores 200/201 replies; the retirement is a
+  created resource, replayed by its key). `requested_at` is truncated to the millisecond (the pass cursor's precision).
   The request handler writes no instruction state, no expiry cause and no slot.
 - **Consumption (the TRANSFER_EXPIRY pass, SERVICE units on `kauro_payment`, first in the pass, oldest `requested_at` first).** Order:
   adopt the order's agency, then the order's row lock, then the instruction's, then the retirement row FOR UPDATE. If `consumed_at` is
@@ -66,8 +68,8 @@ Estimate: 3-4 h of build plus focused cells. The test contract of the lane's cel
 | ACH-M-E1R-TIMEOUT | A consumption that times out behind a held order lock rolls back whole. The retirement stays pending and the next pass consumes it. Covered by ACH-M-E1-TIMEOUT's pass. |
 | ACH-M-E1R-EXPIRY | A retirement has no deadline of its own. The consumption judges the order's state after its last lock, so an order the deadline expired first stays DEADLINE (outcome NOT_OPEN, one expiry, one event). |
 | ACH-M-E1R-CRASH-BEFORE | CMD214 dying before COMMIT leaves no retirement row and no journal entry, and the order stays open. A consumption dying before COMMIT leaves the retirement pending and the order open. |
-| ACH-M-E1R-CRASH-AFTER | **New cell.** CMD214's answer is lost after COMMIT: the retirement is recorded, the order is still open and the slot is held. The same key replays the journaled 202. The next pass consumes it once: EXPIRED RETIRED, slot released, one event. |
+| ACH-M-E1R-CRASH-AFTER | **New cell.** CMD214's answer is lost after COMMIT: the retirement is recorded, the order is still open and the slot is held. The same key replays the journaled 201. The next pass consumes it once: EXPIRED RETIRED, slot released, one event. |
 | ACH-M-E1R-RETRY | **New cell.** A duplicate consumption applies once: two passes, sequential and concurrent, give one version bump, one CHECKOUT_RETIRED event and one `consumed_at`. The same CMD214 key replays; a new key for a recorded or consumed retirement is 409 ORDER_NOT_CAPTURABLE. |
 | ACH-M-E1R-REVOCATION | The member is judged after the order-lock wait, so a member withdrawn meanwhile is refused and nothing is recorded (existing cell ACH-M-E1-REVOCATION, now on `kauro_app`). A withdrawal after the record does not undo it: the decision was authorized at its effect instant. A stale service cannot consume, by the service authority of the pass. |
 | ACH-M-E1R-PARTIAL | A consumption failing at a later write (the event insert) rolls back the expiry, the slot and `consumed_at` together. The next pass consumes it. |
-| ACH-M-E1R-OK | **New cell.** The record runs on `kauro_app` (routed over an app login; a payment-routed run is refused by the harness), answers 202 and changes no order state. The pass applies it. |
+| ACH-M-E1R-OK | **New cell.** The record runs on `kauro_app` (proven by ACH-M-E1-REVOCATION, which routes CMD214 over the app login alone: a unit of another role is refused by the harness), answers 201 and changes no order state. The pass applies it. |

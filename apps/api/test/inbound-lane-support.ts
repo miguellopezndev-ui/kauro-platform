@@ -344,10 +344,10 @@ export async function drafted(accountRef: string, f: CreditFacts, o: OwnerCall =
   assert.equal(credit.state, "DRAFT_MANUAL", "an entry is a draft, never money");
   return { credit, artifact };
 }
-/** A confirmed credit (C6 answered 200, OBSERVED, the service not yet run). */
-export async function confirmed(accountRef: string, f: CreditFacts): Promise<CreditView> {
-  const { credit } = await drafted(accountRef, f);
-  return dataOf<{ credit: CreditView }>(await confirmC6(credit.creditId), 200, `C6 confirms ${f.bankTransactionId}`).credit;
+/** A confirmed credit (C6 answered 200, OBSERVED, the service not yet run); `o` is the owner's call of both commands (its proof). */
+export async function confirmed(accountRef: string, f: CreditFacts, o: OwnerCall = {}): Promise<CreditView> {
+  const { credit } = await drafted(accountRef, f, o);
+  return dataOf<{ credit: CreditView }>(await confirmC6(credit.creditId, 1, o), 200, `C6 confirms ${f.bankTransactionId}`).credit;
 }
 
 // --- the service steps --------------------------------------------------------------------------------------------------------------
