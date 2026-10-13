@@ -195,7 +195,8 @@ test("OK/DENY: OWNER only; a non-member 404, a VIEWER 403, a body without forEco
   assert.deepEqual(await recorded(agencyId), { buyer_type: "agency", for_economic_activity: true, version: "1", recorded_by_user_id: o.owner.userId });
   const events = await w.events("agency_buyer_type", agencyId);
   assert.deepEqual(events.map((e) => [e.version, e.type]), [[1, EVENT_TYPE]]);
-  assert.deepEqual({ ...events[0]!.payload, recordedByMembershipId: typeof events[0]!.payload["recordedByMembershipId"] }, { agencyId, buyerType: "agency", forEconomicActivity: true, recordedByMembershipId: "string" });
+  // the outbox carries machine tokens only (domain assertAllowlistedPayload): the commercial domain's AGENCY, never the form's "agency"
+  assert.deepEqual({ ...events[0]!.payload, recordedByMembershipId: typeof events[0]!.payload["recordedByMembershipId"] }, { agencyId, buyerType: "AGENCY", forEconomicActivity: true, recordedByMembershipId: "string" });
   const journal = await w.journal(key);
   assert.deepEqual([journal?.state, journal?.status, journal?.resourceKind, journal?.resourceId], ["COMMITTED", 201, "agency_buyer_type", agencyId]);
   // any member now reads it, read-only, exactly as recorded

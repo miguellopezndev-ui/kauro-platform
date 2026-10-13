@@ -32,8 +32,9 @@ export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidenc
 export { PgWebSessionStore, WEB_SESSION_STATEMENT_TIMEOUT_MS } from "./web-sessions.js";
 export type { StoredWebSession, NewStoredWebSession } from "./web-sessions.js";
 export { PgSessionFence } from "./session-fence.js";
+export { PgBuyerTypes, PgProjectDashboard, type PgBuyerTypeRecord, type PgProjectDashboardRow, type PgDashboardFilter } from "./repositories/agency-app.js";
 export type { LockedSession } from "./session-fence.js";
-export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf, bankRoutesOf, sessionFenceOf, effectInstantOf } from "./unit-of-work.js";
+export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf, bankRoutesOf, sessionFenceOf, effectInstantOf, buyerTypesOf, projectDashboardOf } from "./unit-of-work.js";
 export { PgBankRoutes } from "./repositories/bank-routes.js";
 export type { NewBankRoute, NewBankRouteVersion, NewTransferInstructions } from "./repositories/bank-routes.js";
 // processing authority (package B08, mandate B08-PERSISTENCE-EXECUTION; docs/design/B08-audit-approval-jobs.md §9, §10)
