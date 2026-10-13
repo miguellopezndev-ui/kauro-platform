@@ -7,7 +7,7 @@
 // One `BankFixtures` serves two hosts: the integration world (bankWorld: S1..S7) and the commission world (IN1: `cw.bank`).
 import assert from "node:assert/strict";
 import { BANK_FAKE_PROVIDER, fakeCreditBytes, fakeOutboundBytes, type BankEvidenceFake, type ContractFakeBuyerTypeReader, type FakeCreditFields } from "@kauro/application/testing";
-import type { PaymentEnvironment } from "@kauro/domain";
+import { payloadDigest, type PaymentEnvironment } from "@kauro/domain";
 import type { Sha256Hex } from "@kauro/contracts";
 import { createPaymentDispatcher, leaseResourceOf, type PaymentDispatcher } from "../src/index.js";
 import { planOf, quoted, type Agent, type IntegrationWorld } from "./integration-support.js";
@@ -72,6 +72,23 @@ export class BankFixtures {
 
   private get oracle() {
     return this.host.cw.h.oracle;
+  }
+
+  /** A seeded credit row is born with its version-1 event in one transaction (bank_credits_event_per_version, migration 0060). */
+  private async seedCredit(sql: string, params: ReadonlyArray<unknown>, creditId: string, eventType: "bank_credit.review_required.v1" | "bank_credit.applied.v1"): Promise<void> {
+    await this.oracle.query("BEGIN");
+    try {
+      await this.oracle.query(sql, params as unknown[]);
+      await this.oracle.query(
+        `INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at)
+         VALUES ($1, 'bank_credit', $2, 1, NULL, $3, 'SYSTEM', NULL, $4, $5, '{}'::jsonb, $6, '1', now())`,
+        [ids.next(), creditId, eventType, ids.next(), ids.next(), payloadDigest({})],
+      );
+      await this.oracle.query("COMMIT");
+    } catch (e) {
+      await this.oracle.query("ROLLBACK");
+      throw e;
+    }
   }
 
   private ownerCall(url: string, body: unknown): Promise<Reply> {
@@ -158,10 +175,12 @@ export class BankFixtures {
     const stored = await this.storeCredit({ creditId: bankTransactionId, rail: "ACH", currency: "USD", grossCents: cents, netCents: cents, feeCents: 0n, payeeDigest: host.payeeDigest, payerEvidenceRef: `payer-${label}`, payerDigest: "c".repeat(64) as Sha256Hex, status: "COMPLETED", bookedAt: observedAt, observedAt });
     const bankCreditId = ids.next();
     const treasuryRefundId = ids.next();
-    await this.oracle.query(
+    await this.seedCredit(
       `INSERT INTO kauro.bank_credits (bank_credit_id, environment, account_ref, bank_transaction_id, state, rail, currency, gross_cents, net_cents, fee_cents, booked_at, evidence_hash)
        VALUES ($1, $2, $3, $4, 'RETURN_REVIEW', 'ACH', 'USD', $5, $5, 0, $6, $7)`,
       [bankCreditId, host.environment, host.accountRef, bankTransactionId, cents.toString(), observedAt, stored.evidenceHash],
+      bankCreditId,
+      "bank_credit.review_required.v1",
     );
     await this.oracle.query("INSERT INTO kauro.treasury_refunds (treasury_refund_id, route_id, environment, account_ref, bank_credit_id, amount_cents) VALUES ($1, $2, $3, $4, $5, $6)", [treasuryRefundId, route.routeId, host.environment, host.accountRef, bankCreditId, cents.toString()]);
     return { bankCreditId, treasuryRefundId };
@@ -219,10 +238,13 @@ export class BankFixtures {
       { agencyId: s.agency.agencyId, quote: facts, orderId: orderId as never, attemptId: "" as never, providerOrderId: `bank:${orderId}` },
       { bank: { route: { provider: bound!.provider, environment: bound!.environment, merchantRef: bound!.merchant_ref, payeeDigest: bound!.payee_digest }, providerCaptureId: bankTransactionId } },
     );
-    await this.oracle.query(
+    const creditRowId = ids.next();
+    await this.seedCredit(
       `INSERT INTO kauro.bank_credits (bank_credit_id, environment, account_ref, bank_transaction_id, state, rail, currency, gross_cents, net_cents, fee_cents, reference, booked_at, evidence_hash, order_id, capture_id)
        VALUES ($1, $2, $3, $4, 'APPLIED', 'ACH', 'USD', $5, $5, 0, $6, $7, $8, $9, $10)`,
-      [ids.next(), host.environment, host.accountRef, bankTransactionId, facts.totalCents.toString(), issued.transfer.reference, observedAt, stored.evidenceHash, orderId, purchase.captureId],
+      [creditRowId, host.environment, host.accountRef, bankTransactionId, facts.totalCents.toString(), issued.transfer.reference, observedAt, stored.evidenceHash, orderId, purchase.captureId],
+      creditRowId,
+      "bank_credit.applied.v1",
     );
     await this.oracle.query("UPDATE kauro.bank_transfer_instructions SET order_state = 'CAPTURED' WHERE order_id = $1", [orderId]);
     return purchase;

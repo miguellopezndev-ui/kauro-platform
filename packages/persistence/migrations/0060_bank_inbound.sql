@@ -100,6 +100,9 @@ INSERT INTO kauro.event_types (event_type) VALUES
   ('bank_credit.drafted.v1'), ('bank_credit.received.v1'), ('bank_credit.matched.v1'), ('bank_credit.review_required.v1'), ('bank_credit.applied.v1'),
   ('statement_import.recorded.v1'), ('bank_transfer_instruction.order_state_changed.v1');
 ALTER TABLE kauro.event_types FORCE ROW LEVEL SECURITY;
+-- D-EVT-1: every registered kind carries its event-per-version rule; a credit version is never written without its event
+CREATE CONSTRAINT TRIGGER bank_credits_event_per_version AFTER INSERT OR UPDATE OF version ON kauro.bank_credits
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('bank_credit', 'bank_credit_id');
 CREATE CONSTRAINT TRIGGER statement_imports_event_per_version AFTER INSERT ON kauro.statement_imports
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('statement_import', 'import_id');
 
