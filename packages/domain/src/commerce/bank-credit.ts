@@ -7,7 +7,11 @@
 import type { Sha256Hex } from "@kauro/contracts";
 import type { BankCreditState } from "./records.js";
 
-export const BANK_CREDIT_RAILS = ["ACH", "DOMESTIC_WIRE"] as const;
+/**
+ * The rail a bank booked a credit on (DV1-03): ACH and DOMESTIC_WIRE are the rails a route version may accept; OTHER and UNKNOWN are
+ * recorded as the bank stated them and always go to review (M1: never in acceptedRails).
+ */
+export const BANK_CREDIT_RAILS = ["ACH", "DOMESTIC_WIRE", "OTHER", "UNKNOWN"] as const;
 export type BankCreditRail = (typeof BANK_CREDIT_RAILS)[number];
 
 /** The credit and statement import are agency-less aggregates (platform scope); an order's bank state change is the agency's. */
@@ -96,7 +100,7 @@ export function matchDecision(credit: Pick<BankCreditRecord, "reference" | "curr
   if (credit.reference === null) return { kind: "REVIEW", reason: "REFERENCE_MISSING" };
   if (keys === null) return { kind: "REVIEW", reason: "NO_ORDER" };
   if (credit.currency !== keys.currency) return { kind: "REVIEW", reason: "CURRENCY_MISMATCH" };
-  if (!keys.acceptedRails.includes(credit.rail)) return { kind: "REVIEW", reason: "RAIL_NOT_ACCEPTED" };
+  if (!(keys.acceptedRails as ReadonlyArray<string>).includes(credit.rail)) return { kind: "REVIEW", reason: "RAIL_NOT_ACCEPTED" };
   if (keys.payeeDigest !== null && credit.payeeDigest !== null && keys.payeeDigest !== credit.payeeDigest) return { kind: "REVIEW", reason: "PAYEE_MISMATCH" };
   if (keys.acceptedPayerDigest === null || credit.payerDigest === null || keys.acceptedPayerDigest !== credit.payerDigest) return { kind: "REVIEW", reason: "PAYER_MISMATCH" };
   return { kind: "MATCHED" };

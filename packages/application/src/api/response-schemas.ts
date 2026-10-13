@@ -972,7 +972,7 @@ const BANK_CREDIT_VIEW_SCHEMA: JsonSchema = closedObject(["creditId", "accountRe
   state: { type: "string", enum: ["DRAFT_MANUAL", "OBSERVED", "MATCH_REVIEW", "MATCHED", "APPLIED", "RETURN_REVIEW"] },
   version: { type: "integer", minimum: 1 },
   source: { type: "string", enum: ["OWNER_MANUAL"] },
-  rail: { type: "string", enum: ["ACH", "DOMESTIC_WIRE"] },
+  rail: { type: "string", enum: ["ACH", "DOMESTIC_WIRE", "OTHER", "UNKNOWN"] },
   grossCents: BANK_CENTS,
   feeCents: { type: ["string", "null"], pattern: "^(0|[1-9][0-9]{0,15})$" },
   currency: { type: "string", enum: ["USD"] },
@@ -1026,7 +1026,7 @@ export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = 
   creditCommand("enterBankCredit", "/api/v1/operations/bank-accounts/{accountRef}/credits", "Enter a manual bank credit the owner read in the bank's own artifact (DRAFT_MANUAL: grants nothing until confirmed)", "201",
     closedObject(["bankTransactionId", "rail", "grossCents", "currency", "reference", "bookedAt", "evidence", "authorizationRef"], {
       bankTransactionId: { type: "string", minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" },
-      rail: { type: "string", enum: ["ACH", "DOMESTIC_WIRE"] },
+      rail: { type: "string", enum: ["ACH", "DOMESTIC_WIRE", "OTHER", "UNKNOWN"] },
       grossCents: { type: "string", pattern: "^[1-9][0-9]{0,15}$" },
       currency: { type: "string", enum: ["USD"] },
       reference: { type: ["string", "null"], minLength: 1, maxLength: 256 },

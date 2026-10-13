@@ -29,6 +29,10 @@ ALTER TABLE kauro.statement_imports
 ALTER TABLE kauro.bank_credits DROP CONSTRAINT bank_credits_reference_check;
 ALTER TABLE kauro.bank_credits ADD CONSTRAINT bank_credits_reference_check CHECK (reference IS NULL OR char_length(reference) BETWEEN 1 AND 256);
 
+-- the rail a bank booked a credit on, as it stated it (DV1-03): OTHER and UNKNOWN are recorded and go to review, never matched
+ALTER TABLE kauro.bank_credits DROP CONSTRAINT bank_credits_rail_check;
+ALTER TABLE kauro.bank_credits ADD CONSTRAINT bank_credits_rail_check CHECK (rail IN ('ACH', 'DOMESTIC_WIRE', 'OTHER', 'UNKNOWN'));
+
 -- the order's accepted billing identity (sha256), frozen at issuance beside the reference: M1's payer key
 ALTER TABLE kauro.bank_transfer_instructions ADD COLUMN accepted_payer_digest text CHECK (accepted_payer_digest IS NULL OR kauro.is_sha256_hex(accepted_payer_digest));
 -- why an EXPIRED bank order expired: its transfer deadline (E1; a later on-time credit may still be honored, DV1-06) or its explicit
