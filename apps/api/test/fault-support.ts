@@ -82,6 +82,11 @@ export interface Routing {
 
 type AnyFactory = { run(context: ExecutionContext, work: (uow: never) => Promise<unknown>, options?: unknown): Promise<unknown> };
 
+/** The harness connection under a routed client (onRoles: the connection of the unit's own role, not the invocation's first). */
+const RAW_CONNECTION = Symbol("raw harness connection");
+const rawConnectionOf = (client: unknown): HarnessConnection | undefined =>
+  typeof client === "object" && client !== null ? ((client as Record<symbol, unknown>)[RAW_CONNECTION] as HarnessConnection | undefined) : undefined;
+
 /** The connection a route hands the unit of work: the harness connection with `release` a no-op and the cell's statement steps. */
 function routedClient(route: Route): PoolClient {
   const instrumented = new Map<string, (...a: unknown[]) => Promise<unknown>>();
@@ -92,6 +97,7 @@ function routedClient(route: Route): PoolClient {
   return new Proxy(route.conn, {
     get(target, prop) {
       if (prop === "release") return () => undefined;
+      if (prop === RAW_CONNECTION) return route.conn;
       if (prop === "query") {
         return (...args: unknown[]) => {
           const first = args[0];
@@ -159,13 +165,15 @@ class RoutedFactory extends PgCommercialUnitOfWorkFactory {
       async (uow) => {
         const at = this.stand();
         const clock = this.clockOf();
+        // the unit's own harness connection: under onRoles the one of its role (the invocation's first connection serves another role)
+        const conn = rawConnectionOf((uow as unknown as { client?: unknown }).client) ?? this.route.conn;
         // a cell's step clock positions the unit's transaction itself (the harness proves the instant it carries was consumed: an expiry cell)
-        if (context.kind === "SERVICE" && clock !== null) await clock.onServer(this.route.conn);
+        if (context.kind === "SERVICE" && clock !== null) await clock.onServer(conn);
         else if (context.kind === "SERVICE" && at !== null) {
           await (uow as unknown as { client: PoolClient }).client.query(`SELECT set_config('kauro_test.clock_offset_seconds', greatest(0, extract(epoch FROM ($1::timestamptz - transaction_timestamp())))::text, true)`, [at.at]);
         }
         // the routed unit's session is the harness connection itself (the clock taps its raw client, never the routing proxy)
-        return work(repositioned(uow, this.clockOf, this.route.conn) as PgCommercialUnitOfWork);
+        return work(repositioned(uow, this.clockOf, conn) as PgCommercialUnitOfWork);
       },
       options,
     );

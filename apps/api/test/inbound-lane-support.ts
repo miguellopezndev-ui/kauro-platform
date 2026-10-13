@@ -4,7 +4,7 @@
 // command runs through the REAL api of the integration world, optionally over a harness connection (`routed`) so a cell can hold it at a
 // lock or at its COMMIT, lose its answer, or fail it after a statement (SqlStep).
 //
-// CONTRACT (the builder serves exactly this; units of the owner commands and of the service steps run as `kauro_payment`):
+// CONTRACT (the builder serves exactly this; units of the owner commands run as `kauro_app`, of the service steps as `kauro_payment`):
 //   owner (KAURO_OWNER, step-up)
 //     C5  POST /api/v1/operations/bank-accounts/{accountRef}/credits             { bankTransactionId, rail, grossCents, currency, reference,
 //                                                                                  bookedAt, evidence{artifactRef,evidenceHash}, authorizationRef }
@@ -46,11 +46,15 @@ import { connectionPid, openConnection, type FaultContext, type HarnessConnectio
 import { financeConsumer, paymentServiceEffect, unitOfWorkEffect } from "../src/payments/consumers.js";
 import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld, type HeldLock, type StoredBankArtifact } from "./bank-support.js";
 import { deliveryOf } from "./commission-support.js";
-import type { SqlStep } from "./fault-support.js";
+import type { RouteRole, SqlStep, UnitLog } from "./fault-support.js";
 import { agentOf, integrationWorld, planOf, quoted, type Agent, type IntegrationWorld } from "./integration-support.js";
 import { dispatch } from "./payment-support.js";
 import { call, freshKey, outcome, type Person, type Reply } from "./support.js";
 
+/** The owner commands (C5, C6, M2, SI2, the owner reads) and CMD214's record run as kauro_app (D-ACH-16, D-INB-CTX-1/2). */
+export const OWNER_ROLE = "kauro_app" as const;
+export const OWNER_LOGIN = "kauro_app_test" as const;
+/** The payment service's steps (M1, P1, E1 and CMD214's consumption, FINANCE) run as kauro_payment. */
 export const ROLE = "kauro_payment" as const;
 export const LOGIN = "kauro_payment_test" as const;
 
@@ -438,7 +442,49 @@ export async function paid(o: Order, over: Partial<CreditFacts> = {}): Promise<{
 
 // --- harness routing ----------------------------------------------------------------------------------------------------------------
 
-export const openPay = (): Promise<HarnessConnection> => openConnection(L().iw.h.pg.clientConfig(LOGIN));
+export const openPay = (): Promise<HarnessConnection> => openLogin(LOGIN);
+export const openApp = (): Promise<HarnessConnection> => openLogin(OWNER_LOGIN);
+const LOGIN_ROLES: Readonly<Record<string, RouteRole>> = { kauro_app_test: "kauro_app", kauro_payment_test: "kauro_payment", kauro_control_test: "kauro_control" };
+const roles = new WeakMap<HarnessConnection, RouteRole>();
+async function openLogin(login: "kauro_app_test" | "kauro_payment_test"): Promise<HarnessConnection> {
+  const c = await openConnection(L().iw.h.pg.clientConfig(login));
+  roles.set(c, LOGIN_ROLES[login]!);
+  return c;
+}
+/** The role a harness connection logs in as (a connection opened elsewhere, mustWaitOn's waiter, is asked once). */
+async function roleOf(conn: HarnessConnection): Promise<RouteRole> {
+  const known = roles.get(conn);
+  if (known !== undefined) return known;
+  const login = (await conn.query<{ u: string }>("SELECT current_user AS u")).rows[0]!.u;
+  const role = LOGIN_ROLES[login];
+  if (role === undefined) throw new Error(`a routed connection logs in as ${login}, not one of ${Object.keys(LOGIN_ROLES).join(", ")}`);
+  roles.set(conn, role);
+  return role;
+}
+/** A connection per role a lane step may open a unit for: the owner's (kauro_app) and the payment service's (kauro_payment). */
+interface Pair {
+  readonly app: HarnessConnection;
+  readonly pay: HarnessConnection;
+}
+async function openPair(): Promise<Pair> {
+  const app = await openApp();
+  try {
+    return { app, pay: await openPay() };
+  } catch (e) {
+    await app.end();
+    throw e;
+  }
+}
+async function endPair(p: Pair): Promise<void> {
+  try {
+    await p.app.end();
+  } finally {
+    await p.pay.end();
+  }
+}
+function onPair<T>(ctx: FaultContext, p: Pair, fn: () => Promise<T>, steps: ReadonlyArray<SqlStep>, routing: { target?: number; log?: UnitLog[] } = {}): Promise<T> {
+  return L().iw.faults.onRoles({ kauro_app: p.app, kauro_payment: p.pay }, ctx.points, steps, fn, routing);
+}
 /**
  * The advisory stream lock of one account held by a connection of the payment login (the KIT's holdInboundStream / holdOutboundStream take the
  * fixed BANK_ACCOUNT; a cell's subject lives on its own fresh account, so it holds that account's stream).
@@ -471,15 +517,17 @@ export async function holdStream(accountRef: string, stream: "INBOUND" | "OUTBOU
   void iw;
   return lock;
 }
-export function routed<T>(ctx: FaultContext, conn: HarnessConnection, fn: () => Promise<T>, steps: ReadonlyArray<SqlStep> = [], target?: number): Promise<T> {
-  return L().iw.faults.on(conn, ROLE, ctx.points, steps, fn, target === undefined ? {} : { target });
+/** `fn` with its units routed over `conn`, under the role the connection logs in as (a unit of another role fails loudly). */
+export async function routed<T>(ctx: FaultContext, conn: HarnessConnection, fn: () => Promise<T>, steps: ReadonlyArray<SqlStep> = [], target?: number): Promise<T> {
+  return L().iw.faults.on(conn, await roleOf(conn), ctx.points, steps, fn, target === undefined ? {} : { target });
 }
+/** `fn` with its units routed over fresh connections, one per role: an owner command's on kauro_app, a service step's on kauro_payment. */
 export async function onFresh<T>(ctx: FaultContext, fn: () => Promise<T>, steps: ReadonlyArray<SqlStep> = [], target?: number): Promise<T> {
-  const c = await openPay();
+  const p = await openPair();
   try {
-    return await routed(ctx, c, fn, steps, target);
+    return await onPair(ctx, p, fn, steps, target === undefined ? {} : { target });
   } finally {
-    await c.end();
+    await endPair(p);
   }
 }
 /** `fn` with the routed units on the operation's step clock (DB-clock cells: template rule 10). */
@@ -508,16 +556,27 @@ export const valueOf = <T>(r: PromiseSettledResult<T>): T => {
   if (r.status !== "fulfilled") throw r.reason;
   return r.value;
 };
-/** The holder's real step held at `at` (default its COMMIT, every lock kept), the waiter observed waiting on its backend, then released. */
+/**
+ * The holder's real step held at `at` (default its COMMIT, every lock kept), the waiter observed waiting on its backend, then released.
+ * Each side routes over one connection per role; the held unit's role (the holder's last unit when it reached `at`) names the holder's
+ * backend, and the waiter is observed on its connection of that same role.
+ */
 export async function holdAndWait<H, W>(ctx: FaultContext, what: string, holder: () => Promise<H>, waiter: () => Promise<W>, at = "uow.before-commit", steps: ReadonlyArray<SqlStep> = []): Promise<{ readonly held: PromiseSettledResult<H>; readonly waited: PromiseSettledResult<W> }> {
-  const hc = await openPay();
-  const wc = await openPay();
+  const hc = await openPair();
+  const wc = await openPair().catch(async (e: unknown) => {
+    await endPair(hc);
+    throw e;
+  });
   try {
     const pause = ctx.points.pause(at);
-    const running = ctx.operation(`${what} (holder)`, () => routed(ctx, hc, holder, steps));
+    const log: UnitLog[] = [];
+    const running = ctx.operation(`${what} (holder)`, () => onPair(ctx, hc, holder, steps, { log }));
     const settledHolder = running.then<PromiseSettledResult<H>, PromiseSettledResult<H>>((value) => ({ status: "fulfilled", value }), (reason: unknown) => ({ status: "rejected", reason }));
     await reach(pause, running, what);
-    const waiting = await ctx.mustWait(L().iw.h.oracle, { waiter: wc, holder: connectionPid(hc) }, (c) => routed(ctx, c, waiter), what);
+    const heldRole = log.at(-1)?.role;
+    if (heldRole !== "kauro_app" && heldRole !== "kauro_payment") assert.fail(`${what}: the holder reached ${at} outside a kauro_app or kauro_payment unit (${String(heldRole)})`);
+    const side = heldRole === "kauro_app" ? "app" : "pay";
+    const waiting = await ctx.mustWait(L().iw.h.oracle, { waiter: wc[side], holder: connectionPid(hc[side]) }, () => onPair(ctx, wc, waiter, []), what);
     // a TIMEOUT cell (a statement timeout injected on the waiter) keeps the holder until the waiter timed out: releasing at once would let it win the lock
     if (L().iw.faults.statementTimeoutMs !== null) {
       const waited = await waiting.pending;
@@ -527,8 +586,11 @@ export async function holdAndWait<H, W>(ctx: FaultContext, what: string, holder:
     pause.release();
     return { held: await settledHolder, waited: await waiting.pending };
   } finally {
-    await hc.end();
-    await wc.end();
+    try {
+      await endPair(hc);
+    } finally {
+      await endPair(wc);
+    }
   }
 }
 
