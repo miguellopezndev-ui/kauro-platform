@@ -194,6 +194,23 @@ export interface ExecutionLimits {
   readonly wallClockMs: number;
 }
 
+/**
+ * The bounds a bounded core call runs under (B05 D5-2b). The real adapter requires them on every call that has no `HostIo`
+ * (validate, verify) and rejects without them; the contract fake ignores them. `deadlineAt` defaults to now + `limits.wallClockMs`.
+ */
+export interface CoreCallControls {
+  readonly limits: ExecutionLimits;
+  readonly deadlineAt?: UtcInstant;
+  /** Where the revision's sealed generations are read from (validate). */
+  readonly source?: SourceReader;
+  /** The frozen quote's billable units (validate): not in the package, so the caller states them (RowCounts). */
+  readonly billableSourceUnits?: number;
+  /** Cancellation of a call that has none of its own (verify). */
+  readonly cancellation?: CancellationChannel;
+  /** Re-reads a staged artifact's bytes (verify); absent, only the metadata is compared. */
+  readonly readArtifact?: (artifact: StagedArtifact) => AsyncIterable<Uint8Array>;
+}
+
 export interface HostIo {
   readonly source: SourceReader;
   readonly scratch: ScratchStore;
@@ -234,8 +251,18 @@ export type ExecutionTerminalCause =
   | "DEADLINE_EXCEEDED"
   | "REFUSED";
 
+/** A core refusal (a MigrationError of the core, or a binding the adapter refuses): the code is the core's or the adapter's own token. */
+export interface CoreRefusal {
+  readonly code: string;
+  readonly message: string;
+}
+
 export interface ExecutionOutcome {
   readonly evidenceClass: CoreEvidenceClass;
+  /** The core version the record names (3.0.0 for the real core, the fake's own token for the fake). */
+  readonly coreVersion?: string;
+  /** Present when terminalCause is REFUSED. */
+  readonly refusal?: CoreRefusal;
   readonly terminalCause: ExecutionTerminalCause;
   readonly stagedArtifacts: readonly StagedArtifact[];
   /** The reconciled row/edge counts and issue totals (kauro-migration-core `Reconciliation`); opaque beyond its hash here. */
@@ -259,6 +286,7 @@ export interface ProfileRequest {
 
 export interface ProfileResult {
   readonly evidenceClass: CoreEvidenceClass;
+  readonly coreVersion?: string;
   readonly outcome: "PROFILED" | "REJECTED" | "CANCELLED";
   readonly profileHash: Sha256Hex | null;
   /** The closed profile document (kauro-migration-core `SourceProfileV1`); opaque beyond its hash here. */
@@ -292,12 +320,13 @@ export type PackageVerificationVerdict = "VALID" | "INVALID" | "ERROR";
 
 export interface PackageVerificationResult {
   readonly evidenceClass: CoreEvidenceClass;
+  readonly coreVersion?: string;
   readonly verdict: PackageVerificationVerdict;
   readonly problems: readonly string[];
 }
 
 export interface PackageVerifierPort {
-  verify(candidate: PackageCandidate, expected: ExpectedAuthority): Promise<PackageVerificationResult>;
+  verify(candidate: PackageCandidate, expected: ExpectedAuthority, controls?: CoreCallControls): Promise<PackageVerificationResult>;
 }
 
 // --- ValidatePort (validatePlan / dryRun) -----------------------------------------------------------------------------------
@@ -309,6 +338,7 @@ export interface ValidateRequest {
   readonly targetContractHash: Sha256Hex | null;
   readonly scratch: ScratchStore;
   readonly cancellation: CancellationChannel;
+  readonly controls?: CoreCallControls;
 }
 
 /**
@@ -324,6 +354,7 @@ export type CoreValidationReceipt = Omit<
 
 export interface ValidateResult {
   readonly evidenceClass: CoreEvidenceClass;
+  readonly coreVersion?: string;
   readonly outcome: "VALID" | "INVALID" | "ERROR";
   readonly receipt: CoreValidationReceipt | null;
   readonly problems: readonly string[];

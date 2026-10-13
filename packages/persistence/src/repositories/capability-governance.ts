@@ -51,7 +51,7 @@ export class PgCapabilityGovernanceRepository implements CapabilityGovernanceRep
   constructor(private readonly db: Queryable) {}
 
   async lockCapability(capabilityId: CapabilityId): Promise<CapabilityGovernanceRecord | null> {
-    const r = await execute<CapabilityRow>(this.db, "SELECT capability_id, revision, state, profile_hash FROM kauro.capabilities WHERE capability_id = $1 FOR UPDATE", [capabilityId]);
+    const r = await execute<CapabilityRow>(this.db, "SELECT capability_id, revision, state, profile_hash FROM kauro.capabilities WHERE capability_id = $1 FOR NO KEY UPDATE", [capabilityId]);
     const row = r.rows[0];
     return row ? { capabilityId: row.capability_id as CapabilityId, revision: Number(row.revision), state: row.state, profileHash: row.profile_hash as Sha256Hex } : null;
   }

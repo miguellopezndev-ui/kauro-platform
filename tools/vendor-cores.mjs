@@ -244,9 +244,17 @@ async function checkInstalled(root, cores) {
     const coreEntry = join(installed, typeof coreExport === "string" ? coreExport : coreExport.default);
     const coreNs = await import(pathToFileURL(coreEntry).href);
     const wrapperNs = await import(pathToFileURL(wrapperEntry).href);
+    // D5-6: the wrapper may add exactly the names listed in its wrapper-additions.json (none when the file is absent)
+    const additionsFile = join(wrapperDir, "wrapper-additions.json");
+    const additions = existsSync(additionsFile) ? JSON.parse(readFileSync(additionsFile, "utf8")) : [];
     const { missing, extra } = diffExportNames(coreNs, wrapperNs);
-    if (missing.length || extra.length) problems.push(`[exports] ${wrapperName} differs from ${core.name}'s root exports: missing [${missing.join(", ")}], extra [${extra.join(", ")}]`);
-    else notes.push(`${wrapperName} exports equal ${core.name}'s ${Object.keys(coreNs).length} root exports`);
+    const listed = new Set(additions);
+    const unlisted = extra.filter((n) => !listed.has(n));
+    const absent = additions.filter((n) => !(n in wrapperNs));
+    const shadowing = additions.filter((n) => n in coreNs);
+    if (missing.length || unlisted.length || absent.length || shadowing.length) {
+      problems.push(`[exports] ${wrapperName} differs from ${core.name}'s root exports: missing [${missing.join(", ")}], extra [${unlisted.join(", ")}], listed but absent [${absent.join(", ")}], listed but already a core export [${shadowing.join(", ")}]`);
+    } else notes.push(`${wrapperName} exports equal ${core.name}'s ${Object.keys(coreNs).length} root exports${additions.length ? ` plus ${additions.length} listed addition(s)` : ""}`);
   }
   return { problems, notes };
 }

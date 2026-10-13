@@ -355,7 +355,7 @@ test("QUOTE_EXPIRY DENY: a reservation RELEASED under a quote that is still ISSU
     // the pass lists the reservation due and is held before it locks the quote; then the reservation is released without its quote leaving
     // ISSUED (a state no actor of the protocol produces; forced as the superuser with the triggers off), so the reservation's UPDATE policy hides it
     const pause = points.pause("db.quote_lock.before");
-    const running = expiryPassOn({ points }, conn, reservation.ends_at, [{ label: "quote_lock", match: /FROM kauro\.quotes WHERE quote_id = \$1 FOR UPDATE/ }], true);
+    const running = expiryPassOn({ points }, conn, reservation.ends_at, [{ label: "quote_lock", match: /FROM kauro\.quotes WHERE quote_id = \$1 FOR NO KEY UPDATE/ }], true);
     await pause.reachedBy(running);
     const forced = await iw.h.pg.connect("postgres");
     try {
@@ -406,7 +406,7 @@ async function ownerWrite(sql: string, params: ReadonlyArray<unknown>): Promise<
 }
 /** One actor's own statement steps (each actor of a cell gets its own labels, so its points are its own). */
 const liveReadOf = (actor: string, nth: number): SqlStep => ({ ...LIVE_READ(nth), label: `${actor}_live_read_${nth}` });
-const quoteLockOf = (actor: string, nth: number): SqlStep => ({ label: `${actor}_quote_lock_${nth}`, match: /FROM kauro\.quotes WHERE quote_id = \$1 FOR UPDATE/, nth });
+const quoteLockOf = (actor: string, nth: number): SqlStep => ({ label: `${actor}_quote_lock_${nth}`, match: /FROM kauro\.quotes WHERE quote_id = \$1 FOR NO KEY UPDATE/, nth });
 /** A STALE_VERSION of CMD027: retryable, its current the project's live quote (else its latest) as it stands now. */
 async function assertStaleWithCurrent(reply: Reply, quoteId: string, what: string): Promise<void> {
   const seen = reply.status >= 400 ? outcome(iw.w, reply) : `${reply.status} ${reply.text.slice(0, 300)}`;

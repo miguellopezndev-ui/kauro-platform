@@ -263,7 +263,7 @@ export class PgProjectRepository implements ProjectRepository {
   }
 
   async lock(projectId: ProjectId): Promise<ProjectRecord | null> {
-    const r = await execute<ProjectRow>(this.db, `SELECT ${PROJECT_COLUMNS} FROM kauro.projects WHERE project_id = $1 FOR UPDATE`, [projectId]);
+    const r = await execute<ProjectRow>(this.db, `SELECT ${PROJECT_COLUMNS} FROM kauro.projects WHERE project_id = $1 FOR NO KEY UPDATE`, [projectId]);
     return r.rows[0] ? projectRecord(r.rows[0]) : null;
   }
 
@@ -441,7 +441,7 @@ export class PgTargetContractRepository implements TargetContractRepository {
   }
 
   async lockLifecycle(contractId: TargetContractId): Promise<TargetContractLifecycle | null> {
-    const r = await execute<LifecycleRow>(this.db, `SELECT ${LIFECYCLE_COLUMNS} FROM kauro.target_contracts WHERE contract_id = $1 FOR UPDATE`, [contractId]);
+    const r = await execute<LifecycleRow>(this.db, `SELECT ${LIFECYCLE_COLUMNS} FROM kauro.target_contracts WHERE contract_id = $1 FOR NO KEY UPDATE`, [contractId]);
     return r.rows[0] ? lifecycleRecord(r.rows[0]) : null;
   }
 
