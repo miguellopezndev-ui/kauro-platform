@@ -87,16 +87,17 @@ $$;
 CREATE TRIGGER request_journal_non_acceptance_evidence BEFORE UPDATE ON kauro.request_journal
   FOR EACH ROW EXECUTE FUNCTION kauro.request_journal_non_acceptance_evidence();
 
--- Into DISPATCHING only from RESERVED, DISPATCHING -> DISPATCHING included (D5-18 edge guard).
+-- Into DISPATCHING only from a RESERVED row no settlement names yet, DISPATCHING -> DISPATCHING included (D5-18 edge guard; a
+-- reservation its core RELEASED unsent stays RESERVED, S09, and is never sent).
 CREATE OR REPLACE FUNCTION kauro.request_journal_dispatch_from_reserved() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 BEGIN
-  RAISE EXCEPTION 'JOURNAL: request % enters DISPATCHING from RESERVED only (it is %)', OLD.request_id, OLD.state USING ERRCODE = 'KA007';
+  RAISE EXCEPTION 'JOURNAL: request % enters DISPATCHING from an unsettled RESERVED only (it is %, settlement %)', OLD.request_id, OLD.state, coalesce(OLD.settlement_state, 'none') USING ERRCODE = 'KA007';
 END
 $$;
 CREATE TRIGGER request_journal_dispatch_from_reserved BEFORE UPDATE OF state ON kauro.request_journal
-  FOR EACH ROW WHEN (NEW.state = 'DISPATCHING' AND OLD.state IS DISTINCT FROM 'RESERVED') EXECUTE FUNCTION kauro.request_journal_dispatch_from_reserved();
+  FOR EACH ROW WHEN (NEW.state = 'DISPATCHING' AND (OLD.state IS DISTINCT FROM 'RESERVED' OR OLD.settlement_state IS NOT NULL)) EXECUTE FUNCTION kauro.request_journal_dispatch_from_reserved();
 
 -- Into RESPONSE_STORED only from a sent state (a response cannot exist for an unsent request; a terminal OLD is refused by
 -- request_journal_guard, which fires first by name).

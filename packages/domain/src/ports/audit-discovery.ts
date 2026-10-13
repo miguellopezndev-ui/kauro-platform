@@ -70,6 +70,8 @@ export interface GrantScope {
  * database's own verdict that it can never be sent (D8-GRANT-2): a RESERVED intent of a model task whose audit no longer interprets,
  * whose interpretation deadline passed on the server clock, or whose MODEL_TASK lease moved to another fence — exactly the refusals of
  * the check before SEND_STARTED (migration 0023, request_journal_model_task_send). Any other intent may have reached its provider.
+ * B05 S09: a core reservation its core RELEASED unsent is listed too (still RESERVED, its usage already reconciled at 0; a settled
+ * row is refused the DISPATCHING edge) and is provablyUnsent.
  */
 export interface GrantUsage {
   readonly requestId: RequestId;

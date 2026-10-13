@@ -300,8 +300,10 @@ test("S08 DENY send edge: markDispatching on a DISPATCHING, UNCERTAIN, RESPONSE_
   const at = async (state: string): Promise<Admission> => {
     const a = await admit(env, run, 50_000n);
     if (state === "RESERVED") return a;
-    if (state === "CANCELLED") {
+    if (state === "RELEASED" || state === "CANCELLED") {
+      // IC's RELEASED leaves the row RESERVED (S09); GRANT_RECONCILIATION's cancel at its fence then makes it CANCELLED
       await settle(a, "RELEASED", 0n);
+      if (state === "CANCELLED") await journal(a, (j) => j.markCancelled(a.requestId, 1, clock.now()));
       return a;
     }
     await dispatch(env, a);
@@ -310,12 +312,14 @@ test("S08 DENY send edge: markDispatching on a DISPATCHING, UNCERTAIN, RESPONSE_
     if (state === "FAILED") await journal(a, (j) => j.markFailed(a.requestId, 1, clock.now()));
     return a;
   };
+  // and a RESERVED request its core already RELEASED (S09: it stays RESERVED, settled): no edge either
   const rows = new Map<string, Admission>();
-  for (const s of ["DISPATCHING", "UNCERTAIN", "RESPONSE_STORED", "FAILED", "CANCELLED"]) rows.set(s, await at(s));
+  for (const s of ["DISPATCHING", "UNCERTAIN", "RESPONSE_STORED", "FAILED", "CANCELLED", "RELEASED"]) rows.set(s, await at(s));
   for (const [s, a] of rows) {
-    assert.equal((await requestRow(env, a.requestId)).state, s);
+    const state = s === "RELEASED" ? "RESERVED" : s;
+    assert.equal((await requestRow(env, a.requestId)).state, state);
     assert.equal(await journal(a, (j) => j.markDispatching(a.requestId, 1, "provider-again", clock.now())), null, `markDispatching on ${s} returns null`);
-    assert.equal((await requestRow(env, a.requestId)).state, s, `${s} unchanged`);
+    assert.equal((await requestRow(env, a.requestId)).state, state, `${s} unchanged`);
     assert.deepEqual(await refusal(run.ag.agencyId, "UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = $1", [a.requestId]), ["KA007", undefined], `a direct UPDATE from ${s} into DISPATCHING`);
   }
   // the edge retried after its first COMMIT sends nothing (the DISPATCHING row above answered null); after the audit's cancellation a
@@ -391,6 +395,7 @@ test("S15 DENY response edge (B06 contract kept): storeResponse at the request's
   await journal(failed, (j) => j.markFailed(failed.requestId, 1, clock.now()));
   const cancelled = await admit(env, run, 50_000n);
   await settle(cancelled, "RELEASED", 0n);
+  await journal(cancelled, (j) => j.markCancelled(cancelled.requestId, 1, clock.now()));
   const reserved = await admit(env, run, 50_000n);
   for (const [name, a] of [["CONSUMED", consumed], ["FAILED", failed], ["CANCELLED", cancelled], ["RESERVED", reserved]] as const) {
     const before = await requestRow(env, a.requestId);

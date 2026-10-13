@@ -334,6 +334,46 @@ test("S14 (GDR) RACE (crash after the DISPATCHING commit): GRANT_RECONCILIATION 
   }
 });
 
+test("S12 (GDR half: the platform's release vs GRANT_RECONCILIATION; IJR adds the real IC's refused edge) RACE (not dispatched, both orders): IC's RELEASED of a RESERVED request returns its cents once and leaves it RESERVED (S09, D5-18 row 1), a settled row is never sent (markDispatching null, a direct UPDATE KA007), GRANT_RECONCILIATION then cancels it moving no cent and the grant closes; with the reconciler first, IC's RELEASED on the CANCELLED request is recorded and moves no cent; a replay moves no cent", async () => {
+  const pool = await freshPool();
+  const sql = (x: Adm) => w.h.oracle.query("UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = $1", [x.requestId]);
+  const ka007 = (e: unknown) => (e as { code?: unknown }).code === "KA007";
+  const settled = (out: Awaited<ReturnType<typeof settle>>) => (out.kind === "NO_REQUEST" ? [out.kind] : [out.kind, out.recorded]);
+  // IC first: the platform's RELEASED from RESERVED
+  {
+    const run = await interpreting("s12-ic-first", pool);
+    const q = await admit(run, 245_000n);
+    assert.deepEqual(await money(run.grantId), ["AUTHORIZED", 25, 0]);
+    assert.deepEqual(settled(await settle(q, "RELEASED", 0n)), ["RECORDED", "RELEASED"]);
+    assert.deepEqual(await request(q), ["RESERVED", "RECONCILED", 0, "RELEASED"], "the request stays RESERVED (S09)");
+    assert.deepEqual(await money(run.grantId), ["AUTHORIZED", 0, 0], "its 25 cents back once");
+    assert.equal(await a.control(run.ag.agencyId, (uow) => uow.requestJournal.markDispatching(q.requestId, 1, "provider-s12", w.now())), null, "a released reservation is never sent");
+    await assert.rejects(sql(q), ka007, "nor by a direct UPDATE");
+    assert.deepEqual(settled(await settle(q, "RELEASED", 0n)), ["REPLAYED", "RELEASED"]);
+    assert.deepEqual(await money(run.grantId), ["AUTHORIZED", 0, 0], "the replay moves no cent");
+    // the audit ends: GRANT_RECONCILIATION cancels the released row (no cent) and closes the grant
+    await a.cancel(run.subject, run.auditId);
+    assert.deepEqual((await sweep()).failed.filter((f) => f.subject === run.grantId), []);
+    assert.deepEqual(await request(q), ["CANCELLED", "RECONCILED", 0, "RELEASED"], "cancelled at its fence, usage as released");
+    if ((await a.grant(run.grantId)).state !== "CLOSED") assert.deepEqual((await sweep()).failed.filter((f) => f.subject === run.grantId), []);
+    assert.deepEqual(await money(run.grantId), ["CLOSED", 0, 0], "the grant closes; no cent moved twice");
+  }
+  // the reconciler first: the audit ends, GRANT_RECONCILIATION cancels the provably unsent RESERVED request, then IC's RELEASED
+  {
+    const run = await interpreting("s12-rec-first", pool);
+    const q = await admit(run, 245_000n);
+    await a.cancel(run.subject, run.auditId);
+    assert.deepEqual((await sweep()).failed.filter((f) => f.subject === run.grantId), []);
+    assert.deepEqual(await request(q), ["CANCELLED", "RECONCILED", 0, null]);
+    const spentAfterRec = await money(run.grantId);
+    assert.deepEqual(spentAfterRec.slice(1), [0, 0], "its 25 cents back once");
+    assert.deepEqual(settled(await settle(q, "RELEASED", 0n)), ["RECORDED", "RELEASED"]);
+    assert.deepEqual(await request(q), ["CANCELLED", "RECONCILED", 0, "RELEASED"]);
+    assert.deepEqual((await money(run.grantId)).slice(1), [0, 0], "IC's late RELEASED moves no cent");
+    await assert.rejects(sql(q), ka007);
+  }
+});
+
 test("L16c (GDR) DENY gate absent (forged, rule 12): with the pool's gate row deleted by the migration owner, a GRANT_RECONCILIATION posting of known usage with excess over the core's maximum is refused at COMMIT (KA006 pool_liability_gate_absent), recorded as a sweep failure, and moves nothing (reservation held, usage KNOWN, no liability); with the row restored the next run posts it and opens the liability", async () => {
   const pool = await freshPool();
   const run = await interpreting("l16c-gdr", pool);

@@ -45,6 +45,9 @@ const UNSENDABLE = `(a.state IS DISTINCT FROM 'INTERPRETING' OR m.interpretation
   OR NOT EXISTS (SELECT 1 FROM kauro.leases l WHERE l.resource_kind = 'MODEL_TASK' AND l.resource_id = r.task_id AND l.fence = r.fence AND l.cost_authority_id = m.grant_id))`;
 
 /** A request whose effect is not settled: in flight, uncertain, a stored response not consumed, or a usage not reconciled. */
+// B05 D5-11 / S09: a core reservation its core RELEASED unsent stays RESERVED, its usage reconciled at 0 and its cents back; it is
+// never sent (a settled row is refused the DISPATCHING edge) and GRANT_RECONCILIATION cancels it at its fence, moving no cent
+const RELEASED_UNSENT = `(r.state = 'RESERVED' AND r.settlement_state = 'RELEASED')`;
 const OPEN_REQUEST = `(r.usage_state <> 'RECONCILED' OR r.state IN ('RESERVED', 'DISPATCHING', 'UNCERTAIN', 'RESPONSE_STORED'))`;
 
 function auditRefs(rows: ReadonlyArray<{ audit_id: unknown; agency_id: unknown }>): ReadonlyArray<AuditRef> {
@@ -149,6 +152,7 @@ export class PgAuditDiscovery implements AuditDiscovery {
            OR EXISTS (
                 SELECT 1 FROM kauro.request_journal r
                  WHERE r.cost_grant_id = g.grant_id AND r.state = 'FAILED' AND r.non_acceptance_evidence IS NOT NULL AND r.usage_state = 'UNKNOWN')
+           OR EXISTS (SELECT 1 FROM kauro.request_journal r WHERE r.cost_grant_id = g.grant_id AND ${RELEASED_UNSENT})
            OR (g.state IN ('AUTHORIZED', 'EXHAUSTED') AND g.expires_at <= kauro.server_now())
            OR (g.state = 'AUTHORIZED' AND g.reserved_cents + g.reconciled_spend_cents >= g.ceiling_cents)
            OR (g.state = 'EXHAUSTED' AND g.reserved_cents + g.reconciled_spend_cents < g.ceiling_cents AND g.expires_at > kauro.server_now())
@@ -181,13 +185,13 @@ export class PgAuditDiscovery implements AuditDiscovery {
     const r = await execute<{ request_id: string; fence: string; state: string; usage_state: string; reserved: string; actual: string | null; provably_unsent: boolean; stale_dispatch: boolean; non_accepted: boolean }>(
       this.db,
       `SELECT r.request_id, r.fence::text AS fence, r.state, r.usage_state, r.reserved_cents::text AS reserved, r.actual_cents::text AS actual,
-              (r.state = 'RESERVED' AND m.model_task_id IS NOT NULL AND ${UNSENDABLE}) AS provably_unsent,
+              (r.state = 'RESERVED' AND (${RELEASED_UNSENT} OR (m.model_task_id IS NOT NULL AND ${UNSENDABLE}))) AS provably_unsent,
               (r.state = 'DISPATCHING' AND m.model_task_id IS NOT NULL AND ${UNSENDABLE}) AS stale_dispatch,
               (r.state = 'FAILED' AND r.non_acceptance_evidence IS NOT NULL AND r.usage_state = 'UNKNOWN') AS non_accepted
          FROM kauro.request_journal r
          LEFT JOIN kauro.model_tasks m ON m.model_task_id = r.task_id
          LEFT JOIN kauro.audits a ON a.agency_id = m.agency_id AND a.audit_id = m.audit_id
-        WHERE r.cost_grant_id = $1 AND r.usage_state <> 'RECONCILED'
+        WHERE r.cost_grant_id = $1 AND (r.usage_state <> 'RECONCILED' OR ${RELEASED_UNSENT})
         ORDER BY r.reserved_at, r.request_id
         FOR UPDATE OF r`,
       [grantId],
