@@ -322,7 +322,7 @@ RDS master is not assumed superuser). It fails if TEMPORARY or CREATE on the dat
 conditions.
 A2 Pool (src/pool.ts:100-105, 159-190): VERIFY_SQL refuses a login with TEMPORARY or CREATE on the database, CREATE on any schema, or
 `current_setting('session_replication_role') <> 'origin'`; `maxLifetimeSeconds: 600`. Data API does not run VERIFY_SQL (B14-R3).
-A3 No SECURITY DEFINER function in kauro migrations (R17; on 21b310f none, comments only 0001:6, 0008:14, 0032:8, 0033:9, 0034:15,
+A3 No SECURITY DEFINER function in kauro migrations except ONE accepted exception (coordinator decision 2026-10-11): `kauro.register_bank_payment_route(uuid,text,text,uuid,text,text)` (0046, PV1 route registration, owner-gated command; owner-owned, fixed body, pinned search_path, CONFIGURED rows only), allowlisted by exact signature in the hardening migration and in the R17 catalog test; not a defect (R17; on 21b310f none, comments only 0001:6, 0008:14, 0032:8, 0033:9, 0034:15,
 0035:11, 0036:18).
 A4 Withdrawn (r3-r7): identity-closure audit, trusted identities, declared trigger/definer inventories, view/rule/callback analysis,
 audit cutover. Sessions, definers, views, rules or callbacks OUTSIDE the TCB can at most write values section B's facts justify;
@@ -461,7 +461,7 @@ admission then UPDATEs it; SDP-30). Lifetime (SDP-31): both ledgers frozen again
 with live_jobs = 0 and its agency_id is immutable; execution_capacity refuses INSERT after 0051 (its seed is its only birth; a
 replacement birth is not supported) and its recount is also queued AFTER INSERT. live_jobs is recounted per ledger row and per job
 (0021:406-413).
-B11 lifetime freeze (rule 22), `0058_lifetime_freeze.sql`: generated from section 3: every "frozen (B11)" cell gets BEFORE DELETE
+B11 lifetime freeze (rule 22), `0067_lifetime_freeze.sql` (planned, next free; 3c): generated from section 3: every "frozen (B11)" cell gets BEFORE DELETE
 FOR EACH ROW and BEFORE TRUNCATE FOR EACH STATEMENT executing kauro.forbid_change; the three config tables (row 15) also refuse
 INSERT and UPDATE; founding_slots (row 25) refuses INSERT (its 0028 seed is its only birth; a test that needs a synthetic cohort
 seeds it as the oracle under ALTER TABLE ... DISABLE TRIGGER, the TCB path of P2, as a migration would).
@@ -496,7 +496,7 @@ issued_at + price_policies.quote_seconds of its policy (KA004 otherwise; CreateQ
 serverNow() in the writing unit, packages/application/src/commercial/quotes/create-quote.ts:138); price_eligibility_snapshots_birth: as_of = server_now() and lookback_starts_at
 = as_of - repeat_lookback_seconds of its policy. Fixtures that back-date quotes move the test clock (src/testing/server-now.ts),
 not the column (D-FIX-2).
-B14 target contract lifetime (SDP-38), `target_contracts_lifetime` BEFORE INSERT OR UPDATE in `0058`: confirmed_at and superseded_at
+B14 target contract lifetime (SDP-38), `target_contracts_lifetime` BEFORE INSERT OR UPDATE in `0067` (planned, next free): confirmed_at and superseded_at
 are NULL or := now at birth; each moves only NULL->now, once; superseded_at only once confirmed_at is set; neither is ever cleared
 or moved (KA004). The transition lock (0003:262) stays. R17 asserts, from pg_trigger, that every table of section 3 refuses DELETE and TRUNCATE.
 B10 authorization bounds (G14), in `0051`: copies of 0021:736-752 and 0022:602-618 without the `rolsuper` block (0021:740-742,
@@ -518,8 +518,8 @@ race proof (rule 1).
 
 | Row | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
-| R1 hardening A | N/A | N/A | N/A | GAP SEC-03 R :: "DENY SEC-DEPTH (release): 0050 records no ledger row when its revokes leave TEMPORARY to a runtime group" | N/A | N/A | GAP SEC-18 R :: "DENY SEC-DEPTH: a pooled runtime login cannot create a temporary table or a pg_temp function (42501)"; SEC-05 R :: "DENY SEC-DEPTH: the pool refuses a login with TEMPORARY, schema CREATE or a non-origin session_replication_role" | N/A |
-| R2 P2 boundary | N/A | N/A | N/A | GAP SEC-112 R :: "DENY SEC-DEPTH (release): 0050 fails when a runtime group, login or PUBLIC holds SET on session_replication_role, owns a kauro object or can execute a definer in kauro, kauro_meta or public" | N/A | N/A | GAP SEC-59 R :: "DENY SEC-DEPTH: a runtime login cannot SET LOCAL session_replication_role = replica (42501)" | N/A |
+| R1 hardening A | N/A | N/A | N/A | C SEC-03 R :: "DENY SEC-DEPTH (release): 0050 records no ledger row when its revokes leave TEMPORARY to a runtime group" | N/A | N/A | C SEC-18 R :: "DENY SEC-DEPTH: a pooled runtime login cannot create a temporary table or a pg_temp function (42501)"; C SEC-05 R :: "DENY SEC-DEPTH: the pool refuses a login with TEMPORARY, schema CREATE or a non-origin session_replication_role" | N/A |
+| R2 P2 boundary | N/A | N/A | N/A | C SEC-112 R :: "DENY SEC-DEPTH (release): 0050 fails when a runtime group, login or PUBLIC holds SET on session_replication_role, owns a kauro object or can execute a definer in kauro, kauro_meta or public" | N/A | N/A | C SEC-59 R :: "DENY SEC-DEPTH: a runtime login cannot SET LOCAL session_replication_role = replica (42501)" | N/A |
 | R7 attempt -> attempt_count (0021:684) | GAP SEC-23 S :: "RACE SEC-DEPTH: two attempts for ordinal n+1, both orders held at the job's FOR SHARE, leave attempt_count = n+1 naming the committed attempt" | N/A guard | N/A no deadline read | N/A guard | N/A guard | GAP SEC-24 S :: "DENY SEC-DEPTH (superuser nested attempt_count): a superuser-owned nested attempt_count of n+1 with no attempt of that ordinal born now is refused KA080" | GAP SEC-25 S :: "DENY SEC-DEPTH (superuser nested current_attempt_id): a superuser-owned nested current_attempt_id naming another job's or an older attempt is refused KA080" | N/A guard |
 | R8 claim -> job fence (0021:686) | GAP SEC-26 S :: "RACE SEC-DEPTH (takeover): two claimants of an expired JOB_ATTEMPT lease, both orders held at the lease row, one fence wins and the job's fence is the winner's" | N/A guard | GAP SEC-27 S :: "EXPIRY SEC-DEPTH: a takeover claim at server_now = expires_at - 1 ms is HELD, at expires_at it advances the fence"; SEC-27b S :: "OK SEC-DEPTH: the initial claim of an absent lease is fence 1 and no takeover" | N/A guard | N/A guard | GAP SEC-28 S :: "DENY SEC-DEPTH (superuser nested fence max): a superuser-owned nested fence = 9223372036854775807 on an ACTIVE job is refused KA080 and jobRecord still reads the job"; SEC-28b S :: "DENY SEC-DEPTH (superuser nested fence in range): a superuser-owned nested fence = OLD + 1 with no attempt claimed at it now is refused KA080" | N/A: claim and bookkeeping share one transaction holding the lease row lock (0006:253); SEC-26 proves the wait | N/A guard |
 | R9 lease INSERT/DELETE | N/A single statement | N/A | N/A | N/A | N/A | N/A | GAP SEC-29 S :: "DENY SEC-DEPTH (lease delete): kauro_control cannot DELETE a lease"; SEC-30 S :: "DENY SEC-DEPTH (lease birth): an INSERT above fence 1 is refused and caller heartbeat/created instants are replaced by server_now" | N/A (DENY SEC-29/30) |
@@ -603,7 +603,7 @@ FH-R2; audit fence (G6), admission instants (G11/G12). B09: R2-140, S058/S057 (b
 trigger (EXECUTE revoke); commission-support.ts:707 callers (b10-commission-service.test.ts:211, b10-failure-cells-accrual.test.ts
 :507, :766). B07: none. B10: R2-136 (b10-recurrence-adapters.test.ts:592-595) seeds its synthetic one-slot cohort under DISABLE TRIGGER (B11).
 
-D1 G14 fixture moves (SDP-23; the kit helpers drive only production writers, never the oracle):
+D1 G14 fixture moves (SDP-23; the kit helpers drive only production writers, never the oracle). DONE in lane L0 (b09-critique, b09-scenarios, commission-support); the execution-migrations stand-in below waits for the G14 guard (L2a):
 - execution-migrations.test.ts:783-795: the stand-in now expects KA081 at COMMIT (title "D8-PEX-8 withdrawn: the superuser oracle is
   bound by the consumption and delivery edges"); SEC-106/107 cover the definer route.
 - b09-critique.test.ts:346-349: `consumeThroughExecution(h, A, second.authorizationId)` (queueJob -> admitJob); `endJob` after the
@@ -634,7 +634,7 @@ D1 G14 fixture moves (SDP-23; the kit helpers drive only production writers, nev
 | L2b money | migrations/0053, 0054, src/audit/store.ts (:582-600), src/audit/store.ts (:194-198), src/audit/discovery.ts (:161-184), src/request-journal.ts (:78-105), M, audit-migrations, grant-reconciliation, adapters-journals-outbox tests | R12-R14, R12b-e, R26 (SEC-114/115/118/119), B12 grants/captures | 225 min, 530k | Opus |
 | L3 commercial | migrations/0055, 0056, H | R15, R16, R19-R21, R31, B13 (i-iii, R), B15, founding first assignment | 220 min, 500k | Opus |
 | L0b quote fixtures (D-FIX-1, D-FIX-2) | src/testing/commerce-purchases.ts (:205-264), test/commerce-support.ts (:400-432), harness cohort seed | SEC-138/142 siblings | 80 min, 180k | claude-sonnet-5-5 |
-| L4 lifetime | migrations/0058, T, b10-recurrence-adapters.test.ts (:592-595 only) | R27, R29 (SEC-Fnn, SEC-135), SEC-130, SEC-140/141 (B14) | 180 min, 380k | claude-sonnet-5-5 |
+| L4 lifetime | migrations/0067 (planned, next free), T, b10-recurrence-adapters.test.ts (:592-595 only) | R27, R29 (SEC-Fnn, SEC-135), SEC-130, SEC-140/141 (B14) | 180 min, 380k | claude-sonnet-5-5 |
 
 src/audit/store.ts is split by line ranges (L2a :488, L2b :582-600): L2a lands first, L2b rebases. Order K -> L0 -> (L1 || L2a ||
 L2b) -> L3 -> L4; L2a needs L0 merged (B10 removes the skip the old fixtures used). Done = every GAP rewritten to C with its title; C1

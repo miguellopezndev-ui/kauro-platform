@@ -56,6 +56,7 @@ import {
   type AgencyFixture,
   type Harness,
   type RecordedSeller,
+  deliverThroughExecution,
   testDatabaseEnvironment,
 } from "@kauro/persistence/testing";
 import { createCommissionService, openCommissionPools, type CommissionHoldPoint, type CommissionPools, type CommissionService } from "../src/index.js";
@@ -804,28 +805,23 @@ export async function approvedRefund(cw: CommissionWorld, s: Selling, p: Purchas
   return refundId;
 }
 
-/** B08's delivery of an authorization, which no runtime role of this base performs: written by the superuser as B09's scenarios write it. */
+/**
+ * B08's delivery of an authorization through the production execution writers (queueJob, admitJob, launch, stage, verify, publish;
+ * SEC-DEPTH-PROVENANCE D1): the agency's owner queues, the control plane runs the rest. Returns the DELIVERED event id read from
+ * domain_events.
+ */
 export async function deliveredByTheExecutionPackage(cw: CommissionWorld, authorizationId: string, agencyId: string): Promise<string> {
-  const { oracle } = cw.h;
-  const deliveredEventId = ids.next();
-  const event = (eventId: string, version: number, type: string) =>
-    oracle.query(
-      `INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at)
-       VALUES ($1, 'commercial_authorization', $2, $3, $4, $5, 'SERVICE', 'execution-control', $6, $7, '{}'::jsonb, $8, '1', now())`,
-      [eventId, authorizationId, version, agencyId, type, ids.next(), ids.next(), sha("{}")],
-    );
-  await oracle.query("BEGIN");
-  try {
-    await oracle.query("UPDATE kauro.commercial_authorizations SET state = 'CONSUMED', version = 2, job_ref = $2, consumed_at = now(), updated_at = now() WHERE authorization_id = $1", [authorizationId, ids.next()]);
-    await event(ids.next(), 2, "commercial_authorization.consumed.v1");
-    await oracle.query("UPDATE kauro.commercial_authorizations SET state = 'DELIVERED', version = 3, delivered_at = now(), updated_at = now() WHERE authorization_id = $1", [authorizationId]);
-    await event(deliveredEventId, 3, "commercial_authorization.delivered.v1");
-    await oracle.query("COMMIT");
-  } catch (e) {
-    await oracle.query("ROLLBACK");
-    throw e;
-  }
-  return deliveredEventId;
+  const owner = await cw.h.oracle.query<{ user_id: string; membership_id: string }>("SELECT user_id, membership_id FROM kauro.memberships WHERE agency_id = $1 AND role = 'OWNER' AND state = 'ACTIVE'", [agencyId]);
+  if (owner.rows.length !== 1) throw new Error(`agency ${agencyId} has no single ACTIVE owner to queue the job`);
+  await deliverThroughExecution(cw.h, { agencyId: agencyId as never, ownerUserId: owner.rows[0]!.user_id as never, ownerMembershipId: owner.rows[0]!.membership_id as never }, authorizationId);
+  return deliveredEventOf(cw, authorizationId);
+}
+
+/** The id of the commercial_authorization.delivered.v1 event of an authorization (the oracle reads domain_events). */
+async function deliveredEventOf(cw: CommissionWorld, authorizationId: string): Promise<string> {
+  const r = await cw.h.oracle.query<{ event_id: string }>("SELECT event_id FROM kauro.domain_events WHERE aggregate_id = $1 AND event_type = 'commercial_authorization.delivered.v1'", [authorizationId]);
+  if (r.rows.length !== 1) throw new Error(`authorization ${authorizationId} has ${r.rows.length} delivered events`);
+  return r.rows[0]!.event_id;
 }
 
 /** The delivery of a recorded event as the dispatcher hands it to the consumer (the oracle reads the event row). */
