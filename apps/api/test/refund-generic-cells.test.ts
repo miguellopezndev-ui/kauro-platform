@@ -7,7 +7,8 @@
 // Design path note: the design names packages/persistence/test/refund-generic-cells.test.ts; the cells need the composed api and the KIT's
 // bankWorld (apps/api/test), which packages/persistence cannot import, so they live here (reported to the coordinator).
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
+import { after, before } from "node:test";
+import { laneTest as test } from "./refund-lane-support.js";
 import type { UserId } from "@kauro/domain";
 import { LOCK_WAIT_OBSERVATION_MS, connectionPid, openConnection, runCell, type CellBody, type FaultContext, type FaultKind, type HarnessConnection } from "@kauro/persistence/testing";
 import type { RouteRole, SqlStep } from "./fault-support.js";
@@ -18,6 +19,7 @@ import {
   COLLISION_A,
   COLLISION_B,
   DEST,
+  expireProofs,
   KINDS,
   L,
   SCOPES,
@@ -325,7 +327,7 @@ cell("DENY RFG-M-X1-REVOCATION (each prerequisite): Declare manual refund execut
       { what: "owner grant", revoke: (o) => iw.h.revokeCorporateGrant(o.grantId), reason: /^403 / },
       { what: "verified identity", revoke: (o) => q("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1", [o.person.userId]), reason: /^403 / },
       { what: "session", revoke: (o) => q("UPDATE kauro.web_sessions SET revoked_at = now() WHERE user_id = $1", [o.person.userId]).catch(() => q("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1", [o.person.userId])), reason: /^403 / },
-      { what: "step-up", revoke: (o) => q("UPDATE kauro.assurance_proofs SET expires_at = now() WHERE user_id = $1", [o.person.userId]), reason: /^403 / },
+      { what: "step-up", revoke: (o) => expireProofs("user_id", o.person.userId), reason: /^403 / },
       // the approval stops being current: the refund leaves APPROVED (the reversal's authorization_lapsed of B09, written as its effect)
       { what: "approval current", revoke: (_o, src) => q(src.scope === "CAPTURE" ? "UPDATE kauro.refunds SET state = 'FAILED', version = version + 1, failure_code = 'CAPTURE_REVERSED' WHERE refund_id = $1" : "UPDATE kauro.treasury_refunds SET state = 'FAILED', version = version + 1 WHERE treasury_refund_id = $1", [src.refundId]), reason: /^409 / },
       // the destination evidence withdrawn: its captured row gone
@@ -494,7 +496,7 @@ cell("DENY RFG-M-X4-REVOCATION (each prerequisite): Declare a resend execution",
         await ctx.revoked(`${scope}: ${what}`, async () => {
           if (what === "grant") await iw.h.revokeCorporateGrant(o.grantId);
           else if (what === "identity" || what === "session") await q("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1", [o.person.userId]);
-          else if (what === "step-up") await q("UPDATE kauro.assurance_proofs SET expires_at = now() WHERE proof_id = $1", [proof]);
+          else if (what === "step-up") await expireProofs("proof_id", proof);
           else await q("DELETE FROM kauro.refund_destinations WHERE refund_id::text = $1 OR treasury_refund_id::text = $1", [b.src.refundId]);
         });
         await held.release();
@@ -1051,6 +1053,8 @@ test("OK RFG-P-DEST-RECIPIENT (bound recipient record, same version at execution
       dataOf<DeclareView>(await declareX1(src), 201, `${scope}: X1`);
       throw new SeamMissing("S4", SEAMS.S4);
     }
+    // S4 is bound (KIT-2): the DP-RECIPIENT positive control is written with X1/G2, never a vacuous pass
+    throw new Error(`${scope}: the DP-RECIPIENT body is not written yet (slice 2)`);
   }
 });
 

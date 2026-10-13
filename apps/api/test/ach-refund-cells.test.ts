@@ -6,7 +6,8 @@
 // Design path note: the design names packages/persistence/test/ach-refund-cells.test.ts; the cells need the composed api and bankWorld
 // (apps/api/test), so they live here (reported to the coordinator).
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
+import { after, before } from "node:test";
+import { laneTest as test } from "./refund-lane-support.js";
 import { LOCK_WAIT_OBSERVATION_MS, runCell, type FaultContext, type FaultKind } from "@kauro/persistence/testing";
 import type { StoredBankArtifact } from "./bank-support.js";
 import { dispatch, reconcile, storeQuery } from "./payment-support.js";
@@ -27,6 +28,7 @@ import {
   dataOf,
   declareX4,
   declared,
+  expireProofs,
   footprint,
   nextExecutionId,
   onFresh,
@@ -333,7 +335,7 @@ for (const row of OWNER_ROWS) {
         const revoke = async (): Promise<void> => {
           if (what === "grant") await iw.h.revokeCorporateGrant(o.grantId);
           else if (what === "identity") await q("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1", [o.person.userId]);
-          else await q("UPDATE kauro.assurance_proofs SET expires_at = now() WHERE proof_id = $1", [proof]);
+          else await expireProofs("proof_id", proof);
         };
         if (row.code === "F2") {
           await ctx.revoked(`${scope}: ${what}`, revoke);
@@ -532,8 +534,9 @@ for (const [code, label] of [["F1", "Approve outbound return"], ["G1", "Record e
       const conn = await openBank();
       try {
         await ctx.partial(`${scope}: ${code} failing after its gate`, "db.state_update.before", async () => {
+          const seen = L().iw.w.internalErrors.length;
           const r = await routed(ctx, conn, () => s.read(a), [{ label: "offer_or_journal", match: /INSERT INTO kauro\.(execution_offers|command_journal)/ }, { label: "state_update", match: /UPDATE kauro\.(refunds|treasury_refunds|outbound_execution_attempts)\b/ }]);
-          if (r.status >= 500) throw new Error(String(r.status));
+          if (r.status >= 500) throw L().iw.w.internalErrors[seen]?.error ?? new Error(String(r.status));
           return r;
         });
       } finally {

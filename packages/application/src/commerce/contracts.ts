@@ -198,6 +198,10 @@ export interface ApproveRefundBody {
   readonly taxCents: MoneyMinorUnits;
   /** A fresh step-up proof of the approving owner, or an applicable standing refund policy (D-REF-B4). */
   readonly authorizationRef: string;
+  /** Payments V1 F2 (lane L-REFUND): the manual-rail destination the owner read from the payer evidence (with destinationEvidence). */
+  readonly destination?: { readonly routingNumber: string; readonly accountNumber: string; readonly holderName: string };
+  /** The restricted payer evidence the destination is proven by. */
+  readonly destinationEvidence?: { readonly artifactRef: string; readonly evidenceHash: string };
 }
 export type ApproveRefundResult = ApproveRefundView;
 export const APPROVE_REFUND = spec<ApproveRefundBody>({

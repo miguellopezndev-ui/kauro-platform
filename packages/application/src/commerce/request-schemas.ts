@@ -25,6 +25,23 @@ const LABEL = { type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PAT
 /** A provider's opaque reference as the browser echoes it back (never trusted: the server compares it with the stored order). */
 const PROVIDER_REF = { type: "string", minLength: 1, maxLength: 256, pattern: "^[A-Za-z0-9._:-]+$" } as const;
 
+/**
+ * A manual-rail refund destination (lane L-REFUND, DV1-10): the numbers as typed (separators allowed; destination-norm-v1 judges them) and the
+ * holder's name. Closed: nothing else is accepted. Never stored: the server keeps the keyed fingerprint, the last four and the display name.
+ */
+export const BANK_DESTINATION = {
+  type: "object",
+  additionalProperties: false,
+  required: ["routingNumber", "accountNumber", "holderName"],
+  properties: {
+    routingNumber: { type: "string", minLength: 1, maxLength: 32 },
+    accountNumber: { type: "string", minLength: 1, maxLength: 64 },
+    holderName: { type: "string", maxLength: 512 },
+  },
+} as const;
+/** The restricted payer evidence a destination is proven by: its artifact and the hash of its bytes. */
+export const BANK_DESTINATION_EVIDENCE = { type: "object", additionalProperties: false, required: ["artifactRef", "evidenceHash"], properties: { artifactRef: ID, evidenceHash: HASH } } as const;
+
 function schema(command: string, required: ReadonlyArray<string>, properties: RequestSchema["properties"]): RequestSchema {
   return {
     $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -53,6 +70,10 @@ export const COMMERCE_REQUEST_SCHEMAS = Object.freeze({
     serviceCents: MONEY,
     taxCents: MONEY,
     authorizationRef: ID,
+    // Payments V1 (lane L-REFUND, F2): the manual-rail refund's destination as the owner read it from the payer evidence, and that evidence;
+    // both OPTIONAL beyond the vendored catalogue (absent: the provider refund of B09; one without the other is refused by the handler)
+    destination: BANK_DESTINATION,
+    destinationEvidence: BANK_DESTINATION_EVIDENCE,
   }),
   /** ExecuteRefund. */
   CMD033: schema("CMD033", ["expectedVersion"], { expectedVersion: VERSION }),

@@ -963,6 +963,53 @@ export const BANK_ROUTE_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Ob
   }),
 ] satisfies ReadonlyArray<OperationalRoute>);
 
+// --- the manual-assisted refunds of the bank-transfer route (lane L-REFUND; ACH-ROUTE r12 §7.13-§7.22, D-24 A) ---------------------------
+const BANK_MONEY = { type: "string", pattern: "^(0|[1-9][0-9]{0,15})$" } as const;
+/** A manual-rail destination as typed (destination-norm-v1 judges it); never echoed back, never stored. */
+export const BANK_REFUND_DESTINATION_SCHEMA: JsonSchema = closedObject(["routingNumber", "accountNumber", "holderName"], {
+  routingNumber: { type: "string", minLength: 1, maxLength: 32 },
+  accountNumber: { type: "string", minLength: 1, maxLength: 64 },
+  holderName: { type: "string", maxLength: 512 },
+});
+export const BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA: JsonSchema = closedObject(["artifactRef", "evidenceHash"], { artifactRef: BANK_UUID, evidenceHash: BANK_HASH });
+/** The COMPLETED envelope of CMD220: the treasury refund after its approval (the destination only by its last four). */
+export const TREASURY_REFUND_COMMAND_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1 },
+  replayed: { type: "boolean" },
+  data: closedObject(["treasuryRefund"], {
+    treasuryRefund: closedObject(["treasuryRefundId", "state", "version", "amountCents", "bankCreditId", "destinationLast4"], {
+      treasuryRefundId: BANK_UUID,
+      state: { type: "string", enum: ["REQUESTED", "APPROVED", "SUBMITTING", "UNCERTAIN", "COMPLETED", "FAILED", "REJECTED"] },
+      version: BANK_VERSION,
+      amountCents: BANK_MONEY,
+      bankCreditId: BANK_UUID,
+      destinationLast4: { type: "string", pattern: "^[0-9]{1,4}$" },
+    }),
+  }),
+});
+export const BANK_REFUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
+  Object.freeze({
+    operationId: "approveTreasuryRefund",
+    method: "POST" as const,
+    path: "/api/v1/operations/treasury-refunds/{treasuryRefundId}/approve",
+    summary: "Approve the route-scope refund of an unassigned bank credit for the manual rail, with the destination read from the payer evidence (APPROVED)",
+    authority: "ACH-ROUTE r12 §7.13-§7.14 (F1, F2), D-ACH-19, D-24 A; KAURO_OWNER with a fresh step-up judged at the database clock; Idempotency-Key (journal of the owner identity)",
+    request: Object.freeze({
+      contentType: "application/json" as const,
+      schema: closedObject(["expectedVersion", "serviceCents", "taxCents", "authorizationRef"], {
+        expectedVersion: BANK_VERSION,
+        serviceCents: BANK_MONEY,
+        taxCents: BANK_MONEY,
+        authorizationRef: BANK_UUID,
+        destination: BANK_REFUND_DESTINATION_SCHEMA,
+        destinationEvidence: BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA,
+      }),
+    }),
+    responses: Object.freeze({ "200": Object.freeze({ description: "The treasury refund after the approval (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: TREASURY_REFUND_COMMAND_RESPONSE_SCHEMA }) }),
+  }),
+] satisfies ReadonlyArray<OperationalRoute>);
+
 export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
   Object.freeze({
     operationId: "getLiveness",
@@ -1008,6 +1055,7 @@ export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze
     }),
   }),
   ...BANK_ROUTE_OPERATIONAL_ROUTES,
+  ...BANK_REFUND_OPERATIONAL_ROUTES,
 ] satisfies ReadonlyArray<OperationalRoute>);
 
 export function operationalResponseSchemaId(operationId: string, status: string): OperationalResponseSchemaId {

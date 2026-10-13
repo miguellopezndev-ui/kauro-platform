@@ -8128,6 +8128,67 @@
         }
       }
     },
+    "/api/v1/operations/treasury-refunds/{treasuryRefundId}/approve": {
+      "post": {
+        "operationId": "approveTreasuryRefund",
+        "summary": "Approve the route-scope refund of an unassigned bank credit for the manual rail, with the destination read from the payer evidence (APPROVED)",
+        "description": "Authority: ACH-ROUTE r12 §7.13-§7.14 (F1, F2), D-ACH-19, D-24 A; KAURO_OWNER with a fresh step-up judged at the database clock; Idempotency-Key (journal of the owner identity)",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/approveTreasuryRefundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The treasury refund after the approval (COMPLETED envelope; an identical replay answers the journaled reply).",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/approveTreasuryRefundResponse200"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/payment-orders/{orderId}": {
       "get": {
         "operationId": "GetPaymentOrder",
@@ -18500,7 +18561,7 @@
             ]
           },
           "404": {
-            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 404, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 404, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -18522,11 +18583,17 @@
                 "reason": null,
                 "layer": "ACCESS",
                 "meaning": "the stored operation is unknown to the operator's finance scope: a foreign and a nonexistent id answer alike"
+              },
+              {
+                "code": "NOT_FOUND",
+                "reason": "EVIDENCE_NOT_FOUND",
+                "layer": "COMMAND",
+                "meaning": "the destination evidence is not in the restricted store"
               }
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 7 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 8 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -18589,11 +18656,17 @@
                 ],
                 "layer": "COMMAND",
                 "meaning": "taxCents is not the tax the approved service releases under the sale's reviewed rule, given every committed refund (D-REF-B6)"
+              },
+              {
+                "code": "IDEMPOTENCY_CONFLICT",
+                "reason": "BODY_CONFLICT",
+                "layer": "COMMAND",
+                "meaning": "the Idempotency-Key was used for another body of this approval (the authorization reference aside)"
               }
             ]
           },
           "422": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 6 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -18621,6 +18694,30 @@
                 "reason": "RESPONSE_CONTRACT_VIOLATION",
                 "layer": "PLATFORM",
                 "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "DESTINATION_NOT_CAPTURED",
+                "layer": "COMMAND",
+                "meaning": "the refund's order was paid by bank transfer and the approval names no destination and destination evidence"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "DESTINATION_INVALID",
+                "layer": "COMMAND",
+                "meaning": "the destination does not normalize (destination-norm-v1: routing, account or holder name)"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "DESTINATION_UNPROVEN",
+                "layer": "COMMAND",
+                "meaning": "the destination evidence is not a classified payer artifact of the source's account"
+              },
+              {
+                "code": "INTEGRITY_FAILURE",
+                "reason": "HASH_MISMATCH",
+                "layer": "COMMAND",
+                "meaning": "the destination evidence is not the artifact the approval cites, or its stored bytes no longer match their digest"
               }
             ]
           },
@@ -18651,7 +18748,7 @@
             ]
           },
           "503": {
-            "description": "Problem (10 \"Responses and safe errors\"): the outcome of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 2 outcomes of this operation answered 503, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -18673,6 +18770,12 @@
                 "reason": null,
                 "layer": "PLATFORM",
                 "meaning": "no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key"
+              },
+              {
+                "code": "CAPACITY_UNAVAILABLE",
+                "reason": "EVIDENCE_UNAVAILABLE",
+                "layer": "COMMAND",
+                "meaning": "the destination evidence could not be read within its bound, or no store, classifier or fingerprinter is bound; retry with the same key"
               }
             ]
           }
@@ -31572,6 +31675,49 @@
           "authorizationRef": {
             "type": "string",
             "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "destination": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "routingNumber",
+              "accountNumber",
+              "holderName"
+            ],
+            "properties": {
+              "routingNumber": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32
+              },
+              "accountNumber": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "holderName": {
+                "type": "string",
+                "maxLength": 512
+              }
+            }
+          },
+          "destinationEvidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifactRef",
+              "evidenceHash"
+            ],
+            "properties": {
+              "artifactRef": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "evidenceHash": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:request:CMD032"
@@ -36165,6 +36311,7 @@
               "GENERAL_ENABLE_CONDITION_UNMET",
               "INSTRUCTIONS_EXPIRED",
               "INSTRUCTIONS_NOT_AVAILABLE",
+              "BODY_CONFLICT",
               "EXECUTION_FENCED",
               "EXECUTION_AUTHORITY_LOST",
               "CAPACITY_LEDGER",
@@ -40618,6 +40765,163 @@
             "description": "Completed external or customer actions, never promised reversible."
           }
         }
+      },
+      "approveTreasuryRefundRequest": {
+        "title": "approveTreasuryRefund request",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "serviceCents",
+          "taxCents",
+          "authorizationRef"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "serviceCents": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,15})$"
+          },
+          "taxCents": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,15})$"
+          },
+          "authorizationRef": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "destination": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "routingNumber",
+              "accountNumber",
+              "holderName"
+            ],
+            "properties": {
+              "routingNumber": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32
+              },
+              "accountNumber": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "holderName": {
+                "type": "string",
+                "maxLength": 512
+              }
+            }
+          },
+          "destinationEvidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifactRef",
+              "evidenceHash"
+            ],
+            "properties": {
+              "artifactRef": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "evidenceHash": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:op:approveTreasuryRefund"
+      },
+      "approveTreasuryRefundResponse200": {
+        "title": "approveTreasuryRefund 200",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "version",
+          "replayed",
+          "data"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "COMPLETED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "treasuryRefund"
+            ],
+            "properties": {
+              "treasuryRefund": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "treasuryRefundId",
+                  "state",
+                  "version",
+                  "amountCents",
+                  "bankCreditId",
+                  "destinationLast4"
+                ],
+                "properties": {
+                  "treasuryRefundId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "REQUESTED",
+                      "APPROVED",
+                      "SUBMITTING",
+                      "UNCERTAIN",
+                      "COMPLETED",
+                      "FAILED",
+                      "REJECTED"
+                    ]
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "amountCents": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,15})$"
+                  },
+                  "bankCreditId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "destinationLast4": {
+                    "type": "string",
+                    "pattern": "^[0-9]{1,4}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:approveTreasuryRefund:200"
       },
       "configureBankRouteRequest": {
         "title": "configureBankRoute request",

@@ -10,6 +10,7 @@
 //     (`BANK_COMMAND_ROLE`), adopting the refund's scope like CMD033 does; F2 is CMD032 itself, extended with the destination;
 //   * refusals answer a Problem whose `reason` is the KIT failure-reason token (domain failure-reasons.ts) named by the design.
 import assert from "node:assert/strict";
+import { test as nodeTest } from "node:test";
 import type { UserId } from "@kauro/domain";
 import { connectionPid, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import { bankWorld, type BankWorld, type StoredBankArtifact } from "./bank-support.js";
@@ -198,6 +199,8 @@ export interface ApproveOptions {
   readonly owner?: Person;
   readonly stepUp?: "FRESH" | "STALE";
   readonly key?: string;
+  /** A proof recorded by the cell (instead of a new one minted per call). */
+  readonly proof?: string;
   readonly serviceCents?: bigint;
   readonly taxCents?: bigint;
   readonly expectedVersion?: number;
@@ -211,7 +214,7 @@ export async function approveF2(src: Source, o: ApproveOptions = {}): Promise<Re
     expectedVersion: o.expectedVersion ?? 1,
     serviceCents: (o.serviceCents ?? src.serviceCents).toString(),
     taxCents: (o.taxCents ?? src.taxCents).toString(),
-    authorizationRef: await iw.w.stepUp(owner, o.stepUp ?? "FRESH"),
+    authorizationRef: o.proof ?? (await iw.w.stepUp(owner, o.stepUp ?? "FRESH")),
   };
   if (o.destination !== null) body["destination"] = o.destination ?? DEST;
   if (evidence !== null) body["destinationEvidence"] = { artifactRef: evidence.artifactRef, evidenceHash: evidence.evidenceHash };
@@ -424,7 +427,8 @@ export async function lapsed(ctx: FaultContext, scope: Scope, kind: Kind, label:
 export const openBank = (login: "kauro_payment_test" | "kauro_app_test" = BANK_COMMAND_LOGIN): Promise<HarnessConnection> => openConnection(L().iw.h.pg.clientConfig(login));
 /** Runs a command with every unit of work it opens routed over `conn` (crashable `uow`, SqlStep points). */
 export function routed<T>(ctx: FaultContext, conn: HarnessConnection, fn: () => Promise<T>, steps: ReadonlyArray<SqlStep> = [], target?: number): Promise<T> {
-  return L().iw.faults.on(conn, BANK_COMMAND_ROLE, ctx.points, steps, fn, target === undefined ? {} : { target });
+  // the bank owner commands run their SERVICE units on the payment service's factory: routed over the same connection
+  return L().iw.faults.on(conn, BANK_COMMAND_ROLE, ctx.points, steps, fn, { payment: true, ...(target === undefined ? {} : { target }) });
 }
 /** A routed command over a fresh connection, closed after. */
 export async function onFresh<T>(ctx: FaultContext, fn: () => Promise<T>, steps: ReadonlyArray<SqlStep> = [], target?: number): Promise<T> {
@@ -473,6 +477,21 @@ export const valueOf = <T>(r: PromiseSettledResult<T>): T => {
 
 // --- the footprint oracle (superuser reads only) -----------------------------------------------------------------------------------
 
+/**
+ * Ends step-up proofs now (REVOCATION cells): proofs are append-only and have no revocation command, so this is a write of the database
+ * owner with triggers off — a fault injected by another writer the product does not have, never a product step.
+ */
+export async function expireProofs(column: "proof_id" | "user_id", value: string): Promise<void> {
+  const owner = await L().iw.h.pg.connect("postgres");
+  try {
+    await owner.query("BEGIN");
+    await owner.query("SET LOCAL session_replication_role = replica");
+    await owner.query(`UPDATE kauro.assurance_proofs SET expires_at = now() WHERE ${column} = $1`, [value]);
+    await owner.query("COMMIT");
+  } finally {
+    await owner.end();
+  }
+}
 export async function q<T extends Record<string, unknown>>(sql: string, params: ReadonlyArray<unknown> = []): Promise<T[]> {
   return (await L().iw.h.oracle.query<T>(sql, params as unknown[])).rows;
 }
@@ -574,4 +593,36 @@ export async function ownOwner(label: string): Promise<{ readonly person: Person
   const person = await iw.w.person(`${safe(label)}-owner`);
   const grantId = await iw.h.grantKauroOwner(person.userId as UserId);
   return { person, grantId };
+}
+
+// --- RED-FIRST: the cells of a slice not built yet (PV1-REFUND coordinator plan 2026-10-13) ------------------------------------------------
+// Each is skipped with a todo naming its slice or the seam it depends on, so no red cell reaches main and none is skipped silently; the
+// slice that builds a step removes its entries. First match wins (the specific seams before the step labels).
+const RED_FIRST: ReadonlyArray<readonly [RegExp, string]> = [
+  [/ RFG-M-(DEST-SI2|NX-SI2-CORR)\b/, "todo: seam SI2 (statement import)"],
+  [/ RFG-M-LOCK-L1 /, "todo: seams S5 (G6 credit reversal) + SI2 (statement import)"],
+  [/ ACH-M-G6-/, "todo: seam S5 (bankWorld.reverseCredit, the G6 Kreversal entry point)"],
+  [/ ACH-M-FC-G5 /, "todo: red-first, slice 3 (X4 resend) + seam SI2 (statement import)"],
+  [/^ACH-16 /, "todo: red-first, slice 3 (X4 resend, P3 booking) + seam S5 (credit reversal)"],
+  [/^ACH-15 /, "todo: red-first, slices 2-3 (G2 record, X4 resend)"],
+  [/^ACH-12 /, "todo: red-first, slice 2 (G2 record executed return)"],
+  [/ ACH-M-G[12]-/, "todo: red-first, slice 2 (G1/G2 record executed return)"],
+  [/ ACH-M-G4-/, "todo: red-first, slice 2 (G4 record resend)"],
+  [/ ACH-M-G3-/, "todo: red-first, slice 3 (G3 record return bounce)"],
+  [/ ACH-M-P3-/, "todo: red-first, slice 3 (the FINANCE return-booking queue); its REVOCATION also seam S7"],
+  [/^DENY CMD033 /, "todo: red-first, slice 4 (CMD033 manual-rail refusal)"],
+  [/^RFG-01 /, "todo: red-first, slice 4 (refund.completed.v1 and its adjustments)"],
+  [/^(NEVER-RESEND:|RFG-03 |RFG-04 )/, "todo: red-first, slice 3 (X3 resolution, X4 resend, the owner queue)"],
+  [/ RFG-M-NR-/, "todo: red-first, slice 3 (NEVER-RESEND at every entry point: X3, X4)"],
+  [/ RFG-M-X3-|: Resolve uncertain execution|RFG-M-OFFER-OUTCOME-/, "todo: red-first, slice 3 (X3 resolve uncertain execution)"],
+  [/ RFG-M-X4-|: Declare a resend execution|RFG-P-DF-(EQUIV|FULLWIDTH|HYPHEN|UNICODE-DIGITS-EVIDENCE)/, "todo: red-first, slices 2-3 (X1 and X4 bind the destination)"],
+  [/ RFG-M-(X2-|LOCK-L3 )/, "todo: red-first, slice 2 (X2 sweep)"],
+  [/ RFG-M-X1-|: Declare manual refund execution/, "todo: red-first, slice 2 (X1 declare manual refund execution)"],
+  [/^RFG-02 |: Record a declared execution| RFG-M-(G2D|OFFER)|RFG-P-OFFER-GATE-|RFG-P-DEST-RECIPIENT|RFG-M-DEST-RECIPIENT |RFG-P-DF-CONCAT-COLLISION /, "todo: red-first, slice 2 (G2 record a declared execution)"],
+];
+
+/** node:test `test`, skipping (with its todo) a cell of a slice not built yet. */
+export function laneTest(title: string, fn: () => Promise<void>): void {
+  const hit = RED_FIRST.find(([re]) => re.test(title));
+  nodeTest(title, hit === undefined ? {} : { skip: hit[1] }, fn);
 }

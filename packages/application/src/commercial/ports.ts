@@ -123,7 +123,11 @@ export interface PayoutEvidenceVerifier {
  * drives, so a cell can prove the application's own bound ends a call that never answers.
  */
 export interface ProviderCallTimer {
-  start(ms: number): { readonly elapsed: Promise<void>; cancel(): void };
+  /**
+   * Starts a bound of `ms`. `expired` (optional) answers synchronously whether the bound has run out by now: a caller that must judge a read
+   * it already holds (lane L-REFUND: an evidence read held at its gate) asks it instead of racing `elapsed`, whose resolution is asynchronous.
+   */
+  start(ms: number): { readonly elapsed: Promise<void>; cancel(): void; expired?(): boolean };
 }
 
 // --- CommercialPrincipalReader (design §2, D10-CTX-1, D10-CTX-2) ---------------------------------------------------------------

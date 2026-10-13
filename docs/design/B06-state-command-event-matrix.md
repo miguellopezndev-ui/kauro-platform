@@ -1810,6 +1810,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is another identity's |
 | 403 | ASSURANCE_REQUIRED | POLICY_NOT_APPLICABLE | — | — | ASSURANCE | the named standing policy does not cover this refund (origin, phase, scope or validity): a policy is referenced, never invented |
 | 404 | NOT_FOUND | — | — | — | ACCESS | the stored operation is unknown to the operator's finance scope: a foreign and a nonexistent id answer alike |
+| 404 | NOT_FOUND | EVIDENCE_NOT_FOUND | — | — | COMMAND | the destination evidence is not in the restricted store |
 | 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
 | 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
 | 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the refund's current version; the current safe version and state come back |
@@ -1817,10 +1818,16 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | CAPTURE_NOT_REFUNDABLE | — | — | COMMAND | the capture is not COMPLETED (reversed captures already returned the money) |
 | 409 | PRECONDITION_FAILED | REFUND_EXCEEDS_REMAINING | — | — | COMMAND | the amounts exceed the reconciled remaining capture, given every committed refund (CMD032 failure) |
 | 409 | PRECONDITION_FAILED | REFUND_TAX_INCONSISTENT | RANGE | — | COMMAND | taxCents is not the tax the approved service releases under the sale's reviewed rule, given every committed refund (D-REF-B6) |
+| 409 | IDEMPOTENCY_CONFLICT | BODY_CONFLICT | — | — | COMMAND | the Idempotency-Key was used for another body of this approval (the authorization reference aside) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | INTEGRITY_FAILURE | DESTINATION_NOT_CAPTURED | — | — | COMMAND | the refund's order was paid by bank transfer and the approval names no destination and destination evidence |
+| 422 | INTEGRITY_FAILURE | DESTINATION_INVALID | — | — | COMMAND | the destination does not normalize (destination-norm-v1: routing, account or holder name) |
+| 422 | INTEGRITY_FAILURE | DESTINATION_UNPROVEN | — | — | COMMAND | the destination evidence is not a classified payer artifact of the source's account |
+| 422 | INTEGRITY_FAILURE | HASH_MISMATCH | — | — | COMMAND | the destination evidence is not the artifact the approval cites, or its stored bytes no longer match their digest |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | EVIDENCE_UNAVAILABLE | — | — | COMMAND | the destination evidence could not be read within its bound, or no store, classifier or fingerprinter is bound; retry with the same key |
 
 ### CMD033 ExecuteRefund
 

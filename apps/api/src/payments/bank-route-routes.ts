@@ -8,6 +8,7 @@
  *   POST /api/v1/operations/bank-routes/{routeId}/disable       disableBankRoute         (KAURO_OWNER)  200
  *   POST /api/v1/operations/bank-routes/{routeId}/details       replaceBankRouteDetails  (KAURO_OWNER)  200
  *   GET  /api/v1/operations/bank-routes/{routeId}               getBankRoute             (KAURO_OWNER)  200
+ *   POST /api/v1/operations/treasury-refunds/{treasuryRefundId}/approve  approveTreasuryRefund  (KAURO_OWNER)  200 (lane L-REFUND)
  *   GET  /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions  (agency member, X-Kauro-Agency) 200
  *
  * Admission of a POST: the envelope headers, the closed request schema, an Idempotency-Key, the path ids; then the person's
@@ -15,7 +16,7 @@
  * Sec-Fetch-Site and CSRF rule; typed credential refusals; none: the anonymous denial, AUTHENTICATION_REQUIRED). Every reply carries Cache-Control: no-store (the server's hook);
  * the instructions never carry an ETag.
  */
-import type { BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest } from "@kauro/application";
+import type { BankRefundHandlers, BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest } from "@kauro/application";
 import { HEADERS, OPERATIONAL_ROUTES, admitEmptyRequest, admitHeaders, admitOperationalBody, operationalRouteResponses, problemOf, readTransferInstructions, repeatedHeaderNames, type CommerceRequestRuntime } from "@kauro/application";
 import type { Clock, CorrelationId, Environment } from "@kauro/domain";
 import { DomainFailure, IDEMPOTENCY_KEY, isUuid } from "@kauro/domain";
@@ -24,6 +25,8 @@ import type { RouteKit } from "../server.js";
 
 export interface BankRouteRouteDependencies {
   readonly handlers: BankRouteHandlers;
+  /** Lane L-REFUND: the owner refund commands of the route (CMD220 ApproveTreasuryRefund); absent, their routes are not served. */
+  readonly refunds?: BankRefundHandlers;
   readonly runtime: CommerceRequestRuntime;
   readonly bank: BankRouteCollaborators | null;
   readonly validator: SchemaValidator;
@@ -116,6 +119,8 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
   command("enableBankRoute", "CMD203", (req) => deps.handlers.enable(req as never));
   command("disableBankRoute", "CMD204", (req) => deps.handlers.disable(req as never));
   command("replaceBankRouteDetails", "CMD205", (req) => deps.handlers.replaceDetails(req as never));
+  const refunds = deps.refunds;
+  if (refunds !== undefined) command("approveTreasuryRefund", "CMD220", (req) => refunds.approveTreasury(req as never));
 
   function read(operationId: string, run: (request: FastifyRequest<{ Params: Record<string, string> }>, correlationId: CorrelationId, path: Readonly<Record<string, string>>, headers: Readonly<Record<string, string | undefined>>) => Promise<FastifyReplyAnswer>): void {
     const route = routeOf(operationId);

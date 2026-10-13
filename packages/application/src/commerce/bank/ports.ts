@@ -9,7 +9,8 @@ import type { UtcInstant } from "@kauro/contracts";
 import type { BankRouteDetails, BankRouteRecord, BankRouteVersionRecord, BankTransferInstructionRecord, CommerceUnitOfWork, EvidenceClassification } from "@kauro/domain";
 import type { AssuranceVerifier } from "../../ports/assurance-and-admission.js";
 import type { ProviderCallTimer } from "../../commercial/ports.js";
-import type { BankEvidenceStore, StoredBankEvidence } from "../ports.js";
+import type { BankEvidenceStore, DestinationFingerprinter, StoredBankEvidence } from "../ports.js";
+import type { DestinationFingerprintRecord, IncomingCredit } from "@kauro/domain";
 
 export interface NewBankRouteInput {
   readonly routeId: string;
@@ -79,6 +80,76 @@ export interface BankDetailsClassifier {
   classifyAccountDetails(evidence: StoredBankEvidence): EvidenceClassification<BankRouteDetails>;
 }
 
+// --- the manual-assisted refunds of the route (lane L-REFUND; ACH-ROUTE r12 §7.13-§7.22, D-24 A) ------------------------------------------
+
+/** The corporate owner's authority as kauro.bank_owner_authority judged it at the database clock (OK records this transaction's act). */
+export interface OwnerAuthorityVerdict {
+  readonly verdict: "OK" | "IDENTITY_DISABLED" | "CORPORATE_ROLE_MISSING" | "STEP_UP_MISSING" | "STEP_UP_NOT_OWNED" | "STEP_UP_STALE";
+  readonly issuedAt: UtcInstant | null;
+  readonly expiresAt: UtcInstant | null;
+}
+
+/** A treasury refund of an unassigned credit (route scope, agency NULL; excess-only: one amount). */
+export interface TreasuryRefundRecord {
+  readonly treasuryRefundId: string;
+  readonly routeId: string;
+  readonly environment: "SANDBOX" | "LIVE";
+  readonly accountRef: string;
+  readonly bankCreditId: string;
+  readonly amountCents: bigint;
+  readonly state: "REQUESTED" | "APPROVED" | "SUBMITTING" | "UNCERTAIN" | "COMPLETED" | "FAILED" | "REJECTED";
+  readonly version: number;
+  readonly approvedByUserId: string | null;
+  readonly approvedAt: UtcInstant | null;
+}
+
+export interface NewRefundDestinationInput {
+  readonly destinationId: string;
+  readonly environment: "SANDBOX" | "LIVE";
+  readonly sourceKind: "CAPTURE" | "BANK_CREDIT";
+  readonly agencyId: string | null;
+  readonly refundId: string | null;
+  readonly treasuryRefundId: string | null;
+  readonly evidenceArtifactRef: string;
+  readonly evidenceHash: string;
+  readonly fingerprint: DestinationFingerprintRecord["fingerprint"];
+  readonly keyId: string;
+  readonly keyVersion: number;
+  readonly normVersion: string;
+  readonly accountLast4: string;
+  readonly holderName: string;
+  readonly capturedBy: string;
+}
+
+export interface CapturedDestination {
+  readonly destinationId: string;
+  readonly fingerprint: DestinationFingerprintRecord["fingerprint"];
+  readonly keyId: string;
+  readonly keyVersion: number;
+  readonly normVersion: string;
+  readonly accountLast4: string;
+}
+
+/** The refund tables in the caller's SERVICE unit of work (persistence PgBankRefunds). */
+export interface BankRefundRepository {
+  lockOutboundStream(environment: string, accountRef: string): Promise<void>;
+  ownerAuthority(userId: string, proofId: string | null, freshnessSeconds: number): Promise<OwnerAuthorityVerdict>;
+  treasuryRefund(treasuryRefundId: string): Promise<TreasuryRefundRecord | null>;
+  lockTreasuryRefund(treasuryRefundId: string): Promise<TreasuryRefundRecord | null>;
+  approveTreasuryRefund(
+    treasuryRefundId: string,
+    expectedVersion: number,
+    approval: { readonly approvedByUserId: string; readonly authorizationProofRef: string; readonly authorizationHash: DestinationFingerprintRecord["fingerprint"]; readonly approvedAt: UtcInstant },
+  ): Promise<TreasuryRefundRecord | null>;
+  destinationOf(sourceKind: "CAPTURE" | "BANK_CREDIT", id: string): Promise<CapturedDestination | null>;
+  insertDestination(d: NewRefundDestinationInput): Promise<void>;
+}
+
+/** Classifies a stored credit artifact (the payer evidence a destination is proven by): pure, fail-closed. */
+export interface BankCreditClassifier {
+  classifyCredit(evidence: StoredBankEvidence): EvidenceClassification<IncomingCredit>;
+}
+
 export interface BankRouteCollaborators {
   readonly routes: (uow: CommerceUnitOfWork) => BankRouteRepository;
   /** The unit's effect instant, read after the caller's locks (kauro.effect_now()). */
@@ -90,4 +161,14 @@ export interface BankRouteCollaborators {
   readonly assurance: AssuranceVerifier;
   readonly timer: ProviderCallTimer;
   readonly random: (n: number) => Uint8Array;
+  /** Lane L-REFUND: the refund tables of the caller's unit of work (absent: every owner refund command answers CAPACITY_UNAVAILABLE). */
+  readonly refunds?: (uow: CommerceUnitOfWork) => BankRefundRepository;
+  /** The destination fingerprinter (DV1-10, DV1-11), read at call time (null: none bound, CAPACITY_UNAVAILABLE). */
+  readonly fingerprinter?: () => DestinationFingerprinter | null;
+  /** The bound integration's credit classifier for the payer evidence a destination is proven by (null: none bound). */
+  readonly creditClassifier?: () => BankCreditClassifier | null;
+  /** The payment service's verified identity the owner refund commands run their SERVICE units under (kauro_payment). */
+  readonly paymentServiceId?: string;
+  /** A named point an owner refund command passes after its evidence read and before its unit (test harness: a cell pauses there). */
+  readonly hold?: (point: string) => Promise<void>;
 }

@@ -36,7 +36,19 @@ import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
 import type { ApprovePlanView, AssuranceVerifier, AuthenticatedSubject, B06Collaborators, B07Collaborators, BuyerTypeReader, LateFailureSink, ProviderCallTimer, CommerceRequestCollaborators, CoreServices, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator, QuoteCollaborators, SessionView } from "@kauro/application";
 import { ContractFakeIdentityIssuer, ContractFakeObjectStorage, ContractFakeSessionVault, contractFakeBankDetailsClassifier } from "@kauro/application/testing";
-import type { BankEvidenceStore } from "@kauro/application";
+import type { BankCreditClassifier, BankEvidenceStore, DestinationFingerprinter } from "@kauro/application";
+
+/**
+ * The bank collaborators a world binds after start-up (read at call time by the api): the restricted evidence store (bankWorld binds its
+ * CONTRACT_FAKE store), lane L-REFUND's destination fingerprinter and payer-evidence classifier, and the named point the owner refund commands
+ * pass between their evidence read and their unit (statementsWorld routes it to the cell's points).
+ */
+export interface BankBinding {
+  evidence: BankEvidenceStore | null;
+  fingerprinter: DestinationFingerprinter | null;
+  creditClassifier: BankCreditClassifier | null;
+  hold: ((point: string) => Promise<void>) | null;
+}
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
   AgencyId,
@@ -421,7 +433,7 @@ export interface World {
   readonly vault: ContractFakeSessionVault;
   readonly internalErrors: Array<{ correlationId: string; error: unknown }>;
   /** The bank-transfer route's restricted evidence store, bound after start-up (bank-support.ts bankWorld binds its CONTRACT_FAKE store). */
-  readonly bank: { evidence: BankEvidenceStore | null };
+  readonly bank: BankBinding;
   /** Agency A (DRAFT) and its people. */
   readonly A: AgencyFixture;
   readonly owner: Person;
@@ -669,10 +681,10 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const { artifacts: _artifacts, patchCompiler: _patchCompiler, disclosures: _disclosures, ...withoutPlanServices } = configured;
   const collaborators: Partial<B06Collaborators> = options.realPlanServices === true ? withoutPlanServices : configured;
 
-  const bank: { evidence: BankEvidenceStore | null } = { evidence: null };
+  const bank: BankBinding = { evidence: null, fingerprinter: null, creditClassifier: null, hold: null };
   const app = assembleApi({
     environment: "LOCAL",
-    bank: { evidence: () => bank.evidence, classifier: () => contractFakeBankDetailsClassifier },
+    bank: { evidence: () => bank.evidence, classifier: () => contractFakeBankDetailsClassifier, fingerprinter: () => bank.fingerprinter, creditClassifier: () => bank.creditClassifier, hold: (point) => (bank.hold === null ? Promise.resolve() : bank.hold(point)) },
     unitOfWork: (options.wrapUnitOfWork ?? ((f) => f))(instrumentedFactory(db.unitOfWork, holds, stats)),
     database: db,
     authenticator: createBearerTokenAuthenticator(tokens),

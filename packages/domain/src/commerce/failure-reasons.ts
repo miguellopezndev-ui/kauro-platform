@@ -106,6 +106,8 @@ export const COMMERCE_FAILURE_REASONS = [
   "INSTRUCTIONS_EXPIRED",
   // I3: an existing visible order whose instructions are not readable (bank order not open, details expired; coordinator ruling RR-2)
   "INSTRUCTIONS_NOT_AVAILABLE",
+  // an idempotency key of a bank owner command reused with another request body (lane L-REFUND; the journal conflict named, never a new effect)
+  "BODY_CONFLICT",
 ] as const;
 
 export type CommerceFailureReason = (typeof COMMERCE_FAILURE_REASONS)[number];

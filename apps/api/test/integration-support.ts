@@ -82,7 +82,22 @@ const cellProviderTimer: ProviderCallTimer = {
       }, POLL_MS);
       poll.unref();
     });
-    return { elapsed, cancel: () => clearInterval(poll) };
+    return {
+      elapsed,
+      cancel: () => clearInterval(poll),
+      // the controlled clock read now: a held read past its bound is judged expired whether or not the poll has fired yet
+      expired: () => {
+        try {
+          if (op.nowMs() - startedAt < ms) return false;
+          // the crossed instant is consumed inside the operation (the same sink the poll hands it to)
+          void crossing.elapsed({ at: op.now() }).catch(() => {});
+          return true;
+        } catch {
+          // the operation settled: fail closed
+          return true;
+        }
+      },
+    };
   },
 };
 
@@ -97,6 +112,8 @@ export async function integrationWorld(options: { readonly sessions?: boolean; r
   if (options.bankEvidence !== true) return Object.assign(sw, { buyers, lateFailures });
   const evidence = bankEvidenceFake();
   sw.w.bank.evidence = evidence;
+  sw.w.bank.fingerprinter = testDestinationFingerprinter;
+  sw.w.bank.creditClassifier = evidence;
   return Object.assign(sw, { buyers, lateFailures, bankEvidence: { evidence, fingerprinter: testDestinationFingerprinter } });
 }
 

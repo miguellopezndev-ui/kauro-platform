@@ -114,7 +114,7 @@ BEGIN
   IF reviewer IS NULL THEN
     -- no session person: only the payment service applying a corporate owner's step-up approval judged in this very transaction by
     -- kauro.bank_owner_authority, of a refund whose destination is captured (Payments V1 F2; 0057)
-    IF pg_catalog.current_user <> 'kauro_payment' OR NEW.state <> 'APPROVED' OR NEW.authorization_kind IS DISTINCT FROM 'OWNER_STEP_UP' OR NEW.authorization_policy_id IS NOT NULL
+    IF NOT pg_catalog.pg_has_role(current_user, 'kauro_payment', 'USAGE') OR NEW.state <> 'APPROVED' OR NEW.authorization_kind IS DISTINCT FROM 'OWNER_STEP_UP' OR NEW.authorization_policy_id IS NOT NULL
        OR NOT kauro.bank_owner_acted(NEW.approved_by_user_id, NEW.authorization_proof_ref) THEN
       RAISE EXCEPTION 'CORPORATE_ROLE_MISSING: refund % is reviewed by a person', OLD.refund_id USING ERRCODE = 'KP007';
     END IF;
@@ -171,10 +171,6 @@ CREATE POLICY refunds_payment_owner_approval ON kauro.refunds FOR UPDATE TO kaur
   WITH CHECK (agency_id = kauro.current_agency_id() AND state = 'APPROVED');
 GRANT UPDATE (approved_service_cents, approved_tax_cents, approved_excess_cents, authorization_kind, authorization_proof_ref, authorization_policy_id, authorization_hash, effects_hash, credit_note_required, approved_by_user_id, approved_at)
   ON kauro.refunds TO kauro_payment;
--- the commitment ceiling of an approval reads the sale's tax rule (payment order and quote of the adopted agency)
-DROP POLICY IF EXISTS quotes_payment_read ON kauro.quotes;
-CREATE POLICY quotes_payment_read ON kauro.quotes FOR SELECT TO kauro_payment USING (agency_id = kauro.current_agency_id());
-GRANT SELECT ON kauro.quotes TO kauro_payment;
 
 -- --- 4. treasury refunds: the route-scope aggregate of the Refund machine ---------------------------------------------------------------
 ALTER TABLE kauro.treasury_refunds

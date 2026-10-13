@@ -165,6 +165,8 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
   if (pools === null) throw new Error("the commission pools were not opened by the api's assembly");
   const statementRuntime = statementServiceRuntime({ units: faults.wrap(new StandingUnits(pools.pools, () => (standing === null ? null : { at: standing }))), calendar }, "LOCAL", clock);
   const { w } = pw;
+  // lane L-REFUND: the owner refund commands' gate point is the running cell's (a no-op outside a routed invocation)
+  w.bank.hold = (point) => faults.pass(point);
   const h = w.h;
   const dispatcherClock = movableClock();
   const completions = new ContractFakePreparationCompletion({ clock });

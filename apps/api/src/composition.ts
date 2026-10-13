@@ -20,8 +20,8 @@
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import type { LateFailureSink, BankDetailsClassifier, BankEvidenceStore, BankRouteCollaborators } from "@kauro/application";
-import { createBankRouteHandlers, realProviderCallTimer } from "@kauro/application";
+import type { LateFailureSink, BankCreditClassifier, BankDetailsClassifier, BankEvidenceStore, BankRouteCollaborators, DestinationFingerprinter } from "@kauro/application";
+import { createBankRefundHandlers, createBankRouteHandlers, realProviderCallTimer } from "@kauro/application";
 import type { AssuranceVerifier, AuditReadRuntime, AuditRuntime, B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators, ProviderCallTimer } from "@kauro/application";
 import { SESSION_POLICY_VERSION, UnrecordedBuyerTypeReader, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createCapabilityCommandHandlers, createQuoteHandlers, createStatementRequestHandlers, problemOf, recordOperatorDenial } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
@@ -29,7 +29,7 @@ import type { UtcInstant } from "@kauro/contracts";
 import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, capabilityGovernanceOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, type DatabaseEnvironment, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
+import { bankRefundsOf, bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, capabilityGovernanceOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, type DatabaseEnvironment, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import { commercialPrincipalReader } from "./commercial-principals.js";
 import type { ApiConfig, IdentityConfig, MigratorConfig } from "./config.js";
@@ -326,7 +326,15 @@ export interface ApiAssembly {
    * every route command and the transfer-instructions read answer CAPACITY_UNAVAILABLE EVIDENCE_UNAVAILABLE; the acceptance tests bind the
    * labelled CONTRACT_FAKE store and classifier of @kauro/application/testing (SIMULATED).
    */
-  readonly bank?: { readonly evidence: () => BankEvidenceStore | null; readonly classifier: () => BankDetailsClassifier | null };
+  readonly bank?: {
+    readonly evidence: () => BankEvidenceStore | null;
+    readonly classifier: () => BankDetailsClassifier | null;
+    /** Lane L-REFUND: the destination fingerprinter (DV1-10/11) and the credit classifier of the payer evidence, read at call time; absent, every owner refund approval answers CAPACITY_UNAVAILABLE EVIDENCE_UNAVAILABLE. */
+    readonly fingerprinter?: () => DestinationFingerprinter | null;
+    readonly creditClassifier?: () => BankCreditClassifier | null;
+    /** Test-only: the named point an owner refund command passes between its evidence read and its unit (never bound by a deployment). */
+    readonly hold?: (point: string) => Promise<void>;
+  };
 }
 
 /**
@@ -402,9 +410,15 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     assurance: createAssuranceVerifier(),
     timer: assembly.commercial?.providerTimer ?? realProviderCallTimer,
     random: assembly.random ?? systemRandom,
+    // lane L-REFUND: the refund tables of the payment service's unit, the fingerprinter and the payer-evidence classifier (late-bound)
+    refunds: (uow) => bankRefundsOf(uow),
+    fingerprinter: assembly.bank?.fingerprinter ?? (() => null),
+    creditClassifier: assembly.bank?.creditClassifier ?? (() => null),
+    ...(assembly.bank?.hold !== undefined ? { hold: assembly.bank.hold } : {}),
   };
   const commerceCollaborators: CommerceRequestCollaborators = { ...commerceEdition(), ...paymentService, bank, ...assembly.commerce };
   const bankRoutes = createBankRouteHandlers(commerceRuntime, bank);
+  const bankRefunds = createBankRefundHandlers({ runtime: commerceRuntime, payment: commerceCollaborators.payment, paymentServiceId: commerceCollaborators.paymentServiceId, bank });
   const commerce = createCommerceRequestHandlers(commerceRuntime, commerceCollaborators);
   // package B10: the agency lifecycle (CMD002, CMD043) on the same runtime, over the lifecycle adapter of the persistence package, B06's
   // active-work inspector and the step-up verifier
@@ -466,7 +480,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     ids,
     paymentRoutes: (app, kit) => {
       registerPaymentRoutes(app, kit, { payments: assembly.payments ?? null, validator, clock, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
-      registerBankRouteRoutes(app, kit, { handlers: bankRoutes, runtime: commerceRuntime, bank, validator, clock, environment: assembly.environment, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
+      registerBankRouteRoutes(app, kit, { handlers: bankRoutes, refunds: bankRefunds, runtime: commerceRuntime, bank, validator, clock, environment: assembly.environment, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
     },
     commissionRoutes: (app, kit) =>
       registerCommissionRoutes(app, kit, {

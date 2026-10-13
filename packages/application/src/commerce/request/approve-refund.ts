@@ -51,12 +51,13 @@ import type { ApproveRefundView } from "../views.js";
 import { refundEffectsView, refundView } from "./projections.js";
 import { CommerceAccessDenied, admissionSpecOf, operatorContextOf, runCommerceCommand, type CommerceRequestCollaborators, type CommerceRequestRuntime } from "./runtime.js";
 import type { CommerceCommandHandler } from "./unbound.js";
+import { approveCaptureWithDestination, namesDestination } from "../bank/approve-destination.js";
 
 /**
  * A money member of the body in minor units: the closed schema admits a MoneyMinorUnits string of up to sixteen digits, and an amount
  * beyond the platform's exact envelope (2^53 - 1, D-MONEY-B1) is refused as the schema violation it is.
  */
-function moneyField(field: "serviceCents" | "taxCents", value: string): bigint {
+export function moneyField(field: "serviceCents" | "taxCents", value: string): bigint {
   try {
     return parseMoney(field, value);
   } catch (e) {
@@ -108,6 +109,8 @@ export function approveRefundHandler(runtime: CommerceRequestRuntime, co: Commer
       const context = operatorContextOf(envelope);
       const userId = envelope.userId as UserId;
       const refundId = envelope.path["refundId"] as RefundId;
+      // Payments V1 F2 (lane L-REFUND): a body naming the manual rail's destination is the owner's bank approval, run by the payment service
+      if (namesDestination(envelope.body)) return approveCaptureWithDestination({ runtime, payment: co.payment, paymentServiceId: co.paymentServiceId, bank: co.bank ?? null }, co, envelope);
       return runCommerceCommand<ApproveRefundBody, ApproveRefundView>(runtime, {
         command: spec,
         envelope,
@@ -121,6 +124,10 @@ export function approveRefundHandler(runtime: CommerceRequestRuntime, co: Commer
           const body = envelope.body;
           const seen = await c.refunds.get(refundId);
           if (seen === null) throw new NotFoundFailure("refund");
+          // a capture paid by bank transfer is refunded on the manual rail only, with its destination captured (Payments V1 F2, DV1-10)
+          if (co.bank != null && (await co.bank.routes(uow).instructionsOf(seen.orderId)) !== null) {
+            throw new DomainFailure("INTEGRITY_FAILURE", "a capture paid by bank transfer is refunded only with its destination captured", { reason: "DESTINATION_NOT_CAPTURED" });
+          }
           // the shared halves of what the approval relies on (the capture, its live entitlement), then the refund's row lock
           await co.queries.awaitTransition(uow, "kauro.capture_facts", seen.captureId);
           const live: CommercialAuthorizationRecord | null = await c.authorizations.findLiveByCapture(seen.captureId);

@@ -5,7 +5,8 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { after, before, test } from "node:test";
+import { after, before } from "node:test";
+import { laneTest as test } from "./refund-lane-support.js";
 import { fileURLToPath } from "node:url";
 import { refundTaxFor, type RefundComponents, type TaxRuleSnapshot } from "@kauro/domain";
 import { dispatch, execute, reconcile, storeQuery } from "./payment-support.js";

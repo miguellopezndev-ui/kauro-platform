@@ -68,6 +68,7 @@ import {
 import type { PoolClient } from "pg";
 import { serverInstantOf } from "./source/rows.js";
 import { PgBankRoutes } from "./repositories/bank-routes.js";
+import { PgBankRefunds } from "./repositories/bank-refunds.js";
 import { PgSessionFence } from "./session-fence.js";
 import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
@@ -644,6 +645,12 @@ export function bankRoutesOf(uow: UnitOfWork): PgBankRoutes {
   return uow.bankRoutes;
 }
 
+/** The manual-assisted refund tables in a commerce unit of work of this package (lane L-REFUND). */
+export function bankRefundsOf(uow: UnitOfWork): PgBankRefunds {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the bank refunds are read in a commerce unit of work of @kauro/persistence");
+  return uow.bankRefunds;
+}
+
 /** The effect instant of a commerce unit of work of this package (read after its locks). */
 export function effectInstantOf(uow: UnitOfWork): Promise<UtcInstant> {
   if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the effect instant is read in a commerce unit of work of @kauro/persistence");
@@ -681,6 +688,8 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   readonly requestReads: PgCommerceRequestReads;
   /** The bank-transfer route's tables (migration 0046, lane L-ROUTE), read through bankRoutesOf(uow). */
   readonly bankRoutes: PgBankRoutes;
+  /** The manual-assisted refund tables of the bank-transfer route (migration 0057, lane L-REFUND), read through bankRefundsOf(uow). */
+  readonly bankRefunds: PgBankRefunds;
   #scopeAgencyId: AgencyId | null = null;
   #financeAgencyId: AgencyId | null = null;
   #causation: CausationId | null = null;
@@ -695,6 +704,7 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
     this.paymentSweeps = new PgPaymentSweeps(client);
     this.requestReads = new PgCommerceRequestReads(client);
     this.bankRoutes = new PgBankRoutes(client);
+    this.bankRefunds = new PgBankRefunds(client);
   }
 
   protected override onJournalEntry(entryId: JournalEntryId): void {

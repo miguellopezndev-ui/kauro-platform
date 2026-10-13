@@ -129,6 +129,14 @@ const COMMAND_SPECIFIC: Readonly<Record<CommerceCommandId, ReadonlyArray<Problem
     outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_STALE", "the approver's step-up is older than the freshness window"),
     outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_NOT_OWNED", "the proof is another identity's"),
     outcome("ASSURANCE", "ASSURANCE_REQUIRED", "POLICY_NOT_APPLICABLE", "the named standing policy does not cover this refund (origin, phase, scope or validity): a policy is referenced, never invented"),
+    // Payments V1 lane L-REFUND (F1/F2, DV1-10, DV1-11, D-24 A): the approval of a refund of a bank-transfer sale captures its destination
+    outcome("COMMAND", "INTEGRITY_FAILURE", "DESTINATION_NOT_CAPTURED", "the refund's order was paid by bank transfer and the approval names no destination and destination evidence"),
+    outcome("COMMAND", "INTEGRITY_FAILURE", "DESTINATION_INVALID", "the destination does not normalize (destination-norm-v1: routing, account or holder name)"),
+    outcome("COMMAND", "INTEGRITY_FAILURE", "DESTINATION_UNPROVEN", "the destination evidence is not a classified payer artifact of the source's account"),
+    outcome("COMMAND", "INTEGRITY_FAILURE", "HASH_MISMATCH", "the destination evidence is not the artifact the approval cites, or its stored bytes no longer match their digest"),
+    outcome("COMMAND", "NOT_FOUND", "EVIDENCE_NOT_FOUND", "the destination evidence is not in the restricted store"),
+    outcome("COMMAND", "CAPACITY_UNAVAILABLE", "EVIDENCE_UNAVAILABLE", "the destination evidence could not be read within its bound, or no store, classifier or fingerprinter is bound; retry with the same key"),
+    outcome("COMMAND", "IDEMPOTENCY_CONFLICT", "BODY_CONFLICT", "the Idempotency-Key was used for another body of this approval (the authorization reference aside)"),
   ],
   CMD033: [
     STALE("refund"),
