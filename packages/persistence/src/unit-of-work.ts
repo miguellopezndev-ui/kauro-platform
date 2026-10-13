@@ -76,6 +76,7 @@ import { PgExecutionDiscovery } from "./execution/discovery.js";
 import { PgAuditReads, type ResolvedDecisionPatch } from "./audit/reads.js";
 import { PgAuditDiscovery } from "./audit/discovery.js";
 import { PgImportStageStore } from "./repositories/import-stages.js";
+import { PgCoreDocumentStore } from "./repositories/core-documents.js";
 import { PgAuditStore } from "./audit/store.js";
 import { PgCommercialSourceReads } from "./source/commercial-reads.js";
 import { PgSourceStore } from "./source/store.js";
@@ -688,7 +689,7 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   readonly requestReads: PgCommerceRequestReads;
   /** The bank-transfer route's tables (migration 0046, lane L-ROUTE), read through bankRoutesOf(uow). */
   readonly bankRoutes: PgBankRoutes;
-  /** The manual-assisted refund tables of the bank-transfer route (migration 0057, lane L-REFUND), read through bankRefundsOf(uow). */
+  /** The manual-assisted refund tables of the bank-transfer route (migration 0059, lane L-REFUND), read through bankRefundsOf(uow). */
   readonly bankRefunds: PgBankRefunds;
   #scopeAgencyId: AgencyId | null = null;
   #financeAgencyId: AgencyId | null = null;
@@ -956,9 +957,12 @@ export class PgAuditUnitOfWork extends PgExecutionUnitOfWork implements AuditUni
   readonly auditDiscovery: PgAuditDiscovery;
   /** B17: the import stages and their receipts (CMD040, CMD041). */
   readonly importStages: PgImportStageStore;
+  /** B05 L3: the stored core documents and plan bindings (migration 0058). */
+  readonly coreDocuments: PgCoreDocumentStore;
 
   constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {
     super(client, context, ids, clock);
+    this.coreDocuments = new PgCoreDocumentStore(client);
     this.audits = new PgAuditStore({ db: client, ids, events: this.events, provenance: () => this.provenance() });
     this.auditDiscovery = new PgAuditDiscovery(client);
     this.importStages = new PgImportStageStore(client);

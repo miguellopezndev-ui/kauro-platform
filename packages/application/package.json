@@ -34,7 +34,9 @@
   },
   "dependencies": {
     "@kauro/contracts": "workspace:*",
-    "@kauro/domain": "workspace:*"
+    "@kauro/domain": "workspace:*",
+    "@kauro/intelligence-core": "workspace:*",
+    "@kauro/migration-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "24.3.1",

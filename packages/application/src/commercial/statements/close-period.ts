@@ -13,7 +13,7 @@
  *     period's end: B10G-R5) still undelivered (INPUTS_UNRECONCILED; an unobservable count is unreconciled, never zero), checked again on
  *     the proposal recomputed under the line locks; every COMMISSIONS delivery takes the open periods FOR SHARE, so none commits between
  *     this check and the COMMIT, and a record committed after it is delivered after the close (its line is the next statement's);
- *  4. the ledger it proposes to close: KAURO_COMMISSION_CUTOFF_V1 over every line existing at the close, with its adjustments and holds,
+ *  4. the ledger it proposes to close: KAURO_COMMISSION_CUTOFF_V2 over every line existing at the close, with its adjustments and holds,
  *     for the period's end, equal to ledgerCutoffHash (STALE_VERSION LEDGER_CHANGED otherwise: the proposal is recomputed, never re-cut);
  *  5. one immutable ISSUED statement per seller with items (composeStatement: ELIGIBLE lines PAYABLE net of their partial holds, lines
  *     awaiting their final completion or funds and HELD lines as reasoned hold items, adjustments not reported before, offsets and the
@@ -85,7 +85,7 @@ export interface CloseProposal {
  */
 export async function proposeCommissionClose(statements: StatementRepository, period: CommissionPeriodRecord, at: UtcInstant): Promise<CloseProposal> {
   const inputs = await statements.periodInputs(period.periodId, at);
-  const ledgerCutoffHash = commissionCutoffHash({ periodId: period.periodId, cutoffAt: period.endsAt, lines: inputs.lines, adjustments: inputs.adjustments, holds: inputs.holds });
+  const ledgerCutoffHash = commissionCutoffHash({ periodId: period.periodId, cutoffAt: period.endsAt, lines: inputs.lines, adjustments: inputs.adjustments, holds: inputs.holds, offsets: inputs.offsets, credit: inputs.credit, funds: inputs.funds });
   return { cutoffAt: period.endsAt, ledgerCutoffHash, inputs };
 }
 
@@ -145,7 +145,7 @@ export function closeCommissionPeriod(rt: StatementServiceRuntime, request: Serv
       //    on one of them is waited for and read, so the hash is of the ledger the statements are composed from and no hold committed after
       //    the reads can reach a line this close then makes PAYABLE (a hold insert takes the line's key-share lock and waits for the close)
       const read = await proposeCommissionClose(statements, period, now);
-      for (const lineId of read.inputs.lines.map((l) => l.lineId).sort()) await ledger.lockLine(lineId);
+      await ledger.lockLines(read.inputs.lines.map((l) => l.lineId));
       const proposal = await proposeCommissionClose(statements, period, now);
       // the recomputed proposal's own count of undelivered inputs is enforced too, never only computed
       const undeliveredProposed = unreconciled(proposal.inputs.undeliveredBeforeCutoff);

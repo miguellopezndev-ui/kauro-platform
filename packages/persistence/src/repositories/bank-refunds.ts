@@ -1,5 +1,5 @@
 /**
- * The manual-assisted refund tables of the bank-transfer route over `pg` (migrations 0045, 0055, 0057; lane L-REFUND; docs/design/ACH-ROUTE.md
+ * The manual-assisted refund tables of the bank-transfer route over `pg` (migrations 0045, 0055, 0059; lane L-REFUND; docs/design/ACH-ROUTE.md
  * r12 §7.13-§7.22, D-24 A): the outbound stream lock L1, the corporate owner's authority verdict (kauro.bank_owner_authority, the one
  * SECURITY DEFINER judgment of identity, grant and step-up at the database clock), the treasury refund of an unassigned credit and the captured
  * refund destination. Every statement runs in the caller's SERVICE unit of work (kauro_payment) under its policies.

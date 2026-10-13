@@ -43,6 +43,7 @@ export { createExecutionUnitOfWorkFactory, PgExecutionUnitOfWorkFactory, PgExecu
 export { PgExecutionStore, PgExecutionReads, PgExecutionDiscovery, EXECUTION_CAPACITY_DOMAIN } from "./execution/index.js";
 export type { ExecutionWriteContext, CheckoutCapacity } from "./execution/index.js";
 // audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; docs/design/B08-audit-approval-jobs.md §9, §10)
+export { PgCoreDocumentStore } from "./repositories/core-documents.js";
 export { createAuditUnitOfWorkFactory, PgAuditUnitOfWorkFactory, PgAuditUnitOfWork, auditReadsOf, decisionArtifactResolver } from "./unit-of-work.js";
 export { PgAuditStore, PgAuditReads, PgAuditDiscovery, modelTaskJournalOf } from "./audit/index.js";
 export type { AuditWriteContext, ResolvedDecisionPatch, ModelTaskJournalBinding, PgModelTaskJournal } from "./audit/index.js";

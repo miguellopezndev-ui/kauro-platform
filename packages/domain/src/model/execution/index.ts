@@ -67,10 +67,14 @@ export {
   jobAttemptCheckpointOf,
   stagedManifestHashOf,
   deliveryManifestHashOf,
+  issuedDeliveryManifestOf,
+  packageExpiryOf,
   jobAttemptIdentityOf,
   jobAttemptStagingPrefixOf,
   packageDeliveryPrefixOf,
 } from "./digests.js";
 export type { AdmittedJobInput, StagedManifestArtifact, StagedManifestDocument, DeliveryManifestArtifact, DeliveryPackageManifest } from "./digests.js";
+export { ROW_COUNT_KEYS, deliveryRowCountsOf } from "./counts.js";
+export type { DeliveryCountFacts, DeliveryCountsVerdict } from "./counts.js";
 export { compareAdmissionCandidates, fairAdmissionOrder } from "./scheduler.js";
 export type { AdmissionCandidate } from "./scheduler.js";

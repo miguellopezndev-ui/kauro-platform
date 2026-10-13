@@ -44,6 +44,13 @@ export interface CaptureFunds {
  * recorded before it, the pools of those lines (the project and first-or-repeat an item names, D10-STMT-2), their purchases'
  * completions and captures' funds (why an accrued line awaits), and the offset terms of each line's agreement.
  */
+/** A settled line’s seller credit: recognized (R - V) and itemized by statements not CORRECTED; the difference is what a statement itemizes next (OFF-R1, OFF-R2). */
+export interface LineCredit {
+  readonly lineId: CommissionLineId;
+  readonly recognizedCents: bigint;
+  readonly itemizedCents: bigint;
+}
+
 export interface PeriodLedgerRows {
   readonly lines: ReadonlyArray<CommissionLineRecord>;
   readonly adjustments: ReadonlyArray<CommissionAdjustmentRecord>;
@@ -53,11 +60,12 @@ export interface PeriodLedgerRows {
   readonly funds: ReadonlyArray<CaptureFunds>;
   readonly offsets: ReadonlyArray<CommissionOffsetRecord>;
   readonly offsetTerms: ReadonlyArray<LineOffsetTerms>;
+  readonly credit: ReadonlyArray<LineCredit>;
 }
 
 // --- the cutoff hash (CMD051 ledgerCutoffHash) ---------------------------------------------------------------------------------
 
-export const COMMISSION_CUTOFF_DOMAIN = "KAURO_COMMISSION_CUTOFF_V1";
+export const COMMISSION_CUTOFF_DOMAIN = "KAURO_COMMISSION_CUTOFF_V2";
 
 function byKey<T>(rows: ReadonlyArray<T>, key: (row: T) => string): T[] {
   return [...rows].sort((a, b) => {
@@ -68,7 +76,7 @@ function byKey<T>(rows: ReadonlyArray<T>, key: (row: T) => string): T[] {
 }
 
 /**
- * KAURO_COMMISSION_CUTOFF_V1: the canonical wrapper of reference/HASHING (as KAURO_PROSPECT_ORGANIZATION_V1) over the period, the
+ * KAURO_COMMISSION_CUTOFF_V2 (V1 plus the offsets with their releases, the seller credit of each line and each capture’s latest funds): the canonical wrapper of reference/HASHING (as KAURO_PROSPECT_ORGANIZATION_V1) over the period, the
  * cutoff and, in id order, each included line's version, state, basis, cumulative entitlement and paid cents, each included
  * adjustment and each included hold's version, state and cents. Any change of an included row — a transition, an adjustment, a hold
  * opened or resolved — changes it, so a close proposed on one ledger and performed on another is refused LEDGER_CHANGED (CMD051).
@@ -79,6 +87,9 @@ export function commissionCutoffHash(input: {
   readonly lines: ReadonlyArray<CommissionLineRecord>;
   readonly adjustments: ReadonlyArray<CommissionAdjustmentRecord>;
   readonly holds: ReadonlyArray<CommissionHoldRecord>;
+  readonly offsets: ReadonlyArray<CommissionOffsetRecord>;
+  readonly credit: ReadonlyArray<LineCredit>;
+  readonly funds: ReadonlyArray<CaptureFunds>;
 }): Sha256Hex {
   const payload = {
     periodId: input.periodId,
@@ -104,8 +115,11 @@ export function commissionCutoffHash(input: {
       state: h.state,
       amountCents: h.amountCents.toString(),
     })),
+    offsets: byKey(input.offsets, (o) => o.offsetId).map((o) => ({ offsetId: o.offsetId, negativeLineId: o.negativeLineId, againstLineId: o.againstLineId, amountCents: o.amountCents.toString(), releasedCents: o.releasedCents.toString() })),
+    credit: byKey(input.credit, (c) => c.lineId).map((c) => ({ lineId: c.lineId, recognizedCents: c.recognizedCents.toString(), itemizedCents: c.itemizedCents.toString() })),
+    funds: byKey(input.funds, (x) => x.captureId).map((x) => ({ captureId: x.captureId, fundsState: x.fundsState })),
   };
-  return rawDigest(canonicalBytes({ domain: COMMISSION_CUTOFF_DOMAIN, version: 1, payload }));
+  return rawDigest(canonicalBytes({ domain: COMMISSION_CUTOFF_DOMAIN, version: 2, payload }));
 }
 
 // --- the statement composition (D10-STMT-2) -----------------------------------------------------------------------------------
@@ -214,9 +228,10 @@ export function composeStatement(input: {
           accruedPending += unpaid;
           break;
         }
-        const offsetIn = sum(rows.offsets.filter((o) => o.againstLineId === line.lineId).map((o) => o.amountCents));
+        // the live claims against the line (amount less releases): never clipped; a claim beyond what the line can pay is a broken yield (OFF-R1)
+        const offset = sum(rows.offsets.filter((o) => o.againstLineId === line.lineId).map((o) => o.amountCents - o.releasedCents));
         const remaining = unpaid - heldOpen;
-        const offset = offsetIn < remaining ? offsetIn : remaining;
+        if (offset > remaining) throw new RangeError(`line ${line.lineId} carries ${offset} cents of live claims beyond its ${remaining} payable cents`);
         push({ ...context, kind: "LINE", disposition: "PAYABLE", heldCents: 0n, offsetCents: offset, payableCents: remaining - offset });
         lineIds.push(line.lineId);
         for (const hold of openHolds) {
@@ -241,16 +256,23 @@ export function composeStatement(input: {
       }
       case "PAID":
       case "ADJUSTED": {
+        const credit = rows.credit.find((c) => c.lineId === line.lineId);
+        const creditDue = credit === undefined ? 0n : credit.recognizedCents - credit.itemizedCents;
+        if (creditDue < 0n) throw new RangeError(`line ${line.lineId} itemizes more seller credit than it recognized`);
+        if (creditDue > 0n) {
+          push({ ...context, kind: "CREDIT", disposition: "CREDIT", heldCents: 0n, offsetCents: 0n, payableCents: creditDue });
+          lineIds.push(line.lineId);
+        }
         const position = line.paidCents - line.cumulativeEntitlementCents;
         if (position <= 0n) break;
         const offsetsOut = byKey(
-          rows.offsets.filter((o) => o.negativeLineId === line.lineId),
+          rows.offsets.filter((o) => o.negativeLineId === line.lineId && o.amountCents > o.releasedCents),
           (o) => `${o.recordedAt}|${o.offsetId}`,
         );
         for (const o of offsetsOut) {
-          push({ ...context, kind: "OFFSET", disposition: "REPORTED", offsetId: o.offsetId, heldCents: 0n, offsetCents: o.amountCents, payableCents: 0n });
+          push({ ...context, kind: "OFFSET", disposition: "REPORTED", offsetId: o.offsetId, heldCents: 0n, offsetCents: o.amountCents - o.releasedCents, payableCents: 0n });
         }
-        const left = position - sum(offsetsOut.map((o) => o.amountCents));
+        const left = position - sum(offsetsOut.map((o) => o.amountCents - o.releasedCents));
         if (left > 0n) {
           negative += left;
           if (terms.get(line.lineId) !== "SIGNED_FUTURE_OFFSET") {
