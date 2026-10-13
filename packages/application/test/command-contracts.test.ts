@@ -88,8 +88,11 @@ test("CMD044 CreateSupportCase matches the catalogue entry and its schema names 
 test("no request schema exposes a server-owned member (verified, agencyOwner, state, agencyId, version, hashes of bytes)", () => {
   const forbidden = ["verified", "agencyOwner", "state", "agencyId", "version", "bodyHash", "revisionHash", "role", "createdAt"];
   for (const s of Object.values(REQUEST_SCHEMAS)) {
-    for (const f of forbidden) assert.ok(!(f in s.properties), `${s.$id} exposes ${f}`);
+    // a member the catalogue itself lists as a request field is client input, not server-owned (CMD003/CMD005: the requested role)
+    const declared = new Set((COMMANDS.find((c) => s.$id.endsWith(`:${c.id}`))?.fields ?? []).map((field) => field.name));
+    for (const f of forbidden) assert.ok(!(f in s.properties) || declared.has(f), `${s.$id} exposes ${f}`);
   }
+  assert.deepEqual(Object.values(REQUEST_SCHEMAS).filter((s) => "role" in s.properties).map((s) => s.$id).sort(), [requestSchemaId("CMD003"), requestSchemaId("CMD005")].sort(), "only the catalogue commands that request a role carry one");
 });
 
 test("scope resolution: only CreateAgency runs without a tenant; agency-path routes carry agencyId; the rest use the header", () => {
