@@ -406,7 +406,7 @@ test("L19 (GDR) RACE (reconciliation clock, monotone): a GRANT_RECONCILIATION pa
     assert.deepEqual((await pass1).failed.filter((f) => f.subject === run.grantId), []);
     assert.deepEqual(await money(run.grantId), ["AUTHORIZED", 5, 3], "pass 1 posted p and judged its own (earlier) instant: still AUTHORIZED");
     assert.deepEqual(await request(q), ["RESERVED", "UNKNOWN", null, null], "the crashed edge sent nothing");
-    // meanwhile no reservation lands on the grant after its expiry (refused at its COMMIT)
+    // meanwhile no reservation lands on the grant after its expiry (one begun after it is refused in its statement)
     const late = admissionOf(run, 50_000n);
     await assert.rejects(a.control(run.ag.agencyId, (uow) => admitIn(uow, late)), (e: unknown) => {
       const codes: string[] = [];
@@ -417,6 +417,33 @@ test("L19 (GDR) RACE (reconciliation clock, monotone): a GRANT_RECONCILIATION pa
     // pass 2, a fresh transaction after the expiry: EXPIRED
     assert.deepEqual((await sweep()).failed.filter((f) => f.subject === run.grantId), []);
     assert.deepEqual(await money(run.grantId), ["EXPIRED", 5, 3], "pass 2: EXPIRED, p posted once");
+    // the commit-time clause itself (request_journal_commit_gate, grant_expired_at_dispatch): a reservation whose statement passed
+    // before its grant's expiry and whose COMMIT falls after it is refused at that COMMIT, with nothing reserved
+    const pool2 = await freshPool(5_000n, 900);
+    const run2 = await interpreting("l19-commit", pool2);
+    const expires2 = (await a.grant(run2.grantId)).expires_at;
+    const K2 = offsetBefore(expires2, 2);
+    standAt(K2);
+    const before2 = await money(run2.grantId);
+    const held = admissionOf(run2, 50_000n);
+    const unit = heldUnit(run2.ag.agencyId, (uow) => admitIn(uow, held));
+    await unit.reached;
+    const inside = await w.h.oracle.query("SELECT clock_timestamp() + make_interval(secs => $1) < $2::timestamptz AS early", [K2, expires2]);
+    assert.equal(inside.rows[0].early, true, "the reservation's statement ran before the grant's expiry");
+    for (let i = 0; ; i++) {
+      const past = (await w.h.oracle.query("SELECT clock_timestamp() + make_interval(secs => $1) >= $2::timestamptz + interval '250 milliseconds' AS past", [K2, expires2])).rows[0].past;
+      if (past === true) break;
+      assert.ok(i < 400, "the shifted clock reaches the second grant's expiry");
+      await new Promise((res) => setTimeout(res, 25));
+    }
+    unit.release();
+    await assert.rejects(unit.done, (e: unknown) => {
+      const codes: string[] = [];
+      for (let c: unknown = e; c !== null && typeof c === "object"; c = (c as { cause?: unknown }).cause) codes.push(`${String((c as { code?: unknown }).code)}:${String((c as { constraint?: unknown }).constraint)}`);
+      return codes.includes("KA083:grant_expired_at_dispatch");
+    }, "refused at COMMIT by the commit gate's grant expiry clause");
+    assert.equal((await w.h.oracle.query("SELECT count(*)::int AS n FROM kauro.request_journal WHERE request_id = $1", [held.requestId])).rows[0].n, 0);
+    assert.deepEqual(await money(run2.grantId), before2, "nothing reserved");
   } finally {
     standAt(0);
   }
