@@ -133,8 +133,10 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0058_b05_core_documents.sql",
     // package B16/B18: operations service principal, incidents, restore candidates and recoveries (provisional number)
     "0059_b16_operations_recovery.sql",
+    // SEC-DEPTH-PROVENANCE L1 (A1/R1/R2): runtime principals outside the guard-execution boundary (provisional number)
+    "0060_runtime_hardening.sql",
     // Payments V1 PV1-INBOUND: credit and statement-import aggregates, guards, the owner pipeline on the payment pool (provisional number)
-    "0060_bank_inbound.sql",
+    "0061_bank_inbound.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

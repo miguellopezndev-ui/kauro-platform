@@ -1,5 +1,5 @@
 /**
- * The inbound side of the bank-transfer route over `pg` (migration 0060, lane PV1-INBOUND; docs/design/ACH-ROUTE.md r12 §7.5-§7.12,
+ * The inbound side of the bank-transfer route over `pg` (migration 0061, lane PV1-INBOUND; docs/design/ACH-ROUTE.md r12 §7.5-§7.12,
  * §7.23, §7.28): credits, the account's stream locks, an instruction found by its reference, the bank order state, statement imports,
  * their coverage and lines, and the route-scope review cases. Every statement runs in the caller's unit of work under its policies: the
  * payment service's pool (kauro_payment) for the owner's commands and for the service steps alike.
@@ -291,7 +291,7 @@ export class PgBankCredits {
   }
 
   /**
-   * Releases the project's open checkout of an order whose bank state is EXPIRED (payment_orders.bank_slot_released_at, migration 0060):
+   * Releases the project's open checkout of an order whose bank state is EXPIRED (payment_orders.bank_slot_released_at, migration 0061):
    * set once, in the unit that expired it, under the order's lock; a second call changes nothing.
    */
   async releaseBankSlot(orderId: string): Promise<void> {
