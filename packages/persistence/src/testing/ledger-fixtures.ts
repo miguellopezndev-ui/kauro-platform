@@ -195,7 +195,7 @@ export async function recordIssuedStatement(
     const seller = input.sellerId as SellerId;
     const composed = composeStatement({ sellerId: seller, periodStartsAt: period.startsAt, cutoffAt: input.cutoffAt, rows });
     const statementId = ids.next() as CommissionStatementId;
-    const cutoffHash = commissionCutoffHash({ periodId: period.periodId, cutoffAt: input.cutoffAt, lines: rows.lines, adjustments: rows.adjustments, holds: rows.holds });
+    const cutoffHash = commissionCutoffHash({ periodId: period.periodId, cutoffAt: input.cutoffAt, lines: rows.lines, adjustments: rows.adjustments, holds: rows.holds, offsets: rows.offsets, credit: rows.credit, funds: rows.funds });
     const issued = await statements.issueStatement({
       statement: {
         statementId,

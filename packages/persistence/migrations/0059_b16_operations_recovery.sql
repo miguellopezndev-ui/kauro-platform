@@ -1,4 +1,4 @@
--- 0057 — operations and recovery: the operations service principal (B18-OPS-1), CMD056 RecordIncident and CMD057 AuthorizeRecovery.
+-- 0059 — operations and recovery: the operations service principal (B18-OPS-1), CMD056 RecordIncident and CMD057 AuthorizeRecovery.
 --
 -- registry commands CMD056 (RecordIncident, role OPERATIONS_SERVICE_OR_OWNER) and CMD057 (AuthorizeRecovery, role KAURO_OWNER), gate
 -- G-RECOVERY, idempotency REQUIRED; CMD059 RestrictCapability (role OPERATIONS_SERVICE_OR_OWNER, 0051) now also runs as the service.

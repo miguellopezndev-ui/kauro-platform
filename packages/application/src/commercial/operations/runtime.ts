@@ -4,7 +4,7 @@
  * CMD056 RecordIncident (owner or operations service) and CMD057 AuthorizeRecovery (owner, fresh step-up) are request handlers over B09's
  * request runtime; the operations records reach the unit of work through the accessor operationsOf (@kauro/persistence). The operations
  * service's route (CMD056 and CMD059 as the service) runs in a SERVICE unit of work of the commission group's factory, as the verified
- * service identity, journaled under it with no agency (migration 0057).
+ * service identity, journaled under it with no agency (migration 0059).
  */
 import type { UtcInstant } from "@kauro/contracts";
 import type { Clock, CommerceUnitOfWork, Environment, ExecutionContext, OperationsRepository, UnitOfWork } from "@kauro/domain";

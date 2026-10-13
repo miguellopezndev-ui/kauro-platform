@@ -1,7 +1,7 @@
 /**
- * The operations and recovery records of packages B16/B18 over `pg` (migration 0057; registry commands CMD056 RecordIncident and CMD057
+ * The operations and recovery records of packages B16/B18 over `pg` (migration 0059; registry commands CMD056 RecordIncident and CMD057
  * AuthorizeRecovery): the incident with its responsibilities, the restore candidate read FOR UPDATE and its one authorization with the
- * recovery row. Every instant is the database's (the birth triggers of 0057). RecordIncident runs under the owner's request session
+ * recovery row. Every instant is the database's (the birth triggers of 0059). RecordIncident runs under the owner's request session
  * (kauro_app, recorded by the person) or the operations service (kauro_commission's group, recorded by the service); AuthorizeRecovery
  * under the owner's only.
  */
