@@ -131,8 +131,10 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0057_seller_credit.sql",
     // package B05 L3: the stored core documents and plan bindings (provisional number)
     "0058_b05_core_documents.sql",
+    // package B16/B18: operations service principal, incidents, restore candidates and recoveries (provisional number)
+    "0059_b16_operations_recovery.sql",
     // Payments V1 L-REFUND: the corporate owner's step-up approval of a manual-rail refund applied by the payment service (bank_owner_authority, owner acts, treasury refund approval; provisional number)
-    "0059_refund_owner_authority.sql",
+    "0060_refund_owner_authority.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
@@ -193,7 +195,7 @@ test("runtime roles are neither owners nor superusers and have no BYPASSRLS; the
     }
     // SECURITY DEFINER requires specific justification (08): the one function is the registration of a bank route's payment route
     // (migration 0046, coordinator decision #2 of lane L-ROUTE: payment_routes stays closed to every runtime role; the function checks the
-    // caller's ACTIVE KAURO_OWNER grant and writes CONFIGURED rows only), and the owner authority of a manual-rail refund (migration 0059,
+    // caller's ACTIVE KAURO_OWNER grant and writes CONFIGURED rows only), and the owner authority of a manual-rail refund (migration 0060,
     // lane L-REFUND: the payment service never reads identities, grants or proofs; the function judges them and records the act), each with a
     // pinned search_path
     const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef ORDER BY p.proname");

@@ -78,7 +78,7 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   // Payments V1 bank-transfer route (0046, lane L-ROUTE; walked by apps/api/test/ach-route-cells.test.ts)
   bank_route: ["bank_routes", "route_id"],
   bank_transfer_instruction: ["bank_transfer_instructions", "order_id"],
-  // Payments V1 treasury refund of an unassigned credit (0059, lane L-REFUND; walked by apps/api/test/ach-refund-cells.test.ts)
+  // Payments V1 treasury refund of an unassigned credit (0060, lane L-REFUND; walked by apps/api/test/ach-refund-cells.test.ts)
   treasury_refund: ["treasury_refunds", "treasury_refund_id"],
 });
 

@@ -23,13 +23,13 @@ import type { FastifyInstance } from "fastify";
 import type { LateFailureSink, BankCreditClassifier, BankDetailsClassifier, BankEvidenceStore, BankRouteCollaborators, DestinationFingerprinter } from "@kauro/application";
 import { createBankRefundHandlers, createBankRouteHandlers, realProviderCallTimer } from "@kauro/application";
 import type { AssuranceVerifier, AuditReadRuntime, AuditRuntime, B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators, ProviderCallTimer } from "@kauro/application";
-import { SESSION_POLICY_VERSION, UnrecordedBuyerTypeReader, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createCapabilityCommandHandlers, createQuoteHandlers, createStatementRequestHandlers, problemOf, recordOperatorDenial } from "@kauro/application";
+import { SESSION_POLICY_VERSION, UnrecordedBuyerTypeReader, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createCapabilityCommandHandlers, createOperationsCommandHandlers, createQuoteHandlers, createStatementRequestHandlers, problemOf, recordOperatorDenial } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { UtcInstant } from "@kauro/contracts";
 import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
-import { bankRefundsOf, bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, capabilityGovernanceOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, type DatabaseEnvironment, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
+import { bankRefundsOf, bankRoutesOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, capabilityGovernanceOf, operationsOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, type DatabaseEnvironment, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
 import type { Authenticator } from "./authenticator.js";
 import { commercialPrincipalReader } from "./commercial-principals.js";
 import type { ApiConfig, IdentityConfig, MigratorConfig } from "./config.js";
@@ -45,7 +45,7 @@ import { createPurchaseRebinder } from "./payments/rebinder.js";
 import { registerPaymentRoutes } from "./payments/routes.js";
 import { registerBankRouteRoutes } from "./payments/bank-route-routes.js";
 import { PAYMENT_SERVICE_ID } from "./payments/runtime.js";
-import { registerCommissionRoutes, type CommissionRoutesBinding } from "./commissions/routes.js";
+import { operationsServiceRuntime, registerCommissionRoutes, type CommissionRoutesBinding } from "./commissions/routes.js";
 
 /** The process clock: business instants come from here, never from the database (07 "Database representation"). */
 export const systemClock: Clock = Object.freeze({ now: () => toUtcInstant(Date.now()), nowMs: () => Date.now() });
@@ -436,7 +436,12 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   // authorizer (the corporate owner's grant) and the step-up verifier
   const sellers = createSellerCommandHandlers(commerceRuntime, { sales: salesOf, attribution: attributionOf, authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }), assurance: createAssuranceVerifier() });
   // package B18: the capability commands (CMD058 ChangeCapability, CMD059 RestrictCapability) on the same runtime, over the capability governance adapter and the corporate owner access
-  const capabilities = createCapabilityCommandHandlers(commerceRuntime, { governance: capabilityGovernanceOf, authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }) });
+  // the operations service (decision B18-OPS-1: a member of the commission group's role) is the second principal of CMD056 and CMD059, when the commission service's pools are bound
+  const operationsService = assembly.commissions === undefined ? undefined : operationsServiceRuntime(assembly.commissions, assembly.environment, clock);
+  const serviceAuthenticator = assembly.commissions?.serviceAuthenticator ?? assembly.payments?.runtime.assembly.serviceAuthenticator ?? undefined;
+  const capabilities = createCapabilityCommandHandlers(commerceRuntime, { governance: capabilityGovernanceOf, authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }), ...(operationsService !== undefined ? { service: operationsService } : {}) });
+  // package B16/B18: RecordIncident (CMD056) and AuthorizeRecovery (CMD057)
+  const operations = createOperationsCommandHandlers(commerceRuntime, { operations: operationsOf, authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }), assurance: createAssuranceVerifier() }, operationsService);
   // package B10: CreateQuote (CMD027) on the same runtime, over the recurrence adapter and its issuance core, the recorded buyer type and
   // B09's re-binding of a paid purchase (the payment service's when bound, else the edition's lineage reader)
   const quotes = createQuoteHandlers(commerceRuntime, {
@@ -467,8 +472,9 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     reads: { ...createReadHandlers(readRuntime), ...createSourceReadHandlers(readRuntime, sources), ...createExecutionReadHandlers(readRuntime), ...createAuditReadHandlers(readRuntime) },
     intakes: { ...createSourceIntakeHandlers(readRuntime), ...createAuditIntakeHandlers(readRuntime) },
     commercial: {
-      commands: [...Object.values(commercial), ...Object.values(quotes), ...Object.values(prospects), ...Object.values(sellers), ...Object.values(capabilities), statements.CMD052] as ReadonlyArray<CommercialCommandHandler<unknown, unknown>>,
+      commands: [...Object.values(commercial), ...Object.values(quotes), ...Object.values(prospects), ...Object.values(sellers), ...Object.values(capabilities), ...Object.values(operations), statements.CMD052] as ReadonlyArray<CommercialCommandHandler<unknown, unknown>>,
       reads: [statements.GetCommissionStatement] as ReadonlyArray<CommercialReadHandler<unknown>>,
+      ...(serviceAuthenticator !== undefined ? { serviceAuthenticator } : {}),
     },
     commerce: { commands: Object.values(commerce.commands) as ReadonlyArray<CommerceCommandHandler<unknown, unknown>>, reads: Object.values(commerce.reads) as ReadonlyArray<CommerceReadHandler<unknown>> },
     authenticator,

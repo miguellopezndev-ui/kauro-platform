@@ -102,7 +102,7 @@ export const EVENT_TYPES = [
   ...COMMERCIAL_EVENT_TYPES,
   // Payments V1 bank-transfer route (commerce/bank-route.ts; migration 0046, lane L-ROUTE)
   ...BANK_ROUTE_EVENT_TYPES,
-  // Payments V1 route-scope treasury refunds (commerce/treasury-refund.ts; migration 0059, lane L-REFUND)
+  // Payments V1 route-scope treasury refunds (commerce/treasury-refund.ts; migration 0060, lane L-REFUND)
   ...TREASURY_REFUND_EVENT_TYPES,
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];

@@ -17,7 +17,7 @@
 import { randomBytes } from "node:crypto";
 import type { Client } from "pg";
 import { BANKING_CALENDAR_FIXTURE_NONBANKING, ContractFakeBankingCalendar, ContractFakePayoutEvidence, ContractFakePreparationCompletion } from "@kauro/application/testing";
-import { correctCommissionStatement, realProviderCallTimer, type CommandResult, type StatementCorrectionView, type StatementServiceHold, type StatementServiceRuntime } from "@kauro/application";
+import { correctCommissionStatement, realProviderCallTimer, type CommandResult, type StatementCorrectionView, type OperationsServiceHold, type StatementServiceHold, type StatementServiceRuntime } from "@kauro/application";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { CorrelationId, ExecutionContext, SettlementId, UserId } from "@kauro/domain";
 import { registryCommissionPolicy, registryPricePolicy, toUtcInstant } from "@kauro/domain";
@@ -89,7 +89,7 @@ export class ServiceHolds {
   readonly #armed = new Map<string, { readonly reached: () => void; readonly release: Promise<void>; readonly fail: Error | null }>();
 
   /** Pauses (or crashes) the next run of `command` that reaches its point before COMMIT. */
-  arm(command: "CMD051" | "CMD053", options: { readonly fail?: Error } = {}): { readonly reached: Promise<void>; release(): void } {
+  arm(command: "CMD051" | "CMD053" | "CMD056" | "CMD059", options: { readonly fail?: Error } = {}): { readonly reached: Promise<void>; release(): void } {
     if (this.#armed.has(command)) throw new Error(`hold ${command} is already armed`);
     let reachedResolve: () => void = () => undefined;
     const reached = new Promise<void>((resolve) => {
@@ -102,6 +102,9 @@ export class ServiceHolds {
     this.#armed.set(command, { reached: reachedResolve, release, fail: options.fail ?? null });
     return { reached, release: () => releaseResolve() };
   }
+
+  /** The same points for the operations service's commands (CMD056, CMD059 as the service; package B18). */
+  readonly operationsHook: OperationsServiceHold = (command, point) => this.hook(command as never, point);
 
   readonly hook: StatementServiceHold = async (command) => {
     const armed = this.#armed.get(command);
@@ -157,7 +160,7 @@ export async function statementsWorld(options: { readonly commercial?: WorldOpti
       const pools = await openCommissionPools({ commission: { ...base, user: ROLES.commissionLogin, poolMax: 4 }, control: { ...base, user: ROLES.controlLogin, poolMax: 2 } }, { clock, random: (n) => new Uint8Array(randomBytes(n)), statementTimeoutMs: raceStatementTimeoutMs(), environment: testDatabaseEnvironment("LOCAL") });
       opened.pools = pools;
       const units = new StandingUnits(pools.pools, () => (standing === null ? null : { at: standing }));
-      return { binding: { units: faults.wrap(units), calendar, payoutEvidence: { integrationClass: payouts.integrationClass, verify: (r) => (faults.verifier === null ? payouts.verify(r) : (faults.verifier(r, (x) => payouts.verify(x)) as ReturnType<typeof payouts.verify>)) }, providerTimer: { start: (ms) => (faults.timer === null ? realProviderCallTimer.start(ms) : faults.timer(ms)) }, hold: serviceHolds.hook }, close: () => pools.close() };
+      return { binding: { units: faults.wrap(units), calendar, payoutEvidence: { integrationClass: payouts.integrationClass, verify: (r) => (faults.verifier === null ? payouts.verify(r) : (faults.verifier(r, (x) => payouts.verify(x)) as ReturnType<typeof payouts.verify>)) }, providerTimer: { start: (ms) => (faults.timer === null ? realProviderCallTimer.start(ms) : faults.timer(ms)) }, hold: serviceHolds.hook, operationsHold: serviceHolds.operationsHook }, close: () => pools.close() };
     },
   });
   faults.stand = () => (standing === null ? null : { at: standing });
@@ -218,7 +221,7 @@ export const routes = {
 };
 
 /** A bearer token of the commission group's services (minted by B09's service-authenticator fake). */
-export function commissionToken(sw: StatementsWorld, serviceId: "commission-service" | "finance-service" | "payment-service" = "commission-service", environment: "LOCAL" | "LIVE" = "LOCAL"): string {
+export function commissionToken(sw: StatementsWorld, serviceId: "commission-service" | "finance-service" | "payment-service" | "operations-service" = "commission-service", environment: "LOCAL" | "LIVE" = "LOCAL"): string {
   return serviceToken(sw.pw, { serviceId, environment });
 }
 
