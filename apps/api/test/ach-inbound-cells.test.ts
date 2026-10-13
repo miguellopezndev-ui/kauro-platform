@@ -36,6 +36,8 @@ import {
   exactFor,
   expirySweep,
   finance,
+  financeRetryDue,
+  kbook,
   footprint,
   holdAndWait,
   holdStream,
@@ -1053,11 +1055,20 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
     return { o, creditId: credit.bank_credit_id };
   };
 
+  /**
+   * Two FINANCE bookings of one source race at its posting group (the ledger line (event, line) the first insert claims): the dispatcher's
+   * pass and a redelivery of the same events (a second pass of the same consumer finds the lease held and books nothing, so the race of
+   * two Kbook units is a pass against a redelivery), each holding its first ledger line in turn.
+   */
+  const firstLine: ReadonlyArray<SqlStep> = [{ label: "first_line", match: /INSERT INTO kauro.ledger_entries/, nth: 1 }];
   cell(t("RACE", "RACE", "two FINANCE passes, both orders"), "race", async (ctx) => {
     for (const first of ["pass A holds", "pass B holds"]) {
       const { o, creditId } = await appliedFor(`p2-race-${first}`);
-      const r = await holdAndWait(ctx, `${first}: Kbook vs Kbook`, () => finance(), () => finance());
+      const pass = (): Promise<unknown> => finance();
+      const redelivery = (): Promise<unknown> => kbook(creditId);
+      const r = await holdAndWait(ctx, `${first}: Kbook vs Kbook`, first === "pass A holds" ? pass : redelivery, first === "pass A holds" ? redelivery : pass, "db.first_line.after", firstLine);
       assert.ok(r.held.status === "fulfilled" && r.waited.status === "fulfilled", first);
+      await finance();
       await assertBooked(creditId, o, first);
     }
   });
@@ -1066,7 +1077,8 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
     const { o, creditId } = await appliedFor("p2-timeout");
     iw.faults.statementTimeoutMs = LOCK_TIMEOUT_MS;
     try {
-      await holdAndWait(ctx, "a FINANCE pass timing out behind the holder", () => finance(), () => finance());
+      const r = await holdAndWait(ctx, "a FINANCE booking timing out behind the holder", () => finance(), () => kbook(creditId), "db.first_line.after", firstLine);
+      assert.equal(r.waited.status, "rejected", "the booking behind the held posting group timed out");
     } finally {
       iw.faults.statementTimeoutMs = null;
     }
@@ -1092,6 +1104,7 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
       ctx.points.crash("uow.before-commit");
       await ctx.operation("FINANCE dying before COMMIT", () => onFresh(ctx, () => finance())).catch(() => undefined);
       assert.deepEqual(await ledgerByAccount(creditId), {}, "no posting-group fragment");
+      assert.ok((await financeRetryDue(creditId)) >= 1, "the died delivery is retried");
       await finance();
       await assertBooked(creditId, o, "then booked once");
     },
@@ -1113,7 +1126,10 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
     const { o, creditId } = await appliedFor("p2-retry");
     await ctx.attempt(() => finance());
     const lines = await count("SELECT 1 FROM kauro.ledger_entries");
-    await q("UPDATE kauro.outbox_records SET delivered_at = NULL WHERE event_id IN (SELECT event_id FROM kauro.domain_events WHERE aggregate_id::text = $1)", [creditId]).catch(() => undefined);
+    // a delivered record is never reopened (outbox guard): the redelivery is the consumer handed each event again
+    const again = await ctx.attempt(() => kbook(creditId));
+    assert.ok(again.length > 0 && again.every((x) => x === "DUPLICATE" || x === "NOT_APPLICABLE"), `every redelivered source is a duplicate or not applicable: ${again.join(", ")}`);
+    assert.ok(again.includes("DUPLICATE"), "the booked source is recognised as posted");
     await ctx.attempt(() => finance());
     assert.equal(await count("SELECT 1 FROM kauro.ledger_entries"), lines, "a redelivered source posts nothing");
     await assertBooked(creditId, o, "once");
@@ -1130,6 +1146,7 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
       await conn.end();
     }
     assert.deepEqual(await ledgerByAccount(creditId), {}, "no residual line");
+    assert.ok((await financeRetryDue(creditId)) >= 1, "the failed delivery is retried");
     await finance();
     await assertBooked(creditId, o, "then exact");
   });

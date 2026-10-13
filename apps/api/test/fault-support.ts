@@ -324,7 +324,15 @@ export class FaultRouting {
         if (typeof value !== "function") return value;
         // inside a routed invocation (faults.on / onRoles) the payment service's units run over the routed connection of the login of the
         // role they need, exactly as the api's request units do (wrap): the lane L-INBOUND's service steps and owner commands
-        if (prop === "run" && this.#als.getStore() !== undefined) return (Reflect.get(this.wrap(target), "run") as (...a: unknown[]) => unknown);
+        const routing = this.#als.getStore();
+        if (prop === "run" && routing !== undefined) {
+          const routedRun = Reflect.get(this.wrap(target), "run") as (...a: unknown[]) => unknown;
+          // the payment dispatcher's SYSTEM units (its lease, claims and settlements: kauro_control) are routed only when the invocation
+          // serves kauro_control; otherwise they run on their own pool, so the routed unit counter and points name the SERVICE effects only
+          const servesControl = routing.conns !== undefined ? routing.conns.has("kauro_control") : routing.role === "kauro_control";
+          return (context: unknown, ...rest: unknown[]) =>
+            (context as { kind?: string }).kind === "SYSTEM" && !servesControl ? (value as (...a: unknown[]) => unknown).call(target, context, ...rest) : routedRun(context, ...rest);
+        }
         const route = this.#pay.getStore();
         if (prop !== "run") return (value as (...a: unknown[]) => unknown).bind(target);
         if (route === undefined) {

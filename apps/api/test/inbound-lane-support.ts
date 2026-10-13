@@ -43,7 +43,7 @@ import { BANK_FAKE_FORMAT, BANK_FAKE_PROVIDER, fakeCreditBytes, fakeStatementByt
 import type { CreateQuoteView } from "@kauro/application";
 import type { UserId } from "@kauro/domain";
 import { connectionPid, openConnection, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
-import { paymentServiceEffect } from "../src/payments/consumers.js";
+import { financeConsumer, paymentServiceEffect, unitOfWorkEffect } from "../src/payments/consumers.js";
 import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld, type HeldLock, type StoredBankArtifact } from "./bank-support.js";
 import { deliveryOf } from "./commission-support.js";
 import type { SqlStep } from "./fault-support.js";
@@ -366,13 +366,50 @@ export const applyService = (creditId: string): Promise<string> => deliverToServ
 /** P2: FINANCE passes until nothing is due. */
 export async function finance(): Promise<ReadonlyArray<{ readonly eventType: string; readonly outcome: string }>> {
   const out: Array<{ eventType: string; outcome: string }> = [];
+  const sink = L().iw.pw.backgroundFailures;
   for (let i = 0; i < 5; i++) {
+    const before = sink.length;
     const pass = await dispatch(L().iw.pw, "FINANCE");
+    // the dispatcher records a delivery's failure and goes on: the pass's first failure is the booking's own error
+    const failed = sink.slice(before)[0];
+    if (failed !== undefined) throw failed.error;
     assert.deepEqual(pass.deliveries.filter((d) => d.outcome === "FAILED" || d.outcome === "DEAD_LETTER"), [], "every FINANCE delivery is applied, a duplicate or not applicable");
     out.push(...pass.deliveries);
     if (pass.deliveries.length === 0) break;
   }
   return out;
+}
+/** The ids of the aggregates whose events book a credit: the credit and its capture. */
+async function bookedAggregates(creditId: string): Promise<ReadonlyArray<string>> {
+  const row = await creditRow(creditId);
+  return [creditId, ...(row?.capture_id ? [row.capture_id] : [])];
+}
+/**
+ * P2 Kbook as a FINANCE redelivery: every FINANCE delivery of the credit's and its capture's events (delivered or not), handed to the
+ * FINANCE consumer in its own SERVICE unit (the dispatcher's effect, without its lease or settlement); answers each outcome.
+ */
+export async function kbook(creditId: string): Promise<ReadonlyArray<string>> {
+  const { iw } = L();
+  const due = await q<{ event_id: string }>(
+    "SELECT e.event_id FROM kauro.outbox_records o JOIN kauro.domain_events e ON e.event_id = o.event_id WHERE o.consumer = 'FINANCE' AND e.aggregate_id::text = ANY($1::text[]) ORDER BY e.sequence",
+    [await bookedAggregates(creditId)],
+  );
+  assert.ok(due.length > 0, `${creditId} has FINANCE deliveries`);
+  const effect = unitOfWorkEffect(iw.pw.service.runtime, financeConsumer());
+  const out: string[] = [];
+  for (const d of due) out.push(await effect.handle((await deliveryOf(iw as never, d.event_id)) as never));
+  return out;
+}
+/**
+ * The dispatcher's backoff of the credit's failed FINANCE deliveries elapses (it schedules a retry on the real process clock): their
+ * next attempt is due now. Answers how many were rescheduled.
+ */
+export async function financeRetryDue(creditId: string): Promise<number> {
+  const r = await L().iw.h.oracle.query(
+    "UPDATE kauro.outbox_records o SET next_attempt_at = now() FROM kauro.domain_events e WHERE e.event_id = o.event_id AND o.consumer = 'FINANCE' AND o.state = 'RETRYABLE' AND e.aggregate_id::text = ANY($1::text[])",
+    [await bookedAggregates(creditId)],
+  );
+  return r.rowCount ?? 0;
 }
 /** E1: one pass of the payment service's sweeps (TRANSFER_EXPIRY is a registered bank sweep). */
 /**
