@@ -6,13 +6,15 @@
  *
  * Lock order (ACH-ROUTE §7.28): the account's INBOUND stream lock, then the credit identity lock Lc, then the order's own locks.
  */
-import type { CommerceEventDelivery } from "@kauro/application";
-import { publishCreditEvent } from "@kauro/application";
-import type { CausationId, CommerceUnitOfWork, CorrelationId, MatchKeys } from "@kauro/domain";
-import { matchDecision } from "@kauro/domain";
+import type { UtcInstant } from "@kauro/contracts";
+import type { CommerceEventDelivery, ProviderOrderObservation } from "@kauro/application";
+import { bankPayeeDigest, fileRemedyReturns, publishCreditEvent, publishOrderStateEvent } from "@kauro/application";
+import type { BankApplyJudgment, BankTransferInstructionRecord, CausationId, CommerceUnitOfWork, CorrelationId, MatchKeys, PaymentOrderId } from "@kauro/domain";
+import { bankOrderStateAfterApply, DomainFailure, effectNowOf, judgeBankApply, matchDecision } from "@kauro/domain";
 import { bankCreditsOf, bankRoutesOf } from "@kauro/persistence";
 import { registerBankDeliveryHandler, type ConsumerOutcome } from "./consumers.js";
 import { causedBy, type PaymentRuntime } from "./runtime.js";
+import { registerBankSweep } from "./sweep.js";
 
 const serviceContext = (rt: PaymentRuntime) => ({ kind: "SERVICE" as const, serviceId: rt.self.serviceId, correlationId: rt.ids.next() as CorrelationId });
 
@@ -67,4 +69,180 @@ export async function matchCredit(rt: PaymentRuntime, delivery: CommerceEventDel
   });
 }
 
+/** The capture identity of a credit: its namespaced credit id, never an invented provider order identity (D-ACH-09). */
+export const creditCaptureRef = (creditId: string): string => `bank-credit:${creditId}`;
+
+/**
+ * P1 Kapply (§7.10, §7.24 P1Δ, DV1-06): a MATCHED credit is applied to its order as an ObservedCapture through the one reconciler
+ * (allocation, authorization under the subject guards and KP004, AMOUNT_MISMATCH / EXCESS_CAPTURE / CAPTURE_WITHOUT_VALID_SUBJECT and
+ * their server refund requests). Lock order: INBOUND stream, Lc, the route's share lock, the subject's shared halves and the order's row
+ * lock (the reconciler), then the instruction's row lock; the transfer deadline, provider time, route and retirement are judged at the
+ * database clock read after that last lock. The credit becomes APPLIED with its capture and the bank order takes its next state.
+ */
+export async function applyCredit(rt: PaymentRuntime, delivery: CommerceEventDelivery): Promise<ConsumerOutcome> {
+  const creditId = delivery.aggregateId;
+  return rt.assembly.commerce.run(serviceContext(rt), async (uow: CommerceUnitOfWork): Promise<ConsumerOutcome> => {
+    const repo = bankCreditsOf(uow as never);
+    const seen = await repo.credit(creditId);
+    if (seen === null) return "NOT_APPLICABLE";
+    await repo.lockStream(seen.environment, seen.accountRef, "INBOUND");
+    const credit = await repo.lockCredit(creditId);
+    // a redelivery after the application (or after an owner's review) is the committed outcome
+    if (credit === null || credit.state !== "MATCHED" || credit.orderId === null) return "DUPLICATE";
+    causedBy(uow, delivery.eventId);
+    const causationId = delivery.eventId as unknown as CausationId;
+    const orderId = credit.orderId;
+    const placed = await repo.instruction(orderId);
+    if (placed === null || placed.environment !== credit.environment || placed.accountRef !== credit.accountRef) throw new DomainFailure("INTEGRITY_FAILURE", "a matched credit names an order of another account");
+    if ((await uow.adoptScope("PAYMENT_ORDER", orderId)) !== placed.agencyId) throw new DomainFailure("INTEGRITY_FAILURE", "the matched order is not in its instruction's agency");
+    const routes = bankRoutesOf(uow as never);
+    const route = await routes.lockShare(placed.routeId);
+    const version = await routes.version(placed.routeId, placed.routeVersion);
+    if (route === null || version === null) throw new DomainFailure("INTEGRITY_FAILURE", "the instruction's route version is not readable");
+    const confirmedAt = await repo.confirmedAtOf(creditId);
+    const captureRef = creditCaptureRef(creditId);
+    const observedAt = await effectNowOf(uow);
+    const observation: ProviderOrderObservation = {
+      providerOrderId: null,
+      orderStatus: "COMPLETED",
+      captures: [
+        {
+          provider: route.provider,
+          environment: credit.environment,
+          providerOrderId: null,
+          providerCaptureId: captureRef,
+          status: "COMPLETED",
+          amountCents: credit.grossCents,
+          currency: credit.currency,
+          payeeDigest: bankPayeeDigest(credit.environment, credit.accountRef),
+          providerCompletedAt: (credit.bookedAt ?? null) as UtcInstant | null,
+          fundsState: "UNKNOWN",
+          feeCents: credit.feeCents,
+          evidenceHash: credit.evidenceHash,
+        },
+      ],
+      refunds: [],
+      absenceIsProof: false,
+      observedAt,
+      evidenceHash: credit.evidenceHash,
+    };
+    const held: { instruction: BankTransferInstructionRecord | null; judged: BankApplyJudgment | null } = { instruction: null, judged: null };
+    const result = await rt.reconciler.applyOrderObservation(uow, {
+      orderId: orderId as PaymentOrderId,
+      source: "PROVIDER_QUERY",
+      observation,
+      artifactRef: creditId as never,
+      causationId,
+      now: observedAt,
+      afterLocks: async (order) => {
+        const instruction = await repo.instruction(orderId, true);
+        if (instruction === null) throw new DomainFailure("INTEGRITY_FAILURE", "the instruction vanished under the order's lock");
+        // the effect instant: the database clock after the last lock wait
+        const effectNow = await effectNowOf(uow);
+        const judged = judgeBankApply({
+          orderState: instruction.orderState,
+          expiryCause: await repo.expiryCauseOf(orderId),
+          transferExpiresAt: instruction.transferExpiresAt,
+          issuedAt: instruction.issuedAt,
+          toleranceMs: version.providerTimeToleranceMs,
+          bookedAt: credit.bookedAt,
+          confirmedAt,
+          effectNow,
+          routeEnabled: route.state === "ENABLED",
+          anotherPurchase: await repo.anotherLivePurchase(order.agencyId, order.projectId, order.quoteId),
+        });
+        held.instruction = instruction;
+        held.judged = judged;
+        return { now: effectNow, authorityBlocker: judged.blocker };
+      },
+    });
+    const locked = held.instruction;
+    const judgment = held.judged;
+    if (locked === null || judgment === null) throw new DomainFailure("INTEGRITY_FAILURE", "the apply was planned without its instruction");
+    if (!judgment.providerTimeVerified) await repo.openCreditCase(uow.ids.next(), "PROVIDER_TIME_UNVERIFIED", credit, "BOOKED_AT_UNVERIFIED");
+    const capture = (await uow.commerce.captures.listForOrder(orderId as PaymentOrderId)).find((c) => c.providerCaptureId === captureRef);
+    if (capture === undefined) {
+      // the reconciler refused the observation as a capture of this order (an exception it recorded): the owner reviews the credit
+      const written = await repo.transitionCredit(creditId, credit.version, { state: "MATCH_REVIEW" });
+      if (written.kind === "STALE") return "DUPLICATE";
+      await repo.openCreditCase(uow.ids.next(), "MATCH_REVIEW", credit, "CAPTURE_NOT_RECORDED");
+      await publishCreditEvent(uow, causationId, written.record, "bank_credit.review_required.v1", { state: written.record.state, previousState: credit.state, reason: "CAPTURE_NOT_RECORDED" });
+      return "APPLIED";
+    }
+    const written = await repo.transitionCredit(creditId, credit.version, { state: "APPLIED", captureId: capture.captureId });
+    if (written.kind === "STALE") return "DUPLICATE";
+    await publishCreditEvent(uow, causationId, written.record, "bank_credit.applied.v1", { orderId, captureId: capture.captureId, state: written.record.state, previousState: credit.state });
+    const received = (await repo.appliedCentsOf(orderId, creditId)) + credit.grossCents;
+    const next = bankOrderStateAfterApply(locked.orderState, { authorized: result.authorizationIssued !== null, pastDeadline: judgment.pastDeadline, expectedCents: locked.amountCents, receivedCents: received });
+    // PARTIALLY_RECEIVED -> PARTIALLY_RECEIVED is a listed edge: each partial receipt is a version of the bank order of its own
+    if (next !== locked.orderState || next === "PARTIALLY_RECEIVED") {
+      const after = next === "EXPIRED" ? await repo.expireOrder(orderId, locked.version, "DEADLINE") : await repo.setOrderState(orderId, locked.version, next);
+      // an expired bank order releases the project's open checkout (D-ACH-05: no further instructions or payment claims)
+      if (next === "EXPIRED") await repo.releaseBankSlot(orderId);
+      await publishOrderStateEvent(uow, causationId, after, locked.orderState, next === "EXPIRED" ? "TRANSFER_DEADLINE_REACHED" : "CREDIT_APPLIED");
+    }
+    return "APPLIED";
+  });
+}
+
 registerBankDeliveryHandler("bank_credit.received.v1", matchCredit);
+registerBankDeliveryHandler("bank_credit.matched.v1", applyCredit);
+
+/** The most bank orders one E1 pass expires (the next pass takes the rest). */
+const EXPIRY_PASS_LIMIT = 500;
+
+type ExpiryCursor = { readonly transferExpiresAt: string; readonly orderId: string };
+
+/**
+ * E1 Kexpiry (§7.12): one pass over the bank orders whose transfer deadline has passed at the database clock, oldest deadline first. Each
+ * order is its own SERVICE unit of work that takes the next candidate after the pass's cursor, adopts the order's stored operation, takes
+ * the order's row lock then the instruction's (the suffix of P1's lock order, §7.28) and judges the deadline again at the effect instant
+ * read after those locks: an order a P1 settled meanwhile (CAPTURED, EXPIRED) is left as it is. The order becomes EXPIRED with cause
+ * DEADLINE, releasing the project's open checkout, and every completed capture of it without a live entitlement is returned (KAURO_REMEDY, at most one request per capture and
+ * origin). The quote is never touched: the price clock is never extended. A failed order is reported to the background-failure sink and the
+ * pass goes on past it (one failing order never holds the others back).
+ */
+export async function expireTransfers(rt: PaymentRuntime): Promise<void> {
+  let after: ExpiryCursor | null = null;
+  for (let taken = 0; taken < EXPIRY_PASS_LIMIT; taken++) {
+    const cursor: ExpiryCursor | null = after;
+    const named: { next: ExpiryCursor | null } = { next: null };
+    try {
+      await rt.assembly.commerce.run(serviceContext(rt), async (uow: CommerceUnitOfWork): Promise<void> => {
+        const repo = bankCreditsOf(uow as never);
+        const [candidate] = await repo.expiredCandidates(await effectNowOf(uow), 1, cursor);
+        if (candidate === undefined) return;
+        named.next = { transferExpiresAt: candidate.transferExpiresAt, orderId: candidate.orderId };
+        await expireOne(uow, candidate);
+      });
+    } catch (e) {
+      rt.onBackgroundFailure(rt.ids.next(), e);
+    }
+    // a cursor that does not move (no candidate left, or a unit that failed before naming one) ends the pass
+    const next = named.next;
+    if (next === null || (cursor !== null && next.orderId === cursor.orderId)) return;
+    after = next;
+  }
+}
+
+async function expireOne(uow: CommerceUnitOfWork, candidate: BankTransferInstructionRecord): Promise<void> {
+  const repo = bankCreditsOf(uow as never);
+  const orderId = candidate.orderId;
+  if ((await uow.adoptScope("PAYMENT_ORDER", orderId)) !== candidate.agencyId) throw new DomainFailure("INTEGRITY_FAILURE", "the expiring order is not in its instruction's agency");
+  const order = await uow.commerce.orders.lock(orderId as PaymentOrderId);
+  if (order === null) throw new DomainFailure("INTEGRITY_FAILURE", "the expiring instruction has no order");
+  const instruction = await repo.instruction(orderId, true);
+  if (instruction === null) throw new DomainFailure("INTEGRITY_FAILURE", "the instruction vanished under the order's lock");
+  // the effect instant: the database clock after the last lock wait
+  const now = await effectNowOf(uow);
+  if (instruction.orderState !== "AWAITING_TRANSFER" && instruction.orderState !== "PARTIALLY_RECEIVED") return;
+  if (Date.parse(now) < Date.parse(instruction.transferExpiresAt)) return;
+  const causationId = orderId as unknown as CausationId;
+  causedBy(uow, orderId);
+  const after = await repo.expireOrder(orderId, instruction.version, "DEADLINE");
+  await repo.releaseBankSlot(orderId);
+  await publishOrderStateEvent(uow, causationId, after, instruction.orderState, "TRANSFER_DEADLINE_REACHED");
+  await fileRemedyReturns(uow, order, causationId, now, "KAURO_REMEDY: the transfer deadline passed without a complete payment");
+}
+
+registerBankSweep("TRANSFER_EXPIRY", expireTransfers);
