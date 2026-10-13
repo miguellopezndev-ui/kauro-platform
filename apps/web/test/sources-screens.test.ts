@@ -131,6 +131,10 @@ test("UI14: each file shows declared size, upload progress, provider observation
   // a clean scan that covered only part of the file is still not fully checked
   const partial = upload({ inspection: { ...(scannerSkipped().inspection as NonNullable<ReturnType<typeof scannerSkipped>["inspection"]>), scanState: "COVERED_CLEAN", scanCoverage: { expectedParts: 4, scannedParts: 3, expectedBytes: 2048, scannedBytes: 1536 } } });
   assert.ok(renderToStaticMarkup(createElement(UploadFacts, { upload: partial, progress: null })).includes("Not fully checked: 3 of 4 parts were scanned"));
+  // the scanner's own verdict decides: a skip is a skip even if the coverage figures look complete
+  const skippedFull = upload({ inspection: { ...(scannerSkipped().inspection as NonNullable<ReturnType<typeof scannerSkipped>["inspection"]>), scanCoverage: { expectedParts: 4, scannedParts: 4, expectedBytes: 2048, scannedBytes: 2048 } } });
+  assert.equal(uploadFacts(skippedFull).scanner.kind === "INSPECTED" && (uploadFacts(skippedFull).scanner as { fullyChecked: boolean }).fullyChecked, false);
+  assert.ok(renderToStaticMarkup(createElement(UploadFacts, { upload: skippedFull, progress: null })).includes("Not fully checked: the scanner skipped this file"));
   const clean = upload({ inspection: { ...(scannerSkipped().inspection as NonNullable<ReturnType<typeof scannerSkipped>["inspection"]>), scanState: "COVERED_CLEAN", scanCoverage: { expectedParts: 4, scannedParts: 4, expectedBytes: 2048, scannedBytes: 2048 } } });
   const cleanHtml = renderToStaticMarkup(createElement(UploadFacts, { upload: clean, progress: null }));
   assert.ok(cleanHtml.includes("Fully checked: no problem found") && !cleanHtml.includes("Not fully checked"));
