@@ -105,6 +105,6 @@ test("DENY registration seams: one handler per bank event type and one pass per 
   registerBankDeliveryHandler("outbound.bounced.v1", async () => "NOT_APPLICABLE");
   assert.throws(() => registerBankDeliveryHandler("outbound.bounced.v1", async () => "APPLIED"), /already registered/);
   assert.deepEqual([...BANK_SWEEP_NAMES], ["TRANSFER_EXPIRY", "EXECUTION_WINDOW"]);
-  registerBankSweep("EXECUTION_WINDOW", async () => undefined);
+  // X2 (lane L-REFUND) registered EXECUTION_WINDOW when the payments module loaded: a second registration is refused
   assert.throws(() => registerBankSweep("EXECUTION_WINDOW", async () => undefined), /already registered/);
 });

@@ -9,6 +9,9 @@
  *   POST /api/v1/operations/bank-routes/{routeId}/details       replaceBankRouteDetails  (KAURO_OWNER)  200
  *   GET  /api/v1/operations/bank-routes/{routeId}               getBankRoute             (KAURO_OWNER)  200
  *   POST /api/v1/operations/treasury-refunds/{treasuryRefundId}/approve  approveTreasuryRefund  (KAURO_OWNER)  200 (lane L-REFUND)
+ *   POST /api/v1/operations/refunds/{refundId}/execution-declarations   declareRefundExecution (KAURO_OWNER)  201 (lane L-REFUND, X1)
+ *   POST /api/v1/operations/execution-attempts/{attemptId}/records      recordRefundExecution  (KAURO_OWNER)  200 (lane L-REFUND, G2/G4)
+ *   GET  /api/v1/operations/execution-attempts                           listExecutionAttempts  (KAURO_OWNER)  200 (lane L-REFUND, the queue)
  *   GET  /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions  (agency member, X-Kauro-Agency) 200
  *
  * Admission of a POST: the envelope headers, the closed request schema, an Idempotency-Key, the path ids; then the person's
@@ -120,7 +123,11 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
   command("disableBankRoute", "CMD204", (req) => deps.handlers.disable(req as never));
   command("replaceBankRouteDetails", "CMD205", (req) => deps.handlers.replaceDetails(req as never));
   const refunds = deps.refunds;
-  if (refunds !== undefined) command("approveTreasuryRefund", "CMD220", (req) => refunds.approveTreasury(req as never));
+  if (refunds !== undefined) {
+    command("approveTreasuryRefund", "CMD220", (req) => refunds.approveTreasury(req as never));
+    command("declareRefundExecution", "CMD221", (req) => refunds.declareExecution(req as never));
+    command("recordRefundExecution", "CMD222", (req) => refunds.recordExecution(req as never));
+  }
 
   function read(operationId: string, run: (request: FastifyRequest<{ Params: Record<string, string> }>, correlationId: CorrelationId, path: Readonly<Record<string, string>>, headers: Readonly<Record<string, string | undefined>>) => Promise<FastifyReplyAnswer>): void {
     const route = routeOf(operationId);
@@ -151,6 +158,15 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     const authority = kit.requestAuthority(request, headers, authenticated.subject.identity.userId);
     return await deps.handlers.get({ correlationId, subject: authenticated.subject, routeId: path["routeId"]!, authority });
   });
+
+  if (refunds !== undefined) {
+    read("listExecutionAttempts", async (request, correlationId, _path, headers) => {
+      const authenticated = await kit.subjectOrRefusal(request, headers, "READ_EXECUTION_ATTEMPTS", { correlationId, agencyId: null });
+      if (authenticated.kind === "PROBLEM") return authenticated;
+      const authority = kit.requestAuthority(request, headers, authenticated.subject.identity.userId);
+      return await refunds.executionQueue({ correlationId, subject: authenticated.subject, authority });
+    });
+  }
 
   read("getTransferInstructions", async (request, correlationId, path, headers) => {
     const selector = headers[HEADERS.agency];

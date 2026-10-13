@@ -18,6 +18,7 @@ import { paymentRoutes } from "./commerce-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { agentOf, bought, integrationWorld, type Agent, type IntegrationWorld } from "./integration-support.js";
 import { execute } from "./payment-support.js";
+import { executionWindowPass } from "../src/payments/index.js";
 import { asProblem, call, freshKey, ids, type Person, type Reply } from "./support.js";
 import type { Purchase } from "./commission-support.js";
 
@@ -289,9 +290,9 @@ export function ownerQueue(owner: Person = L().owner): Promise<Reply> {
 export function cmd033(src: Source, expectedVersion: number): Promise<Reply> {
   return execute(L().iw.pw, src.refundId, { expectedVersion });
 }
-/** One pass of the payment service's sweeps (X2 EXECUTION_WINDOW is a registered bank sweep). */
+/** One X2 pass: the EXECUTION_WINDOW bank sweep as the payment service runs it (alone, so a cell's crash/pause lands on its units). */
 export async function sweepX2(): Promise<void> {
-  await L().iw.pw.service.runSweepPass();
+  await executionWindowPass(L().iw.pw.service.runtime);
 }
 
 // --- replies ------------------------------------------------------------------------------------------------------------------------
@@ -605,20 +606,26 @@ const RED_FIRST: ReadonlyArray<readonly [RegExp, string]> = [
   [/ ACH-M-FC-G5 /, "todo: red-first, slice 3 (X4 resend) + seam SI2 (statement import)"],
   [/^ACH-16 /, "todo: red-first, slice 3 (X4 resend, P3 booking) + seam S5 (credit reversal)"],
   [/^ACH-15 /, "todo: red-first, slices 2-3 (G2 record, X4 resend)"],
-  [/^ACH-12 /, "todo: red-first, slice 2 (G2 record executed return)"],
-  [/ ACH-M-G[12]-/, "todo: red-first, slice 2 (G1/G2 record executed return)"],
-  [/ ACH-M-G4-/, "todo: red-first, slice 2 (G4 record resend)"],
+  [/ ACH-M-G4-/, "todo: red-first, slice 3 (G4 records a RESEND attempt, declared only by X4)"],
   [/ ACH-M-G3-/, "todo: red-first, slice 3 (G3 record return bounce)"],
   [/ ACH-M-P3-/, "todo: red-first, slice 3 (the FINANCE return-booking queue); its REVOCATION also seam S7"],
   [/^DENY CMD033 /, "todo: red-first, slice 4 (CMD033 manual-rail refusal)"],
+  [/^GAP PRODUCTION-BANK-BINDING /, "todo: GAP slice 4 (startApi binds no destination fingerprinter nor credit classifier: a deploy answers 503 EVIDENCE_UNAVAILABLE to every owner refund approval)"],
+  [/ RFG-M-X1-REVOCATION-SESSION /, "todo: GAP session fence: the owner commands run in SERVICE units of kauro_payment, which take no lock on the caller's web session (rule 16); a session revoked while X1 waits at L1 is not refused"],
+  [/ RFG-M-(X1-RACE|LOCK-L3) /, "todo: seam S5 (bankWorld.reverseCredit, the G6 Kreversal racing the declaration)"],
+  [/RFG-P-DEST-RECIPIENT|RFG-M-DEST-RECIPIENT /, "todo: GAP seam S4 (bankWorld.storeRecipientRecord, the DP-RECIPIENT proof is not offered)"],
+  [/^RFG-02 /, "todo: red-first, slice 4 (refund.completed.v1 on the manual rail)"],
   [/^RFG-01 /, "todo: red-first, slice 4 (refund.completed.v1 and its adjustments)"],
   [/^(NEVER-RESEND:|RFG-03 |RFG-04 )/, "todo: red-first, slice 3 (X3 resolution, X4 resend, the owner queue)"],
   [/ RFG-M-NR-/, "todo: red-first, slice 3 (NEVER-RESEND at every entry point: X3, X4)"],
   [/ RFG-M-X3-|: Resolve uncertain execution|RFG-M-OFFER-OUTCOME-/, "todo: red-first, slice 3 (X3 resolve uncertain execution)"],
-  [/ RFG-M-X4-|: Declare a resend execution|RFG-P-DF-(EQUIV|FULLWIDTH|HYPHEN|UNICODE-DIGITS-EVIDENCE)/, "todo: red-first, slices 2-3 (X1 and X4 bind the destination)"],
-  [/ RFG-M-(X2-|LOCK-L3 )/, "todo: red-first, slice 2 (X2 sweep)"],
-  [/ RFG-M-X1-|: Declare manual refund execution/, "todo: red-first, slice 2 (X1 declare manual refund execution)"],
-  [/^RFG-02 |: Record a declared execution| RFG-M-(G2D|OFFER)|RFG-P-OFFER-GATE-|RFG-P-DEST-RECIPIENT|RFG-M-DEST-RECIPIENT |RFG-P-DF-CONCAT-COLLISION /, "todo: red-first, slice 2 (G2 record a declared execution)"],
+  [/ RFG-M-X4-|: Declare a resend execution| RFG-P-DF-(EQUIV|FULLWIDTH|HYPHEN|UNICODE-DIGITS-EVIDENCE)/, "todo: red-first, slices 2-3 (X1 and X4 bind the destination)"],
+  [/\[RFG-M-X2-RACE\]/, "todo: red-first, slice 4 (the RETURN leg asserts the one refund.completed.v1)"],
+  [/\[RFG-M-X2-REVOCATION\]/,"todo: red-first, slice 3 (the revoked owner's X3 NOT_EXECUTED)"],
+  [/ RFG-M-X2-/, "todo: red-first, slice 3 (every leg: RESEND attempts, declared only by X4)"],
+  [/ RFG-M-G2D-RACE /, "todo: seam SI2 (the statement import links the same debit G2 records)"],
+  [/ RFG-M-OFFER-| RFG-P-OFFER-GATE-/, "todo: red-first, slice 3 (the offer cells loop RESEND attempts (X4, G3) and X3 RESOLVE_EXECUTED)"],
+  [/ RFG-P-(E-ID|E-AMT|E-TIME|E-DEST-UNPROVEN|E-DEST-CONFLICT|E-REF-CONFLICT|E-ALL|DEST-SAME-LAST4|DEST-ROUTING|DEST-NAME|DEST-ABSENT|DEST-PARTIAL-ONLY|DEST-FULL|DF-KEY-VERSION|DF-INVALID-EVIDENCE|DF-CONCAT-COLLISION) /, "todo: red-first, slice 3 (every leg: RESEND attempts (X4) and X3 RESOLVE_EXECUTED; the RETURN x RECORD legs run now as their own cell)"],
 ];
 
 /** node:test `test`, skipping (with its todo) a cell of a slice not built yet. */

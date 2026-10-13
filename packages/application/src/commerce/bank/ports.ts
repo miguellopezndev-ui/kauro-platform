@@ -10,7 +10,7 @@ import type { BankRouteDetails, BankRouteRecord, BankRouteVersionRecord, BankTra
 import type { AssuranceVerifier } from "../../ports/assurance-and-admission.js";
 import type { ProviderCallTimer } from "../../commercial/ports.js";
 import type { BankEvidenceStore, DestinationFingerprinter, StoredBankEvidence } from "../ports.js";
-import type { DestinationFingerprintRecord, IncomingCredit } from "@kauro/domain";
+import type { DestinationFingerprintRecord, IncomingCredit, OutboundEvidence } from "@kauro/domain";
 
 export interface NewBankRouteInput {
   readonly routeId: string;
@@ -128,6 +128,105 @@ export interface CapturedDestination {
   readonly keyVersion: number;
   readonly normVersion: string;
   readonly accountLast4: string;
+  readonly holderName: string;
+}
+
+/** One outbound execution attempt (DV1-08): what its declaration froze and what its record learned. */
+export interface ExecutionAttemptRecord {
+  readonly attemptId: string;
+  readonly environment: "SANDBOX" | "LIVE";
+  readonly accountRef: string;
+  readonly kind: "RETURN" | "RESEND";
+  readonly state: "DECLARED" | "UNCERTAIN" | "RECORDED" | "NOT_EXECUTED";
+  readonly version: number;
+  readonly sourceKind: "CAPTURE" | "BANK_CREDIT";
+  readonly agencyId: string | null;
+  readonly captureId: string | null;
+  readonly refundId: string | null;
+  readonly bankCreditId: string | null;
+  readonly treasuryRefundId: string | null;
+  readonly sourceId: string;
+  readonly attemptNumber: number;
+  readonly reference: string;
+  readonly amountCents: bigint;
+  readonly currency: "USD";
+  readonly declaredAt: UtcInstant;
+  readonly declaredBy: string;
+  readonly destinationFingerprint: DestinationFingerprintRecord["fingerprint"];
+  readonly keyId: string;
+  readonly keyVersion: number;
+  readonly normVersion: string;
+  readonly bankExecutionId: string | null;
+  readonly destinationProof: "DP_FULL" | "DP_RECIPIENT" | null;
+  readonly evidenceHash: string | null;
+  readonly recordedAt: UtcInstant | null;
+}
+
+export interface NewExecutionAttemptInput {
+  readonly attemptId: string;
+  readonly environment: "SANDBOX" | "LIVE";
+  readonly accountRef: string;
+  readonly kind: "RETURN" | "RESEND";
+  readonly sourceKind: "CAPTURE" | "BANK_CREDIT";
+  readonly agencyId: string | null;
+  readonly captureId: string | null;
+  readonly refundId: string | null;
+  readonly bankCreditId: string | null;
+  readonly treasuryRefundId: string | null;
+  readonly attemptNumber: number;
+  readonly reference: string;
+  readonly amountCents: bigint;
+  readonly declaredAt: UtcInstant;
+  readonly declaredBy: string;
+  readonly destinationFingerprint: DestinationFingerprintRecord["fingerprint"];
+  readonly keyId: string;
+  readonly keyVersion: number;
+  readonly normVersion: string;
+}
+
+export type ExecutionOfferCommandName = "RECORD_RETURN" | "RECORD_RESEND" | "RESOLVE_EXECUTED";
+export interface ExecutionOfferRecord {
+  readonly offerId: string;
+  readonly attemptId: string;
+  readonly command: ExecutionOfferCommandName;
+  readonly idempotencyKey: string;
+  readonly requestedArtifactRef: string;
+  readonly expectedEvidenceHash: string;
+  readonly actorUserId: string;
+}
+export type ExecutionGateOutcomeName = "CLASSIFIED" | "UNKNOWN_EVIDENCE" | "MALFORMED_EVIDENCE" | "HASH_MISMATCH" | "UNAUTHENTICATED_EVIDENCE" | "EVIDENCE_UNAVAILABLE";
+export interface ExecutionOutcomeRecord {
+  readonly outcomeId: string;
+  readonly offerId: string;
+  readonly gateOutcome: ExecutionGateOutcomeName;
+  readonly bankExecutionId: string | null;
+  readonly outcomeCode: string;
+  readonly footprint: "RECORDED" | "REVIEW";
+  readonly reviewCaseKind: string | null;
+}
+export interface NewBankReviewCaseInput {
+  readonly caseId: string;
+  readonly kind: string;
+  readonly environment: "SANDBOX" | "LIVE";
+  readonly accountRef: string;
+  readonly attemptId: string | null;
+  readonly sourceKind: "CAPTURE" | "BANK_CREDIT" | null;
+  readonly sourceId: string | null;
+  readonly detailCode: string;
+  readonly evidenceHash: string | null;
+}
+export interface QueuedAttemptRecord {
+  readonly attemptId: string;
+  readonly kind: "RETURN" | "RESEND";
+  readonly state: string;
+  readonly sourceKind: "CAPTURE" | "BANK_CREDIT";
+  readonly refundId: string | null;
+  readonly treasuryRefundId: string | null;
+  readonly reference: string;
+  readonly amountCents: bigint;
+  readonly declaredAt: UtcInstant;
+  readonly accountLast4: string;
+  readonly holderName: string;
 }
 
 /** The refund tables in the caller's SERVICE unit of work (persistence PgBankRefunds). */
@@ -143,11 +242,36 @@ export interface BankRefundRepository {
   ): Promise<TreasuryRefundRecord | null>;
   destinationOf(sourceKind: "CAPTURE" | "BANK_CREDIT", id: string): Promise<CapturedDestination | null>;
   insertDestination(d: NewRefundDestinationInput): Promise<void>;
+  // slice 2 (X1, G2/G4, X2, the owner queue)
+  lockCaptureRefunds(captureId: string): Promise<void>;
+  lockBankCredit(bankCreditId: string): Promise<boolean>;
+  awaitAuthorization(authorizationId: string): Promise<void>;
+  attempt(attemptId: string): Promise<ExecutionAttemptRecord | null>;
+  lockAttempt(attemptId: string): Promise<ExecutionAttemptRecord | null>;
+  openAttemptOf(sourceKind: "CAPTURE" | "BANK_CREDIT", sourceId: string): Promise<ExecutionAttemptRecord | null>;
+  attemptsOfRefund(sourceKind: "CAPTURE" | "BANK_CREDIT", id: string): Promise<ReadonlyArray<ExecutionAttemptRecord>>;
+  nextAttemptNumber(sourceKind: "CAPTURE" | "BANK_CREDIT", sourceId: string): Promise<number>;
+  insertAttempt(a: NewExecutionAttemptInput): Promise<ExecutionAttemptRecord>;
+  recordAttempt(attemptId: string, expectedVersion: number, record: { readonly bankExecutionId: string; readonly proof: "DP_FULL" | "DP_RECIPIENT"; readonly evidenceHash: string; readonly recordedAt: UtcInstant }): Promise<ExecutionAttemptRecord | null>;
+  lapseAttempt(attemptId: string, expectedVersion: number): Promise<ExecutionAttemptRecord | null>;
+  executionIdUsed(environment: string, accountRef: string, bankExecutionId: string): Promise<boolean>;
+  findOffer(attemptId: string, command: ExecutionOfferCommandName, idempotencyKey: string): Promise<ExecutionOfferRecord | null>;
+  insertOffer(o: ExecutionOfferRecord): Promise<void>;
+  outcomeOf(offerId: string): Promise<ExecutionOutcomeRecord | null>;
+  insertOutcome(o: ExecutionOutcomeRecord): Promise<void>;
+  openCaseIfNone(c: NewBankReviewCaseInput): Promise<boolean>;
+  resolveOpenCases(kind: string, attemptId: string, at: UtcInstant): Promise<number>;
+  transitionTreasuryRefund(treasuryRefundId: string, expectedVersion: number, state: "SUBMITTING" | "UNCERTAIN" | "COMPLETED"): Promise<(TreasuryRefundRecord & { readonly previousState: TreasuryRefundRecord["state"] }) | null>;
+  dueAttempts(at: UtcInstant, limit: number): Promise<ReadonlyArray<{ readonly attemptId: string; readonly sourceKind: "CAPTURE" | "BANK_CREDIT"; readonly refundId: string | null }>>;
+  executionWindowMs(environment: string, accountRef: string): Promise<number | null>;
+  ownerQueue(limit: number): Promise<ReadonlyArray<QueuedAttemptRecord>>;
 }
 
 /** Classifies a stored credit artifact (the payer evidence a destination is proven by): pure, fail-closed. */
 export interface BankCreditClassifier {
   classifyCredit(evidence: StoredBankEvidence): EvidenceClassification<IncomingCredit>;
+  /** A manual execution artifact (a send receipt) the owner records (G2, G4, X3-EXECUTED). */
+  classifyOutbound(evidence: StoredBankEvidence): EvidenceClassification<OutboundEvidence>;
 }
 
 export interface BankRouteCollaborators {

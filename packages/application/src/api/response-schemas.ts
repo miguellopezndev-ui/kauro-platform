@@ -988,6 +988,45 @@ export const TREASURY_REFUND_COMMAND_RESPONSE_SCHEMA: JsonSchema = closedObject(
     }),
   }),
 });
+/** An execution attempt as the owner sees it: the destination by its last four and holder only, never the full account. */
+const EXECUTION_ATTEMPT_VIEW_SCHEMA: JsonSchema = closedObject(["attemptId", "kind", "state", "reference", "amountCents", "currency", "declaredAt", "sourceKind", "sourceId", "destination", "bankExecutionId"], {
+  attemptId: BANK_UUID,
+  kind: { type: "string", enum: ["RETURN", "RESEND"] },
+  state: { type: "string", enum: ["DECLARED", "UNCERTAIN", "RECORDED", "NOT_EXECUTED"] },
+  reference: { type: "string", minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" },
+  amountCents: BANK_MONEY,
+  currency: { type: "string", enum: ["USD"] },
+  declaredAt: BANK_UTC,
+  sourceKind: { type: "string", enum: ["CAPTURE", "BANK_CREDIT"] },
+  sourceId: BANK_UUID,
+  destination: closedObject(["accountLast4", "holderName"], { accountLast4: { type: "string", pattern: "^[0-9]{1,4}$" }, holderName: { type: "string", maxLength: 512 } }),
+  bankExecutionId: { type: ["string", "null"], minLength: 1, maxLength: 256, pattern: "^[A-Za-z0-9._:-]+$" },
+});
+const REFUND_STATE_VIEW_SCHEMA: JsonSchema = { type: ["object", "null"], additionalProperties: false, required: ["state", "version"], properties: { state: { type: "string", minLength: 1, maxLength: 64 }, version: BANK_VERSION } };
+const executionEnvelope = (data: JsonSchema): JsonSchema =>
+  closedObject(["kind", "version", "replayed", "data"], { kind: { type: "string", enum: ["COMPLETED"] }, version: { type: "integer", minimum: 1 }, replayed: { type: "boolean" }, data });
+export const DECLARE_EXECUTION_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(closedObject(["attempt", "refund"], { attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA, refund: REFUND_STATE_VIEW_SCHEMA }));
+export const RECORD_EXECUTION_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(closedObject(["attempt", "refund", "offerId"], { attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA, refund: REFUND_STATE_VIEW_SCHEMA, offerId: BANK_UUID }));
+export const EXECUTION_QUEUE_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], {
+  data: closedObject(["items"], {
+    items: {
+      type: "array",
+      maxItems: 500,
+      items: closedObject(["attemptId", "kind", "state", "sourceKind", "amountCents", "currency", "reference", "declaredAt", "destination"], {
+        attemptId: BANK_UUID,
+        kind: { type: "string", enum: ["RETURN", "RESEND"] },
+        state: { type: "string", enum: ["DECLARED"] },
+        sourceKind: { type: "string", enum: ["CAPTURE", "BANK_CREDIT"] },
+        amountCents: BANK_MONEY,
+        currency: { type: "string", enum: ["USD"] },
+        reference: { type: "string", minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" },
+        declaredAt: BANK_UTC,
+        destination: closedObject(["accountLast4", "holderName"], { accountLast4: { type: "string", pattern: "^[0-9]{1,4}$" }, holderName: { type: "string", maxLength: 512 } }),
+      }),
+    },
+  }),
+});
+const OWNER_REFUND_AUTHORITY = "KAURO_OWNER with a fresh step-up judged at the database clock; Idempotency-Key (journal of the owner identity)";
 export const BANK_REFUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
   Object.freeze({
     operationId: "approveTreasuryRefund",
@@ -1007,6 +1046,32 @@ export const BANK_REFUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = O
       }),
     }),
     responses: Object.freeze({ "200": Object.freeze({ description: "The treasury refund after the approval (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: TREASURY_REFUND_COMMAND_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "declareRefundExecution",
+    method: "POST" as const,
+    path: "/api/v1/operations/refunds/{refundId}/execution-declarations",
+    summary: "Declare the manual transfer of an approved refund (CAPTURE refund or BANK_CREDIT treasury refund): the refund SUBMITTING, one DECLARED attempt with its reference (NEVER-RESEND)",
+    authority: "ACH-ROUTE r12 §7.21 (X1), DV1-08, D-24 A; " + OWNER_REFUND_AUTHORITY,
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["expectedVersion", "amountCents", "authorizationRef"], { expectedVersion: BANK_VERSION, amountCents: BANK_MONEY, authorizationRef: BANK_UUID }) }),
+    responses: Object.freeze({ "201": Object.freeze({ description: "The DECLARED attempt and the refund after the declaration (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: DECLARE_EXECUTION_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "recordRefundExecution",
+    method: "POST" as const,
+    path: "/api/v1/operations/execution-attempts/{attemptId}/records",
+    summary: "Record the send receipt of a declared attempt: the receipt read, classified and matched (amount, time, reference, destination); a proof records the attempt and completes the refund, a refusal opens its review case",
+    authority: "ACH-ROUTE r12 §7.22 (G1, G2, G4), D-24 A; " + OWNER_REFUND_AUTHORITY,
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["evidence", "authorizationRef"], { evidence: BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA, authorizationRef: BANK_UUID }) }),
+    responses: Object.freeze({ "200": Object.freeze({ description: "The RECORDED attempt, the refund after it and the offer of this key (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: RECORD_EXECUTION_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "listExecutionAttempts",
+    method: "GET" as const,
+    path: "/api/v1/operations/execution-attempts",
+    summary: "The owner queue: the DECLARED attempts to send, oldest first, with the destination by its last four and holder",
+    authority: "ACH-ROUTE r12 §7.21, D-24 A; KAURO_OWNER",
+    responses: Object.freeze({ "200": Object.freeze({ description: "The DECLARED attempts (at most 500).", contentType: JSON_CONTENT_TYPE, schema: EXECUTION_QUEUE_RESPONSE_SCHEMA }) }),
   }),
 ] satisfies ReadonlyArray<OperationalRoute>);
 

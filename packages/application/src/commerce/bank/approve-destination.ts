@@ -94,15 +94,11 @@ export interface TreasuryRefundView {
 }
 
 /** The lane's operational ids of the command journal (route-scope owner commands; not registry commands). */
-export const BANK_REFUND_COMMAND_IDS = Object.freeze({ approveTreasury: "CMD220" } as const);
-
-export interface BankRefundHandlers {
-  approveTreasury(request: BankRouteRequest<ApproveTreasuryRefundBody>): Promise<CommandResult<TreasuryRefundView>>;
-}
+export const BANK_REFUND_COMMAND_IDS = Object.freeze({ approveTreasury: "CMD220", declareExecution: "CMD221", recordExecution: "CMD222" } as const);
 
 /** What the owner refund commands run on: the request runtime (its clock), the payment service's units and identity, the bank collaborators. */
 export interface OwnerRefundDependencies {
-  readonly runtime: Pick<CommerceRequestRuntime, "clock">;
+  readonly runtime: Pick<CommerceRequestRuntime, "clock" | "unitOfWork" | "commerceAuthorizer">;
   readonly payment: CommerceUnitOfWorkFactory | null;
   readonly paymentServiceId: string;
   readonly bank: BankRouteCollaborators | null;
@@ -110,11 +106,11 @@ export interface OwnerRefundDependencies {
 
 // --- failures -------------------------------------------------------------------------------------------------------------------------
 
-const integrity = (reason: "DESTINATION_NOT_CAPTURED" | "DESTINATION_INVALID" | "DESTINATION_UNPROVEN" | "HASH_MISMATCH", message: string): DomainFailure => new DomainFailure("INTEGRITY_FAILURE", message, { reason });
-const stepUpStale = (): DomainFailure => new DomainFailure("ASSURANCE_REQUIRED", "the owner's step-up is not fresh at the effect", { reason: "STEP_UP_STALE" });
+export const integrity = (reason: "DESTINATION_NOT_CAPTURED" | "DESTINATION_INVALID" | "DESTINATION_UNPROVEN" | "HASH_MISMATCH", message: string): DomainFailure => new DomainFailure("INTEGRITY_FAILURE", message, { reason });
+export const stepUpStale = (): DomainFailure => new DomainFailure("ASSURANCE_REQUIRED", "the owner's step-up is not fresh at the effect", { reason: "STEP_UP_STALE" });
 
 /** The definer's verdict as the failure the caller answers (OK: none). */
-function verdictFailure(v: OwnerAuthorityVerdict): DomainFailure | null {
+export function verdictFailure(v: OwnerAuthorityVerdict): DomainFailure | null {
   switch (v.verdict) {
     case "OK":
       return null;
@@ -128,7 +124,7 @@ function verdictFailure(v: OwnerAuthorityVerdict): DomainFailure | null {
 }
 
 /** fresh iff `at` is at most the freshness after the proof's issue and before its expiry (the definer's rule, at the effect instant). */
-function freshAt(v: OwnerAuthorityVerdict, at: UtcInstant): boolean {
+export function freshAt(v: OwnerAuthorityVerdict, at: UtcInstant): boolean {
   if (v.issuedAt === null || v.expiresAt === null) return false;
   const t = Date.parse(at);
   return t <= Date.parse(v.issuedAt) + STEP_UP_FRESHNESS_SECONDS * 1000 && t < Date.parse(v.expiresAt);
@@ -438,9 +434,10 @@ export function treasuryRefundAuthorizationHash(p: { readonly treasuryRefundId: 
   ) as Sha256Hex;
 }
 
-export function createBankRefundHandlers(d: OwnerRefundDependencies): BankRefundHandlers {
+/** CMD220 ApproveTreasuryRefund (the handlers are composed in execute-refund.ts). */
+export function approveTreasuryHandler(d: OwnerRefundDependencies): (request: BankRouteRequest<ApproveTreasuryRefundBody>) => Promise<CommandResult<TreasuryRefundView>> {
   return {
-    approveTreasury(request) {
+    approveTreasury(request: BankRouteRequest<ApproveTreasuryRefundBody>): Promise<CommandResult<TreasuryRefundView>> {
       const treasuryRefundId = request.path["treasuryRefundId"]!;
       const userId = request.subject.identity.userId as UserId;
       const body = request.body;
@@ -509,5 +506,5 @@ export function createBankRefundHandlers(d: OwnerRefundDependencies): BankRefund
         replayVersion: (view) => view.treasuryRefund.version,
       });
     },
-  };
+  }.approveTreasury;
 }

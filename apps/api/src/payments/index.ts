@@ -76,6 +76,8 @@ export type { DispatchPass, PaymentDispatcher } from "./dispatcher.js";
 export { CLAIM_NEVER_COMMITTED, CLAIM_WINDOW_SECONDS, cancelUnclaimed } from "./sweep.js";
 export type { SweepPass } from "./sweep.js";
 export { BANK_SWEEP_NAMES, registerBankSweep } from "./sweep.js";
+// lane L-REFUND: X2 registers the EXECUTION_WINDOW bank sweep when this module loads
+export { EXECUTION_WINDOW_BATCH, EXECUTION_WINDOW_LAPSED, executionWindowPass, lapseAttempt } from "./execution-window.js";
 export type { BankSweep, BankSweepName } from "./sweep.js";
 export { applyInboxRecord, settleConflict } from "./webhook.js";
 export type { InboxPass, WebhookOutcome, WebhookRequest } from "./webhook.js";

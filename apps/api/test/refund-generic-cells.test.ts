@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { after, before } from "node:test";
 import { laneTest as test } from "./refund-lane-support.js";
 import type { UserId } from "@kauro/domain";
-import { LOCK_WAIT_OBSERVATION_MS, connectionPid, openConnection, runCell, type CellBody, type FaultContext, type FaultKind, type HarnessConnection } from "@kauro/persistence/testing";
+import { EFFECT_CLOCK_MARGIN_MS, LOCK_WAIT_OBSERVATION_MS, connectionPid, openConnection, runCell, type CellBody, type FaultContext, type FaultKind, type HarnessConnection } from "@kauro/persistence/testing";
 import type { RouteRole, SqlStep } from "./fault-support.js";
 import { paymentRoutes } from "./commerce-support.js";
 import { dispatch, reconcile, storeQuery } from "./payment-support.js";
@@ -109,10 +109,11 @@ async function hw<H, W>(ctx: FaultContext, what: string, holder: Actor<H>, waite
   const wc = await openConnection(iw.h.pg.clientConfig(waiter.login));
   try {
     const pause = ctx.points.pause(at);
-    const running = ctx.operation(`${what} (holder)`, () => iw.faults.on(hc, holder.role, ctx.points, steps, holder.run));
+    // a bank actor's SERVICE units run on the payment service's factory: routed over the same connection (as refund-lane-support routed())
+    const running = ctx.operation(`${what} (holder)`, () => iw.faults.on(hc, holder.role, ctx.points, steps, holder.run, { payment: holder.role === "kauro_payment" }));
     const settled = running.then<PromiseSettledResult<H>, PromiseSettledResult<H>>((value) => ({ status: "fulfilled", value }), (reason: unknown) => ({ status: "rejected", reason }));
     await reach(pause, running, what);
-    const waiting = await ctx.mustWait(iw.h.oracle, { waiter: wc, holder: connectionPid(hc) }, () => iw.faults.on(wc, waiter.role, ctx.points, [], waiter.run), what);
+    const waiting = await ctx.mustWait(iw.h.oracle, { waiter: wc, holder: connectionPid(hc) }, () => iw.faults.on(wc, waiter.role, ctx.points, [], waiter.run, { payment: waiter.role === "kauro_payment" }), what);
     pause.release();
     return { held: await settled, waited: await waiting.pending };
   } finally {
@@ -299,9 +300,11 @@ cell(
       assert.equal(lost.status, 500);
       const [committed] = await attemptsOf(src);
       assert.equal(committed?.state, "DECLARED", `${scope}: the declaration committed`);
+      const events = (await footprint(src)).events;
+      assert.equal(events.filter((e) => e === "outbound.declared.v1").length, 1, `${scope}: one declaration event: ${JSON.stringify(events)}`);
       const replay = dataOf<DeclareView>(await declareX1(src, { key }), 201, `${scope}: replay`);
       assert.deepEqual([replay.attempt.attemptId, replay.attempt.reference, Date.parse(replay.attempt.declaredAt)], [committed!.attempt_id, committed!.reference, committed!.declared_at.getTime()], `${scope}: the same attempt, reference and declaredAt`);
-      assert.equal((await footprint(src)).events.filter((e) => e.includes("execution_declared") || e.includes("submitting") || e.startsWith("refund.")).length, 1, `${scope}: one declaration event`);
+      assert.deepEqual((await footprint(src)).events, events, `${scope}: the replay publishes nothing`);
     }
   },
   "uow",
@@ -320,7 +323,54 @@ cell("RACE RFG-M-X1-RETRY (replay and conflict): Declare manual refund execution
   }
 });
 
-cell("DENY RFG-M-X1-REVOCATION (each prerequisite): Declare manual refund execution", "revocation", async (ctx) => {
+/** A write of the database owner with triggers off: a fault injected by a writer the product does not have (never a product step). */
+async function forced(sql: string, params: ReadonlyArray<unknown>): Promise<void> {
+  const owner = await L().iw.h.pg.connect("postgres");
+  try {
+    await owner.query("BEGIN");
+    await owner.query("SET LOCAL session_replication_role = replica");
+    await owner.query(sql, [...params]);
+    await owner.query("COMMIT");
+  } finally {
+    await owner.end();
+  }
+}
+
+test("GAP PRODUCTION-BANK-BINDING (the production composition, startApi, binds the destination fingerprinter and the credit classifier): Approve destination refund", async () => {
+  // slice 4 replaces this body with the started API answering an owner approval 200 with a fingerprinted destination
+  assert.fail("startApi passes no bank collaborators to assembleApi: every owner refund approval of a deploy answers 503 EVIDENCE_UNAVAILABLE");
+});
+
+/** A write of the database owner with every trigger on (a writer the product does not have); answers the SQLSTATE it failed with, or null. */
+async function ownerWriteState(sql: string, params: ReadonlyArray<unknown>): Promise<string | null> {
+  const owner = await L().iw.h.pg.connect("postgres");
+  try {
+    await owner.query(sql, [...params]);
+    return null;
+  } catch (e) {
+    return (e as { code?: string }).code ?? String(e);
+  } finally {
+    await owner.end();
+  }
+}
+
+test("DENY database guard KP014, no design cell id (a DECLARED manual-rail refund written COMPLETED by a writer outside the commands): never COMPLETED without execution evidence", async () => {
+  for (const scope of SCOPES) {
+    const a = await openAttempt(scope, "RETURN", `kp014-${scope}`);
+    const state = await ownerWriteState(
+      scope === "CAPTURE"
+        ? "UPDATE kauro.refunds SET state = 'COMPLETED', version = version + 1, provider_refund_id = 'forged-execution' WHERE refund_id = $1"
+        : "UPDATE kauro.treasury_refunds SET state = 'COMPLETED', version = version + 1 WHERE treasury_refund_id = $1",
+      [a.src.refundId],
+    );
+    assert.equal(state, "KP014", `${scope}: the database refuses the completion without a RECORDED attempt (EXECUTION_EVIDENCE_MISSING)`);
+    assert.equal(await attemptState(a.attempt.attemptId), "DECLARED", `${scope}: the attempt is untouched`);
+    if (scope === "CAPTURE") assert.equal((await refundOf(a.src))?.state, "SUBMITTING", "the refund stays SUBMITTING");
+  }
+});
+
+/** X1 held at L1 while one prerequisite is withdrawn, then refused (the session arm is its own cell: the GAP of the SERVICE units). */
+const x1Revocation = (arms: ReadonlyArray<string>): CellBody => async (ctx) => {
   const { iw, bw } = L();
   for (const scope of SCOPES) {
     const prerequisites: Array<{ readonly what: string; readonly revoke: (o: { person: import("./support.js").Person; grantId: string }, src: Source) => Promise<unknown>; readonly reason: RegExp }> = [
@@ -329,11 +379,11 @@ cell("DENY RFG-M-X1-REVOCATION (each prerequisite): Declare manual refund execut
       { what: "session", revoke: (o) => q("UPDATE kauro.web_sessions SET revoked_at = now() WHERE user_id = $1", [o.person.userId]).catch(() => q("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1", [o.person.userId])), reason: /^403 / },
       { what: "step-up", revoke: (o) => expireProofs("user_id", o.person.userId), reason: /^403 / },
       // the approval stops being current: the refund leaves APPROVED (the reversal's authorization_lapsed of B09, written as its effect)
-      { what: "approval current", revoke: (_o, src) => q(src.scope === "CAPTURE" ? "UPDATE kauro.refunds SET state = 'FAILED', version = version + 1, failure_code = 'CAPTURE_REVERSED' WHERE refund_id = $1" : "UPDATE kauro.treasury_refunds SET state = 'FAILED', version = version + 1 WHERE treasury_refund_id = $1", [src.refundId]), reason: /^409 / },
+      { what: "approval current", revoke: (_o, src) => forced(src.scope === "CAPTURE" ? "UPDATE kauro.refunds SET state = 'FAILED', version = version + 1, failure_code = 'CAPTURE_REVERSED' WHERE refund_id = $1" : "UPDATE kauro.treasury_refunds SET state = 'FAILED', version = version + 1 WHERE treasury_refund_id = $1", [src.refundId]), reason: /^409 / },
       // the destination evidence withdrawn: its captured row gone
-      { what: "destination evidence", revoke: (_o, src) => q("DELETE FROM kauro.refund_destinations WHERE refund_id::text = $1 OR treasury_refund_id::text = $1", [src.refundId]), reason: /^409 DESTINATION/ },
+      { what: "destination evidence", revoke: (_o, src) => forced("DELETE FROM kauro.refund_destinations WHERE refund_id::text = $1 OR treasury_refund_id::text = $1", [src.refundId]), reason: /^409 DESTINATION/ },
     ];
-    for (const p of prerequisites) {
+    for (const p of prerequisites.filter((x) => arms.includes(x.what))) {
       const o = await ownOwner(`x1-revoke-${scope}-${p.what.replace(/ /g, "-")}`);
       const src = await approved(scope, `x1-revoke-${scope}-${p.what.replace(/ /g, "-")}`);
       const before = await footprint(src);
@@ -351,7 +401,9 @@ cell("DENY RFG-M-X1-REVOCATION (each prerequisite): Declare manual refund execut
       assert.equal((await footprint(src)).events.length, before.events.length, `${scope} ${p.what}: no event`);
     }
   }
-});
+};
+cell("DENY RFG-M-X1-REVOCATION (each prerequisite): Declare manual refund execution", "revocation", x1Revocation(["owner grant", "verified identity", "step-up", "approval current", "destination evidence"]));
+cell("DENY RFG-M-X1-REVOCATION-SESSION (the session revoked while X1 waits at L1): Declare manual refund execution", "revocation", x1Revocation(["session"]));
 
 cell("RACE RFG-M-X1-PARTIAL (later write fails): Declare manual refund execution", "partial", async (ctx) => {
   for (const scope of SCOPES) {
@@ -531,9 +583,16 @@ async function windowEdge(ctx: FaultContext, attempt: AttemptView, offsetMs: num
   await onClock(ctx, what, () => sweepX2());
 }
 
-cell("RACE RFG-M-X2-RACE (both orders): Lapse manual execution window", "race", async (ctx) => {
+/** An X2 cell over both kinds (the full cell, slice 3: RESEND attempts come from X4) and its RETURN legs as their own cell (slice 2). */
+function x2Cell(title: string, fault: FaultKind, body: (kinds: ReadonlyArray<Kind>) => CellBody, at?: string): void {
+  cell(title, fault, body(KINDS), at);
+  const [verb, id, ...rest] = title.split(" ");
+  cell(`${verb} [${id}] RETURN legs (slice 2): ${rest.join(" ")}`, fault, body(["RETURN"]), at);
+}
+
+x2Cell("RACE RFG-M-X2-RACE (both orders): Lapse manual execution window", "race", (kinds) => async (ctx) => {
   for (const scope of SCOPES)
-    for (const kind of KINDS) {
+    for (const kind of kinds) {
       // record first: the pass skips RECORDED
       const a = await openAttempt(scope, kind, `x2-race-rec-${scope}-${kind}`);
       const boundary = plusMs(a.attempt.declaredAt, routeTiming().manualExecutionWindowMs);
@@ -556,10 +615,10 @@ cell("RACE RFG-M-X2-RACE (both orders): Lapse manual execution window", "race", 
     }
 });
 
-cell("RACE RFG-M-X2-TIMEOUT (statement timeout): Lapse manual execution window", "race", async (ctx) => {
+x2Cell("RACE RFG-M-X2-TIMEOUT (statement timeout): Lapse manual execution window", "race", (kinds) => async (ctx) => {
   const { iw, bw } = L();
   for (const scope of SCOPES)
-    for (const kind of KINDS) {
+    for (const kind of kinds) {
       const a = await openAttempt(scope, kind, `x2-timeout-${scope}-${kind}`);
       ctx.clock.past(plusMs(a.attempt.declaredAt, routeTiming().manualExecutionWindowMs));
       const held = await bw.holdAttemptRow(a.attempt.attemptId);
@@ -580,28 +639,38 @@ cell("RACE RFG-M-X2-TIMEOUT (statement timeout): Lapse manual execution window",
     }
 });
 
-cell("RACE RFG-M-X2-EXPIRY (window boundary): Lapse manual execution window", "expiry", async (ctx) => {
-  for (const scope of SCOPES)
-    for (const kind of KINDS) {
-      const states: string[] = [];
-      for (const offset of [-1, 0, 1]) {
+x2Cell("RACE RFG-M-X2-EXPIRY (window boundary): Lapse manual execution window", "expiry", (kinds) => async (ctx) => {
+  // the admit leg stands the harness margin before the boundary: the effect clock (kauro.effect_now(), rounded up to the millisecond) runs
+  // on with the pass's transaction, so a -1 ms stand would be judged at or past the boundary. Every attempt is declared first (at the real
+  // database clock) and the legs are judged in the order of their instants, since the controlled clock never moves backwards: a pass at an
+  // earlier instant cannot lapse a later leg's attempt before that leg (its boundary is past every earlier instant)
+  const OFFSETS = [-EFFECT_CLOCK_MARGIN_MS, 0, 1] as const;
+  for (const kind of kinds) {
+    const legs: { scope: Scope; offset: number; src: Source; attempt: AttemptView; at: number }[] = [];
+    for (const scope of SCOPES)
+      for (const offset of OFFSETS) {
         const a = await openAttempt(scope, kind, `x2-expiry-${offset}-${scope}-${kind}`);
-        if (offset === 0) ctx.deadline(plusMs(a.attempt.declaredAt, routeTiming().manualExecutionWindowMs), `${scope} ${kind}: declaredAt + window`);
-        await windowEdge(ctx, a.attempt, offset, `${scope} ${kind}: X2 at window ${offset} ms`);
-        states.push(`${offset}:${await attemptState(a.attempt.attemptId)}`);
-        if (offset >= 0 && kind === "RETURN") assert.equal((await refundOf(a.src))?.state, "UNCERTAIN");
-        if (offset >= 0) assert.equal(await sourceReserved(a.src), a.src.totalCents, "the share stays held");
+        legs.push({ scope, offset, ...a, at: Date.parse(plusMs(a.attempt.declaredAt, routeTiming().manualExecutionWindowMs)) + offset });
       }
-      assert.deepEqual(states, ["-1:DECLARED", "0:UNCERTAIN", "1:UNCERTAIN"], `${scope} ${kind}: DB-clock boundary`);
+    const states = new Map<string, string[]>(SCOPES.map((sc) => [sc, []]));
+    for (const leg of [...legs].sort((x, y) => x.at - y.at)) {
+      const { scope, offset, src, attempt } = leg;
+      if (offset === 0) ctx.deadline(plusMs(attempt.declaredAt, routeTiming().manualExecutionWindowMs), `${scope} ${kind}: declaredAt + window`);
+      await windowEdge(ctx, attempt, offset, `${scope} ${kind}: X2 at window ${offset} ms`);
+      states.get(scope)!.push(`${offset}:${await attemptState(attempt.attemptId)}`);
+      if (offset >= 0 && kind === "RETURN") assert.equal((await refundOf(src))?.state, "UNCERTAIN");
+      if (offset >= 0) assert.equal(await sourceReserved(src), src.totalCents, "the share stays held");
     }
+    for (const scope of SCOPES) assert.deepEqual(states.get(scope), [`${-EFFECT_CLOCK_MARGIN_MS}:DECLARED`, "0:UNCERTAIN", "1:UNCERTAIN"], `${scope} ${kind}: DB-clock boundary`);
+  }
 });
 
-cell(
+x2Cell(
   "RACE RFG-M-X2-CRASH-BEFORE (crash before Kexecwindow COMMIT): Lapse manual execution window",
   "crash-before-commit",
-  async (ctx) => {
+  (kinds) => async (ctx) => {
     for (const scope of SCOPES)
-      for (const kind of KINDS) {
+      for (const kind of kinds) {
         const a = await openAttempt(scope, kind, `x2-crb-${scope}-${kind}`);
         ctx.clock.past(plusMs(a.attempt.declaredAt, routeTiming().manualExecutionWindowMs));
         ctx.points.crash("uow.before-commit");
@@ -613,12 +682,12 @@ cell(
   "uow",
 );
 
-cell(
+x2Cell(
   "RACE RFG-M-X2-CRASH-AFTER (lost settle): Lapse manual execution window",
   "crash-after-commit",
-  async (ctx) => {
+  (kinds) => async (ctx) => {
     for (const scope of SCOPES)
-      for (const kind of KINDS) {
+      for (const kind of kinds) {
         const a = await openAttempt(scope, kind, `x2-cra-${scope}-${kind}`);
         ctx.clock.past(plusMs(a.attempt.declaredAt, routeTiming().manualExecutionWindowMs));
         ctx.points.crash("uow.after-commit");
@@ -633,9 +702,9 @@ cell(
   "uow",
 );
 
-cell("RACE RFG-M-X2-RETRY (two sweepers and redelivery): Lapse manual execution window", "race", async (ctx) => {
+x2Cell("RACE RFG-M-X2-RETRY (two sweepers and redelivery): Lapse manual execution window", "race", (kinds) => async (ctx) => {
   for (const scope of SCOPES)
-    for (const kind of KINDS) {
+    for (const kind of kinds) {
       const a = await openAttempt(scope, kind, `x2-retry-${scope}-${kind}`);
       ctx.clock.past(plusMs(a.attempt.declaredAt, routeTiming().manualExecutionWindowMs));
       const r = await hw(ctx, `${scope} ${kind}: two sweepers`, bank(() => onClock(ctx, "sweeper 1", () => sweepX2())), bank(() => onClock(ctx, "sweeper 2", () => sweepX2())));
@@ -648,9 +717,9 @@ cell("RACE RFG-M-X2-RETRY (two sweepers and redelivery): Lapse manual execution 
     }
 });
 
-cell("RACE RFG-M-X2-REVOCATION (route disabled, owner revoked, lease lost): Lapse manual execution window", "revocation", async (ctx) => {
+x2Cell("RACE RFG-M-X2-REVOCATION (route disabled, owner revoked, lease lost): Lapse manual execution window", "revocation", (kinds) => async (ctx) => {
   for (const scope of SCOPES)
-    for (const kind of KINDS) {
+    for (const kind of kinds) {
       const o = await ownOwner(`x2-revoke-${scope}-${kind}`);
       const a = await openAttempt(scope, kind, `x2-revoke-${scope}-${kind}`);
       ctx.deadline(plusMs(a.attempt.declaredAt, routeTiming().manualExecutionWindowMs), `${scope} ${kind}: window`);
@@ -664,9 +733,9 @@ cell("RACE RFG-M-X2-REVOCATION (route disabled, owner revoked, lease lost): Laps
     }
 });
 
-cell("RACE RFG-M-X2-PARTIAL (case insert fails): Lapse manual execution window", "partial", async (ctx) => {
+x2Cell("RACE RFG-M-X2-PARTIAL (case insert fails): Lapse manual execution window", "partial", (kinds) => async (ctx) => {
   for (const scope of SCOPES)
-    for (const kind of KINDS) {
+    for (const kind of kinds) {
       const a = await openAttempt(scope, kind, `x2-partial-${scope}-${kind}`);
       ctx.clock.past(plusMs(a.attempt.declaredAt, routeTiming().manualExecutionWindowMs));
       const conn = await openBank();
@@ -965,21 +1034,36 @@ interface Forge {
   readonly caseKind?: string;
   /** The destination captured at F2 (default DEST). */
   readonly approval?: Destination;
+  /** Undoes a forge that changed the attempt itself (not its evidence), so the unforged control judges the attempt as declared. */
+  restore?(src: Source): Promise<unknown>;
 }
+
+/** The legs a slice built so far runs as its own cell ([id] RETURN x RECORD, both scopes); the full cell keeps every leg (slice 3). */
+const RETURN_RECORD_LEGS: ReadonlyArray<readonly [Kind, "RECORD"]> = [["RETURN", "RECORD"]];
+const titleOfLegs = (title: string): string => {
+  const [verb, id, ...rest] = title.split(" ");
+  return `${verb} [${id}] RETURN x RECORD legs (slice 2): ${rest.join(" ")}`;
+};
 
 /** Runs one forged control through G2/G4 (both scopes, both kinds) and X3 EXECUTED (both kinds), then the unforged control records. */
 function predicateControl(f: Forge): void {
-  test(f.title, async () => {
-    await runCell({ id: f.title.split(" ")[1]!, step: f.title, fault: "expiry", expect: f.refusal }, async (ctx) => {
+  const all: ReadonlyArray<readonly [Kind, "RECORD" | "RESOLVE_EXECUTED"]> = KINDS.flatMap((k) => [[k, "RECORD"] as const, [k, "RESOLVE_EXECUTED"] as const]);
+  predicateLegs(f, f.title, all);
+  predicateLegs(f, titleOfLegs(f.title), RETURN_RECORD_LEGS);
+}
+function predicateLegs(f: Forge, title: string, legs: ReadonlyArray<readonly [Kind, "RECORD" | "RESOLVE_EXECUTED"]>): void {
+  test(title, async () => {
+    // the RECORD-only legs declare no deadline: each forged request is retried with unforged evidence (two counted requests per leg)
+    const fault: FaultKind = legs.some(([, c]) => c === "RESOLVE_EXECUTED") ? "expiry" : "retry";
+    await runCell({ id: f.title.split(" ")[1]!, step: title, fault, expect: f.refusal }, async (ctx) => {
       for (const scope of SCOPES)
-        for (const kind of KINDS)
-          for (const command of ["RECORD", "RESOLVE_EXECUTED"] as const) {
+        for (const [kind, command] of legs) {
             const approval = f.approval === undefined ? {} : { destination: f.approval };
             const a = command === "RECORD" ? await openAttempt(scope, kind, `pred-${scope}-${kind}`, approval) : await lapsed(ctx, scope, kind, `pred-x3-${scope}-${kind}`, approval);
             const reserved = await sourceReserved(a.src);
             const before = await footprint(a.src);
             const forged = await storeExecution(a.attempt, await f.forge(a.attempt, a.src));
-            const r = command === "RECORD" ? await recordG2(a.attempt, forged) : await resolveX3(a.attempt, "EXECUTED", forged);
+            const r = command === "RECORD" ? await ctx.attempt(() => recordG2(a.attempt, forged)) : await resolveX3(a.attempt, "EXECUTED", forged);
             assertRefused(r, f.refusal, `${scope} ${kind} ${command}`);
             const after = await footprint(a.src);
             assert.deepEqual([after.refund?.state, after.attempts.map(([k, s]) => `${k}:${s}`)], [before.refund?.state, before.attempts.map(([k, s]) => `${k}:${s}`)], `${scope} ${kind} ${command}: no attempt or refund state change`);
@@ -988,8 +1072,9 @@ function predicateControl(f: Forge): void {
             if (f.caseKind !== undefined) assert.ok(after.cases.some(([k, s]) => k === f.caseKind && s === "OPEN"), `${scope} ${kind} ${command}: a ${f.caseKind} case: ${JSON.stringify(after.cases)}`);
             assert.equal(after.events.filter((e) => e === "refund.completed.v1").length, 0, "no completion");
             // the control: unforged evidence records the same attempt
+            await f.restore?.(a.src);
             const ok = await storeExecution(a.attempt, { bankExecutionId: nextExecutionId("control"), ...(f.approval === undefined ? {} : { full: f.approval }) });
-            const good = command === "RECORD" ? await recordG2(a.attempt, ok) : await resolveX3(a.attempt, "EXECUTED", ok);
+            const good = command === "RECORD" ? await ctx.attempt(() => recordG2(a.attempt, ok)) : await resolveX3(a.attempt, "EXECUTED", ok);
             assert.equal(dataOf<RecordView>(good, 200, `${scope} ${kind} ${command}: the unforged control`).attempt.state, "RECORDED");
           }
     });
@@ -1010,7 +1095,16 @@ predicateControl({ title: "DENY RFG-P-DEST-RECIPIENT-CHANGED (recipient record b
 predicateControl({ title: "DENY RFG-P-DEST-RECIPIENT-UNVERSIONED (recipient id without a version): Record a declared execution", refusal: "409 DESTINATION_UNPROVEN", caseKind: "DESTINATION_UNPROVEN", forge: () => ({ full: null, recipientRef: "recipient-1", recipientVersion: null }) });
 predicateControl({ title: "DENY RFG-P-DEST-ABSENT (send receipt with no destination fields): Record a declared execution — attempt stays DECLARED or UNCERTAIN, DESTINATION_UNPROVEN case, share held", refusal: "409 DESTINATION_UNPROVEN", caseKind: "DESTINATION_UNPROVEN", forge: () => ({ full: null, accountLast4: null }) });
 predicateControl({ title: "DENY RFG-P-DEST-PARTIAL-ONLY (last four and routing only, both equal): Record a declared execution", refusal: "409 DESTINATION_UNPROVEN", caseKind: "DESTINATION_UNPROVEN", forge: () => ({ full: null, accountLast4: DEST_LAST4_OF(), routingDigest: "a".repeat(64) }) });
-predicateControl({ title: "DENY RFG-P-DF-KEY-VERSION (a fingerprint under another key id, key version or normalizer version never compares equal): Record a declared execution", refusal: "409 DESTINATION_UNPROVEN", forge: async (_a, src) => { await q("UPDATE kauro.outbound_execution_attempts SET fingerprint_key_version = fingerprint_key_version + 1 WHERE source_id = $1 AND state IN ('DECLARED','UNCERTAIN')", [src.sourceId]); return {}; } });
+predicateControl({
+  title: "DENY RFG-P-DF-KEY-VERSION (a fingerprint under another key id, key version or normalizer version never compares equal): Record a declared execution",
+  refusal: "409 DESTINATION_UNPROVEN",
+  forge: async (_a, src) => {
+    await q("UPDATE kauro.outbound_execution_attempts SET fingerprint_key_version = fingerprint_key_version + 1 WHERE source_id = $1 AND state IN ('DECLARED','UNCERTAIN')", [src.sourceId]);
+    return {};
+  },
+  // the forge changed the attempt, not its evidence: the unforged control judges the attempt under the key version it was declared with
+  restore: (src) => q("UPDATE kauro.outbound_execution_attempts SET fingerprint_key_version = fingerprint_key_version - 1 WHERE source_id = $1 AND state IN ('DECLARED','UNCERTAIN')", [src.sourceId]),
+});
 predicateControl({ title: "DENY RFG-P-DF-INVALID-EVIDENCE (DP-FULL evidence or a recipient artifact whose holder normalizes to 141 code points or whose routing fails the ABA check): Record a declared execution — DESTINATION_UNPROVEN", refusal: "409 DESTINATION_UNPROVEN", forge: () => ({ full: { ...DEST, holderName: "A".repeat(141) } }) });
 predicateControl({ title: "DENY RFG-P-DF-UNICODE-DIGITS-EVIDENCE (DP-FULL evidence or a recipient artifact whose routing or account uses Arabic-Indic or full-width digits): Record a declared execution — DESTINATION_UNPROVEN, and X1 and X4 refuse the binding", refusal: "409 DESTINATION_UNPROVEN", forge: () => ({ full: { ...DEST, routingNumber: "٠٢١٠٠٠٠٢١" } }) });
 predicateControl({ title: "DENY RFG-P-DF-CONCAT-COLLISION (routing 021000021, account 12341234, holder 1234M versus account 123412341234, holder M): distinct destinations give distinct fingerprints", refusal: "409 DESTINATION_CONFLICT", approval: COLLISION_A, forge: () => ({ full: COLLISION_B }) });
@@ -1022,16 +1116,27 @@ function DEST_LAST4_OF(): string {
 
 /** The positive controls: the evidence satisfies every predicate (rule 12's OK side), G2/G4 both scopes and X3 EXECUTED both kinds. */
 function positiveControl(title: string, evidence: (a: AttemptView) => ExecutionOverrides, approval?: Destination): void {
+  const all: ReadonlyArray<readonly [Kind, "RECORD" | "RESOLVE_EXECUTED"]> = KINDS.flatMap((k) => [[k, "RECORD"] as const, [k, "RESOLVE_EXECUTED"] as const]);
+  positiveLegs(title, title, evidence, all, approval);
+  positiveLegs(title, titleOfLegs(title), evidence, RETURN_RECORD_LEGS, approval);
+}
+function positiveLegs(id: string, title: string, evidence: (a: AttemptView) => ExecutionOverrides, legs: ReadonlyArray<readonly [Kind, "RECORD" | "RESOLVE_EXECUTED"]>, approval?: Destination): void {
   test(title, async () => {
-    await runCell({ id: title.split(" ")[1]!, step: title, fault: "expiry", expect: "RECORDED" }, async (ctx) => {
+    const fault: FaultKind = legs.some(([, c]) => c === "RESOLVE_EXECUTED") ? "expiry" : "retry";
+    await runCell({ id: id.split(" ")[1]!, step: title, fault, expect: "RECORDED" }, async (ctx) => {
       for (const scope of SCOPES)
-        for (const kind of KINDS)
-          for (const command of ["RECORD", "RESOLVE_EXECUTED"] as const) {
+        for (const [kind, command] of legs) {
             const approved_ = approval === undefined ? {} : { destination: approval };
             const a = command === "RECORD" ? await openAttempt(scope, kind, `ok-${scope}-${kind}`, approved_) : await lapsed(ctx, scope, kind, `ok-x3-${scope}-${kind}`, approved_);
             const stored = await storeExecution(a.attempt, evidence(a.attempt));
-            const r = command === "RECORD" ? await recordG2(a.attempt, stored) : await resolveX3(a.attempt, "EXECUTED", stored);
+            const key = freshKey("ok");
+            const r = command === "RECORD" ? await ctx.attempt(() => recordG2(a.attempt, stored, { key })) : await resolveX3(a.attempt, "EXECUTED", stored);
             const view = dataOf<RecordView>(r, 200, `${scope} ${kind} ${command}`);
+            if (command === "RECORD") {
+              // the lost answer retried: the same key and body replays the recorded answer, nothing moves again
+              const again = dataOf<RecordView>(await ctx.attempt(() => recordG2(a.attempt, stored, { key })), 200, `${scope} ${kind}: the replay`);
+              assert.deepEqual(again, view, `${scope} ${kind}: the replay answers the recorded view`);
+            }
             assert.equal(view.attempt.state, "RECORDED");
             if (kind === "RETURN") assert.equal(view.refund?.state, "COMPLETED", `${scope}: COMPLETED with ${a.attempt.amountCents} cents`);
           }
