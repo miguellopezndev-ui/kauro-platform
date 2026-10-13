@@ -33,8 +33,10 @@ export async function matchCredit(rt: PaymentRuntime, delivery: CommerceEventDel
     let keys: MatchKeys | null = null;
     if (instruction !== null) {
       const route = await bankRoutesOf(uow as never).version(instruction.routeId, instruction.routeVersion);
-      if (route !== null) {
-        await uow.adoptScope("PAYMENT_ORDER", instruction.orderId);
+      const adopted = route === null ? null : await uow.adoptScope("PAYMENT_ORDER", instruction.orderId);
+      // the order the reference names must exist in its agency and be the instruction's (a second, independent lookup)
+      const order = adopted === null ? null : await uow.commerce.orders.get(instruction.orderId as never);
+      if (route !== null && order !== null && adopted === instruction.agencyId) {
         keys = {
           orderId: instruction.orderId,
           reference: instruction.reference,

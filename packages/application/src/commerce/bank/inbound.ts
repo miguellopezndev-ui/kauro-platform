@@ -286,8 +286,9 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
               deferred = e;
               return;
             }
-            await co.hold(BANK_HOLD_GATE_READ);
           });
+          // the product hold point: after the read, with every lock released (a replacement of the artifact from here on changes nothing it verified)
+          if (deferred === null && verified !== null) await co.hold(BANK_HOLD_GATE_READ);
         },
         async body(uow, causationId) {
           const body = envelope.body;
