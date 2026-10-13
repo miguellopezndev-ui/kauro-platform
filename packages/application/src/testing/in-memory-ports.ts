@@ -418,6 +418,7 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
       insert: () => notInMemory("InvitationRepository.insert"),
       get: () => notInMemory("InvitationRepository.get"),
       findByTokenHash: () => notInMemory("InvitationRepository.findByTokenHash"),
+      findByMembership: () => notInMemory("InvitationRepository.findByMembership"),
       consume: () => notInMemory("InvitationRepository.consume"),
       revoke: () => notInMemory("InvitationRepository.revoke"),
     } satisfies InvitationRepository,

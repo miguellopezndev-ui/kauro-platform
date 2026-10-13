@@ -17,7 +17,7 @@
  * CHECK violation with no known field. Such an answer is a defect of the route, not one of its outcomes, so the guard replaces
  * it with RESPONSE_CONTRACT_VIOLATION and the sink receives the violation under the correlation id.
  */
-import type { B06CommandId } from "../commands/contracts.js";
+import type { B06CommandId, TeamCommandId } from "../commands/contracts.js";
 import { AUDIT_COMMAND_OUTCOMES, AUDIT_INTAKE_OUTCOMES, AUDIT_ROUTE_OUTCOMES, CORE_SERVICES_UNAVAILABLE } from "../audit/outcomes.js";
 import { EXECUTION_COMMAND_OUTCOMES, EXECUTION_ROUTE_OUTCOMES } from "../execution/outcomes.js";
 import { SOURCE_COMMAND_OUTCOMES, SOURCE_ROUTE_OUTCOMES } from "../sources/outcomes.js";
@@ -38,11 +38,21 @@ const CONTENT_REFUSED: ReadonlyArray<ProblemOutcome> = Object.freeze([
   outcome("COMMAND", "CONTENT_REFUSED", "SECRET_LIKE_CONTENT", "the summary holds a private key, a cloud or API key, a token or a name-and-value credential; nothing was stored, sent or logged"),
   outcome("COMMAND", "CONTENT_REFUSED", "RECORD_LIKE_CONTENT", "the summary holds rows of records (three delimited lines) or three e-mail addresses; nothing was stored, sent or logged"),
 ]);
+/** The step-up the authorizer needs for CMD005 and CMD007 (the same three refusals as CMD025's). */
+const STEP_UP_REFUSALS: ReadonlyArray<ProblemOutcome> = Object.freeze([
+  outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_MISSING", "no step-up proof, or not a step-up proof"),
+  outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_NOT_OWNED", "the proof is not the caller's"),
+  outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_STALE", "the step-up is older than the freshness window or expired"),
+]);
+/** The role set the request names is the domain's closed set: anything else changes nothing (CMD005 failure: "a client-invented privileged role makes no change"). */
+const ROLE_UNKNOWN = outcome("COMMAND", "INVALID_REQUEST", null, "the role is not one of the closed membership roles; nothing changed", { fieldCodes: ["ENUM"] });
+/** The reason code of a revocation is a short token; a value that is not one changes nothing (CMD006). */
+const REASON_CODE_INVALID = outcome("COMMAND", "INVALID_REQUEST", null, "the reason code is not a reason token; nothing changed", { fieldCodes: ["FORMAT", "TYPE"] });
 const NOT_CONTROLLER = outcome("COMMAND", "NOT_AUTHORIZED", "NOT_APPROVAL_CONTROLLER", "only the approving actor or an OWNER ends an approval's future use (D-AUTHZ-3)");
 
 /** The command-specific outcomes, by served command (design §8; reference/COMMAND_CATALOGUE preconditions and failures). */
 /** The commands this module catalogues itself: B06's seven and B11's CMD044 (B07's come composed from sources/outcomes). */
-type CatalogueCommandId = B06CommandId | "CMD044";
+type CatalogueCommandId = B06CommandId | "CMD044" | TeamCommandId;
 
 const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   CMD001: [
@@ -107,6 +117,52 @@ const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<Proble
     STALE("plan"),
     outcome("COMMAND", "PRECONDITION_FAILED", "PLAN_NOT_APPROVED", "the plan is not APPROVED", { current: "ALWAYS" }),
   ],
+  CMD003: [
+    NOT_VISIBLE("the agency"),
+    STALE("agency"),
+    ROLE_UNKNOWN,
+    outcome("COMMAND", "NOT_AUTHORIZED", "ROLE_NOT_GRANTABLE", "the requested role is outside the inviter's grantable subset (an ADMIN never grants OWNER)"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "AGENCY_NOT_OPEN", "the agency grants no new access (not DRAFT or ACTIVE)"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "SELF_TARGET", "the inviter named its own identity"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "MEMBER_ALREADY_LIVE", "the identity already holds a live membership of the agency (invited, active or suspended)"),
+    outcome("COMMAND", "INVALID_REQUEST", "UNKNOWN_REFERENCE", "the intended identity is not known to the platform", { fieldCodes: ["UNKNOWN_REFERENCE"] }),
+  ],
+  CMD004: [
+    NOT_VISIBLE("the invitation (another person's invitation answers alike)"),
+    STALE("membership"),
+    outcome("COMMAND", "NOT_AUTHORIZED", "INVITATION_TOKEN_MISMATCH", "the presented token is not the invitation's"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "INVITATION_REVOKED", "the inviter revoked the invitation"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "INVITATION_CONSUMED", "the invitation was already consumed"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "INVITATION_EXPIRED", "the invitation reached its deadline on the database clock"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "UNLISTED_TRANSITION", "the membership is no longer INVITED (accepted, revoked or expired)"),
+  ],
+  CMD005: [
+    NOT_VISIBLE("the membership"),
+    STALE("membership"),
+    ...STEP_UP_REFUSALS,
+    ROLE_UNKNOWN,
+    outcome("COMMAND", "PRECONDITION_FAILED", "MEMBERSHIP_NOT_ACTIVE", "the target is not a live accepted membership (an INVITED one is reissued instead)"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "NO_SEMANTIC_CHANGE", "the membership already has the requested role", { current: "ALWAYS" }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "LAST_OWNER_PROTECTED", "the change would leave the agency without an active owner", { current: "ALWAYS" }),
+  ],
+  CMD006: [
+    NOT_VISIBLE("the membership"),
+    REASON_CODE_INVALID,
+    STALE("membership"),
+    outcome("COMMAND", "NOT_AUTHORIZED", "OWNER_PROTECTED", "an ADMIN never acts on an OWNER"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "LAST_OWNER_PROTECTED", "the revocation would leave the agency without an active owner", { current: "ALWAYS" }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "UNLISTED_TRANSITION", "the membership is already revoked or expired"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "INVITATION_CONSUMED", "the invitation was consumed while the revocation ran", { current: "ALWAYS" }),
+  ],
+  CMD007: [
+    NOT_VISIBLE("the agency or the successor's membership"),
+    STALE("agency"),
+    ...STEP_UP_REFUSALS,
+    outcome("COMMAND", "PRECONDITION_FAILED", "AGENCY_NOT_OPEN", "the agency is under closure authority"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "SELF_TARGET", "the owner named its own membership"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "RECIPIENT_NOT_ACTIVE", "the successor's membership is not ACTIVE"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "NO_SEMANTIC_CHANGE", "the successor already owns the agency"),
+  ],
   CMD044: [
     NOT_VISIBLE("the project"),
     ...CONTENT_REFUSED,
@@ -114,14 +170,17 @@ const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<Proble
   ],
 });
 
-const TENANT_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044"]);
-const HEADER_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044"]);
+const TENANT_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD003", "CMD005", "CMD006", "CMD007", "CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044"]);
+const HEADER_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD005", "CMD006", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044"]);
+/** Routes with an id in the path and no tenant selector at all: CMD004 (the invitation names its agency, never the request). */
+const PATH_ONLY_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD004"]);
 
 function catalogueOf(command: CatalogueCommandId): ReadonlyArray<ProblemOutcome> {
   const entries = [
     ...EVERY_ROUTE,
     ...COOKIE_CSRF,
     ...(TENANT_COMMANDS.has(command) ? [...PATH_IDS, ...TENANT] : []),
+    ...(PATH_ONLY_COMMANDS.has(command) ? PATH_IDS : []),
     ...(HEADER_COMMANDS.has(command) ? AGENCY_HEADER : []),
     ...COMMAND_SPECIFIC[command],
   ];
@@ -140,6 +199,11 @@ function catalogueOf(command: CatalogueCommandId): ReadonlyArray<ProblemOutcome>
  */
 export const COMMAND_OUTCOMES: Readonly<Record<ServedCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   CMD001: catalogueOf("CMD001"),
+  CMD003: catalogueOf("CMD003"),
+  CMD004: catalogueOf("CMD004"),
+  CMD005: catalogueOf("CMD005"),
+  CMD006: catalogueOf("CMD006"),
+  CMD007: catalogueOf("CMD007"),
   CMD009: catalogueOf("CMD009"),
   CMD010: catalogueOf("CMD010"),
   CMD011: catalogueOf("CMD011"),

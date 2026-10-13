@@ -68,7 +68,7 @@ const NARROW_SUMMARY = Object.freeze({ minLength: 20, pattern: TEXT_PATTERN });
  * (docs/design/B07-upload-source-lifecycle.md §9.5: served routes move from x-kauro-planned to paths), and CMD044 of the support
  * package (B11 W4).
  */
-export type ServedCommandId = "CMD001" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId | ExecutionCommandId | AuditCommandId | "CMD044";
+export type ServedCommandId = "CMD001" | "CMD003" | "CMD004" | "CMD005" | "CMD006" | "CMD007" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId | ExecutionCommandId | AuditCommandId | "CMD044";
 export type CommandResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}${ServedCommandId}`;
 export type AcceptedResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}accepted`;
 export type OperationalResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}op:${string}`;
@@ -351,6 +351,32 @@ const B06_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
     },
   },
   {
+    name: "InviteMemberView",
+    description: "CMD003 InviteMember result: the pending membership and its invitation. The single-use token is a member of the FIRST execution's reply only; the journal holds no token and a replay answers without it (docs/design/B16-team-commands.md D-TEAM-1).",
+    contract: null,
+    withheld: {},
+    members: {
+      invitationId: platform(true, ID, "The invitation (a forwarded token names this id, never another agency)."),
+      agencyId: platform(true, ID, "The agency the invitation is explicitly scoped to."),
+      membershipId: registry(true, NARROW_ID, ["Membership", "membershipId"]),
+      role: registry(true, undefined, ["Membership", "role"]),
+      state: registry(true, undefined, ["Membership", "state"]),
+      version: registry(true, undefined, ["Membership", "version"]),
+      expiresAt: platform(true, UTC, "When the invitation stops being acceptable, on the database clock."),
+    },
+  },
+  {
+    name: "TransferOwnershipView",
+    description: "CMD007 TransferOwnership result: the agency at its new version, the successor who became OWNER and the former owner who stays ADMIN.",
+    contract: null,
+    withheld: {},
+    members: {
+      agency: platform(true, ref("AgencyView"), "The agency after the transfer."),
+      newOwner: platform(true, ref("MembershipView"), "The successor's membership, now OWNER."),
+      previousOwner: platform(true, ref("MembershipView"), "The former owner's membership, now ADMIN."),
+    },
+  },
+  {
     name: "ArchiveClientView",
     description: "CMD010 ArchiveClient result: the archived client and the work archiving retained; no deletion, refund or rollback member.",
     contract: null,
@@ -439,6 +465,11 @@ export type CommandReply = { readonly status: 200 | 201; readonly view: string }
 /** The success reply of every served command: status and the view its COMPLETED envelope carries (none for ACCEPTED). */
 export const COMMAND_RESPONSES: Readonly<Record<ServedCommandId, CommandReply>> = Object.freeze({
   CMD001: { status: 201, view: "CreateAgencyView" },
+  CMD003: { status: 201, view: "InviteMemberView" },
+  CMD004: { status: 200, view: "MembershipView" },
+  CMD005: { status: 200, view: "MembershipView" },
+  CMD006: { status: 200, view: "MembershipView" },
+  CMD007: { status: 200, view: "TransferOwnershipView" },
   CMD009: { status: 201, view: "EndClientView" },
   CMD010: { status: 200, view: "ArchiveClientView" },
   CMD011: { status: 201, view: "ProjectView" },

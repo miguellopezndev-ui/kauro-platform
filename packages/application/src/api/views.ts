@@ -34,6 +34,33 @@ export interface MembershipView {
   readonly acceptedAt?: UtcInstant;
 }
 
+/**
+ * A new invitation (B16 CMD003): the safe facts of the pending membership and its invitation. The raw single-use token is NOT part
+ * of the journaled view (stored token material is hashed, 08): it is delivered once, on the first execution only, as the
+ * no token member (the guard FORBIDDEN_RESPONSE_FIELDS names invitationToken): the raw token goes to the delivery channel once, after the commit (D-TEAM-1).
+ */
+export interface InviteMemberView {
+  readonly invitationId: string;
+  readonly agencyId: string;
+  readonly membershipId: string;
+  readonly role: Membership["role"];
+  readonly state: Membership["state"];
+  /** The version of the pending membership (the aggregate the invitation created). */
+  readonly version: number;
+  readonly expiresAt: UtcInstant;
+  /** Present on the first execution only; never journaled, never replayed. */
+}
+
+/** CMD004: the membership the accepted invitation activated. */
+export type AcceptInvitationView = MembershipView;
+
+/** CMD007: the agency (its new version) and both memberships the transfer changed. */
+export interface TransferOwnershipView {
+  readonly agency: AgencyView;
+  readonly newOwner: MembershipView;
+  readonly previousOwner: MembershipView;
+}
+
 export interface EndClientView {
   readonly clientId: string;
   readonly agencyId: string;
