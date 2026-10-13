@@ -470,3 +470,17 @@ ALTER TABLE kauro.pool_liability_gates NO FORCE ROW LEVEL SECURITY;
 INSERT INTO kauro.pool_liability_gates (pool_grant_id) SELECT grant_id FROM kauro.cost_grants WHERE grant_kind = 'PLATFORM_MONTHLY' ON CONFLICT DO NOTHING;
 ALTER TABLE kauro.cost_grants FORCE ROW LEVEL SECURITY;
 ALTER TABLE kauro.pool_liability_gates FORCE ROW LEVEL SECURITY;
+
+-- SEC-DEPTH R17 (0060): a trigger fires without EXECUTE, and a direct call is not a route, so PUBLIC holds EXECUTE on none of this
+-- migration's trigger functions (0060 revoked it from the ones that existed then; a function created afterwards starts with it)
+REVOKE EXECUTE ON FUNCTION kauro.request_journal_settlement_final() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.request_journal_non_acceptance_evidence() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.request_journal_dispatch_from_reserved() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.request_journal_response_from_sent() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.dispatch_liabilities_birth() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.dispatch_liabilities_clearing() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.pool_liability_gate_birth() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.request_journal_reserves_grant() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.request_journal_model_task_send() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.request_journal_commit_gate() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.dispatch_liabilities_commit_gate() FROM PUBLIC;

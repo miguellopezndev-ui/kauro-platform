@@ -1,5 +1,5 @@
 // B05 dispatch settlement under GRANT_RECONCILIATION (lane L3m, GDR titles; docs/design/B05-cores.md D5-18 branches (a) and (b),
-// D5-19, D5-20, LOCK-B05-1; migration 0060 provisional): the sweeper of this package against the core admissions the Intelligence
+// D5-19, D5-20, LOCK-B05-1; migration 0061 provisional): the sweeper of this package against the core admissions the Intelligence
 // core adapter's beginDispatch writes, IC's settlement (settleDispatch) and the journal's edges, on real PostgreSQL 17 through the
 // control plane's own units. Every interleaving is fixed by a hold inside a unit of work (or a FaultPoint) and the other side's lock
 // wait observed in pg_stat_activity (waitForLockWait), never by a sleep. Time is the labelled TEST CLOCK of the control plane's units.

@@ -1,5 +1,5 @@
 // B05 dispatch settlement, liabilities and the pool liability gate (lane L3m, LDG titles; docs/design/B05-cores.md D5-11, D5-18,
-// D5-19, D5-19b, LOCK-B05-1; migration 0060 provisional): the admission of a core reservation through beginDispatch, its settlement
+// D5-19, D5-19b, LOCK-B05-1; migration 0061 provisional): the admission of a core reservation through beginDispatch, its settlement
 // (settleDispatch), GRANT_RECONCILIATION's micros evidence (reconcileRequestMicros), the journal's send and response edges, and the
 // pool's liability gate taken at COMMIT, on real PostgreSQL 17 through the control plane's login. Every interleaving is fixed by a
 // FaultPoint or an open transaction and the other side's lock wait observed in pg_stat_activity (mustWait), never by a sleep.
