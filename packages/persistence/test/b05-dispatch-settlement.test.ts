@@ -1448,7 +1448,11 @@ test("L17 RACE (deadline at COMMIT, every session on one test-clock offset): a r
       }),
       (c, run) => admitWith(rawStore(c), admissionOf(run, 50_000n)),
     );
-    assert.ok(refusedBy("KA081")(rejection(outcome)), "the deadline judged after the audit share");
+    // the admission's MODEL_TASK lease carries the interpretation deadline as its own (audit/store.ts claimTaskLease), and claim_lease
+    // judges it after the wait at the judged instant (0063, FCG-B06-LEASE-1b): the claim refuses first, before the reservation's KA081
+    const refused = rejection(outcome);
+    assert.ok(refusedBy("KA005")(refused), "the deadline judged after the audit share, by the task lease's claim");
+    assert.match(String((refused as { cause?: { message?: unknown } }).cause?.message), /^LEASE: deadline of .* has passed$/, "refused for its deadline, not a fence");
     assert.deepEqual(await money(env, run.grantId), { reserved: 5, spent: 0, state: "AUTHORIZED" }, "nothing reserved beyond the first admission");
     assert.equal((await env.h.oracle.query("SELECT state FROM kauro.audits WHERE audit_id = $1", [run.auditId])).rows[0].state, "INTERPRETING", "the crashed cancellation changed nothing");
   }

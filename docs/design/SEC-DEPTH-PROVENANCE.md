@@ -296,24 +296,24 @@ Residual B-LIFETIME-2 (feeds none): `domain_events` event evidence of versions (
 
 ### 3c Planned enforcing triggers (the check requires each in its migration once that file exists)
 
-- planned `commercial_authorizations_first_assignment` BEFORE INSERT OR UPDATE ON `commercial_authorizations` in 0063 (columns: `job_ref` `consumed_at` `delivered_at`) B10/B12, SDP-36
-- planned `execution_capacity_birth` BEFORE INSERT ON `execution_capacity` in 0063 (columns: `*`) B9: the seed is its only birth
-- planned `leases_birth` BEFORE INSERT ON `leases` in 0064 (columns: `fence` `cancel_version` `heartbeat_at` `expires_at` `created_at` `updated_at` `deadline_at`) B2: deadline_at within its subject's deadline
-- planned `capture_facts_first_assignment` BEFORE INSERT OR UPDATE ON `capture_facts` in 0066 (columns: `provider_completed_at`) B12
-- planned `payment_orders_allocation_birth` BEFORE INSERT ON `payment_orders` in 0066 (columns: `allocated_cents`) B4
-- planned `founding_slot_reservations_first_assignment` BEFORE INSERT OR UPDATE ON `founding_slot_reservations` in 0068 (columns: `consumed_at` `consumed_by_authorization_id`) B8/B12
-- planned `price_eligibility_snapshots_birth` AFTER INSERT ON `price_eligibility_snapshots` in 0068 (columns: `agency_id` `quote_id` `project_id` `founding_slot_ref` `founding_discount_bps` `policy_version` `qualifying_project_ids` `qualifying_count` `as_of` `lookback_starts_at`) B13, SDP-37
-- planned `target_contracts_lifetime` BEFORE INSERT OR UPDATE ON `target_contracts` in 0069 (columns: `confirmed_at` `superseded_at`) B14, SDP-38
-- planned `state_machines_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_machines` in 0069 (columns: `*`) B11
-- planned `state_transitions_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_transitions` in 0069 (columns: `*`) B11
-- planned `founding_slots_birth` BEFORE INSERT ON `founding_slots` in 0069 (columns: `*`) B11, SDP-35
-- planned `quotes_issuance_clock` BEFORE INSERT ON `quotes` in 0068 (columns: `issued_at` `expires_at` `price_policy_version` `replaces_quote_id`) B15, SDP-39
-- planned `founding_slot_reservations_eligibility` BEFORE INSERT ON `founding_slot_reservations` in 0068 (columns: `agency_id` `quote_id` `policy_version` `slot_no`) B13 (iii), SDP-40
-- planned `agency_execution_capacity_guard` BEFORE INSERT OR UPDATE ON `agency_execution_capacity` in 0063 (columns: `agency_id` `last_admitted_at` `live_jobs` `updated_at`) B9: redefined, also at birth
-- planned `execution_capacity_last_admission_guard` BEFORE UPDATE ON `execution_capacity` in 0063 (columns: `last_admission_at` `ledger_id` `updated_at`) B9/G11: redefined
-- planned `request_journal_guard` BEFORE INSERT OR UPDATE ON `request_journal` in 0065 (columns: `usage_state` `actual_cents` `reconciled_at` `state` `response_artifact_hash`) B3: redefined, usage frozen once RECONCILED
-- planned `agency_recurrence_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `agency_recurrence` in 0067 (columns: `*`) B5b: redefined, every column
-- planned `qualifying_purchases_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `qualifying_purchases` in 0068 (columns: `*`) B8: redefined, every column at birth, no update
+- planned `commercial_authorizations_first_assignment` BEFORE INSERT OR UPDATE ON `commercial_authorizations` in 0064 (columns: `job_ref` `consumed_at` `delivered_at`) B10/B12, SDP-36
+- planned `execution_capacity_birth` BEFORE INSERT ON `execution_capacity` in 0064 (columns: `*`) B9: the seed is its only birth
+- planned `leases_birth` BEFORE INSERT ON `leases` in 0065 (columns: `fence` `cancel_version` `heartbeat_at` `expires_at` `created_at` `updated_at` `deadline_at`) B2: deadline_at within its subject's deadline
+- planned `capture_facts_first_assignment` BEFORE INSERT OR UPDATE ON `capture_facts` in 0067 (columns: `provider_completed_at`) B12
+- planned `payment_orders_allocation_birth` BEFORE INSERT ON `payment_orders` in 0067 (columns: `allocated_cents`) B4
+- planned `founding_slot_reservations_first_assignment` BEFORE INSERT OR UPDATE ON `founding_slot_reservations` in 0069 (columns: `consumed_at` `consumed_by_authorization_id`) B8/B12
+- planned `price_eligibility_snapshots_birth` AFTER INSERT ON `price_eligibility_snapshots` in 0069 (columns: `agency_id` `quote_id` `project_id` `founding_slot_ref` `founding_discount_bps` `policy_version` `qualifying_project_ids` `qualifying_count` `as_of` `lookback_starts_at`) B13, SDP-37
+- planned `target_contracts_lifetime` BEFORE INSERT OR UPDATE ON `target_contracts` in 0070 (columns: `confirmed_at` `superseded_at`) B14, SDP-38
+- planned `state_machines_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_machines` in 0070 (columns: `*`) B11
+- planned `state_transitions_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_transitions` in 0070 (columns: `*`) B11
+- planned `founding_slots_birth` BEFORE INSERT ON `founding_slots` in 0070 (columns: `*`) B11, SDP-35
+- planned `quotes_issuance_clock` BEFORE INSERT ON `quotes` in 0069 (columns: `issued_at` `expires_at` `price_policy_version` `replaces_quote_id`) B15, SDP-39
+- planned `founding_slot_reservations_eligibility` BEFORE INSERT ON `founding_slot_reservations` in 0069 (columns: `agency_id` `quote_id` `policy_version` `slot_no`) B13 (iii), SDP-40
+- planned `agency_execution_capacity_guard` BEFORE INSERT OR UPDATE ON `agency_execution_capacity` in 0064 (columns: `agency_id` `last_admitted_at` `live_jobs` `updated_at`) B9: redefined, also at birth
+- planned `execution_capacity_last_admission_guard` BEFORE UPDATE ON `execution_capacity` in 0064 (columns: `last_admission_at` `ledger_id` `updated_at`) B9/G11: redefined
+- planned `request_journal_guard` BEFORE INSERT OR UPDATE ON `request_journal` in 0066 (columns: `usage_state` `actual_cents` `reconciled_at` `state` `response_artifact_hash`) B3: redefined, usage frozen once RECONCILED
+- planned `agency_recurrence_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `agency_recurrence` in 0068 (columns: `*`) B5b: redefined, every column
+- planned `qualifying_purchases_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `qualifying_purchases` in 0069 (columns: `*`) B8: redefined, every column at birth, no update
 
 ## A. Hardening (defence in depth; P2 lists what is NOT hardening)
 
@@ -463,7 +463,7 @@ admission then UPDATEs it; SDP-30). Lifetime (SDP-31): both ledgers frozen again
 with live_jobs = 0 and its agency_id is immutable; execution_capacity refuses INSERT after 0051 (its seed is its only birth; a
 replacement birth is not supported) and its recount is also queued AFTER INSERT. live_jobs is recounted per ledger row and per job
 (0021:406-413).
-B11 lifetime freeze (rule 22), `0067_lifetime_freeze.sql` (planned, next free; 3c): generated from section 3: every "frozen (B11)" cell gets BEFORE DELETE
+B11 lifetime freeze (rule 22), `0068_lifetime_freeze.sql` (planned, next free; 3c): generated from section 3: every "frozen (B11)" cell gets BEFORE DELETE
 FOR EACH ROW and BEFORE TRUNCATE FOR EACH STATEMENT executing kauro.forbid_change; the three config tables (row 15) also refuse
 INSERT and UPDATE; founding_slots (row 25) refuses INSERT (its 0028 seed is its only birth; a test that needs a synthetic cohort
 seeds it as the oracle under ALTER TABLE ... DISABLE TRIGGER, the TCB path of P2, as a migration would).

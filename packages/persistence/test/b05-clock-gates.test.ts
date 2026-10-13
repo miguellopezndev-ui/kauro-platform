@@ -31,7 +31,7 @@ after(async () => {
 /** The package owning each migration file (its header; 0001-0007 the B06 foundation; 0023's deadline gates are B05's, D5-20). */
 function ownerOfFile(tag: string): string {
   const n = Number(tag);
-  if (n <= 8 || n === 54) return "B06";
+  if (n <= 8 || n === 54 || n === 63) return "B06";
   if ((n >= 9 && n <= 12) || n === 18 || n === 20) return "B07";
   if ((n >= 13 && n <= 17) || n === 19 || n === 53) return "B09";
   if (n === 21 || n === 22 || n === 24 || n === 44) return "B08";
@@ -404,7 +404,7 @@ test("CK2 (CK) DENY commit-time locks (census): in the live schema no deferred c
   assert.ok(fkProblems.some((p) => p.includes("not D5-11's 14")), "the count changed");
 });
 
-test("CK3 (CK) DENY process clock (census): in persistence src/audit/**, src/request-journal.ts, src/lease-store.ts, apps/control/src/audit/**, domain src/model/audit/** and ports, application src/audit/**, data-plane src/cores/** and application src/adapters/cores/intelligence/** there is no Date.now(, zero-argument new Date(, performance.now( or process.hrtime( and no comparison of a database instant with a process clock; the database clock reads from the app (serverNow, serverInstantOf) and the app-side judges (reached) equal the checked-in list with their class, LeaseStore claim/heartbeat/checkpoint have no caller in those paths and their product callers are exactly the checked-in outbox dispatchers, whose expiry claim_lease/heartbeat_lease/checkpoint_lease judge after the row lock at GREATEST(p_now, effect_now()) (0054), and the process clocks of the product are exactly the four injection points (apps/control composition.ts:70, apps/api composition.ts:48, apps/api identity-verifier.ts:60, application sources/provider-holds.ts:28); a planted Date.now() in apps/control/src/audit fails", () => {
+test("CK3 (CK) DENY process clock (census): in persistence src/audit/**, src/request-journal.ts, src/lease-store.ts, apps/control/src/audit/**, domain src/model/audit/** and ports, application src/audit/**, data-plane src/cores/** and application src/adapters/cores/intelligence/** there is no Date.now(, zero-argument new Date(, performance.now( or process.hrtime( and no comparison of a database instant with a process clock; the database clock reads from the app (serverNow, serverInstantOf) and the app-side judges (reached) equal the checked-in list with their class, LeaseStore claim/heartbeat/checkpoint have no caller in those paths and their product callers are exactly the checked-in outbox dispatchers, whose expiry claim_lease/heartbeat_lease/checkpoint_lease judge after the row lock at GREATEST(p_now, effect_now()) (0054) in their latest definition, claim_lease's deadline judged at that same instant after the lock and never at p_now (0063), and the process clocks of the product are exactly the four injection points (apps/control composition.ts:70, apps/api composition.ts:48, apps/api identity-verifier.ts:60, application sources/provider-holds.ts:28); a planted Date.now() in apps/control/src/audit fails", () => {
   const app = appSide();
   assert.deepEqual(app.problems, [], "no process clock in the B05/B08 paths");
   for (const p of CK3_PATHS) assert.ok(tsFiles(p).length > 0, `${p} is scanned`);
@@ -413,14 +413,29 @@ test("CK3 (CK) DENY process clock (census): in persistence src/audit/**, src/req
   assert.deepEqual(product.points, [...INJECTION_POINTS].sort(), "the product's process clocks are its four injection points");
   assert.deepEqual(product.leaseCallers, [...LEASE_CALLERS].sort(), "the LeaseStore claim/heartbeat/checkpoint callers are the checked-in outbox dispatchers");
   for (const caller of product.leaseCallers) assert.ok(!CK3_PATHS.some((p) => caller.startsWith(p)), `${caller} is not in a B05 path`);
-  // their expiry is judged after the row lock at the database clock (0054): the param is never the judge alone
-  const leaseFns = readFileSync(join(REPO_ROOT, "packages/persistence/migrations/0054_lease_expiry_after_lock.sql"), "utf8");
+  // their expiry is judged after the row lock at the database clock (0054) in the definition that is in force, the latest migration
+  // defining the function: the param is never the judge alone. claim_lease's deadline is judged at that instant too (0063)
+  const latestBody = (fn: string): { file: string; body: string } => {
+    const defining = readdirSync(MIGRATIONS_DIR)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .map((f) => ({ file: f, sql: stripComments(readFileSync(join(MIGRATIONS_DIR, f), "utf8")) }))
+      .filter((m) => m.sql.includes(`FUNCTION kauro.${fn}(`));
+    const last = defining[defining.length - 1];
+    assert.ok(last !== undefined, `${fn} is defined by a migration`);
+    return { file: last.file, body: last.sql.slice(last.sql.indexOf(`FUNCTION kauro.${fn}(`)).split("$$;")[0]! };
+  };
   for (const fn of ["claim_lease", "heartbeat_lease", "checkpoint_lease"]) {
-    const body = leaseFns.slice(leaseFns.indexOf(`FUNCTION kauro.${fn}(`)).split("$$;")[0]!;
+    const { file, body } = latestBody(fn);
     const lock = body.indexOf("FOR UPDATE");
     const judge = body.indexOf("GREATEST(p_now, kauro.effect_now())");
-    assert.ok(lock > 0 && judge > lock, `${fn} judges the expiry at GREATEST(p_now, effect_now()) after its row lock`);
+    assert.ok(lock > 0 && judge > lock, `${fn} (${file}) judges the expiry at GREATEST(p_now, effect_now()) after its row lock`);
   }
+  const claim = latestBody("claim_lease");
+  const judgedAt = claim.body.indexOf("judged := GREATEST(p_now, kauro.effect_now())");
+  const deadlineJudge = claim.body.indexOf("judged >= p_deadline");
+  assert.ok(judgedAt > claim.body.indexOf("FOR UPDATE") && deadlineJudge > judgedAt, `claim_lease (${claim.file}) judges its deadline at the judged instant after the row lock`);
+  assert.ok(!/p_now\s*>=?\s*p_deadline|p_deadline\s*<=?\s*p_now/.test(claim.body), `claim_lease (${claim.file}) never judges its deadline at the caller's p_now`);
   // a planted Date.now() in apps/control/src/audit fails (the scan run on a copy of that file with the plant)
   const target = join(REPO_ROOT, "apps/control/src/audit/grants.ts");
   const planted = readFileSync(target, "utf8") + "\nexport const plantedNow = (): number => Date.now();\n";
