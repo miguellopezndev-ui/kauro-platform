@@ -78,6 +78,8 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   // Payments V1 bank-transfer route (0046, lane L-ROUTE; walked by apps/api/test/ach-route-cells.test.ts)
   bank_route: ["bank_routes", "route_id"],
   bank_transfer_instruction: ["bank_transfer_instructions", "order_id"],
+  // package B11 lane A1 (0062): the agency's buyer type, one row per agency keyed by it
+  agency_buyer_type: ["agency_buyer_types", "agency_id"],
 });
 
 // every runtime login of this branch: B06 five, package B09's payment service and package B10's commission service
@@ -150,6 +152,14 @@ before(async () => {
     await c.query("UPDATE kauro.plans SET state = 'APPROVED', approval_id = $2, version = 5 WHERE plan_id = $1 AND version = 4", [p.planId, approvalId]);
     await event(c, { aggregateKind: "plan", aggregateId: p.planId, aggregateVersion: 5, agencyId: A.agencyId, eventType: "plan.approved.v1", actorUserId: approver, payload: { planId: p.planId, agencyId: A.agencyId, approvalId } });
   });
+  // B11 lane A1: CMD101's writes as the owner's own session — the buyer type (v1, written once) and its event
+  await tx(app, { agencyId: A.agencyId, userId: alice }, async (c) => {
+    await c.query(
+      "INSERT INTO kauro.agency_buyer_types (agency_id, buyer_type, for_economic_activity, recorded_by_user_id, recorded_by_membership_id, recorded_at, version) VALUES ($1, 'agency', true, $2, $3, now(), 1)",
+      [A.agencyId, A.ownerUserId, A.ownerMembershipId],
+    );
+    await event(c, { aggregateKind: "agency_buyer_type", aggregateId: A.agencyId, aggregateVersion: 1, agencyId: A.agencyId, eventType: "agency_buyer_type.recorded.v1", actorUserId: alice, payload: { agencyId: A.agencyId } });
+  });
   const idOf: Record<WalkedKind, string> = {
     agency: A.agencyId,
     membership: approverMembership,
@@ -162,6 +172,7 @@ before(async () => {
     source_file: source.fileId,
     retention_record: source.retentionId,
     support_case: (await supportCase(app, A, projectId)).caseId,
+    agency_buyer_type: A.agencyId,
   };
   for (const kind of WALKED_KINDS) {
     const [table, column] = TABLE_OF[kind];

@@ -23,6 +23,8 @@ export type { CursorBinding, CursorPosition } from "./api/cursor.js";
 export { sealCursor, openCursor, isCursorKey, CURSOR_PATTERN, CURSOR_SORT, CURSOR_SNAPSHOT_POLICY } from "./api/cursor.js";
 export type { ReadSpec, ReadQuery, ReadHead, ReadAdmission, ReadRequest, ReadResult, ReadHandler, ReadHandlers, ReadRuntime } from "./queries/reads.js";
 export { READ_ROUTES, admitRead, admitReadQuery, runRead, createReadHandlers } from "./queries/reads.js";
+export type { ProjectDashboardItem } from "./queries/reads.js";
+export * from "./agency/buyer-type.js";
 export type { StrictJsonOptions, StrictJsonReason } from "./api/strict-json.js";
 export { parseStrictJson, StrictJsonError } from "./api/strict-json.js";
 export type { CompiledSchemaSet, SchemaBundleInput } from "./api/json-schema.js";
