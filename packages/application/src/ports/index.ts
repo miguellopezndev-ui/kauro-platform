@@ -25,6 +25,8 @@ export type {
   CancellationState,
   CancellationChannel,
   ExecutionLimits,
+  CoreCallControls,
+  CoreRefusal,
   HostIo,
   ExecutionSubject,
   ExecutionTerminalCause,
@@ -53,6 +55,7 @@ export type {
   InterpretPort,
   PlanCompilerPort,
 } from "./core-ports.js";
+export type { CoreDocumentPort, CoreInputReadConfig, CoreInputRef, CoreInputResolver, CorePlanBinding } from "./core-inputs.js";
 export type {
   AcceptedGeneration,
   AttemptCapability,

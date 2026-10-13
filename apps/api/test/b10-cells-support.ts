@@ -224,11 +224,13 @@ const epochMsOf = (iso: string): number => Date.parse(iso.replace(/(\.\d{3})\d*Z
 /**
  * Places the effect clock of the transaction open on `conn` EFFECT_CLOCK_MARGIN_MS before `deadline` (a database instant): kauro.effect_now()
  * is the controlled instant plus the time the transaction has run (0038), so the controlled clock moves to the deadline less that elapsed
- * time (measured by the transaction itself, rounded up) and less the margin, and is put on the transaction (onServer). Returns the instant
+ * time (measured by the transaction itself, rounded down) and less the margin, and is put on the transaction (onServer). Returns the instant
  * kauro.server_now() then reads. Called at a pause of the unit, inside the cell's operation.
  */
 export async function effectClockBefore(ctx: Pick<FaultContext, "clock">, conn: HarnessConnection, deadline: string): Promise<string> {
-  const r = await conn.query<{ ms: string }>("SELECT ceil(extract(epoch FROM clock_timestamp() - transaction_timestamp()) * 1000)::text AS ms");
+  // rounded DOWN: the transaction runs on after this read, so its effect clock only moves later than placed; rounding up placed it up to 1 ms
+  // more than the margin before the deadline when the next statement came within that fraction (main d0b544c, CLAIM_DEADLINE `within`)
+  const r = await conn.query<{ ms: string }>("SELECT floor(extract(epoch FROM clock_timestamp() - transaction_timestamp()) * 1000)::text AS ms");
   ctx.clock.set(epochMsOf(deadline) - Number(r.rows[0]!.ms) - EFFECT_CLOCK_MARGIN_MS);
   return ctx.clock.onServer(conn);
 }
