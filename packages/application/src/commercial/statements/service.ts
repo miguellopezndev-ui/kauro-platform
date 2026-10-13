@@ -14,6 +14,15 @@ import { problemOf } from "../../api/problems.js";
 import type { CommercialServiceRole } from "../authorizer.js";
 import type { StatementServiceRuntime } from "./runtime.js";
 
+/**
+ * What a service command runs on (the commission group's SERVICE units of work, the authorizer, the deployment's environment and the
+ * database's instant): the statement service runtime, and package B18's operations service runtime (decision B18-OPS-1).
+ */
+export type ServiceRunRuntime = Pick<StatementServiceRuntime, "units" | "environment" | "clock" | "authorizer" | "serverNow"> & {
+  /** A test seam inside the unit of work before COMMIT; `never` accepts the hold of any command set. */
+  readonly hold?: (command: never, point: "BEFORE_COMMIT") => Promise<void>;
+};
+
 /** A service command as its route admitted it: the verified service identity, the idempotency key, the path ids and the closed body. */
 export interface ServiceCommandRequest<Body> {
   readonly correlationId: CorrelationId;
@@ -39,7 +48,7 @@ export function serviceContextOf(identity: ServiceIdentity, correlationId: Corre
 }
 
 /** The durable DENY fact of a service command in its own transaction (the service stream: no agency, actor SERVICE; 0028). */
-export async function recordServiceDenial(rt: Pick<StatementServiceRuntime, "units" | "clock">, context: ServiceContext, action: string, failure: DomainFailure): Promise<void> {
+export async function recordServiceDenial(rt: Pick<ServiceRunRuntime, "units" | "clock">, context: ServiceContext, action: string, failure: DomainFailure): Promise<void> {
   await rt.units.run(context, (uow) =>
     uow.securityEvents.append({
       agencyId: null,
@@ -74,10 +83,12 @@ class Replayed {
  * and becomes the CONFLICT / REJECTED / UNAVAILABLE result; any other exception propagates (INTERNAL_ERROR by correlation id).
  */
 export async function runServiceCommand<Body, View>(
-  rt: StatementServiceRuntime,
+  rt: ServiceRunRuntime,
   input: {
-    readonly command: "CMD051" | "CMD053";
+    readonly command: "CMD051" | "CMD053" | "CMD056" | "CMD059";
     readonly role: CommercialServiceRole;
+    /** The success status the route answers and the journal stores (200 unless the command creates a resource: 201). */
+    readonly status?: 200 | 201;
     readonly request: ServiceCommandRequest<Body>;
     /** Work done before the unit of work opens (a port that reaches a provider; 07 "no port call inside a transaction"). */
     readonly before?: () => Promise<void>;
@@ -86,6 +97,7 @@ export async function runServiceCommand<Body, View>(
   },
 ): Promise<CommandResult<View>> {
   const { request, command } = input;
+  const status = input.status ?? 200;
   const context = serviceContextOf(request.identity, request.correlationId);
   const decision = rt.authorizer.authorizeCommercialService({ identity: request.identity, role: input.role, deploymentEnvironment: rt.environment });
   if (decision.kind === "DENY") {
@@ -100,20 +112,20 @@ export async function runServiceCommand<Body, View>(
     const out = await rt.units.run(context, async (uow): Promise<ServiceOutcome<View> | Replayed> => {
       const reservation = await uow.journal.reserve(identity, digest, request.correlationId);
       if (reservation.kind === "REPLAY") {
-        if (reservation.entry.responseStatus !== 200 || reservation.entry.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "journaled entry is COMMITTED without a complete response");
+        if (reservation.entry.responseStatus !== status || reservation.entry.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "journaled entry is COMMITTED without a complete response");
         return new Replayed(reservation.entry.responseBody);
       }
       if (reservation.kind === "CONFLICT") throw new IdempotencyConflictFailure();
       if (reservation.kind === "PENDING") throw new DomainFailure("PRECONDITION_FAILED", "the same logical operation is still pending", { reason: "OPERATION_PENDING" }, true);
       const now = await rt.serverNow(uow);
       const outcome = await input.body(uow, now, reservation.entryId as string);
-      await rt.hold?.(command, "BEFORE_COMMIT");
-      const committed = await uow.journal.commit(reservation.entryId, { responseStatus: 200, responseBody: outcome.view, resourceKind: outcome.resourceKind, resourceId: outcome.resourceId });
-      if (committed.state !== "COMMITTED" || committed.responseStatus !== 200 || committed.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the journal did not record the response of this command");
+      await (rt.hold as ((command: string, point: "BEFORE_COMMIT") => Promise<void>) | undefined)?.(command, "BEFORE_COMMIT");
+      const committed = await uow.journal.commit(reservation.entryId, { responseStatus: status, responseBody: outcome.view, resourceKind: outcome.resourceKind, resourceId: outcome.resourceId });
+      if (committed.state !== "COMMITTED" || committed.responseStatus !== status || committed.responseBody === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the journal did not record the response of this command");
       return { ...outcome, view: committed.responseBody as View };
     });
-    if (out instanceof Replayed) return { kind: "COMPLETED", status: 200, view: out.view as View, version: input.versionOf(out.view as View), replayed: true };
-    return { kind: "COMPLETED", status: 200, view: out.view, version: out.version, replayed: false };
+    if (out instanceof Replayed) return { kind: "COMPLETED", status, view: out.view as View, version: input.versionOf(out.view as View), replayed: true };
+    return { kind: "COMPLETED", status, view: out.view, version: out.version, replayed: false };
   } catch (e) {
     if (!(e instanceof DomainFailure) || e.code === "INTERNAL_ERROR") throw e;
     if (e.code === "NOT_FOUND") await recordServiceDenial(rt, context, command, e);

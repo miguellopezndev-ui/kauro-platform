@@ -128,10 +128,12 @@ export function reconcileCommissionPayout(rt: StatementServiceRuntime, request: 
       }
       await statements.recordReconciliation({ reconciliationId: uow.ids.next() as PayoutReconciliationId, intentId: intent.intentId, evidence: facts, reconciledAt: now });
       const moved = applied(await statements.transitionIntent(intent.intentId, intent.version, facts.status, now));
+      // G-ORD-1: the line rows of the statement in one call, after the intent (S79), before any statement or line write
+      await ledger.lockLines(items.map((i) => i.lineId as CommissionLineId));
       if (facts.status === "SETTLED") {
         const paid = applied(await statements.transitionStatement(statementId, statement.version, { state: "PAID", payoutEvidenceHash: facts.evidenceHash }, now));
         for (const item of items) {
-          const line = await ledger.lockLine(item.lineId as CommissionLineId);
+          const line = await ledger.getLine(item.lineId as CommissionLineId);
           if (line === null || line.state !== "PAYABLE") throw new DomainFailure("INTEGRITY_FAILURE", "a payable item's line is not PAYABLE under its statement's lock");
           applied(await ledger.transitionLine(line.lineId, line.version, { state: "PAID" }, now));
         }
@@ -141,14 +143,14 @@ export function reconcileCommissionPayout(rt: StatementServiceRuntime, request: 
       const reissued = applied(await statements.transitionStatement(statementId, statement.version, { state: "ISSUED" }, now));
       const reviewAt = addHours(now, PAYOUT_FAILED_REVIEW_HOURS);
       for (const item of items) {
-        const line = await ledger.lockLine(item.lineId as CommissionLineId);
+        const line = await ledger.getLine(item.lineId as CommissionLineId);
         if (line === null || line.state !== "PAYABLE") throw new DomainFailure("INTEGRITY_FAILURE", "a payable item's line is not PAYABLE under its statement's lock");
         applied(await ledger.transitionLine(line.lineId, line.version, { state: "HELD", heldReason: "PAYOUT_FAILED", reviewAt }, now));
       }
       // the ISSUED statement is never approvable again (its lines left it, D10-GAP-8): a correcting statement supersedes it in the same
       // COMMIT, itemizing the lines as they now stand (HELD PAYOUT_FAILED), so a later statement that makes them payable is their one live
       // payable item (D10-GAP-12, B10G-R1)
-      const { corrected } = await supersedeStatement(rt, uow, reissued, now);
+      const { corrected } = await supersedeStatement(rt, uow, reissued, now, "CMD053");
       return {
         view: view(moved, corrected.state, undefined, { paid: 0, held: items.length }, calendarDateIn(reviewAt, rt.policy.operationalTimeZone)),
         version: moved.version,

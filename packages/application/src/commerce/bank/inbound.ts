@@ -134,7 +134,7 @@ export function bankCreditView(c: BankCreditRecord): BankCreditView {
   };
 }
 
-/** The owner's context on the payment service's pool: the units of the inbound commands run as kauro_payment (migration 0057). */
+/** The owner's context on the payment service's pool: the units of the inbound commands run as kauro_payment (migration 0060). */
 export const paymentOperatorContextOf = (envelope: Pick<CommandEnvelope<unknown>, "userId" | "correlationId">): OperatorContext => ({ ...operatorContextOf(envelope), pool: "PAYMENT" as const });
 
 export function inboundEnvelopeOf<Body>(id: InboundCommandId, request: BankRouteRequest<Body>): CommandEnvelope<Body> {
@@ -571,7 +571,7 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
     async retire(request) {
       const id = BANK_INBOUND_COMMAND_IDS.retire;
       const envelope: CommandEnvelope<RetireBankCheckoutBody> = { ...inboundEnvelopeOf(id, request), agencyId: request.agencyId };
-      // the payment boundary's pool: the instruction, the order lock and the slot are the payment service's columns (0057 CMD214)
+      // the payment boundary's pool: the instruction, the order lock and the slot are the payment service's columns (0060 CMD214)
       const context = { ...tenantContextOf(envelope), pool: "PAYMENT" as const };
       const agencyId = context.agencyId;
       const orderId = request.path["orderId"]!;

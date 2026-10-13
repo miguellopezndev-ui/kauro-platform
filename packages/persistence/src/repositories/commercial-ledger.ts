@@ -302,7 +302,7 @@ function holdRecord(r: HoldRow): CommissionHoldRecord {
   );
 }
 
-const OFFSET = `offset_id, seller_id, negative_line_id, against_line_id, amount_cents, agreement_id, ${canonical("recorded_at")}`;
+const OFFSET = `offset_id, seller_id, negative_line_id, against_line_id, amount_cents, agreement_id, ${canonical("recorded_at")}, (SELECT coalesce(sum(r.amount_cents), 0) FROM kauro.commission_offset_releases r WHERE r.offset_id = commission_offsets.offset_id) AS released_cents`;
 interface OffsetRow {
   offset_id: string;
   seller_id: string;
@@ -311,6 +311,7 @@ interface OffsetRow {
   amount_cents: string;
   agreement_id: string;
   recorded_at: string;
+  released_cents: string;
 }
 function offsetRecord(r: OffsetRow): CommissionOffsetRecord {
   return {
@@ -321,6 +322,7 @@ function offsetRecord(r: OffsetRow): CommissionOffsetRecord {
     amountCents: money(r.amount_cents),
     agreementId: r.agreement_id as SellerAgreementId,
     recordedAt: instantOf(r.recorded_at),
+    releasedCents: money(r.released_cents),
   };
 }
 
@@ -482,8 +484,10 @@ export class PgCommissionLedgerRepository implements CommissionLedgerRepository 
   async lockPoolsOfCapture(captureId: CaptureId): Promise<ReadonlyArray<{ readonly pool: CommissionPoolRecord; readonly lines: ReadonlyArray<CommissionLineRecord> }>> {
     const pools = await execute<PoolRow>(this.db, `SELECT ${POOL} FROM kauro.commission_pools WHERE capture_id = $1 ORDER BY pool_id FOR UPDATE`, [captureId]);
     const out: Array<{ pool: CommissionPoolRecord; lines: ReadonlyArray<CommissionLineRecord> }> = [];
+    // G-ORD-1: every line of the capture, row-locked in one call after the pools
+    const all = await execute<{ line_id: string }>(this.db, "SELECT line_id FROM kauro.commission_lines WHERE capture_id = $1", [captureId]);
+    if (all.rows.length > 0) await execute(this.db, "SELECT kauro.commission_lock_line_rows($1::uuid[], 'UPDATE')", [all.rows.map((x) => x.line_id).sort()]);
     for (const row of pools.rows) {
-      await execute(this.db, "SELECT line_id FROM kauro.commission_lines WHERE pool_id = $1 ORDER BY line_id FOR UPDATE", [row.pool_id]);
       out.push({ pool: poolRecord(row), lines: await this.linesOfPool(row.pool_id as CommissionPoolId) });
     }
     return out;
@@ -491,7 +495,7 @@ export class PgCommissionLedgerRepository implements CommissionLedgerRepository 
 
   async fenceLinesOfCapture(captureId: CaptureId): Promise<void> {
     const lines = await execute<{ line_id: string }>(this.db, "SELECT line_id FROM kauro.commission_lines WHERE capture_id = $1 ORDER BY line_id", [captureId]);
-    for (const { line_id } of lines.rows) await execute(this.db, "SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.commission_lines', $1))", [line_id]);
+    if (lines.rows.length > 0) await execute(this.db, "SELECT kauro.commission_lock_line_rows($1::uuid[], 'KEY SHARE', 'EXCLUSIVE')", [lines.rows.map((x) => x.line_id)]);
   }
 
   async applyBasisChange(
@@ -561,8 +565,17 @@ export class PgCommissionLedgerRepository implements CommissionLedgerRepository 
   }
 
   async lockLine(lineId: CommissionLineId): Promise<CommissionLineRecord | null> {
-    const r = await execute<LineRow>(this.db, `SELECT ${LINE} FROM ${LINE_FROM} WHERE l.line_id = $1 FOR UPDATE OF l`, [lineId]);
+    await execute(this.db, "SELECT kauro.commission_lock_line_rows(ARRAY[$1::uuid], 'UPDATE')", [lineId]);
+    const r = await execute<LineRow>(this.db, `SELECT ${LINE} FROM ${LINE_FROM} WHERE l.line_id = $1`, [lineId]);
     return r.rows[0] ? lineRecord(r.rows[0]) : null;
+  }
+
+  async lockLines(lineIds: ReadonlyArray<CommissionLineId>, subject?: "EXCLUSIVE" | "SHARE"): Promise<ReadonlyArray<CommissionLineRecord>> {
+    const ids = [...new Set(lineIds)].sort();
+    if (ids.length === 0) return [];
+    await execute(this.db, "SELECT kauro.commission_lock_line_rows($1::uuid[], 'UPDATE', $2::text)", [ids, subject ?? null]);
+    const r = await execute<LineRow>(this.db, `SELECT ${LINE} FROM ${LINE_FROM} WHERE l.line_id = ANY ($1::uuid[]) ORDER BY l.line_id`, [ids]);
+    return r.rows.map(lineRecord);
   }
 
   async linesOfSeller(sellerId: SellerId): Promise<ReadonlyArray<CommissionLineRecord>> {
@@ -576,7 +589,8 @@ export class PgCommissionLedgerRepository implements CommissionLedgerRepository 
     if (change.state === "HELD" && change.heldReason !== undefined) {
       // the line is HELD only under an OPEN hold of its whole unpaid amount: the one that exists, or the one this edge opens (PAYOUT_FAILED)
       if (change.reviewAt === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "a line held for a reason names the review date of its hold");
-      const locked = await execute<{ version: string; state: string; unpaid: string }>(this.db, `SELECT l.version, l.state, ${UNPAID} AS unpaid FROM kauro.commission_lines l WHERE l.line_id = $1 FOR UPDATE`, [lineId]);
+      await execute(this.db, "SELECT kauro.commission_lock_line_rows(ARRAY[$1::uuid], 'UPDATE')", [lineId]);
+      const locked = await execute<{ version: string; state: string; unpaid: string }>(this.db, `SELECT l.version, l.state, ${UNPAID} AS unpaid FROM kauro.commission_lines l WHERE l.line_id = $1`, [lineId]);
       const row = locked.rows[0];
       if (row === undefined) throw new DomainFailure("NOT_FOUND", "the line is not visible in this context");
       if (int(row.version) !== expectedVersion) return { kind: "STALE", currentVersion: int(row.version), currentState: row.state };
@@ -698,7 +712,7 @@ export class PgCommissionLedgerRepository implements CommissionLedgerRepository 
     return r.rows.map(purchaseRecord);
   }
 
-  async recordOffset(offset: CommissionOffsetRecord): Promise<CommissionOffsetRecord> {
+  async recordOffset(offset: Omit<CommissionOffsetRecord, "releasedCents">): Promise<CommissionOffsetRecord> {
     const r = await execute<OffsetRow>(
       this.db,
       `INSERT INTO kauro.commission_offsets (offset_id, seller_id, negative_line_id, against_line_id, amount_cents, agreement_id, recorded_at, created_at)

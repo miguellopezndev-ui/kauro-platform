@@ -76,6 +76,7 @@ import { PgExecutionDiscovery } from "./execution/discovery.js";
 import { PgAuditReads, type ResolvedDecisionPatch } from "./audit/reads.js";
 import { PgAuditDiscovery } from "./audit/discovery.js";
 import { PgImportStageStore } from "./repositories/import-stages.js";
+import { PgCoreDocumentStore } from "./repositories/core-documents.js";
 import { PgAuditStore } from "./audit/store.js";
 import { PgCommercialSourceReads } from "./source/commercial-reads.js";
 import { PgSourceStore } from "./source/store.js";
@@ -126,6 +127,12 @@ const ISOLATION_SQL: Readonly<Record<IsolationLevel, string>> = Object.freeze({
 const COMMISSION_GROUP_SERVICES: ReadonlySet<string> = new Set(["commission-service", "finance-service"]);
 
 /**
+ * The operations service (package B18, decision B18-OPS-1): a member of the same runtime group, so it needs no pool of its own; migration
+ * 0059 gives that role only what the service does (record an incident, restrict a capability, its own journal). It does not adopt agencies.
+ */
+const OPERATIONS_GROUP_SERVICES: ReadonlySet<string> = new Set(["operations-service"]);
+
+/**
  * SYSTEM runs under the control plane, SERVICE under the payment service (package B09, D-CTX-B1) — or, for the commission and finance
  * services, under the commission service's group (package B10, D10-CTX-1) — and every other context under the request handlers.
  */
@@ -134,7 +141,7 @@ export function runtimeRoleOf(context: ExecutionContext): RuntimeRole {
     case "SYSTEM":
       return "kauro_control";
     case "SERVICE":
-      return COMMISSION_GROUP_SERVICES.has(context.serviceId) ? "kauro_commission" : "kauro_payment";
+      return COMMISSION_GROUP_SERVICES.has(context.serviceId) || OPERATIONS_GROUP_SERVICES.has(context.serviceId) ? "kauro_commission" : "kauro_payment";
     case "TENANT":
     case "OPERATOR":
       // Payments V1: a person-authorized money command of the payment boundary names its pool (the inbound bank credits, the checkout retirement)
@@ -692,7 +699,7 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   readonly requestReads: PgCommerceRequestReads;
   /** The bank-transfer route's tables (migration 0046, lane L-ROUTE), read through bankRoutesOf(uow). */
   readonly bankRoutes: PgBankRoutes;
-  /** The inbound credit, statement and order-state tables (migration 0057, lane PV1-INBOUND), read through bankCreditsOf(uow). */
+  /** The inbound credit, statement and order-state tables (migration 0060, lane PV1-INBOUND), read through bankCreditsOf(uow). */
   readonly bankCredits: PgBankCredits;
   #scopeAgencyId: AgencyId | null = null;
   #financeAgencyId: AgencyId | null = null;
@@ -960,9 +967,12 @@ export class PgAuditUnitOfWork extends PgExecutionUnitOfWork implements AuditUni
   readonly auditDiscovery: PgAuditDiscovery;
   /** B17: the import stages and their receipts (CMD040, CMD041). */
   readonly importStages: PgImportStageStore;
+  /** B05 L3: the stored core documents and plan bindings (migration 0058). */
+  readonly coreDocuments: PgCoreDocumentStore;
 
   constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {
     super(client, context, ids, clock);
+    this.coreDocuments = new PgCoreDocumentStore(client);
     this.audits = new PgAuditStore({ db: client, ids, events: this.events, provenance: () => this.provenance() });
     this.auditDiscovery = new PgAuditDiscovery(client);
     this.importStages = new PgImportStageStore(client);

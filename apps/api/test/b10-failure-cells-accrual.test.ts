@@ -37,10 +37,10 @@ const FACT_INSERT: SqlStep = { label: "fact_insert", match: /INSERT INTO kauro\.
 const HOLD_INSERT: SqlStep = { label: "hold_insert", match: /INSERT INTO kauro\.commission_holds/ };
 const LINE_UPDATE: SqlStep = { label: "line_update", match: /UPDATE kauro\.commission_lines/ };
 const POOLS_LOCK: SqlStep = { label: "pools_lock", match: /FROM kauro\.commission_pools WHERE capture_id = \$1 ORDER BY pool_id FOR UPDATE/ };
-const LINES_LOCK: SqlStep = { label: "lines_lock", match: /FROM kauro\.commission_lines WHERE pool_id = \$1 ORDER BY line_id FOR UPDATE/ };
+const LINES_LOCK: SqlStep = { label: "lines_lock", match: /SELECT kauro\.commission_lock_line_rows\(\$1::uuid\[\], 'UPDATE'\)/ };
 const ADJUSTMENT_INSERT: SqlStep = { label: "adjustment_insert", match: /INSERT INTO kauro\.commission_adjustments/ };
 const AGENCY_LOCK: SqlStep = { label: "agency_lock", match: /pg_advisory_xact_lock\(kauro\.transition_key\('kauro\.agency_commissions'/ };
-const LINE_LOCK = (lineId: string): SqlStep => ({ label: "line_lock", match: /WHERE l\.line_id = \$1 FOR UPDATE OF l/, when: (params) => params[0] === lineId });
+const LINE_LOCK = (lineId: string): SqlStep => ({ label: "line_lock", match: /SELECT kauro\.commission_lock_line_rows\(ARRAY\[\$1::uuid\], 'UPDATE'\)/, when: (params) => params[0] === lineId });
 
 /** An agency whose claims are ACCEPTED, its first purchase confirmed and delivered to COMMISSIONS: converted, accrued, lines ACCRUED_PENDING. */
 async function accrued(label: string, shares: ReadonlyArray<number>): Promise<Converting> {

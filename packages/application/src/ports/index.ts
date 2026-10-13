@@ -55,7 +55,7 @@ export type {
   InterpretPort,
   PlanCompilerPort,
 } from "./core-ports.js";
-export type { CoreDocumentPort, CoreInputReadConfig, CoreInputRef, CoreInputResolver, CorePlanBinding } from "./core-inputs.js";
+export type { CoreDocumentKind, CoreDocumentPort, CoreDocumentStore, CoreInputReadConfig, CoreInputRef, CoreInputResolver, CorePlanBinding } from "./core-inputs.js";
 export type {
   AcceptedGeneration,
   AttemptCapability,

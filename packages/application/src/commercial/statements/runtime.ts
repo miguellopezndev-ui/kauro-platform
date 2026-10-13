@@ -45,7 +45,7 @@ export interface StatementRequestCollaborators extends StatementRecords {
 }
 
 /** Where a service command is held or crashed by a test (only tests bind it), inside its unit of work before COMMIT. */
-export type StatementServiceHold = (command: "CMD051" | "CMD053", point: "BEFORE_COMMIT") => Promise<void>;
+export type StatementServiceHold = (command: "CMD051" | "CMD053", point: "BEFORE_COMMIT" | "LINES_LOCKED" | "SET_DISCOVERED", detail?: { readonly cutoffAt: string }) => Promise<void>;
 
 /** A unit-of-work factory of the commission group (SERVICE contexts of the commission and finance services on kauro_commission). */
 export interface CommissionGroupUnits {

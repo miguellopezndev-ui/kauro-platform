@@ -127,9 +127,14 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0055_bank_kit_fixtures.sql",
     // package B10 lane OFFSET: offsets as claims that yield, the one lock order, noncash settlement (docs/design/B10-OFFSET.md)
     "0056_offset_claims_yield.sql",
-    // Payments V1 PV1-INBOUND: credit and statement-import aggregates, guards, the owner pipeline on the payment pool
-    "0057_bank_inbound.sql",
-    // "0057_seller_credit.sql", (pending)
+    // package B10 lane OFFSET: seller credit as a durable receivable, CREDIT statement items, the source position shrink (docs/design/B10-OFFSET.md; provisional number)
+    "0057_seller_credit.sql",
+    // package B05 L3: the stored core documents and plan bindings (provisional number)
+    "0058_b05_core_documents.sql",
+    // package B16/B18: operations service principal, incidents, restore candidates and recoveries (provisional number)
+    "0059_b16_operations_recovery.sql",
+    // Payments V1 PV1-INBOUND: credit and statement-import aggregates, guards, the owner pipeline on the payment pool (provisional number)
+    "0060_bank_inbound.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

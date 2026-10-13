@@ -45,7 +45,7 @@ import {
 import { execute, instant, int, optionalInstant, optionalText, type Queryable } from "../sql.js";
 import { cents, defined, optionalCents, publishVersion, staleOf, type CommerceWriteContext } from "./commerce-shared.js";
 
-/** The states of an order whose checkout is still open (payment_orders_one_open_per_project), unless its expired bank order released it (0057). */
+/** The states of an order whose checkout is still open (payment_orders_one_open_per_project), unless its expired bank order released it (0060). */
 export const OPEN_ORDER_STATES: ReadonlyArray<PaymentOrderState> = ["INTENT_CREATED", "CREATING", "CREATED", "APPROVED", "CAPTURING", "CAPTURE_UNCERTAIN"];
 /** The states of a live attempt (payment_attempts_one_live_order, payment_attempts_one_live_refund). */
 export const LIVE_ATTEMPT_STATES: ReadonlyArray<PaymentAttemptState> = ["PREPARED", "DISPATCHING", "PROVIDER_PENDING", "UNCERTAIN"];

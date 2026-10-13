@@ -49,6 +49,8 @@ import {
 import {
   EXECUTION_POLICY,
   deliveryManifestHashOf,
+  deliveryRowCountsOf,
+  issuedDeliveryManifestOf,
   type AgencyId,
   type ArtifactReadbackId,
   type ArtifactReadbackRecord,
@@ -803,20 +805,11 @@ export class JobPipeline {
           const copiesNow = await x.deliveryArtifactsOf(pkg.packageVersionId);
           const facts = current === null ? null : await x.readAuthority(current);
           if (current === null || facts === null || facts.captureCompletedAt === null) throw new StepRefused("JOB_NOT_FOUND");
+          // ROWCOUNTS-PRODUCER: the issued RowCounts, from the sealed revision's populations and the bound receipt's counts
+          const counted = deliveryRowCountsOf(await x.deliveryCountFacts(current));
+          if (counted.kind === "REFUSED") throw new CountsRefused(counted.reason);
           const createdAt = await uow.executionDiscovery.serverNow();
-          const deliveryManifestHash = deliveryManifestHashOf({
-            packageId: pkg.packageVersionId,
-            revisionHash: current.revisionHash,
-            planHash: current.planHash,
-            targetContractHash: current.targetContractHash,
-            corePackageHash: current.corePackageHash,
-            validationReceiptHash: current.validationReceiptHash,
-            artifacts: copiesNow.map((c) => ({ role: c.role, objectName: c.objectName, generation: c.generation, sha256: c.sha256, byteLength: c.byteLength })),
-            counts: { artifacts: copiesNow.length },
-            createdAt,
-            expiresAt: this.packageExpiry(createdAt, facts.captureCompletedAt),
-            manifestVersion: "1",
-          });
+          const deliveryManifestHash = deliveryManifestHashOf(issuedDeliveryManifestOf({ packageId: pkg.packageVersionId, subject: current, copies: copiesNow, counts: counted.counts, createdAt, captureCompletedAt: facts.captureCompletedAt }));
           const outcome = await x.publish({ jobId, packageVersionId: pkg.packageVersionId, deliveryManifestHash, anchorId: uow.ids.next() });
           if (outcome.kind === "REFUSED") throw new StepRefused(outcome.reason);
           const after = await x.readAuthority(outcome.job);
@@ -825,6 +818,9 @@ export class JobPipeline {
           return applied("PUBLISHED");
         });
       } catch (e) {
+        const counts = e instanceof CountsRefused ? e.reason : e instanceof Error && e.cause instanceof CountsRefused ? e.cause.reason : null;
+        // no package is issued without its RowCounts: the job fails with the reason and its private package is revoked
+        if (counts !== null) return this.failFor(job.jobId, attempt.attemptId, `DELIVERY_${counts}`, service);
         const stale = e instanceof StaleAuthority ? e.reason : e instanceof Error && e.cause instanceof StaleAuthority ? e.cause.reason : null;
         if (stale === null) throw e;
         const reason = await this.bound(service, agencyId, async (uow) => {
@@ -860,14 +856,13 @@ export class JobPipeline {
     return reason;
   }
 
-  /** PackageManifest.expiresAt: the first package's soft deadline (+ 604,800 s), never past the PAID_ORDINARY hard cap (D8-RET-1). */
-  private packageExpiry(createdAt: UtcInstant, captureCompletedAt: string): UtcInstant {
-    const soft = microsOfInstant(createdAt) + BigInt(EXECUTION_POLICY.paidOrdinarySoftSeconds) * 1_000_000n;
-    const hard = microsOfInstant(captureCompletedAt) + BigInt(EXECUTION_POLICY.paidOrdinaryHardSeconds) * 1_000_000n;
-    const at = soft < hard ? soft : hard;
-    const ms = Number(at / 1000n);
-    const micros = Number(at % 1_000_000n);
-    return `${new Date(ms).toISOString().slice(0, 19)}.${String(micros).padStart(6, "0")}Z`;
+}
+
+/** The publication found no RowCounts it may issue (deliveryRowCountsOf): the unit rolls back and the job fails with the reason. */
+class CountsRefused extends Error {
+  constructor(readonly reason: string) {
+    super(`the publication has no RowCounts to issue: ${reason}`);
+    this.name = "CountsRefused";
   }
 }
 
