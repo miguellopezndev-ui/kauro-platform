@@ -1432,7 +1432,18 @@
       },
       "kauro.refunds": {
         "UPDATE": [
+          "approved_at",
+          "approved_by_user_id",
+          "approved_excess_cents",
+          "approved_service_cents",
+          "approved_tax_cents",
+          "authorization_hash",
+          "authorization_kind",
+          "authorization_policy_id",
+          "authorization_proof_ref",
           "completed_at",
+          "credit_note_required",
+          "effects_hash",
           "evidence_hash",
           "failure_code",
           "provider_refund_id",
@@ -1825,6 +1836,14 @@
       ],
       "using": "(seller_id = kauro.current_seller_id())"
     },
+    "assurance_proofs/assurance_proofs_bank_owner_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": "true"
+    },
     "assurance_proofs/assurance_proofs_self_read": {
       "check": null,
       "command": "SELECT",
@@ -2034,6 +2053,22 @@
         "kauro_payment"
       ],
       "using": "true"
+    },
+    "bank_owner_acts/bank_owner_acts_definer": {
+      "check": "(txid = txid_current())",
+      "command": "ALL",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": "true"
+    },
+    "bank_owner_acts/bank_owner_acts_payment_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "(txid = txid_current())"
     },
     "bank_review_cases/bank_review_cases_service": {
       "check": "true",
@@ -2340,6 +2375,14 @@
         "kauro_app"
       ],
       "using": null
+    },
+    "command_journal/command_journal_bank_owner": {
+      "check": "((actor_kind = 'USER'::text) AND (agency_id IS NULL) AND (operation = ANY (ARRAY['CMD032'::text, 'CMD220'::text, 'CMD221'::text, 'CMD222'::text, 'CMD223'::text, 'CMD224'::text, 'CMD225'::text, 'CMD226'::text, 'CMD227'::text, 'CMD228'::text, 'CMD229'::text])) AND (EXISTS ( SELECT 1\n   FROM kauro.bank_owner_acts a\n  WHERE ((a.txid = txid_current()) AND ((a.user_id)::text = command_journal.actor_id)))))",
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "((actor_kind = 'USER'::text) AND (agency_id IS NULL) AND (operation = ANY (ARRAY['CMD032'::text, 'CMD220'::text, 'CMD221'::text, 'CMD222'::text, 'CMD223'::text, 'CMD224'::text, 'CMD225'::text, 'CMD226'::text, 'CMD227'::text, 'CMD228'::text, 'CMD229'::text])) AND (EXISTS ( SELECT 1\n   FROM kauro.bank_owner_acts a\n  WHERE ((a.txid = txid_current()) AND ((a.user_id)::text = command_journal.actor_id)))))"
     },
     "command_journal/command_journal_commission": {
       "check": "((agency_id IS NULL) AND (actor_kind = 'SERVICE'::text) AND (actor_id = ANY (ARRAY['commission-service'::text, 'finance-service'::text])))",
@@ -3143,6 +3186,14 @@
       ],
       "using": "((agency_id = kauro.current_agency_id()) AND (aggregate_kind = ANY (ARRAY['quote'::text, 'payment_order'::text, 'payment_attempt'::text, 'capture'::text, 'commercial_authorization'::text, 'refund'::text, 'tax_document'::text, 'reconciliation_case'::text])))"
     },
+    "domain_events/domain_events_payment_treasury": {
+      "check": "((agency_id IS NULL) AND (aggregate_kind = 'treasury_refund'::text) AND (split_part(event_type, '.'::text, 1) = 'treasury_refund'::text))",
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "((agency_id IS NULL) AND (aggregate_kind = 'treasury_refund'::text))"
+    },
     "domain_events/domain_events_tenant": {
       "check": "(agency_id = kauro.current_agency_id())",
       "command": "ALL",
@@ -3378,6 +3429,14 @@
         "kauro_app"
       ],
       "using": "((kauro.current_agency_id() IS NOT NULL) AND ((NOT held) OR (live_agency_id = kauro.current_agency_id())))"
+    },
+    "identities/identities_bank_owner_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": "true"
     },
     "identities/identities_owner_reads_sellers": {
       "check": null,
@@ -3891,6 +3950,14 @@
         "kauro_payment"
       ],
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id = kauro.current_agency_id()))))"
+    },
+    "outbox_records/outbox_records_payment_treasury": {
+      "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'treasury_refund'::text))))",
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'treasury_refund'::text))))"
     },
     "outbox_records/outbox_records_tenant": {
       "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id = kauro.current_agency_id()))))",
@@ -4758,6 +4825,14 @@
         "kauro_payment"
       ],
       "using": "((agency_id = kauro.current_agency_id()) AND (state <> ALL (ARRAY['REQUESTED'::text, 'REJECTED'::text])))"
+    },
+    "refunds/refunds_payment_owner_approval": {
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = 'APPROVED'::text))",
+      "command": "UPDATE",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "((agency_id = kauro.current_agency_id()) AND (state = 'REQUESTED'::text))"
     },
     "refunds/refunds_payment_read": {
       "check": null,
@@ -5760,6 +5835,14 @@
       ],
       "using": "(seller_id = kauro.current_seller_id())"
     },
+    "treasury_refunds/treasury_refunds_owner_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()"
+    },
     "treasury_refunds/treasury_refunds_service": {
       "check": "true",
       "command": "ALL",
@@ -6410,6 +6493,9 @@
         "INSERT",
         "SELECT"
       ],
+      "kauro.treasury_refunds": [
+        "SELECT"
+      ],
       "kauro.upload_capacity": [
         "SELECT"
       ],
@@ -6887,6 +6973,9 @@
         "UPDATE"
       ],
       "kauro.bank_machine_edges": [
+        "SELECT"
+      ],
+      "kauro.bank_owner_acts": [
         "SELECT"
       ],
       "kauro.bank_review_cases": [
