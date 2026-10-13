@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import { registryJson } from "@kauro/contracts";
-import { AGGREGATE_KINDS, SOURCE_LIFECYCLE_STATE_MACHINES, sealedSubjectHashOf, sourceRevisionManifestHashOf, type SealedSubjectDocument, type SourceRevisionManifest } from "@kauro/domain";
+import { AGGREGATE_KINDS, BANK_CREDIT_AGGREGATE_KINDS, SOURCE_LIFECYCLE_STATE_MACHINES, sealedSubjectHashOf, sourceRevisionManifestHashOf, type SealedSubjectDocument, type SourceRevisionManifest } from "@kauro/domain";
 import {
   admitSourceFile,
   appendFixtureEvent,
@@ -537,12 +537,35 @@ test("UploadSession, StoredObject, SourceFile and RetentionRecord are seeded exa
   const t = await tenant("kinds");
   const eventOf = (kind: string) =>
     tx(app, as(t), (c) => event(c, { aggregateKind: kind, aggregateId: ids.next(), aggregateVersion: 1, agencyId: t.ag.agencyId, eventType: "project.created.v1", actorUserId: t.ag.ownerUserId }));
+  // the payment service's agency-less kinds (0055/0062) live in tables the request handler holds no grant on (D-CTX-B1): kauro_app is
+  // refused them outright, and they bind for the payment service, the one role that writes their events, as an agency-less aggregate
+  const paymentOnly = new Set<string>(BANK_CREDIT_AGGREGATE_KINDS);
   for (const kind of AGGREGATE_KINDS) {
     await assert.rejects(eventOf(kind), (e: unknown) => {
+      if (paymentOnly.has(kind)) {
+        assert.equal(code(e), "42501", String(e));
+        return true;
+      }
       assert.equal(code(e), "KA006", String(e));
       assert.match((e as Error).message, /is not an aggregate of agency/, kind);
       return true;
     });
+  }
+  const payment = await pg.connect("kauro_payment_test");
+  try {
+    for (const kind of BANK_CREDIT_AGGREGATE_KINDS) {
+      const eventType = kind === "bank_credit" ? "bank_credit.drafted.v1" : "statement_import.recorded.v1";
+      await assert.rejects(
+        tx(payment, {}, (c) => event(c, { aggregateKind: kind, aggregateId: ids.next(), aggregateVersion: 1, agencyId: null, eventType, actorUserId: null })),
+        (e: unknown) => {
+          assert.equal(code(e), "KA006", String(e));
+          assert.match((e as Error).message, /is not an aggregate of agency/, kind);
+          return true;
+        },
+      );
+    }
+  } finally {
+    await payment.end();
   }
   // a kind no package on this tree registers (package B09 registers quote since the B07+B09 merge)
   await assert.rejects(eventOf("job"), (e: unknown) => {
