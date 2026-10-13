@@ -2352,6 +2352,14 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
+    "capture_facts/capture_facts_route_available_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": "true"
+    },
     "capture_facts/capture_facts_tenant_read": {
       "check": null,
       "command": "SELECT",
@@ -3231,8 +3239,8 @@
       "roles": [
         "kauro_payment"
       ],
-      "using": "((agency_id IS NULL) AND (aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text])))",
-      "check": "((agency_id IS NULL) AND (aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text])) AND (split_part(event_type, '.'::text, 1) = aggregate_kind))"
+      "using": "((agency_id IS NULL) AND (aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text, 'settlement'::text])))",
+      "check": "((agency_id IS NULL) AND (aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text, 'settlement'::text])) AND (split_part(event_type, '.'::text, 1) = aggregate_kind))"
     },
     "domain_events/domain_events_payment_bank_order": {
       "command": "ALL",
@@ -3766,6 +3774,14 @@
       ],
       "using": "(((agency_id IS NOT NULL) AND (agency_id = kauro.current_agency_id())) OR ((agency_id IS NULL) AND (kauro.current_agency_id() IS NULL)))"
     },
+    "ledger_entries/ledger_entries_route_available_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": "(account_code = 'PSP_AVAILABLE'::text)"
+    },
     "membership_invitations/membership_invitations_invitee_read": {
       "check": null,
       "command": "SELECT",
@@ -4012,8 +4028,8 @@
       "roles": [
         "kauro_payment"
       ],
-      "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text])))))",
-      "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text])))))"
+      "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text, 'settlement'::text])))))",
+      "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text, 'settlement'::text])))))"
     },
     "outbox_records/outbox_records_tenant": {
       "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id = kauro.current_agency_id()))))",
@@ -4158,6 +4174,14 @@
         "kauro_payment"
       ],
       "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "payment_orders/payment_orders_route_available_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": "true"
     },
     "payment_orders/payment_orders_tenant_claim": {
       "check": "((agency_id = kauro.current_agency_id()) AND (state = ANY (ARRAY['CREATING'::text, 'CAPTURING'::text])))",
@@ -4793,6 +4817,14 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
+    "reconciliation_cases/reconciliation_cases_route_available_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": "true"
+    },
     "reconciliation_cases/reconciliation_cases_tenant_read": {
       "check": null,
       "command": "SELECT",
@@ -4897,6 +4929,14 @@
         "kauro_payment"
       ],
       "using": null
+    },
+    "refunds/refunds_route_available_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": "true"
     },
     "refunds/refunds_tenant_read": {
       "check": null,
@@ -5552,6 +5592,14 @@
       "command": "ALL",
       "roles": [
         "kauro_payment"
+      ],
+      "using": "true"
+    },
+    "settlements/settlements_route_available_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_owner"
       ],
       "using": "true"
     },

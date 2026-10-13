@@ -15,7 +15,8 @@ export const BANK_CREDIT_RAILS = ["ACH", "DOMESTIC_WIRE", "OTHER", "UNKNOWN"] as
 export type BankCreditRail = (typeof BANK_CREDIT_RAILS)[number];
 
 /** The credit and statement import are agency-less aggregates (platform scope); an order's bank state change is the agency's. */
-export const BANK_CREDIT_AGGREGATE_KINDS = ["bank_credit", "statement_import"] as const;
+// `settlement`: the settlement observation of the route account (0017 kauro.settlements; an aggregate of its own from 0062, lane PV1-SETTLE)
+export const BANK_CREDIT_AGGREGATE_KINDS = ["bank_credit", "statement_import", "settlement"] as const;
 export const BANK_CREDIT_EVENT_TYPES = [
   "bank_credit.drafted.v1",
   "bank_credit.received.v1",
@@ -24,6 +25,7 @@ export const BANK_CREDIT_EVENT_TYPES = [
   "bank_credit.applied.v1",
   "statement_import.recorded.v1",
   "bank_transfer_instruction.order_state_changed.v1",
+  "settlement.recorded.v1",
 ] as const;
 export type BankCreditEventType = (typeof BANK_CREDIT_EVENT_TYPES)[number];
 
@@ -36,6 +38,7 @@ export const BANK_CREDIT_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<BankCreditEven
   "bank_credit.applied.v1": ["creditId", "orderId", "captureId", "state", "previousState"],
   "statement_import.recorded.v1": ["importId", "evidenceHash", "lines", "newLines"],
   "bank_transfer_instruction.order_state_changed.v1": ["orderId", "agencyId", "previousState", "orderState", "cause"],
+  "settlement.recorded.v1": ["settlementId", "withdrawnCents", "feeCents", "receivedCents", "bankEvidence"],
 });
 
 /** The payment service learns of a received and a matched credit; the owner (NOTIFICATIONS) of every credit, import and order-state change. */

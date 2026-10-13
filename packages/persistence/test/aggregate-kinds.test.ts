@@ -81,6 +81,7 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   // Payments V1 inbound credits (0061, lane PV1-INBOUND)
   bank_credit: ["bank_credits", "bank_credit_id"],
   statement_import: ["statement_imports", "import_id"],
+  settlement: ["settlements", "settlement_id"],
 });
 
 // every runtime login of this branch: B06 five, package B09's payment service and package B10's commission service
