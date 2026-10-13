@@ -95,6 +95,10 @@ export interface BankCreditRepository {
   expireOrder(orderId: string, expectedVersion: number, cause: "DEADLINE" | "RETIRED"): Promise<BankTransferInstructionRecord>;
   /** Releases the project's open checkout of an order whose bank state is EXPIRED (set once). */
   releaseBankSlot(orderId: string): Promise<void>;
+  /** CMD214: the order's recorded retirement, if any (D-INB-CTX-2). */
+  retirementOf(orderId: string): Promise<{ readonly orderId: string; readonly requestedAt: UtcInstant; readonly consumedAt: UtcInstant | null } | null>;
+  /** CMD214: records the member's retirement (the database stamps its instant); the caller holds the order's lock. */
+  recordRetirement(r: { readonly orderId: string; readonly agencyId: string; readonly requestedBy: string; readonly reasonCode: string }): Promise<{ readonly orderId: string; readonly requestedAt: UtcInstant }>;
   environmentsOfAccount(accountRef: string): Promise<ReadonlyArray<"SANDBOX" | "LIVE">>;
   openCreditCase(caseId: string, kind: "MATCH_REVIEW" | "PROVIDER_TIME_UNVERIFIED", credit: Pick<BankCreditRecord, "creditId" | "environment" | "accountRef" | "evidenceHash">, detailCode: string): Promise<boolean>;
   resolveCreditCases(creditId: string): Promise<number>;

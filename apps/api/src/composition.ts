@@ -26,7 +26,7 @@ import type { AssuranceVerifier, AuditReadRuntime, AuditRuntime, B06Collaborator
 import { SESSION_POLICY_VERSION, UnrecordedBuyerTypeReader, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createCapabilityCommandHandlers, createOperationsCommandHandlers, createQuoteHandlers, createStatementRequestHandlers, problemOf, recordOperatorDenial } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { UtcInstant } from "@kauro/contracts";
-import type { AuditUnitOfWorkFactory, Clock, CommerceUnitOfWorkFactory, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
+import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
 import { COMMERCE_POLICY_VERSION, DomainFailure, createIdGenerator, toUtcInstant } from "@kauro/domain";
 import type { ApplyResult, KauroPool, LedgerEntry, PoolErrorSink } from "@kauro/persistence";
 import { bankRoutesOf, bankCreditsOf, sessionFenceOf, effectInstantOf, PgCapabilityPublication, PgInquiryStore, PgWebSessionStore, agencyLifecycleOf, capabilityGovernanceOf, operationsOf, agencyOrderPrecedesClaim, applyMigrationsAs, classifyError, compareSchema, createPool, type DatabaseEnvironment, attributionOf, commercialPrincipalsOf, listMigrations, readSchemaLedger, salesOf, createCommercialUnitOfWorkFactory, quoteReadsOf, recurrenceOf, ledgerOf, statementsOf } from "@kauro/persistence";
@@ -334,13 +334,6 @@ export interface ApiAssembly {
  * the request side of the payments workflow (CMD028, CMD029, CMD031, CMD032 and the four B09 reads), the agency lifecycle of package B10
  * (CMD002, CMD043), the payment service's routes (CMD030, CMD033, CMD034) and the HTTP server over an open unit-of-work factory.
  */
-/** The inbound bank commands before a payment runtime is bound: every unit is refused as unavailable (the owner commands run on the payment pool). */
-const unavailableUnitOfWork = {
-  run: async () => {
-    throw new DomainFailure("CAPACITY_UNAVAILABLE", "the payment service's pool is not bound", { reason: "EVIDENCE_UNAVAILABLE" }, true);
-  },
-} as unknown as CommerceUnitOfWorkFactory;
-
 export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const clock = assembly.clock ?? systemClock;
   const ids = assembly.ids ?? createIdGenerator(clock, systemRandom);
@@ -414,9 +407,8 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   };
   const commerceCollaborators: CommerceRequestCollaborators = { ...commerceEdition(), ...paymentService, bank, ...assembly.commerce };
   const bankRoutes = createBankRouteHandlers(commerceRuntime, bank);
-  // the owner's inbound credit commands run on the payment service's pool (migration 0062); without a payment runtime they are unavailable
-  const inboundRuntime: CommerceRequestRuntime = { ...commerceRuntime, unitOfWork: assembly.payments === undefined ? unavailableUnitOfWork : assembly.payments.runtime.assembly.commerce };
-  const bankInbound = createBankInboundHandlers(inboundRuntime, bank);
+  // the owner's inbound credit commands and CMD214's record run on the request pool (kauro_app, D-ACH-16, D-INB-CTX-1/2)
+  const bankInbound = createBankInboundHandlers(commerceRuntime, bank);
   const commerce = createCommerceRequestHandlers(commerceRuntime, commerceCollaborators);
   // package B10: the agency lifecycle (CMD002, CMD043) on the same runtime, over the lifecycle adapter of the persistence package, B06's
   // active-work inspector and the step-up verifier
