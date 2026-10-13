@@ -214,3 +214,11 @@ CREATE POLICY security_events_payment_member ON kauro.security_events FOR INSERT
       WHERE m.agency_id = security_events.agency_id AND m.user_id = kauro.current_user_id() AND m.state IN ('INVITED', 'ACTIVE', 'SUSPENDED')
     )
   );
+
+-- --- SEC-DEPTH R17: no trigger function of this migration is executable by PUBLIC (a trigger runs it with the writer's rights; nobody
+-- calls it directly), as 0061 does for its own
+REVOKE EXECUTE ON FUNCTION kauro.bank_transfer_instructions_expiry_cause() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.bank_credits_guard() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.bank_credits_confirmed_at() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.assurance_proofs_guard() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.payment_orders_bank_slot_guard() FROM PUBLIC;
