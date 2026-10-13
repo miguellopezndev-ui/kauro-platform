@@ -143,6 +143,7 @@ test("M24 OK child store: under the real child preload the platform AttemptScrat
       callDir: real,
       quotaBytes: 1 << 20,
       heapMegabytes: 256,
+      signal: AbortSignal.timeout(60_000),
     });
     assert.ok(res.outcome?.ok, JSON.stringify(res.outcome));
     const v = (res.outcome as { value: { mid: Record<string, number>; end: Record<string, number> } }).value;
@@ -172,6 +173,7 @@ test("M15b OK isolation probe: inside the real child the environment is empty, a
       callDir: real,
       quotaBytes: 1 << 20,
       heapMegabytes: 256,
+      signal: AbortSignal.timeout(60_000),
     });
     assert.ok(res.outcome?.ok, JSON.stringify(res.outcome));
     const v = (res.outcome as { value: Record<string, unknown> }).value;
@@ -181,7 +183,7 @@ test("M15b OK isolation probe: inside the real child the environment is empty, a
     if (process.platform !== "win32") assert.deepEqual(env, []);
     assert.notEqual(v["outside"], "WRITTEN");
     assert.equal(v["promises"], "OUTSIDE_CAPABILITY");
-    assert.notEqual(v["network"], "CONNECTED");
+    assert.equal(v["network"], "KAURO_NETWORK_REFUSED", "the network is refused at once by the sandbox: neither connected nor left pending");
     assert.throws(() => statSync(outside));
   } finally {
     t.dispose();

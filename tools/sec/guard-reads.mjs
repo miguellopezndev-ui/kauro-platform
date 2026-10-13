@@ -199,11 +199,13 @@ function section(doc, heading) {
   return next < 0 ? doc.slice(start) : doc.slice(start, start + heading.length + next);
 }
 
-// 3c: "- planned `name` BEFORE INSERT OR UPDATE ON `table` in 0046 (columns: `a` `b`)"
+// 3c: "- planned `name` BEFORE INSERT OR UPDATE ON `table` in sec_depth_l2a_admission (columns: `a` `b`)". The migration is named by
+// its slug (the file NNNN_<slug>.sql), never by number: a number shifts whenever another migration lands first (incident
+// PLANNED-MIGRATION-SHIFT, four times on 2026-10-13), a slug does not.
 export function plannedTriggers(doc) {
   const out = [];
   for (const line of section(doc, "### 3c").split("\n")) {
-    const m = /^- planned `(\w+)` ((?:BEFORE|AFTER) [A-Z ,_a-z]+?) ON `(\w+)` in (\d{4})(?: \(columns: ([^)]*)\))?/.exec(line);
+    const m = /^- planned `(\w+)` ((?:BEFORE|AFTER) [A-Z ,_a-z]+?) ON `(\w+)` in (\w+)(?: \(columns: ([^)]*)\))?/.exec(line);
     if (!m) continue;
     const ev = parseEvents(m[2].trim());
     const columns = new Set([...(m[5] ?? "").matchAll(/`([a-z_][a-z0-9_]*|[*])`/g)].map((x) => x[1]));
@@ -302,6 +304,7 @@ export function resolveTrigger(db, planned, table, name, migrationsPresent) {
   const sql = db.triggers.get(`${table}.${name}`);
   const p = planned.find((x) => x.name === name && x.table === table);
   // a planned (re)definition stands for the trigger until its migration exists; from then on the SQL must carry it
+  if (p && /^\d+$/u.test(p.migration)) return { error: `planned trigger ${name} on ${table} names its migration by number (${p.migration}): name it by slug (NNNN_<slug>.sql), a number shifts when another migration lands first` };
   if (p && !migrationsPresent.has(p.migration)) return { trig: p };
   if (sql) return { trig: sql };
   if (!p) return { error: `trigger ${name} does not exist on ${table} (neither in the migrations nor planned in 3c)` };
@@ -352,7 +355,7 @@ export function firesOnUpdateOf(trig, col) {
 export function problems(inv, doc, db) {
   const { tables, residual } = sectionLines(doc);
   const planned = plannedTriggers(doc);
-  const migrationsPresent = new Set(db.files.map((f) => f.slice(0, 4)));
+  const migrationsPresent = new Set(db.files.map((f) => f.replace(/^\d{4}_/u, "").replace(/\.sql$/u, "")));
   const readsByFn = readsOfFunctions(db);
   const out = [];
   for (const [t, cols] of Object.entries(inv.tables)) {
