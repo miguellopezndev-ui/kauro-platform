@@ -242,7 +242,7 @@ test("the labelled Intelligence-core fake plans a complete candidate manifest, a
   const journal = testJournal();
   const auditAttemptId = v7(20);
 
-  const manifest = await core.planCandidates({ revisionHash: sha("revision-1"), sourceProfileHash: sha("profile-1"), targetContractHash: sha("target-1") });
+  const manifest = await core.planCandidates({ agencyId: AGENCY, revisionHash: sha("revision-1"), sourceProfileHash: sha("profile-1"), targetContractHash: sha("target-1") });
   assert.equal(manifest.evidenceClass, "SIMULATED");
   const document = manifest.document as { readonly complete: boolean; readonly candidates: readonly unknown[] };
   assert.equal(document.complete, true);
@@ -251,6 +251,8 @@ test("the labelled Intelligence-core fake plans a complete candidate manifest, a
   const requestOf = (): InterpretRequest => ({
     auditAttemptId,
     agencyId: AGENCY,
+    projectId: PROJECT,
+    revisionId: v7(3),
     candidateManifest: manifest,
     journal,
     fundedCeilingCents: 150,
@@ -278,17 +280,17 @@ test("the labelled Intelligence-core fake plans a complete candidate manifest, a
   assert.equal(eventsAfterReplay.length, events.length, "a replay of a stored response appends nothing new to the journal");
 
   // A different candidate set is a new dispatch, scripted to the next queued outcome.
-  const secondManifest = await core.planCandidates({ revisionHash: sha("revision-2"), sourceProfileHash: sha("profile-2"), targetContractHash: null });
+  const secondManifest = await core.planCandidates({ agencyId: AGENCY, revisionHash: sha("revision-2"), sourceProfileHash: sha("profile-2"), targetContractHash: null });
   const second = await core.interpret({ ...requestOf(), candidateManifest: secondManifest });
   assert.equal(second.outcome, "NEEDS_DECISION");
   assert.ok(second.candidateDecisions !== null);
 
-  const thirdManifest = await core.planCandidates({ revisionHash: sha("revision-3"), sourceProfileHash: sha("profile-3"), targetContractHash: null });
+  const thirdManifest = await core.planCandidates({ agencyId: AGENCY, revisionHash: sha("revision-3"), sourceProfileHash: sha("profile-3"), targetContractHash: null });
   const third = await core.interpret({ ...requestOf(), candidateManifest: thirdManifest });
   assert.equal(third.outcome, "UNSUPPORTED");
   assert.equal(third.candidateDecisions, null);
 
-  const fourthManifest = await core.planCandidates({ revisionHash: sha("revision-4"), sourceProfileHash: sha("profile-4"), targetContractHash: null });
+  const fourthManifest = await core.planCandidates({ agencyId: AGENCY, revisionHash: sha("revision-4"), sourceProfileHash: sha("profile-4"), targetContractHash: null });
   const fourth = await core.interpret({ ...requestOf(), candidateManifest: fourthManifest });
   assert.equal(fourth.outcome, "FAILED");
   assert.equal(fourth.candidateDecisions, null);
@@ -306,7 +308,7 @@ test("the labelled Intelligence-core fake plans a complete candidate manifest, a
   assert.ok(reservationsAfterFirst >= 1);
 
   // With no room under the funded ceiling, interpret answers FAILED and reserves nothing (never dispatches without room).
-  const fifthManifest = await core.planCandidates({ revisionHash: sha("revision-5"), sourceProfileHash: sha("profile-5"), targetContractHash: null });
+  const fifthManifest = await core.planCandidates({ agencyId: AGENCY, revisionHash: sha("revision-5"), sourceProfileHash: sha("profile-5"), targetContractHash: null });
   const beforeStarved = await journal.read(auditAttemptId);
   const starved = await core.interpret({ ...requestOf(), candidateManifest: fifthManifest, fundedCeilingCents: 1 });
   assert.equal(starved.outcome, "FAILED");

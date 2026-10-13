@@ -44,6 +44,7 @@ import {
   type InterpretResult,
   type ObjectStoragePort,
   type OutboxConsumer,
+  type CoreDocumentStore,
   type PlanCompilerPort,
   type ProfilePort,
   type ProfileResult,
@@ -91,6 +92,8 @@ export interface AuditOrchestrationDependencies extends AuditWorkDependencies {
   readonly profile: ProfilePort;
   readonly interpret: InterpretPort;
   readonly compiler: PlanCompilerPort;
+  /** The stored core documents (D5-14): the PROFILE step stores the profile the interpretation later reads by its hash; absent, the intelligence adapter fails PROFILE_EVIDENCE_MISSING. */
+  readonly documents?: CoreDocumentStore;
   /** The validator's call and the receipt's recording (receipts.ts). */
   readonly validator: PlanValidator;
   readonly limits: ExecutionLimits;
@@ -261,7 +264,8 @@ export class AuditOrchestration implements OutboxConsumer {
     if (profiled.outcome === "REJECTED") return failed("SOURCE_PROFILE_REJECTED", profiled.evidenceClass);
     const profileHash = profiled.profileHash;
     if (profiled.outcome !== "PROFILED" || !isSha256Hex(profileHash)) return failed("PROFILE_ANSWER_MALFORMED", profiled.evidenceClass);
-    const manifest = await this.deps.interpret.planCandidates({ revisionHash: audit.revisionHash, sourceProfileHash: profileHash, targetContractHash: audit.targetContractHash });
+    if (this.deps.documents !== undefined) await this.deps.documents.putDocument(audit.agencyId, "SOURCE_PROFILE", profileHash, profiled.profileDocument);
+    const manifest = await this.deps.interpret.planCandidates({ agencyId: audit.agencyId, revisionHash: audit.revisionHash, sourceProfileHash: profileHash, targetContractHash: audit.targetContractHash });
     if (!isSha256Hex(manifest.candidateSetHash)) return failed("CANDIDATE_MANIFEST_MALFORMED", manifest.evidenceClass);
     return {
       outcome: "COMPLETED",
@@ -280,7 +284,7 @@ export class AuditOrchestration implements OutboxConsumer {
       return failed("PROFILE_EVIDENCE_MISSING", "EXECUTED_LOCAL");
     }
     // the manifest re-derived with no dispatch and no spend, and bound to the one the PROFILE step recorded (D8-CAU-5)
-    const manifest: CandidateManifest = await this.deps.interpret.planCandidates({ revisionHash: audit.revisionHash, sourceProfileHash: audit.profileEvidenceHash, targetContractHash: audit.targetContractHash });
+    const manifest: CandidateManifest = await this.deps.interpret.planCandidates({ agencyId: audit.agencyId, revisionHash: audit.revisionHash, sourceProfileHash: audit.profileEvidenceHash, targetContractHash: audit.targetContractHash });
     if (manifest.candidateSetHash !== audit.candidateManifestHash) return failed("CANDIDATE_MANIFEST_CHANGED", manifest.evidenceClass);
     // the platform's fenced journal of the audit's run: every append by this step at its fence, each call a unit of its own
     const context = boundSystem(SERVICE, audit.agencyId, this.deps.ids.next() as never);
@@ -289,6 +293,8 @@ export class AuditOrchestration implements OutboxConsumer {
     const result: InterpretResult = await this.deps.interpret.interpret({
       auditAttemptId: audit.auditId,
       agencyId: audit.agencyId,
+      projectId: audit.projectId,
+      revisionId: audit.revisionId,
       candidateManifest: manifest,
       journal,
       fundedCeilingCents: room > 0n ? Number(room) : 0,

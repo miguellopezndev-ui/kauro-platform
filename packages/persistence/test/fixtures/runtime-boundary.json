@@ -823,6 +823,22 @@
           "version"
         ]
       },
+      "kauro.core_documents": {
+        "INSERT": [
+          "agency_id",
+          "doc_hash",
+          "document",
+          "kind"
+        ]
+      },
+      "kauro.core_plan_bindings": {
+        "INSERT": [
+          "agency_id",
+          "config_document",
+          "core_config_hash",
+          "plan_hash"
+        ]
+      },
       "kauro.cost_grants": {
         "INSERT": [
           "ceiling_cents",
@@ -1173,6 +1189,7 @@
           "agency_id",
           "artifact_evidence_hash",
           "core_package_hash",
+          "counts",
           "disposition_evidence_hash",
           "plan_hash",
           "plan_id",
@@ -2758,6 +2775,38 @@
         "kauro_app"
       ],
       "using": "kauro.acting_corporate_owner()"
+    },
+    "core_documents/core_documents_control_put": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": null,
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "core_documents/core_documents_control_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))",
+      "check": null
+    },
+    "core_plan_bindings/core_plan_bindings_control_put": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": null,
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "core_plan_bindings/core_plan_bindings_control_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))",
+      "check": null
     },
     "corporate_roles/corporate_roles_control": {
       "check": "true",
@@ -6370,6 +6419,12 @@
         "SELECT"
       ],
       "kauro.commercial_authorizations": [
+        "SELECT"
+      ],
+      "kauro.core_documents": [
+        "SELECT"
+      ],
+      "kauro.core_plan_bindings": [
         "SELECT"
       ],
       "kauro.corporate_roles": [

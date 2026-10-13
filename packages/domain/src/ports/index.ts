@@ -219,3 +219,5 @@ export type {
 export type { AuditRef, GrantRef, AuditSource, DraftValidation, ValidationSubject, GrantScope, GrantUsage, AuditDiscovery } from "./audit-discovery.js";
 // import stages and their receipts (package B17: CMD040, CMD041)
 export type { ImportStageStore } from "./import-stage-store.js";
+// the stored core documents and plan bindings (package B05 L3, migration 0058)
+export type { CoreDocumentRepository, CoreDocumentKindName, CorePlanBindingRecord } from "./core-document-store.js";
