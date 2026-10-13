@@ -183,7 +183,7 @@ test("M15b OK isolation probe: inside the real child the environment is empty, a
     if (process.platform !== "win32") assert.deepEqual(env, []);
     assert.notEqual(v["outside"], "WRITTEN");
     assert.equal(v["promises"], "OUTSIDE_CAPABILITY");
-    assert.notEqual(v["network"], "CONNECTED");
+    assert.equal(v["network"], "KAURO_NETWORK_REFUSED", "the network is refused at once by the sandbox: neither connected nor left pending");
     assert.throws(() => statSync(outside));
   } finally {
     t.dispose();

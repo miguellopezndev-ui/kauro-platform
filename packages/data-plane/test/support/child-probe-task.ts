@@ -40,7 +40,7 @@ export async function run(payload: { mode: "store" | "probe"; root: string; atte
         const socket = net.connect({ host: "127.0.0.1", port: 9 });
         const timer = setTimeout(() => {
           socket.destroy();
-          reject(Object.assign(new Error("probe connect deadline"), { code: "PROBE_TIMEOUT" }));
+          reject(Object.assign(new Error("probe connect deadline"), { code: "PENDING" }));
         }, 3000);
         socket.on("connect", () => {
           clearTimeout(timer);
