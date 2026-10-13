@@ -137,6 +137,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0060_runtime_hardening.sql",
     // package B05 L3m: the durable send and the settlement of a model dispatch, dispatch liabilities, the pool's liability gate (provisional number)
     "0061_b05_dispatch_settlement.sql",
+    // package B05 L3t: the audit's and the grant's authority deadlines judged at COMMIT (provisional number)
+    "0062_audit_clock_at_commit.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
