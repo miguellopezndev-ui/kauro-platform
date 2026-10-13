@@ -16,7 +16,7 @@
  * Sec-Fetch-Site and CSRF rule; typed credential refusals; none: the anonymous denial, AUTHENTICATION_REQUIRED). Every reply carries Cache-Control: no-store (the server's hook);
  * the instructions never carry an ETag.
  */
-import type { BankInboundHandlers, BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest } from "@kauro/application";
+import type { BankInboundHandlers, BankSettlementHandlers, BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest } from "@kauro/application";
 import { HEADERS, OPERATIONAL_ROUTES, admitEmptyRequest, admitHeaders, admitOperationalBody, operationalRouteResponses, problemOf, readTransferInstructions, repeatedHeaderNames, type CommerceRequestRuntime } from "@kauro/application";
 import type { AgencyId, Clock, CorrelationId, Environment } from "@kauro/domain";
 import { DomainFailure, IDEMPOTENCY_KEY, isUuid } from "@kauro/domain";
@@ -27,6 +27,8 @@ export interface BankRouteRouteDependencies {
   readonly handlers: BankRouteHandlers;
   /** The owner's inbound credit commands (lane PV1-INBOUND). */
   readonly inbound?: BankInboundHandlers;
+  /** The owner's settlement observation (lane PV1-SETTLE, CMD215). */
+  readonly settlement?: BankSettlementHandlers;
   readonly runtime: CommerceRequestRuntime;
   readonly bank: BankRouteCollaborators | null;
   readonly validator: SchemaValidator;
@@ -133,6 +135,8 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     command("importBankStatement", "CMD213", (req) => inbound.importStatement(req as never));
     command("retireBankCheckout", "CMD214", (req) => inbound.retire(req as never), true);
   }
+  const settlement = deps.settlement;
+  if (settlement !== undefined) command("recordBankSettlement", "CMD215", (req) => settlement.record(req as never));
 
   function read(operationId: string, run: (request: FastifyRequest<{ Params: Record<string, string> }>, correlationId: CorrelationId, path: Readonly<Record<string, string>>, headers: Readonly<Record<string, string | undefined>>) => Promise<FastifyReplyAnswer>): void {
     const route = routeOf(operationId);

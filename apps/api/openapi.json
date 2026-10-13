@@ -6694,6 +6694,67 @@
         }
       }
     },
+    "/api/v1/operations/bank-accounts/{accountRef}/settlements": {
+      "post": {
+        "operationId": "recordBankSettlement",
+        "summary": "Record a settlement observation from the provider's settlement record and, when the money arrived, the receiving bank's receipt (no typed figure)",
+        "description": "Authority: ACH-ROUTE r12 §7.25 (ST1, ST2), R2-085, PV1-SETTLE D-SET-1; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/recordBankSettlementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The settlement observation (COMPLETED envelope; an identical replay answers the journaled reply). Bank-available money only with a receipt.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/recordBankSettlementResponse201"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/operations/bank-accounts/{accountRef}/statement-imports": {
       "post": {
         "operationId": "importBankStatement",
@@ -37523,6 +37584,10 @@
               "STATEMENT_ALREADY_IMPORTED",
               "PROVIDER_INCONSISTENCY",
               "ATTRIBUTION_NOT_OVERRIDABLE",
+              "CURRENCY_MISMATCH",
+              "RECEIPT_MISMATCH",
+              "SETTLEMENT_INCONSISTENT",
+              "WITHDRAWAL_ALREADY_SETTLED",
               "EXECUTION_FENCED",
               "EXECUTION_AUTHORITY_LOST",
               "CAPACITY_LEDGER",
@@ -44161,6 +44226,169 @@
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:response:op:openSession:201"
+      },
+      "recordBankSettlementRequest": {
+        "title": "recordBankSettlement request",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifactRef",
+          "evidenceHash",
+          "receipt",
+          "authorizationRef"
+        ],
+        "properties": {
+          "artifactRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "evidenceHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "receipt": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "required": [
+              "artifactRef",
+              "evidenceHash"
+            ],
+            "properties": {
+              "artifactRef": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9._:-]+$"
+              },
+              "evidenceHash": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "authorizationRef": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:op:recordBankSettlement"
+      },
+      "recordBankSettlementResponse201": {
+        "title": "recordBankSettlement 201",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "version",
+          "replayed",
+          "data"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "COMPLETED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "settlement"
+            ],
+            "properties": {
+              "settlement": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "settlementId",
+                  "accountRef",
+                  "withdrawalId",
+                  "currency",
+                  "periodStart",
+                  "periodEnd",
+                  "withdrawnCents",
+                  "feeCents",
+                  "receivedCents",
+                  "bankAvailableCents",
+                  "bankEvidence",
+                  "observedAt"
+                ],
+                "properties": {
+                  "settlementId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "accountRef": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  },
+                  "withdrawalId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "enum": [
+                      "USD"
+                    ]
+                  },
+                  "periodStart": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+                  },
+                  "periodEnd": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+                  },
+                  "withdrawnCents": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,15})$"
+                  },
+                  "feeCents": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,15})$"
+                  },
+                  "receivedCents": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^(0|[1-9][0-9]{0,15})$"
+                  },
+                  "bankAvailableCents": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,15})$"
+                  },
+                  "bankEvidence": {
+                    "type": "boolean"
+                  },
+                  "observedAt": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:recordBankSettlement:201"
       },
       "replaceBankRouteDetailsRequest": {
         "title": "replaceBankRouteDetails request",
