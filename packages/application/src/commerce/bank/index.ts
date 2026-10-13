@@ -7,5 +7,5 @@ export type { BankCreditRepository, BankEvidenceClassifier, BankInboundCollabora
 export { BANK_HOLD_GATE_READ, BANK_HOLD_STATEMENT_LOCKED } from "./inbound-ports.js";
 export type { EnterBankCreditBody, ConfirmBankCreditBody, AttributeBankCreditBody, BankCreditView, BankCreditCommandView, BankMatchKeysView, BankInboundHandlers, RetireBankCheckoutBody, RetiredCheckoutView, InboundReadRequest, InboundReadAnswer, ImportStatementBody, StatementImportView, StatementImportCommandView } from "./inbound.js";
 export { BANK_INBOUND_COMMAND_IDS, bankCreditView, createBankInboundHandlers, paymentOperatorContextOf, publishCreditEvent, publishOrderStateEvent } from "./inbound.js";
-export type { SettlementEvidenceClassifier, SettlementEvidenceCollaborators, SettlementArtifacts, VerifiedSettlement } from "./settlement.js";
-export { SETTLEMENT_CURRENCY, readSettlementEvidence } from "./settlement.js";
+export type { SettlementEvidenceClassifier, SettlementEvidenceCollaborators, SettlementArtifacts, VerifiedSettlement, BankSettlementRepository, NewBankSettlementInput, BankSettlementCollaborators, RecordSettlementBody, SettlementView, SettlementCommandView, BankSettlementHandlers } from "./settlement.js";
+export { BANK_HOLD_SETTLEMENT_LOCKED, SETTLEMENT_CURRENCY, createBankSettlementHandlers, readSettlementEvidence } from "./settlement.js";

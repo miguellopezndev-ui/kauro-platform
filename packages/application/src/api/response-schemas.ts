@@ -1029,6 +1029,27 @@ export const STATEMENT_IMPORT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind"
     }),
   }),
 });
+export const BANK_SETTLEMENT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1 },
+  replayed: { type: "boolean" },
+  data: closedObject(["settlement"], {
+    settlement: closedObject(["settlementId", "accountRef", "withdrawalId", "currency", "periodStart", "periodEnd", "withdrawnCents", "feeCents", "receivedCents", "bankAvailableCents", "bankEvidence", "observedAt"], {
+      settlementId: BANK_UUID,
+      accountRef: BANK_REF,
+      withdrawalId: BANK_REF,
+      currency: { type: "string", enum: ["USD"] },
+      periodStart: BANK_UTC,
+      periodEnd: BANK_UTC,
+      withdrawnCents: BANK_CENTS,
+      feeCents: BANK_CENTS,
+      receivedCents: { type: ["string", "null"], pattern: "^(0|[1-9][0-9]{0,15})$" },
+      bankAvailableCents: BANK_CENTS,
+      bankEvidence: { type: "boolean" },
+      observedAt: BANK_UTC,
+    }),
+  }),
+});
 export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
   Object.freeze({
     operationId: "retireBankCheckout",
@@ -1068,6 +1089,24 @@ export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = 
     authority: "ACH-ROUTE r12 §7.23 (SI1, SI2), §7.28; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
     request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["artifactRef", "evidenceHash", "authorizationRef"], { artifactRef: BANK_REF, evidenceHash: BANK_HASH, authorizationRef: BANK_UUID }) }),
     responses: Object.freeze({ "201": Object.freeze({ description: "The import (COMPLETED envelope; an identical replay answers the journaled reply). BALANCED only with zero orphan debits.", contentType: JSON_CONTENT_TYPE, schema: STATEMENT_IMPORT_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "recordBankSettlement",
+    method: "POST" as const,
+    path: "/api/v1/operations/bank-accounts/{accountRef}/settlements",
+    summary: "Record a settlement observation from the provider's settlement record and, when the money arrived, the receiving bank's receipt (no typed figure)",
+    authority: "ACH-ROUTE r12 §7.25 (ST1, ST2), R2-085, PV1-SETTLE D-SET-1; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+    request: Object.freeze({
+      contentType: "application/json" as const,
+      schema: closedObject(["artifactRef", "evidenceHash", "receipt", "authorizationRef"], {
+        artifactRef: BANK_REF,
+        evidenceHash: BANK_HASH,
+        // the receiving bank's receipt, or null while the money is in transit (R2-085)
+        receipt: { ...closedObject(["artifactRef", "evidenceHash"], { artifactRef: BANK_REF, evidenceHash: BANK_HASH }), type: ["object", "null"] },
+        authorizationRef: BANK_UUID,
+      }),
+    }),
+    responses: Object.freeze({ "201": Object.freeze({ description: "The settlement observation (COMPLETED envelope; an identical replay answers the journaled reply). Bank-available money only with a receipt.", contentType: JSON_CONTENT_TYPE, schema: BANK_SETTLEMENT_RESPONSE_SCHEMA }) }),
   }),
   Object.freeze({
     operationId: "getBankCredit",

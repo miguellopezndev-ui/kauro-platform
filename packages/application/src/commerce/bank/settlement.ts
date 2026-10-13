@@ -9,11 +9,16 @@
  * No money figure is ever typed by the owner: every amount, instant and identity comes from the classified artifacts (21 "never grade
  * from a screenshot"). Bank-available money exists only with a receipt (D-LEDGER-B5).
  */
-import type { BankAccountRef, BankReceiptEvidence, CommerceFailureReason, EvidenceClassification, PaymentEnvironment, SettlementEvidence } from "@kauro/domain";
-import { DomainFailure, PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
+import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
+import type { BankAccountRef, BankReceiptEvidence, CommerceFailureReason, CommerceUnitOfWork, EvidenceClassification, OperatorContext, PaymentEnvironment, SettlementEvidence, SettlementId } from "@kauro/domain";
+import { DomainFailure, NotFoundFailure, PROVIDER_CALL_TIMEOUT_MS, actorOf, settlementPostings } from "@kauro/domain";
+import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import type { ProviderCallTimer } from "../../commercial/ports.js";
 import type { BankEvidenceStore, StoredBankEvidence } from "../ports.js";
-import { evidenceUnavailable } from "./route-config.js";
+import { CommerceAccessDenied, runCommerceCommand, type CommerceRequestRuntime } from "../request/runtime.js";
+import { BANK_INBOUND_COMMAND_IDS, inboundCommandOf, inboundEnvelopeOf, paymentOperatorContextOf } from "./inbound.js";
+import type { BankInboundCollaborators } from "./inbound-ports.js";
+import { STEP_UP_ALLOW, assuredAt, evidenceUnavailable, judgedAtCommit, type BankRouteRequest } from "./route-config.js";
 
 /** The pure classifiers of the two settlement artifacts (the bound integration's evidence port). */
 export interface SettlementEvidenceClassifier {
@@ -98,4 +103,220 @@ export async function readSettlementEvidence(co: SettlementEvidenceCollaborators
     if (receipt.bankAvailableCents < receipt.receivedCents) throw precondition("SETTLEMENT_INCONSISTENT", "the bank balance is below the receipt it shows");
   }
   return { settlement, receipt, normalizerVersion: stored.normalizerVersion };
+}
+
+// --- ST2: CMD215 RecordSettlementObservation (D-SET-1, D-SET-4..D-SET-7) ----------------------------------------------------------------
+
+/** The settlement tables of the caller's unit of work (the persistence adapter's PgBankSettlements, bound by the api composition). */
+export interface BankSettlementRepository {
+  routeOfAccount(environment: string, accountRef: string): Promise<{ readonly bankRouteId: string; readonly paymentRouteId: string; readonly currency: string } | null>;
+  /** The payout cash basis lock (CMD052's, 0043), held to COMMIT. */
+  lockFunds(): Promise<void>;
+  providerAvailableCents(paymentRouteId: string, currency: string): Promise<bigint>;
+  settledAs(environment: string, accountRef: string, withdrawalId: string, receipt: { readonly receivingAccountRef: string; readonly bankTransactionId: string } | null): Promise<string | null>;
+  insert(s: NewBankSettlementInput): Promise<void>;
+}
+export interface NewBankSettlementInput {
+  readonly settlementId: string;
+  readonly paymentRouteId: string;
+  readonly bankRouteId: string;
+  readonly environment: "SANDBOX" | "LIVE";
+  readonly accountRef: string;
+  readonly withdrawalId: string;
+  readonly artifactRef: string;
+  readonly evidenceHash: string;
+  readonly currency: string;
+  readonly grossCents: bigint;
+  readonly feeCents: bigint;
+  readonly heldCents: bigint;
+  readonly withdrawnCents: bigint;
+  readonly periodStart: string;
+  readonly periodEnd: string;
+  readonly observedAt: string;
+  readonly normalizerVersion: string;
+  readonly recordedBy: string;
+  readonly receipt: { readonly receivingAccountRef: string; readonly bankTransactionId: string; readonly artifactRef: string; readonly evidenceHash: string; readonly receivedCents: bigint; readonly bankAvailableCents: bigint } | null;
+  readonly createdAt: UtcInstant;
+}
+
+export interface BankSettlementCollaborators extends BankInboundCollaborators {
+  readonly settlements: (uow: CommerceUnitOfWork) => BankSettlementRepository;
+}
+
+/** CMD215's body: the two stored artifacts (no figure is typed) and the owner's step-up. */
+export interface RecordSettlementBody extends SettlementArtifacts {
+  readonly authorizationRef: string;
+}
+export interface SettlementView {
+  readonly settlementId: string;
+  readonly accountRef: string;
+  readonly withdrawalId: string;
+  readonly currency: string;
+  readonly periodStart: string;
+  readonly periodEnd: string;
+  readonly withdrawnCents: string;
+  readonly feeCents: string;
+  readonly receivedCents: string | null;
+  readonly bankAvailableCents: string;
+  readonly bankEvidence: boolean;
+  readonly observedAt: string;
+}
+export interface SettlementCommandView {
+  readonly settlement: SettlementView;
+}
+export interface BankSettlementHandlers {
+  /** CMD215 ST1+ST2: the owner records the settlement of one withdrawal of the route account. */
+  record(request: BankRouteRequest<RecordSettlementBody>): Promise<CommandResult<SettlementCommandView>>;
+}
+
+/** The registered hold under the settlement's locks (a test pauses, crashes or fails here; production: a no-op). */
+export const BANK_HOLD_SETTLEMENT_LOCKED = "bank:settlement-locked";
+
+const inFuture = (instant: string, at: string): boolean => Date.parse(instant) > Date.parse(at);
+
+export function createBankSettlementHandlers(runtime: CommerceRequestRuntime, co: BankSettlementCollaborators): BankSettlementHandlers {
+  const collaborators: SettlementEvidenceCollaborators = { evidence: co.evidence, settlementClassifier: co.classifier, timer: co.timer };
+
+  async function authorizeOwner(uow: CommerceUnitOfWork, envelope: CommandEnvelope<unknown>, what: string): Promise<void> {
+    const decision = await runtime.commerceAuthorizer.authorizeOperator(uow, { identity: envelope.subject.identity, role: "KAURO_OWNER" });
+    if (decision.kind === "DENY") throw CommerceAccessDenied.of(what, decision);
+  }
+
+  return {
+    async record(request) {
+      const id = BANK_INBOUND_COMMAND_IDS.settle;
+      const envelope = inboundEnvelopeOf(id, request);
+      const context = paymentOperatorContextOf(envelope);
+      const accountRef = request.path["accountRef"]!;
+      let environment: "SANDBOX" | "LIVE" | null = null;
+      let verified: VerifiedSettlement | null = null;
+      let deferred: DomainFailure | null = null;
+      return runCommerceCommand<RecordSettlementBody, SettlementCommandView>(runtime, {
+        command: inboundCommandOf(id),
+        envelope,
+        context,
+        replayVersion: () => 1,
+        async access(uow) {
+          const credits = co.credits(uow);
+          const environments = await credits.environmentsOfAccount(accountRef);
+          environment = environments.includes(envelope.environment as "SANDBOX" | "LIVE") ? (envelope.environment as "SANDBOX" | "LIVE") : (environments[0] ?? null);
+          // the decision first, in a unit-local scope (its share locks released): ST2 re-judges the owner under the locks
+          await credits.released(() => authorizeOwner(uow, envelope, id));
+          if (environment === null) return;
+          // ST1: both artifacts are read, hash-verified, classified and checked outside every lock (no lock is held yet); never cached
+          try {
+            verified = await readSettlementEvidence(collaborators, accountRef, environment, envelope.body);
+          } catch (e) {
+            if (!(e instanceof DomainFailure)) throw e;
+            deferred = e;
+          }
+        },
+        async body(uow, causationId) {
+          const body = envelope.body;
+          const credits = co.credits(uow);
+          const repo = co.settlements(uow);
+          if (environment === null) throw new NotFoundFailure("bank account");
+          // §7.28 and D-SET-5: L1 (the OUTBOUND stream: the withdrawal is a debit of the account), then INBOUND, then the payout cash
+          // basis lock (CMD052's): a payout approval and a settlement serialize in both orders
+          await credits.lockStream(environment, accountRef, "OUTBOUND");
+          await credits.lockStream(environment, accountRef, "INBOUND");
+          await repo.lockFunds();
+          await co.hold(BANK_HOLD_SETTLEMENT_LOCKED);
+          // the owner is judged again under the locks (a withdrawal while the command read or waited is seen)
+          await authorizeOwner(uow, envelope, id);
+          if (deferred !== null) throw deferred;
+          const evidence: VerifiedSettlement | null = verified;
+          if (evidence === null) throw new DomainFailure("INTEGRITY_FAILURE", "the settlement evidence was not verified");
+          const { settlement, receipt } = evidence;
+          // the effect instant: the database clock read after the last lock wait (the step-up is judged at it, and again at COMMIT)
+          const at = await assuredAt(co, uow, envelope.userId, body.authorizationRef, null);
+          judgedAtCommit(co, uow, envelope.userId, body.authorizationRef, null, envelope.authority, runtime.clock);
+          // no instant of the evidence lies after the effect instant: a period never ends after it, nor an observation or a booking
+          if (inFuture(settlement.periodEnd, at) || inFuture(settlement.observedAt, at) || (receipt !== null && (inFuture(receipt.bookedAt, at) || inFuture(receipt.observedAt, at)))) {
+            throw precondition("COVERAGE_END_IN_FUTURE", "the settlement evidence states an instant after the effect instant");
+          }
+          const route = await repo.routeOfAccount(environment, accountRef);
+          if (route === null) throw new NotFoundFailure("bank account");
+          if (route.currency !== settlement.currency) throw precondition("CURRENCY_MISMATCH", "the settlement is not in the route's currency");
+          // D-SET-4: one settlement per withdrawal and per bank transaction
+          const receiptIdentity = receipt === null ? null : { receivingAccountRef: receipt.accountRef, bankTransactionId: receipt.bankTransactionId };
+          if ((await repo.settledAs(environment, accountRef, settlement.withdrawalId, receiptIdentity)) !== null) throw precondition("WITHDRAWAL_ALREADY_SETTLED", "the withdrawal or its bank transaction is already settled");
+          // D-SET-5: no settlement of imaginary liquidity, judged under the funds lock
+          const available = await repo.providerAvailableCents(route.paymentRouteId, settlement.currency);
+          if (settlement.withdrawnCents + settlement.feeCents > available) {
+            throw new DomainFailure("PRECONDITION_FAILED", "the provider-available balance does not cover the withdrawal and its fee", { reason: "FUNDS_UNAVAILABLE" });
+          }
+          const settlementId = uow.ids.next();
+          const observedAt = (receipt?.observedAt ?? settlement.observedAt) as UtcInstant;
+          const receivedCents = receipt?.receivedCents ?? null;
+          await repo.insert({
+            settlementId,
+            paymentRouteId: route.paymentRouteId,
+            bankRouteId: route.bankRouteId,
+            environment,
+            accountRef,
+            withdrawalId: settlement.withdrawalId,
+            artifactRef: body.artifactRef,
+            evidenceHash: settlement.evidenceHash,
+            currency: settlement.currency,
+            grossCents: settlement.grossCents,
+            feeCents: settlement.feeCents,
+            heldCents: settlement.heldCents,
+            withdrawnCents: settlement.withdrawnCents,
+            periodStart: settlement.periodStart,
+            periodEnd: settlement.periodEnd,
+            observedAt,
+            normalizerVersion: evidence.normalizerVersion,
+            recordedBy: envelope.userId,
+            receipt:
+              receipt === null || body.receipt === null
+                ? null
+                : { receivingAccountRef: receipt.accountRef, bankTransactionId: receipt.bankTransactionId, artifactRef: body.receipt.artifactRef, evidenceHash: receipt.evidenceHash, receivedCents: receipt.receivedCents, bankAvailableCents: receipt.bankAvailableCents },
+            createdAt: at,
+          });
+          await uow.events.publish({
+            aggregateKind: "settlement" as never,
+            aggregateId: settlementId as never,
+            aggregateVersion: 1,
+            agencyId: null,
+            eventType: "settlement.recorded.v1" as never,
+            actor: actorOf(uow.context as OperatorContext),
+            causationId,
+            correlationId: envelope.correlationId,
+            payload: { settlementId, withdrawnCents: Number(settlement.withdrawnCents), feeCents: Number(settlement.feeCents), receivedCents: Number(receivedCents ?? 0n), bankEvidence: receipt !== null },
+          });
+          // D-SET-6: one balanced SETTLEMENT set, agency-less, its source the observation (UNIQUE (event_id, line_no))
+          await uow.commerce.ledger.post(
+            {
+              agencyId: null,
+              source: { kind: "SETTLEMENT", settlementId: settlementId as unknown as SettlementId },
+              sourceKind: "SETTLEMENT",
+              sourceRef: settlementId,
+              currency: settlement.currency,
+              effectiveAt: (receipt?.bookedAt ?? settlement.periodEnd) as UtcInstant,
+              observedAt,
+              evidenceHash: (receipt?.evidenceHash ?? settlement.evidenceHash) as Sha256Hex,
+              lines: settlementPostings(settlement.withdrawnCents, settlement.feeCents, receivedCents ?? 0n),
+            },
+            at,
+          );
+          const view: SettlementView = {
+            settlementId,
+            accountRef,
+            withdrawalId: settlement.withdrawalId,
+            currency: settlement.currency,
+            periodStart: settlement.periodStart,
+            periodEnd: settlement.periodEnd,
+            withdrawnCents: settlement.withdrawnCents.toString(),
+            feeCents: settlement.feeCents.toString(),
+            receivedCents: receivedCents === null ? null : receivedCents.toString(),
+            bankAvailableCents: (receipt?.bankAvailableCents ?? 0n).toString(),
+            bankEvidence: receipt !== null,
+            observedAt,
+          };
+          return { status: 201, view: { settlement: view }, version: 1, resourceKind: "settlement", resourceId: settlementId, allowFact: STEP_UP_ALLOW };
+        },
+      });
+    },
+  };
 }
