@@ -6,9 +6,9 @@
 --   * bank_credits and statement_imports are agency-less aggregates (agency_id always NULL, decision #1 of 0046) with events of their own;
 --   * bank_credits gets its guard: the listed edges of kauro.bank_machine_edges ('BankCredit'), a single version bump per change and the
 --     columns that never change after the draft;
---   * the owner's commands run on the payment service's pool (kauro_payment): an OPERATOR or TENANT unit of work marked pool = 'PAYMENT'
---     (unit-of-work.ts runtimeRoleOf). kauro_payment therefore reads the caller's own identity, step-up proofs, corporate roles and session
---     row (the same own-row predicates kauro_app holds) and writes the caller's own journal and security events, nothing of another person;
+--   * the owner's commands (C5, C6, M2, SI2) and CMD214's record run on the request pool (kauro_app), the owner's rows gated by
+--     kauro.acting_corporate_owner() (D-ACH-16, D-INB-CTX-1/2); the payment service (kauro_payment) applies money (P1), expires orders (E1)
+--     and consumes the recorded checkout retirements. kauro_payment reads no person's identity, membership, session or journal;
 --   * the bank order state change of an instruction (an order_state bump) is an event of its own.
 
 ALTER TABLE kauro.bank_credits
@@ -130,24 +130,64 @@ GRANT UPDATE (version) ON kauro.bank_routes TO kauro_payment;
 -- the lookup by (environment, account, reference) happens before any agency is adopted: the reference names the order, never a guess
 CREATE POLICY bank_transfer_instructions_payment_lookup ON kauro.bank_transfer_instructions FOR SELECT TO kauro_payment USING (true);
 
--- --- the owner's pipeline on the payment service's pool ---------------------------------------------------------------------------------
--- The same own-row predicates kauro_app holds (0002, 0013, 0025/0047): the person's own identity, proofs, corporate roles and session.
-CREATE POLICY identities_payment_self_read ON kauro.identities FOR SELECT TO kauro_payment USING (user_id = kauro.current_user_id());
-CREATE POLICY assurance_proofs_payment_self_read ON kauro.assurance_proofs FOR SELECT TO kauro_payment USING (user_id = kauro.current_user_id());
-CREATE POLICY corporate_roles_payment_self_read ON kauro.corporate_roles FOR SELECT TO kauro_payment USING (user_id = kauro.current_user_id());
-CREATE POLICY web_sessions_payment_read ON kauro.web_sessions FOR SELECT TO kauro_payment
-  USING (secret_sha256 = kauro.current_session_sha256() AND user_id = kauro.current_user_id());
-CREATE POLICY web_sessions_payment_lock ON kauro.web_sessions FOR UPDATE TO kauro_payment
-  USING (secret_sha256 = kauro.current_session_sha256() AND user_id = kauro.current_user_id()) WITH CHECK (false);
-GRANT SELECT ON kauro.identities, kauro.assurance_proofs, kauro.corporate_roles TO kauro_payment;
-GRANT SELECT (secret_sha256, user_id, revoked_at, idle_expires_at, absolute_expires_at) ON kauro.web_sessions TO kauro_payment;
-GRANT UPDATE (session_id) ON kauro.web_sessions TO kauro_payment;
--- the owner's own journal entries (identity-scoped, no agency) and security facts
-CREATE POLICY command_journal_payment_owner ON kauro.command_journal FOR ALL TO kauro_payment
-  USING (agency_id IS NULL AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text)
-  WITH CHECK (agency_id IS NULL AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text);
-CREATE POLICY security_events_payment_owner ON kauro.security_events FOR INSERT TO kauro_payment
-  WITH CHECK (agency_id IS NULL AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text);
+-- --- the owner's commands on the request pool (D-ACH-16, D-INB-CTX-1) ---------------------------------------------------------------
+-- C5, C6, M2 and SI2 are the corporate owner's decisions: OPERATOR units of kauro_app, as the route configuration commands of 0046, each
+-- row gated by kauro.acting_corporate_owner() (no agency bound, an ACTIVE KAURO_OWNER grant of the caller). They draft a credit, confirm
+-- it (OBSERVED) or attribute it (MATCHED), and record a statement's import, coverage, lines and line cases. They never apply money:
+-- APPLIED, the capture, the authorization and the order's bank state stay the payment service's (kauro_payment) columns.
+CREATE POLICY bank_credits_owner_read ON kauro.bank_credits FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner());
+CREATE POLICY bank_credits_owner_draft ON kauro.bank_credits FOR INSERT TO kauro_app
+  WITH CHECK (kauro.acting_corporate_owner() AND state = 'DRAFT_MANUAL' AND created_by = kauro.current_user_id() AND order_id IS NULL AND capture_id IS NULL);
+-- the row lock of any credit (Lc, SI2's identity lock) and the owner's two edges: DRAFT_MANUAL -> OBSERVED (C6), MATCH_REVIEW -> MATCHED (M2);
+-- the guard of this migration refuses an unlisted edge, the column grant keeps capture_id out of reach
+CREATE POLICY bank_credits_owner_decide ON kauro.bank_credits FOR UPDATE TO kauro_app
+  USING (kauro.acting_corporate_owner())
+  WITH CHECK (kauro.acting_corporate_owner() AND state IN ('OBSERVED', 'MATCHED') AND capture_id IS NULL);
+GRANT SELECT ON kauro.bank_credits TO kauro_app;
+GRANT INSERT (bank_credit_id, environment, account_ref, bank_transaction_id, state, version, rail, currency, gross_cents, net_cents, fee_cents, reference, booked_at,
+  evidence_hash, payer_digest, payee_digest, artifact_ref, created_by) ON kauro.bank_credits TO kauro_app;
+GRANT UPDATE (state, version, net_cents, fee_cents, payer_digest, payee_digest, reference, booked_at, order_id) ON kauro.bank_credits TO kauro_app;
+
+CREATE POLICY statement_imports_owner ON kauro.statement_imports FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner());
+CREATE POLICY statement_imports_owner_record ON kauro.statement_imports FOR INSERT TO kauro_app
+  WITH CHECK (kauro.acting_corporate_owner() AND imported_by = kauro.current_user_id());
+GRANT SELECT ON kauro.statement_imports TO kauro_app;
+GRANT INSERT (import_id, environment, account_ref, artifact_ref, evidence_hash, normalizer_version, idempotency_key, imported_by) ON kauro.statement_imports TO kauro_app;
+CREATE POLICY statement_coverage_owner ON kauro.statement_coverage FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner());
+CREATE POLICY statement_coverage_owner_record ON kauro.statement_coverage FOR INSERT TO kauro_app WITH CHECK (kauro.acting_corporate_owner());
+GRANT SELECT, INSERT ON kauro.statement_coverage TO kauro_app;
+CREATE POLICY statement_lines_owner ON kauro.statement_lines FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner());
+CREATE POLICY statement_lines_owner_record ON kauro.statement_lines FOR INSERT TO kauro_app WITH CHECK (kauro.acting_corporate_owner() AND linked_attempt_id IS NULL);
+-- a recorded line is locked (its identity) and a debit linked once to a RECORDED attempt; nothing else of a line changes
+CREATE POLICY statement_lines_owner_link ON kauro.statement_lines FOR UPDATE TO kauro_app
+  USING (kauro.acting_corporate_owner()) WITH CHECK (kauro.acting_corporate_owner());
+GRANT SELECT ON kauro.statement_lines TO kauro_app;
+GRANT INSERT (line_id, import_id, environment, account_ref, line_kind, bank_line_id, bank_execution_id, amount_cents, fee_cents, currency, reference, status,
+  executed_at, booked_at, observed_at, destination_account_digest, destination_account_last4, destination_routing_digest, recipient_ref, recipient_version,
+  evidence_hash) ON kauro.statement_lines TO kauro_app;
+GRANT UPDATE (linked_attempt_id) ON kauro.statement_lines TO kauro_app;
+-- an attempt is read and its row locked (the execution identity lock), never written by the owner (WITH CHECK (false))
+CREATE POLICY outbound_execution_attempts_owner_read ON kauro.outbound_execution_attempts FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner());
+CREATE POLICY outbound_execution_attempts_owner_lock ON kauro.outbound_execution_attempts FOR UPDATE TO kauro_app
+  USING (kauro.acting_corporate_owner()) WITH CHECK (false);
+GRANT SELECT ON kauro.outbound_execution_attempts TO kauro_app;
+GRANT UPDATE (state) ON kauro.outbound_execution_attempts TO kauro_app;
+-- an orphan debit's case (SI2) is opened, a credit's review case resolved by the owner's attribution (M2)
+CREATE POLICY bank_review_cases_owner_read ON kauro.bank_review_cases FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner());
+CREATE POLICY bank_review_cases_owner_open ON kauro.bank_review_cases FOR INSERT TO kauro_app
+  WITH CHECK (kauro.acting_corporate_owner() AND state = 'OPEN' AND kind IN ('RECORD_REQUIRED', 'UNDECLARED_OUTBOUND') AND line_id IS NOT NULL);
+CREATE POLICY bank_review_cases_owner_resolve ON kauro.bank_review_cases FOR UPDATE TO kauro_app
+  USING (kauro.acting_corporate_owner() AND source_kind = 'BANK_CREDIT') WITH CHECK (kauro.acting_corporate_owner() AND state = 'RESOLVED');
+GRANT SELECT ON kauro.bank_review_cases TO kauro_app;
+GRANT INSERT (case_id, kind, environment, account_ref, line_id, detail_code, evidence_hash) ON kauro.bank_review_cases TO kauro_app;
+GRANT UPDATE (state, resolved_at) ON kauro.bank_review_cases TO kauro_app;
+-- the owner's agency-less credit and import events and their outbox records (0046's owner-route pattern), for these two kinds only
+CREATE POLICY domain_events_owner_bank ON kauro.domain_events FOR ALL TO kauro_app
+  USING (agency_id IS NULL AND aggregate_kind IN ('bank_credit', 'statement_import') AND kauro.acting_corporate_owner())
+  WITH CHECK (agency_id IS NULL AND aggregate_kind IN ('bank_credit', 'statement_import') AND split_part(event_type, '.', 1) = aggregate_kind AND kauro.acting_corporate_owner());
+CREATE POLICY outbox_records_owner_bank ON kauro.outbox_records FOR ALL TO kauro_app
+  USING (EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = outbox_records.event_id AND e.agency_id IS NULL AND e.aggregate_kind IN ('bank_credit', 'statement_import')) AND kauro.acting_corporate_owner())
+  WITH CHECK (EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = outbox_records.event_id AND e.agency_id IS NULL AND e.aggregate_kind IN ('bank_credit', 'statement_import')) AND kauro.acting_corporate_owner());
 
 -- --- step-up proof revocation -----------------------------------------------------------------------------------------------------------
 -- A step-up proof stays append-only evidence, with one exception: its validity can be ENDED early (a revocation of the step-up an owner
@@ -196,24 +236,61 @@ CREATE UNIQUE INDEX payment_orders_one_open_per_project ON kauro.payment_orders 
   WHERE state IN ('INTENT_CREATED', 'CREATING', 'CREATED', 'APPROVED', 'CAPTURING', 'CAPTURE_UNCERTAIN') AND bank_slot_released_at IS NULL;
 GRANT UPDATE (bank_slot_released_at) ON kauro.payment_orders TO kauro_payment;
 
--- --- CMD214: the agency's billing member retires its open bank checkout (§7.12 E1, retirement half) ----------------------------------
--- The retirement is a person-authorized command of the payment boundary: its tenant unit runs on the payment service's pool (the
--- instruction's state, the order's lock and its slot are the payment service's columns, never kauro_app's). The B06 authorizer reads
--- the member's own live membership in the bound agency; its journal entry and security facts are the member's, in that agency.
-CREATE POLICY memberships_payment_member_read ON kauro.memberships FOR SELECT TO kauro_payment
-  USING (agency_id = kauro.current_agency_id() AND user_id = kauro.current_user_id());
-GRANT SELECT ON kauro.memberships TO kauro_payment;
-CREATE POLICY command_journal_payment_member ON kauro.command_journal FOR ALL TO kauro_payment
-  USING (agency_id IS NOT NULL AND agency_id = kauro.current_agency_id() AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text)
-  WITH CHECK (agency_id IS NOT NULL AND agency_id = kauro.current_agency_id() AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text);
-CREATE POLICY security_events_payment_member ON kauro.security_events FOR INSERT TO kauro_payment
-  WITH CHECK (
-    agency_id IS NOT NULL AND agency_id = kauro.current_agency_id() AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text
-    AND EXISTS (
-      SELECT 1 FROM kauro.memberships m
-      WHERE m.agency_id = security_events.agency_id AND m.user_id = kauro.current_user_id() AND m.state IN ('INVITED', 'ACTIVE', 'SUSPENDED')
-    )
-  );
+-- --- CMD214: the agency's billing member retires its open bank checkout (§7.12 E1, retirement half; D-INB-CTX-2) ----------------------
+-- The member's request is RECORDED by a TENANT unit of kauro_app (the request pool never writes a money state, D-ACH-16): one row per
+-- order, stamped at the database clock. The payment service's TRANSFER_EXPIRY pass CONSUMES it, first in the pass, under the order's and
+-- the instruction's locks: an open order becomes EXPIRED with cause RETIRED and releases its slot (outcome RETIRED); an order a credit
+-- closed first is left as it is (outcome NOT_OPEN). A row is consumed once; nothing else of it ever changes and it is never deleted.
+CREATE TABLE kauro.bank_checkout_retirements (
+  order_id      uuid PRIMARY KEY,
+  agency_id     uuid NOT NULL,
+  requested_by  uuid NOT NULL,
+  reason_code   text NOT NULL CHECK (char_length(reason_code) BETWEEN 1 AND 200),
+  requested_at  timestamptz NOT NULL,
+  consumed_at   timestamptz,
+  outcome       text CHECK (outcome IS NULL OR outcome IN ('RETIRED', 'NOT_OPEN')),
+  FOREIGN KEY (agency_id, order_id) REFERENCES kauro.payment_orders (agency_id, order_id),
+  CONSTRAINT bank_checkout_retirements_consumed CHECK ((consumed_at IS NULL) = (outcome IS NULL))
+);
+CREATE INDEX bank_checkout_retirements_pending ON kauro.bank_checkout_retirements (requested_at, order_id) WHERE consumed_at IS NULL;
+CREATE OR REPLACE FUNCTION kauro.bank_checkout_retirements_guard() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    -- recorded at the database clock (to the millisecond, the precision of the pass's cursor), never consumed at birth
+    NEW.requested_at := date_trunc('milliseconds', kauro.effect_now());
+    IF NEW.consumed_at IS NOT NULL OR NEW.outcome IS NOT NULL THEN
+      RAISE EXCEPTION 'CONTEXT: a retirement is recorded unconsumed' USING ERRCODE = 'KA006';
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF OLD.consumed_at IS NOT NULL OR NEW.consumed_at IS NULL THEN
+    RAISE EXCEPTION 'IMMUTABLE_COLUMN: bank_checkout_retirements is consumed once' USING ERRCODE = 'KA004';
+  END IF;
+  NEW.consumed_at := kauro.effect_now();
+  RETURN NEW;
+END
+$$;
+CREATE TRIGGER bank_checkout_retirements_guard BEFORE INSERT OR UPDATE ON kauro.bank_checkout_retirements
+  FOR EACH ROW EXECUTE FUNCTION kauro.bank_checkout_retirements_guard();
+CREATE TRIGGER bank_checkout_retirements_immutable BEFORE UPDATE ON kauro.bank_checkout_retirements
+  FOR EACH ROW EXECUTE FUNCTION kauro.forbid_column_change('order_id,agency_id,requested_by,reason_code,requested_at');
+ALTER TABLE kauro.bank_checkout_retirements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kauro.bank_checkout_retirements FORCE ROW LEVEL SECURITY;
+-- the member records in its bound agency, as itself; it reads its agency's retirements (the replay and the once-only check)
+CREATE POLICY bank_checkout_retirements_tenant_read ON kauro.bank_checkout_retirements FOR SELECT TO kauro_app
+  USING (agency_id = kauro.current_agency_id());
+CREATE POLICY bank_checkout_retirements_tenant_record ON kauro.bank_checkout_retirements FOR INSERT TO kauro_app
+  WITH CHECK (agency_id = kauro.current_agency_id() AND requested_by = kauro.current_user_id());
+GRANT SELECT ON kauro.bank_checkout_retirements TO kauro_app;
+GRANT INSERT (order_id, agency_id, requested_by, reason_code) ON kauro.bank_checkout_retirements TO kauro_app;
+-- the payment service finds the pending ones before it adopts an agency (as E1's candidates), and consumes one in the agency it adopted
+CREATE POLICY bank_checkout_retirements_service_read ON kauro.bank_checkout_retirements FOR SELECT TO kauro_payment USING (true);
+CREATE POLICY bank_checkout_retirements_service_consume ON kauro.bank_checkout_retirements FOR UPDATE TO kauro_payment
+  USING (agency_id = kauro.current_agency_id()) WITH CHECK (agency_id = kauro.current_agency_id() AND consumed_at IS NOT NULL);
+GRANT SELECT ON kauro.bank_checkout_retirements TO kauro_payment;
+GRANT UPDATE (consumed_at, outcome) ON kauro.bank_checkout_retirements TO kauro_payment;
 
 -- --- SEC-DEPTH R17: no trigger function of this migration is executable by PUBLIC (a trigger runs it with the writer's rights; nobody
 -- calls it directly), as 0061 does for its own
@@ -222,3 +299,4 @@ REVOKE EXECUTE ON FUNCTION kauro.bank_credits_guard() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION kauro.bank_credits_confirmed_at() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION kauro.assurance_proofs_guard() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION kauro.payment_orders_bank_slot_guard() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.bank_checkout_retirements_guard() FROM PUBLIC;

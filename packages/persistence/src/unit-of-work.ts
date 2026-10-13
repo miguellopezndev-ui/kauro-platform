@@ -142,10 +142,6 @@ export function runtimeRoleOf(context: ExecutionContext): RuntimeRole {
       return "kauro_control";
     case "SERVICE":
       return COMMISSION_GROUP_SERVICES.has(context.serviceId) || OPERATIONS_GROUP_SERVICES.has(context.serviceId) ? "kauro_commission" : "kauro_payment";
-    case "TENANT":
-    case "OPERATOR":
-      // Payments V1: a person-authorized money command of the payment boundary names its pool (the inbound bank credits, the checkout retirement)
-      return context.pool === "PAYMENT" ? "kauro_payment" : "kauro_app";
     default:
       return "kauro_app";
   }
