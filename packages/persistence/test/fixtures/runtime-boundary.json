@@ -1189,6 +1189,7 @@
           "agency_id",
           "artifact_evidence_hash",
           "core_package_hash",
+          "counts",
           "disposition_evidence_hash",
           "plan_hash",
           "plan_id",

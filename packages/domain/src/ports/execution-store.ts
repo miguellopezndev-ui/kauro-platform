@@ -41,6 +41,7 @@ import type {
   VerificationResult,
 } from "../model/execution/records.js";
 import type { AdmissionCandidate } from "../model/execution/scheduler.js";
+import type { DeliveryCountFacts } from "../model/execution/counts.js";
 import type { CommerceUnitOfWork, CommerceUnitOfWorkFactory } from "./commerce.js";
 import type { ExecutionDiscovery } from "./execution-discovery.js";
 import type { LeaseRecord } from "./lease-store.js";
@@ -213,6 +214,11 @@ export interface ExecutionStore {
   stagedArtifactsOf(attemptId: ProcessingAttemptId): Promise<ReadonlyArray<StagedArtifactRecord>>;
   readbacksOf(attemptId: ProcessingAttemptId): Promise<ReadonlyArray<ArtifactReadbackRecord>>;
   deliveryArtifactsOf(packageVersionId: PackageVersionId): Promise<ReadonlyArray<DeliveryArtifactRecord>>;
+  /**
+   * The facts of the issued RowCounts (ROWCOUNTS-PRODUCER): the populations of the sealed revision the job binds and the counts of
+   * the validation receipt it binds (by agency, receipt hash, plan hash and revision hash), as stored; deliveryRowCountsOf judges them.
+   */
+  deliveryCountFacts(subject: JobExecutionSubject): Promise<DeliveryCountFacts>;
   verificationsOf(attemptId: ProcessingAttemptId): Promise<ReadonlyArray<PackageVerificationRecord>>;
   /** The attempt's latest cleanup pass (the highest pass number), or null. */
   cleanupOf(attemptId: ProcessingAttemptId): Promise<AttemptCleanupRecord | null>;

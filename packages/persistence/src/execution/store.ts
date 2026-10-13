@@ -29,6 +29,7 @@ import {
   type CommercialAuthorizationId,
   type DeliveryArtifactRecord,
   type DeliveryCopyInput,
+  type DeliveryCountFacts,
   type EventPayload,
   type EventProvenance,
   type EventPublisher,
@@ -202,6 +203,32 @@ export class PgExecutionStore implements ExecutionStore {
   async deliveryArtifactsOf(packageVersionId: PackageVersionId): Promise<ReadonlyArray<DeliveryArtifactRecord>> {
     const r = await execute<Row>(this.db, `SELECT ${DELIVERY_COLUMNS} FROM kauro.delivery_artifacts WHERE package_version_id = $1 ORDER BY object_name`, [packageVersionId]);
     return r.rows.map(deliveryRecord);
+  }
+
+  async deliveryCountFacts(subject: JobExecutionSubject): Promise<DeliveryCountFacts> {
+    // ROWCOUNTS-PRODUCER: both rows are immutable once the job binds them (the revision's populations are frozen at READY_TO_SEAL,
+    // the receipt is append-only, 0004), so this snapshot is the one the publication issues
+    const r = await execute<Row>(
+      this.db,
+      `SELECT (SELECT r.physical_source_rows::text FROM kauro.dataset_revisions r WHERE r.agency_id = $1 AND r.project_id = $2 AND r.manifest_hash = $3) AS physical,
+              (SELECT r.logical_source_records::text FROM kauro.dataset_revisions r WHERE r.agency_id = $1 AND r.project_id = $2 AND r.manifest_hash = $3) AS logical,
+              (SELECT r.billable_source_units::text FROM kauro.dataset_revisions r WHERE r.agency_id = $1 AND r.project_id = $2 AND r.manifest_hash = $3) AS billable,
+              (SELECT r.association_edges::text FROM kauro.dataset_revisions r WHERE r.agency_id = $1 AND r.project_id = $2 AND r.manifest_hash = $3) AS edges,
+              (SELECT v.counts FROM kauro.validation_receipts v
+                WHERE v.agency_id = $1 AND v.receipt_hash = $4 AND v.plan_id = $5 AND v.plan_hash = $6 AND v.revision_hash = $3 AND v.target_contract_hash = $7) AS receipt_counts`,
+      [subject.agencyId, subject.projectId, subject.revisionHash, subject.validationReceiptHash, subject.planId, subject.planHash, subject.targetContractHash],
+    );
+    const x = one(r.rows, "delivery count facts");
+    const count = (v: unknown): number | null => (typeof v === "string" && /^\d+$/.test(v) ? Number(v) : null);
+    const physical = count(x["physical"]);
+    const logical = count(x["logical"]);
+    const billable = count(x["billable"]);
+    const edges = count(x["edges"]);
+    const populations =
+      physical === null || logical === null || billable === null || edges === null
+        ? null
+        : { physicalSourceRows: physical, logicalSourceRecords: logical, billableSourceUnits: billable, associationEdges: edges };
+    return { populations, receiptCounts: x["receipt_counts"] ?? null };
   }
 
   async verificationsOf(attemptId: ProcessingAttemptId): Promise<ReadonlyArray<PackageVerificationRecord>> {

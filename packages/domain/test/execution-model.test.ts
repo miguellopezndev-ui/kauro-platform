@@ -22,6 +22,9 @@ import {
   assertAllowlistedPayload,
   consumersOf,
   deliveryManifestHashOf,
+  deliveryRowCountsOf,
+  packageExpiryOf,
+  ROW_COUNT_KEYS,
   fairAdmissionOrder,
   jobAttemptCheckpointOf,
   jobAttemptIdentityOf,
@@ -168,7 +171,7 @@ test("the digests of processing authority: the input binding is domain separated
     corePackageHash: subject.corePackageHash,
     validationReceiptHash: subject.validationReceiptHash,
     artifacts: [{ role: "import", objectName: "delivery/x", generation: "3", sha256: "d".repeat(64), byteLength: 5 }],
-    counts: { physicalSourceRows: 3 },
+    counts: { physicalSourceRows: 3, logicalSourceRecords: 3, billableSourceUnits: 3, associationEdges: 0, emittedRepresentatives: 3, mergedNonSurvivors: 0, rejected: 0, withheld: 0, unresolved: 0, emittedArtifactRows: 3 },
     createdAt: "2026-09-29T00:00:00.000Z",
     expiresAt: "2026-10-06T00:00:00.000Z",
     manifestVersion: "1",
@@ -236,4 +239,38 @@ test("B06-R1 seam (b08/land): a job's JOB_ATTEMPT checkpoint is KAURO_JOB_ATTEMP
     assert.notEqual(jobAttemptCheckpointOf({ ...admitted, [member]: other }), checkpoint, `${member} binds the checkpoint`);
   }
   assert.notEqual(checkpoint, admitted.inputBindingHash, "the checkpoint is not the lease subject");
+});
+
+test("ROWCOUNTS-PRODUCER: the issued package's RowCounts are the sealed revision's four populations and the validation receipt's execution counts; a receipt that disagrees with the sealed populations, is incomplete, malformed or positive in unresolved, or a revision without populations, is refused", () => {
+  const populations = { physicalSourceRows: 120, logicalSourceRecords: 110, billableSourceUnits: 100, associationEdges: 7 };
+  const receipt = { ...populations, emittedRepresentatives: 90, mergedNonSurvivors: 15, rejected: 3, withheld: 12, unresolved: 0, emittedArtifactRows: 97 };
+  const issued = deliveryRowCountsOf({ populations, receiptCounts: receipt });
+  assert.deepEqual(issued, { kind: "COUNTS", counts: receipt });
+  assert.deepEqual(Object.keys(issued.kind === "COUNTS" ? issued.counts : {}), ROW_COUNT_KEYS, "the registry RowCounts members, in order, nothing else");
+  assert.ok(Object.isFrozen(issued.kind === "COUNTS" ? issued.counts : null));
+  const refused = (facts: Parameters<typeof deliveryRowCountsOf>[0]) => {
+    const out = deliveryRowCountsOf(facts);
+    return out.kind === "REFUSED" ? out.reason : "COUNTS";
+  };
+  for (const key of ["physicalSourceRows", "logicalSourceRecords", "billableSourceUnits", "associationEdges"] as const) {
+    assert.equal(refused({ populations, receiptCounts: { ...receipt, [key]: receipt[key] + 1 } }), "COUNTS_MISMATCH", key);
+  }
+  assert.equal(refused({ populations: null, receiptCounts: receipt }), "COUNTS_UNAVAILABLE");
+  assert.equal(refused({ populations, receiptCounts: null }), "COUNTS_UNAVAILABLE");
+  assert.equal(refused({ populations, receiptCounts: [] }), "COUNTS_UNAVAILABLE");
+  const { emittedArtifactRows: _dropped, ...incomplete } = receipt;
+  assert.equal(refused({ populations, receiptCounts: incomplete }), "COUNTS_UNAVAILABLE");
+  assert.equal(refused({ populations, receiptCounts: { ...receipt, extra: 1 } }), "COUNTS_UNAVAILABLE");
+  for (const bad of [-1, 1.5, "3", Number.MAX_SAFE_INTEGER + 1, null]) {
+    assert.equal(refused({ populations, receiptCounts: { ...receipt, rejected: bad } }), "COUNTS_UNAVAILABLE", String(bad));
+    assert.equal(refused({ populations: { ...populations, associationEdges: bad as number }, receiptCounts: receipt }), "COUNTS_UNAVAILABLE", String(bad));
+  }
+  assert.equal(refused({ populations, receiptCounts: { ...receipt, unresolved: 1 } }), "COUNTS_UNRESOLVED");
+});
+
+test("ROWCOUNTS-PRODUCER: packageExpiryOf is the first package's soft deadline (+ 7 days) at microsecond precision, capped by the PAID_ORDINARY hard deadline (+ 14 days from the capture); a malformed instant is refused", () => {
+  assert.equal(packageExpiryOf("2026-09-29T00:00:00.123456Z", "2026-09-28T00:00:00Z"), "2026-10-06T00:00:00.123456Z", "soft first");
+  assert.equal(packageExpiryOf("2026-09-29T10:11:12.5Z", "2026-09-20T01:02:03.000007Z"), "2026-10-04T01:02:03.000007Z", "hard cap");
+  assert.equal(packageExpiryOf("2026-09-29T10:11:12Z", "2026-09-28T00:00:00Z"), "2026-10-06T10:11:12.000000Z");
+  for (const bad of ["2026-09-29 10:11:12Z", "2026-09-29T10:11:12.1234567Z", "2026-09-29T10:11:12+00:00", ""]) assert.throws(() => packageExpiryOf(bad, "2026-09-28T00:00:00Z"), RangeError, bad);
 });

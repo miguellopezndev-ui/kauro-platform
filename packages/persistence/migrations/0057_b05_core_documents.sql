@@ -46,3 +46,8 @@ CREATE POLICY core_plan_bindings_control_put ON kauro.core_plan_bindings FOR INS
 GRANT SELECT ON kauro.core_documents, kauro.core_plan_bindings TO kauro_control;
 GRANT INSERT (agency_id, kind, doc_hash, document) ON kauro.core_documents TO kauro_control;
 GRANT INSERT (plan_hash, agency_id, config_document, core_config_hash) ON kauro.core_plan_bindings TO kauro_control;
+
+-- ROWCOUNTS-PRODUCER (B05): the publication issues the registry RowCounts of the package it makes AVAILABLE from the sealed
+-- revision's populations and the validation receipt's counts (@kauro/domain deliveryRowCountsOf); the control plane reads the
+-- receipt's counts column, under the receipt's existing agency policy (validation_receipts_control_execution_read, 0021).
+GRANT SELECT (counts) ON kauro.validation_receipts TO kauro_control;
