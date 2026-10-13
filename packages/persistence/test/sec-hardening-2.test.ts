@@ -95,7 +95,7 @@ async function policyRoles(c: Client): Promise<Array<{ policyname: string; roles
 /** The migration is refused with `message` (42501), nothing of it persists: no ledger row, the definer still the migrator's. */
 async function refused(p: PreMigration, message: RegExp, label: string): Promise<void> {
   const t = target();
-  await assert.rejects(applyMigrations(p.owner, { dir: p.dir }), (e: unknown) => message.test(String((e as Error).message)) && sqlState(e) === "42501", label);
+  await assert.rejects(applyMigrations(p.owner, { dir: p.dir }), (e: unknown) => message.test(String((e as Error).message)) && migrationState(e) === "42501", label);
   assert.equal(await ledgerHas(p.owner, t.version), false, `${label}: the failed hardening recorded no ledger row`);
   assert.equal(await definerOwner(p.su), "kauro_owner", `${label}: the definer is still the migrator's`);
 }
@@ -107,6 +107,9 @@ async function appliedNow(p: PreMigration, label: string): Promise<void> {
   assert.equal(await ledgerHas(p.owner, t.version), true, label);
   assert.equal(await definerOwner(p.su), REGISTRAR, label);
 }
+
+/** The SQLSTATE of a migration failure (the runner wraps the driver error as its cause). */
+const migrationState = (e: unknown): string => sqlState((e as { cause?: unknown }).cause ?? e);
 
 /** Runs `probe` under a savepoint of the caller's open transaction and expects SQLSTATE `code`; the transaction stays usable. */
 async function refusedInSavepoint(c: Client, probe: () => Promise<unknown>, code: string, message: string): Promise<void> {
@@ -251,7 +254,7 @@ test("TIMEOUT SEC-HARDENING-2 (release): a reader holding payment_routes makes t
     await p.su.query("BEGIN");
     await p.su.query("SELECT 1 FROM kauro.payment_routes LIMIT 1");
     try {
-      await assert.rejects(applyMigrations(p.owner, { dir: p.dir, lockTimeoutMs: 500 }), (e: unknown) => sqlState(e) === "55P03", "the hardening stops at its lock timeout");
+      await assert.rejects(applyMigrations(p.owner, { dir: p.dir, lockTimeoutMs: 500 }), (e: unknown) => migrationState(e) === "55P03", "the hardening stops at its lock timeout");
     } finally {
       await p.su.query("ROLLBACK");
     }
@@ -268,6 +271,7 @@ test("DENY SEC-HARDENING-2 (release): a failing membership check rolls the whole
   const p = await preMigration("sec_hardening_2");
   try {
     await p.su.query(`CREATE ROLE ${ROLES.appLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.app}`);
+    // a runtime login (not the group: granting kauro_owner to kauro_app is circular, 0LP01, since the migrator created the group)
     await p.su.query(`GRANT kauro_owner TO ${ROLES.appLogin}`);
     await refused(p, /is a member of non-runtime role kauro_owner/, "a runtime login in the migrator's role");
     assert.deepEqual(await policyRoles(p.su), [{ policyname: "corporate_roles_register_bank_read", roles: ["kauro_owner"] }, { policyname: "payment_routes_register_bank", roles: ["kauro_owner"] }], "the policies are as before");
