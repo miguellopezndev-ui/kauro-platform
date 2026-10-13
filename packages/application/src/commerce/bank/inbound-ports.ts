@@ -53,6 +53,10 @@ export interface BankCreditRepository {
   instructionByReference(environment: string, accountRef: string, reference: string): Promise<BankTransferInstructionRecord | null>;
   instruction(orderId: string, lock?: boolean): Promise<BankTransferInstructionRecord | null>;
   acceptedPayerDigestOf(orderId: string): Promise<string | null>;
+  /** The bank order to EXPIRED with its cause (STALE_VERSION when the version moved); the caller holds the order's and the instruction's locks. */
+  expireOrder(orderId: string, expectedVersion: number, cause: "DEADLINE" | "RETIRED"): Promise<BankTransferInstructionRecord>;
+  /** Releases the project's open checkout of an order whose bank state is EXPIRED (set once). */
+  releaseBankSlot(orderId: string): Promise<void>;
   environmentsOfAccount(accountRef: string): Promise<ReadonlyArray<"SANDBOX" | "LIVE">>;
   openCreditCase(caseId: string, kind: "MATCH_REVIEW" | "PROVIDER_TIME_UNVERIFIED", credit: Pick<BankCreditRecord, "creditId" | "environment" | "accountRef" | "evidenceHash">, detailCode: string): Promise<boolean>;
   resolveCreditCases(creditId: string): Promise<number>;

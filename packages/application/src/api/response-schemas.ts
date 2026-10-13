@@ -1007,7 +1007,22 @@ const creditCommand = (operationId: string, path: string, summary: string, statu
     request: Object.freeze({ contentType: "application/json" as const, schema: request }),
     responses: Object.freeze({ [status]: Object.freeze({ description: "The credit after the command (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: BANK_CREDIT_COMMAND_RESPONSE_SCHEMA }) }),
   });
+export const RETIRED_CHECKOUT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1 },
+  replayed: { type: "boolean" },
+  data: closedObject(["order"], { order: closedObject(["orderId", "bankState", "expiryCause", "version"], { orderId: BANK_UUID, bankState: { type: "string", enum: ["EXPIRED"] }, expiryCause: { type: "string", enum: ["RETIRED"] }, version: { type: "integer", minimum: 1 } }) }),
+});
 export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
+  Object.freeze({
+    operationId: "retireBankCheckout",
+    method: "POST" as const,
+    path: "/api/v1/payment-orders/{orderId}/retirements",
+    summary: "Retire an open bank checkout (EXPIRED, cause RETIRED): no further instructions; a later credit is recorded and returned",
+    authority: "ACH-ROUTE r12 §7.12 (E1 retirement), D-ACH-05; the agency's billing member (X-Kauro-Agency); Idempotency-Key (the agency's journal)",
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["reasonCode"], { reasonCode: { type: "string", minLength: 1, maxLength: 200 } }) }),
+    responses: Object.freeze({ "200": Object.freeze({ description: "The bank order after the retirement (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: RETIRED_CHECKOUT_RESPONSE_SCHEMA }) }),
+  }),
   creditCommand("enterBankCredit", "/api/v1/operations/bank-accounts/{accountRef}/credits", "Enter a manual bank credit the owner read in the bank's own artifact (DRAFT_MANUAL: grants nothing until confirmed)", "201",
     closedObject(["bankTransactionId", "rail", "grossCents", "currency", "reference", "bookedAt", "evidence", "authorizationRef"], {
       bankTransactionId: { type: "string", minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" },

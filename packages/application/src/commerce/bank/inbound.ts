@@ -16,13 +16,13 @@
  * Every version check answers STALE_VERSION (no reason); the command ids are the lane's operational ids of the command journal.
  */
 import type { CommandId, UtcInstant } from "@kauro/contracts";
-import type { BankCreditRecord, CausationId, CommerceUnitOfWork, CorrelationId, OperatorContext, UserId } from "@kauro/domain";
+import type { AgencyId, BankCreditRecord, CausationId, CommerceUnitOfWork, CorrelationId, OperatorContext, PaymentOrderId, UserId } from "@kauro/domain";
 import { BANK_CREDIT_RAILS, DomainFailure, NotFoundFailure, PROVIDER_CALL_TIMEOUT_MS, StaleVersionFailure, actorOf } from "@kauro/domain";
 import { judgedUnderHold, type RequestAuthority } from "../../api/authority.js";
 import type { AuthenticatedSubject, CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { problemOf, type Problem } from "../../api/problems.js";
 import type { StoredBankEvidence } from "../ports.js";
-import { CommerceAccessDenied, operatorContextOf, recordCommerceDenial, runCommerceCommand, type CommerceRequestRuntime, type RunnableCommand } from "../request/runtime.js";
+import { CommerceAccessDenied, operatorContextOf, recordCommerceDenial, runCommerceCommand, tenantContextOf, type CommerceRequestRuntime, type RunnableCommand } from "../request/runtime.js";
 import { BANK_HOLD_GATE_READ, type BankCreditRepository, type BankInboundCollaborators } from "./inbound-ports.js";
 import { STEP_UP_ALLOW, assuredAt, evidenceUnavailable, integrationClassOf, judgedAtCommit, type BankRouteRequest } from "./route-config.js";
 
@@ -48,6 +48,15 @@ export interface AttributeBankCreditBody {
   readonly billingEvidenceRef: string;
   readonly reasonCode: string;
   readonly authorizationRef: string;
+}
+
+/** CMD214's body: why the checkout is retired. */
+export interface RetireBankCheckoutBody {
+  readonly reasonCode: string;
+}
+/** CMD214's answer: the bank order as the retirement left it. */
+export interface RetiredCheckoutView {
+  readonly order: { readonly orderId: string; readonly bankState: "EXPIRED"; readonly expiryCause: "RETIRED"; readonly version: number };
 }
 
 export interface BankCreditView {
@@ -140,6 +149,23 @@ export async function publishCreditEvent(uow: CommerceUnitOfWork, causationId: C
   });
 }
 
+/** The event of one bank order state version (the agency's; the payment service publishes it in the agency it adopted). */
+export async function publishOrderStateEvent(uow: CommerceUnitOfWork, causationId: CausationId, instruction: { readonly orderId: string; readonly agencyId: string; readonly version: number; readonly orderState: string }, previousState: string, cause: string): Promise<void> {
+  const context = uow.context;
+  if (context.kind === "ANONYMOUS") throw new DomainFailure("INTEGRITY_FAILURE", "a bank order state change is never anonymous");
+  await uow.events.publish({
+    aggregateKind: "bank_transfer_instruction",
+    aggregateId: instruction.orderId as never,
+    aggregateVersion: instruction.version,
+    agencyId: instruction.agencyId as never,
+    eventType: "bank_transfer_instruction.order_state_changed.v1",
+    actor: actorOf(context),
+    causationId,
+    correlationId: context.correlationId,
+    payload: { orderId: instruction.orderId, agencyId: instruction.agencyId, previousState, orderState: instruction.orderState, cause },
+  });
+}
+
 // --- the stored artifact ---------------------------------------------------------------------------------------------------------------
 
 const creditMismatch = (): DomainFailure => new DomainFailure("INTEGRITY_FAILURE", "the stored artifact disagrees with the credit", { reason: "CREDIT_EVIDENCE_MISMATCH" });
@@ -179,6 +205,8 @@ export interface BankInboundHandlers {
   attribute(request: BankRouteRequest<AttributeBankCreditBody>): Promise<CommandResult<BankCreditCommandView>>;
   getCredit(request: InboundReadRequest & { readonly creditId: string }): Promise<InboundReadAnswer<BankCreditCommandView>>;
   getMatchKeys(request: InboundReadRequest & { readonly orderId: string }): Promise<InboundReadAnswer<BankMatchKeysView>>;
+  /** CMD214: the agency's billing member retires its open bank checkout (E1's retirement half). */
+  retire(request: BankRouteRequest<RetireBankCheckoutBody> & { readonly agencyId: AgencyId }): Promise<CommandResult<RetiredCheckoutView>>;
 }
 export interface InboundReadRequest {
   readonly correlationId: CorrelationId;
@@ -386,6 +414,52 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
         },
       };
     }),
+
+    async retire(request) {
+      const id = BANK_INBOUND_COMMAND_IDS.retire;
+      const envelope: CommandEnvelope<RetireBankCheckoutBody> = { ...inboundEnvelopeOf(id, request), agencyId: request.agencyId };
+      // the payment boundary's pool: the instruction, the order lock and the slot are the payment service's columns (0057 CMD214)
+      const context = { ...tenantContextOf(envelope), pool: "PAYMENT" as const };
+      const agencyId = context.agencyId;
+      const orderId = request.path["orderId"]!;
+      const authorize = async (uow: CommerceUnitOfWork): Promise<void> => {
+        // the checkout's own role: the agency's billing member who opens a checkout (CMD028, AGENCY_BILLING) retires it
+        const decision = await runtime.authorizer.authorize(uow, { command: "CMD028", identity: envelope.subject.identity, agencyId });
+        if (decision.kind === "DENY") throw CommerceAccessDenied.of(id, decision);
+      };
+      return runCommerceCommand<RetireBankCheckoutBody, RetiredCheckoutView>(runtime, {
+        command: { id, journalScope: "TENANT" },
+        envelope,
+        context,
+        replayVersion: (view) => view.order.version,
+        async access(uow) {
+          // a caller with no ACTIVE membership in the agency it names is refused before any of its rows is locked (ADV-PV1R-10): the
+          // membership read under a savepoint rolled back at once, so no membership half is held across the order's lock wait
+          const member = await co.credits(uow).released(() => uow.memberships.findLive(agencyId, context.userId));
+          if (member === null || member.state !== "ACTIVE") await authorize(uow);
+        },
+        async body(uow, causationId) {
+          const repo = co.credits(uow);
+          const seen = await repo.instruction(orderId);
+          if (seen === null || seen.agencyId !== agencyId) throw new NotFoundFailure("payment order");
+          // lock order (§7.28, E1's): the order's row lock, then the member's access decision after that wait (a revocation committed
+          // meanwhile is seen), then the instruction's row lock; the state is judged after the last lock
+          const order = await uow.commerce.orders.lock(orderId as PaymentOrderId);
+          if (order === null || order.agencyId !== agencyId) throw new NotFoundFailure("payment order");
+          await authorize(uow);
+          const instruction = await repo.instruction(orderId, true);
+          if (instruction === null) throw new NotFoundFailure("payment order");
+          if (instruction.orderState !== "AWAITING_TRANSFER" && instruction.orderState !== "PARTIALLY_RECEIVED") {
+            throw new DomainFailure("PRECONDITION_FAILED", "the bank checkout is no longer open", { reason: "ORDER_NOT_CAPTURABLE" });
+          }
+          const after = await repo.expireOrder(orderId, instruction.version, "RETIRED");
+          await repo.releaseBankSlot(orderId);
+          await publishOrderStateEvent(uow, causationId, after, instruction.orderState, "CHECKOUT_RETIRED");
+          const view: RetiredCheckoutView = { order: { orderId, bankState: "EXPIRED", expiryCause: "RETIRED", version: after.version } };
+          return { status: 200, view, version: after.version, resourceKind: "bank_transfer_instruction", resourceId: orderId };
+        },
+      });
+    },
   };
 
   async function ownerRead<View>(request: InboundReadRequest, what: string, read: (uow: CommerceUnitOfWork) => Promise<View>): Promise<InboundReadAnswer<View>> {
