@@ -8,8 +8,10 @@ import { SUPPORT_CATEGORIES } from "@kauro/domain";
 import { B06_COMMANDS, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, REQUEST_SCHEMA_PREFIX, SUPPORT_COMMANDS, requestSchemaId } from "../src/index.js";
 
 const IN_SCOPE = ["CMD001", "CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026"] as const;
-/** The B06 commands and CMD044 of the support package (B11 W4), whose request schema is checked against the catalogue too. */
-const WITH_SUPPORT = [...IN_SCOPE, "CMD044"] as const;
+/** B16's five team commands (CMD003-CMD007). */
+const TEAM = ["CMD003", "CMD004", "CMD005", "CMD006", "CMD007"] as const;
+/** The B06 commands, CMD044 of the support package (B11 W4) and the B16 team commands, whose request schemas are checked against the catalogue too. */
+const WITH_SUPPORT = [...IN_SCOPE, "CMD044", ...TEAM] as const;
 
 test("every in-scope spec matches the catalogue entry: method, path, role, fields in order", () => {
   for (const id of IN_SCOPE) {
