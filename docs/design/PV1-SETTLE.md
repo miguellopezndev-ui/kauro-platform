@@ -29,22 +29,32 @@ to another RECORDED attempt or to a recorded settlement (ST2)").
 - **D-SET-4 Identity and conflict.** One settlement per (route, withdrawalId) and one per bank transaction id: a second
   observation of the same withdrawal or of an already-settled bank transaction is 409 PRECONDITION_FAILED
   WITHDRAWAL_ALREADY_SETTLED (ST2-RETRY "other body or a bank transaction id already settled 409"); the same key and body replays.
-- **D-SET-5 Funds lock.** The body takes the route's INBOUND stream lock (§7.28 L-order: the provider balance's writers C6/P2 hold
-  it) and then the payout-cash lock (`kauro.payout-cash`, CMD052's basis, 0043 fence): CMD052 and ST2 serialize in both orders.
-  Under both, `withdrawn + fee <= PSP_AVAILABLE` of the route (ledger balance) or 409 FUNDS_UNAVAILABLE: no settlement of
-  imaginary liquidity.
+- **D-SET-5 Funds lock.** The body takes the account's L1 OUTBOUND stream lock (the withdrawal is a debit of the route account),
+  then its INBOUND stream lock (§7.28 L-order: the provider balance's writers C6/P2 hold it), then the payout-cash lock
+  (`kauro.payout-cash`, CMD052's basis, 0043 fence): CMD052 and ST2 serialize in both orders. Then the owner is re-judged, and the
+  effect instant `at` is the database clock read after that last lock wait; a period end, settlement observation, receipt booking or
+  receipt observation after `at` is 409 COVERAGE_END_IN_FUTURE. Under the locks, `withdrawn + fee <= PSP_AVAILABLE` of the payment
+  route or 409 FUNDS_UNAVAILABLE: no settlement of imaginary liquidity. The balance is read by the SECURITY DEFINER STABLE function
+  `kauro.route_provider_available_cents(route, currency)` (EXECUTE: kauro_payment only), because the payment service cannot read
+  another agency's postings. GAP: V1 has no producer of bank-route PSP_AVAILABLE (the D-ACH-11 availability observation is not
+  built), so a live CMD215 refuses FUNDS_UNAVAILABLE until it lands; the cells seed the balance as a fixture.
 - **D-SET-6 Postings** (source SETTLEMENT, agency NULL, one set, balanced, UNIQUE(event_id,line_no) = idempotent):
   DEBIT BANK_IN_TRANSIT W / CREDIT PSP_AVAILABLE W (the provider's release); if fee F > 0: DEBIT PROCESSOR_EXPENSE F / CREDIT
   PSP_AVAILABLE F (the withdrawal fee only; the period's capture fees are FEE-sourced already); if a receipt R: DEBIT BANK_CASH R /
   CREDIT BANK_IN_TRANSIT R. gross and held are recorded facts, not posted (they are posted by their own sources).
 - **D-SET-7 Event.** `settlement.recorded.v1` (aggregate `settlement`, version 1, agency NULL), payload
-  `{ settlementId, withdrawalId, withdrawnCents, receivedCents, bankEvidence: boolean }`; an outbox record for FINANCE is not
-  needed (the postings are written in the command's unit).
+  `{ settlementId, withdrawnCents, feeCents, receivedCents, bankEvidence: boolean }` (counts as safe integers; the provider's
+  withdrawal id is a free-form reference and stays out of the outbox); an outbox record for FINANCE is not needed (the postings are
+  written in the command's unit).
 - **D-SET-8 Cells file.** The cells run in `apps/api/test/settlement-cells.test.ts`, not in packages/persistence as §7.25 names:
   ST2 is an owner command (journal, step-up, route) and `@kauro/persistence` cannot reach the application's classifier. The SET-M
   titles are §7.25's exactly.
+- **D-SET-9 Event per version, scoped.** `settlements_event_per_version` (D-EVT-1) binds the rows a command writes: bank-route rows
+  (`withdrawal_id IS NOT NULL`, CMD215). 0017's provider balance observation (no withdrawal) has no V1 producer command; its event
+  obligation lands with that producer. Received money below the withdrawal stays in BANK_IN_TRANSIT (W - R) until a later observation:
+  GAP, no V1 command closes the remainder.
 
-## Failure matrix (§7.25, 16 cells; N/A cells justified in §7.25)
+## Failure matrix (§7.25, 10 cells; the N/A cells are justified in §7.25)
 
 | Step | RACE | TIMEOUT | EXPIRY | CRASH-BEFORE | CRASH-AFTER | RETRY | REVOCATION | PARTIAL |
 |---|---|---|---|---|---|---|---|---|
