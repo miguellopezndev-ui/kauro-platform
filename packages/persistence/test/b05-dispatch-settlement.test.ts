@@ -292,6 +292,17 @@ test("L08 RACE (reconciliation): GRANT_RECONCILIATION evidence in micros above m
   await env.h.audit.run(controlOf(run3.ag.agencyId), (uow) => uow.audits.reconcileRequestMicros(c3.requestId, 245_000n));
   assert.deepEqual(await liabilities(env, pool3), []);
   assert.deepEqual(await money(env, run3.grantId), { reserved: 0, spent: 25, state: "AUTHORIZED" });
+  // after IC's estimate (D5-18 row 2: usage null -> COMMITTED at the maximum, usageKnown false; no excess, no liability) provider
+  // evidence above the maximum opens the request's one liability by the same rule: evidence - max
+  const pool4 = await freshPool(env);
+  const run4 = await interpretingRun(env, "l08-estimate", pool4);
+  const d = await admit(env, run4, 245_000n);
+  await answered(d, "25");
+  await settle(d, "COMMITTED", 245_000n, false);
+  assert.deepEqual(await liabilities(env, pool4), [], "the estimate at the maximum owes nothing over it");
+  await env.h.audit.run(controlOf(run4.ag.agencyId), (uow) => uow.audits.reconcileRequestMicros(d.requestId, 260_000n));
+  assert.deepEqual(await liabilities(env, pool4), [{ request_id: d.requestId, excess: "15000", state: "OPEN" }], "judged on the evidence");
+  assert.deepEqual(await money(env, run4.grantId), { reserved: 0, spent: 25, state: "AUTHORIZED" }, "spend capped at the 25 reserved cents");
 });
 
 test("S08 DENY send edge: markDispatching on a DISPATCHING, UNCERTAIN, RESPONSE_STORED, FAILED or CANCELLED request returns null, a direct UPDATE into DISPATCHING from any state but RESERVED is refused KA007, and an edge retried after its first COMMIT and an audit cancellation sends nothing", async () => {
