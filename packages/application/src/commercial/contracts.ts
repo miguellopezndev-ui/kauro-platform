@@ -31,9 +31,11 @@ import type {
   SellerView,
   CapabilityVersionView,
   CapabilityRestrictionView,
+  IncidentView,
+  RecoveryAuthorizationView,
 } from "./views.js";
 
-export type CommercialCommandId = "CMD002" | "CMD027" | "CMD043" | "CMD045" | "CMD046" | "CMD047" | "CMD048" | "CMD049" | "CMD050" | "CMD051" | "CMD052" | "CMD053" | "CMD058" | "CMD059";
+export type CommercialCommandId = "CMD002" | "CMD027" | "CMD043" | "CMD045" | "CMD046" | "CMD047" | "CMD048" | "CMD049" | "CMD050" | "CMD051" | "CMD052" | "CMD053" | "CMD056" | "CMD057" | "CMD058" | "CMD059";
 
 export type CommercialPrincipalKind = "AGENCY_MEMBER" | "SELLER" | "SELLER_OR_OWNER" | "CORPORATE_OPERATOR" | "COMMERCIAL_SERVICE";
 
@@ -52,6 +54,11 @@ export interface CommercialCommandSpec<Body> {
    * seller or the owner) and kauro_commission for the two services (D10-CTX-2).
    */
   readonly runtimeRole: "kauro_app" | "kauro_commission";
+  /**
+   * Set when a verified service identity may also act (role OPERATIONS_SERVICE_OR_OWNER): the technical role it must hold and the runtime
+   * group its unit of work runs in (decision B18-OPS-1). The person path of the same route is `principal` and `runtimeRole`.
+   */
+  readonly service?: { readonly role: "OPERATIONS_SERVICE"; readonly runtimeRole: "kauro_commission" };
   readonly scope: CommercialScope;
   /** The path parameter naming the aggregate; null for a command that creates its aggregate (CMD045: a prospect has no identity yet). */
   readonly aggregateParam: string | null;
@@ -370,6 +377,56 @@ export const RECONCILE_COMMISSION_PAYOUT = spec<ReconcileCommissionPayoutBody>({
   stepUp: false,
 });
 
+// --- CMD056 RecordIncident, CMD057 AuthorizeRecovery (package B16; gate G-RECOVERY) ------------------------------------------------
+
+export interface RecordIncidentBody {
+  readonly severity: string;
+  readonly affectedScopeRefs: ReadonlyArray<string>;
+  readonly summary: string;
+}
+export type RecordIncidentResult = IncidentView;
+export const RECORD_INCIDENT = spec<RecordIncidentBody>({
+  id: "CMD056",
+  name: "RecordIncident",
+  method: "POST",
+  path: "/api/v1/operations/incidents",
+  role: "OPERATIONS_SERVICE_OR_OWNER",
+  principal: "CORPORATE_OPERATOR",
+  runtimeRole: "kauro_app",
+  service: { role: "OPERATIONS_SERVICE", runtimeRole: "kauro_commission" },
+  scope: "CORPORATE",
+  aggregateParam: null,
+  scopeKind: null,
+  expectedVersionRequired: false,
+  authorityHashFields: [],
+  fields: ["severity", "affectedScopeRefs", "summary"],
+  stepUp: false,
+});
+
+export interface AuthorizeRecoveryBody {
+  readonly restoreCandidateRef: string;
+  readonly deletionJournalHash: string;
+  /** A fresh step-up proof of the authorizing owner (08). */
+  readonly authorizationRef: string;
+}
+export type AuthorizeRecoveryResult = RecoveryAuthorizationView;
+export const AUTHORIZE_RECOVERY = spec<AuthorizeRecoveryBody>({
+  id: "CMD057",
+  name: "AuthorizeRecovery",
+  method: "POST",
+  path: "/api/v1/operations/recoveries",
+  role: "KAURO_OWNER",
+  principal: "CORPORATE_OPERATOR",
+  runtimeRole: "kauro_app",
+  scope: "CORPORATE",
+  aggregateParam: null,
+  scopeKind: null,
+  expectedVersionRequired: false,
+  authorityHashFields: [],
+  fields: ["restoreCandidateRef", "deletionJournalHash", "authorizationRef"],
+  stepUp: true,
+});
+
 // --- CMD058 ChangeCapability, CMD059 RestrictCapability (package B18; gate G-RELEASE) -----------------------------------------------
 
 export interface ChangeCapabilityBody {
@@ -408,6 +465,7 @@ export const RESTRICT_CAPABILITY = spec<RestrictCapabilityBody>({
   role: "OPERATIONS_SERVICE_OR_OWNER",
   principal: "CORPORATE_OPERATOR",
   runtimeRole: "kauro_app",
+  service: { role: "OPERATIONS_SERVICE", runtimeRole: "kauro_commission" },
   scope: "CORPORATE",
   aggregateParam: "capabilityId",
   scopeKind: null,
@@ -430,6 +488,8 @@ export const COMMERCIAL_COMMANDS = Object.freeze({
   CMD051: CLOSE_COMMISSION_PERIOD,
   CMD052: APPROVE_COMMISSION_PAYOUT,
   CMD053: RECONCILE_COMMISSION_PAYOUT,
+  CMD056: RECORD_INCIDENT,
+  CMD057: AUTHORIZE_RECOVERY,
   CMD058: CHANGE_CAPABILITY,
   CMD059: RESTRICT_CAPABILITY,
 } as const);

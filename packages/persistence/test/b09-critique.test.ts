@@ -18,6 +18,8 @@ import {
   type UserId,
 } from "@kauro/domain";
 import { start, type AgencyFixture, type Harness } from "../src/testing/harness.js";
+import { consumeThroughExecution } from "../src/testing/execution-delivery.js";
+import { endJob } from "../src/testing/execution-fixtures.js";
 import {
   ENVIRONMENT,
   PAYMENT_SERVICE,
@@ -342,13 +344,12 @@ test("B09-F2 (replacement path): a paid, unexecuted purchase is re-bound once to
   const q6 = await issuedQuote(app, A, s6, profiles.get(A.agencyId)!, routes.issuerRef, { replacesQuoteId: q4.quoteId });
   // a re-binding row alone (the entitlement not revoked, the quotes not moved) cannot commit
   await assert.rejects(rebind(A, { order: second.order, captureId: second.captureId, from: q4, fromVersion: 3, fromAuthorizationId: second.authorizationId!, to: q6, ordinal: 1 }, "ROW_ONLY"), refusedWith("KP013"));
-  // execution started (the processing package's consumption, written here by the superuser oracle in the absence of B08's role)
-  await h.oracle.query("BEGIN");
-  await h.oracle.query("UPDATE kauro.commercial_authorizations SET state = 'CONSUMED', job_ref = $2, consumed_at = now(), version = 2 WHERE authorization_id = $1", [second.authorizationId, ids.next()]);
-  await commerceEvent(h.oracle, "commercial_authorization", second.authorizationId!, 2, A.agencyId, "commercial_authorization.consumed.v1", { kind: "SERVICE", id: "execution-control" });
-  await h.oracle.query("COMMIT");
+  // execution started: the processing package's consumption, written by the production execution writers (queueJob, admitJob; D1)
+  const consumed = await consumeThroughExecution(h, A, second.authorizationId!);
   await assert.rejects(rebind(A, { order: second.order, captureId: second.captureId, from: q4, fromVersion: 3, fromAuthorizationId: second.authorizationId!, to: q6, ordinal: 1 }), refusedWith("KP013"));
   assert.equal((await h.oracle.query("SELECT 1 FROM kauro.purchase_rebindings WHERE capture_id = $1", [second.captureId])).rowCount, 0);
+  // the job ends so that the platform's one ACTIVE slot is free again (R2-046 capacity)
+  await endJob(h, A, consumed.jobId);
 });
 
 // --- B09-F3 ----------------------------------------------------------------------------------------------------------------------------------

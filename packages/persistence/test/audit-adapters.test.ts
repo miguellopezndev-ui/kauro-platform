@@ -172,7 +172,7 @@ test("the audit store through every repository method as the owning roles: two S
   assert.equal(replanned.modelTaskId, taskInput.modelTaskId);
   const owner = interpret.step.stepId as string as LeaseOwnerId;
   const r1 = ids.next() as RequestId;
-  const first = await h.audit.run(controlOf(A.agencyId), (uow) => uow.audits.beginDispatch(task.modelTaskId, { requestId: r1, ownerId: owner, requestHash: sha("request-1"), reservedCents: 25n }));
+  const first = await h.audit.run(controlOf(A.agencyId), (uow) => uow.audits.beginDispatch(task.modelTaskId, { requestId: r1, ownerId: owner, requestHash: sha("request-1"), reservedCents: 25n, stepFence: interpret.step.fence }));
   assert.equal(first.kind, "RESERVED");
   assert.deepEqual(first.kind === "RESERVED" ? [first.request.requestId, first.request.state, first.request.fence, first.lease.fence, first.lease.costAuthorityId] : [], [r1, "RESERVED", 1, 1, inputA.grantId]);
   assert.deepEqual(await heldOn(inputA.grantId), { reserved: 25, spent: 0, state: "AUTHORIZED" }, "the intent reserves on the audit's grant");
@@ -182,7 +182,7 @@ test("the audit store through every repository method as the owning roles: two S
     assert.equal((await uow.requestJournal.storeResponse(r1, 1, sha("response-1"), { usageState: "KNOWN", actualCents: "20" }, clock.now()))?.state, "RESPONSE_STORED");
   });
   // a redelivered INTERPRET asks again: the stored response comes back before any new dispatch intent — no row, no reservation
-  const again = await h.audit.run(controlOf(A.agencyId), (uow) => uow.audits.beginDispatch(task.modelTaskId, { requestId: ids.next() as RequestId, ownerId: owner, requestHash: sha("request-1"), reservedCents: 25n }));
+  const again = await h.audit.run(controlOf(A.agencyId), (uow) => uow.audits.beginDispatch(task.modelTaskId, { requestId: ids.next() as RequestId, ownerId: owner, requestHash: sha("request-1"), reservedCents: 25n, stepFence: interpret.step.fence }));
   assert.deepEqual(again.kind === "STORED_RESPONSE" ? [again.kind, again.request.requestId, again.request.responseArtifactHash] : [again.kind], ["STORED_RESPONSE", r1, sha("response-1")]);
   assert.deepEqual(await oracleOne("SELECT count(*)::int AS n FROM kauro.request_journal WHERE task_id = $1", [task.modelTaskId]), { n: 1 });
   assert.deepEqual(await heldOn(inputA.grantId), { reserved: 25, spent: 0, state: "AUTHORIZED" });
@@ -332,13 +332,13 @@ test("B06-R1 seam (b08/land): the MODEL_TASK lease is born with the model task's
   // the first dispatch owner's claim stores the task's checkpoint with the lease and reserves its intent at fence 1
   const owner1 = ids.next() as LeaseOwnerId;
   const first = await h.audit.run(controlOf(B.agencyId), (uow) =>
-    uow.audits.beginDispatch(task.modelTaskId, { requestId: ids.next() as RequestId, ownerId: owner1, requestHash: sha("b06-r1-request-1"), reservedCents: 25n }),
+    uow.audits.beginDispatch(task.modelTaskId, { requestId: ids.next() as RequestId, ownerId: owner1, requestHash: sha("b06-r1-request-1"), reservedCents: 25n, stepFence: interpret.step.fence }),
   );
   assert.deepEqual(first.kind === "RESERVED" ? [first.request.fence, first.lease.fence, first.lease.ownerId, first.lease.checkpointHash] : [first.kind], [1, 1, owner1, checkpoint]);
   // while owner 1's lease is live another owner is HELD and reserves nothing
   const owner2 = ids.next() as LeaseOwnerId;
   const held = await h.audit.run(controlOf(B.agencyId), (uow) =>
-    uow.audits.beginDispatch(task.modelTaskId, { requestId: ids.next() as RequestId, ownerId: owner2, requestHash: sha("b06-r1-request-2"), reservedCents: 25n }),
+    uow.audits.beginDispatch(task.modelTaskId, { requestId: ids.next() as RequestId, ownerId: owner2, requestHash: sha("b06-r1-request-2"), reservedCents: 25n, stepFence: interpret.step.fence }),
   );
   assert.equal(held.kind, "HELD");
   assert.deepEqual(await lease(), { owner_id: owner1, fence: 1, checkpoint_hash: checkpoint });
@@ -355,7 +355,7 @@ test("B06-R1 seam (b08/land): the MODEL_TASK lease is born with the model task's
   const r2 = ids.next() as RequestId;
   const resumed = await within(env.control, service(B.agencyId), async (c) => {
     await clockAt(c, lapsed);
-    return controlAuditStore(c).beginDispatch(task.modelTaskId, { requestId: r2, ownerId: owner2, requestHash: sha("b06-r1-request-2"), reservedCents: 25n });
+    return controlAuditStore(c).beginDispatch(task.modelTaskId, { requestId: r2, ownerId: owner2, requestHash: sha("b06-r1-request-2"), reservedCents: 25n, stepFence: interpret.step.fence });
   });
   assert.deepEqual(
     resumed.kind === "RESERVED" ? [resumed.request.requestId, resumed.request.fence, resumed.lease.fence, resumed.lease.ownerId, resumed.lease.checkpointHash] : [resumed.kind],

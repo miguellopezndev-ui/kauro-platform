@@ -43,6 +43,8 @@ import Fastify, { LogController, type FastifyInstance, type FastifyReply, type F
 import type { CommandId, Sha256Hex } from "@kauro/contracts";
 import type {
   AcceptedResponse,
+  ServiceAuthenticator,
+  ServiceCommandRequest,
   AuditHandlers,
   AuditIntakeHandlers,
   AuditReadHandlers,
@@ -194,6 +196,11 @@ export interface ApiServerOptions {
     readonly commands: ReadonlyArray<CommercialCommandHandler<unknown, unknown>>;
     /** The served B10 reads (GetCommissionStatement; COMMERCIAL_SERVED_READ_IDS), each with its admission spec and declared replies. */
     readonly reads?: ReadonlyArray<CommercialReadHandler<unknown>>;
+    /**
+     * The verified service identities of the operations service (package B18, decision B18-OPS-1): a command whose handler declares a
+     * `service` execution (CMD056, CMD059; role OPERATIONS_SERVICE_OR_OWNER) first tries them; a request that carries none is the owner's.
+     */
+    readonly serviceAuthenticator?: ServiceAuthenticator;
   };
   readonly authenticator: Authenticator;
   /**
@@ -541,7 +548,7 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
   for (const handler of options.commercial?.commands ?? []) {
     const spec = handler.spec;
     if (!isServedCommercialCommand(spec.id)) throw new Error(`${spec.id} has a handler but is not a served B10 command (COMMERCIAL_SERVED_COMMAND_IDS of @kauro/application)`);
-    registerCommand(app, options, handler.admission, commercialCommandRouteResponses(spec.id), (envelope) => handler.execute(envelope), sink, hashAddress);
+    registerCommand(app, options, handler.admission, commercialCommandRouteResponses(spec.id), (envelope) => handler.execute(envelope), sink, hashAddress, handler.service !== undefined && options.commercial?.serviceAuthenticator !== undefined ? { authenticator: options.commercial.serviceAuthenticator, run: handler.service } : undefined);
   }
   for (const handler of options.commercial?.reads ?? []) {
     if (!isServedCommercialRead(handler.operationId)) throw new Error(`${handler.operationId} has a handler but is not a served B10 read (COMMERCIAL_SERVED_READ_IDS of @kauro/application)`);
@@ -728,6 +735,8 @@ function registerCommand<Body, View>(
   execute: (envelope: CommandEnvelope<Body>) => Promise<CommandResult<View>>,
   sink: (correlationId: string, error: unknown) => void,
   hashAddress: (ip: string | undefined) => Sha256Hex | null,
+  /** The second principal of a dual-principal route (OPERATIONS_SERVICE_OR_OWNER): a verified service identity runs `run`, else the person's path. */
+  service?: { readonly authenticator: ServiceAuthenticator; readonly run: (request: ServiceCommandRequest<Body>) => Promise<CommandResult<View>> },
 ): void {
   app.route<{ Params: Record<string, string>; Body: Buffer | undefined; Reply: CommandReply<View> }>({
     method: spec.method,
@@ -752,6 +761,46 @@ function registerCommand<Body, View>(
       };
       const admission = admitStructure(spec, raw, options.validator, options.clock);
       if (admission.kind === "PROBLEM") return sendProblem(reply, admission.problem);
+      // the one-time secrets of a completed result go to their channel after COMMIT, never into the response; a failing channel is an internal error
+      const deliverOneTime = async (result: CommandResult<View>): Promise<void> => {
+        if (result.kind !== "COMPLETED" || result.oneTime === undefined || options.oneTimeDelivery === undefined) return;
+        try {
+          await options.oneTimeDelivery({ command: spec.id, view: result.view, secrets: result.oneTime });
+        } catch (error) {
+          sink(admission.admission.correlationId, error);
+        }
+      };
+      const answer = (result: CommandResult<View>): FastifyReply => {
+        switch (result.kind) {
+          case "COMPLETED": {
+            const body: CompletedResponse<View> = { kind: "COMPLETED", version: result.version, replayed: result.replayed, data: result.view };
+            return reply.code(result.status).type(HEADERS.contentType).send(body);
+          }
+          case "ACCEPTED": {
+            const body: AcceptedResponse = { kind: "ACCEPTED", operationId: result.operationId, state: result.state, statusPath: result.statusPath, pollAfterSeconds: result.pollAfterSeconds };
+            return reply.code(result.status).type(HEADERS.contentType).send(body);
+          }
+          case "CONFLICT":
+          case "REJECTED":
+          case "UNAVAILABLE":
+            return sendProblem(reply, result.problem);
+        }
+      };
+      // the operations service, when it presented a verified service identity (a person's credential is no service identity: null)
+      if (service !== undefined) {
+        const identity = await service.authenticator.authenticate(headers);
+        if (identity !== null) {
+          const correlationId = admission.admission.correlationId;
+          try {
+            const served = await service.run({ correlationId, idempotencyKey: admission.admission.idempotencyKey, identity, path: admission.admission.path, body: admission.admission.body as Body });
+            await deliverOneTime(served);
+            return answer(served);
+          } catch (error) {
+            sink(correlationId, error);
+            return sendProblem(reply, internalProblem(correlationId));
+          }
+        }
+      }
       // the refusal of an unauthenticated consequential command — or of refused credentials (B11 D-AUTH-5: decided here, before
       // the journal is reserved, so no idempotency key is consumed) — is a durable fact before it is an answer (08 "Audit events")
       const authenticated = await subjectOrRefusal(options, request, headers, spec.id as CommandId, { correlationId: admission.admission.correlationId, agencyId: admission.admission.agencyId }, sink);
@@ -767,27 +816,8 @@ function registerCommand<Body, View>(
         sink(envelope.correlationId, error);
         return sendProblem(reply, internalProblem(envelope.correlationId));
       }
-      switch (result.kind) {
-        case "COMPLETED": {
-          if (result.oneTime !== undefined && options.oneTimeDelivery !== undefined) {
-            try {
-              await options.oneTimeDelivery({ command: spec.id, view: result.view, secrets: result.oneTime });
-            } catch (error) {
-              sink(envelope.correlationId, error);
-            }
-          }
-          const body: CompletedResponse<View> = { kind: "COMPLETED", version: result.version, replayed: result.replayed, data: result.view };
-          return reply.code(result.status).type(HEADERS.contentType).send(body);
-        }
-        case "ACCEPTED": {
-          const body: AcceptedResponse = { kind: "ACCEPTED", operationId: result.operationId, state: result.state, statusPath: result.statusPath, pollAfterSeconds: result.pollAfterSeconds };
-          return reply.code(result.status).type(HEADERS.contentType).send(body);
-        }
-        case "CONFLICT":
-        case "REJECTED":
-        case "UNAVAILABLE":
-          return sendProblem(reply, result.problem);
-      }
+      await deliverOneTime(result);
+      return answer(result);
     },
   });
 }

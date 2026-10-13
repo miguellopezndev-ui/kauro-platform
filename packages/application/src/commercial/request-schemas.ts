@@ -72,6 +72,14 @@ export const COMMERCIAL_REQUEST_SCHEMAS = Object.freeze({
   CMD052: schema("CMD052", ["expectedVersion", "payeeRef", "authorizationRef"], { expectedVersion: VERSION, payeeRef: ID, authorizationRef: ID }),
   /** ReconcileCommissionPayout: the stored payout evidence the verifier authenticates. */
   CMD053: schema("CMD053", ["providerPayoutEvidenceRef"], { providerPayoutEvidenceRef: ID }),
+  /** RecordIncident: the severity label (S1..S4, or FALSE_POSITIVE for a monitoring false positive), the safe scopes it affects and a short summary. */
+  CMD056: schema("CMD056", ["severity", "affectedScopeRefs", "summary"], {
+    severity: { type: "string", enum: ["S1", "S2", "S3", "S4", "FALSE_POSITIVE"] },
+    affectedScopeRefs: { type: "array", minItems: 1, maxItems: 20, items: { type: "string", pattern: "^(platform|agency|capability|project|provider|route|worker):[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" } },
+    summary: { type: "string", minLength: 1, maxLength: 500, pattern: LABEL_PATTERN },
+  }),
+  /** AuthorizeRecovery: the prepared restore candidate, the deletion journal hash the restore must honour and the owner's step-up proof. */
+  CMD057: schema("CMD057", ["restoreCandidateRef", "deletionJournalHash", "authorizationRef"], { restoreCandidateRef: ID, deletionJournalHash: HASH, authorizationRef: ID }),
   /** ChangeCapability: the capability version read, the new profile hash and the qualification evidence hashes it cites (1..50; a repeated hash is recorded once). */
   CMD058: schema("CMD058", ["expectedVersion", "profileHash", "qualificationEvidenceRefs"], {
     expectedVersion: VERSION,

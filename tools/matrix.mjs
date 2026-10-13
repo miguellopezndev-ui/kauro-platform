@@ -749,6 +749,43 @@ APPLICABILITY.CMD059 = {
   "external uncertainty": "NOT_APPLICABLE: a restriction reaches no provider; the SUSPENDED edge, the restriction evidence and the journal entry are rows of one database transaction, and routing the work of a paid project to recovery or refund is the recovery commands' own step",
 };
 
+// package B16/B18's operations commands (registry CMD056 RecordIncident, CMD057 AuthorizeRecovery; gate G-RECOVERY) and the operations
+// service principal of CMD056 and CMD059 (decision B18-OPS-1): the owner's, or the operations service's, none reaches a provider
+const OPERATIONS = "cmd056-cmd057-operations.test.ts";
+const CMD056_OK = "CMD056-OK: the owner records an actual incident";
+const CMD056_DENY = "CMD056-DENY: an agency member and a stranger are refused";
+const CMD056_RACE = "CMD056-RACE: an identical retry replays the 201";
+const CMD057_OK = "CMD057-OK: the owner with a fresh step-up authorizes a PREPARED restore candidate";
+const CMD057_DENY = "CMD057-DENY: an agency member and a stranger are refused";
+const CMD057_RACE = "CMD057-RACE: an identical retry replays the 200";
+const CMD059_SERVICE_OK = "CMD059-OK (operations service): the operations service restricts an offered capability";
+const CMD059_SERVICE_DENY = "CMD059-DENY (operations service): the commission and finance services are wrong service identities";
+const CMD059_SERVICE_RACE = "CMD059-RACE (operations service): an identical retry replays the 200";
+APPLICABILITY.CMD056 = {
+  "legitimate state": [[OPERATIONS, CMD056_OK]],
+  "wrong role": [[OPERATIONS, CMD056_DENY]],
+  "wrong agency": [[OPERATIONS, CMD056_DENY]],
+  "stale version": "NOT_APPLICABLE: RecordIncident creates a record and carries no expectedVersion (registry fields: severity, affectedScopeRefs, summary); the replay of its key is the retry case",
+  "duplicate request": [[OPERATIONS, CMD056_RACE]],
+  "changed-body same key": [[OPERATIONS, CMD056_RACE]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[OPERATIONS, CMD056_RACE]],
+  "external uncertainty": "NOT_APPLICABLE: recording an incident reaches no provider; the incident, its responsibilities and the journal entry are rows of one database transaction (the registry lists no event for it, so no consumer fans out)",
+};
+APPLICABILITY.CMD057 = {
+  "legitimate state": [[OPERATIONS, CMD057_OK]],
+  "wrong role": [[OPERATIONS, CMD057_DENY]],
+  "wrong agency": [[OPERATIONS, CMD057_DENY]],
+  "stale version": [[OPERATIONS, CMD057_DENY], [OPERATIONS, CMD057_RACE]],
+  "duplicate request": [[OPERATIONS, CMD057_RACE]],
+  "changed-body same key": [[OPERATIONS, CMD057_RACE]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[OPERATIONS, CMD057_RACE]],
+  "external uncertainty": "NOT_APPLICABLE: an authorization runs no restore (the control plane runs and releases it after its own checks); the candidate's edge, the recovery row, the step-up fact and the journal entry are rows of one database transaction (the registry lists no event for it)",
+};
+// CMD059 admits the operations service as its second principal: the service cases join the owner's
+for (const [cell, extra] of [["legitimate state", CMD059_SERVICE_OK], ["wrong role", CMD059_SERVICE_DENY], ["wrong agency", CMD059_SERVICE_DENY], ["duplicate request", CMD059_SERVICE_RACE], ["changed-body same key", CMD059_SERVICE_RACE], ["lost response", CMD059_SERVICE_RACE], ["stale version", CMD059_SERVICE_RACE]]) APPLICABILITY.CMD059[cell].push([OPERATIONS, extra]);
+
 // package B09's served payment commands (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8 CMD030, CMD033, CMD034)
 const WEBHOOK = "cmd030-payment-webhook.test.ts";
 const EXECUTE = "cmd033-execute-refund.test.ts";

@@ -14,11 +14,11 @@
  *    verified service identities, mapped to their one technical role by this code-owned table (D-AUTHZ-B3).
  */
 
-export type ServiceRole = "PAYMENT_SERVICE" | "AUTHENTICATED_PROVIDER" | "FISCAL_SERVICE" | "COMMISSION_SERVICE" | "FINANCE_SERVICE";
+export type ServiceRole = "PAYMENT_SERVICE" | "AUTHENTICATED_PROVIDER" | "FISCAL_SERVICE" | "COMMISSION_SERVICE" | "FINANCE_SERVICE" | "OPERATIONS_SERVICE";
 
 /** A service identity the service authenticator verified (issuer, audience, expected identity, environment; 10). */
 export interface ServiceIdentity {
-  /** The verified service identity, a lowercase token (payment-service, provider-ingress, fiscal-service, commission-service, finance-service). */
+  /** The verified service identity, a lowercase token (payment-service, provider-ingress, fiscal-service, commission-service, finance-service, operations-service). */
   readonly serviceId: string;
   readonly audience: string;
   /** The deployment environment the identity was issued for (LOCAL, SANDBOX, LIVE). */
@@ -38,6 +38,10 @@ export const SERVICE_ROLE_TABLE: Readonly<Record<string, ServiceRole>> = Object.
   "fiscal-service": "FISCAL_SERVICE",
   "commission-service": "COMMISSION_SERVICE",
   "finance-service": "FINANCE_SERVICE",
+  // package B18 (R2 CMD056 RecordIncident and CMD059 RestrictCapability, role OPERATIONS_SERVICE_OR_OWNER): the operations service records an
+  // incident and restricts a capability; it holds no other command, and no other service holds its role. It runs in kauro_commission's group
+  // beside the commission and finance services (decision B18-OPS-1: that group's pools are the only verified service pools of the api).
+  "operations-service": "OPERATIONS_SERVICE",
 });
 
 export function serviceHoldsRole(serviceId: string, role: ServiceRole): boolean {

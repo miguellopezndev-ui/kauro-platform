@@ -230,6 +230,9 @@ test("R23: every served route declares its replies (the route inventory the Open
       // package B18's capability governance (CMD058, CMD059): the corporate owner's, synchronous
       ["POST", "/api/v1/operations/capabilities/:capabilityId/versions", "ChangeCapability", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD058" } }],
       ["POST", "/api/v1/operations/capabilities/:capabilityId/restrict", "RestrictCapability", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD059" } }],
+      // package B16/B18 operations commands (CMD056, CMD057): CMD056 answers 201 (a created incident), CMD057 200
+      ["POST", "/api/v1/operations/incidents", "RecordIncident", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD056" } }],
+      ["POST", "/api/v1/operations/recoveries", "AuthorizeRecovery", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD057" } }],
       // package B10's statement and payout operations (mandate B10-STATEMENTS-PAYOUTS): the owner's approval and the statement read
       ["POST", "/api/v1/sales/statements/:statementId/approve-payout", "ApproveCommissionPayout", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD052" } }],
       ["GET", "/api/v1/sales/statements/:statementId", "GetCommissionStatement", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetCommissionStatement" } }],

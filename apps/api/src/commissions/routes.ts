@@ -17,7 +17,7 @@
  * B15). Without the commission service's units of work (an edition that binds none) the routes are served all the same and find no
  * verified service identity.
  */
-import type { BankingCalendarSource, CommandResult, CompletedResponse, CommandSpec, PayoutEvidenceVerifier, Problem, ProviderCallTimer, SchemaValidator, ServiceAuthenticator, StatementServiceHold, StatementServiceRuntime, UnauthenticatedRequest } from "@kauro/application";
+import type { BankingCalendarSource, OperationsServiceHold, OperationsServiceRuntime, CommandResult, CompletedResponse, CommandSpec, PayoutEvidenceVerifier, Problem, ProviderCallTimer, SchemaValidator, ServiceAuthenticator, StatementServiceHold, StatementServiceRuntime, UnauthenticatedRequest } from "@kauro/application";
 import {
   CLOSE_COMMISSION_PERIOD,
   HEADERS,
@@ -35,7 +35,7 @@ import {
 } from "@kauro/application";
 import type { Clock, CorrelationId, Environment, ServiceIdentity } from "@kauro/domain";
 import { DomainFailure, registryCommissionPolicy } from "@kauro/domain";
-import { RecordedBankingCalendarSource, commissionWorkOf, ledgerOf, salesOf, statementsOf, type PgCommercialUnitOfWork, type PgCommercialUnitOfWorkFactory } from "@kauro/persistence";
+import { RecordedBankingCalendarSource, operationsOf, commissionWorkOf, ledgerOf, salesOf, statementsOf, type PgCommercialUnitOfWork, type PgCommercialUnitOfWorkFactory } from "@kauro/persistence";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { Authenticator } from "../authenticator.js";
 import { commercialPrincipalReader } from "../commercial-principals.js";
@@ -56,6 +56,21 @@ export interface CommissionRoutesBinding {
   readonly providerTimer?: ProviderCallTimer;
   /** Interleavings of the service commands (tests only). */
   readonly hold?: StatementServiceHold;
+  /** Interleavings of the operations service commands, CMD056 and CMD059 as the service (tests only). */
+  readonly operationsHold?: OperationsServiceHold;
+}
+
+/** The runtime of the operations service (CMD056, CMD059 as the service; decision B18-OPS-1) over the commission group's units of work. */
+export function operationsServiceRuntime(binding: CommissionRoutesBinding, environment: Environment, clock: Clock): OperationsServiceRuntime {
+  return {
+    units: binding.units as unknown as OperationsServiceRuntime["units"],
+    environment,
+    clock,
+    authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }),
+    serverNow: (uow) => serverNow(uow as PgCommercialUnitOfWork),
+    operations: operationsOf,
+    ...(binding.operationsHold !== undefined ? { hold: binding.operationsHold } : {}),
+  };
 }
 
 /** The runtime of the service commands over a binding: the commission service's units of work and the platform's ports. */

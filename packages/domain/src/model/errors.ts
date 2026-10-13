@@ -20,6 +20,7 @@ import { AUDIT_FAILURE_REASONS } from "./audit/failure-reasons.js";
 import { TARGET_FAILURE_REASONS } from "./target-contract.js";
 import { IMPORT_STAGE_FAILURE_REASONS } from "./import-stage.js";
 import { CAPABILITY_FAILURE_REASONS } from "./capability-governance.js";
+import { RECOVERY_FAILURE_REASONS } from "./operations-recovery.js";
 
 export const FAILURE_CODES = [
   "INVALID_REQUEST",
@@ -310,6 +311,8 @@ export const FAILURE_REASONS = [
   ...IMPORT_STAGE_FAILURE_REASONS,
   // capability governance (package B18: CMD058, CMD059)
   ...CAPABILITY_FAILURE_REASONS,
+  // operations and recovery (package B16: CMD057)
+  ...RECOVERY_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

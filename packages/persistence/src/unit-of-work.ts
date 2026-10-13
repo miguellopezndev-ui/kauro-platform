@@ -126,6 +126,12 @@ const ISOLATION_SQL: Readonly<Record<IsolationLevel, string>> = Object.freeze({
 const COMMISSION_GROUP_SERVICES: ReadonlySet<string> = new Set(["commission-service", "finance-service"]);
 
 /**
+ * The operations service (package B18, decision B18-OPS-1): a member of the same runtime group, so it needs no pool of its own; migration
+ * 0059 gives that role only what the service does (record an incident, restrict a capability, its own journal). It does not adopt agencies.
+ */
+const OPERATIONS_GROUP_SERVICES: ReadonlySet<string> = new Set(["operations-service"]);
+
+/**
  * SYSTEM runs under the control plane, SERVICE under the payment service (package B09, D-CTX-B1) — or, for the commission and finance
  * services, under the commission service's group (package B10, D10-CTX-1) — and every other context under the request handlers.
  */
@@ -134,7 +140,7 @@ export function runtimeRoleOf(context: ExecutionContext): RuntimeRole {
     case "SYSTEM":
       return "kauro_control";
     case "SERVICE":
-      return COMMISSION_GROUP_SERVICES.has(context.serviceId) ? "kauro_commission" : "kauro_payment";
+      return COMMISSION_GROUP_SERVICES.has(context.serviceId) || OPERATIONS_GROUP_SERVICES.has(context.serviceId) ? "kauro_commission" : "kauro_payment";
     default:
       return "kauro_app";
   }
