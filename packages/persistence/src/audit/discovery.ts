@@ -26,7 +26,9 @@ import {
   type GrantScope,
   type GrantUsage,
   type PlanId,
+  type ProjectId,
   type RequestId,
+  type ValidationSource,
   type RequestJournalRecord,
   type RevisionId,
   type ValidationSubject,
@@ -97,6 +99,41 @@ export class PgAuditDiscovery implements AuditDiscovery {
     return {
       revisionState: revision.rows[0]?.state ?? "NOT_VISIBLE",
       acceptedGenerations: files.rows.map((f) => ({ objectName: str(f.object_name), generation: str(f.generation), sha256: str(f.sha256), byteLength: int(f.bytes) })),
+    };
+  }
+
+  async validationSource(agencyId: AgencyId, revisionHash: string): Promise<ValidationSource | null> {
+    const revision = await execute<{ project_id: string; revision_id: string; state: string; physical: string | null; logical: string | null; billable: string | null; edges: string | null }>(
+      this.db,
+      `SELECT r.project_id, r.revision_id, r.state, r.physical_source_rows::text AS physical, r.logical_source_records::text AS logical,
+              r.billable_source_units::text AS billable, r.association_edges::text AS edges
+         FROM kauro.dataset_revisions r WHERE r.agency_id = $1 AND r.manifest_hash = $2`,
+      [agencyId, revisionHash],
+    );
+    // a manifest hash names one revision of the agency; none (or, defensively, two) is no source
+    if (revision.rows.length !== 1) return null;
+    const r = revision.rows[0]!;
+    const files = await execute<{ object_name: string; generation: string; sha256: string; bytes: string }>(
+      this.db,
+      `SELECT o.object_name, f.provider_generation AS generation, f.sha256, f.bytes::text AS bytes
+         FROM kauro.sealed_revision_files s
+         JOIN kauro.source_files f ON f.agency_id = s.agency_id AND f.file_id = s.file_id
+         JOIN kauro.stored_objects o ON o.agency_id = f.agency_id AND o.object_id = f.accepted_object_id
+        WHERE s.agency_id = $1 AND s.revision_id = $2 AND s.disposition = 'INCLUDED'
+        ORDER BY s.ordinal`,
+      [agencyId, r.revision_id],
+    );
+    const count = (v: string | null): number | null => (v !== null && /^\d+$/.test(v) ? Number(v) : null);
+    const [physical, logical, billable, edges] = [count(r.physical), count(r.logical), count(r.billable), count(r.edges)];
+    return {
+      projectId: str(r.project_id) as ProjectId,
+      revisionId: str(r.revision_id) as RevisionId,
+      revisionState: str(r.state),
+      acceptedGenerations: files.rows.map((f) => ({ objectName: str(f.object_name), generation: str(f.generation), sha256: str(f.sha256), byteLength: int(f.bytes) })),
+      populations:
+        physical === null || logical === null || billable === null || edges === null
+          ? null
+          : { physicalSourceRows: physical, logicalSourceRecords: logical, billableSourceUnits: billable, associationEdges: edges },
     };
   }
 

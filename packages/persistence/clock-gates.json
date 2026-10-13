@@ -4505,70 +4505,70 @@
   },
   {
    "key": "apps/control/src/audit/orchestration.ts#serverNow1",
-   "at": "apps/control/src/audit/orchestration.ts:180",
+   "at": "apps/control/src/audit/orchestration.ts:183",
    "text": "const claimedAt = await uow.executionDiscovery.serverNow();",
    "class": "AT_COMMIT",
    "reason": "the claim's instant: its deadline binds at 0023:584 at COMMIT (audit_steps_claim_at_commit, L20)"
   },
   {
    "key": "apps/control/src/audit/orchestration.ts#reached1",
-   "at": "apps/control/src/audit/orchestration.ts:181",
+   "at": "apps/control/src/audit/orchestration.ts:184",
    "text": "if (reached(claimedAt, audit.absoluteDeadlineAt)) throw new StepRefused(\"ABSOLUTE_DEADLINE_REACHED\");",
    "class": "AT_COMMIT",
    "reason": "claim deadline: binding at 0023:584 at COMMIT (audit_steps_claim_at_commit, L20)"
   },
   {
    "key": "apps/control/src/audit/orchestration.ts#reached2",
-   "at": "apps/control/src/audit/orchestration.ts:191",
+   "at": "apps/control/src/audit/orchestration.ts:195",
    "text": "if (funding === null || funding.state !== \"AUTHORIZED\" || reached(claimedAt, funding.expiresAt)) throw new StepRefused(\"GRANT_NOT_FUNDED\");",
    "class": "ADVISORY",
    "reason": "the claim's funding expiry: a claim spends nothing; every spend is judged at the reservation's and the edge's COMMIT (L17, S19)"
   },
   {
    "key": "apps/control/src/audit/orchestration.ts#reached3",
-   "at": "apps/control/src/audit/orchestration.ts:215",
+   "at": "apps/control/src/audit/orchestration.ts:220",
    "text": "if (reached(await uow.executionDiscovery.serverNow(), audit.absoluteDeadlineAt)) throw new StepRefused(\"ABSOLUTE_DEADLINE_REACHED\");",
    "class": "AT_COMMIT",
    "reason": "record deadline: binding at 0023:598 at COMMIT (audit_steps_result_at_commit, L20)"
   },
   {
    "key": "apps/control/src/audit/orchestration.ts#serverNow2",
-   "at": "apps/control/src/audit/orchestration.ts:215",
+   "at": "apps/control/src/audit/orchestration.ts:220",
    "text": "if (reached(await uow.executionDiscovery.serverNow(), audit.absoluteDeadlineAt)) throw new StepRefused(\"ABSOLUTE_DEADLINE_REACHED\");",
    "class": "AT_COMMIT",
    "reason": "record deadline: binding at 0023:598 at COMMIT (audit_steps_result_at_commit, L20)"
   },
   {
    "key": "apps/control/src/audit/orchestration.ts#reached4",
-   "at": "apps/control/src/audit/orchestration.ts:229",
+   "at": "apps/control/src/audit/orchestration.ts:234",
    "text": "if (audit.cancelVersion !== 0 || audit.state !== phase || reached(await uow.executionDiscovery.serverNow(), audit.absoluteDeadlineAt)) return \"CANCELLED\";",
    "class": "ADVISORY",
    "reason": "the cancellation channel: the binding judgements are at COMMIT"
   },
   {
    "key": "apps/control/src/audit/orchestration.ts#serverNow3",
-   "at": "apps/control/src/audit/orchestration.ts:229",
+   "at": "apps/control/src/audit/orchestration.ts:234",
    "text": "if (audit.cancelVersion !== 0 || audit.state !== phase || reached(await uow.executionDiscovery.serverNow(), audit.absoluteDeadlineAt)) return \"CANCELLED\";",
    "class": "ADVISORY",
    "reason": "the cancellation channel: the binding judgements are at COMMIT"
   },
   {
    "key": "apps/control/src/audit/orchestration.ts#serverNowIn1",
-   "at": "apps/control/src/audit/orchestration.ts:353",
+   "at": "apps/control/src/audit/orchestration.ts:359",
    "text": "completedAt: () => serverNowIn(this.deps, SERVICE, audit.agencyId),",
    "class": "STAMP",
    "reason": "a receipt stamp, judged nowhere in the app"
   },
   {
    "key": "apps/control/src/audit/plan-validation.ts#serverNow1",
-   "at": "apps/control/src/audit/plan-validation.ts:49",
-   "text": "return { subject, intent, startedAt: await uow.executionDiscovery.serverNow() };",
+   "at": "apps/control/src/audit/plan-validation.ts:50",
+   "text": "return { subject, intent, source, startedAt: await uow.executionDiscovery.serverNow() };",
    "class": "STAMP",
    "reason": "a receipt stamp, judged nowhere in the app"
   },
   {
    "key": "apps/control/src/audit/plan-validation.ts#serverNowIn1",
-   "at": "apps/control/src/audit/plan-validation.ts:57",
+   "at": "apps/control/src/audit/plan-validation.ts:59",
    "text": "completedAt: () => serverNowIn(this.deps, SERVICE, agencyId),",
    "class": "STAMP",
    "reason": "a receipt stamp, judged nowhere in the app"

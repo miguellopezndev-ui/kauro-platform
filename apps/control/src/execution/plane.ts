@@ -108,7 +108,7 @@ export function assembleExecutionPlane(options: ControlExecutionOptions, storage
   const jobAdmission = new JobAdmission({ units, ids, pipeline });
   const audit = { units, ids, retryAfterSeconds };
   const auditScratch = join(scratchRoot, "audit");
-  const validator = new PlanValidator({ validate: options.validate, receipts: options.receipts, corePackageHash: options.corePackageHash, limits: options.limits, scratchRoot: auditScratch });
+  const validator = new PlanValidator({ validate: options.validate, receipts: options.receipts, corePackageHash: options.corePackageHash, limits: options.limits, storage, scratchRoot: auditScratch });
   const auditCancellations = new AuditCancellations(audit);
   const sweepers: ExecutionSweepers = {
     jobAdmission,

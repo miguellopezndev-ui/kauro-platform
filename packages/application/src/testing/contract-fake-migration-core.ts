@@ -112,10 +112,33 @@ const EMPTY_OUTCOME: Omit<ExecutionOutcome, "evidenceClass" | "terminalCause"> =
   resourceMetrics: { peakMemoryBytes: 0, peakScratchBytes: 0, wallClockMs: 0 },
 };
 
+/** The four populations of a source (registry RowCounts; domain SourcePopulations). */
+export interface ContractFakeSourcePopulations {
+  readonly physicalSourceRows: number;
+  readonly logicalSourceRecords: number;
+  readonly billableSourceUnits: number;
+  readonly associationEdges: number;
+}
+
+export interface ContractFakeMigrationCoreOptions {
+  /**
+   * The populations of the revision a validation names, as the test's harness sealed them (the fake parses no source, so it is told
+   * them; B05 L1v). When given, `validate` needs the caller's controls like the real adapter (a source and the frozen billable units,
+   * else ERROR) and reports these populations with the caller's billable units, so the receipt counts the revision's own source.
+   * Absent, every receipt reports CONTRACT_FAKE_MIGRATION_CORE_COUNTS (the simulated one-record source).
+   */
+  readonly populationsOf?: (revisionHash: Sha256Hex) => Promise<ContractFakeSourcePopulations | null>;
+}
+
 export class ContractFakeMigrationCore implements ProfilePort, ValidatePort, ExecutionEnvelopePort, PackageVerifierPort {
   readonly evidenceClass: CoreEvidenceClass = "SIMULATED";
   readonly coreVersion = CONTRACT_FAKE_MIGRATION_CORE_VERSION;
+  readonly #populationsOf: ContractFakeMigrationCoreOptions["populationsOf"];
   #sequence = 0;
+
+  constructor(options: ContractFakeMigrationCoreOptions = {}) {
+    this.#populationsOf = options.populationsOf;
+  }
   readonly #calls: MigrationCoreCall[] = [];
   readonly #holds = new Map<string, HoldRecord[]>();
   readonly #executeFaults: MigrationCoreExecutionFault[] = [];
@@ -183,6 +206,15 @@ export class ContractFakeMigrationCore implements ProfilePort, ValidatePort, Exe
     return this.#record("validate", async () => {
       await request.cancellation.check();
       const corePackageHash = CONTRACT_FAKE_MIGRATION_CORE_PACKAGE_HASH;
+      let counts: RowCounts = CONTRACT_FAKE_MIGRATION_CORE_COUNTS;
+      if (this.#populationsOf !== undefined) {
+        const controls = request.controls;
+        const populations = await this.#populationsOf(request.revisionHash);
+        if (controls?.source === undefined || controls.billableSourceUnits === undefined || populations === null) {
+          return { evidenceClass: this.evidenceClass, coreVersion: this.coreVersion, outcome: "ERROR" as const, receipt: null, problems: ["validate needs controls (source, billableSourceUnits) and a sealed revision"] };
+        }
+        counts = Object.freeze({ ...CONTRACT_FAKE_MIGRATION_CORE_COUNTS, ...populations, billableSourceUnits: controls.billableSourceUnits });
+      }
       return {
         evidenceClass: this.evidenceClass,
         coreVersion: this.coreVersion,
@@ -195,7 +227,7 @@ export class ContractFakeMigrationCore implements ProfilePort, ValidatePort, Exe
           profileEvidenceHash: digestOf({ token: CONTRACT_FAKE_MIGRATION_CORE_TOKEN, part: "profile", planHash: request.planHash }),
           dispositionEvidenceHash: digestOf({ token: CONTRACT_FAKE_MIGRATION_CORE_TOKEN, part: "disposition", planHash: request.planHash }),
           artifactEvidenceHash: digestOf({ token: CONTRACT_FAKE_MIGRATION_CORE_TOKEN, part: "artifact", planHash: request.planHash }),
-          counts: CONTRACT_FAKE_MIGRATION_CORE_COUNTS,
+          counts,
         },
         problems: [],
       };

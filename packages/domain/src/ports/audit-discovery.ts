@@ -9,7 +9,8 @@
  * with kauro.server_now() in SQL (D8-CLOCK-1): no method takes an instant from its caller. The pg implementation is
  * @kauro/persistence's; the writes stay the AuditStore's.
  */
-import type { AgencyId, PlanId, RequestId, RevisionId } from "../model/ids.js";
+import type { AgencyId, PlanId, ProjectId, RequestId, RevisionId } from "../model/ids.js";
+import type { SourcePopulations } from "../model/source/records.js";
 import type { AuditId, CostGrantId } from "../model/audit/ids.js";
 import type { AuditRecord, AuditState, CostGrantRecord, PlanValidationRecord } from "../model/audit/records.js";
 import type { ExecutionSourceGeneration } from "./execution-discovery.js";
@@ -31,6 +32,20 @@ export interface GrantRef {
 export interface AuditSource {
   readonly revisionState: string;
   readonly acceptedGenerations: ReadonlyArray<ExecutionSourceGeneration>;
+}
+
+/**
+ * What a validation reads (B05 L1v): the sealed revision a plan binds (by its agency and manifest hash), the sealed manifest's exact
+ * ACCEPTED generations and the populations frozen before capture, so the core counts the revision's own source and is told its
+ * billable units; null when the agency has no such revision.
+ */
+export interface ValidationSource {
+  readonly projectId: ProjectId;
+  readonly revisionId: RevisionId;
+  readonly revisionState: string;
+  readonly acceptedGenerations: ReadonlyArray<ExecutionSourceGeneration>;
+  /** null while a population is not frozen. */
+  readonly populations: SourcePopulations | null;
 }
 
 /** An open validation intent of an audit's system draft (D8-AUD-4), with the draft's body and state. */
@@ -95,6 +110,8 @@ export interface AuditDiscovery {
   liveAuditsOfRevision(agencyId: AgencyId, revisionId: RevisionId): Promise<ReadonlyArray<AuditRef>>;
   /** PROFILE's inputs, in a unit bound to the audit's agency: its revision's state and sealed ACCEPTED generations. */
   auditSource(audit: AuditRecord): Promise<AuditSource>;
+  /** A validation's source (ValidationSource), in a unit bound to the agency. */
+  validationSource(agencyId: AgencyId, revisionHash: string): Promise<ValidationSource | null>;
   /** The unsettled validation intents of the audit's system drafts, in a unit bound to its agency. */
   openDraftValidations(auditId: AuditId): Promise<ReadonlyArray<DraftValidation>>;
   /** PLAN_VALIDATION's subject, in a unit bound to the plan's agency; null for a plan the control plane cannot see. */
