@@ -64,6 +64,8 @@ import type {
   OutboundEvidence,
   ProviderId,
   StatementPage,
+  SettlementEvidence,
+  BankReceiptEvidence,
   UsdBankAccountDetails,
 } from "@kauro/domain";
 
@@ -498,6 +500,10 @@ export interface BankEvidenceReadPortV1 extends Pick<BankTransferEvidencePort, "
   listStatementDebits(input: { readonly accountRef: BankAccountRef; readonly since: string | null; readonly limit: number; readonly deadline: UtcInstant }): Promise<BankOutcome<DebitPage>>;
   /** Pure, no I/O: the only V1 statement path (SI1). */
   classifyStatement(evidence: StoredBankEvidence): EvidenceClassification<StatementPage>;
+  /** Pure, no I/O: the provider's settlement record of the route account (ST1, PV1-SETTLE). */
+  classifySettlement(evidence: StoredBankEvidence): EvidenceClassification<SettlementEvidence>;
+  /** Pure, no I/O: the receiving bank's receipt of a withdrawal (ST1, PV1-SETTLE). */
+  classifyBankReceipt(evidence: StoredBankEvidence): EvidenceClassification<BankReceiptEvidence>;
 }
 
 /**

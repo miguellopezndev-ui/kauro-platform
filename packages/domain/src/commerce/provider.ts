@@ -337,3 +337,36 @@ export interface StatementPage extends BankEvidenceRef {
   readonly credits: ReadonlyArray<IncomingCredit>;
   readonly debits: ReadonlyArray<StatementDebit>;
 }
+
+/**
+ * The provider's settlement record of the route account for a period (ST1, PV1-SETTLE D-SET-2; R2 15 "Settlement and withdrawal"):
+ * the period's gross, the withdrawal's fee, the balance held at its end, and the withdrawal it released to the bank. `withdrawalId`
+ * is the withdrawal's statement-line identity on the route account (the debit a later NX check finds explained by the settlement).
+ */
+export interface SettlementEvidence extends BankEvidenceRef {
+  readonly accountRef: BankAccountRef;
+  readonly currency: string;
+  readonly periodStart: UtcInstant;
+  readonly periodEnd: UtcInstant;
+  readonly withdrawalId: string;
+  readonly grossCents: bigint;
+  readonly feeCents: bigint;
+  readonly heldCents: bigint;
+  readonly withdrawnCents: bigint;
+  readonly observedAt: UtcInstant;
+}
+
+/** The receiving bank's own record of a withdrawal's arrival (ST1, D-SET-2): the only source of bank-available money (D-LEDGER-B5). */
+export interface BankReceiptEvidence extends BankEvidenceRef {
+  /** The receiving account as the bank shows it (never the route account). */
+  readonly accountRef: string;
+  /** The provider withdrawal this receipt cites. */
+  readonly withdrawalId: string;
+  readonly bankTransactionId: string;
+  readonly currency: string;
+  readonly receivedCents: bigint;
+  /** The receiving account's available balance after the receipt, as the bank shows it. */
+  readonly bankAvailableCents: bigint;
+  readonly bookedAt: UtcInstant;
+  readonly observedAt: UtcInstant;
+}
