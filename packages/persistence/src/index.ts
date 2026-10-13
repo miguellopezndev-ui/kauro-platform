@@ -36,7 +36,7 @@ export type { LockedSession } from "./session-fence.js";
 export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf, bankRoutesOf, bankCreditsOf, sessionFenceOf, effectInstantOf } from "./unit-of-work.js";
 export { PgBankRoutes } from "./repositories/bank-routes.js";
 export { PgBankCredits } from "./repositories/bank-credits.js";
-export type { NewBankCredit, BankCreditChange, BankCreditWrite, BankStream } from "./repositories/bank-credits.js";
+export type { NewBankCredit, BankCreditChange, BankCreditWrite, BankStream, NewStatementImport, NewStatementLine, StatementLineWrite } from "./repositories/bank-credits.js";
 export type { NewBankRoute, NewBankRouteVersion, NewTransferInstructions } from "./repositories/bank-routes.js";
 // processing authority (package B08, mandate B08-PERSISTENCE-EXECUTION; docs/design/B08-audit-approval-jobs.md §9, §10)
 export { createExecutionUnitOfWorkFactory, PgExecutionUnitOfWorkFactory, PgExecutionUnitOfWork, executionReadsOf } from "./unit-of-work.js";

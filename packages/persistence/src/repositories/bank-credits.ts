@@ -128,6 +128,44 @@ const instructionOf = (r: InstructionRow): BankTransferInstructionRecord => ({
   version: int(r.version),
 });
 
+export interface NewStatementImport {
+  readonly importId: string;
+  readonly environment: "SANDBOX" | "LIVE";
+  readonly accountRef: string;
+  readonly artifactRef: string;
+  readonly evidenceHash: string;
+  readonly normalizerVersion: string;
+  readonly idempotencyKey: string;
+  readonly importedBy: string;
+}
+
+/** One statement line as the classified artifact states it (destination: digests, last digits and provider references only). */
+export interface NewStatementLine {
+  readonly lineId: string;
+  readonly importId: string;
+  readonly environment: "SANDBOX" | "LIVE";
+  readonly accountRef: string;
+  readonly lineKind: "CREDIT" | "DEBIT";
+  readonly bankLineId: string;
+  readonly bankExecutionId: string | null;
+  readonly amountCents: bigint | null;
+  readonly feeCents: bigint | null;
+  readonly currency: string;
+  readonly reference: string | null;
+  readonly status: string;
+  readonly executedAt: string | null;
+  readonly bookedAt: string | null;
+  readonly observedAt: string;
+  readonly destinationAccountDigest: string | null;
+  readonly destinationAccountLast4: string | null;
+  readonly destinationRoutingDigest: string | null;
+  readonly recipientRef: string | null;
+  readonly recipientVersion: string | null;
+  readonly evidenceHash: string;
+}
+
+export type StatementLineWrite = { readonly kind: "NEW" | "SAME"; readonly lineId: string; readonly linkedAttemptId: string | null } | { readonly kind: "DIFFERENT" };
+
 export type BankStream = "INBOUND" | "OUTBOUND";
 
 export class PgBankCredits {
@@ -313,6 +351,125 @@ export class PgBankCredits {
   async acceptedPayerDigestOf(orderId: string): Promise<Sha256Hex | null> {
     const r = await execute<{ d: string | null }>(this.db, "SELECT accepted_payer_digest AS d FROM kauro.bank_transfer_instructions WHERE order_id = $1", [orderId]);
     return (r.rows[0]?.d ?? null) as Sha256Hex | null;
+  }
+
+  // --- statement imports (SI2, §7.23) ------------------------------------------------------------------------------------------------
+
+  /** The import of the same artifact (its evidence hash) in the account, if any. */
+  async importOfArtifact(environment: string, accountRef: string, evidenceHash: string): Promise<string | null> {
+    const r = await execute<{ id: string }>(this.db, "SELECT import_id AS id FROM kauro.statement_imports WHERE environment = $1 AND account_ref = $2 AND evidence_hash = $3", [environment, accountRef, evidenceHash]);
+    return r.rows[0]?.id ?? null;
+  }
+
+  /**
+   * The earliest instant a statement of the account may cover: the first route version of the account in the environment, less that
+   * version's provider-time tolerance (a bank's booking clock may precede the platform's by it, DV1-06); null when the account has none.
+   */
+  async coverageFloorOf(environment: string, accountRef: string): Promise<UtcInstant | null> {
+    const r = await execute<{ t: Date | null }>(
+      this.db,
+      `SELECT min(v.created_at - v.provider_time_tolerance_ms * interval '1 millisecond') AS t
+         FROM kauro.bank_route_versions v JOIN kauro.bank_routes r USING (route_id)
+        WHERE r.environment = $1 AND r.account_ref = $2`,
+      [environment, accountRef],
+    );
+    const t = r.rows[0]?.t ?? null;
+    return t === null ? null : instant(t);
+  }
+
+  async insertImport(i: NewStatementImport): Promise<void> {
+    await execute(
+      this.db,
+      `INSERT INTO kauro.statement_imports (import_id, environment, account_ref, artifact_ref, evidence_hash, normalizer_version, idempotency_key, imported_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [i.importId, i.environment, i.accountRef, i.artifactRef, i.evidenceHash, i.normalizerVersion, i.idempotencyKey, i.importedBy],
+    );
+  }
+
+  async insertCoverage(importId: string, stream: BankStream, from: string, to: string): Promise<void> {
+    await execute(this.db, "INSERT INTO kauro.statement_coverage (import_id, stream, covered_from, covered_to) VALUES ($1, $2, $3, $4)", [importId, stream, from, to]);
+  }
+
+  /**
+   * Records one line by the bank's own line identity: NEW when first seen, SAME when an identical line is already recorded (nothing
+   * changes), DIFFERENT when the recorded line carries other immutable money fields (never overwritten).
+   */
+  async recordLine(l: NewStatementLine): Promise<StatementLineWrite> {
+    const amount = l.amountCents === null ? null : l.amountCents.toString();
+    const inserted = await execute<{ id: string }>(
+      this.db,
+      `INSERT INTO kauro.statement_lines (line_id, import_id, environment, account_ref, line_kind, bank_line_id, bank_execution_id, amount_cents, fee_cents, currency, reference,
+         status, executed_at, booked_at, observed_at, destination_account_digest, destination_account_last4, destination_routing_digest, recipient_ref, recipient_version, evidence_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+       ON CONFLICT (environment, account_ref, line_kind, bank_line_id) DO NOTHING RETURNING line_id AS id`,
+      [
+        l.lineId,
+        l.importId,
+        l.environment,
+        l.accountRef,
+        l.lineKind,
+        l.bankLineId,
+        l.bankExecutionId,
+        amount,
+        l.feeCents === null ? null : l.feeCents.toString(),
+        l.currency,
+        l.reference,
+        l.status,
+        l.executedAt,
+        l.bookedAt,
+        l.observedAt,
+        l.destinationAccountDigest,
+        l.destinationAccountLast4,
+        l.destinationRoutingDigest,
+        l.recipientRef,
+        l.recipientVersion,
+        l.evidenceHash,
+      ],
+    );
+    if (inserted.rows[0]) return { kind: "NEW", lineId: inserted.rows[0].id, linkedAttemptId: null };
+    const r = await execute<{ id: string; a: string | null; c: string; x: string | null; ref: string | null; l: string | null }>(
+      this.db,
+      `SELECT line_id AS id, amount_cents::text AS a, currency AS c, bank_execution_id AS x, reference AS ref, linked_attempt_id::text AS l
+         FROM kauro.statement_lines WHERE environment = $1 AND account_ref = $2 AND line_kind = $3 AND bank_line_id = $4 FOR UPDATE`,
+      [l.environment, l.accountRef, l.lineKind, l.bankLineId],
+    );
+    const seen = r.rows[0];
+    if (seen === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "a statement line conflicted and is not readable");
+    if (seen.a !== amount || seen.c !== l.currency || seen.x !== l.bankExecutionId || seen.ref !== l.reference) return { kind: "DIFFERENT" };
+    return { kind: "SAME", lineId: seen.id, linkedAttemptId: seen.l };
+  }
+
+  /** The RECORDED execution attempt of the account carrying the bank execution id, locked (the execution identity lock), if any. */
+  async recordedAttemptOf(environment: string, accountRef: string, bankExecutionId: string): Promise<string | null> {
+    const r = await execute<{ id: string }>(
+      this.db,
+      "SELECT attempt_id AS id FROM kauro.outbound_execution_attempts WHERE environment = $1 AND account_ref = $2 AND bank_execution_id = $3 AND state = 'RECORDED' FOR UPDATE",
+      [environment, accountRef, bankExecutionId],
+    );
+    return r.rows[0]?.id ?? null;
+  }
+
+  /** Whether any execution attempt was declared with the reference (a declaration precedes every Kauro refund execution). */
+  async attemptDeclaredWith(reference: string): Promise<boolean> {
+    const r = await execute(this.db, "SELECT 1 FROM kauro.outbound_execution_attempts WHERE reference = $1", [reference]);
+    return r.rows.length > 0;
+  }
+
+  /** Links a debit line to the RECORDED attempt that explains it (set once). */
+  async linkLine(lineId: string, attemptId: string): Promise<void> {
+    const r = await execute(this.db, "UPDATE kauro.statement_lines SET linked_attempt_id = $2 WHERE line_id = $1 AND linked_attempt_id IS NULL", [lineId, attemptId]);
+    if ((r.rowCount ?? 0) !== 1) throw new DomainFailure("INTEGRITY_FAILURE", "the statement line is already linked");
+  }
+
+  /** Opens the line's review case of `kind`; false when one is already open for it. */
+  async openLineCase(caseId: string, kind: "RECORD_REQUIRED" | "UNDECLARED_OUTBOUND", line: { readonly environment: string; readonly accountRef: string; readonly lineId: string; readonly evidenceHash: string }, detailCode: string): Promise<boolean> {
+    const r = await execute(
+      this.db,
+      `INSERT INTO kauro.bank_review_cases (case_id, kind, environment, account_ref, line_id, detail_code, evidence_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`,
+      [caseId, kind, line.environment, line.accountRef, line.lineId, detailCode, line.evidenceHash],
+    );
+    return (r.rowCount ?? 0) > 0;
   }
 
   // --- route-scope review cases -----------------------------------------------------------------------------------------------------
