@@ -286,10 +286,13 @@ test("DENY SEC-HARDENING-2 (release): a failing membership check rolls the whole
 test("DENY SEC-HARDENING-2 (release): a pre-existing kauro_route_registrar that can log in or has other members stops the hardening", async () => {
   const p = await preMigration("sec_hardening_2");
   try {
+    // each wrong shape is otherwise usable (the migrator already its INHERIT+SET member), so only the shape check stops it
     await p.su.query(`CREATE ROLE ${REGISTRAR} LOGIN`);
-    await refused(p, /has shape/, "a registrar that can log in");
+    await p.su.query(`GRANT ${REGISTRAR} TO kauro_owner WITH INHERIT TRUE, SET TRUE`);
+    await refused(p, /has shape login=t/, "a registrar that can log in");
     await p.su.query(`DROP ROLE ${REGISTRAR}`);
     await p.su.query(`CREATE ROLE ${REGISTRAR} NOLOGIN NOINHERIT`);
+    await p.su.query(`GRANT ${REGISTRAR} TO kauro_owner WITH INHERIT TRUE, SET TRUE`);
     await p.su.query(`GRANT ${REGISTRAR} TO kauro_app`);
     await refused(p, /has shape/, "a registrar with a runtime member");
     await p.su.query(`DROP ROLE ${REGISTRAR}`);
@@ -332,7 +335,9 @@ test("DENY SEC-HARDENING-2 (pool): the pool refuses a runtime login that is also
   const refusedBy = async (user: string, what: string): Promise<void> => {
     const pool = fresh(user);
     try {
-      await assert.rejects(pool.acquire(), (e: unknown) => e instanceof PrivilegedRoleError && e.message.includes(what), `${user}: ${what}`);
+      // an accepted connection is released before the assertion fails, so pool.end() never waits on it
+      const outcome = await pool.acquire().then((v) => { v.client.release(); return null; }, (e: unknown) => e);
+      assert.ok(outcome instanceof PrivilegedRoleError && outcome.message.includes(what), `${user}: ${what} (got ${outcome === null ? "an accepted connection" : String(outcome)})`);
       assert.equal(pool.totalCount, 0, `${user}: the connection was destroyed, not pooled`);
     } finally {
       await pool.end();
