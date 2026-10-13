@@ -390,6 +390,8 @@ test("R2-054 REVOCATION (binding): a window is born only on a COMPLETED capture 
   const p2 = await w.paid(w.A, "staged-t8-two");
   const foreign = await bornWindow({ ...p1, captureId: p2.captureId });
   assert.ok("error" in foreign && foreign.error.startsWith("KA072 LIFECYCLE_BINDING: a staged retention window"), `another plan's capture: ${JSON.stringify(foreign)}`);
+  const otherPlan = await bornWindow({ ...p1, planId: p2.planId });
+  assert.ok("error" in otherPlan && otherPlan.error.startsWith("KA072 LIFECYCLE_BINDING: a staged retention window"), `its capture paid another plan: ${JSON.stringify(otherPlan)}`);
   const none = await bornWindow({ ...p1, captureId: ids.next() });
   assert.ok("error" in none && none.error.startsWith("KA072 LIFECYCLE_BINDING: a staged retention window"), `no capture: ${JSON.stringify(none)}`);
   // the writer's own capture instant, hard deadline and release are ignored or refused
