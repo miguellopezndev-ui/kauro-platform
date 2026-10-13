@@ -64,15 +64,17 @@ test("SEC-DEPTH enforcement (negative): an unknown trigger, a missing birth, an 
     const db = parseMigrations(dir);
     const inv = inventory(dir, db);
     assert.deepEqual(Object.keys(inv.tables).sort(), ["leases", "other"]);
-    const good = "### 3b x\n\n- `leases` (row 7; feeds authority) birth: [leases_guard]; bound: `fence` [leases_guard] +1; `checkpoint_hash` [leases_planned] kept; first: `expires_at` [leases_guard] claim := now.\nResidual B-LIFETIME-2 (feeds none): `other` test.\n\n### 3c x\n\n- planned `leases_planned` BEFORE INSERT OR UPDATE ON `leases` in 0009 (columns: `checkpoint_hash`) test\n\n## A.";
+    const good = "### 3b x\n\n- `leases` (row 7; feeds authority) birth: [leases_guard]; bound: `fence` [leases_guard] +1; `checkpoint_hash` [leases_planned] kept; first: `expires_at` [leases_guard] claim := now.\nResidual B-LIFETIME-2 (feeds none): `other` test.\n\n### 3c x\n\n- planned `leases_planned` BEFORE INSERT OR UPDATE ON `leases` in leases_lifetime (columns: `checkpoint_hash`) test\n\n## A.";
     assert.deepEqual(problems(inv, good, db), []);
-    const out = problems(inv, good.replace(" birth: [leases_guard];", "").replace("[leases_planned]", "[leases_nothing]").replace("in 0009", "in 0002"), db);
+    const out = problems(inv, good.replace(" birth: [leases_guard];", "").replace("[leases_planned]", "[leases_nothing]").replace("in leases_lifetime", "in empty"), db);
     assert.ok(out.some((x) => /leases: feeds authority but has no birth cell/.test(x)), out.join("\n"));
     assert.ok(out.some((x) => /checkpoint_hash: trigger leases_nothing does not exist/.test(x)), out.join("\n"));
     const ofList = problems(inv, good.replace("`fence` [leases_guard]", "`fence` [leases_guard]").replace("`checkpoint_hash` [leases_planned]", "`checkpoint_hash` [leases_guard]"), db);
     assert.ok(ofList.some((x) => /checkpoint_hash: leases_guard fires only on UPDATE OF fence, expires_at/.test(x)), ofList.join("\n"));
-    const missingPlanned = problems(inv, good.replace("in 0009", "in 0002"), db);
-    assert.ok(missingPlanned.some((x) => /planned trigger leases_planned on leases is missing from migration 0002/.test(x)), missingPlanned.join("\n"));
+    const missingPlanned = problems(inv, good.replace("in leases_lifetime", "in empty"), db);
+    assert.ok(missingPlanned.some((x) => /planned trigger leases_planned on leases is missing from migration empty/.test(x)), missingPlanned.join("\n"));
+    const numbered = problems(inv, good.replace("in leases_lifetime", "in 0009"), db);
+    assert.ok(numbered.some((x) => /planned trigger leases_planned on leases names its migration by number \(0009\)/.test(x)), numbered.join("\n"));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
