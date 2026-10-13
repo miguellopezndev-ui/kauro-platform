@@ -34,9 +34,24 @@ export async function run(payload: { mode: "store" | "probe"; root: string; atte
     }
     try {
       const net = await import("node:net");
+      // settles on connect, error or a deadline (a connect that neither succeeds nor fails must not keep the child alive); the
+      // socket is always destroyed and the timer cleared
       await new Promise<void>((resolve, reject) => {
-        const socket = net.connect({ host: "127.0.0.1", port: 9 }, () => resolve());
-        socket.on("error", reject);
+        const socket = net.connect({ host: "127.0.0.1", port: 9 });
+        const timer = setTimeout(() => {
+          socket.destroy();
+          reject(Object.assign(new Error("probe connect deadline"), { code: "PROBE_TIMEOUT" }));
+        }, 3000);
+        socket.on("connect", () => {
+          clearTimeout(timer);
+          socket.destroy();
+          resolve();
+        });
+        socket.on("error", (error) => {
+          clearTimeout(timer);
+          socket.destroy();
+          reject(error);
+        });
       });
       result["network"] = "CONNECTED";
     } catch (error) {
