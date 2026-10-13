@@ -241,7 +241,7 @@ test("B06-R1 seam (b08/land): a job's JOB_ATTEMPT checkpoint is KAURO_JOB_ATTEMP
   assert.notEqual(checkpoint, admitted.inputBindingHash, "the checkpoint is not the lease subject");
 });
 
-test("ROWCOUNTS-PRODUCER: the issued package's RowCounts are the sealed revision's four populations and the validation receipt's execution counts; a receipt that disagrees with the sealed populations, is incomplete, malformed or positive in unresolved, or a revision without populations, is refused", () => {
+test("ROWCOUNTS-PRODUCER: the issued package's RowCounts are the sealed revision's four populations and the validation receipt's execution counts; populations a receipt names are never issued (the sealed revision's win); a receipt that is incomplete, malformed or positive in unresolved, or a revision without populations, is refused", () => {
   const populations = { physicalSourceRows: 120, logicalSourceRecords: 110, billableSourceUnits: 100, associationEdges: 7 };
   const receipt = { ...populations, emittedRepresentatives: 90, mergedNonSurvivors: 15, rejected: 3, withheld: 12, unresolved: 0, emittedArtifactRows: 97 };
   const issued = deliveryRowCountsOf({ populations, receiptCounts: receipt });
@@ -253,7 +253,7 @@ test("ROWCOUNTS-PRODUCER: the issued package's RowCounts are the sealed revision
     return out.kind === "REFUSED" ? out.reason : "COUNTS";
   };
   for (const key of ["physicalSourceRows", "logicalSourceRecords", "billableSourceUnits", "associationEdges"] as const) {
-    assert.equal(refused({ populations, receiptCounts: { ...receipt, [key]: receipt[key] + 1 } }), "COUNTS_MISMATCH", key);
+    assert.deepEqual(deliveryRowCountsOf({ populations, receiptCounts: { ...receipt, [key]: receipt[key] + 1 } }), { kind: "COUNTS", counts: receipt }, key);
   }
   assert.equal(refused({ populations: null, receiptCounts: receipt }), "COUNTS_UNAVAILABLE");
   assert.equal(refused({ populations, receiptCounts: null }), "COUNTS_UNAVAILABLE");

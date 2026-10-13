@@ -133,10 +133,30 @@ test("ROWCOUNTS-PRODUCER OK: the published package's KAURO_DELIVERY_MANIFEST_V1 
   await w.quiesce();
 });
 
-test("ROWCOUNTS-PRODUCER DENY: a bound receipt whose populations differ from the sealed revision's, that lacks a RowCounts member or carries another, holds a non-integer, or has a positive unresolved fails the job DELIVERY_COUNTS_MISMATCH, DELIVERY_COUNTS_UNAVAILABLE or DELIVERY_COUNTS_UNRESOLVED, revokes the private package and never delivers", async () => {
+test("ROWCOUNTS-PRODUCER OK (populations): a bound receipt naming other populations than the sealed revision's (the core's own view: the validator hands it none) still issues the sealed revision's four populations, never the receipt's, with the receipt's execution counts", async () => {
+  const A = await w.agency("rc-pop");
+  const p = await w.paid(A, "rc-pop");
+  const { jobId } = await verifiedPrivate(w, p);
+  const receiptHash = await receiptHashOf(jobId);
+  const sealed = await oracleCounts(p, receiptHash);
+  const view = { ...sealed, physicalSourceRows: 1, logicalSourceRecords: 1, billableSourceUnits: sealed.billableSourceUnits + 5, associationEdges: sealed.associationEdges + 2 };
+  await forgeReceiptCounts(receiptHash, view);
+  const rec = recordingUnits(w.units);
+  const plane = w.planeWith({ units: rec.units }).execution;
+  assert.ok(plane !== null);
+  assert.deepEqual(await plane.pipeline.publish(jobId as ProcessingJobId), { kind: "APPLIED", what: "PUBLISHED" });
+  const [pub] = rec.published;
+  const pkgId = (await w.packages(jobId))[0]!.package_version_id;
+  const issued = (counts: RowCounts) => deliveryManifestHashOf(issuedDeliveryManifestOf({ packageId: pkgId, subject: pub!.job, copies: pub!.copies, counts, createdAt: pub!.createdAt, captureCompletedAt: pub!.facts.captureCompletedAt! }));
+  assert.equal(pub!.hash, issued(sealed), "the sealed revision's populations are issued");
+  assert.notEqual(pub!.hash, issued(view), "never the receipt's");
+  assert.equal((await w.job(jobId)).state, "READY");
+  await w.quiesce();
+});
+
+test("ROWCOUNTS-PRODUCER DENY: a bound receipt that lacks a RowCounts member or carries another, holds a non-integer, or has a positive unresolved fails the job DELIVERY_COUNTS_UNAVAILABLE or DELIVERY_COUNTS_UNRESOLVED, revokes the private package and never delivers", async () => {
   const A = await w.agency("rc-deny");
   const cases: ReadonlyArray<readonly [string, (c: RowCounts) => Record<string, unknown>, string]> = [
-    ["populations differ", (c) => ({ ...c, billableSourceUnits: c.billableSourceUnits + 1 }), "DELIVERY_COUNTS_MISMATCH"],
     ["member missing", (c) => { const { emittedArtifactRows: _gone, ...rest } = c; return rest; }, "DELIVERY_COUNTS_UNAVAILABLE"],
     ["extra member", (c) => ({ ...c, artifacts: 1 }), "DELIVERY_COUNTS_UNAVAILABLE"],
     ["non-integer", (c) => ({ ...c, rejected: 0.5 }), "DELIVERY_COUNTS_UNAVAILABLE"],

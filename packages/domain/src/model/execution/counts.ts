@@ -3,9 +3,10 @@
  * have named denominators and cannot be substituted for one another"; docs/design/B13-report-model.md §3, Q-B13-1).
  *
  * The four populations are the sealed revision's, frozen before capture (03 "Count the correct population"); the six execution
- * counts are the Migration Core's ValidationReceipt.counts, which only the validator establishes (D8-CAU-6). The receipt carries
- * the populations it counted too: when they differ from the sealed revision's the receipt is not of these inputs and nothing is
- * issued (COUNTS_MISMATCH). A receipt that is not exactly the ten RowCounts members as non-negative safe integers, or a revision
+ * counts are the Migration Core's ValidationReceipt.counts, which only the validator establishes (D8-CAU-6). The populations the
+ * receipt also names are never issued: the platform's validator does not hand the core the sealed populations (CoreCallControls
+ * source/billableSourceUnits are not passed by PlanValidator), so they are the core's own view, and the sealed revision's always win
+ * (03 "cannot be substituted for one another"). A receipt that is not exactly the ten RowCounts members as non-negative safe integers, or a revision
  * without populations, is COUNTS_UNAVAILABLE; a positive `unresolved` blocks final acceptance (COUNTS_UNRESOLVED). The verdict is
  * fail closed: only a COUNTS answer names counts.
  */
@@ -38,7 +39,7 @@ export interface DeliveryCountFacts {
 
 export type DeliveryCountsVerdict =
   | { readonly kind: "COUNTS"; readonly counts: RowCounts }
-  | { readonly kind: "REFUSED"; readonly reason: "COUNTS_UNAVAILABLE" | "COUNTS_MISMATCH" | "COUNTS_UNRESOLVED" };
+  | { readonly kind: "REFUSED"; readonly reason: "COUNTS_UNAVAILABLE" | "COUNTS_UNRESOLVED" };
 
 const isCount = (n: unknown): n is number => typeof n === "number" && Number.isSafeInteger(n) && n >= 0;
 
@@ -51,7 +52,6 @@ export function deliveryRowCountsOf(facts: DeliveryCountFacts): DeliveryCountsVe
   if (keys.length !== ROW_COUNT_KEYS.length || !ROW_COUNT_KEYS.every((k) => Object.prototype.hasOwnProperty.call(receipt, k) && isCount(receipt[k]))) {
     return { kind: "REFUSED", reason: "COUNTS_UNAVAILABLE" };
   }
-  if (POPULATION_KEYS.some((k) => receipt[k] !== populations[k])) return { kind: "REFUSED", reason: "COUNTS_MISMATCH" };
   if (receipt["unresolved"] !== 0) return { kind: "REFUSED", reason: "COUNTS_UNRESOLVED" };
   const counts: Record<string, number> = {};
   for (const k of ROW_COUNT_KEYS) counts[k] = (POPULATION_KEYS as ReadonlyArray<string>).includes(k) ? populations[k as (typeof POPULATION_KEYS)[number]] : (receipt[k] as number);
