@@ -699,7 +699,7 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   readonly requestReads: PgCommerceRequestReads;
   /** The bank-transfer route's tables (migration 0046, lane L-ROUTE), read through bankRoutesOf(uow). */
   readonly bankRoutes: PgBankRoutes;
-  /** The inbound credit, statement and order-state tables (migration 0061, lane PV1-INBOUND), read through bankCreditsOf(uow). */
+  /** The inbound credit, statement and order-state tables (migration 0062, lane PV1-INBOUND), read through bankCreditsOf(uow). */
   readonly bankCredits: PgBankCredits;
   #scopeAgencyId: AgencyId | null = null;
   #financeAgencyId: AgencyId | null = null;

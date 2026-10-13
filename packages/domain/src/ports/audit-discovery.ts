@@ -80,6 +80,10 @@ export interface GrantUsage {
   readonly reservedCents: bigint;
   readonly actualCents: bigint | null;
   readonly provablyUnsent: boolean;
+  /** B05 D5-18 branch (a): DISPATCHING and no longer sendable by its owner (the UNSENDABLE predicate). */
+  readonly staleDispatch: boolean;
+  /** B05 D5-18 branch (b): FAILED with non-acceptance evidence and usage UNKNOWN. */
+  readonly nonAccepted: boolean;
 }
 
 export interface AuditDiscovery {

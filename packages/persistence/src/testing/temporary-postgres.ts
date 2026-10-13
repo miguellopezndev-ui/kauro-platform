@@ -89,6 +89,8 @@ function run(cmd: string, args: string[], what: string, options: { readonly deta
 export interface StartOptions {
   /** Skip applying migrations (a test that exercises the runner itself). */
   readonly migrate?: boolean;
+  /** Apply the migrations of this directory instead of the package's (a test of a migration on a cluster at the one before it). */
+  readonly migrationsDir?: string;
   /**
    * Install the labelled TEST CLOCK (default true; see TEST_CLOCK_FUNCTION). false keeps the shipped kauro.server_now() exactly as
    * the migration defines it (the migrations test proves that body).
@@ -214,7 +216,7 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
     if (options.migrate !== false) {
       const owner = await connect(ROLES.owner);
       try {
-        migrations = await applyMigrations(owner);
+        migrations = await applyMigrations(owner, options.migrationsDir === undefined ? {} : { dir: options.migrationsDir });
       } finally {
         await owner.end();
       }

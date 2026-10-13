@@ -78,7 +78,7 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   // Payments V1 bank-transfer route (0046, lane L-ROUTE; walked by apps/api/test/ach-route-cells.test.ts)
   bank_route: ["bank_routes", "route_id"],
   bank_transfer_instruction: ["bank_transfer_instructions", "order_id"],
-  // Payments V1 inbound credits (0061, lane PV1-INBOUND)
+  // Payments V1 inbound credits (0062, lane PV1-INBOUND)
   bank_credit: ["bank_credits", "bank_credit_id"],
   statement_import: ["statement_imports", "import_id"],
 });

@@ -414,7 +414,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   };
   const commerceCollaborators: CommerceRequestCollaborators = { ...commerceEdition(), ...paymentService, bank, ...assembly.commerce };
   const bankRoutes = createBankRouteHandlers(commerceRuntime, bank);
-  // the owner's inbound credit commands run on the payment service's pool (migration 0061); without a payment runtime they are unavailable
+  // the owner's inbound credit commands run on the payment service's pool (migration 0062); without a payment runtime they are unavailable
   const inboundRuntime: CommerceRequestRuntime = { ...commerceRuntime, unitOfWork: assembly.payments === undefined ? unavailableUnitOfWork : assembly.payments.runtime.assembly.commerce };
   const bankInbound = createBankInboundHandlers(inboundRuntime, bank);
   const commerce = createCommerceRequestHandlers(commerceRuntime, commerceCollaborators);

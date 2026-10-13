@@ -14,6 +14,13 @@ import type { Id, Sha256Hex } from "@kauro/contracts";
 import {
   AUDIT_POLICY,
   DomainFailure,
+  MICROS_PER_CENT,
+  centsOfMicros,
+  dispatchSettlementHashOf,
+  excessMicrosOf,
+  postedCentsOf,
+  type DispatchSettlement,
+  type SettlementOutcome,
   NotFoundFailure,
   decisionArtifactHashOf,
   modelTaskCheckpointOf,
@@ -92,6 +99,27 @@ import {
   validationRecord,
   type Row,
 } from "./rows.js";
+
+/** A request's settlement view (B05 D5-11), read under its row lock. */
+interface SettlementRow {
+  request_id: string;
+  cost_grant_id: string;
+  state: string;
+  usage_state: string;
+  reserved: string;
+  actual: string | null;
+  max: string | null;
+  core_run_id: string | null;
+  core_reservation_id: string | null;
+  settlement_state: DispatchSettlement["state"] | null;
+  settlement_hash: string | null;
+  charge: string | null;
+  evidence: string | null;
+}
+
+/** discovery.ts's UNSENDABLE for a DISPATCHING row `r` of model task `m` and audit `a` (B05 D5-18 branch (a); not widened). */
+const UNSENDABLE_DISPATCH = `(a.state IS DISTINCT FROM 'INTERPRETING' OR m.interpretation_deadline_at <= kauro.server_now()
+  OR NOT EXISTS (SELECT 1 FROM kauro.leases l WHERE l.resource_kind = 'MODEL_TASK' AND l.resource_id = r.task_id AND l.fence = r.fence AND l.cost_authority_id = m.grant_id))`;
 
 /** What the audit store writes through: the unit of work's connection, id generator, publisher and provenance. */
 export interface AuditWriteContext {
@@ -499,10 +527,32 @@ export class PgAuditStore implements AuditStore {
   }
 
   async beginDispatch(modelTaskId: ModelTaskId, dispatch: DispatchIntent): Promise<DispatchOutcome> {
+    if (!Number.isSafeInteger(dispatch.stepFence) || dispatch.stepFence < 1) throw new DomainFailure("INVALID_REQUEST", "a dispatch intent names the fence of the INTERPRET step that admits it");
+    const core = dispatch.core;
+    if (core !== undefined && (core.maxChargeMicros <= 0n || dispatch.reservedCents !== centsOfMicros(core.maxChargeMicros))) {
+      throw new DomainFailure("INVALID_REQUEST", "a core admission reserves ceil(maxChargeMicros / 10,000) cents of a positive maximum");
+    }
     const found = await execute<Row>(this.db, `SELECT ${MODEL_TASK_COLUMNS} FROM kauro.model_tasks WHERE model_task_id = $1`, [modelTaskId]);
     if (!found.rows[0]) throw new NotFoundFailure("model task");
     const task = modelTaskRecord(found.rows[0]);
     const taskId = modelTaskId as string as TaskId;
+    // B05 D5-11: the core's (run, reservation) is the admission's idempotency key: the same maximum is a replay, another a conflict
+    if (core !== undefined) {
+      const prior = await execute<{ request_id: string; task_id: string; max: string; request_key: string }>(
+        this.db,
+        "SELECT request_id, task_id, max_charge_micros::text AS max, core_request_key AS request_key FROM kauro.request_journal WHERE core_run_id = $1 AND core_reservation_id = $2",
+        [core.runId, core.reservationId],
+      );
+      const p = prior.rows[0];
+      if (p) {
+        if (p.task_id !== (modelTaskId as string) || BigInt(p.max) !== core.maxChargeMicros || p.request_key !== core.requestKey) {
+          throw new DomainFailure("IDEMPOTENCY_CONFLICT", `core reservation ${core.reservationId} of run ${core.runId} was admitted with another request`, { reason: "REQUEST_DIGEST_DIFFERS" });
+        }
+        const request = await this.#requests.get(p.request_id as RequestId);
+        if (request === null) throw new DomainFailure("INTEGRITY_FAILURE", "the admitted request is not visible");
+        return { kind: "REPLAYED", request };
+      }
+    }
     // a response already stored for the task is compiled before any new dispatch intent (D8-AUD-3)
     const stored = await execute<{ request_id: string }>(
       this.db,
@@ -534,6 +584,8 @@ export class PgAuditStore implements AuditStore {
       costGrantId: task.grantId,
       upstreamRequestIds: [],
       reservedAt: await serverInstantOf(this.db),
+      stepFence: dispatch.stepFence,
+      ...(core === undefined ? {} : { core: { runId: core.runId, reservationId: core.reservationId, requestKey: core.requestKey, maxChargeMicros: core.maxChargeMicros } }),
     });
     return { kind: "RESERVED", request, lease };
   }
@@ -581,6 +633,9 @@ export class PgAuditStore implements AuditStore {
 
   async reconcileRequest(requestId: RequestId, actualCents: bigint): Promise<CostGrantRecord> {
     if (actualCents < 0n) throw new DomainFailure("INVALID_REQUEST", "a reconciled usage is non-negative");
+    // B05 D5-11: a core-admitted request that was not cancelled unsent is reconciled in micros (cents evidence = cents * 10,000 exactly)
+    const kind = await execute<{ core: boolean; state: string }>(this.db, "SELECT max_charge_micros IS NOT NULL AS core, state FROM kauro.request_journal WHERE request_id = $1", [requestId]);
+    if (kind.rows[0]?.core === true && kind.rows[0].state !== "CANCELLED") return this.reconcileRequestMicros(requestId, actualCents * MICROS_PER_CENT);
     const r = await execute<{ cost_grant_id: string; reserved: string }>(
       this.db,
       `UPDATE kauro.request_journal SET usage_state = 'RECONCILED', actual_cents = $2 WHERE request_id = $1 AND usage_state <> 'RECONCILED'
@@ -596,5 +651,195 @@ export class PgAuditStore implements AuditStore {
       [settled.cost_grant_id, settled.reserved, actualCents.toString()],
     );
     return grantRecord(one(g.rows, "the reconciled grant"));
+  }
+
+  /** The funding grant of a request, read unlocked (cost_grant_id is immutable, 0006:101), then locked FOR UPDATE (LOCK-B05-1). */
+  private async lockFundingGrant(requestId: RequestId): Promise<string | null> {
+    const r = await execute<{ cost_grant_id: string }>(this.db, "SELECT cost_grant_id FROM kauro.request_journal WHERE request_id = $1", [requestId]);
+    const grantId = r.rows[0]?.cost_grant_id;
+    if (grantId === undefined) return null;
+    await execute(this.db, "SELECT 1 FROM kauro.cost_grants WHERE grant_id = $1 FOR UPDATE", [grantId]);
+    return grantId;
+  }
+
+  /** The request's settlement view under its row lock (after the grant's, LOCK-B05-1). */
+  private async lockSettlementRow(requestId: RequestId): Promise<SettlementRow> {
+    const r = await execute<SettlementRow>(
+      this.db,
+      `SELECT request_id, cost_grant_id, state, usage_state, reserved_cents::text AS reserved, actual_cents::text AS actual, max_charge_micros::text AS max,
+              core_run_id, core_reservation_id, settlement_state, settlement_hash, charge_micros::text AS charge, non_acceptance_evidence AS evidence
+         FROM kauro.request_journal WHERE request_id = $1 FOR UPDATE`,
+      [requestId],
+    );
+    return one(r.rows, "the settled request");
+  }
+
+  private async grantOf(grantId: string): Promise<CostGrantRecord> {
+    const g = await execute<Row>(this.db, `SELECT ${GRANT_COLUMNS} FROM kauro.cost_grants WHERE grant_id = $1`, [grantId]);
+    return grantRecord(one(g.rows, "the funding grant"));
+  }
+
+  /** Moves the grant's money for one request: its reservation leaves, `postedCents` joins the spend (0 for a release). */
+  private async postToGrant(grantId: string, reservedCents: bigint, postedCents: bigint): Promise<CostGrantRecord> {
+    const g = await execute<Row>(
+      this.db,
+      `UPDATE kauro.cost_grants SET reserved_cents = reserved_cents - $2, reconciled_spend_cents = reconciled_spend_cents + $3 WHERE grant_id = $1 RETURNING ${GRANT_COLUMNS}`,
+      [grantId, reservedCents.toString(), postedCents.toString()],
+    );
+    return grantRecord(one(g.rows, "the posted grant"));
+  }
+
+  /** The excess over the admitted maximum, opened as the pool's liability in this transaction (D5-11; its gate is taken at COMMIT). */
+  private async openLiability(row: SettlementRow, chargeMicros: bigint): Promise<bigint> {
+    if (row.max === null) return 0n;
+    const excess = excessMicrosOf(chargeMicros, BigInt(row.max));
+    if (excess === 0n) return 0n;
+    // a request owes one liability: an estimate's (COMMITTED, usage not known) stands when provider evidence arrives later
+    const r = await execute(
+      this.db,
+      `INSERT INTO kauro.dispatch_liabilities (request_id, grant_id, pool_id, excess_micros, opened_at)
+       SELECT $1, $2, kauro.liability_gate_pool_of($2), $3, kauro.server_now()
+        WHERE NOT EXISTS (SELECT 1 FROM kauro.dispatch_liabilities WHERE request_id = $1)`,
+      [row.request_id, row.cost_grant_id, excess.toString()],
+    );
+    return (r.rowCount ?? 0) === 1 ? excess : 0n;
+  }
+
+  async reconcileRequestMicros(requestId: RequestId, chargeMicros: bigint): Promise<CostGrantRecord> {
+    if (chargeMicros < 0n) throw new DomainFailure("INVALID_REQUEST", "a reconciled charge is non-negative");
+    const grantId = await this.lockFundingGrant(requestId);
+    if (grantId === null) throw new DomainFailure("PRECONDITION_FAILED", `request ${requestId} is not visible or already reconciled`, { reason: "UNLISTED_TRANSITION" });
+    const row = await this.lockSettlementRow(requestId);
+    const reserved = BigInt(row.reserved);
+    if (row.usage_state === "RECONCILED") {
+      // an equal value again is idempotent; another one is no transition
+      const equal = row.max === null ? row.actual !== null && BigInt(row.actual) === centsOfMicros(chargeMicros) : row.charge !== null && BigInt(row.charge) === chargeMicros;
+      if (equal) return this.grantOf(grantId);
+      throw new DomainFailure("PRECONDITION_FAILED", `request ${requestId} is not visible or already reconciled`, { reason: "UNLISTED_TRANSITION" });
+    }
+    if (row.max === null) {
+      // a request without a core admission: today's rule, in cents (ceil of the micros)
+      const posted = centsOfMicros(chargeMicros);
+      await execute(this.db, "UPDATE kauro.request_journal SET usage_state = 'RECONCILED', actual_cents = $2 WHERE request_id = $1", [requestId, posted.toString()]);
+      return this.postToGrant(grantId, reserved, posted);
+    }
+    const posted = postedCentsOf(chargeMicros, reserved);
+    if (row.settlement_state === "COMMITTED" && row.usage_state === "ESTIMATED") {
+      // IC committed an estimate (its reservation already left the grant): provider evidence corrects the spend by the difference;
+      // the excess is judged on the evidence, once (a liability of the request is unique)
+      const before = row.actual === null ? 0n : BigInt(row.actual);
+      await execute(this.db, "UPDATE kauro.request_journal SET usage_state = 'RECONCILED', actual_cents = $2 WHERE request_id = $1", [requestId, posted.toString()]);
+      await this.openLiability(row, chargeMicros);
+      const g = await execute<Row>(this.db, `UPDATE kauro.cost_grants SET reconciled_spend_cents = reconciled_spend_cents + $2 WHERE grant_id = $1 RETURNING ${GRANT_COLUMNS}`, [grantId, (posted - before).toString()]);
+      return grantRecord(one(g.rows, "the reconciled grant"));
+    }
+    if (row.settlement_state === "COMMITTED" || row.settlement_state === "RELEASED") {
+      throw new DomainFailure("PRECONDITION_FAILED", `request ${requestId} is settled ${row.settlement_state} and reconciles nothing else`, { reason: "UNLISTED_TRANSITION" });
+    }
+    const hash = dispatchSettlementHashOf({ runId: str(row.core_run_id), reservationId: str(row.core_reservation_id), state: "COMMITTED", chargeMicros, usageKnown: true });
+    await execute(
+      this.db,
+      `UPDATE kauro.request_journal SET usage_state = 'RECONCILED', actual_cents = $2, settlement_state = 'COMMITTED', charge_micros = $3, usage_known = true, settlement_hash = $4
+        WHERE request_id = $1`,
+      [requestId, posted.toString(), chargeMicros.toString(), hash],
+    );
+    await this.openLiability(row, chargeMicros);
+    return this.postToGrant(grantId, reserved, posted);
+  }
+
+  async settleDispatch(settlement: DispatchSettlement): Promise<SettlementOutcome> {
+    if (settlement.chargeMicros < 0n) throw new DomainFailure("INVALID_REQUEST", "a settled charge is non-negative");
+    if (settlement.state === "RELEASED" && settlement.chargeMicros !== 0n) throw new DomainFailure("INVALID_REQUEST", "a release charges nothing");
+    const found = await execute<{ request_id: string }>(this.db, "SELECT request_id FROM kauro.request_journal WHERE core_run_id = $1 AND core_reservation_id = $2", [settlement.runId, settlement.reservationId]);
+    const requestId = found.rows[0]?.request_id as RequestId | undefined;
+    // a (run, reservation) never admitted: nothing to settle (IC's settleFromJournal releases what it never reserved here)
+    if (requestId === undefined) return { kind: "NO_REQUEST" };
+    const grantId = await this.lockFundingGrant(requestId);
+    if (grantId === null) return { kind: "NO_REQUEST" };
+    const row = await this.lockSettlementRow(requestId);
+    const hash = dispatchSettlementHashOf(settlement);
+    const answer = async (kind: "REPLAYED" | "RECORDED", recorded: DispatchSettlement["state"], liabilityMicros: bigint): Promise<SettlementOutcome> => {
+      const request = await this.#requests.get(requestId);
+      if (request === null) throw new DomainFailure("INTEGRITY_FAILURE", "the settled request is not visible");
+      return kind === "REPLAYED" ? { kind, request, recorded } : { kind, request, recorded, liabilityMicros };
+    };
+    if (row.settlement_state === "COMMITTED" || row.settlement_state === "RELEASED") {
+      if (row.settlement_hash === hash) return answer("REPLAYED", row.settlement_state, 0n);
+      throw new DomainFailure("IDEMPOTENCY_CONFLICT", `SETTLEMENT_CONFLICT: reservation ${settlement.reservationId} of run ${settlement.runId} is settled ${row.settlement_state} with another body`, { reason: "REQUEST_DIGEST_DIFFERS" });
+    }
+    if (row.settlement_state === "AMBIGUOUS" && row.settlement_hash === hash) return answer("REPLAYED", "AMBIGUOUS", 0n);
+    const reserved = BigInt(row.reserved);
+    const record = (state: DispatchSettlement["state"], extra: string, params: ReadonlyArray<unknown>) =>
+      execute(
+        this.db,
+        `UPDATE kauro.request_journal SET settlement_state = $2, charge_micros = $3, usage_known = $4, settlement_hash = $5${extra} WHERE request_id = $1`,
+        [requestId, state, settlement.chargeMicros.toString(), settlement.usageKnown, hash, ...params],
+      );
+    const ambiguous = async (): Promise<SettlementOutcome> => {
+      // the reservation is held: usage stays as it is (UNKNOWN until provider evidence)
+      await record("AMBIGUOUS", "", []);
+      return answer("RECORDED", "AMBIGUOUS", 0n);
+    };
+    if (settlement.state === "AMBIGUOUS") return ambiguous();
+    if (settlement.state === "RELEASED") {
+      if (row.state === "RESERVED" && row.usage_state === "UNKNOWN") {
+        // never sent: the reservation goes back, and the row leaves RESERVED (CANCELLED) so it can be neither sent nor block the grant's close
+        await record("RELEASED", ", state = 'CANCELLED', usage_state = 'RECONCILED', actual_cents = 0", []);
+        await this.postToGrant(grantId, reserved, 0n);
+        return answer("RECORDED", "RELEASED", 0n);
+      }
+      if (row.state === "FAILED" && row.evidence !== null && row.usage_state === "UNKNOWN") {
+        await record("RELEASED", ", usage_state = 'RECONCILED', actual_cents = 0", []);
+        await this.postToGrant(grantId, reserved, 0n);
+        return answer("RECORDED", "RELEASED", 0n);
+      }
+      if (row.state === "CANCELLED" && row.usage_state === "RECONCILED" && row.actual !== null && BigInt(row.actual) === 0n) {
+        // GRANT_RECONCILIATION already released it unsent: recorded, no cent moves
+        await record("RELEASED", "", []);
+        return answer("RECORDED", "RELEASED", 0n);
+      }
+      return ambiguous();
+    }
+    // COMMITTED: min(ceil(charge / 10,000), reserved) cents posted; the excess over the admitted maximum is a liability
+    if (row.usage_state !== "UNKNOWN" && row.usage_state !== "KNOWN") {
+      throw new DomainFailure("IDEMPOTENCY_CONFLICT", `SETTLEMENT_CONFLICT: request ${requestId} was reconciled before reservation ${settlement.reservationId} was committed`, { reason: "REQUEST_DIGEST_DIFFERS" });
+    }
+    const posted = postedCentsOf(settlement.chargeMicros, reserved);
+    await record("COMMITTED", ", usage_state = $6, actual_cents = $7", [settlement.usageKnown ? "RECONCILED" : "ESTIMATED", posted.toString()]);
+    const liability = await this.openLiability(row, settlement.chargeMicros);
+    await this.postToGrant(grantId, reserved, posted);
+    return answer("RECORDED", "COMMITTED", liability);
+  }
+
+  async markStaleDispatchUncertain(requestId: RequestId): Promise<boolean> {
+    const r = await execute(
+      this.db,
+      `UPDATE kauro.request_journal r SET state = 'UNCERTAIN'
+         FROM kauro.model_tasks m LEFT JOIN kauro.audits a ON a.agency_id = m.agency_id AND a.audit_id = m.audit_id
+        WHERE r.request_id = $1 AND m.model_task_id = r.task_id AND r.state = 'DISPATCHING' AND ${UNSENDABLE_DISPATCH}`,
+      [requestId],
+    );
+    return (r.rowCount ?? 0) === 1;
+  }
+
+  async releaseNonAccepted(requestId: RequestId): Promise<CostGrantRecord> {
+    const grantId = await this.lockFundingGrant(requestId);
+    if (grantId === null) throw new NotFoundFailure("request");
+    const row = await this.lockSettlementRow(requestId);
+    if (!(row.state === "FAILED" && row.evidence !== null && row.usage_state === "UNKNOWN")) {
+      throw new DomainFailure("PRECONDITION_FAILED", `request ${requestId} is not a FAILED request with non-acceptance evidence and unknown usage`, { reason: "UNLISTED_TRANSITION" });
+    }
+    if (row.max !== null && (row.settlement_state === null || row.settlement_state === "AMBIGUOUS")) {
+      // the settlement IC sends for a never-accepted request (RELEASED, 0, usage known): its late arrival is a replay
+      const hash = dispatchSettlementHashOf({ runId: str(row.core_run_id), reservationId: str(row.core_reservation_id), state: "RELEASED", chargeMicros: 0n, usageKnown: true });
+      await execute(
+        this.db,
+        "UPDATE kauro.request_journal SET usage_state = 'RECONCILED', actual_cents = 0, settlement_state = 'RELEASED', charge_micros = 0, usage_known = true, settlement_hash = $2 WHERE request_id = $1",
+        [requestId, hash],
+      );
+    } else {
+      await execute(this.db, "UPDATE kauro.request_journal SET usage_state = 'RECONCILED', actual_cents = 0 WHERE request_id = $1", [requestId]);
+    }
+    return this.postToGrant(grantId, BigInt(row.reserved), 0n);
   }
 }
