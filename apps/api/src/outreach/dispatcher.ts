@@ -141,18 +141,17 @@ export function createOutreachDispatcher(rt: OutreachRuntime, options: { readonl
 
     async submit(claimed, lease) {
       // D3: the gate is one statement in its own unit; the abort signal is created and the port called with no await in between
-      const gate = await rt.units.run(serviceContext(rt), (uow) => outreachSendOf(uow).gate(claimed.intentId, claimed.fence));
+      const gate = /* b12:gate */ await rt.units.run(serviceContext(rt), (uow) => outreachSendOf(uow).gate(claimed.intentId, claimed.fence));
       if (!gate.fenceMatches || !gate.open || gate.state !== "SUBMITTING") {
         // the start gate is closed: nothing was sent, and the intent is judged by D5 (it never submits late)
-        await self.record(claimed.intentId, lease, { kind: "NOT_ATTEMPTED" });
-        return { state: "NOT_ATTEMPTED", intentState: gate.state };
+        return self.record(claimed.intentId, lease, { kind: "NOT_ATTEMPTED" }).then(() => ({ state: "NOT_ATTEMPTED" as const, intentState: gate.state }));
       }
       if (rt.compliance === null || rt.optOutKey === null) throw new DomainFailure("INTEGRITY_FAILURE", "a sealed intent was admitted without the compliance configuration");
       const mime = buildOutreachMime(claimed.facts, rt.compliance, rt.optOutKey);
       if (payloadHashOf(mime) !== claimed.payloadHash) throw new DomainFailure("INTEGRITY_FAILURE", "the rebuilt message does not hash to the intent's payload hash");
       const submission: OutreachSubmission = { intentId: claimed.intentId, fence: claimed.fence, senderId: claimed.senderId, senderAddress: claimed.senderAddress, route: claimed.route, mime };
       const signal = providerCallSignal();
-      const call = portOf(claimed.route).submit(submission, signal);
+      const call = /* b12:submit */ portOf(claimed.route).submit(submission, signal);
       let answer: OutcomeAnswer;
       try {
         answer = classifyAnswer(await call);
