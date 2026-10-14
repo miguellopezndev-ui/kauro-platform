@@ -2866,7 +2866,7 @@
    "case": "R2-082",
    "package": "B15",
    "gate": "G-FISCAL",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3739,7 +3739,7 @@
    "case": "R2-114",
    "package": "B18",
    "gate": "G-RELEASE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -4204,9 +4204,10 @@
    "title": "Real external integration",
    "cases": 9,
    "counts": {
-    "NOT_EXECUTED": 9
+    "NOT_EXECUTED": 8,
+    "EXECUTED_LOCAL": 1
    },
-   "status": "NOT_STARTED",
+   "status": "IN_PROGRESS",
    "acceptedSubject": null,
    "rounds": [],
    "waitingFor": ""
@@ -4242,9 +4243,10 @@
    "title": "Final candidate and independent release audit",
    "cases": 11,
    "counts": {
-    "NOT_EXECUTED": 11
+    "NOT_EXECUTED": 10,
+    "EXECUTED_LOCAL": 1
    },
-   "status": "NOT_STARTED",
+   "status": "IN_PROGRESS",
    "acceptedSubject": null,
    "rounds": [],
    "waitingFor": ""

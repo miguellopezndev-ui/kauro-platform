@@ -2,9 +2,8 @@
  "package": "B15",
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
-  "file": null,
-  "registry": "packages/contracts/registry/program.json",
-  "note": "no case map yet: no evidence claimed"
+  "file": "docs/design/B15-case-map.md",
+  "sha256": "a67f64c0f8c9c80bbd30d30ff68c9e0a5997178f91a345d19bf8586a10314e4a"
  },
  "rows": [
   {
@@ -13,15 +12,21 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PART(pv1/refund-build) NOT_EXECUTED; target b-DEF"
   },
   {
    "case": "R2-082",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd028-create-payment-order.test.ts :: R2-082: DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms, expired price, no deliverable capacity (CAPACITY_UNAVAILABLE), unqualified route, unreviewed treatment — is refused before any intent or provider call"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-083",
@@ -29,7 +34,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B17",
+    "B18"
+   ],
+   "claimed": "OPEN -> T6 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "R2-084",
@@ -37,7 +46,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B17",
+    "B18"
+   ],
+   "claimed": "OPEN -> T6 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "R2-085",
@@ -45,7 +58,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PART(pv1 ACH settlement observation) NOT_EXECUTED; target b-DEF"
   },
   {
    "case": "R2-133",
@@ -53,7 +69,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B12"
+   ],
+   "claimed": "PART(pv1/caveats + B12 L-SEND) NOT_EXECUTED; target b-DEF"
   },
   {
    "case": "CMD035-OK",
@@ -61,7 +80,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B17",
+    "B18"
+   ],
+   "claimed": "OPEN -> T6 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD035-DENY",
@@ -69,7 +92,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B17",
+    "B18"
+   ],
+   "claimed": "OPEN -> T6 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD035-RACE",
@@ -77,7 +104,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B17",
+    "B18"
+   ],
+   "claimed": "OPEN -> T6 NOT_EXECUTED; target SIMULATED"
   }
  ]
 }

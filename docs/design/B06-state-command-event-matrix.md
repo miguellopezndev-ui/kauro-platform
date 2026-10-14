@@ -3378,9 +3378,9 @@ the check proves every citation resolves to an existing test.
 | Mutation | Applicability |
 | --- | --- |
 | legitimate state | `cmd028-create-payment-order.test.ts` :: "OK: an AGENCY_BILLING member creates one order for an issued quote…" |
-| wrong role | `cmd028-create-payment-order.test.ts` :: "DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED…" |
-| wrong agency | `cmd028-create-payment-order.test.ts` :: "DENY: a foreign tenant's quote is NOT_FOUND…" |
-| stale version | `cmd028-create-payment-order.test.ts` :: "DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms…" |
+| wrong role | `cmd028-create-payment-order.test.ts` :: "R2-082: DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED…" |
+| wrong agency | `cmd028-create-payment-order.test.ts` :: "R2-082: DENY: a foreign tenant's quote is NOT_FOUND…" |
+| stale version | `cmd028-create-payment-order.test.ts` :: "R2-082: DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms…" |
 | duplicate request | `cmd028-create-payment-order.test.ts` :: "RACE: an identical retry replays the one order…" |
 | changed-body same key | `cmd028-create-payment-order.test.ts` :: "RACE: an identical retry replays the one order, the same key with another termsHash is 409 IDEMPOTENCY_CONFLICT…" |
 | invalid schema | `b09-request-side.test.ts` :: "B09 admission: each served payment command refuses a malformed body at the boundary…" |
