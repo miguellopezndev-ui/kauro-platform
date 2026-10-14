@@ -15,3 +15,7 @@ export {
 } from "./calendar.js";
 export { OUTREACH_HANDLERS, OutreachNotBuilt, type OutreachHandlerName } from "./handlers.js";
 export { B12_SERVED_READ_IDS, createOutreachStubCommandHandlers, createOutreachStubReadHandlers, isB12CommercialCommand, isB12CommercialRead, isB12RegistryLessOperation, type B12CommandId, type B12ReadId } from "./routes.js";
+// lane L-AUTH: CMD062, PrepareOutreachReview, GetOutreachReview, RevokeOutreachAuthorization, WithdrawOutreachChannelPolicy
+export { createOutreachAuthCommandHandlers, createOutreachAuthReadHandlers, type OutreachAuthCommandHandlers } from "./auth-handlers.js";
+export type { OutreachAuthStore, OutreachAuthCollaborators } from "./auth-store.js";
+export { outreachReviewDigest, OUTREACH_REVIEW_DOMAIN } from "./prepare-review.js";
