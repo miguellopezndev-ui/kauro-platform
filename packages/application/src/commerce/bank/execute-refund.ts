@@ -383,6 +383,7 @@ function declareExecution(d: OwnerRefundDependencies, request: BankRouteRequest<
         current = { state: t.state, version: t.version, total: t.amountCents };
       }
       await bank.hold?.("bank:declare-locked");
+      if (await repo.isFrozen(source.scope, source.sourceId)) throw precondition("EXECUTION_FROZEN", "a debit contradicted a terminal attempt of this source");
       // 3. NEVER-RESEND first: an open attempt of the source refuses whatever else the request says
       if ((await repo.openAttemptOf(source.scope, source.sourceId)) !== null) throw precondition("EXECUTION_ATTEMPT_OPEN", "an execution attempt of this source is DECLARED or UNCERTAIN");
       const destination = await repo.destinationOf(source.scope, refundId);
@@ -553,6 +554,7 @@ function declareResend(d: OwnerRefundDependencies, request: BankRouteRequest<Dec
       const attempt = await repo.lockAttempt(attemptId);
       if (attempt === null) throw new NotFoundFailure("execution attempt");
       await bank.hold?.("bank:declare-locked");
+      if (await repo.isFrozen(attempt.sourceKind, attempt.sourceId)) throw precondition("EXECUTION_FROZEN", "a debit contradicted a terminal attempt of this source");
       // 3. NEVER-RESEND first: an open attempt of the source refuses whatever else the request says
       if ((await repo.openAttemptOf(attempt.sourceKind, attempt.sourceId)) !== null) throw precondition("EXECUTION_ATTEMPT_OPEN", "an execution attempt of this source is DECLARED or UNCERTAIN");
       // 4. a recorded bounce with an open payable, the amount within it
@@ -721,10 +723,15 @@ function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<R
         }
         return existing;
       }
-      const inadmissible = mode.admits(attempt);
-      if (inadmissible !== null) throw inadmissible;
+      // an offer on a NOT_EXECUTED attempt commits its row and, in the same COMMIT, the contradiction and the source freeze (the outcome then refuses)
+      const contradicting = attempt.state === "NOT_EXECUTED";
+      if (!contradicting) {
+        const inadmissible = mode.admits(attempt);
+        if (inadmissible !== null) throw inadmissible;
+      }
       const fresh: ExecutionOfferRecord = { offerId: uow.ids.next() as string, attemptId, command, idempotencyKey: key, requestedArtifactRef: body.evidence.artifactRef, expectedEvidenceHash: body.evidence.evidenceHash, actorUserId: userId };
       await repo.insertOffer(fresh);
+      if (contradicting) await repo.contradictOffered(uow.ids.next() as string, uow.ids.next() as string, attempt, body.evidence.evidenceHash);
       await allowFact(uow, context, operation, await bank.effectNow(uow));
       return fresh;
     });

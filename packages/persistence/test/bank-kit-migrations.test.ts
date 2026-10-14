@@ -307,7 +307,15 @@ test("the source union is closed: a CAPTURE source names agency, capture and ref
   await assert.rejects(attempt(oracle, { source_kind: "CAPTURE", bank_credit_id: null, treasury_refund_id: null }), (e: unknown) => sqlState(e) === "23502" || constraintOf(e) === "outbound_attempts_source_union");
   await assert.rejects(attempt(oracle, { kind: "RESEND" }), (e: unknown) => constraintOf(e) === "outbound_attempts_kind_parent");
   await assert.rejects(attempt(oracle, { parent_bounce_id: id() }), (e: unknown) => constraintOf(e) === "outbound_attempts_kind_parent");
-  await attempt(oracle, { kind: "RESEND", parent_bounce_id: id() });
+  // a RESEND names a bounce that exists and never exceeds it (0071): a stranger id is refused, a real bounce admits up to its cents
+  await assert.rejects(attempt(oracle, { kind: "RESEND", parent_bounce_id: id() }), (e: unknown) => sqlState(e) === "23514");
+  const creditId = id();
+  const treasuryId = id();
+  const sent = await attempt(oracle, { bank_credit_id: creditId, treasury_refund_id: treasuryId, state: "RECORDED", bank_execution_id: "exec-bounce-1", destination_proof: "DP_FULL", evidence_hash: SHA, recorded_at: new Date().toISOString() });
+  const bounceId = id();
+  await oracle.query("INSERT INTO kauro.outbound_return_bounces (bounce_id, attempt_id, environment, account_ref, source_kind, source_id, bounced_cents, evidence_hash, recorded_by) SELECT $1, attempt_id, environment, account_ref, source_kind, source_id, 10000, $3, $4 FROM kauro.outbound_execution_attempts WHERE attempt_id = $2", [bounceId, sent, SHA, id()]);
+  await assert.rejects(attempt(oracle, { kind: "RESEND", parent_bounce_id: bounceId, attempt_number: 2, bank_credit_id: creditId, treasury_refund_id: treasuryId, amount_cents: 10001 }), (e: unknown) => sqlState(e) === "23514");
+  await attempt(oracle, { kind: "RESEND", parent_bounce_id: bounceId, attempt_number: 2, bank_credit_id: creditId, treasury_refund_id: treasuryId });
   // a recipient version without its recipient is nothing (DP-RECIPIENT needs both)
   await assert.rejects(attempt(oracle, { recipient_version: "v1" }), (e: unknown) => constraintOf(e) === "outbound_attempts_recipient_version");
   // the reference is the platform's own format and unique

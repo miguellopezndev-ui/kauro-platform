@@ -431,6 +431,8 @@ DECLARE
   ceiling bigint;
   spent bigint;
 BEGIN
+  -- a RESEND without its bounce is the kind/parent check's to refuse
+  IF NEW.parent_bounce_id IS NULL THEN RETURN NEW; END IF;
   SELECT b.bounced_cents INTO ceiling FROM kauro.outbound_return_bounces b WHERE b.bounce_id = NEW.parent_bounce_id;
   SELECT coalesce(sum(a.amount_cents), 0) INTO spent FROM kauro.outbound_execution_attempts a WHERE a.parent_bounce_id = NEW.parent_bounce_id AND a.state IN ('DECLARED', 'UNCERTAIN', 'RECORDED');
   IF ceiling IS NULL OR spent + NEW.amount_cents > ceiling THEN
@@ -441,3 +443,13 @@ END
 $$;
 DROP TRIGGER IF EXISTS outbound_resend_ceiling ON kauro.outbound_execution_attempts;
 CREATE TRIGGER outbound_resend_ceiling BEFORE INSERT ON kauro.outbound_execution_attempts FOR EACH ROW WHEN (NEW.kind = 'RESEND') EXECUTE FUNCTION kauro.outbound_resend_ceiling();
+
+-- Late evidence on a terminal attempt (DV1-08/DV1-10, X3 vs SI2): a statement import (the owner, kauro_app) that finds a debit carrying the
+-- reference of a NOT_EXECUTED attempt opens its REFUND_TERMINAL_CONTRADICTED case and freezes the source's refunds (X1/X4 refuse EXECUTION_FROZEN).
+-- Nothing else widens: the case needs its attempt and line, the freeze names only this reason.
+CREATE POLICY bank_review_cases_owner_open_contradiction ON kauro.bank_review_cases FOR INSERT TO kauro_app
+  WITH CHECK (kauro.acting_corporate_owner() AND state = 'OPEN' AND kind = 'REFUND_TERMINAL_CONTRADICTED' AND attempt_id IS NOT NULL AND line_id IS NOT NULL);
+GRANT INSERT (attempt_id, source_kind, source_id) ON kauro.bank_review_cases TO kauro_app;
+CREATE POLICY bank_source_freezes_owner_contradiction ON kauro.bank_source_freezes FOR INSERT TO kauro_app
+  WITH CHECK (kauro.acting_corporate_owner() AND reason = 'REFUND_TERMINAL_CONTRADICTED');
+GRANT INSERT ON kauro.bank_source_freezes TO kauro_app;

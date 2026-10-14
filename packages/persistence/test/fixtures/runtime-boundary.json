@@ -101,12 +101,15 @@
       "kauro.bank_review_cases": {
         "INSERT": [
           "account_ref",
+          "attempt_id",
           "case_id",
           "detail_code",
           "environment",
           "evidence_hash",
           "kind",
-          "line_id"
+          "line_id",
+          "source_id",
+          "source_kind"
         ],
         "UPDATE": [
           "resolved_at",
@@ -2319,6 +2322,14 @@
       ],
       "using": null
     },
+    "bank_review_cases/bank_review_cases_owner_open_contradiction": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "(kauro.acting_corporate_owner() AND (state = 'OPEN'::text) AND (kind = 'REFUND_TERMINAL_CONTRADICTED'::text) AND (attempt_id IS NOT NULL) AND (line_id IS NOT NULL))"
+    },
     "bank_review_cases/bank_review_cases_owner_read": {
       "check": null,
       "command": "SELECT",
@@ -2438,6 +2449,14 @@
         "kauro_app"
       ],
       "using": "kauro.bank_route_visible_to_tenant(route_id, rollout, participants_version)"
+    },
+    "bank_source_freezes/bank_source_freezes_owner_contradiction": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "(kauro.acting_corporate_owner() AND (reason = 'REFUND_TERMINAL_CONTRADICTED'::text))"
     },
     "bank_source_freezes/bank_source_freezes_service": {
       "check": "true",
@@ -4262,6 +4281,14 @@
         "kauro_payment"
       ],
       "using": "true"
+    },
+    "outbound_return_bounces/outbound_return_bounces_service": {
+      "command": "ALL",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": "true"
     },
     "outbox_records/outbox_records_commerce_subscribers": {
       "check": "((NOT (EXISTS ( SELECT 1\n   FROM (kauro.domain_events e\n     JOIN kauro.commerce_event_bindings b ON ((b.event_type = e.event_type)))\n  WHERE (e.event_id = outbox_records.event_id)))) OR (EXISTS ( SELECT 1\n   FROM (kauro.domain_events e\n     JOIN kauro.commerce_event_subscriptions s ON ((s.event_type = e.event_type)))\n  WHERE ((e.event_id = outbox_records.event_id) AND (s.consumer = outbox_records.consumer)))))",
@@ -6594,6 +6621,9 @@
       "kauro.bank_routes": [
         "INSERT"
       ],
+      "kauro.bank_source_freezes": [
+        "INSERT"
+      ],
       "kauro.bank_transfer_instructions": [
         "INSERT",
         "SELECT"
@@ -7620,6 +7650,10 @@
         "INSERT",
         "SELECT",
         "UPDATE"
+      ],
+      "kauro.outbound_return_bounces": [
+        "INSERT",
+        "SELECT"
       ],
       "kauro.outbox_records": [
         "INSERT",

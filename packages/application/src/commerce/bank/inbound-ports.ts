@@ -111,6 +111,8 @@ export interface BankCreditRepository {
   recordLine(l: NewStatementLineInput): Promise<StatementLineWriteResult>;
   recordedAttemptOf(environment: string, accountRef: string, bankExecutionId: string): Promise<string | null>;
   attemptDeclaredWith(reference: string): Promise<boolean>;
+  /** A debit carrying the reference of a NOT_EXECUTED attempt: its REFUND_TERMINAL_CONTRADICTED case and the freeze of its source; false when there is no such attempt. */
+  contradictTerminalAttempt(caseId: string, freezeId: string, line: { readonly environment: string; readonly accountRef: string; readonly lineId: string; readonly reference: string; readonly evidenceHash: string }): Promise<boolean>;
   linkLine(lineId: string, attemptId: string): Promise<void>;
   openLineCase(caseId: string, kind: "RECORD_REQUIRED" | "UNDECLARED_OUTBOUND", line: { readonly environment: string; readonly accountRef: string; readonly lineId: string; readonly evidenceHash: string }, detailCode: string): Promise<boolean>;
   /** Runs `work` under a savepoint rolled back once it settled: every lock it took is released, nothing it wrote survives. */

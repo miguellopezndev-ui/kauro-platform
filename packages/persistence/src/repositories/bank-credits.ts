@@ -516,6 +516,34 @@ export class PgBankCredits {
     return r.rows.length > 0;
   }
 
+  /**
+   * Late evidence on a terminal attempt (DV1-08/DV1-10): a debit that carries the reference of an attempt the owner resolved NOT_EXECUTED
+   * contradicts that terminal fact. The source's refunds are frozen (X1/X4 refuse EXECUTION_FROZEN) and one REFUND_TERMINAL_CONTRADICTED case
+   * is opened for the attempt and line; the committed facts do not change. Answers whether such an attempt exists.
+   */
+  async contradictTerminalAttempt(caseId: string, freezeId: string, line: { readonly environment: string; readonly accountRef: string; readonly lineId: string; readonly reference: string; readonly evidenceHash: string }): Promise<boolean> {
+    const found = await execute<{ attempt_id: string; source_kind: string; source_id: string }>(
+      this.db,
+      "SELECT attempt_id, source_kind, source_id FROM kauro.outbound_execution_attempts WHERE reference = $1 AND state = 'NOT_EXECUTED' AND environment = $2 AND account_ref = $3",
+      [line.reference, line.environment, line.accountRef],
+    );
+    const a = found.rows[0];
+    if (a === undefined) return false;
+    await execute(
+      this.db,
+      `INSERT INTO kauro.bank_review_cases (case_id, kind, environment, account_ref, attempt_id, line_id, source_kind, source_id, detail_code, evidence_hash)
+       VALUES ($1, 'REFUND_TERMINAL_CONTRADICTED', $2, $3, $4, $5, $6, $7, 'DEBIT_AFTER_NOT_EXECUTED', $8) ON CONFLICT DO NOTHING`,
+      [caseId, line.environment, line.accountRef, a.attempt_id, line.lineId, a.source_kind, a.source_id, line.evidenceHash],
+    );
+    await execute(
+      this.db,
+      `INSERT INTO kauro.bank_source_freezes (freeze_id, environment, account_ref, source_kind, source_id, reason)
+       VALUES ($1, $2, $3, $4, $5, 'REFUND_TERMINAL_CONTRADICTED') ON CONFLICT DO NOTHING`,
+      [freezeId, line.environment, line.accountRef, a.source_kind, a.source_id],
+    );
+    return true;
+  }
+
   /** Links a debit line to the RECORDED attempt that explains it (set once). */
   async linkLine(lineId: string, attemptId: string): Promise<void> {
     const r = await execute(this.db, "UPDATE kauro.statement_lines SET linked_attempt_id = $2 WHERE line_id = $1 AND linked_attempt_id IS NULL", [lineId, attemptId]);

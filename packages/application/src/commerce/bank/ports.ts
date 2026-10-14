@@ -259,6 +259,7 @@ export interface BankRefundRepository {
   awaitAuthorization(authorizationId: string): Promise<void>;
   attempt(attemptId: string): Promise<ExecutionAttemptRecord | null>;
   lockAttempt(attemptId: string): Promise<ExecutionAttemptRecord | null>;
+  isFrozen(sourceKind: "CAPTURE" | "BANK_CREDIT", sourceId: string): Promise<boolean>;
   openAttemptOf(sourceKind: "CAPTURE" | "BANK_CREDIT", sourceId: string): Promise<ExecutionAttemptRecord | null>;
   attemptsOfRefund(sourceKind: "CAPTURE" | "BANK_CREDIT", id: string): Promise<ReadonlyArray<ExecutionAttemptRecord>>;
   nextAttemptNumber(sourceKind: "CAPTURE" | "BANK_CREDIT", sourceId: string): Promise<number>;
@@ -268,6 +269,7 @@ export interface BankRefundRepository {
   executionIdUsed(environment: string, accountRef: string, bankExecutionId: string): Promise<boolean>;
   findOffer(attemptId: string, command: ExecutionOfferCommandName, idempotencyKey: string): Promise<ExecutionOfferRecord | null>;
   insertOffer(o: ExecutionOfferRecord): Promise<void>;
+  contradictOffered(caseId: string, freezeId: string, a: { readonly attemptId: string; readonly environment: string; readonly accountRef: string; readonly sourceKind: string; readonly sourceId: string }, evidenceHash: string): Promise<void>;
   outcomeOf(offerId: string): Promise<ExecutionOutcomeRecord | null>;
   insertOutcome(o: ExecutionOutcomeRecord): Promise<void>;
   openCaseIfNone(c: NewBankReviewCaseInput): Promise<boolean>;

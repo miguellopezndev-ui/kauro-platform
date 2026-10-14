@@ -375,6 +375,12 @@ export class PgBankRefunds {
     return r.rows[0] ? attemptOf(r.rows[0]) : null;
   }
 
+  /** Whether a debit contradicted a terminal attempt of this source: X1/X4 refuse EXECUTION_FROZEN (FC-G5 resolves it, LATER). */
+  async isFrozen(sourceKind: "CAPTURE" | "BANK_CREDIT", sourceId: string): Promise<boolean> {
+    const r = await execute(this.db, "SELECT 1 FROM kauro.bank_source_freezes WHERE source_kind = $1 AND source_id = $2", [sourceKind, sourceId]);
+    return r.rows.length > 0;
+  }
+
   /** The open (DECLARED or UNCERTAIN) attempt of a source, if any (the NEVER-RESEND fence's row). */
   async openAttemptOf(sourceKind: "CAPTURE" | "BANK_CREDIT", sourceId: string): Promise<ExecutionAttemptRow | null> {
     const r = await execute<AttemptDbRow>(
@@ -624,6 +630,22 @@ export class PgBankRefunds {
       [attemptId, expectedVersion],
     );
     return r.rows[0] ? attemptOf(r.rows[0]) : null;
+  }
+
+  /** An execution offer committed on a NOT_EXECUTED attempt: the same contradiction as a late debit (REFUND_TERMINAL_CONTRADICTED case and the source freeze), in the offer's own COMMIT. */
+  async contradictOffered(caseId: string, freezeId: string, a: { readonly attemptId: string; readonly environment: string; readonly accountRef: string; readonly sourceKind: string; readonly sourceId: string }, evidenceHash: string): Promise<void> {
+    await execute(
+      this.db,
+      `INSERT INTO kauro.bank_review_cases (case_id, kind, environment, account_ref, attempt_id, source_kind, source_id, detail_code, evidence_hash)
+       VALUES ($1, 'REFUND_TERMINAL_CONTRADICTED', $2, $3, $4, $5, $6, 'OFFER_AFTER_NOT_EXECUTED', $7) ON CONFLICT DO NOTHING`,
+      [caseId, a.environment, a.accountRef, a.attemptId, a.sourceKind, a.sourceId, evidenceHash],
+    );
+    await execute(
+      this.db,
+      `INSERT INTO kauro.bank_source_freezes (freeze_id, environment, account_ref, source_kind, source_id, reason)
+       VALUES ($1, $2, $3, $4, $5, 'REFUND_TERMINAL_CONTRADICTED') ON CONFLICT DO NOTHING`,
+      [freezeId, a.environment, a.accountRef, a.sourceKind, a.sourceId],
+    );
   }
 
   /** CORR-OFFERED (DV1-11): whether any execution offer exists for the attempt (any command, with or without an outcome). */
