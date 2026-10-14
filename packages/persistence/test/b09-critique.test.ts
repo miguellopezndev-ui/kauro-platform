@@ -748,7 +748,7 @@ test("B09-F16: a debit note never validates; a credit note validates only agains
   await within(payment, service(A.agencyId), async (c) => {
     await c.query("UPDATE kauro.tax_documents SET state = 'SUBMITTING', issue_request_hash = $2, version = 3 WHERE document_id = $1", [invoice, sha(`issue-${invoice}`)]);
     await commerceEvent(c, "tax_document", invoice, 3, A.agencyId, "tax_document.submitting.v1", PAYMENT_SERVICE);
-    await c.query("UPDATE kauro.tax_documents SET state = 'ISSUED', provider_document_id = $2, legal_number = 'SETP-990001', evidence_hash = $3, issued_at = now(), version = 4 WHERE document_id = $1", [invoice, `DOC-${invoice.slice(-12)}`, sha(`issued-${invoice}`)]);
+    await c.query("UPDATE kauro.tax_documents SET state = 'ISSUED', provider_document_id = $2, legal_number = 'SETP-990001', evidence_hash = $3, issued_at = now(), fiscal_status = 'ACCEPTED', verification_ref = 'CUFE-' || $1::text, version = 4 WHERE document_id = $1", [invoice, `DOC-${invoice.slice(-12)}`, sha(`issued-${invoice}`)]);
     await commerceEvent(c, "tax_document", invoice, 4, A.agencyId, "tax_document.issued.v1", PAYMENT_SERVICE);
   });
   // another reviewed version of the same treatment is not the corrected invoice's snapshot
@@ -1056,7 +1056,7 @@ test("B09-N5: fiscal profile versions form one lineage — a version is supersed
   await within(payment, service(G.agencyId), async (c) => {
     await c.query("UPDATE kauro.tax_documents SET state = 'SUBMITTING', issue_request_hash = $2, version = 3 WHERE document_id = $1", [invoice, sha(`issue-${invoice}`)]);
     await commerceEvent(c, "tax_document", invoice, 3, G.agencyId, "tax_document.submitting.v1", PAYMENT_SERVICE);
-    await c.query("UPDATE kauro.tax_documents SET state = 'ISSUED', provider_document_id = $2, legal_number = 'SETP-990005', evidence_hash = $3, issued_at = now(), version = 4 WHERE document_id = $1", [invoice, `DOC-${invoice.slice(-12)}`, sha(`issued-${invoice}`)]);
+    await c.query("UPDATE kauro.tax_documents SET state = 'ISSUED', provider_document_id = $2, legal_number = 'SETP-990005', evidence_hash = $3, issued_at = now(), fiscal_status = 'ACCEPTED', verification_ref = 'CUFE-' || $1::text, version = 4 WHERE document_id = $1", [invoice, `DOC-${invoice.slice(-12)}`, sha(`issued-${invoice}`)]);
     await commerceEvent(c, "tax_document", invoice, 4, G.agencyId, "tax_document.issued.v1", PAYMENT_SERVICE);
   });
   // the owner re-reviews (supersession and successor at one instant), and only then is a refund of the sale requested and completed

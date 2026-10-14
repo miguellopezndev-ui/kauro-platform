@@ -560,6 +560,17 @@
           "version"
         ]
       },
+      "kauro.stage_receipt_reconciliations": {
+        "INSERT": [
+          "agency_id",
+          "content_hash",
+          "opened_by_membership_id",
+          "project_id",
+          "receipt_upload_ref",
+          "reconciliation_id",
+          "stage_id"
+        ]
+      },
       "kauro.stage_receipts": {
         "INSERT": [
           "agency_id",
@@ -1130,6 +1141,7 @@
         ],
         "UPDATE": [
           "receipt_hash",
+          "refusal_reason",
           "result"
         ]
       },
@@ -1546,6 +1558,7 @@
           "plan_id",
           "policy_hash",
           "project_id",
+          "recheck_of_plan_id",
           "revision_hash",
           "state",
           "superseded_by_plan_id",
@@ -5977,6 +5990,22 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
+    "stage_receipt_reconciliations/stage_receipt_reconciliations_tenant_open": {
+      "check": "((agency_id = kauro.current_agency_id()) AND (EXISTS ( SELECT 1\n   FROM kauro.memberships m\n  WHERE ((m.agency_id = stage_receipt_reconciliations.agency_id) AND (m.membership_id = stage_receipt_reconciliations.opened_by_membership_id) AND (m.user_id = kauro.current_user_id()) AND (m.state = 'ACTIVE'::text) AND (m.role = ANY (ARRAY['OWNER'::text, 'ADMIN'::text, 'OPERATOR'::text]))))))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null
+    },
+    "stage_receipt_reconciliations/stage_receipt_reconciliations_tenant_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
+    },
     "stage_receipts/stage_receipts_tenant_read": {
       "check": null,
       "command": "SELECT",
@@ -6233,6 +6262,14 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
+    "target_contracts/target_contracts_tenant_birth_draft": {
+      "check": "((confirmed_at IS NULL) AND (confirmed_by_membership_id IS NULL) AND (confirmation_evidence_ref IS NULL) AND (superseded_at IS NULL) AND (superseded_by_contract_id IS NULL))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null
+    },
     "tax_documents/tax_documents_finance_read": {
       "check": null,
       "command": "SELECT",
@@ -6424,6 +6461,22 @@
         "kauro_validator"
       ],
       "using": null
+    },
+    "vendor_qualifications/vendor_qualifications_control_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "true"
+    },
+    "vendor_qualifications/vendor_qualifications_owner_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()"
     },
     "web_sessions/web_sessions_open": {
       "check": "((user_id = kauro.current_user_id()) AND (secret_sha256 = kauro.current_session_sha256()))",
@@ -6943,6 +6996,9 @@
       "kauro.source_tables": [
         "SELECT"
       ],
+      "kauro.stage_receipt_reconciliations": [
+        "SELECT"
+      ],
       "kauro.stage_receipts": [
         "SELECT"
       ],
@@ -7006,6 +7062,9 @@
         "SELECT"
       ],
       "kauro.validation_receipts": [
+        "SELECT"
+      ],
+      "kauro.vendor_qualifications": [
         "SELECT"
       ],
       "kauro_meta.schema_migrations": [
@@ -7461,6 +7520,9 @@
       ],
       "kauro.upload_session_secrets": [
         "DELETE",
+        "SELECT"
+      ],
+      "kauro.vendor_qualifications": [
         "SELECT"
       ],
       "kauro_meta.schema_migrations": [

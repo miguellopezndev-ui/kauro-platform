@@ -28,7 +28,7 @@
 ALTER TABLE kauro.target_contracts
   ADD COLUMN superseded_by_contract_id uuid,
   ADD CONSTRAINT target_contracts_superseder_fk FOREIGN KEY (agency_id, superseded_by_contract_id)
-    REFERENCES kauro.target_contracts (agency_id, contract_id) DEFERRABLE INITIALLY DEFERRED,
+    REFERENCES kauro.target_contracts (agency_id, contract_id),
   ADD CONSTRAINT target_contracts_supersession_whole CHECK ((superseded_at IS NULL) = (superseded_by_contract_id IS NULL)),
   ADD CONSTRAINT target_contracts_no_self_supersession CHECK (superseded_by_contract_id IS DISTINCT FROM contract_id);
 

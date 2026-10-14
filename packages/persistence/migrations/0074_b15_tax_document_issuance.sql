@@ -82,6 +82,9 @@ CREATE TRIGGER tax_documents_submitting_guard BEFORE UPDATE OF state ON kauro.ta
   FOR EACH ROW WHEN (OLD.state = 'VALIDATED' AND NEW.state = 'SUBMITTING') EXECUTE FUNCTION kauro.tax_documents_submitting_guard();
 
 -- --- 5. FISCAL subscriptions -----------------------------------------------------------------------------------------------------------
+-- FORCE lifted inside this migration's own transaction and restored before COMMIT (0022, 0028)
+ALTER TABLE kauro.commerce_event_subscriptions NO FORCE ROW LEVEL SECURITY;
 INSERT INTO kauro.commerce_event_subscriptions (event_type, consumer) VALUES
   ('tax_document.submitting.v1', 'FISCAL'),
   ('tax_document.issued.v1', 'FISCAL');
+ALTER TABLE kauro.commerce_event_subscriptions FORCE ROW LEVEL SECURITY;

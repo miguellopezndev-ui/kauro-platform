@@ -288,15 +288,40 @@ export async function sealedSource(clients: SourceClients, ag: AgencyFixture, pr
   return { revisionId: sealed.revisionId, manifestHash: sealed.manifestHash };
 }
 
-/** A confirmed, current target contract of the project, as observation and confirmation leave it (plans_target_fk). */
+/**
+ * A confirmed, current target contract of the project, as observation and confirmation leave it (plans_target_fk): the request session
+ * creates it as a DRAFT (0073 birth (a)) and confirms it with its membership and a confirmation evidence artifact (0050).
+ */
 export async function targetContract(app: Client, ag: AgencyFixture, projectId: string, seed: string): Promise<{ contractId: string; bodyHash: string }> {
   const contractId = ids.next();
+  const evidenceId = ids.next();
   const bodyHash = sha(`${seed}-target-${contractId}`);
   await tx(app, { agencyId: ag.agencyId, userId: ag.ownerUserId }, async (c) => {
+    // a re-observation of the project's current target instance, or the project's first observation
+    const current = await c.query<{ instance_id: string }>(
+      "SELECT instance_id FROM kauro.target_contracts WHERE agency_id = $1 AND project_id = $2 AND confirmed_at IS NOT NULL AND superseded_at IS NULL",
+      [ag.agencyId, projectId],
+    );
+    const instanceId = current.rows[0]?.instance_id ?? ids.next();
     await c.query(
       `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, created_at)
-       VALUES ($1, $2, $3, 'CLEAN', $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), now(), $8, 'R2-INITIAL', now())`,
-      [contractId, ag.agencyId, projectId, ids.next(), ids.next(), sha("bundle"), bodyHash, sha(`authority-${contractId}`)],
+       VALUES ($1, $2, $3, 'CLEAN', $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), NULL, $8, 'R2-INITIAL', now())`,
+      [contractId, ag.agencyId, projectId, instanceId, ids.next(), sha("bundle"), bodyHash, sha(`authority-${contractId}`)],
+    );
+    await c.query(
+      `INSERT INTO kauro.target_artifacts (artifact_id, agency_id, project_id, kind, mode, instance_id, document, content_hash, created_by_membership_id)
+       VALUES ($1, $2, $3, 'CONFIRMATION_EVIDENCE', 'CLEAN', $4, '{}'::jsonb, $5, $6)`,
+      [evidenceId, ag.agencyId, projectId, instanceId, sha(`confirmation-${contractId}`), ag.ownerMembershipId],
+    );
+    // as CMD019 does: a confirmed newer contract supersedes the project's current one (0073 (b), (c))
+    await c.query(
+      `UPDATE kauro.target_contracts SET superseded_at = now(), superseded_by_contract_id = $2, version = version + 1
+        WHERE agency_id = $1 AND project_id = $3 AND confirmed_at IS NOT NULL AND superseded_at IS NULL`,
+      [ag.agencyId, contractId, projectId],
+    );
+    await c.query(
+      "UPDATE kauro.target_contracts SET confirmed_at = kauro.server_now(), confirmed_by_membership_id = $2, confirmation_evidence_ref = $3, version = version + 1 WHERE contract_id = $1",
+      [contractId, ag.ownerMembershipId, evidenceId],
     );
   });
   return { contractId, bodyHash };

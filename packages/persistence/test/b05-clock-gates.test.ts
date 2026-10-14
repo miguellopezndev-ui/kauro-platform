@@ -28,8 +28,24 @@ after(async () => {
 
 // --- classification ------------------------------------------------------------------------------------------------------------------
 
+/**
+ * The owner of a migration by its file stem (the name after the number): provisional numbers are renumbered at the batch
+ * (tools/renumber-migration.mjs rewrites the number, never the stem), so a lane's files are keyed by stem, not by number.
+ */
+const OWNER_BY_STEM: Readonly<Record<string, string>> = {
+  b17_stage_receipt_reconciliations: "B17",
+  b17_target_supersession: "B17",
+  b15_tax_document_issuance: "B15",
+};
+const stemOfTag = (tag: string): string | undefined => {
+  const file = readdirSync(MIGRATIONS_DIR).find((f) => f.startsWith(`${tag}_`) && f.endsWith(".sql"));
+  return file === undefined ? undefined : file.slice(tag.length + 1, -".sql".length);
+};
+
 /** The package owning each migration file (its header; 0001-0007 the B06 foundation; 0023's deadline gates are B05's, D5-20). */
 function ownerOfFile(tag: string): string {
+  const stem = stemOfTag(tag);
+  if (stem !== undefined && OWNER_BY_STEM[stem] !== undefined) return OWNER_BY_STEM[stem]!;
   const n = Number(tag);
   if (n <= 8 || n === 54 || n === 67) return "B06";
   if ((n >= 9 && n <= 12) || n === 18 || n === 20) return "B07";

@@ -157,6 +157,12 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0070_b05_model_task_request_key.sql",
     // B16 L3 CMD042: the deletion request, its receipts, the DELETING/DELETED guards and the prevention guards KA087/KA088 (provisional number)
     "0071_b16_deletion.sql",
+    // B17 L0D: import-stage parent edges and the receipt reconciliations of a finalized stage (R2-023, R2-025; provisional number)
+    "0072_b17_stage_receipt_reconciliations.sql",
+    // B17 L0D: target supersession births, re-check plans, the validation refusal reason, vendor qualifications, drift repair (R2-026, S078; provisional number)
+    "0073_b17_target_supersession.sql",
+    // B15 L0D: tax document issuance facts, the widened issuer half, the SUBMITTING backstop, FISCAL subscriptions (CMD035, R2-083/084; provisional number)
+    "0074_b15_tax_document_issuance.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
