@@ -390,6 +390,8 @@ export interface SalesResourceView {
   readonly familyId: string;
   readonly version: number;
   readonly state: "CURRENT" | "SUPERSEDED";
+  /** The CURRENT resource of the family (the resource itself while it is CURRENT): a retired copy names its replacement (R2-135). */
+  readonly currentResourceId: string;
   readonly contentRef: Sha256Hex;
   readonly capabilityIds: ReadonlyArray<string>;
   readonly createdAt: UtcInstant;

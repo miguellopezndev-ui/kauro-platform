@@ -9,14 +9,18 @@ import { DomainFailure, NotFoundFailure, isUuid } from "@kauro/domain";
 import { problemOf, type Problem } from "../../api/problems.js";
 import { CommerceAccessDenied, recordOperatorDenial, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
 import type { ReadRequest, ReadResult } from "../../queries/reads.js";
-import { sellerOrOwner } from "./draft-access.js";
-import type { DraftReadHandler, OutreachDraftCollaborators, SalesResourceView } from "./draft-store.js";
+import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
+import type { CommercialReadHandler } from "../statements/get-statement.js";
+import type { SalesResourceView } from "../views.js";
+import { draftReadAdmission, sellerOrOwner } from "./draft-access.js";
+import type { OutreachDraftCollaborators } from "./draft-store.js";
 
-export const GET_SALES_RESOURCE_OPERATION = "GetSalesResource";
+export const GET_SALES_RESOURCE_OPERATION = "GetSalesResource" as const;
 
-export function getSalesResourceHandler(runtime: CommerceRequestRuntime, co: OutreachDraftCollaborators): DraftReadHandler<SalesResourceView> {
+export function getSalesResourceHandler(runtime: CommerceRequestRuntime, co: OutreachDraftCollaborators): CommercialReadHandler<SalesResourceView> {
   return {
     operationId: GET_SALES_RESOURCE_OPERATION,
+    admission: draftReadAdmission(GET_SALES_RESOURCE_OPERATION),
     async execute(request: ReadRequest): Promise<ReadResult<SalesResourceView>> {
       const userId = request.subject.identity.userId as UserId;
       const context = { kind: "OPERATOR", userId, correlationId: request.correlationId } as const;
@@ -39,8 +43,9 @@ export function getSalesResourceHandler(runtime: CommerceRequestRuntime, co: Out
             version: resource.version,
             state: resource.state,
             currentResourceId: resource.currentResourceId,
-            contentRef: resource.contentRef,
+            contentRef: resource.contentRef as Sha256Hex,
             capabilityIds: resource.capabilityIds,
+            createdAt: resource.createdAt as UtcInstant,
           } satisfies SalesResourceView;
         });
         return { kind: "READ", view };

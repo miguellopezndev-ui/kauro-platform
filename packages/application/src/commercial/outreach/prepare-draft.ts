@@ -12,23 +12,18 @@
  * the caller cannot see answers NOT_FOUND exactly like an id nobody holds. A RESEND_TRANSACTIONAL sender is admitted here (the draft is a
  * proposal); CMD063 and the database refuse its send (KC028).
  */
-import type { UtcInstant } from "@kauro/contracts";
+import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { CausationId } from "@kauro/domain";
 import { DomainFailure, isUuid } from "@kauro/domain";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { operatorContextOf, runCommerceCommand, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
+import { commercialAdmissionSpecOf, type CommercialCommandHandler } from "../agency/runtime.js";
+import { B12_COMMERCIAL_COMMANDS, type PrepareOutreachDraftBody } from "../contracts.js";
+import type { OutreachDraftView } from "../views.js";
 import { sellerOrOwner } from "./draft-access.js";
-import type { DraftActor, DraftCommandHandler, DraftPurpose, OutreachDraftCollaborators, PreparedDraftView } from "./draft-store.js";
+import type { DraftActor, DraftPurpose, OutreachDraftCollaborators } from "./draft-store.js";
 
-export interface PrepareOutreachDraftBody {
-  readonly prospectId: string;
-  readonly senderIdentityRef: string;
-  readonly purpose: DraftPurpose;
-  readonly contentRef: string;
-  readonly provenanceEvidenceHash: string;
-  /** The sales resources the draft cites (plan A8). */
-  readonly resourceIds: ReadonlyArray<string>;
-}
+const spec = B12_COMMERCIAL_COMMANDS.CMD061;
 
 export const PREPARE_OUTREACH_DRAFT_OPERATION = "CMD061";
 
@@ -38,14 +33,15 @@ function refuseShape(field: string, code: "FORMAT" | "ENUM"): never {
   throw new DomainFailure("INVALID_REQUEST", "request refused: SCHEMA_VIOLATION", { reason: "SCHEMA_VIOLATION", fields: [{ field, code }] });
 }
 
-export function prepareDraftHandler(runtime: CommerceRequestRuntime, co: OutreachDraftCollaborators): DraftCommandHandler<PrepareOutreachDraftBody, PreparedDraftView> {
+export function prepareDraftHandler(runtime: CommerceRequestRuntime, co: OutreachDraftCollaborators): CommercialCommandHandler<PrepareOutreachDraftBody, OutreachDraftView> {
   return {
-    operation: PREPARE_OUTREACH_DRAFT_OPERATION,
-    async execute(envelope: CommandEnvelope<PrepareOutreachDraftBody>): Promise<CommandResult<PreparedDraftView>> {
+    spec,
+    admission: commercialAdmissionSpecOf(spec),
+    async execute(envelope: CommandEnvelope<PrepareOutreachDraftBody>): Promise<CommandResult<OutreachDraftView>> {
       const context = operatorContextOf(envelope);
       let actor: DraftActor | null = null;
-      return runCommerceCommand<PrepareOutreachDraftBody, PreparedDraftView>(runtime, {
-        command: { id: PREPARE_OUTREACH_DRAFT_OPERATION, journalScope: "OPERATOR_IDENTITY" },
+      return runCommerceCommand<PrepareOutreachDraftBody, OutreachDraftView>(runtime, {
+        command: { id: spec.id, journalScope: "OPERATOR_IDENTITY" },
         envelope,
         context,
         replayVersion: () => 1,
@@ -58,9 +54,11 @@ export function prepareDraftHandler(runtime: CommerceRequestRuntime, co: Outreac
           if (!isUuid(body.prospectId)) refuseShape("prospectId", "FORMAT");
           if (!isUuid(body.senderIdentityRef)) refuseShape("senderIdentityRef", "FORMAT");
           if (!PURPOSES.has(body.purpose)) refuseShape("purpose", "ENUM");
-          if (!body.resourceIds.every((id) => isUuid(id))) refuseShape("resourceIds", "FORMAT");
+          const resourceIds = body.resourceIds ?? [];
+          if (!resourceIds.every((id) => isUuid(id))) refuseShape("resourceIds", "FORMAT");
           const draftId = uow.ids.next();
-          const prepared = await co.drafts(uow).prepareDraft({
+          const store = co.drafts(uow);
+          const prepared = await store.prepareDraft({
             draftId,
             actor,
             prospectId: body.prospectId,
@@ -68,9 +66,23 @@ export function prepareDraftHandler(runtime: CommerceRequestRuntime, co: Outreac
             purpose: body.purpose,
             contentRef: body.contentRef,
             provenanceEvidenceHash: body.provenanceEvidenceHash,
-            resourceIds: body.resourceIds,
+            resourceIds,
           });
-          return { status: 201, view: prepared, version: prepared.version, resourceKind: "outreach_draft", resourceId: prepared.draftId };
+          const record = await store.draftOf(prepared.draftId);
+          if (record === null) throw new DomainFailure("INTEGRITY_FAILURE", "the prepared draft cannot be read back");
+          const view: OutreachDraftView = {
+            draftId: record.draftId,
+            prospectId: record.prospectId,
+            senderIdentityRef: record.senderId,
+            purpose: record.purpose,
+            contentHash: record.contentHash as Sha256Hex,
+            contentRef: record.contentRef as Sha256Hex,
+            provenanceEvidenceHash: record.provenanceEvidenceHash as Sha256Hex,
+            version: record.version,
+            state: record.state as OutreachDraftView["state"],
+            createdAt: record.createdAt as UtcInstant,
+          };
+          return { status: 201, view, version: record.version, resourceKind: "outreach_draft", resourceId: record.draftId };
         },
       });
     },

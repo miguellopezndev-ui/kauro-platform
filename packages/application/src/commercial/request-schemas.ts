@@ -100,6 +100,7 @@ export const COMMERCIAL_REQUEST_SCHEMAS = Object.freeze({
     purpose: PURPOSE,
     contentRef: HASH,
     provenanceEvidenceHash: HASH,
+    resourceIds: { type: "array", maxItems: 20, items: ID },
   }),
   /** AuthorizeOutreach: the sender, the sealed drafts' content bindings, the window, the bound count, the review digest and the owner's step-up proof. */
   CMD062: schema("CMD062", ["senderIdentityRef", "allowedContentHashes", "validFrom", "expiresAt", "maximumSends", "permissionEvidenceHash", "assuranceProofRef"], {

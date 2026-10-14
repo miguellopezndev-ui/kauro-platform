@@ -12,15 +12,16 @@ import type { UtcInstant } from "@kauro/contracts";
 import type { CausationId } from "@kauro/domain";
 import { DomainFailure, outreachContentId } from "@kauro/domain";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
+import type { Sha256Hex } from "@kauro/contracts";
 import { operatorContextOf, runCommerceCommand, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
+import { commercialAdmissionSpecOf, type CommercialCommandHandler } from "../agency/runtime.js";
+import { B12_COMMERCIAL_COMMANDS, type PutOutreachContentBody } from "../contracts.js";
+import type { OutreachContentView } from "../views.js";
 import { contentChecks, type ContentRule } from "./content-checks.js";
 import { sellerOrOwner } from "./draft-access.js";
-import type { DraftActor, DraftCommandHandler, OutreachContentView, OutreachDraftCollaborators } from "./draft-store.js";
+import type { DraftActor, OutreachDraftCollaborators } from "./draft-store.js";
 
-export interface PutOutreachContentBody {
-  readonly subject: string;
-  readonly body: string;
-}
+const spec = B12_COMMERCIAL_COMMANDS.PutOutreachContent;
 
 export const PUT_OUTREACH_CONTENT_OPERATION = "PutOutreachContent";
 
@@ -48,14 +49,15 @@ function refuseUnstorable(content: PutOutreachContentBody): void {
   if (fields.length > 0) throw new DomainFailure("INVALID_REQUEST", "request refused: SCHEMA_VIOLATION", { reason: "SCHEMA_VIOLATION", fields });
 }
 
-export function putContentHandler(runtime: CommerceRequestRuntime, co: OutreachDraftCollaborators): DraftCommandHandler<PutOutreachContentBody, OutreachContentView> {
+export function putContentHandler(runtime: CommerceRequestRuntime, co: OutreachDraftCollaborators): CommercialCommandHandler<PutOutreachContentBody, OutreachContentView> {
   return {
-    operation: PUT_OUTREACH_CONTENT_OPERATION,
+    spec,
+    admission: commercialAdmissionSpecOf(spec),
     async execute(envelope: CommandEnvelope<PutOutreachContentBody>): Promise<CommandResult<OutreachContentView>> {
       const context = operatorContextOf(envelope);
       let actor: DraftActor | null = null;
       return runCommerceCommand<PutOutreachContentBody, OutreachContentView>(runtime, {
-        command: { id: PUT_OUTREACH_CONTENT_OPERATION, journalScope: "OPERATOR_IDENTITY" },
+        command: { id: spec.id, journalScope: "OPERATOR_IDENTITY" },
         envelope,
         context,
         replayVersion: () => 1,
@@ -71,9 +73,10 @@ export function putContentHandler(runtime: CommerceRequestRuntime, co: OutreachD
             const fields = verdict.refused.map((rule) => RULE_FIELD[rule]);
             throw new DomainFailure("CONTENT_REFUSED", `the outreach content breaks ${verdict.refused.join(", ")}: nothing was stored`, { fields });
           }
-          const contentId = await co.drafts(uow).putContent(content, actor.userId);
-          if (contentId !== outreachContentId(content.subject, content.body)) throw new DomainFailure("INTEGRITY_FAILURE", "the stored content id is not the content's address");
-          return { status: 201, view: { contentId }, version: 1, resourceKind: "outreach_content", resourceId: journalIdOf(contentId) };
+          const stored = await co.drafts(uow).putContent(content, actor.userId);
+          if (stored.contentRef !== outreachContentId(content.subject, content.body)) throw new DomainFailure("INTEGRITY_FAILURE", "the stored content id is not the content's address");
+          const view: OutreachContentView = { contentRef: stored.contentRef as Sha256Hex, createdAt: stored.createdAt as OutreachContentView["createdAt"] };
+          return { status: 201, view, version: 1, resourceKind: "outreach_content", resourceId: journalIdOf(stored.contentRef) };
         },
       });
     },

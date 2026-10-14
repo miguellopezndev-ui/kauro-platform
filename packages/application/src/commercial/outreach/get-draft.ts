@@ -10,14 +10,18 @@ import { DomainFailure, NotFoundFailure } from "@kauro/domain";
 import { problemOf, type Problem } from "../../api/problems.js";
 import { CommerceAccessDenied, recordOperatorDenial, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
 import type { ReadRequest, ReadResult } from "../../queries/reads.js";
-import { sellerOrOwner } from "./draft-access.js";
-import type { DraftReadHandler, OutreachDraftCollaborators, OutreachDraftView } from "./draft-store.js";
+import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
+import type { CommercialReadHandler } from "../statements/get-statement.js";
+import type { OutreachDraftView } from "../views.js";
+import { draftReadAdmission, sellerOrOwner } from "./draft-access.js";
+import type { OutreachDraftCollaborators } from "./draft-store.js";
 
-export const GET_OUTREACH_DRAFT_OPERATION = "GetOutreachDraft";
+export const GET_OUTREACH_DRAFT_OPERATION = "GetOutreachDraft" as const;
 
-export function getDraftHandler(runtime: CommerceRequestRuntime, co: OutreachDraftCollaborators): DraftReadHandler<OutreachDraftView> {
+export function getDraftHandler(runtime: CommerceRequestRuntime, co: OutreachDraftCollaborators): CommercialReadHandler<OutreachDraftView> {
   return {
     operationId: GET_OUTREACH_DRAFT_OPERATION,
+    admission: draftReadAdmission(GET_OUTREACH_DRAFT_OPERATION),
     async execute(request: ReadRequest): Promise<ReadResult<OutreachDraftView>> {
       const userId = request.subject.identity.userId as UserId;
       const context = { kind: "OPERATOR", userId, correlationId: request.correlationId } as const;
@@ -39,12 +43,12 @@ export function getDraftHandler(runtime: CommerceRequestRuntime, co: OutreachDra
             prospectId: draft.prospectId,
             senderIdentityRef: draft.senderId,
             purpose: draft.purpose,
-            contentRef: draft.contentRef,
-            contentHash: draft.contentHash,
-            provenanceEvidenceHash: draft.provenanceEvidenceHash,
-            resourceIds: draft.resourceIds,
+            contentRef: draft.contentRef as Sha256Hex,
+            contentHash: draft.contentHash as Sha256Hex,
+            provenanceEvidenceHash: draft.provenanceEvidenceHash as Sha256Hex,
             version: draft.version,
-            state: draft.state,
+            state: draft.state as OutreachDraftView["state"],
+            createdAt: draft.createdAt as UtcInstant,
           } satisfies OutreachDraftView;
         });
         return { kind: "READ", view };
