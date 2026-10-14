@@ -203,8 +203,10 @@ async function waitsOn(reply: Promise<Reply>, fragment: string, what: string): P
   return first;
 }
 
-function release(hold: Hold | null, name: HoldName): void {
-  if (hold !== null && pw.w.holds.armedNames.includes(name)) hold.release();
+// HoldPoints.pass() removes a hold from armedNames the moment a unit of work REACHES it, so a guard on armedNames skipped the release
+// of exactly the holds that are held (the held transaction then died of idle_in_transaction_session_timeout): releasing is idempotent.
+function release(hold: Hold | null, _name: HoldName): void {
+  if (hold !== null) hold.release();
 }
 
 // --- footprints -----------------------------------------------------------------------------------------------------------------------
