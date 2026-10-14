@@ -1,0 +1,9 @@
+{
+  "sourceTree": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+  "lock": { "path": "pnpm-lock.yaml", "sha256": "1111111111111111111111111111111111111111111111111111111111111111" },
+  "cores": [
+    { "name": "kauro-migration-core-3.0.0.tgz", "sha256": "2222222222222222222222222222222222222222222222222222222222222222" },
+    { "name": "kauro-intelligence-core-0.6.0.tgz", "sha256": "3333333333333333333333333333333333333333333333333333333333333333" }
+  ],
+  "imageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
