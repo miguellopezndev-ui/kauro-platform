@@ -589,6 +589,7 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
       confirm: () => notInMemory("TargetContractRepository.confirm"),
       lockCurrentOfProject: () => notInMemory("TargetContractRepository.lockCurrentOfProject"),
       holdTransitions: () => notInMemory("TargetContractRepository.holdTransitions"),
+      lockPlansBoundTo: () => notInMemory("TargetContractRepository.lockPlansBoundTo"),
       approvedPlansBoundTo: () => notInMemory("TargetContractRepository.approvedPlansBoundTo"),
       supersede: () => notInMemory("TargetContractRepository.supersede"),
       insertRecheckPlan: () => notInMemory("TargetContractRepository.insertRecheckPlan"),

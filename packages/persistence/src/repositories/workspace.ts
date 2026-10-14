@@ -528,6 +528,15 @@ export class PgTargetContractRepository implements TargetContractRepository {
     );
   }
 
+  async lockPlansBoundTo(agencyId: AgencyId, projectId: ProjectId, targetContractHashes: ReadonlyArray<Sha256Hex>): Promise<void> {
+    if (targetContractHashes.length === 0) return;
+    await execute(
+      this.db,
+      `SELECT plan_id FROM kauro.plans WHERE agency_id = $1 AND project_id = $2 AND target_contract_hash = ANY($3::text[]) ORDER BY plan_id FOR SHARE`,
+      [agencyId, projectId, [...targetContractHashes]],
+    );
+  }
+
   async approvedPlansBoundTo(agencyId: AgencyId, projectId: ProjectId, targetContractHashes: ReadonlyArray<Sha256Hex>): Promise<ReadonlyArray<BoundPlan>> {
     if (targetContractHashes.length === 0) return [];
     const r = await execute<{ plan_id: string; version: number | string; target_contract_hash: string; body: PlanBody }>(

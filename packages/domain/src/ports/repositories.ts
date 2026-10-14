@@ -335,6 +335,12 @@ export interface TargetContractRepository {
    * reader of a contract's currency (its shared half: issuance, admission, publication, StartAudit, lockCurrentByHash) is ordered with it.
    */
   holdTransitions(contractIds: ReadonlyArray<TargetContractId>): Promise<void>;
+  /**
+   * Every plan of the project bound to one of the listed target body hashes, FOR SHARE in ascending plan_id, taken BEFORE the exclusive
+   * halves: a reader that holds a plan row and then waits on a contract's shared half (CMD041, ApprovePlan) is ordered before the
+   * supersession instead of deadlocking with it (the re-check plan's birth references the bound plan, a FOR KEY SHARE on its row).
+   */
+  lockPlansBoundTo(agencyId: AgencyId, projectId: ProjectId, targetContractHashes: ReadonlyArray<Sha256Hex>): Promise<void>;
   /** The APPROVED plans of the project bound to one of the listed target body hashes, with their bodies, ascending plan_id (a plain read). */
   approvedPlansBoundTo(agencyId: AgencyId, projectId: ProjectId, targetContractHashes: ReadonlyArray<Sha256Hex>): Promise<ReadonlyArray<BoundPlan>>;
   /** Supersedes a current contract by `by` (confirmed in this same unit of work): the instant is the database's; learned once. */

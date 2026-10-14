@@ -7,8 +7,9 @@
  * the stored authority) → reserve → the contract (NOT_FOUND; a foreign and a nonexistent contract answer alike) → the project row
  * (FOR NO KEY UPDATE: the serialization point of two confirmations of one project, and of ExecuteProject) → the contract row (FOR NO KEY
  * UPDATE) → the contract decided on the locked record (below) → the stored body → the evidence → the project's current contracts (FOR NO KEY
- * UPDATE, ascending) → the exclusive transition halves of those and of this contract, ascending → the APPROVED plans bound to them (the last
- * await) → the effect clock → the judgments:
+ * UPDATE, ascending) → every plan bound to those (FOR SHARE, ascending: a reader holding a plan row before a contract's shared half, CMD041
+ * or ApprovePlan, is ordered before this unit instead of deadlocking with the re-check birth's reference to its plan) → the exclusive
+ * transition halves of those contracts and of this one, ascending → the APPROVED plans bound to them (the last await) → the effect clock → the judgments:
  *
  *   - SUPERSEDED: 409 TARGET_STALE; CONFIRMED: 409 PRECONDITION_FAILED TARGET_ALREADY_CONFIRMED naming where it stands, answered
  *     before the version is compared, so the loser of a race is told what became of the contract, not that it is stale;
@@ -70,6 +71,7 @@ export function confirmTargetContractHandler(runtime: AuditRuntime): ConfirmTarg
           // equivalence branch), their exclusive transition halves and this contract's, ascending; then the APPROVED plans bound to them
           const evidence = await uow.targetContracts.getArtifact(envelope.body.confirmationEvidenceRef as ArtifactRef);
           const priors = await uow.targetContracts.lockCurrentOfProject(membership.agencyId, contract.projectId, contractId);
+          await uow.targetContracts.lockPlansBoundTo(membership.agencyId, contract.projectId, priors.map((p) => p.bodyHash));
           await uow.targetContracts.holdTransitions([...priors.map((p) => p.contractId), contractId]);
           const bound = await uow.targetContracts.approvedPlansBoundTo(membership.agencyId, contract.projectId, priors.map((p) => p.bodyHash));
           // r15/r25: the clock is read after the last await, and nothing is awaited between the judgments and the effect
