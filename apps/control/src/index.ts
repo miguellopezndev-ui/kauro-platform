@@ -73,3 +73,5 @@ export { GrantReconciliation } from "./audit/grants.js";
 export { AuditCancellations } from "./audit/cancellation.js";
 export { PlanValidator, judgeReceipt, openValidatorReceipts, planBodyHashOf, validationReceiptHashOf, VALIDATION_RECEIPT_DOMAIN } from "./audit/receipts.js";
 export type { ValidationReceipts, ReceiptJudgement, ValidatedSubject, ValidationRun, ValidatorDatabaseConfig } from "./audit/receipts.js";
+export { importerProfileOf, importerProfileRefusal, IMPORTER_PROFILE_IDS, IMPORTER_PROFILE_REASONS, IMPORTER_VERSION } from "./audit/importer-profile.js";
+export type { ImporterProfile, ImporterProfileReason } from "./audit/importer-profile.js";

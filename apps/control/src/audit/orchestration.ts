@@ -52,6 +52,7 @@ import {
 import { isSha256Hex, type Sha256Hex, type UtcInstant } from "@kauro/contracts";
 import { AttemptEnvelopeFailure, AttemptScratchStore, GenerationSourceReader } from "@kauro/data-plane";
 import {
+  isDomainFailure,
   LIVE_AUDIT_STATES,
   type AgencyId,
   type AuditEdge,
@@ -71,12 +72,13 @@ import {
   type PlanId,
   type PlanValidationId,
   type SystemContext,
+  type TargetBody,
   type ValidationReceiptId,
   type ValidationSource,
 } from "@kauro/domain";
 import { modelTaskJournalOf } from "@kauro/persistence";
 import { EXECUTION_SERVICES, applied, boundSystem, refused, type ExecutionStep } from "../execution/work.js";
-import { planBodyHashOf, type PlanValidator } from "./receipts.js";
+import { planBodyHashOf, refusalReasonOf, type PlanValidator } from "./receipts.js";
 import { StepRefused, channelOf, guarded, inAgency, reached, serverNowIn, type AuditWorkDependencies } from "./work.js";
 
 const SERVICE = EXECUTION_SERVICES.AUDIT_ORCHESTRATION;
@@ -116,6 +118,8 @@ interface Claim {
   readonly draft: DraftValidation | null;
   /** VALIDATE: the sealed revision the draft binds (B05 L1v). */
   readonly validationSource: ValidationSource | null;
+  /** VALIDATE: the target body the draft binds (M3). */
+  readonly validationTarget: TargetBody | null;
 }
 
 /** A step's result, recorded once under its fence, and the edges it takes in the same unit. */
@@ -169,7 +173,14 @@ export class AuditOrchestration implements OutboxConsumer {
       const claim = await this.claim(auditId, agencyId, eventVersion);
       const answer = claim.step.kind === "PROFILE" ? await this.profile(claim) : claim.step.kind === "INTERPRET" ? await this.interpret(claim) : await this.validate(claim);
       if ("kind" in answer) return answer;
-      return this.record(claim, answer);
+      try {
+        return await this.record(claim, answer);
+      } catch (e) {
+        // M13: the audit's target was superseded before the draft was born (the store awaited its transition lock): that unit rolled back whole,
+        // so no plan exists; a supersession is monotone, hence the refusal is recorded in a unit of its own
+        if (claim.step.kind === "INTERPRET" && isDomainFailure(e) && e.code === "TARGET_STALE") return this.record(claim, failed("TARGET_STALE", answer.evidenceClass));
+        throw e;
+      }
     });
   }
 
@@ -187,6 +198,7 @@ export class AuditOrchestration implements OutboxConsumer {
       let grant: CostGrantRecord | null = null;
       let draft: DraftValidation | null = null;
       let validationSource: ValidationSource | null = null;
+      let validationTarget: TargetBody | null = null;
       if (kind === "PROFILE") {
         // profile_worker_claims: the source SEALED and the grant AUTHORIZED and unexpired (a lost source is EXECUTION_CONTROL's)
         const source = await uow.auditDiscovery.auditSource(audit);
@@ -203,9 +215,10 @@ export class AuditOrchestration implements OutboxConsumer {
         draft = open[open.length - 1] ?? null;
         if (draft === null) throw new StepRefused("NO_OPEN_DRAFT");
         validationSource = await uow.auditDiscovery.validationSource(audit.agencyId, draft.validation.revisionHash);
+        validationTarget = await uow.auditDiscovery.validationTarget(draft.validation.planId);
       }
       const claimed = await uow.audits.claimStep(auditId, kind, this.deps.ids.next() as AuditStepId);
-      return { audit: claimed.audit, step: claimed.step, claimedAt, generations, grant, draft, validationSource };
+      return { audit: claimed.audit, step: claimed.step, claimedAt, generations, grant, draft, validationSource, validationTarget };
     });
   }
 
@@ -356,16 +369,17 @@ export class AuditOrchestration implements OutboxConsumer {
       startedAt: claim.claimedAt,
       cancellation: this.channel(claim),
       source: claim.validationSource,
+      target: claim.validationTarget,
       completedAt: () => serverNowIn(this.deps, SERVICE, audit.agencyId),
     });
-    const settle = async (uow: AuditUnitOfWork, result: "VALID" | "INVALID" | "ERROR", receiptHash: Sha256Hex | null): Promise<void> => {
-      const settled = await uow.audits.settleValidation(intent.validationId, { result, receiptHash });
+    const settle = async (uow: AuditUnitOfWork, result: "VALID" | "INVALID" | "ERROR", receiptHash: Sha256Hex | null, refusalReason?: string): Promise<void> => {
+      const settled = await uow.audits.settleValidation(intent.validationId, { result, receiptHash, ...(refusalReason === undefined ? {} : { refusalReason }) });
       if (!settled.current) throw new StepRefused("INTENT_NOT_CURRENT");
     };
     if (judged.kind === "CONTRACT_FAILURE") {
       // fatal_contract_error: a null, incomplete or foreign receipt; the intent settles ERROR and the draft needs validation again
       return { ...failed(judged.reason, judged.evidenceClass), apply: async (uow, current) => {
-        await settle(uow, "ERROR", null);
+        await settle(uow, "ERROR", null, refusalReasonOf(judged.reason));
         await advance(uow, current, { to: "FAILED", reasonCode: judged.reason });
       } };
     }
