@@ -427,7 +427,7 @@ test("Data handling: what is processed, isolation, what a model sees, who decide
     "Do not upload credentials or secrets, full payment card data, or health data.",
     "A request for another agency's project is answered exactly like a request for a project that does not exist.",
     "it receives only a limited context that Kauro selects, never your files as a whole. It cannot approve a change and it cannot write to your CRM.",
-    "A copy your agency downloaded stays with your agency",
+    "A copy you downloaded stays with you",
     "has not been through an independent security certification and does not claim one",
     "does not guarantee that you meet any regulation",
   ]) assert.ok(text.includes(claim), claim);

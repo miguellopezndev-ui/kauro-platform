@@ -240,7 +240,7 @@ export const PUBLIC_COPY = {
   "security.retention.links": "A download link works for {minutes}.",
   "security.retention.defect": "A defect in Kauro's work can be reported for {days} after the package is prepared, and Kauro aims to repair a verified material defect within {repair}.",
   "security.residual.heading": "What deletion does not cover",
-  "security.residual.body": "Deleted means removed from Kauro's storage, staging and derived files, including temporary support copies, on the schedule above. A copy your agency downloaded stays with your agency, and financial and legal records are kept apart from CRM content for as long as the rules require.",
+  "security.residual.body": "Deleted means removed from Kauro's storage, staging and derived files, including temporary support copies, on the schedule above. A copy you downloaded stays with you, and financial and legal records are kept apart from CRM content for as long as the rules require.",
   "security.claims.heading": "What this page does not claim",
   "security.claims.body": "Kauro has not been through an independent security certification and does not claim one. It does not promise anonymity or zero retention, it does not look for vulnerabilities in your systems, and it does not guarantee that you meet any regulation.",
   "security.next.heading": "Read the terms or ask a question",
