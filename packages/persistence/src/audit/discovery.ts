@@ -31,9 +31,10 @@ import {
   type ValidationSource,
   type RequestJournalRecord,
   type RevisionId,
+  type TargetBody,
   type ValidationSubject,
 } from "@kauro/domain";
-import { execute, int, type Queryable } from "../sql.js";
+import { execute, instant, int, type Queryable } from "../sql.js";
 import { pageLimit, str } from "../source/rows.js";
 import { GRANT_COLUMNS, VALIDATION_COLUMNS, cents, grantRecord, validationRecord, type Row } from "./rows.js";
 
@@ -172,6 +173,29 @@ export class PgAuditDiscovery implements AuditDiscovery {
       revisionHash: str(p.revision_hash),
       targetContractHash: str(p.target_contract_hash),
       current: latest.rows[0] ? validationRecord(latest.rows[0]) : null,
+    };
+  }
+
+  async validationTarget(planId: PlanId): Promise<TargetBody | null> {
+    // the plan's own project's contract of its hash (a body hash is unique per project, never across projects)
+    const r = await execute<{ mode: TargetBody["mode"]; instance_id: string; importer_profile_id: string; importer_version: string; objects: TargetBody["objects"]; observed_at: unknown; authority_evidence_hash: string; capability_version: string }>(
+      this.db,
+      `SELECT t.mode, t.instance_id, t.importer_profile_id, t.importer_version, t.objects, t.observed_at, t.authority_evidence_hash, t.capability_version
+         FROM kauro.plans p JOIN kauro.target_contracts t ON t.agency_id = p.agency_id AND t.project_id = p.project_id AND t.body_hash = p.target_contract_hash
+        WHERE p.plan_id = $1`,
+      [planId],
+    );
+    const t = r.rows[0];
+    if (!t) return null;
+    return {
+      mode: t.mode,
+      instanceId: t.instance_id,
+      importerProfileId: t.importer_profile_id,
+      importerVersion: t.importer_version,
+      objects: t.objects,
+      observedAt: instant(t.observed_at),
+      authorityEvidenceHash: t.authority_evidence_hash as TargetBody["authorityEvidenceHash"],
+      capabilityVersion: t.capability_version,
     };
   }
 

@@ -80,3 +80,5 @@ export { RecoveryJournalTail, tailedEntryOf, RECOVERY_JOURNAL_TAIL_SOURCE, TAILE
 export type { RecoveryJournalTailDependencies } from "./recovery/journal-tail.js";
 export { NotificationJournal, notificationIdentityOf, NOTIFICATIONS_CONSUMER } from "./consumers/notification-journal.js";
 export type { NotificationJournalDependencies } from "./consumers/notification-journal.js";
+export { importerProfileOf, importerProfileRefusal, IMPORTER_PROFILE_IDS, IMPORTER_PROFILE_REASONS, IMPORTER_VERSION } from "./audit/importer-profile.js";
+export type { ImporterProfile, ImporterProfileReason } from "./audit/importer-profile.js";

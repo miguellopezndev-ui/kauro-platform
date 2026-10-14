@@ -81,6 +81,7 @@ import {
   type ValidationReceiptId,
   type VersionedWrite,
 } from "@kauro/domain";
+import { targetBodyDigest, type TargetBody } from "@kauro/domain";
 import { PgAuditUnitOfWorkFactory, PgValidationReceiptRecorder, type KauroPool, type PgAuditUnitOfWork } from "@kauro/persistence";
 import {
   activateAgency,
@@ -101,6 +102,27 @@ export const ids: IdGenerator = createIdGenerator(clock, (n) => new Uint8Array(r
 
 export function sha(value: string | Uint8Array): Sha256Hex {
   return createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * The importer-profile catalogue's keys as the tests know them (B17 L2, R2-018..022): the oracle of the product's own table, so a
+ * product key that drifts fails the catalogue cell instead of passing against itself. Every confirmed fixture target names one.
+ */
+export const IMPORTER_PROFILE_IDS = Object.freeze({
+  HUBSPOT_IMPORT_UI: "0192a000-0000-7000-8000-000000000001",
+  SALESFORCE_DATA_LOADER: "0192a000-0000-7000-8000-000000000002",
+  SF_BULK_API2: "0192a000-0000-7000-8000-000000000003",
+});
+export const IMPORTER_VERSION = "R2-INITIAL";
+export const FIXTURE_OBSERVED_AT = "2026-10-01T00:00:00.000Z";
+
+/** What a fixture target is made of when a test needs a particular profile or object inventory (default: the mode's own profile, no objects). */
+export interface TargetShape {
+  /** The contract body's mode when it is not the project's (CLEAN: the importer-profile gate is vacuous). */
+  readonly mode?: "CLEAN";
+  readonly importerProfileId?: string;
+  readonly importerVersion?: string;
+  readonly objects?: TargetBody["objects"];
 }
 
 /** The application name of every control-plane connection of the harness (pg_stat_activity). */
@@ -325,7 +347,7 @@ export interface ExecutionWorld {
   /** A confirmed, current target contract of the project (observation and confirmation leave it; the request handlers' write). */
   confirmTarget(agency: AgencyFixture, projectId: ProjectId, label: string, mode?: "HUBSPOT" | "SALESFORCE"): Promise<{ readonly contractId: string; readonly targetContractHash: Sha256Hex }>;
   /** A fresh project of the agency (HUBSPOT, or SALESFORCE), its revision sealed recently through B07's lifecycle and its target confirmed. */
-  subject(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE" }): Promise<AuditSubject>;
+  subject(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE"; readonly target?: TargetShape }): Promise<AuditSubject>;
   /** A paid purchase of a fresh project of the agency (HUBSPOT, or SALESFORCE under that mode's own offered capability). */
   paid(agency: AgencyFixture, label: string, options?: { readonly mode?: "HUBSPOT" | "SALESFORCE" }): Promise<Purchase>;
   /**
@@ -352,7 +374,8 @@ export interface ExecutionWorld {
   /** The retention sweeper's retention_expires of the purchase's source (the harness, fifteen days ahead on the TEST CLOCK). */
   expireSource(p: Purchase): Promise<void>;
   /** A newer observation supersedes the purchase's target contract (the request handlers' write). */
-  supersedeTarget(p: Purchase): Promise<void>;
+  /** With `hold`, the supersession is left uncommitted on that connection (its caller ends the transaction): the held half of a race. */
+  supersedeTarget(p: Pick<Purchase, "agency" | "contractId">, hold?: Harness["oracle"]): Promise<void>;
   /** A capability suspended (material_counterexample) by the control plane's operations (SUSPENDED is terminal: use a mode no other test needs). */
   suspendCapability(capabilityId: string): Promise<void>;
   /** The process instant the dispatcher claims at, moved with the TEST CLOCK. */
@@ -607,7 +630,7 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
   };
 
   /** A fresh project of the agency, its revision sealed recently through B07's lifecycle, and a confirmed, current target contract. */
-  async function subjectOf(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE"): Promise<AuditSubject> {
+  async function subjectOf(ag: AgencyFixture, label: string, mode: "HUBSPOT" | "SALESFORCE", shape: TargetShape = {}): Promise<AuditSubject> {
     const withCapability = await capabilityOf(mode);
     const tenant = () => h.tenant(ag.agencyId, ag.ownerUserId);
     const actor = { kind: "USER", userId: ag.ownerUserId } as const;
@@ -637,20 +660,31 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     });
     // B07: the source sealed recently through the lifecycle fixture (a quote promises no more source than its seal left)
     const source = await h.sealedRevision(ag, projectId, "SEALED", { base: new Date(Date.now() - RECENT_SEAL_MS) });
-    const { contractId, targetContractHash } = await confirmedTarget(ag, projectId, label, mode);
+    const { contractId, targetContractHash } = await confirmedTarget(ag, projectId, label, mode, shape);
     return { agency: ag, projectId, revisionId: source.revisionId, revisionHash: source.revisionHash, contractId, targetContractHash, capabilityId: withCapability };
   }
 
   /** A confirmed, current target contract of the project (observation and confirmation leave it; plans_target_fk). */
-  async function confirmedTarget(ag: AgencyFixture, projectId: ProjectId, label: string, mode: "HUBSPOT" | "SALESFORCE"): Promise<{ readonly contractId: string; readonly targetContractHash: Sha256Hex }> {
+  async function confirmedTarget(ag: AgencyFixture, projectId: ProjectId, label: string, mode: "HUBSPOT" | "SALESFORCE", shape: TargetShape = {}): Promise<{ readonly contractId: string; readonly targetContractHash: Sha256Hex }> {
     const capabilityVersion = (await oracle.query<{ version: string }>("SELECT version FROM kauro.capabilities WHERE capability_id = $1", [await capabilityOf(mode)])).rows[0]?.version ?? "R2-INITIAL";
     const contractId = ids.next();
-    const targetContractHash = sha(`target-${label}-${contractId}`);
+    // B17 L2: the fixture's hash is the real KAURO_TARGET_BODY_V1 digest of its body (PLAN_VALIDATION compares it), its profile a catalogue one
+    const body: TargetBody = {
+      mode: shape.mode ?? mode,
+      instanceId: ids.next(),
+      importerProfileId: shape.importerProfileId ?? (mode === "HUBSPOT" ? IMPORTER_PROFILE_IDS.HUBSPOT_IMPORT_UI : IMPORTER_PROFILE_IDS.SALESFORCE_DATA_LOADER),
+      importerVersion: shape.importerVersion ?? IMPORTER_VERSION,
+      objects: shape.objects ?? [],
+      observedAt: FIXTURE_OBSERVED_AT as UtcInstant,
+      authorityEvidenceHash: sha(`authority-${contractId}`),
+      capabilityVersion,
+    };
+    const targetContractHash = targetBodyDigest(body);
     // 0084: the confirmed fixture is the oracle's (a request session bears only drafts)
     await oracle.query(
         `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 'R2-INITIAL', '[]'::jsonb, $7, $8, now(), now(), $9, $10, now())`,
-        [contractId, ag.agencyId, projectId, mode, ids.next(), ids.next(), sha("bundle"), targetContractHash, sha(`authority-${contractId}`), capabilityVersion],
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, now(), $12, $13, now())`,
+        [contractId, ag.agencyId, projectId, mode, body.instanceId, body.importerProfileId, body.importerVersion, JSON.stringify(body.objects), sha("bundle"), targetContractHash, body.observedAt, body.authorityEvidenceHash, capabilityVersion],
     );
     return { contractId, targetContractHash };
   }
@@ -794,7 +828,7 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     },
 
     subject(ag, label, options = {}) {
-      return subjectOf(ag, label, options.mode ?? "HUBSPOT");
+      return subjectOf(ag, label, options.mode ?? "HUBSPOT", options.target);
     },
 
     async paid(ag, label, options = {}) {
@@ -900,35 +934,36 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
       await h.expireRevision(p.agency, p.projectId, p.revisionId);
     },
 
-    async supersedeTarget(p) {
+    async supersedeTarget(p, hold) {
+      const db = hold ?? oracle;
       // 0084 (b): CMD019's shape through the oracle — a later observation of the same instance supersedes the contract and is
       // confirmed in the same transaction
-      await oracle.query("BEGIN");
+      await db.query("BEGIN");
       try {
-        const old = (await oracle.query<{ project_id: string; mode: string; instance_id: string; observed_at: Date; capability_version: string }>(
+        const old = (await db.query<{ project_id: string; mode: string; instance_id: string; observed_at: Date; capability_version: string }>(
           "SELECT project_id, mode, instance_id, observed_at, capability_version FROM kauro.target_contracts WHERE contract_id = $1",
           [p.contractId],
         )).rows[0]!;
         const next = ids.next();
-        await oracle.query(
+        await db.query(
           `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, created_at)
            VALUES ($1, $2, $3, $4, $5, $6, 'R2-INITIAL', '[]'::jsonb, $7, $8, $9, NULL, $10, $11, now())`,
           [next, p.agency.agencyId, old.project_id, old.mode, old.instance_id, ids.next(), sha("bundle"), sha(`superseder-${next}`), new Date(Math.max(Date.now(), old.observed_at.getTime() + 1)), sha(`authority-${next}`), old.capability_version],
         );
-        await oracle.query("UPDATE kauro.target_contracts SET superseded_at = now(), superseded_by_contract_id = $2, version = version + 1 WHERE contract_id = $1", [p.contractId, next]);
+        await db.query("UPDATE kauro.target_contracts SET superseded_at = now(), superseded_by_contract_id = $2, version = version + 1 WHERE contract_id = $1", [p.contractId, next]);
         const evidenceId = ids.next();
-        await oracle.query(
+        await db.query(
           `INSERT INTO kauro.target_artifacts (artifact_id, agency_id, project_id, kind, mode, instance_id, document, content_hash, created_by_membership_id)
            VALUES ($1, $2, $3, 'CONFIRMATION_EVIDENCE', $4, $5, '{}'::jsonb, $6, $7)`,
           [evidenceId, p.agency.agencyId, old.project_id, old.mode, old.instance_id, sha(`confirmation-${next}`), p.agency.ownerMembershipId],
         );
-        await oracle.query(
+        await db.query(
           "UPDATE kauro.target_contracts SET confirmed_at = kauro.server_now(), confirmed_by_membership_id = $2, confirmation_evidence_ref = $3, version = version + 1 WHERE contract_id = $1",
           [next, p.agency.ownerMembershipId, evidenceId],
         );
-        await oracle.query("COMMIT");
+        if (hold === undefined) await db.query("COMMIT");
       } catch (e) {
-        await oracle.query("ROLLBACK");
+        await db.query("ROLLBACK");
         throw e;
       }
     },

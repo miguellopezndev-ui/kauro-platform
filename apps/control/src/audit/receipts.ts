@@ -16,7 +16,8 @@ import { join } from "node:path";
 import { attemptIdentityOf, attemptStagingPrefixOf, stagedManifestObjectNameOf, type AttemptCapability, type CancellationChannel, type CoreEvidenceClass, type ExecutionLimits, type ObjectStoragePort, type ValidatePort, type ValidateResult } from "@kauro/application";
 import { DOMAINS, canonicalBytes, isSha256Hex, rawDigest, structuredDigest, type RowCounts, type Sha256Hex, type UtcInstant } from "@kauro/contracts";
 import { AttemptEnvelopeFailure, AttemptScratchStore, GenerationSourceReader } from "@kauro/data-plane";
-import type { AgencyId, Environment, PlanBody, PlanId, ValidationReceiptId, ValidationReceiptRecord, ValidationSource } from "@kauro/domain";
+import { targetBodyDigest, type AgencyId, type Environment, type PlanBody, type PlanId, type TargetBody, type ValidationReceiptId, type ValidationReceiptRecord, type ValidationSource } from "@kauro/domain";
+import { importerProfileRefusal } from "./importer-profile.js";
 import { PgValidationReceiptRecorder, createPool, type DatabaseEnvironment, type PoolErrorSink } from "@kauro/persistence";
 
 /** The validator's write path: one append-only receipt, recorded by kauro_validator (persistence's PgValidationReceiptRecorder). */
@@ -71,6 +72,11 @@ export function validationReceiptHashOf(receipt: Omit<ValidationReceiptRecord, "
     blockingIssueCodes: receipt.blockingIssueCodes,
   };
   return rawDigest(canonicalBytes({ domain: VALIDATION_RECEIPT_DOMAIN, version: 1, payload }));
+}
+
+/** A contract failure's reason as the token plan_validations.refusal_reason keeps (kauro.is_token); anything else is named generically. */
+export function refusalReasonOf(reason: string): string {
+  return /^[A-Z][A-Z0-9_]{2,63}$/.test(reason) ? reason : "VALIDATION_CONTRACT_FAILURE";
 }
 
 /** The subject the platform validated: the intent's plan, body hash, source and target, in its agency. */
@@ -173,6 +179,12 @@ export interface ValidationRun {
    * frozen populations: nothing is validated (VALIDATION_SOURCE_UNAVAILABLE).
    */
   readonly source: ValidationSource | null;
+  /**
+   * The target body the plan binds (AuditDiscovery.validationTarget, read in the caller's unit): its digest must be the intent's
+   * targetContractHash (TARGET_DIGEST_MISMATCH) and its importer profile must carry the plan (importer-profile.ts, R2-018..022). Absent:
+   * nothing is validated (TARGET_UNAVAILABLE).
+   */
+  readonly target: TargetBody | null;
   /** The server's instant once the validator answered (a unit of its own, D8-CLOCK-1). */
   readonly completedAt: () => Promise<UtcInstant>;
 }
@@ -198,6 +210,11 @@ export class PlanValidator {
    */
   async run(run: ValidationRun): Promise<ReceiptJudgement> {
     if (planBodyHashOf(run.body) !== run.subject.planHash) return { kind: "CONTRACT_FAILURE", reason: "BODY_DIGEST_MISMATCH", evidenceClass: "EXECUTED_LOCAL" };
+    // the target the plan binds, exactly (ADV-19), then the importer profile that must carry the plan (M3; R2-018..022): both before the core
+    if (run.target === null) return { kind: "CONTRACT_FAILURE", reason: "TARGET_UNAVAILABLE", evidenceClass: "EXECUTED_LOCAL" };
+    if (targetBodyDigest(run.target) !== run.subject.targetContractHash) return { kind: "CONTRACT_FAILURE", reason: "TARGET_DIGEST_MISMATCH", evidenceClass: "EXECUTED_LOCAL" };
+    const refusal = importerProfileRefusal(run.body, run.target);
+    if (refusal !== null) return { kind: "CONTRACT_FAILURE", reason: refusal, evidenceClass: "EXECUTED_LOCAL" };
     const sealed = run.source;
     if (sealed === null || sealed.revisionState !== "SEALED" || sealed.populations === null || sealed.acceptedGenerations.length === 0) {
       return { kind: "CONTRACT_FAILURE", reason: "VALIDATION_SOURCE_UNAVAILABLE", evidenceClass: "EXECUTED_LOCAL" };
