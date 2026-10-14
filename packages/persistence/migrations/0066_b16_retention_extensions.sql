@@ -99,7 +99,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END
-$;
+$$;
 REVOKE EXECUTE ON FUNCTION kauro.retention_records_soft_deadline() FROM PUBLIC;
 
 ALTER TABLE kauro.event_types NO FORCE ROW LEVEL SECURITY;
