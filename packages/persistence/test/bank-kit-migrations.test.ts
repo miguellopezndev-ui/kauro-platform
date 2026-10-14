@@ -126,7 +126,7 @@ test("the vocabulary table mirrors every closed domain list exactly (BANK_RAILS 
 const ENVIRONMENTS = ["SANDBOX", "LIVE"] as const;
 /** The source-freeze reasons: the two BANK_CASE_KINDS a freeze is opened for (a limited subset, not the whole list). */
 const FREEZE_REASONS = ["UNDECLARED_OUTBOUND", "REFUND_TERMINAL_CONTRADICTED"] as const;
-/** An execution offer opens a route-money case, never a settlement refusal (SETTLEMENT_REFUSED is the settlement intent's, 0071). */
+/** An execution offer opens a route-money case, never a settlement refusal (SETTLEMENT_REFUSED is the settlement intent's, 0079). */
 const OFFER_REVIEW_CASE_KINDS = BANK_CASE_KINDS.filter((k) => k !== "SETTLEMENT_REFUSED");
 const ENUM_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>> = {
   "outbound_execution_attempts.environment": ENVIRONMENTS,

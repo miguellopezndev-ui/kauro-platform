@@ -1,5 +1,5 @@
 /**
- * The settlement observation of the bank-transfer route over `pg` (migration 0071, lane PV1-SETTLE; docs/design/ACH-ROUTE.md r12 §7.25,
+ * The settlement observation of the bank-transfer route over `pg` (migration 0079, lane PV1-SETTLE; docs/design/ACH-ROUTE.md r12 §7.25,
  * docs/design/PV1-SETTLE.md D-SET-4/5, docs/design/PV1-SETTLE-two-step.md D-SET-10): the route of an account, the settlement or live intent
  * already recorded for a withdrawal or a bank transaction, the route's provider-available balance (kauro.route_provider_available_cents),
  * the owner's recorded intents (kauro.settlement_requests: CMD215 inserts one on kauro_app), their consumption by the payment service

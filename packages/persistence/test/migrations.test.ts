@@ -172,7 +172,7 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // SEC OWNER-POLICY-FORALL-2: every FOR ALL policy wider than its role's grants becomes one policy per granted command (provisional number)
     "0078_sec_policy_per_command.sql",
     // Payments V1 PV1-SETTLE: the bank-route settlement observation (CMD215), its event and the route's provider-available read (provisional number)
-    "0071_bank_settlement.sql",
+    "0079_bank_settlement.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
@@ -234,7 +234,7 @@ test("runtime roles are neither owners nor superusers and have no BYPASSRLS; the
     // SECURITY DEFINER requires specific justification (08): the one function is the registration of a bank route's payment route
     // (migration 0046, coordinator decision #2 of lane L-ROUTE: payment_routes stays closed to every runtime role; the function checks the
     // caller's ACTIVE KAURO_OWNER grant and writes CONFIGURED rows only), and the read-only provider-available balance of a payment route
-    // (migration 0062, PV1-SETTLE D-SET-5: the payment service cannot read another agency's postings, the funds guard needs the route's
+    // (migration 0079, PV1-SETTLE D-SET-5: the payment service cannot read another agency's postings, the funds guard needs the route's
     // whole PSP_AVAILABLE; executable by kauro_payment only), each with a pinned search_path
     const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef ORDER BY p.proname");
     assert.deepEqual(definers.rows, [

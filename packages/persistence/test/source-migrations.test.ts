@@ -481,7 +481,7 @@ test("B07 tables force row-level security, belong to the migrator, grant no DELE
   }
   // still no SECURITY DEFINER function anywhere, but the one migration 0046 registers (coordinator decision #2 of lane L-ROUTE; the same exact
   // allowlist as migrations.test.ts): the registration of a bank route's payment route, and the read-only provider-available balance of a
-  // payment route (migration 0071, PV1-SETTLE D-SET-5), each with a pinned search_path
+  // payment route (migration 0079, PV1-SETTLE D-SET-5), each with a pinned search_path
   const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef ORDER BY p.proname");
   assert.deepEqual(definers.rows, [
     { proname: "register_bank_payment_route", proconfig: ["search_path=pg_catalog, pg_temp"] },
