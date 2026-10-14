@@ -27,6 +27,10 @@ export type InspectionReceiptId = Branded<Id, "InspectionReceiptId">;
 export type RetentionId = Branded<Id, "RetentionId">;
 /** One explicit soft-deadline extension of a project's retention (CMD060; at most one per project). */
 export type RetentionExtensionId = Branded<Id, "RetentionExtensionId">;
+/** One requested managed deletion of a project (CMD042; at most one per project). */
+export type DeletionId = Branded<Id, "DeletionId">;
+/** One deletion receipt: the executor appends one per attempt (B16 L3). */
+export type DeletionReceiptId = Branded<Id, "DeletionReceiptId">;
 /** One immutable retention anchor fact. */
 export type RetentionAnchorId = Branded<Id, "RetentionAnchorId">;
 /** One provider hold record: one included file's accepted generation, held by one seal attempt (B07-R1, D-HOLD-1). */

@@ -259,6 +259,9 @@ async function reserveUpload(runtime: SourceRuntime, collaborators: B07Collabora
     }
     const project = await uow.projects.get(revision.projectId);
     if (!project) throw new DomainFailure("INTEGRITY_FAILURE", "a visible revision's project is not visible");
+    if (project.state === "DELETION_REQUESTED" || project.state === "DELETED") {
+      throw new DomainFailure("PRECONDITION_FAILED", "the project's deletion was requested", { reason: "PROJECT_DELETION_REQUESTED", currentVersion: project.version, currentState: project.state });
+    }
     if (project.state !== "OPEN") {
       throw new DomainFailure("PRECONDITION_FAILED", "the project takes no new upload", { reason: "PROJECT_NOT_OPEN", currentVersion: project.version, currentState: project.state });
     }

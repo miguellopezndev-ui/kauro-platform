@@ -507,6 +507,7 @@
         "UPDATE": [
           "effective_deadline",
           "soft_deadline",
+          "state",
           "version"
         ]
       },
@@ -1023,6 +1024,7 @@
         "UPDATE": [
           "association_edges",
           "billable_source_units",
+          "deleted_at",
           "evaluation_hash",
           "evaluation_id",
           "expired_at",
@@ -1033,6 +1035,12 @@
           "terminal_reason",
           "updated_at",
           "version"
+        ]
+      },
+      "kauro.deletion_requests": {
+        "UPDATE": [
+          "completed_at",
+          "state"
         ]
       },
       "kauro.dispatch_liabilities": {
@@ -1210,6 +1218,10 @@
           "current_revision_id",
           "mode",
           "project_id",
+          "state",
+          "version"
+        ],
+        "UPDATE": [
           "state",
           "version"
         ]
@@ -3250,6 +3262,14 @@
       ],
       "using": "((agency_id = kauro.current_agency_id()) OR (grant_kind = 'PLATFORM_MONTHLY'::text))"
     },
+    "dataset_revisions/dataset_revisions_control_deleted": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((agency_id = kauro.current_agency_id()) AND (state = ANY (ARRAY['CANCELLED'::text, 'EXPIRED'::text])))",
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = 'DELETED'::text))"
+    },
     "dataset_revisions/dataset_revisions_control_read": {
       "check": null,
       "command": "SELECT",
@@ -3314,6 +3334,62 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
+    "deletion_receipts/deletion_receipts_control_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": null,
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "deletion_receipts/deletion_receipts_control_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))",
+      "check": null
+    },
+    "deletion_receipts/deletion_receipts_tenant_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": null
+    },
+    "deletion_requests/deletion_requests_control_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))",
+      "check": null
+    },
+    "deletion_requests/deletion_requests_control_update": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "deletion_requests/deletion_requests_tenant_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "((agency_id = kauro.current_agency_id()) AND (requested_by_user_id = kauro.current_user_id()) AND (state = 'REQUESTED'::text))"
+    },
+    "deletion_requests/deletion_requests_tenant_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": null
+    },
     "delivery_artifacts/delivery_artifacts_control_insert": {
       "check": "(agency_id = kauro.current_agency_id())",
       "command": "INSERT",
@@ -3361,6 +3437,14 @@
         "kauro_control"
       ],
       "using": null
+    },
+    "domain_events/domain_events_control_deletion": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": null,
+      "check": "((agency_id = kauro.current_agency_id()) AND (actor_kind = 'SERVICE'::text) AND (split_part(event_type, '.'::text, 1) = aggregate_kind) AND (event_type = ANY (kauro.deletion_control_event_types())))"
     },
     "domain_events/domain_events_control_execution": {
       "check": "((agency_id = kauro.current_agency_id()) AND (actor_kind = 'SERVICE'::text) AND (split_part(event_type, '.'::text, 1) = aggregate_kind) AND ((event_type = ANY (kauro.execution_control_event_types())) OR (event_type = ANY (ARRAY['processing_job.cancel_requested.v1'::text, 'retention_record.created.v1'::text]))))",
@@ -3449,6 +3533,14 @@
         "kauro_app"
       ],
       "using": null
+    },
+    "domain_events/domain_events_tenant_not_deletion_control": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "(NOT (event_type = ANY (kauro.deletion_control_event_types())))"
     },
     "domain_events/domain_events_tenant_not_execution_control": {
       "check": "(NOT (event_type = ANY (kauro.execution_control_event_types())))",
@@ -4649,6 +4741,14 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
+    "projects/projects_control_deleted": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((agency_id = kauro.current_agency_id()) AND (state = 'DELETION_REQUESTED'::text))",
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = 'DELETED'::text))"
+    },
     "projects/projects_control_execution_read": {
       "check": null,
       "command": "SELECT",
@@ -5243,6 +5343,14 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
+    "retention_records/retention_records_control_deleted": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((agency_id = kauro.current_agency_id()) AND (state = 'DELETING'::text))",
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = ANY (ARRAY['DELETED'::text, 'DELETED_WITH_RESIDUALS'::text])))"
+    },
     "retention_records/retention_records_control_expire": {
       "check": "((agency_id = kauro.current_agency_id()) AND (state = 'EXPIRED'::text))",
       "command": "UPDATE",
@@ -5282,6 +5390,14 @@
         "kauro_payment"
       ],
       "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "retention_records/retention_records_tenant_deleting": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((agency_id = kauro.current_agency_id()) AND (state = ANY (ARRAY['ACTIVE'::text, 'EXPIRED'::text])))",
+      "check": "((agency_id = kauro.current_agency_id()) AND (state = 'DELETING'::text))"
     },
     "retention_records/retention_records_tenant_extend": {
       "check": "((agency_id = kauro.current_agency_id()) AND (class = ANY (ARRAY['PAID_ORDINARY'::text, 'PAID_STAGED'::text])) AND (state = 'ACTIVE'::text))",
@@ -6533,6 +6649,13 @@
       "kauro.decision_artifacts": [
         "SELECT"
       ],
+      "kauro.deletion_receipts": [
+        "SELECT"
+      ],
+      "kauro.deletion_requests": [
+        "INSERT",
+        "SELECT"
+      ],
       "kauro.domain_events": [
         "INSERT",
         "SELECT"
@@ -7132,6 +7255,13 @@
         "SELECT"
       ],
       "kauro.decision_artifacts": [
+        "SELECT"
+      ],
+      "kauro.deletion_receipts": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.deletion_requests": [
         "SELECT"
       ],
       "kauro.delivery_artifacts": [

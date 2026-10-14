@@ -87,8 +87,8 @@ export const SQLSTATE = Object.freeze({
   // refusal it names, adds its MAP entry and its migration, and keeps the value.
   B16_L2_RETENTION_A: "KA085",
   B16_L2_RETENTION_B: "KA086",
-  B16_L3_DELETION_A: "KA087",
-  B16_L3_DELETION_B: "KA088",
+  B16_L3_PROJECT_DELETION_REQUESTED: "KA087",
+  B16_L3_DELETION_EVIDENCE: "KA088",
   B16_L4_BREAKGLASS_A: "KA089",
   B16_L5_DOWNLOAD_A: "KA090",
   B16_L6_RESTORE_A: "KA091",
@@ -184,6 +184,9 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KA082: { code: "INTEGRITY_FAILURE", reason: "CAPACITY_LEDGER" },
   KA083: { code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
   KA084: { code: "INTEGRITY_FAILURE", reason: "PUBLICATION_EVIDENCE_MISSING" },
+  // package B16 L3 (migration 0070): nothing new enters a project whose deletion was requested; a deletion's closing facts need their evidence
+  KA087: { code: "PRECONDITION_FAILED", reason: "PROJECT_DELETION_REQUESTED" },
+  KA088: { code: "INTEGRITY_FAILURE" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },

@@ -12,6 +12,7 @@ export { PgSelectionManifestRepository, PgSelectionEvaluationRepository } from "
 export { PgSourceRevisionRepository, PgProjectRevisionPointer, PgRevisionAuthorityInspector, PgPendingOperationJournal } from "./revisions.js";
 export { PgSealedManifestRepository } from "./seals.js";
 export { PgRetentionRepository } from "./retention.js";
+export { PgDeletionRepository } from "./deletion.js";
 export { PgSourceAvailabilityReader, PgRevisionLineageReader } from "./readers.js";
 export { serverInstantOf } from "./rows.js";
 export type { SourceAudience } from "./rows.js";
