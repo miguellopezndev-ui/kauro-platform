@@ -94,6 +94,14 @@ function handler<Body, View>(runtime: CommerceRequestRuntime, co: OwnerToolColla
             if (decision.kind === "DENY") throw CommerceAccessDenied.of(spec.id, decision);
             return;
           }
+          if (run.who === "SELLER_SELF") {
+            // the writer's half of the caller's own seller BEFORE the authorizer's shared half: a shared half held to COMMIT and then upgraded
+            // would deadlock two changes of one seller (each holding S, each waiting for X); taken first, the second change waits, then reads
+            // the first one's committed version (STALE_VERSION). A caller with no seller row takes nothing and is refused by the authorizer.
+            const tools = co.tools(uow);
+            const own = await tools.sellerOfIdentity(envelope.userId);
+            if (own !== null) await tools.holdOwnSeller(own);
+          }
           const decision = run.who === "SELLER_SELF" ? await co.authorizer.authorizeSellerSelf(uow, identity) : await co.authorizer.authorizeSeller(uow, identity);
           if (decision.kind === "DENY") throw CommerceAccessDenied.of(spec.id, decision);
           actingSellerId = decision.sellerId;
