@@ -69,7 +69,8 @@ export { PAYMENT_SERVICE_ID, PROVIDER_INGRESS_ID, SERVICE_AUDIENCE } from "./run
 export type { PaymentRuntime } from "./runtime.js";
 export { NotDueYet, recordServiceDenial, storeProviderQuery, watchAttempt } from "./service-commands.js";
 export type { ServiceCommandRequest } from "./service-commands.js";
-export { AWAIT_INVOICE_SECONDS, eventTypesOf, financeConsumer, fiscalConsumer, paymentServiceEffect, recordedAtOf, reevaluateBlockedDrafts, refundExecutionKey, unitOfWorkEffect } from "./consumers.js";
+export { AWAIT_INVOICE_SECONDS, OBSERVE_AGAIN_SECONDS, eventTypesOf, financeConsumer, fiscalConsumer, paymentServiceEffect, recordedAtOf, reconcileFiscalDelivery, reevaluateBlockedDrafts, refundExecutionKey, unitOfWorkEffect } from "./consumers.js";
+export type { FiscalConsumerOptions, FiscalConsumerPoint } from "./consumers.js";
 export type { ConsumerOutcome, DeliveryEffect, PaymentConsumerName } from "./consumers.js";
 export { registerBankDeliveryHandler } from "./consumers.js";
 export type { BankDeliveryHandler } from "./consumers.js";

@@ -825,6 +825,55 @@ function commerceUnitOfWork(b06: UnitOfWork, s: InMemoryCommerceStore, clock: Cl
       async lock(documentId) {
         return see(s.taxDocuments.get(documentId));
       },
+      // CMD035 (B15 L6): the orchestration store keeps no issuance facts and no locks; the deadline guard is the database's
+      async getForIssuance(documentId) {
+        return see(s.taxDocuments.get(documentId));
+      },
+      async lockForIssuance(documentId) {
+        return see(s.taxDocuments.get(documentId));
+      },
+      async holdTransition() {},
+      async awaitTransition() {},
+      async markSubmitting(documentId, expected, issueRequestHash) {
+        serviceOnly("a fiscal document");
+        const current = see(s.taxDocuments.get(documentId));
+        if (current !== null && current.state !== "VALIDATED") throw refused(`UNLISTED_TRANSITION TaxDocument ${current.state} -> SUBMITTING`);
+        const w = cas(current, expected, (r) => r.state, (r) => ({ ...r, state: "SUBMITTING" as const, issueRequestHash, version: r.version + 1 }));
+        if (w.kind === "APPLIED") {
+          s.taxDocuments.set(documentId, w.record);
+          await versioned("tax_document", documentId, w.record.version, w.record.agencyId, { previousState: "VALIDATED", state: "SUBMITTING" });
+        }
+        return w;
+      },
+      async recordBridgeAction(documentId, expected) {
+        serviceOnly("a fiscal document");
+        const current = see(s.taxDocuments.get(documentId));
+        if (current !== null && current.state !== "SUBMITTING") throw refused("a bridge action is recorded while SUBMITTING");
+        const w = cas(current, expected, (r) => r.state, (r) => ({ ...r, version: r.version + 1 }));
+        if (w.kind === "APPLIED") {
+          s.taxDocuments.set(documentId, w.record);
+          await versioned("tax_document", documentId, w.record.version, w.record.agencyId, { previousState: "SUBMITTING", state: "SUBMITTING" });
+        }
+        return w;
+      },
+      async conclude(documentId, expected, conclusion) {
+        serviceOnly("a fiscal document");
+        const current = see(s.taxDocuments.get(documentId));
+        if (current !== null && current.state !== "SUBMITTING" && current.state !== "UNCERTAIN") throw refused(`UNLISTED_TRANSITION TaxDocument ${current.state} -> ${conclusion.state}`);
+        const { absenceObservedFrom: _from, ...change } = conclusion;
+        const w = cas(current, expected, (r) => r.state, (r) => ({ ...r, ...change, version: r.version + 1 }));
+        if (w.kind === "APPLIED") {
+          s.taxDocuments.set(documentId, w.record);
+          await versioned("tax_document", documentId, w.record.version, w.record.agencyId, { previousState: current!.state, state: conclusion.state });
+        }
+        return w;
+      },
+      async lockWaitingCreditNotes(invoiceId) {
+        return [...s.taxDocuments.values()].filter((d) => see(d) !== null && d.kind === "CREDIT_NOTE" && d.correctsDocumentId === invoiceId && d.state === "DRAFT" && d.blockedReason === undefined).sort((a, b) => (a.documentId < b.documentId ? -1 : 1));
+      },
+      async listWaitingCreditNotes(limit) {
+        return [...s.taxDocuments.values()].filter((d) => see(d) !== null && d.kind === "CREDIT_NOTE" && d.state === "DRAFT" && d.blockedReason === undefined).sort((a, b) => instantMs(a.createdAt) - instantMs(b.createdAt)).slice(0, limit);
+      },
       async findLiveInvoice(captureId) {
         return [...s.taxDocuments.values()].find((d) => see(d) !== null && d.captureId === captureId && d.kind === "INVOICE" && d.state !== "REJECTED" && !(d.state === "CORRECTED" && d.issuedAt === undefined)) ?? null;
       },

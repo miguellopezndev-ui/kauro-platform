@@ -9,7 +9,7 @@
  * The payment service settles a provider's inbox record in the transaction that applies it, under the B06 guards (a record with a
  * conflicting body is never APPLIED, KA012; a settled record stays settled, KA007; APPLIED only under READ COMMITTED).
  */
-import type { UtcInstant } from "@kauro/contracts";
+import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import {
   DomainFailure,
   LEDGER_ACCOUNT_VERSION,
@@ -137,6 +137,27 @@ function documentRecord(r: DocumentRow): TaxDocumentRecord {
   );
 }
 
+// the issuance facts of 0074, read only by CMD035's methods (the B09 record keeps its shape)
+type IssuanceDocument = NonNullable<Awaited<ReturnType<TaxDocumentRepository["getForIssuance"]>>>;
+interface IssuanceRow extends DocumentRow {
+  submit_deadline_at: Date | null;
+  fiscal_status: "ACCEPTED" | "ACCEPTED_WITH_OBSERVATIONS" | null;
+  verification_ref: string | null;
+  bridge_action_ref: string | null;
+}
+const ISSUANCE_FIELDS = ["submit_deadline_at", "fiscal_status", "verification_ref", "bridge_action_ref"];
+const ISSUANCE_COLUMNS = ISSUANCE_FIELDS.join(", ");
+const T_ISSUANCE_COLUMNS = ISSUANCE_FIELDS.map((c) => `t.${c}`).join(", ");
+
+function issuanceRecord(r: IssuanceRow): IssuanceDocument {
+  return defined<IssuanceDocument>(documentRecord(r), {
+    submitDeadlineAt: optionalInstant(r.submit_deadline_at),
+    fiscalStatus: r.fiscal_status ?? undefined,
+    verificationRef: optionalText(r.verification_ref),
+    bridgeActionRef: optionalText(r.bridge_action_ref),
+  });
+}
+
 function documentCandidate(d: TaxDocumentRecord, previousState: TaxDocumentState | null): Candidate {
   return {
     documentId: d.documentId,
@@ -236,6 +257,102 @@ export class PgTaxDocumentRepository implements TaxDocumentRepository {
       return stale;
     }
     const record = documentRecord(row);
+    await publishVersion(this.ctx, "tax_document", { id: record.documentId, agencyId: record.agencyId, version: record.version }, { previousState: row.previous_state, state: record.state }, documentCandidate(record, row.previous_state));
+    return { kind: "APPLIED", record };
+  }
+
+  // --- CMD035 issuance (B15 L6, M6; migration 0074) ------------------------------------------------------------------------------
+
+  async getForIssuance(documentId: TaxDocumentId): Promise<IssuanceDocument | null> {
+    const r = await execute<IssuanceRow>(this.ctx.db, `SELECT ${DOCUMENT_COLUMNS}, ${ISSUANCE_COLUMNS} FROM kauro.tax_documents WHERE document_id = $1`, [documentId]);
+    return r.rows[0] ? issuanceRecord(r.rows[0]) : null;
+  }
+
+  async lockForIssuance(documentId: TaxDocumentId): Promise<IssuanceDocument | null> {
+    const r = await execute<IssuanceRow>(this.ctx.db, `SELECT ${DOCUMENT_COLUMNS}, ${ISSUANCE_COLUMNS} FROM kauro.tax_documents WHERE document_id = $1 FOR NO KEY UPDATE`, [documentId]);
+    return r.rows[0] ? issuanceRecord(r.rows[0]) : null;
+  }
+
+  async holdTransition(documentId: TaxDocumentId): Promise<void> {
+    await execute(this.ctx.db, "SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.tax_documents', $1::uuid::text))", [documentId]);
+  }
+
+  async awaitTransition(documentId: TaxDocumentId): Promise<void> {
+    await execute(this.ctx.db, "SELECT kauro.await_transition('kauro.tax_documents', $1::uuid::text)", [documentId]);
+  }
+
+  async markSubmitting(documentId: TaxDocumentId, expectedVersion: number, issueRequestHash: Sha256Hex, windowMs: number): Promise<VersionedWrite<IssuanceDocument>> {
+    if (!Number.isInteger(windowMs) || windowMs < 1) throw new DomainFailure("INTEGRITY_FAILURE", "a submit window is a positive number of milliseconds");
+    return this.issuanceWrite(
+      documentId,
+      `UPDATE kauro.tax_documents AS t SET version = t.version + 1, state = 'SUBMITTING', issue_request_hash = $3, submit_deadline_at = kauro.effect_now() + make_interval(secs => $4::numeric / 1000)
+         FROM kauro.tax_documents AS o
+        WHERE t.document_id = $1 AND t.version = $2 AND t.state = 'VALIDATED' AND o.document_id = t.document_id
+       RETURNING ${T_DOCUMENT_COLUMNS}, ${T_ISSUANCE_COLUMNS}, o.state AS previous_state`,
+      [documentId, expectedVersion, issueRequestHash, windowMs],
+    );
+  }
+
+  async recordBridgeAction(documentId: TaxDocumentId, expectedVersion: number, bridgeActionRef: string): Promise<VersionedWrite<IssuanceDocument>> {
+    return this.issuanceWrite(
+      documentId,
+      `UPDATE kauro.tax_documents AS t SET version = t.version + 1, bridge_action_ref = $3
+         FROM kauro.tax_documents AS o
+        WHERE t.document_id = $1 AND t.version = $2 AND t.state = 'SUBMITTING' AND o.document_id = t.document_id
+       RETURNING ${T_DOCUMENT_COLUMNS}, ${T_ISSUANCE_COLUMNS}, o.state AS previous_state`,
+      [documentId, expectedVersion, bridgeActionRef],
+    );
+  }
+
+  async conclude(documentId: TaxDocumentId, expectedVersion: number, conclusion: Parameters<TaxDocumentRepository["conclude"]>[2]): Promise<VersionedWrite<IssuanceDocument>> {
+    const params: unknown[] = [documentId, expectedVersion, conclusion.state];
+    const sets = ["version = t.version + 1", "state = $3"];
+    const add = (column: string, value: unknown): void => {
+      params.push(value);
+      sets.push(`${column} = $${params.length}`);
+    };
+    if (conclusion.providerDocumentId !== undefined) add("provider_document_id", conclusion.providerDocumentId);
+    if (conclusion.legalNumber !== undefined) add("legal_number", conclusion.legalNumber);
+    if (conclusion.rejectionCode !== undefined) add("rejection_code", conclusion.rejectionCode);
+    if (conclusion.evidenceHash !== undefined) add("evidence_hash", conclusion.evidenceHash);
+    if (conclusion.issuedAt !== undefined) add("issued_at", conclusion.issuedAt);
+    if (conclusion.fiscalStatus !== undefined) add("fiscal_status", conclusion.fiscalStatus);
+    if (conclusion.verificationRef !== undefined) add("verification_ref", conclusion.verificationRef);
+    let absence = "";
+    if (conclusion.absenceObservedFrom !== undefined) {
+      // absence is proof only when the observation began at or after the submit deadline, judged here on the database's instants
+      params.push(conclusion.absenceObservedFrom);
+      absence = ` AND t.submit_deadline_at IS NOT NULL AND t.submit_deadline_at <= $${params.length}::timestamptz`;
+    }
+    return this.issuanceWrite(
+      documentId,
+      `UPDATE kauro.tax_documents AS t SET ${sets.join(", ")} FROM kauro.tax_documents AS o
+        WHERE t.document_id = $1 AND t.version = $2 AND t.state IN ('SUBMITTING', 'UNCERTAIN')${absence} AND o.document_id = t.document_id
+       RETURNING ${T_DOCUMENT_COLUMNS}, ${T_ISSUANCE_COLUMNS}, o.state AS previous_state`,
+      params,
+    );
+  }
+
+  async lockWaitingCreditNotes(invoiceId: TaxDocumentId): Promise<ReadonlyArray<TaxDocumentRecord>> {
+    const r = await execute<DocumentRow>(
+      this.ctx.db,
+      `SELECT ${DOCUMENT_COLUMNS} FROM kauro.tax_documents WHERE corrects_document_id = $1 AND kind = 'CREDIT_NOTE' AND state = 'DRAFT' AND blocked_reason IS NULL ORDER BY document_id FOR NO KEY UPDATE`,
+      [invoiceId],
+    );
+    return r.rows.map(documentRecord);
+  }
+
+  async listWaitingCreditNotes(limit: number): Promise<ReadonlyArray<TaxDocumentRecord>> {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new DomainFailure("INVALID_REQUEST", "a waiting credit-note page is 1..1000 documents");
+    const r = await execute<DocumentRow>(this.ctx.db, `SELECT ${DOCUMENT_COLUMNS} FROM kauro.tax_documents WHERE kind = 'CREDIT_NOTE' AND state = 'DRAFT' AND blocked_reason IS NULL ORDER BY created_at, document_id LIMIT $1`, [limit]);
+    return r.rows.map(documentRecord);
+  }
+
+  private async issuanceWrite(documentId: TaxDocumentId, sql: string, params: ReadonlyArray<unknown>): Promise<VersionedWrite<IssuanceDocument>> {
+    const r = await execute<IssuanceRow & { previous_state: TaxDocumentState }>(this.ctx.db, sql, [...params]);
+    const row = r.rows[0];
+    if (!row) return staleOf(this.ctx.db, "tax_documents", "document_id", "state", documentId, "tax document");
+    const record = issuanceRecord(row);
     await publishVersion(this.ctx, "tax_document", { id: record.documentId, agencyId: record.agencyId, version: record.version }, { previousState: row.previous_state, state: record.state }, documentCandidate(record, row.previous_state));
     return { kind: "APPLIED", record };
   }

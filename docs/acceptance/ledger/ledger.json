@@ -2875,7 +2875,7 @@
    "case": "R2-083",
    "package": "B15",
    "gate": "G-FISCAL",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -2884,7 +2884,7 @@
    "case": "R2-084",
    "package": "B15",
    "gate": "G-FISCAL",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -2911,7 +2911,7 @@
    "case": "CMD035-OK",
    "package": "B15",
    "gate": "G-FISCAL",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "SIMULATED",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -2920,7 +2920,7 @@
    "case": "CMD035-DENY",
    "package": "B15",
    "gate": "G-FISCAL",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -2929,7 +2929,7 @@
    "case": "CMD035-RACE",
    "package": "B15",
    "gate": "G-FISCAL",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -4204,8 +4204,10 @@
    "title": "Real external integration",
    "cases": 9,
    "counts": {
-    "NOT_EXECUTED": 8,
-    "EXECUTED_LOCAL": 1
+    "NOT_EXECUTED": 3,
+    "EXECUTED_LOCAL": 1,
+    "SIMULATED": 3,
+    "PARTIAL": 2
    },
    "status": "IN_PROGRESS",
    "acceptedSubject": null,
