@@ -89,6 +89,8 @@ export interface OutreachDispatcher {
   takeOver(): Promise<{ readonly kind: "HELD" } | { readonly kind: "CLAIMED"; readonly fence: number }>;
   /** D2 for one intent. */
   claim(intentId: string, lease: OutreachLeaseRef): Promise<ClaimVerdict>;
+  /** D3 alone: the start gate and the one provider call; the classified answer, recorded by nobody (NOT_ATTEMPTED when the gate is closed). */
+  call(claimed: ClaimedSubmission & { readonly fence: number }, lease: OutreachLeaseRef): Promise<OutcomeAnswer>;
   /** D3 + D4 for an admitted submission: the start gate, the one port call, the recorded answer. */
   submit(claimed: ClaimedSubmission & { readonly fence: number }, lease: OutreachLeaseRef): Promise<OutreachSubmitResult>;
   /** D4 for an answer the caller already holds (the claimant's own, or a late one: D4b). */
@@ -139,12 +141,12 @@ export function createOutreachDispatcher(rt: OutreachRuntime, options: { readonl
       return rt.units.run(serviceContext(rt), (uow) => outreachSendOf(uow).claim(intentId, lease, sealCheckOf(rt)));
     },
 
-    async submit(claimed, lease) {
+    async call(claimed) {
       // D3: the gate is one statement in its own unit; the abort signal is created and the port called with no await in between
       const gate = /* b12:gate */ await rt.units.run(serviceContext(rt), (uow) => outreachSendOf(uow).gate(claimed.intentId, claimed.fence));
       if (!gate.fenceMatches || !gate.open || gate.state !== "SUBMITTING") {
         // the start gate is closed: nothing was sent, and the intent is judged by D5 (it never submits late)
-        return self.record(claimed.intentId, lease, { kind: "NOT_ATTEMPTED" }).then(() => ({ state: "NOT_ATTEMPTED" as const, intentState: gate.state }));
+        return { kind: "NOT_ATTEMPTED" };
       }
       if (rt.compliance === null || rt.optOutKey === null) throw new DomainFailure("INTEGRITY_FAILURE", "a sealed intent was admitted without the compliance configuration");
       const mime = buildOutreachMime(claimed.facts, rt.compliance, rt.optOutKey);
@@ -152,11 +154,18 @@ export function createOutreachDispatcher(rt: OutreachRuntime, options: { readonl
       const submission: OutreachSubmission = { intentId: claimed.intentId, fence: claimed.fence, senderId: claimed.senderId, senderAddress: claimed.senderAddress, route: claimed.route, mime };
       const signal = providerCallSignal();
       const call = /* b12:submit */ portOf(claimed.route).submit(submission, signal);
-      let answer: OutcomeAnswer;
       try {
-        answer = classifyAnswer(await call);
+        return classifyAnswer(await call);
       } catch (e) {
-        answer = thrownAnswer(e);
+        return thrownAnswer(e);
+      }
+    },
+
+    async submit(claimed, lease) {
+      const answer = await self.call(claimed, lease);
+      if (answer.kind === "NOT_ATTEMPTED") {
+        const intentState = await self.record(claimed.intentId, lease, answer);
+        return { state: "NOT_ATTEMPTED", intentState };
       }
       if (rt.hold !== null) await rt.hold("AFTER_SUBMIT", { intentId: claimed.intentId, ownerId });
       const state = await self.record(claimed.intentId, lease, answer);
