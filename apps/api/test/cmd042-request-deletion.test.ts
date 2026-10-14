@@ -354,6 +354,54 @@ test("CMD042-DENY: foreign 404, VIEWER 403, no step-up, stale version, already D
   assert.deepEqual(await footprint(p.projectId), deleted, "the project stays DELETION_REQUESTED");
 });
 
+test("CMD042-DENY (duplicate key): a request session inserting a second deletion request for a project that has one is refused 23505 deletion_requests_one_per_project and writes nothing; the OK sibling is the same insert for a project with none", async () => {
+  const p = await sealedProject();
+  const q = await sealedProject();
+  const first = requested(await requestDeletion(p.projectId)).data;
+  const [original] = (await deletionsOf(p.projectId)) ?? [];
+  assert.equal(original?.deletion_id, first.deletionId);
+  const before = await footprint(p.projectId);
+  const insert = (c: PoolClient, projectId: string): Promise<unknown> =>
+    c.query(
+      "INSERT INTO kauro.deletion_requests (deletion_id, agency_id, project_id, reason_code, requested_by_membership_id, requested_by_user_id, assurance_proof_ref) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      [ids.next(), pw.w.A.agencyId, projectId, original!.reason_code, original!.requested_by_membership_id, pw.w.owner.userId, original!.assurance_proof_ref],
+    );
+  const duplicate = await ownerTx();
+  let failure: { code?: unknown; constraint?: unknown } = {};
+  try {
+    await insert(duplicate, p.projectId);
+  } catch (e) {
+    failure = e as { code?: unknown; constraint?: unknown };
+  } finally {
+    await end(duplicate, "ROLLBACK");
+  }
+  assert.deepEqual([failure.code, failure.constraint], ["23505", "deletion_requests_one_per_project"], "the second request row of one project is a unique violation");
+  assert.deepEqual(await footprint(p.projectId), before, "the refused insert wrote nothing");
+  assert.deepEqual((await deletionsOf(p.projectId))?.map((d) => d.deletion_id), [first.deletionId], "the original request is the only one");
+  // OK sibling: the same insert for a project with no request SUCCEEDS (the row is present inside its transaction, then rolled back so
+  // nothing remains): another guard or policy refusing it would fail here instead of passing as "not a duplicate". The birth guard
+  // (KA088) admits a request only for a project that is DELETION_REQUESTED in the transaction, so the sibling project is placed there
+  // first (as CMD042's COMMIT leaves it) and still has no request row.
+  await placeDeletionRequested(q.projectId);
+  assert.equal((await deletionsOf(q.projectId))?.length, 0, "the sibling project is DELETION_REQUESTED and has no request row");
+  const sibling = await ownerTx();
+  let siblingFailure: unknown = null;
+  let inserted: number | null = null;
+  let visible = -1;
+  try {
+    inserted = (await insert(sibling, q.projectId) as { rowCount: number | null }).rowCount;
+    visible = Number(((await sibling.query("SELECT count(*)::text AS n FROM kauro.deletion_requests WHERE project_id = $1", [q.projectId])) as { rows: Array<{ n: string }> }).rows[0]!.n);
+  } catch (e) {
+    siblingFailure = e;
+  } finally {
+    await end(sibling, "ROLLBACK");
+  }
+  assert.equal(siblingFailure, null, `the sibling insert is not refused (${String((siblingFailure as { code?: unknown } | null)?.code ?? "")} ${String((siblingFailure as Error | null)?.message ?? "")})`);
+  assert.equal(inserted, 1, "the sibling insert wrote one row");
+  assert.equal(visible, 1, "the sibling's request row is present inside its transaction");
+  assert.equal((await deletionsOf(q.projectId))?.length, 0, "rolled back: no request of the sibling project remains");
+});
+
 // --- prevention (GAP-DEL-P1..P4; P3, the model dispatch, is the control plane's: b16-deletion-executor.test.ts) ---------------------------
 
 test("CMD042-DENY (prevention): after DELETION_REQUESTED an upload reservation is refused PROJECT_DELETION_REQUESTED", async () => {

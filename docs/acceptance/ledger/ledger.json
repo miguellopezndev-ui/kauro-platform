@@ -2974,7 +2974,7 @@
    "case": "S064",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3127,7 +3127,7 @@
    "case": "R2-123",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3136,7 +3136,7 @@
    "case": "R2-124",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3145,7 +3145,7 @@
    "case": "R2-125",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3325,7 +3325,7 @@
    "case": "CMD042-OK",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3334,7 +3334,7 @@
    "case": "CMD042-DENY",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3343,7 +3343,7 @@
    "case": "CMD042-RACE",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3460,7 +3460,7 @@
    "case": "CMD060-OK",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3469,7 +3469,7 @@
    "case": "CMD060-DENY",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3478,7 +3478,7 @@
    "case": "CMD060-RACE",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -4216,9 +4216,9 @@
    "title": "Security and restoration qualification",
    "cases": 61,
    "counts": {
-    "EXECUTED_LOCAL": 43,
-    "NOT_EXECUTED": 12,
-    "PARTIAL": 6
+    "EXECUTED_LOCAL": 52,
+    "PARTIAL": 7,
+    "NOT_EXECUTED": 2
    },
    "status": "IN_PROGRESS",
    "acceptedSubject": null,
