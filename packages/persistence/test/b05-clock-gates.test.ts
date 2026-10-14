@@ -37,12 +37,13 @@ function ownerOfFile(tag: string): string {
   if (n === 21 || n === 22 || n === 24 || n === 44) return "B08";
   if (n === 23 || n === 58 || n === 61 || n === 66 || n === 68 || n === 70) return "B05";
   if (n >= 25 && n <= 27) return "B11";
-  if ((n >= 28 && n <= 43) || n === 48 || n === 49 || n === 56 || n === 57 || n === 76) return "B10";
-  if (n === 45 || n === 46 || n === 47 || n === 55 || n === 75) return "PV1";
+  if ((n >= 28 && n <= 43) || n === 48 || n === 49 || n === 56 || n === 57 || n === 73) return "B10";
+  if (n === 45 || n === 46 || n === 47 || n === 55 || n === 72) return "PV1";
   if (n === 50 || n === 52) return "B17";
   if (n === 51 || n === 59) return "B18";
   if (n === 60) return "SEC-DEPTH";
-  if (n === 69 || n === 71) return "B16";
+  if (n === 69 || n === 71 || (n >= 74 && n <= 76)) return "B16";
+  if (n === 77) return "SEC-HARDENING-2";
   return "UNKNOWN";
 }
 const fileTag = (at: string): string => at.split(":")[0]!;
