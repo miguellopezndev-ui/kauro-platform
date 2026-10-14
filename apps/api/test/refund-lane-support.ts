@@ -638,7 +638,6 @@ const RED_FIRST: ReadonlyArray<readonly [RegExp, string]> = [
   [/^GAP PRODUCTION-BANK-BINDING /, "todo: GAP slice 4 (startApi binds no destination fingerprinter nor credit classifier: a deploy answers 503 EVIDENCE_UNAVAILABLE to every owner refund approval)"],
   [/ RFG-M-X1-REVOCATION-SESSION /, "todo: GAP session fence: the owner commands run in SERVICE units of kauro_payment, which take no lock on the caller's web session (rule 16); a session revoked while X1 waits at L1 is not refused"],
   [/ RFG-M-(X1-RACE|LOCK-L3) /, "todo: seam S5 (bankWorld.reverseCredit, the G6 Kreversal racing the declaration)"],
-  [/ RFG-P-NX-COVERAGE /, "todo: GAP harness: coverage is account-wide, so the neighbouring legs of the shared bank account fill the one-day gap; needs a per-leg bank account (multi-route world)"],
   [/ RFG-P-NX-CORR-DF /, "todo: GAP product (DV1-10 CORR-DF): statement_lines keep only account and routing digests, not the keyed DF with the holder, so X3 cannot compare a debit destination to the attempt fingerprint (needs a DF column computed at SI2)"],
   [/\[RFG-M-X2-RACE\]/, "todo: red-first, slice 4 (the RETURN leg asserts the one refund.completed.v1)"],
   [/\[RFG-M-X2-REVOCATION\]/,"todo: red-first, slice 3 (the revoked owner's X3 NOT_EXECUTED)"],

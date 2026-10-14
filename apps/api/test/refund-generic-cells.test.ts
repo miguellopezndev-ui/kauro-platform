@@ -1247,6 +1247,34 @@ function nxControl(title: string, refusalText: string, debits: (a: AttemptView) 
         assert.equal(ok.attempt.state, "NOT_EXECUTED");
         if (kind === "RETURN") assert.deepEqual([ok.refund?.state, await sourceReserved(c.src)], ["FAILED", 0n], `${scope}: FAILED owner_attested_no_effect, share released`);
       };
+      if (options.gapDay === true) {
+        // coverage is account-wide: a contiguous import of any later leg or control would fill an earlier leg's gap (the controlled clock
+        // runs ahead of the real declaration instants). So every attempt (and its control) is declared and lapsed first; each gap leg is then
+        // judged, in the order of its instant, against only gap-shaped imports (its own and the earlier legs', all ending behind it); the
+        // contiguous control coverage is imported last.
+        const legs: { scope: Scope; kind: Kind; a: Awaited<ReturnType<typeof lapsed>>; c: Awaited<ReturnType<typeof lapsed>> }[] = [];
+        for (const scope of SCOPES)
+          for (const kind of KINDS) legs.push({ scope, kind, a: await lapsed(ctx, scope, kind, `nx-${scope}-${kind}`), c: await lapsed(ctx, scope, kind, `nx-control-${scope}-${kind}`) });
+        const { manualExecutionWindowMs, coverageLagMs } = routeTiming();
+        const instant = (x: AttemptView): number => Date.parse(plusMs(x.declaredAt, manualExecutionWindowMs + coverageLagMs));
+        for (const { scope, kind, a } of [...legs].sort((x, y) => instant(x.a.attempt) - instant(y.a.attempt))) {
+          ctx.clock.set(new Date(Math.max(instant(a.attempt), ctx.clock.nowMs())));
+          const to = plusMs(ctx.clock.now(), EFFECT_CLOCK_MARGIN_MS - coverageLagMs);
+          const s1 = await statementWith(plusMs(a.attempt.declaredAt, -60_000), plusMs(a.attempt.declaredAt, 3_600_000), []);
+          assert.equal((await onClock(ctx, `${scope} ${kind}: SI2 before the gap`, () => importSI2(s1))).status, 201);
+          // the judged interval is [declaredAt, effectNow - lag]: the gap stands inside it, between the first coverage and ten minutes before its end
+          const s2 = await statementWith(plusMs(to, -600_000), to, []);
+          assert.equal((await onClock(ctx, `${scope} ${kind}: SI2 after the gap`, () => importSI2(s2))).status, 201);
+          const before = await footprint(a.src);
+          assertRefused(await onClock(ctx, `${scope} ${kind}: NOT_EXECUTED`, () => resolveX3(a.attempt, "NOT_EXECUTED", null)), refusalText, `${scope} ${kind}`);
+          assert.equal(await attemptState(a.attempt.attemptId), "UNCERTAIN", `${scope} ${kind}: stays UNCERTAIN`);
+          assert.equal(await sourceReserved(a.src), a.src.totalCents, `${scope} ${kind}: ${a.src.totalCents} cents held`);
+          assert.equal((await footprint(a.src)).refund?.state, before.refund?.state);
+        }
+        // the control: the same attempts' neighbours with contiguous coverage are NOT_EXECUTED (the gap, not the clock, refused the legs)
+        for (const { scope, kind, c } of [...legs].sort((x, y) => instant(x.c.attempt) - instant(y.c.attempt))) await control(scope, kind, c);
+        return;
+      }
       if (options.early === true) {
         // the controlled clock never moves backwards: every attempt (and its control) is declared and lapsed first, then the legs are judged in the
         // order of their instants, each the effect-clock margin before declaredAt + window + coverageLag (the clock-run margin X2-EXPIRY uses)
@@ -1277,16 +1305,8 @@ function nxControl(title: string, refusalText: string, debits: (a: AttemptView) 
           ctx.clock.set(new Date(Math.max(Date.parse(nx), ctx.clock.nowMs())));
           // the coverage ends the harness margin past effectNow − lag: X3's effect clock runs on with its transaction (kauro.effect_now(), 0038)
           const to = plusMs(ctx.clock.now(), EFFECT_CLOCK_MARGIN_MS - coverageLagMs);
-          if (options.gapDay === true) {
-            const s1 = await statementWith(plusMs(a.attempt.declaredAt, -60_000), plusMs(a.attempt.declaredAt, 3_600_000), []);
-            assert.equal((await onClock(ctx, "SI2 before the gap", () => importSI2(s1))).status, 201);
-            // the judged interval is [declaredAt, effectNow - lag] (about window long): the gap stands inside it, between the first coverage and ten minutes before its end
-            const s2 = await statementWith(plusMs(to, -600_000), to, []);
-            assert.equal((await onClock(ctx, "SI2 after the gap", () => importSI2(s2))).status, 201);
-          } else {
-            const s3 = await statementWith(plusMs(a.attempt.declaredAt, -60_000), to, (await debits(a.attempt)).map((d) => ({ executedAt: plusMs(a.attempt.declaredAt, 1), ...d })));
-            assert.equal((await onClock(ctx, "SI2 imports the coverage", () => importSI2(s3))).status, 201);
-          }
+          const s3 = await statementWith(plusMs(a.attempt.declaredAt, -60_000), to, (await debits(a.attempt)).map((d) => ({ executedAt: plusMs(a.attempt.declaredAt, 1), ...d })));
+          assert.equal((await onClock(ctx, "SI2 imports the coverage", () => importSI2(s3))).status, 201);
           const before = await footprint(a.src);
           const r = await onClock(ctx, `${scope} ${kind}: NOT_EXECUTED`, () => resolveX3(a.attempt, "NOT_EXECUTED", null));
           assertRefused(r, refusalText, `${scope} ${kind}`);
