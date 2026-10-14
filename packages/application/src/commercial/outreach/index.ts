@@ -14,3 +14,5 @@ export {
   outreachBusinessDaysAfter,
 } from "./calendar.js";
 export { OUTREACH_HANDLERS, OutreachNotBuilt, type OutreachHandlerName } from "./handlers.js";
+export { sendHandler, SEND_AUTHORIZED_OUTREACH_OPERATION } from "./send.js";
+export type { OutreachSendStore, OutreachSendCollaborators, OutreachSealer, SendSealFacts, SendActor, QueueSendRequest, QueuedSendRecord, SendAuthorizedOutreachBody, SentIntentView, SendCommandHandler } from "./send-store.js";
