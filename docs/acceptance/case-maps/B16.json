@@ -3,19 +3,21 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B16-case-map.md",
-  "sha256": "62a62e8bfa6d28cca832dce9da43eb3012d1bc95d4dd7582c82feb32749a87d6"
+  "sha256": "1d7d14ba1b5c0002e9cb29c8a7ab0f67a72bdfb1eba344c9c7aafbacd86b0c55"
  },
  "rows": [
   {
    "case": "S048",
-   "class": "EXECUTED_LOCAL",
+   "class": "PARTIAL",
    "test": [
     "apps/api/test/b16-tenant-sweep.test.ts :: S048 sweep: every id route answers a foreign and a nonexistent id identically, with Cache-Control no-store"
    ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "OPEN -> L5 EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B16"
+   ],
+   "claimed": "OPEN -> L5 PARTIAL (PLANNED L5; target EXECUTED_LOCAL)"
   },
   {
    "case": "S049",
@@ -58,30 +60,34 @@
   },
   {
    "case": "S064",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "OPEN -> L3 PART(B14) EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L3 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
   },
   {
    "case": "S065",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "OPEN -> L6 PART(B14) EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L6 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
   },
   {
    "case": "S071",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "S076",
@@ -121,32 +127,34 @@
   },
   {
    "case": "R2-048",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "OPEN -> L5 PART(B15) EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
   },
   {
    "case": "R2-049",
-   "class": "SIMULATED",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B14"
    ],
-   "claimed": "OPEN -> L4 PART(B14) SIMULATED"
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target PART(B14) SIMULATED"
   },
   {
    "case": "R2-050",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-053",
@@ -161,39 +169,41 @@
   },
   {
    "case": "R2-054",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L7 (PR #96, not on main) PART(STAGE-RELEASE) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L7 (PR #96, not on main) NOT_EXECUTED; target PART(STAGE-RELEASE) EXECUTED_LOCAL"
   },
   {
    "case": "R2-055",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L7 (PR #96, not on main) PART(STAGE-RELEASE) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L7 (PR #96, not on main) NOT_EXECUTED; target PART(STAGE-RELEASE) EXECUTED_LOCAL"
   },
   {
    "case": "R2-056",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "OPEN -> L3 PART(B14) EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L3 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
   },
   {
    "case": "R2-057",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L3+L6 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L3+L6 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-060",
@@ -208,59 +218,65 @@
   },
   {
    "case": "R2-074",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "OPEN -> L6 PART(B14) EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L6 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
   },
   {
    "case": "R2-076",
-   "class": "EXECUTED_LOCAL",
+   "class": "PARTIAL",
    "test": [
     "packages/persistence/test/adapters-leases.test.ts :: B06-R1: an expired JOB_ATTEMPT or MODEL_TASK lease that never stored a checkpoint cannot be resumed — another owner's takeover with no checkpoint or an invented one is REFUSED RESUME_WITHOUT_CHECKPOINT and the lease stays as its first owner left it; an OUTBOX_DISPATCH lease, which spends nothing, is still taken over without one, never with an invented one"
    ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "OPEN -> L6 PART(B14) EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L6 PARTIAL (PLANNED L6; target PART(B14) EXECUTED_LOCAL)"
   },
   {
    "case": "R2-123",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L2 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-124",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L2 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-125",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L3 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-126",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "OPEN -> L6 PART(B14) EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L6 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
   },
   {
    "case": "CMD003-OK",
@@ -430,111 +446,117 @@
   },
   {
    "case": "CMD038-OK",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "OPEN -> L5 PART(B15) EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
   },
   {
    "case": "CMD038-DENY",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "OPEN -> L5 PART(B15) EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
   },
   {
    "case": "CMD038-RACE",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "OPEN -> L5 PART(B15) EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
   },
   {
    "case": "CMD042-OK",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L3 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD042-DENY",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L3 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD042-RACE",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L3 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD054-OK",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD054-DENY",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD054-RACE",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD055-OK",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD055-DENY",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD055-RACE",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD056-OK",
@@ -571,14 +593,16 @@
   },
   {
    "case": "CMD057-OK",
-   "class": "EXECUTED_LOCAL",
+   "class": "PARTIAL",
    "test": [
     "apps/api/test/cmd056-cmd057-operations.test.ts :: CMD057-OK: the owner with a fresh step-up authorizes a PREPARED restore candidate for its own deletion journal hash — 200 AUTHORIZED at the next candidate revision, one recovery row naming the owner, the proof and the hash, the journal and the step-up fact committed with it"
    ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "OPEN -> L6 PART(B14) EXECUTED_LOCAL"
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L6 PARTIAL (PLANNED L6; target PART(B14) EXECUTED_LOCAL)"
   },
   {
    "case": "CMD057-DENY",
@@ -604,30 +628,30 @@
   },
   {
    "case": "CMD060-OK",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L2 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD060-DENY",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L2 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD060-RACE",
-   "class": "EXECUTED_LOCAL",
+   "class": "NOT_EXECUTED",
    "test": [],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L2 EXECUTED_LOCAL"
+   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
   }
  ]
 }

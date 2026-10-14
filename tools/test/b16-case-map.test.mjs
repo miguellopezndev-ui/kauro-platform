@@ -19,7 +19,7 @@ test("B16 case map: every B16 case of the registry appears exactly once and noth
 
 test("B16 case map: a status is DONE, or OPEN naming its owning lane; a DONE row cites at least one test", () => {
   for (const r of rows) {
-    assert.match(r.status, /^(DONE EXECUTED_LOCAL|OPEN -> L[2-8](\+L[2-8])?( \(PR #\d+, not on main\))? .+)$/, r.caseId);
+    assert.match(r.status, /^(DONE EXECUTED_LOCAL|OPEN -> L[2-8](\+L[2-8])?( \(PR #\d+, not on main\))? (NOT_EXECUTED; target .+|PARTIAL \(PLANNED L[2-8]; target .+\)))$/, r.caseId);
     if (r.status.startsWith("DONE")) assert.ok(r.citations.length > 0, `${r.caseId} is DONE with no cited test`);
   }
   assert.deepEqual(rows.filter((r) => r.caseId === "R2-054" || r.caseId === "R2-055").map((r) => r.status.startsWith("OPEN -> L7")), [true, true]);
