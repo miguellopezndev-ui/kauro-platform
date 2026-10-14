@@ -13,7 +13,7 @@ import { randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 import type { ExecutionContext } from "@kauro/domain";
 import { PgCommercialUnitOfWork, PgCommercialUnitOfWorkFactory } from "@kauro/persistence";
-import { crashableFactory, instrumentPort, raceStatementTimeoutMs, type FaultPoints, type HarnessConnection, type SqlSession } from "@kauro/persistence/testing";
+import { crashableFactory, instrumentPort, raceStatementTimeoutMs, runtimeRoleOf, type FaultPoints, type HarnessConnection, type SqlSession } from "@kauro/persistence/testing";
 import { clock } from "./support.js";
 
 export type RouteRole = "kauro_app" | "kauro_payment" | "kauro_commission" | "kauro_control";
@@ -330,24 +330,27 @@ export class FaultRouting {
       get: (target, prop) => {
         const value: unknown = Reflect.get(target, prop, target);
         if (typeof value !== "function") return value;
-        // inside a routed invocation (faults.on / onRoles) the payment service's units run over the routed connection of the login of the
-        // role they need, exactly as the api's request units do (wrap): the lane L-INBOUND's service steps and owner commands
-        const routing = this.#als.getStore();
-        if (prop === "run" && routing !== undefined) {
-          const routedRun = Reflect.get(this.wrap(target), "run") as (...a: unknown[]) => unknown;
-          // the payment dispatcher's SYSTEM units (its lease, claims and settlements: kauro_control) are routed only when the invocation
-          // serves kauro_control; otherwise they run on their own pool, so the routed unit counter and points name the SERVICE effects only
-          const servesControl = routing.conns !== undefined ? routing.conns.has("kauro_control") : routing.role === "kauro_control";
-          return (context: unknown, ...rest: unknown[]) =>
-            (context as { kind?: string }).kind === "SYSTEM" && !servesControl ? (value as (...a: unknown[]) => unknown).call(target, context, ...rest) : routedRun(context, ...rest);
-        }
-        const route = this.#pay.getStore();
         if (prop !== "run") return (value as (...a: unknown[]) => unknown).bind(target);
+        // inside a routed invocation (faults.on / onRoles) a payment service unit runs over the routed connection of the login of the role
+        // it needs (runtimeRoleOf), exactly as the api's request units do (wrap): the lane L-INBOUND's service steps and owner commands. A unit
+        // whose role the invocation does not serve (a SERVICE re-binding inside a kauro_app request's invocation; the dispatcher's SYSTEM
+        // units outside a kauro_control one) runs on the service's own pool as in production, so the routed counter and points name only the
+        // units the cell routes, and a cell observes that unit by its own application name (blockedBy)
+        const routing = this.#als.getStore();
+        const serves = (context: unknown): boolean => {
+          if (routing === undefined) return false;
+          const role = runtimeRoleOf(context as ExecutionContext) as RouteRole;
+          return routing.conns !== undefined ? routing.conns.has(role) : routing.role === role;
+        };
+        const routedRun = routing === undefined ? null : (Reflect.get(this.wrap(target), "run") as (...a: unknown[]) => unknown);
+        const route = this.#pay.getStore();
         if (route === undefined) {
           // outside onPayment the units run unchanged, except that while a cell's step clock is set a SERVICE unit positions its
           // transaction on it (the payment service's steps a cell runs on the step clock without routing them: withClock)
           return (context: unknown, work: (uow: object) => Promise<unknown>, ...rest: unknown[]) =>
-            (value as (...a: unknown[]) => Promise<unknown>).call(
+            routedRun !== null && serves(context)
+              ? routedRun(context, work, ...rest)
+              : (value as (...a: unknown[]) => Promise<unknown>).call(
               target,
               context,
               async (uow: object) => {
@@ -369,7 +372,8 @@ export class FaultRouting {
               ...rest,
             ),
         };
-        return (crashableFactory(traced, route.points, "uow", ["run"]) as { run: (...a: unknown[]) => unknown }).run;
+        const tracedRun = (crashableFactory(traced, route.points, "uow", ["run"]) as { run: (...a: unknown[]) => unknown }).run;
+        return (context: unknown, ...rest: unknown[]) => (routedRun !== null && serves(context) ? routedRun(context, ...rest) : tracedRun(context, ...rest));
       },
     });
   }
