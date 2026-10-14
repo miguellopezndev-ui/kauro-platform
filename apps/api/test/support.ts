@@ -65,6 +65,7 @@ import type {
   ValidationReceiptId,
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
+import { confirmedContract, supersede } from "./b17-target-supersession-support.js";
 import { PgWebSessionStore } from "@kauro/persistence";
 import { ROLES, raceStatementTimeoutMs, serverNow, startHarness, waitForLockWait, type AgencyFixture, type Harness, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import {
@@ -829,13 +830,10 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     async targetContract(agency, projectId, opts = {}) {
       const contractId = ids.next();
       const targetContractHash = sha(`target-${contractId}`);
-      await w.asTenant(agency, async (c) => {
-        await c.query(
-          `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, superseded_at, created_at)
-           VALUES ($1, $2, $3, $10, $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), now(), $8, 'R2-INITIAL', $9, now())`,
-          [contractId, agency.agencyId, projectId, ids.next(), ids.next(), sha("bundle"), targetContractHash, sha(`authority-${contractId}`), opts.superseded ? new Date() : null, opts.mode ?? "CLEAN"],
-        );
-      });
+      // 0073: a request session bears only drafts, so the confirmed fixture is the oracle's; a re-observation of the project supersedes
+      // its current contract (one current per project), and `superseded` is superseded at once by a newer confirmed observation
+      await confirmedContract(oracle, { agencyId: agency.agencyId, projectId, mode: opts.mode ?? "CLEAN", membershipId: agency.ownerMembershipId, targetContractHash, contractId });
+      if (opts.superseded) await supersede(oracle, { agencyId: agency.agencyId, contractId }, agency.ownerMembershipId);
       return { contractId, targetContractHash };
     },
 
