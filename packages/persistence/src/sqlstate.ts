@@ -188,6 +188,8 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KA083: { code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
   KA084: { code: "INTEGRITY_FAILURE", reason: "PUBLICATION_EVIDENCE_MISSING" },
   // package B16 L3 (migration 0071): nothing new enters a project whose deletion was requested; a deletion's closing facts need their evidence
+  // KA085 (0069): the soft deadline of a retention record moved without its extension row, a bypassing writer only
+  KA085: { code: "INTEGRITY_FAILURE" },
   KA087: { code: "PRECONDITION_FAILED", reason: "PROJECT_DELETION_REQUESTED" },
   KA088: { code: "INTEGRITY_FAILURE" },
   // B16 lane L4 (CMD054): a grant whose support case or incident does not justify its project now (another project or agency, closed,
@@ -197,6 +199,9 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   // step the database refuses (out of journal order, a payment conflict, a release without its run) is unreconciled consequences
   KA091: { code: "CAPACITY_UNAVAILABLE", retryable: true },
   KA092: { code: "PRECONDITION_FAILED", reason: "CONSEQUENCES_UNRECONCILED" },
+  // B16 L5 (0075): a download grant a request session wrote around CMD038 (package not AVAILABLE, changed membership, lifetime over 900 s,
+  // an artifact that is not a live delivery copy). Only a bypassing writer reaches it: an integrity failure like KA088, never a retry
+  KA094: { code: "INTEGRITY_FAILURE" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },
