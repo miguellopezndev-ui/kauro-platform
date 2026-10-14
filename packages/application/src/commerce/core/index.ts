@@ -26,3 +26,21 @@ export { checkoutPaths, attemptRequest, prepareProviderAttempt, operationOf, pro
 export type { CommerceAuthorizerDependencies } from "./authorizer.js";
 export { createCommerceAuthorizer } from "./authorizer.js";
 export { fileRemedyReturns } from "./remedy.js";
+export type {
+  FiscalAcceptance,
+  ProviderFiscalDocument,
+  FiscalDocumentPage,
+  FiscalDocumentQuery,
+  FiscalDocumentPages,
+  FiscalSubmitAnswer,
+  FiscalIssuanceRoute,
+  FiscalIssuancePoint,
+  FiscalIssuanceRuntime,
+  FiscalScope,
+  IssueTaxDocumentRequest,
+  TaxDocumentIssueView,
+  FiscalIssuanceReason,
+  IssueTaxDocumentOutcome,
+  ReconcileTaxDocumentOutcome,
+} from "./fiscal-issuance.js";
+export { FiscalIssuanceRefusal, issueTaxDocument, reconcileTaxDocument, validateWaitingCreditNotes, issueViewOf } from "./fiscal-issuance.js";
