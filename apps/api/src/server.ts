@@ -75,6 +75,7 @@ import type {
   SourceIntakeHandlers,
   SourceReadHandlers,
   SupportHandlers,
+  TeamHandlers,
   UnauthenticatedRequest,
   RequestAuthority,
 } from "@kauro/application";
@@ -154,13 +155,22 @@ export function routeInventoryOf(app: FastifyInstance): ReadonlyArray<RouteInven
   return [...inventory];
 }
 
+/**
+ * The delivery channel of a one-time secret a command mints (the invitation token of CMD003): handed to this function after the
+ * command committed, NEVER written to the response (08 "Invitation, recovery and ownership transfer": the invitation token is not a
+ * response member) and never journaled. A failing channel is recorded as an internal error; the answer is still sent and the
+ * invitation is recovered by revoking and reissuing it. The production channel (e-mail) is a provider adapter of another package.
+ */
+export type OneTimeDelivery = (delivery: { readonly command: string; readonly view: unknown; readonly secrets: Readonly<Record<string, string>> }) => void | Promise<void>;
+
 export interface ApiServerOptions {
   readonly environment: Environment;
+  readonly oneTimeDelivery?: OneTimeDelivery;
   /**
    * The seven B06 commands, the six B07 source-lifecycle commands (B07 design §11), the two B08 execution commands and the four B08
-   * audit commands (B08 design §12), and the support package's CMD044 (B11 W4).
+   * audit commands (B08 design §12), the support package's CMD044 (B11 W4) and the team package's CMD003..CMD007 (B16).
    */
-  readonly handlers: B06Handlers & B07Handlers & ExecutionHandlers & AuditHandlers & SupportHandlers;
+  readonly handlers: B06Handlers & B07Handlers & ExecutionHandlers & AuditHandlers & SupportHandlers & TeamHandlers;
   /**
    * The manual-10 agency, team, client and project reads (re-check finding N16), the two support reads (B11 W4), the source reads
    * (B07 design §9.1), GetJob and GetAudit (B08 design §12).
@@ -757,6 +767,15 @@ function registerCommand<Body, View>(
       };
       const admission = admitStructure(spec, raw, options.validator, options.clock);
       if (admission.kind === "PROBLEM") return sendProblem(reply, admission.problem);
+      // the one-time secrets of a completed result go to their channel after COMMIT, never into the response; a failing channel is an internal error
+      const deliverOneTime = async (result: CommandResult<View>): Promise<void> => {
+        if (result.kind !== "COMPLETED" || result.oneTime === undefined || options.oneTimeDelivery === undefined) return;
+        try {
+          await options.oneTimeDelivery({ command: spec.id, view: result.view, secrets: result.oneTime });
+        } catch (error) {
+          sink(admission.admission.correlationId, error);
+        }
+      };
       const answer = (result: CommandResult<View>): FastifyReply => {
         switch (result.kind) {
           case "COMPLETED": {
@@ -779,7 +798,9 @@ function registerCommand<Body, View>(
         if (identity !== null) {
           const correlationId = admission.admission.correlationId;
           try {
-            return answer(await service.run({ correlationId, idempotencyKey: admission.admission.idempotencyKey, identity, path: admission.admission.path, body: admission.admission.body as Body }));
+            const served = await service.run({ correlationId, idempotencyKey: admission.admission.idempotencyKey, identity, path: admission.admission.path, body: admission.admission.body as Body });
+            await deliverOneTime(served);
+            return answer(served);
           } catch (error) {
             sink(correlationId, error);
             return sendProblem(reply, internalProblem(correlationId));
@@ -801,6 +822,7 @@ function registerCommand<Body, View>(
         sink(envelope.correlationId, error);
         return sendProblem(reply, internalProblem(envelope.correlationId));
       }
+      await deliverOneTime(result);
       return answer(result);
     },
   });
