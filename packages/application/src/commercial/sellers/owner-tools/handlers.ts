@@ -218,6 +218,7 @@ export function createOwnerToolHandlers(runtime: CommerceRequestRuntime, co: Own
       who: "OWNER",
       async body(_uow, envelope, tools) {
         const b = envelope.body;
+        await tools.lockIdentity(b.userId);
         if (!(await tools.identityExists(b.userId))) throw new NotFoundFailure("identity");
         const existing = await tools.sellerOfIdentity(b.userId);
         if (existing !== null) throw precondition("UNLISTED_TRANSITION", "the identity already has a seller row: a seller is born once per corporate identity");

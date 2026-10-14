@@ -240,6 +240,11 @@ export class PgOwnerToolStore {
 
   // --- reads ----------------------------------------------------------------------------------------------------------------------
 
+  /** The writer's half of an identity's subject (kauro.identities): two registrations of one person serialize, the second reads the first's row. */
+  async lockIdentity(userId: string): Promise<void> {
+    await holdSalesTransition(this.db, "kauro.identities", userId);
+  }
+
   async identityExists(userId: string): Promise<boolean> {
     const r = await execute(this.db, "SELECT 1 FROM kauro.identities WHERE user_id = $1", [userId]);
     return r.rowCount === 1;

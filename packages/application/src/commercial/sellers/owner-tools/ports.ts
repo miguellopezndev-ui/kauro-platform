@@ -71,6 +71,7 @@ export interface OwnerToolStore {
   holdOwnSeller(sellerId: string): Promise<OwnerToolSeller | null>;
   sellerFacts(sellerId: string): Promise<OwnerToolSeller | null>;
   lockProspectClaims(prospectIds: ReadonlyArray<string>): Promise<void>;
+  lockIdentity(userId: string): Promise<void>;
   identityExists(userId: string): Promise<boolean>;
   sellerOfIdentity(userId: string): Promise<string | null>;
   legalReview(sellerId: string, reviewId: string): Promise<{ readonly classification: string; readonly outcome: string } | null>;
