@@ -531,8 +531,51 @@ export interface TaxDocumentChange {
   readonly verificationRef?: string;
 }
 
+/**
+ * The issuance facts of a document (migration 0074; B15 L6 M6): the submit deadline the intent stamps at kauro.effect_now() + window,
+ * the fiscal acceptance and verification reference an ISSUED document carries (R2 15:139), and the manual bridge's prepared action.
+ */
+export interface TaxDocumentIssuanceFacts {
+  readonly submitDeadlineAt?: UtcInstant;
+  readonly fiscalStatus?: "ACCEPTED" | "ACCEPTED_WITH_OBSERVATIONS";
+  readonly verificationRef?: string;
+  readonly bridgeActionRef?: string;
+}
+export type IssuanceTaxDocument = TaxDocumentRecord & TaxDocumentIssuanceFacts;
+
+/** A concluding change of a submission (SUBMITTING or UNCERTAIN to ISSUED, UNCERTAIN or REJECTED; CMD035 and its reconciler). */
+export interface TaxDocumentConclusion extends TaxDocumentChange {
+  readonly state: "ISSUED" | "UNCERTAIN" | "REJECTED";
+  /**
+   * Set when the conclusion is REJECTED by absence: the effect instant the observation began at. The database concludes only when the
+   * document's submit deadline is at or before it (absence is proof only after the deadline; R2 15:141, R2-084).
+   */
+  readonly absenceObservedFrom?: UtcInstant;
+}
+
 export interface TaxDocumentRepository {
   get(documentId: TaxDocumentId): Promise<TaxDocumentRecord | null>;
+  /** The document with its issuance facts, unlocked (CMD035's first read, before any lock of the global order). */
+  getForIssuance(documentId: TaxDocumentId): Promise<IssuanceTaxDocument | null>;
+  /** The document row FOR NO KEY UPDATE with its issuance facts (CMD035 and its reconciler, after the profile and issuer shared halves). */
+  lockForIssuance(documentId: TaxDocumentId): Promise<IssuanceTaxDocument | null>;
+  /** The document's exclusive transition half (the subject of 0074 tax_documents_transition_lock), held to COMMIT, taken after its row. */
+  holdTransition(documentId: TaxDocumentId): Promise<void>;
+  /** The document's shared transition half, held to COMMIT: a reader of its state (credit-note drafting) is ordered with its writers. */
+  awaitTransition(documentId: TaxDocumentId): Promise<void>;
+  /**
+   * VALIDATED -> SUBMITTING at expectedVersion + 1 with the exact request digest; submit_deadline_at = kauro.effect_now() + windowMs (the
+   * database's clock, after every lock). The 0074 backstop re-judges the route and the issuer's validity at kauro.effect_now().
+   */
+  markSubmitting(documentId: TaxDocumentId, expectedVersion: number, issueRequestHash: Sha256Hex, windowMs: number): Promise<VersionedWrite<IssuanceTaxDocument>>;
+  /** SUBMITTING stays SUBMITTING: the manual bridge's prepared action is recorded once (version + 1; never ISSUED by assumption). */
+  recordBridgeAction(documentId: TaxDocumentId, expectedVersion: number, bridgeActionRef: string): Promise<VersionedWrite<IssuanceTaxDocument>>;
+  /** Concludes a submission (only from SUBMITTING or UNCERTAIN); STALE when the version moved or, by absence, before the deadline. */
+  conclude(documentId: TaxDocumentId, expectedVersion: number, conclusion: TaxDocumentConclusion): Promise<VersionedWrite<IssuanceTaxDocument>>;
+  /** The unblocked DRAFT credit notes correcting an invoice, ascending by id, FOR NO KEY UPDATE (the issued.v1 consumer; M19, M20). */
+  lockWaitingCreditNotes(invoiceId: TaxDocumentId): Promise<ReadonlyArray<TaxDocumentRecord>>;
+  /** The unblocked DRAFT credit notes of the adopted agency, oldest first (REEVALUATE re-judges them beside the blocked drafts). */
+  listWaitingCreditNotes(limit: number): Promise<ReadonlyArray<TaxDocumentRecord>>;
   lock(documentId: TaxDocumentId): Promise<TaxDocumentRecord | null>;
   findLiveInvoice(captureId: CaptureId): Promise<TaxDocumentRecord | null>;
   findLiveCreditNote(refundId: RefundId): Promise<TaxDocumentRecord | null>;
