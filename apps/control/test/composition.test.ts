@@ -56,7 +56,7 @@ test("the composition root opens only a kauro_control pool, assembles one sweepe
   // exactly the sweepers of design §12.5, and a consumer for every source-lifecycle destination of EVENT_SUBSCRIPTIONS it owns
   assert.deepEqual(Object.keys(env.plane.sweeperByName).sort(), [...SOURCE_SWEEPERS].sort());
   const consumers = Object.values(env.plane.consumers).map((c) => c.consumer).sort();
-  assert.deepEqual(consumers, ["AUTHORITY_JOURNAL", "SELECTION_EVALUATION", "STORAGE_LIFECYCLE", "UPLOAD_INSPECTION"]);
+  assert.deepEqual(consumers, ["AUTHORITY_JOURNAL", "DELETION_EXECUTOR", "SELECTION_EVALUATION", "STORAGE_LIFECYCLE", "UPLOAD_INSPECTION"]);
   for (const consumer of consumers) {
     assert.ok((CONSUMERS as ReadonlyArray<string>).includes(consumer));
     assert.ok(EVENT_SUBSCRIPTIONS.some((s) => s.consumer === consumer), `${consumer} is a registered destination`);

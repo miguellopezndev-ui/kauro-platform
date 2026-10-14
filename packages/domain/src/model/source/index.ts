@@ -14,6 +14,8 @@ export type {
   RetentionId,
   RetentionAnchorId,
   RetentionExtensionId,
+  DeletionId,
+  DeletionReceiptId,
   ObjectHoldId,
   SealAttemptId,
   HoldReleaseId,
@@ -98,6 +100,14 @@ export type {
   RetentionAnchorRecord,
   RetentionRecordRow,
   RetentionExtensionRow,
+  DeletionRequestRow,
+  DeletionRecordRef,
+  DeletionPackageRef,
+  DeletionDerivedRows,
+  DeletionScope,
+  DeletionReceiptRow,
+  DeletionReceiptBody,
+  DeletionRequestState,
   ExpectedPartKind,
 } from "./records.js";
 export type {

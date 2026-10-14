@@ -24,6 +24,7 @@ import {
   type AgencyId,
   type CausationId,
   type DomainEventRecord,
+  type ProjectId,
   type RetentionId,
   type RevisionId,
   type SourceFileId,
@@ -40,7 +41,7 @@ export interface AuthorityJournalDependencies {
 }
 
 /** The aggregate each routed event's subject is (the tombstone's subject is the event's aggregate). */
-const SUBJECT_KIND: Readonly<Record<keyof typeof AUTHORITY_TOMBSTONES, "upload_session" | "dataset_revision" | "source_file" | "retention_record">> = Object.freeze({
+const SUBJECT_KIND: Readonly<Record<keyof typeof AUTHORITY_TOMBSTONES, "upload_session" | "dataset_revision" | "source_file" | "retention_record" | "project">> = Object.freeze({
   "upload_session.cancelled.v1": "upload_session",
   "upload_session.expired.v1": "upload_session",
   "upload_session.rejected.v1": "upload_session",
@@ -51,6 +52,7 @@ const SUBJECT_KIND: Readonly<Record<keyof typeof AUTHORITY_TOMBSTONES, "upload_s
   "dataset_revision.deleted.v1": "dataset_revision",
   "source_file.admission_revoked.v1": "source_file",
   "retention_record.extended.v1": "retention_record",
+  "project.deletion_requested.v1": "project",
 });
 
 /** What the subject is now: its current state, the revision its authority belonged to and the instant of its terminal transition. */
@@ -130,6 +132,15 @@ export class AuthorityJournal implements OutboxConsumer {
         const extension = await uow.sources.retention.extensionOfProject(record.projectId);
         if (extension === null || extension.retentionId !== record.retentionId) return null;
         return { state: "EXTENDED", revisionId: record.revisionId, terminalAt: undefined };
+      }
+      case "project": {
+        // B16 CMD042: the fact is the project's one deletion request (no later transition removes it); the project itself may be DELETED since
+        const projectId = event.aggregateId as ProjectId;
+        // the control role reads the project through the deletion repository (its column grant), never a whole project row
+        const project = await uow.sources.deletions.projectState(projectId);
+        const request = await uow.sources.deletions.forProject(projectId);
+        if (project === null || request === null) return null;
+        return { state: "DELETION_REQUESTED", revisionId: project.currentRevisionId, terminalAt: request.requestedAt as UtcInstant };
       }
       default:
         return null;

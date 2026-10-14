@@ -27,7 +27,7 @@ import {
 import { execute, int, type Queryable } from "../sql.js";
 import { bool, exact, instantText, notAvailable, one, opt, optionalInstantText, optionalInt, optionalString, pageLimit, str } from "./rows.js";
 
-const OBJECT_COLUMNS = [
+export const OBJECT_COLUMNS = [
   "object_id",
   "agency_id",
   "project_id",

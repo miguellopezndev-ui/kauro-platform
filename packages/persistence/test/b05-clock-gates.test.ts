@@ -42,6 +42,7 @@ function ownerOfFile(tag: string): string {
   if (n === 50 || n === 52) return "B17";
   if (n === 51 || n === 59) return "B18";
   if (n === 60) return "SEC-DEPTH";
+  if (n === 69 || n === 71) return "B16";
   return "UNKNOWN";
 }
 const fileTag = (at: string): string => at.split(":")[0]!;

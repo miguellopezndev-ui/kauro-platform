@@ -8,6 +8,7 @@ import type { B07Handlers } from "../contracts.js";
 import { cancelUploadHandler } from "./cancel-upload.js";
 import { completeUploadHandler } from "./complete-upload.js";
 import { createRevisionHandler } from "./create-revision.js";
+import { requestDeletionHandler } from "./request-deletion.js";
 import { requestRetentionExtensionHandler, type RetentionHandlers } from "./request-retention-extension.js";
 import { reserveUploadHandler } from "./reserve-upload.js";
 import { sealRevisionHandler } from "./seal-revision.js";
@@ -27,7 +28,7 @@ export function createB07Handlers(runtime: SourceRuntime, collaborators: B07Coll
 
 /** The retention package's commands (B16 L2): CMD060 on the source runtime (it edits the source store's retention record). */
 export function createRetentionHandlers(runtime: SourceRuntime): RetentionHandlers {
-  return Object.freeze({ CMD060: requestRetentionExtensionHandler(runtime) });
+  return Object.freeze({ CMD042: requestDeletionHandler(runtime), CMD060: requestRetentionExtensionHandler(runtime) });
 }
 
 export type { RetentionHandlers } from "./request-retention-extension.js";

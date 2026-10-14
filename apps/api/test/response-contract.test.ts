@@ -164,6 +164,8 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/uploads/:uploadId/cancel", "CancelUpload", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD015" } }],
       ["POST", "/api/v1/revisions/:revisionId/selection", "SelectInputTables", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD016" } }],
       ["POST", "/api/v1/revisions/:revisionId/seal", "SealRevision", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD017" } }],
+      // package B16 L3 (CMD042): the project deletion request, synchronous (the executor is the control plane's)
+      ["POST", "/api/v1/projects/:projectId/deletion-requests", "RequestDeletion", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD042" } }],
       // package B16 L2 (CMD060): the one soft-deadline extension of a project, synchronous
       ["POST", "/api/v1/projects/:projectId/retention-extensions", "RequestRetentionExtension", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD060" } }],
       // the two execution commands (B08 design §12): ExecuteProject answers the shared ACCEPTED envelope, CancelJob the job

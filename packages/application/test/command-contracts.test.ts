@@ -10,8 +10,8 @@ import { B06_COMMANDS, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, REQUEST_SCHEMA_PREFI
 const IN_SCOPE = ["CMD001", "CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026"] as const;
 /** B16's five team commands (CMD003-CMD007). */
 const TEAM = ["CMD003", "CMD004", "CMD005", "CMD006", "CMD007"] as const;
-/** B16 lane L2's retention extension (CMD060). */
-const RETENTION = ["CMD060"] as const;
+/** B16 retention package: CMD042 RequestDeletion (L3) and CMD060 RequestRetentionExtension (L2). */
+const RETENTION = ["CMD042", "CMD060"] as const;
 /** The B06 commands, CMD044 of the support package (B11 W4) and the B16 team and retention commands, whose request schemas are checked against the catalogue too. */
 const WITH_SUPPORT = [...IN_SCOPE, "CMD044", ...TEAM, ...RETENTION] as const;
 

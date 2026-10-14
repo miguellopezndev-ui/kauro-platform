@@ -10,7 +10,7 @@
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { CommercialAuthorizationId } from "../commerce/records.js";
-import type { AgencyId, ApprovalId, PlanId, RevisionId } from "../model/ids.js";
+import type { AgencyId, ApprovalId, PlanId, ProjectId, RevisionId } from "../model/ids.js";
 import type { ProcessingAttemptId, ProcessingJobId } from "../model/execution/ids.js";
 import type { ProcessingJobRecord } from "../model/execution/records.js";
 
@@ -36,7 +36,9 @@ export type ExecutionFact =
   | { readonly kind: "AUTHORIZATION"; readonly authorizationId: CommercialAuthorizationId }
   | { readonly kind: "APPROVAL"; readonly approvalId: ApprovalId }
   | { readonly kind: "PLAN"; readonly planId: PlanId }
-  | { readonly kind: "REVISION"; readonly revisionId: RevisionId };
+  | { readonly kind: "REVISION"; readonly revisionId: RevisionId }
+  /** A deletion requested for the project (B16 CMD042): every live job of the project relies on it. */
+  | { readonly kind: "PROJECT"; readonly projectId: ProjectId };
 
 /** One sealed ACCEPTED generation the attempt may read, as the seal recorded it (the AttemptCapability's, D8-STG-1). */
 export interface ExecutionSourceGeneration {

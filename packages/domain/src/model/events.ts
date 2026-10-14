@@ -88,6 +88,11 @@ export const EVENT_TYPES = [
   "retention_record.expired.v1",
   // the one explicit soft-deadline extension of a project (B16 CMD060; migration 0069, provisional)
   "retention_record.extended.v1",
+  // the managed deletion of a project (B16 CMD042 and DELETION_EXECUTOR; migration 0071, provisional)
+  "project.deletion_requested.v1",
+  "project.deleted.v1",
+  "retention_record.deleting.v1",
+  "retention_record.deleted.v1",
   // admitted source files (platform machine SourceFile, decision D-FILE-1; an aggregate since B07-F9): the admission recorded by
   // UPLOAD_INSPECTION and its revocation, which the execution consumer and the agency must learn of
   "source_file.admitted.v1",
@@ -181,6 +186,10 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "project.current_revision_changed.v1": ["projectId", "agencyId", "currentRevisionId", "previousRevisionId", "changedByMembershipId"],
   "retention_record.created.v1": ["retentionId", "agencyId", "projectId", "revisionId", "retentionClass", "anchorEvidenceHash", "policyVersion"],
   "retention_record.expired.v1": ["retentionId", "agencyId", "projectId", "revisionId", "retentionClass"],
+  "project.deletion_requested.v1": ["projectId", "agencyId", "deletionId", "reasonCode"],
+  "project.deleted.v1": ["projectId", "agencyId", "deletionId"],
+  "retention_record.deleting.v1": ["retentionId", "agencyId", "projectId", "deletionId"],
+  "retention_record.deleted.v1": ["retentionId", "agencyId", "projectId", "deletionId", "withResiduals"],
   "retention_record.extended.v1": ["retentionId", "agencyId", "projectId", "revisionId", "extensionId", "retentionClass", "requestedSeconds", "grantedSeconds", "cappedAtHardDeadline"],
   "source_file.admitted.v1": ["fileId", "agencyId", "projectId", "originRevisionId", "originUploadId", "inspectionReceiptHash", "bytes", "format"],
   // the revisions whose selection or seal names the file travel as ids so EXECUTION_CONTROL (B08) can revoke stale authority
@@ -212,7 +221,7 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
  * launch, staging, verification and publication of a job; model/execution/events.ts, D8-XPKG-7), and so are AUDIT_ORCHESTRATION
  * (an audit's PROFILE, INTERPRET and VALIDATE steps) and PLAN_VALIDATION (a plan's validation intent; model/audit/events.ts).
  */
-export const CONSUMERS = ["NOTIFICATIONS", "EXECUTION_CONTROL", "UPLOAD_INSPECTION", "SELECTION_EVALUATION", "STORAGE_LIFECYCLE", "AUTHORITY_JOURNAL", ...COMMERCE_CONSUMERS, ...EXECUTION_CONSUMERS, ...AUDIT_CONSUMERS] as const;
+export const CONSUMERS = ["NOTIFICATIONS", "EXECUTION_CONTROL", "UPLOAD_INSPECTION", "SELECTION_EVALUATION", "STORAGE_LIFECYCLE", "AUTHORITY_JOURNAL", "DELETION_EXECUTOR", ...COMMERCE_CONSUMERS, ...EXECUTION_CONSUMERS, ...AUDIT_CONSUMERS] as const;
 export type Consumer = (typeof CONSUMERS)[number];
 
 export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType; readonly consumer: Consumer }> = Object.freeze([
@@ -258,6 +267,9 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   // the one contractual extension of a soft deadline is a durable fact outside the restore boundary (14; B16 CMD060, GAP-RET-10): a
   // restored database never forgets it was used, so a second one cannot be granted
   { eventType: "retention_record.extended.v1", consumer: "AUTHORITY_JOURNAL" },
+  // a requested deletion is a durable authority fact (a restore never resurrects the project) and the executor's work item (B16 CMD042)
+  { eventType: "project.deletion_requested.v1", consumer: "DELETION_EXECUTOR" },
+  { eventType: "project.deletion_requested.v1", consumer: "AUTHORITY_JOURNAL" },
   ...COMMERCE_EVENT_SUBSCRIPTIONS,
   // processing authority (package B08 §11): admission, launch and verification to JOB_EXECUTION, a cancellation to EXECUTION_CONTROL,
   // every terminal outcome and a package's availability to the agency
