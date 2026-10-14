@@ -39,7 +39,7 @@
   {
    "case": "R2-114",
    "package": "B18",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
