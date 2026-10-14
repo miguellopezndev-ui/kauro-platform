@@ -68,7 +68,11 @@ test("RFG-01 OK: a manual-rail refund is declared, executed outside Kauro and re
     const view = dataOf<RecordView>(await recordG2(attempt, receipt), 200, `G2 records ${scope}`);
     assert.deepEqual([view.attempt.state, view.refund?.state], ["RECORDED", "COMPLETED"]);
     const fp = await footprint(src);
-    assert.deepEqual(fp.events.filter((e) => e === "refund.completed.v1"), ["refund.completed.v1"], `${scope}: refund.completed exactly once`);
+    // the scope's completion: refund.completed.v1 of the agency refund; the route-scope treasury refund (D-ACH-19, an aggregate kind of the
+    // Refund machine) completes as treasury_refund.completed.v1 and never publishes an agency refund.completed
+    const done = scope === "BANK_CREDIT" ? "treasury_refund.completed.v1" : "refund.completed.v1";
+    assert.deepEqual(fp.events.filter((e) => e === done), [done], `${scope}: ${done} exactly once`);
+    if (scope === "BANK_CREDIT") assert.deepEqual(fp.events.filter((e) => e === "refund.completed.v1"), [], "a treasury refund publishes no agency refund.completed");
     assert.equal((await q<{ evidence_hash: string }>("SELECT evidence_hash FROM kauro.outbound_execution_attempts WHERE attempt_id = $1", [attempt.attemptId]))[0]?.evidence_hash, receipt.evidenceHash, "the receipt is kept: the attempt binds its stored bytes");
     assert.ok((await L().bw.evidence.get(receipt.artifactRef)) !== null, "the receipt artifact stays in the restricted store");
     if (scope === "CAPTURE") {
@@ -87,7 +91,7 @@ test("RFG-01 OK: a manual-rail refund is declared, executed outside Kauro and re
     // a replay of the record, an identical second offer under another key, adds no completion
     const again = await recordG2({ ...attempt, state: "RECORDED" }, receipt);
     assert.ok(again.status === 200 || again.status === 409, `the second record is a replay or a refusal: ${again.status}`);
-    assert.deepEqual((await footprint(src)).events.filter((e) => e === "refund.completed.v1").length, 1, `${scope}: still one refund.completed`);
+    assert.deepEqual((await footprint(src)).events.filter((e) => e === done).length, 1, `${scope}: still one ${done}`);
   }
 });
 

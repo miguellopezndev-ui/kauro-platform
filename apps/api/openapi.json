@@ -24656,7 +24656,7 @@
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 7 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 8 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -24716,6 +24716,12 @@
                 "reason": "REFUND_UNCERTAIN",
                 "layer": "COMMAND",
                 "meaning": "a prior submission may have refunded: reconcile it (CMD034) before any new dispatch"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "MANUAL_RAIL_NO_AUTOMATED_OUTBOUND",
+                "layer": "COMMAND",
+                "meaning": "the refund is on the manual rail: only the owner's declared execution and its recorded evidence move its money"
               }
             ]
           },

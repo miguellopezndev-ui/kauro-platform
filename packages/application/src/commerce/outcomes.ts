@@ -144,6 +144,8 @@ const COMMAND_SPECIFIC: Readonly<Record<CommerceCommandId, ReadonlyArray<Problem
     outcome("COMMAND", "PRECONDITION_FAILED", "CAPTURE_NOT_REFUNDABLE", "the capture was reversed: the authorization lapsed and no refund is dispatched"),
     outcome("COMMAND", "PAYMENT_PENDING", "REFUND_IN_PROGRESS", "a submission of this refund is in flight under another key"),
     outcome("COMMAND", "PAYMENT_UNCERTAIN", "REFUND_UNCERTAIN", "a prior submission may have refunded: reconcile it (CMD034) before any new dispatch"),
+    // Payments V1 lane L-REFUND (NEVER-RESEND, D-ACH-19/20): a manual-rail refund (destination captured, bank-transfer order, treasury refund) is never dispatched
+    outcome("COMMAND", "PRECONDITION_FAILED", "MANUAL_RAIL_NO_AUTOMATED_OUTBOUND", "the refund is on the manual rail: only the owner's declared execution and its recorded evidence move its money"),
     PROVIDER_SERVICES,
   ],
   CMD034: [
