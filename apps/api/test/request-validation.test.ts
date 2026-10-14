@@ -268,6 +268,10 @@ test("exactly the fourteen catalogue routes and the selection manifest intake ar
   // POST and the credit and match-key reads as GET, named here exactly
   for (const path of ["/api/v1/operations/bank-accounts/:accountRef/credits", "/api/v1/operations/bank-credits/:creditId/confirmations", "/api/v1/operations/bank-credits/:creditId/attributions", "/api/v1/operations/bank-accounts/:accountRef/statement-imports", "/api/v1/payment-orders/:orderId/retirements"]) bankPosts.add(path);
   for (const path of ["/api/v1/operations/bank-credits/:creditId", "/api/v1/operations/bank-orders/:orderId/match-keys"]) bankGets.add(path);
+  // lane B12-OWNER-SCREENS-1 (GAP-API-8, GAP-API-9): the owner evidence-artifact upload as POST and the inbound-credit queue read as GET,
+  // named here exactly
+  bankPosts.add("/api/v1/operations/bank-accounts/:accountRef/evidence-artifacts");
+  bankGets.add("/api/v1/operations/bank-credits");
   assert.deepEqual(inventory.filter((r) => r.method === "POST" && bankPosts.has(r.url)).map((r) => r.url).sort(), [...bankPosts].sort());
   assert.deepEqual(inventory.filter((r) => r.method === "GET" && bankGets.has(r.url)).map((r) => r.url).sort(), [...bankGets].sort());
   // B06's seven commands, B07's six (design §11), B08's two job commands and four audit commands (design §12), B17 four commands (CMD018, CMD019, CMD040, CMD041), B11's CMD044, B16's five team commands (CMD003..CMD007) and the
