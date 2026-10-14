@@ -148,7 +148,8 @@ export async function admitWith(store: PgAuditStore | { createModelTask: PgAudit
     taskKey: sha(`task-${a.core.reservationId}`),
     candidateManifestHash: a.run.candidateManifestHash,
     policyHash: sha("model-policy"),
-    minimizedRequestHash: sha(`minimized-${a.core.reservationId}`),
+    minimizedRequestHash: sha(`request-${a.core.reservationId}`),
+    core: { runId: a.core.runId, requestKey: a.core.requestKey },
     providerProfileId: ids.next() as Id,
     maximumCostCents: 40n,
   });

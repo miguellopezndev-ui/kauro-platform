@@ -13,6 +13,7 @@ export type {
   InspectionReceiptId,
   RetentionId,
   RetentionAnchorId,
+  RetentionExtensionId,
   ObjectHoldId,
   SealAttemptId,
   HoldReleaseId,
@@ -27,6 +28,7 @@ export {
   PROVIDER_SESSION_LIFETIME_SECONDS,
   SIGNATURE_MAX_AGE_SECONDS,
   PENDING_RESUME_GRACE_SECONDS,
+  RETENTION_EXTENSION_MAX_SECONDS,
   PROVIDER_CALL_TIMEOUT_MS,
   SEAL_HOLD_ATTEMPT_SECONDS,
   HOLD_RELEASE_CLAIM_SECONDS,
@@ -95,6 +97,7 @@ export type {
   RetentionAnchorKind,
   RetentionAnchorRecord,
   RetentionRecordRow,
+  RetentionExtensionRow,
   ExpectedPartKind,
 } from "./records.js";
 export type {

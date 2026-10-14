@@ -119,6 +119,17 @@ export const RETRYABLE_FAILURE_CODES: ReadonlySet<FailureCode> = new Set<Failure
  * Safe reason codes: machine tokens that narrow a failure code. They never carry customer values. The list is closed so a
  * frontend and the acceptance harness can enumerate the outcomes a command can produce.
  */
+/** The refusals of CMD060 RequestRetentionExtension (package B16 lane L2; R2-123, R2-124), appended after the recovery reasons. */
+export const RETENTION_EXTENSION_FAILURE_REASONS = [
+  "TERMS_VERSION_MISMATCH",
+  "NO_EXTENDABLE_RECORD",
+  "RETENTION_EXPIRED",
+  "EXTENSION_ALREADY_USED",
+  "NO_SOFT_DEADLINE",
+  "SOFT_DEADLINE_PASSED",
+  "NO_EXTENSION_ROOM",
+] as const;
+
 export const FAILURE_REASONS = [
   // authorization (08 "Identity is not permission")
   "SUBJECT_UNAUTHENTICATED",
@@ -316,6 +327,8 @@ export const FAILURE_REASONS = [
   ...CAPABILITY_FAILURE_REASONS,
   // operations and recovery (package B16: CMD057)
   ...RECOVERY_FAILURE_REASONS,
+  // the one soft-deadline extension of a project (package B16 lane L2: CMD060 RequestRetentionExtension; R2-123, R2-124)
+  ...RETENTION_EXTENSION_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

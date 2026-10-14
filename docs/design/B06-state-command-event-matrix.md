@@ -518,6 +518,7 @@ settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh st
 | CMD016 SelectInputTables | POST /api/v1/revisions/{revisionId}/selection | AGENCY_OPERATOR | AGENCY_HEADER | — | DatasetRevision all_uploads_completed; DatasetRevision previously_admitted_inputs_selected; DatasetRevision selection_changes | dataset_revision.selection_changed.v1 | dataset_revision.selection_changed.v1 → SELECTION_EVALUATION |
 | CMD017 SealRevision | POST /api/v1/revisions/{revisionId}/seal | AGENCY_OPERATOR | AGENCY_HEADER | — | DatasetRevision seal_command; RetentionRecord (initial ACTIVE) | retention_record.created.v1, dataset_revision.sealed.v1 | dataset_revision.sealed.v1 → NOTIFICATIONS |
 | CMD044 CreateSupportCase | POST /api/v1/projects/{projectId}/support-cases | AGENCY_MEMBER | AGENCY_HEADER | — | SupportCase (initial OPEN) | support_case.opened.v1 | — |
+| CMD060 RequestRetentionExtension | POST /api/v1/projects/{projectId}/retention-extensions | AGENCY_OWNER_OR_ADMIN | AGENCY_HEADER | — |  | retention_record.extended.v1 | retention_record.extended.v1 → AUTHORITY_JOURNAL |
 | CMD036 ExecuteProject | POST /api/v1/projects/{projectId}/execute | AGENCY_OPERATOR | AGENCY_HEADER | — | Job (initial QUEUED) | processing_job.queued.v1 | processing_job.queued.v1 → JOB_EXECUTION |
 | CMD037 CancelJob | POST /api/v1/jobs/{jobId}/cancel | AGENCY_OPERATOR | AGENCY_HEADER | — | Job cancel_command | processing_job.cancel_requested.v1 | processing_job.cancel_requested.v1 → EXECUTION_CONTROL |
 | CMD018 CreateTargetContract | POST /api/v1/projects/{projectId}/target-contracts | AGENCY_OPERATOR | AGENCY_HEADER | — |  |  | — |
@@ -1398,6 +1399,51 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | SUPPORT_CALENDAR_UNAVAILABLE | — | — | COMMAND | the versioned holiday calendar does not cover the year of the follow-up, so no next review can be promised; retry with the same key |
+
+### CMD060 RequestRetentionExtension
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the project is not visible to the caller's agency |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the retention record's current version; the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | TERMS_VERSION_MISMATCH | — | — | COMMAND | termsVersion is not the terms version the agency accepted; nothing changed |
+| 409 | PRECONDITION_FAILED | NO_EXTENDABLE_RECORD | — | — | COMMAND | the project has no PAID_ORDINARY or PAID_STAGED retention record (an unpaid source gets no extension) |
+| 409 | PRECONDITION_FAILED | RETENTION_EXPIRED | — | always | COMMAND | the governing record is expired or in managed deletion; an expired or deleted scope is never extended |
+| 409 | PRECONDITION_FAILED | EXTENSION_ALREADY_USED | — | always | COMMAND | the project already used its one extension; nothing resets a clock |
+| 409 | PRECONDITION_FAILED | NO_SOFT_DEADLINE | — | always | COMMAND | no package has been made available yet, so there is no soft deadline to extend |
+| 409 | PRECONDITION_FAILED | SOFT_DEADLINE_PASSED | — | always | COMMAND | the soft deadline has passed on the database clock |
+| 409 | PRECONDITION_FAILED | NO_EXTENSION_ROOM | — | always | COMMAND | the soft deadline is already at the hard cap; nothing is granted and the extension is not consumed |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
 ### CMD036 ExecuteProject
 
@@ -2974,6 +3020,20 @@ the check proves every citation resolves to an existing test.
 | changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…"<br>`cmd044-create-support-case.test.ts` :: "RACE: an identical retry, the same key with another digest…" |
 | invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…"<br>`request-validation.test.ts` :: "CMD044 closed request…" |
 | lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…"<br>`cmd044-create-support-case.test.ts` :: "RACE: an identical retry, the same key with another digest…" |
+| external uncertainty | NOT_APPLICABLE: the command performs no external effect; every effect is rows of one database transaction, and an outbox row is dispatched later by its consumer's package (N20), whose uncertainty belongs to that consumer |
+
+### CMD060 RequestRetentionExtension
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd060-request-retention-extension.test.ts` :: "CMD060-OK: one extension of a PAID_ORDINARY soft deadline…" |
+| wrong role | `cmd060-request-retention-extension.test.ts` :: "CMD060-DENY: a VIEWER or BILLING member…"<br>`role-matrix.test.ts` :: "N17: every served command against every role…" |
+| wrong agency | `cmd060-request-retention-extension.test.ts` :: "CMD060-DENY: a VIEWER or BILLING member…" |
+| stale version | `cmd060-request-retention-extension.test.ts` :: "CMD060-DENY: a VIEWER or BILLING member…" |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…"<br>`cmd060-request-retention-extension.test.ts` :: "RETRY: an identical replay answers 200 byte for byte…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…"<br>`cmd060-request-retention-extension.test.ts` :: "RETRY: an identical replay answers 200 byte for byte…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…"<br>`cmd060-request-retention-extension.test.ts` :: "RACE (crash after COMMIT): the lost answer is recovered by the key…" |
 | external uncertainty | NOT_APPLICABLE: the command performs no external effect; every effect is rows of one database transaction, and an outbox row is dispatched later by its consumer's package (N20), whose uncertainty belongs to that consumer |
 
 ### CMD036 ExecuteProject

@@ -26,6 +26,7 @@ import { TARGET_FAILURE_REASONS } from "../src/model/target-contract.js";
 import { IMPORT_STAGE_FAILURE_REASONS } from "../src/model/import-stage.js";
 import { CAPABILITY_FAILURE_REASONS } from "../src/model/capability-governance.js";
 import { RECOVERY_FAILURE_REASONS } from "../src/model/operations-recovery.js";
+import { RETENTION_EXTENSION_FAILURE_REASONS } from "../src/model/errors.js";
 
 const AGENCY = "0192a000-0000-7000-8000-0000000000a1" as AgencyId;
 const OTHER_AGENCY = "0192a000-0000-7000-8000-0000000000a2" as AgencyId;
@@ -202,9 +203,9 @@ test("every B10 failure reason of design section 12 is registered once in FAILUR
   assert.equal(section12.length, 42);
   assert.equal((FAILURE_REASONS as ReadonlyArray<string>).includes("IN_HOUSE_NOT_ATTRIBUTABLE"), false, "the retired reason is registered nowhere");
   assert.deepEqual([...COMMERCIAL_FAILURE_REASONS], section12, "the B10 list is section 12's, in its order");
-  // later packages append after B10's: B17 (CMD018/CMD019) target-contract reasons, B17 (CMD040/CMD041) import-stage reasons, then B18 (CMD058/CMD059) capability reasons, then the recovery reasons (CMD057)
-  const later = [...TARGET_FAILURE_REASONS, ...IMPORT_STAGE_FAILURE_REASONS, ...CAPABILITY_FAILURE_REASONS, ...RECOVERY_FAILURE_REASONS];
-  assert.deepEqual(FAILURE_REASONS.slice(FAILURE_REASONS.length - later.length), later, "B17 and B18 tail");
+  // later packages append after B10's: B17 (CMD018/CMD019) target-contract reasons, B17 (CMD040/CMD041) import-stage reasons, then B18 (CMD058/CMD059) capability reasons, then the recovery reasons (CMD057), then the retention-extension reasons (CMD060)
+  const later = [...TARGET_FAILURE_REASONS, ...IMPORT_STAGE_FAILURE_REASONS, ...CAPABILITY_FAILURE_REASONS, ...RECOVERY_FAILURE_REASONS, ...RETENTION_EXTENSION_FAILURE_REASONS];
+  assert.deepEqual(FAILURE_REASONS.slice(FAILURE_REASONS.length - later.length), later, "B17, B18 and B16 tail");
   const all: ReadonlyArray<string> = FAILURE_REASONS.slice(0, FAILURE_REASONS.length - later.length);
   for (const r of section12) {
     assert.equal(all.filter((x) => x === r).length, 1, `${r} is registered exactly once`);

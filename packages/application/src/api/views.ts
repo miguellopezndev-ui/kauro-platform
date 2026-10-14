@@ -203,6 +203,25 @@ export interface SupportCaseView {
   readonly version: number;
 }
 
+/**
+ * CMD060 RequestRetentionExtension: the one extension of a project's soft access deadline and its exact capped endpoint (09 "Quotes,
+ * reuploads and retention": never beyond the original hard cap; R2-123 the cap is disclosed). The hard deadline is shown unchanged.
+ */
+export interface RetentionExtensionView {
+  readonly extensionId: string;
+  readonly projectId: string;
+  readonly retentionId: string;
+  /** The record's version after the extension (the aggregate the command edited). */
+  readonly retentionVersion: number;
+  readonly requestedSeconds: number;
+  readonly grantedSeconds: number;
+  readonly previousSoftDeadline: UtcInstant;
+  readonly softDeadline: UtcInstant;
+  readonly hardDeadline: UtcInstant;
+  readonly effectiveDeadline: UtcInstant;
+  readonly cappedAtHardDeadline: boolean;
+}
+
 /** A page of a list read: at most the page size, and the cursor of the next page when there may be one. */
 export interface Page<Item> {
   readonly items: ReadonlyArray<Item>;

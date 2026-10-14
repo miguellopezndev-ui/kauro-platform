@@ -14,9 +14,12 @@ import {
   retentionAnchorHashOf,
   type AgencyId,
   type ClientId,
+  type MembershipId,
   type NewRetentionAnchor,
   type ProjectId,
   type RetentionAnchorId,
+  type RetentionExtensionId,
+  type RetentionExtensionRow,
   type RetentionAnchorKind,
   type RetentionAnchorRecord,
   type RetentionId,
@@ -85,6 +88,41 @@ function retentionRecord(r: Row): RetentionRecordRow {
     ...opt("expiredAt", optionalInstantText(r["expired_at"])),
   };
 }
+
+const EXTENSION_COLUMNS = [
+  "extension_id",
+  "agency_id",
+  "project_id",
+  "retention_id",
+  "requested_seconds",
+  "granted_seconds",
+  exact("previous_soft_deadline"),
+  exact("soft_deadline"),
+  exact("hard_deadline"),
+  "capped_at_hard_deadline",
+  "purpose",
+  "terms_version",
+].join(", ");
+
+function extensionRecord(r: Row): RetentionExtensionRow {
+  return {
+    extensionId: str<RetentionExtensionId>(r["extension_id"]),
+    agencyId: str<AgencyId>(r["agency_id"]),
+    projectId: str<ProjectId>(r["project_id"]),
+    retentionId: str<RetentionId>(r["retention_id"]),
+    requestedSeconds: int(r["requested_seconds"]),
+    grantedSeconds: int(r["granted_seconds"]),
+    previousSoftDeadline: instantText(r["previous_soft_deadline"]),
+    softDeadline: instantText(r["soft_deadline"]),
+    hardDeadline: instantText(r["hard_deadline"]),
+    cappedAtHardDeadline: r["capped_at_hard_deadline"] === true,
+    purpose: str(r["purpose"]),
+    termsVersion: str(r["terms_version"]),
+  };
+}
+
+/** kauro.effect_now() as an exact UTC instant: the server clock plus the time the transaction has run (migration 0038). */
+const EFFECT_NOW_EXACT = `to_char(kauro.effect_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
 
 export class PgRetentionRepository implements RetentionRepository {
   constructor(private readonly db: Queryable) {}
@@ -173,6 +211,74 @@ export class PgRetentionRepository implements RetentionRepository {
     const row = r.rows[0];
     if (row) return { kind: "APPLIED", record: retentionRecord(row) };
     return missedWrite(this.db, "retention_records", "retention_id", retentionId, expectedVersion, "retention record", ({ state }) => notAvailable("the retention record", state));
+  }
+
+  async recordById(retentionId: RetentionId): Promise<RetentionRecordRow | null> {
+    const r = await execute<Row>(this.db, `SELECT ${RECORD_COLUMNS} FROM kauro.retention_records WHERE retention_id = $1`, [retentionId]);
+    return r.rows[0] ? retentionRecord(r.rows[0]) : null;
+  }
+
+  async lockPaidRecordsOfProject(projectId: ProjectId): Promise<ReadonlyArray<RetentionRecordRow>> {
+    // the project's shared transition lock, never its row lock (CMD042 holds the row and then the exclusive transition: the order
+    // is project transition, then record, B16 lock order)
+    await execute(this.db, "SELECT kauro.await_transition('kauro.projects', $1::uuid::text)", [projectId]);
+    const r = await execute<Row>(
+      this.db,
+      `SELECT ${RECORD_COLUMNS} FROM kauro.retention_records WHERE project_id = $1 AND class IN ('PAID_ORDINARY', 'PAID_STAGED') ORDER BY retention_id FOR NO KEY UPDATE`,
+      [projectId],
+    );
+    return r.rows.map(retentionRecord);
+  }
+
+  async extensionOfProject(projectId: ProjectId): Promise<RetentionExtensionRow | null> {
+    const r = await execute<Row>(this.db, `SELECT ${EXTENSION_COLUMNS} FROM kauro.retention_extensions WHERE project_id = $1`, [projectId]);
+    return r.rows[0] ? extensionRecord(r.rows[0]) : null;
+  }
+
+  async effectInstant(): Promise<string> {
+    const r = await execute<{ now: string }>(this.db, `SELECT ${EFFECT_NOW_EXACT} AS now`);
+    const now = r.rows[0]?.now;
+    if (typeof now !== "string") throw new DomainFailure("INTEGRITY_FAILURE", "the server clock answered nothing");
+    return now;
+  }
+
+  async extendSoftDeadline(input: {
+    readonly extensionId: RetentionExtensionId;
+    readonly retentionId: RetentionId;
+    readonly expectedVersion: number;
+    readonly requestedSeconds: number;
+    readonly purpose: string;
+    readonly termsVersion: string;
+    readonly membershipId: MembershipId;
+  }): Promise<{ readonly extension: RetentionExtensionRow; readonly record: RetentionRecordRow }> {
+    // the extension row first: the database binds it to the record, to this request session and to the window (migration 0069); the
+    // endpoint is computed in SQL from the locked record, so it is exact to the microsecond
+    const inserted = await execute<Row>(
+      this.db,
+      `INSERT INTO kauro.retention_extensions (extension_id, agency_id, project_id, retention_id, requested_seconds, granted_seconds, previous_soft_deadline, soft_deadline,
+          hard_deadline, capped_at_hard_deadline, purpose, terms_version, requested_by_membership_id, requested_by_user_id, created_at)
+       SELECT $1, r.agency_id, r.project_id, r.retention_id, $3::integer,
+              floor(extract(epoch FROM (least(r.soft_deadline + $3::integer * interval '1 second', r.hard_deadline) - r.soft_deadline)))::integer,
+              r.soft_deadline, least(r.soft_deadline + $3::integer * interval '1 second', r.hard_deadline), r.hard_deadline,
+              r.soft_deadline + $3::integer * interval '1 second' > r.hard_deadline, $4, $5, $6, kauro.current_user_id(), kauro.server_now()
+         FROM kauro.retention_records r WHERE r.retention_id = $2 AND r.version = $7 AND r.soft_deadline IS NOT NULL
+       RETURNING ${EXTENSION_COLUMNS}`,
+      [input.extensionId, input.retentionId, input.requestedSeconds, input.purpose, input.termsVersion, input.membershipId, input.expectedVersion],
+    );
+    const extension = inserted.rows[0];
+    if (!extension) throw new DomainFailure("INTEGRITY_FAILURE", "the locked retention record is not the version the extension was judged at");
+    const moved = await execute<Row>(
+      this.db,
+      `UPDATE kauro.retention_records
+          SET soft_deadline = (SELECT x.soft_deadline FROM kauro.retention_extensions x WHERE x.extension_id = $3),
+              effective_deadline = least((SELECT x.soft_deadline FROM kauro.retention_extensions x WHERE x.extension_id = $3), hard_deadline),
+              version = $2 + 1
+        WHERE retention_id = $1 AND version = $2 RETURNING ${RECORD_COLUMNS}`,
+      [input.retentionId, input.expectedVersion, input.extensionId],
+    );
+    const record = moved.rows[0];
+    if (!record) throw new DomainFailure("INTEGRITY_FAILURE", "the locked retention record moved while its extension was written");
+    return { extension: extensionRecord(extension), record: retentionRecord(record) };
   }
 
   async findDue(limit: number): Promise<ReadonlyArray<{ readonly retentionId: RetentionId; readonly agencyId: AgencyId; readonly revisionId?: RevisionId }>> {

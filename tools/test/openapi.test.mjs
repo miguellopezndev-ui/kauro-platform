@@ -111,6 +111,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/projects/{projectId}/import-stages/{stageId}/receipts SubmitStageReceipt",
       "POST /api/v1/projects/{projectId}/quotes CreateQuote",
       "POST /api/v1/projects/{projectId}/refund-requests RequestRefund",
+      "POST /api/v1/projects/{projectId}/retention-extensions RequestRetentionExtension",
       "POST /api/v1/projects/{projectId}/revisions CreateRevision",
       "POST /api/v1/projects/{projectId}/support-cases CreateSupportCase",
       "POST /api/v1/projects/{projectId}/target-contracts CreateTargetContract",
