@@ -19,3 +19,6 @@ export {
 } from "./banking-calendar.js";
 export type { PayoutIntentFacts, PayoutMismatch } from "./payout-evidence.js";
 export { PAYOUT_EVIDENCE_FAKE_PROVIDER, ContractFakePayoutEvidence } from "./payout-evidence.js";
+// package B12 (lane K1): the outreach send fakes (SIMULATED; the live Gmail half is PART(B15/B19))
+export type { FakeSendEvent, FakeSendScript, RecordedSend } from "./outreach-send.js";
+export { ContractFakeGmailSend, ContractFakeResend, GMAIL_SEND_FAKE_PROVIDER, RESEND_FAKE_PROVIDER } from "./outreach-send.js";

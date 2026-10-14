@@ -81,6 +81,10 @@ export function createPlanHandler(runtime: AuditRuntime, compiler: PlanCompilerP
             });
           }
 
+          // the audit's target after its shared transition half (R2-026, B17 L1 meeting row 11): a plan is never born on a superseded contract;
+          // a supersession issued meanwhile waits for this unit, one committed first refuses (the plans birth trigger backstops it)
+          const target = await uow.targetContracts.lockCurrentByHash(membership.agencyId, audit.projectId, audit.targetContractHash);
+          if (target === null || target.confirmedAt === undefined || target.supersededAt !== undefined) throw new DomainFailure("TARGET_STALE", "the audit's target contract is not confirmed and current");
           const planId = uow.ids.next() as PlanId;
           const draft = await uow.plans.insert({ planId, agencyId: membership.agencyId, projectId: audit.projectId, body: compilation.body, createdByMembershipId: membership.membershipId, createdAt: ctx.now });
           if (draft.bodyHash !== bodyHash) throw new DomainFailure("INTEGRITY_FAILURE", "the stored plan hash is not the digest of its body", { reason: "BODY_DIGEST_MISMATCH" });

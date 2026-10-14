@@ -15,7 +15,7 @@
  * (PROFILE, INTERPRET and VALIDATE under the audit's fence) and PLAN_VALIDATION (only the current intent), and the sweepers
  * AUDIT_DEADLINES and GRANT_RECONCILIATION; EXECUTION_CONTROL also cancels the audits of a lost source.
  */
-export { PgOutboxDispatcher, serviceOf } from "./dispatcher.js";
+export { AGENCY_LESS_NOTIFICATION_EVENT_TYPES, PgOutboxDispatcher, serviceOf } from "./dispatcher.js";
 export type { DispatcherOptions, DispatchCounts } from "./dispatcher.js";
 export { UploadInspection, claimConsistentWith, QUARANTINE_AFTER_INSPECTION } from "./consumers/upload-inspection.js";
 export type { UploadInspectionDependencies } from "./consumers/upload-inspection.js";
@@ -73,3 +73,12 @@ export { GrantReconciliation } from "./audit/grants.js";
 export { AuditCancellations } from "./audit/cancellation.js";
 export { PlanValidator, judgeReceipt, openValidatorReceipts, planBodyHashOf, validationReceiptHashOf, VALIDATION_RECEIPT_DOMAIN } from "./audit/receipts.js";
 export type { ValidationReceipts, ReceiptJudgement, ValidatedSubject, ValidationRun, ValidatorDatabaseConfig } from "./audit/receipts.js";
+// package B16 L6: the restore runner, the recovery journal's tail and NOTIFICATIONS with its journaled dispatch identity
+export { RestoreRunner, RestoreStepRefused, planHashOf } from "./recovery/restore-runner.js";
+export type { RestorePlan, RestoredDatabase, RestoreTarget, RestoreOutcome, RestoreRunnerDependencies } from "./recovery/restore-runner.js";
+export { RecoveryJournalTail, tailedEntryOf, RECOVERY_JOURNAL_TAIL_SOURCE, TAILED_EVENT_TYPES } from "./recovery/journal-tail.js";
+export type { RecoveryJournalTailDependencies } from "./recovery/journal-tail.js";
+export { NotificationJournal, notificationIdentityOf, NOTIFICATIONS_CONSUMER } from "./consumers/notification-journal.js";
+export type { NotificationJournalDependencies } from "./consumers/notification-journal.js";
+export { importerProfileOf, importerProfileRefusal, IMPORTER_PROFILE_IDS, IMPORTER_PROFILE_REASONS, IMPORTER_VERSION } from "./audit/importer-profile.js";
+export type { ImporterProfile, ImporterProfileReason } from "./audit/importer-profile.js";

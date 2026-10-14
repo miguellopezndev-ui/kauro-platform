@@ -33,12 +33,16 @@ export { PgWebSessionStore, WEB_SESSION_STATEMENT_TIMEOUT_MS } from "./web-sessi
 export type { StoredWebSession, NewStoredWebSession } from "./web-sessions.js";
 export { PgSessionFence } from "./session-fence.js";
 export { PgBuyerTypes, PgProjectDashboard, type PgBuyerTypeRecord, type PgProjectDashboardRow, type PgDashboardFilter } from "./repositories/agency-app.js";
-export type { LockedSession } from "./session-fence.js";
-export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf, bankRoutesOf, bankCreditsOf, sessionFenceOf, effectInstantOf, buyerTypesOf, projectDashboardOf } from "./unit-of-work.js";
+export type { LockedSession, SessionFenceMode } from "./session-fence.js";
+export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf, bankRoutesOf, bankCreditsOf, bankSettlementsOf, sessionFenceOf, effectInstantOf, exactEffectNowOf, buyerTypesOf, projectDashboardOf, bankRefundsOf } from "./unit-of-work.js";
 export { PgBankRoutes } from "./repositories/bank-routes.js";
 export { PgBankCredits } from "./repositories/bank-credits.js";
+export { PgBankSettlements } from "./repositories/bank-settlements.js";
+export type { BankSettlementRoute, NewBankSettlement, NewSettlementRequest, SettlementRequestRow, SettlementRequestPageItem, SettlementRequestOutcome, SettlementRefusalReason } from "./repositories/bank-settlements.js";
 export type { NewBankCredit, BankCreditChange, BankCreditWrite, BankStream, NewStatementImport, NewStatementLine, StatementLineWrite, BankCheckoutRetirementRecord } from "./repositories/bank-credits.js";
 export type { NewBankRoute, NewBankRouteVersion, NewTransferInstructions } from "./repositories/bank-routes.js";
+export { PgBankRefunds } from "./repositories/bank-refunds.js";
+export type { OwnerAuthorityRow, TreasuryRefundRow, NewRefundDestination, TreasuryApproval } from "./repositories/bank-refunds.js";
 // processing authority (package B08, mandate B08-PERSISTENCE-EXECUTION; docs/design/B08-audit-approval-jobs.md §9, §10)
 export { createExecutionUnitOfWorkFactory, PgExecutionUnitOfWorkFactory, PgExecutionUnitOfWork, executionReadsOf } from "./unit-of-work.js";
 export { PgExecutionStore, PgExecutionReads, PgExecutionDiscovery, EXECUTION_CAPACITY_DOMAIN } from "./execution/index.js";
@@ -141,6 +145,13 @@ export { PgCapabilityGovernanceRepository } from "./repositories/capability-gove
 export { capabilityGovernanceOf } from "./capability-governance-access.js";
 export { operationsOf } from "./operations-recovery-access.js";
 export { PgOperationsRepository } from "./repositories/operations-recovery.js";
+export { breakglassOf } from "./breakglass-access.js";
+export { PgBreakglassRepository } from "./repositories/breakglass.js";
+// package B16 L6: the authority journal outside the restore boundary and the restore run's database side (migration 0076)
+export { PgAuthorityJournal, provisionAuthorityJournal, AUTHORITY_JOURNAL_SCHEMA, RECOVERY_JOURNAL_KINDS, RecoveryJournalConflict } from "./journal/pg-authority-journal.js";
+export type { RecoveryJournalKind, RecoveryJournalRecord, RecoveryJournalEntry, JournalTombstone } from "./journal/pg-authority-journal.js";
+export { PgRestoreOwnerStore, PgRestoreControl, PgRecoveryAuthority, PgJournalTail, restoreControlOf, recoveryAuthorityOf, journalTailOf } from "./journal/restore-store.js";
+export type { RestoreRunRow, RestoreRunState, AppliedOutcome, ObservationRow, ReleaseHold, TombstonedSubjectKind, CandidateRow, RecoveryRow, TailedEvent } from "./journal/restore-store.js";
 // CMD027's reads (mandate B10-COMMANDS-QUOTE; design §3.4, §3.5): the sealed revision's billable population, the project's live quote
 export { PgQuoteReads, quoteReadsOf } from "./commercial-quote-access.js";
 // the commission service's work lists (mandate B10-COMMISSION-SERVICE; docs/design/B10-commercial-domain.md §14; D10-SVC-1, D10-SVC-2):
@@ -149,3 +160,8 @@ export { PgCommissionWork, commissionWorkOf } from "./commission-service-access.
 export type { DueReservation, LedgerPurchase, ReleasableFundsHold, LineOnHeldFunds } from "./commission-service-access.js";
 export { ConnectionSecurityError, connectionSecurityOf, sslOptionsOf } from "./tls.js";
 export type { ConnectionSecurityInput, DatabaseTls, VerifiedSslOptions } from "./tls.js";
+// package B12 (lane K1): the outreach writers with their T2 subjects, the ordered advisory locks and the effect_now lease fence (plan §L)
+export { PgOutreachWriters } from "./repositories/commercial-outreach.js";
+export type { OutreachIntentKeys, NewOutreachIntent, IntentAnswer } from "./repositories/commercial-outreach.js";
+export { OutreachLocks, holdOutreachLease } from "./outreach-access.js";
+export type { OutreachLockMode } from "./outreach-access.js";

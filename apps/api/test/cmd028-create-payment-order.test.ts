@@ -117,7 +117,7 @@ test("OK: an AGENCY_BILLING member creates one order for an issued quote — the
   assert.deepEqual([detail.order.state, detail.order.paymentStatus, detail.captures.length, detail.commercialAuthorization], ["CREATED", "PENDING", 0, undefined]);
 });
 
-test("DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms, expired price, no deliverable capacity (CAPACITY_UNAVAILABLE), unqualified route, unreviewed treatment — is refused before any intent or provider call", async () => {
+test("R2-082: DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms, expired price, no deliverable capacity (CAPACITY_UNAVAILABLE), unqualified route, unreviewed treatment — is refused before any intent or provider call", async () => {
   const { w } = pw;
   const quote = await pw.readyQuote("cmd028-deny");
   const refusedWithNothing = async (what: string, request: () => Promise<Reply>, expected: string): Promise<Reply> => {
@@ -189,6 +189,8 @@ test("DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_
   // unreviewed treatment (R2-082): a corporate owner records a REVIEW_REQUIRED version; the sale path is blocked until re-reviewed
   await pw.recordProfileVersion("REVIEW_REQUIRED");
   await refusedWithNothing("unreviewed treatment", () => createOrder(quote), "409 PRECONDITION_FAILED FISCAL_TREATMENT_UNREVIEWED");
+  // R2-082: the block is on the sale path only: the project and the quote stay readable (200) while it holds
+  assert.deepEqual([(await read(w, `/api/v1/projects/${quote.projectId}`, w.billing.token)).status, (await read(w, paymentRoutes.getQuote(quote.quoteId), w.billing.token)).status], [200, 200], "R2-082: GET project and quote answer 200 while the treatment is unreviewed");
   await pw.recordProfileVersion("EXEMPT_EXPORT");
 
   // with every prerequisite restored the same quote checks out: the refusals left nothing behind that blocks it

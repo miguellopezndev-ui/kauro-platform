@@ -7,6 +7,7 @@ import type { UtcInstant } from "@kauro/contracts";
 import type { BankCreditRecord, BankTransferInstructionRecord, EvidenceClassification, IncomingCredit, StatementPage } from "@kauro/domain";
 import type { StoredBankEvidence } from "../ports.js";
 import type { BankDetailsClassifier, BankRouteCollaborators } from "./ports.js";
+import type { SettlementEvidenceClassifier } from "./settlement.js";
 
 export type BankStreamName = "INBOUND" | "OUTBOUND";
 
@@ -84,6 +85,8 @@ export type StatementLineWriteResult = { readonly kind: "NEW" | "SAME"; readonly
 export interface BankCreditRepository {
   lockStream(environment: string, accountRef: string, stream: BankStreamName): Promise<void>;
   credit(creditId: string): Promise<BankCreditRecord | null>;
+  /** B12 GAP-API-9: the credits in one state, oldest first, keyset (created_at, bank_credit_id) after `after`, at most `limit`. */
+  listCredits(state: string, after: { readonly createdAt: string; readonly id: string } | null, limit: number): Promise<ReadonlyArray<{ readonly credit: BankCreditRecord; readonly position: { readonly createdAt: string; readonly id: string } }>>;
   lockCredit(creditId: string): Promise<BankCreditRecord | null>;
   creditByTransaction(environment: string, accountRef: string, bankTransactionId: string, lock?: boolean): Promise<BankCreditRecord | null>;
   insertCredit(c: NewBankCreditInput): Promise<BankCreditRecord | null>;
@@ -111,6 +114,8 @@ export interface BankCreditRepository {
   recordLine(l: NewStatementLineInput): Promise<StatementLineWriteResult>;
   recordedAttemptOf(environment: string, accountRef: string, bankExecutionId: string): Promise<string | null>;
   attemptDeclaredWith(reference: string): Promise<boolean>;
+  /** A debit carrying the reference of a NOT_EXECUTED attempt: its REFUND_TERMINAL_CONTRADICTED case and the freeze of its source; false when there is no such attempt. */
+  contradictTerminalAttempt(caseId: string, freezeId: string, line: { readonly environment: string; readonly accountRef: string; readonly lineId: string; readonly reference: string; readonly evidenceHash: string }): Promise<boolean>;
   linkLine(lineId: string, attemptId: string): Promise<void>;
   openLineCase(caseId: string, kind: "RECORD_REQUIRED" | "UNDECLARED_OUTBOUND", line: { readonly environment: string; readonly accountRef: string; readonly lineId: string; readonly evidenceHash: string }, detailCode: string): Promise<boolean>;
   /** Runs `work` under a savepoint rolled back once it settled: every lock it took is released, nothing it wrote survives. */
@@ -118,7 +123,7 @@ export interface BankCreditRepository {
 }
 
 /** Classifies an owner-supplied credit or statement artifact (R1): pure, fail-closed, never a partial value. */
-export interface BankEvidenceClassifier extends BankDetailsClassifier {
+export interface BankEvidenceClassifier extends BankDetailsClassifier, SettlementEvidenceClassifier {
   classifyCredit(evidence: StoredBankEvidence): EvidenceClassification<IncomingCredit>;
   classifyStatement(evidence: StoredBankEvidence): EvidenceClassification<StatementPage>;
 }
@@ -128,6 +133,8 @@ export interface BankInboundCollaborators extends BankRouteCollaborators {
   readonly classifier: () => BankEvidenceClassifier | null;
   /** The product's registered hold (a test pauses, crashes or fails here; production: a no-op). */
   readonly hold: (point: string) => Promise<void>;
+  /** The list cursors' HMAC key (the api's configured cursor key; absent: a per-process random key, cursors die with the process). */
+  readonly cursorKey?: Uint8Array;
 }
 
 export const BANK_HOLD_GATE_READ = "bank:gate-read";

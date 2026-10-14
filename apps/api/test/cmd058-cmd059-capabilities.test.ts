@@ -32,8 +32,8 @@ async function capability(label: string, state: PathState = "QUALIFIED_INTERNAL"
   const { w } = pw;
   const id = ids.next();
   await w.h.oracle.query(
-    `INSERT INTO kauro.capabilities (capability_id, version, kind, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at)
-     VALUES ($1, $2, 'TOOL', 'DESIGN', $3, '[]'::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
+    `INSERT INTO kauro.capabilities (capability_id, version, kind, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at, importer_tool)
+     VALUES ($1, $2, 'TOOL', 'DESIGN', $3, '[]'::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now(), 'SALESFORCE_DATA_LOADER')`,
     [id, `B18-${label}`, sha(`profile-${label}`)],
   );
   if (state !== "DESIGN") await w.h.publishCapability(id as never, state);
@@ -47,7 +47,28 @@ const versionRows = async (capabilityId: string) =>
 const restrictionRows = async (capabilityId: string) =>
   (await pw.w.h.oracle.query<{ incident_ref: string; prior_state: string; revision_after: number; recorded_by_user_id: string; created_at: Date }>("SELECT * FROM kauro.capability_restrictions WHERE capability_id = $1", [capabilityId])).rows;
 
+/**
+ * S078 seeds: every TOOL capability version cites evidence that must resolve to a PASS vendor qualification of this capability, the body's
+ * profile and an export-back hash. The rows are inserted through the oracle (no runtime role can) before each call; the unknown capability
+ * and the CLEAN mode (outside the predicates) get none. The refusals of the five predicates are b17-vendor-qualification.test.ts's.
+ */
+async function qualify(capabilityId: string, body: Record<string, unknown>): Promise<void> {
+  const refs = body["qualificationEvidenceRefs"];
+  const profileHash = body["profileHash"];
+  if (!Array.isArray(refs) || typeof profileHash !== "string") return;
+  for (const ref of refs) {
+    if (typeof ref !== "string") continue;
+    await pw.w.h.oracle.query(
+      `INSERT INTO kauro.vendor_qualifications (evidence_hash, capability_id, tool, profile_hash, envelope, export_back_evidence_hash, result)
+       SELECT $1, capability_id, 'SALESFORCE_DATA_LOADER', $3, '{"object":"Contact","operation":"UPSERT"}'::jsonb, $4, 'PASS' FROM kauro.capabilities WHERE capability_id = $2 AND kind = 'TOOL'
+       ON CONFLICT (evidence_hash) DO NOTHING`,
+      [ref, capabilityId, profileHash, sha(`export-back-${ref}`)],
+    );
+  }
+}
+
 async function change(capabilityId: string, body: Record<string, unknown>, options: { readonly token?: string; readonly key?: string } = {}): Promise<Reply> {
+  await qualify(capabilityId, body);
   return call(pw.w, { url: versionsUrl(capabilityId), token: options.token ?? pw.kora.token, agency: null, key: options.key ?? freshKey("cmd058"), body });
 }
 async function restrict(capabilityId: string, body: Record<string, unknown>, options: { readonly token?: string; readonly key?: string } = {}): Promise<Reply> {

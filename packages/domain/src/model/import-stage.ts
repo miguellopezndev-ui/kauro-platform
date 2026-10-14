@@ -55,6 +55,12 @@ export const IMPORT_STAGE_FAILURE_REASONS = [
   "CHILD_PLAN_NOT_APPROVED",
   // CMD041: the stage's target instance is not the project's current target
   "STAGE_TARGET_MISMATCH",
+  // CMD040 (R2-024): a receipt row's correlation key is not this stage's for that source identity (a receipt of another stage)
+  "RECEIPT_FOREIGN_STAGE",
+  // CMD040 (R2-023): the receipt claims MATCHED for a child source one of whose parent identities is not MATCHED (a blocked edge)
+  "CHILD_EDGE_BLOCKED",
+  // CMD041 (R2-023, R2-025): a parent of the stage holds an open receipt reconciliation: its identity is not settled
+  "PARENT_IDENTITY_UNDER_RECONCILIATION",
 ] as const;
 export type ImportStageFailureReason = (typeof IMPORT_STAGE_FAILURE_REASONS)[number];
 
@@ -76,13 +82,25 @@ export interface ImportStageRecord {
   readonly planId: PlanId;
   /** The exact source identities the stage's package contains (its membership). */
   readonly sourceIds: ReadonlyArray<string>;
+  /** The parent identity each child source depends on (compiled with the stage, immutable; R2-023). */
+  readonly parentEdges: ReadonlyArray<StageParentEdge>;
   readonly version: number;
   readonly continuedAt?: UtcInstant;
   readonly continuedByMembershipId?: string;
   readonly continuationReceiptHash?: Sha256Hex;
 }
 
-export type ReceiptDisposition = "MATCHED" | "FAILED" | "UNRESOLVED";
+export interface StageParentEdge {
+  readonly childSourceId: string;
+  readonly parentStageId: string;
+  readonly parentSourceId: string;
+}
+
+/**
+ * MATCHED, FAILED, UNRESOLVED as the receipt says; BLOCKED_BY_PARENT for a child source one of whose parent identities is not MATCHED in
+ * that parent's latest receipt (R2-023: "the omitted dependencies remain explicit exceptions"). A blocked source counts as failed.
+ */
+export type ReceiptDisposition = "MATCHED" | "FAILED" | "UNRESOLVED" | "BLOCKED_BY_PARENT";
 /** What a validated receipt concluded: every identity matched; a fully accounted partition with failures; or unresolved identities. */
 export type ReceiptResult = "COMPLETE" | "PARTIAL_ACCOUNTED" | "NEEDS_CORRECTION";
 
@@ -142,35 +160,74 @@ function idText(v: unknown): v is string {
   return typeof v === "string" && v.length > 0 && v.length <= ID_MAX;
 }
 
+export interface ParsedReceiptRow {
+  readonly sourceId: string;
+  readonly status: "MATCHED" | "FAILED";
+  readonly targetId?: string;
+  /** stageCorrelationKey(stageId, packageHash, sourceId): binds the row to the stage it was produced for (R2-024). */
+  readonly correlationKey: string;
+}
 export interface ParsedReceipt {
-  readonly rows: ReadonlyArray<{ readonly sourceId: string; readonly status: "MATCHED" | "FAILED"; readonly targetId?: string }>;
+  readonly rows: ReadonlyArray<ParsedReceiptRow>;
 }
 
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
 /**
- * The closed check of an uploaded receipt document: exactly `rows`, each row exactly sourceId + status (+ targetId, required for MATCHED
- * and refused for FAILED). Returns the typed document or null (a verified flag or any other member is refused).
+ * The closed check of an uploaded receipt document: exactly `rows`, each row exactly sourceId + status + correlationKey (+ targetId,
+ * required for MATCHED and refused for FAILED). Returns the typed document or null (a verified flag or any other member is refused).
  */
 export function parseStageReceipt(document: unknown): ParsedReceipt | null {
   if (!isRecord(document) || Object.keys(document).length !== 1 || !Array.isArray(document["rows"])) return null;
   const rows = document["rows"] as unknown[];
   if (rows.length > MAX_ROWS) return null;
-  const out: Array<{ sourceId: string; status: "MATCHED" | "FAILED"; targetId?: string }> = [];
+  const out: ParsedReceiptRow[] = [];
   for (const r of rows) {
-    if (!isRecord(r) || !Object.keys(r).every((k) => k === "sourceId" || k === "status" || k === "targetId")) return null;
+    if (!isRecord(r) || !Object.keys(r).every((k) => k === "sourceId" || k === "status" || k === "targetId" || k === "correlationKey")) return null;
     if (!idText(r["sourceId"]) || (r["status"] !== "MATCHED" && r["status"] !== "FAILED")) return null;
+    const correlationKey = r["correlationKey"];
+    if (typeof correlationKey !== "string" || !SHA256_HEX.test(correlationKey)) return null;
     if (r["status"] === "MATCHED") {
       if (!idText(r["targetId"])) return null;
-      out.push({ sourceId: r["sourceId"], status: "MATCHED", targetId: r["targetId"] });
+      out.push({ sourceId: r["sourceId"], status: "MATCHED", targetId: r["targetId"], correlationKey });
     } else {
       if ("targetId" in r) return null;
-      out.push({ sourceId: r["sourceId"], status: "FAILED" });
+      out.push({ sourceId: r["sourceId"], status: "FAILED", correlationKey });
     }
   }
   return { rows: out };
 }
 
+/**
+ * KAURO_STAGE_CORRELATION_V1 (R2-024, 05:103 "Kauro validates that the receipt belongs to the purchased stage"): the key a stage's package
+ * gives each of its source identities; a receipt row carries it back, so a receipt of another stage with the same rows never validates.
+ */
+export function stageCorrelationKey(stageId: string, packageHash: Sha256Hex, sourceId: string): Sha256Hex {
+  return structuredDigest(DOMAINS.STAGE_CORRELATION, 1, { stageId, packageHash, sourceId });
+}
+
+/** Whether some row's correlation key is not the stage's key for that row's source identity (row r foreign iff r.correlationKey != key). */
+export function receiptOfAnotherStage(stage: Pick<ImportStageRecord, "stageId" | "packageHash">, parsed: ParsedReceipt): boolean {
+  return parsed.rows.some((r) => r.correlationKey !== stageCorrelationKey(stage.stageId, stage.packageHash, r.sourceId));
+}
+
+/**
+ * The child sources of a stage that are blocked by a parent (R2-023: "Dependent stages can proceed only for an approved subset with complete
+ * parent identities"): a child source is admitted iff every edge of it names a parent source that is MATCHED in that parent's latest receipt
+ * mapping. `parentMappings` holds the latest mapping of each parent stage (a parent with none blocks every edge into it).
+ */
+export function blockedChildSources(edges: ReadonlyArray<StageParentEdge>, parentMappings: ReadonlyMap<string, ReadonlyArray<ReceiptMappingRow>>): ReadonlySet<string> {
+  const blocked = new Set<string>();
+  for (const e of edges) {
+    const row = parentMappings.get(e.parentStageId)?.find((m) => m.sourceId === e.parentSourceId);
+    if (row?.disposition !== "MATCHED") blocked.add(e.childSourceId);
+  }
+  return blocked;
+}
+
 export type ReceiptValidation =
   | { readonly kind: "FOREIGN_IDS"; readonly count: number }
+  | { readonly kind: "CHILD_EDGE_BLOCKED"; readonly sourceIds: ReadonlyArray<string> }
   | {
       readonly kind: "VALIDATED";
       readonly mapping: ReadonlyArray<ReceiptMappingRow>;
@@ -182,17 +239,20 @@ export type ReceiptValidation =
 
 /**
  * Validates a receipt against the stage's exact membership (CMD040 effect "Validate exact membership and source-to-target IDs, including
- * failed and missing records"). A source identity the stage does not contain refuses the whole receipt (FOREIGN_IDS). Within the
- * membership, every identity gets one disposition: MATCHED (one row, a target identity no other source claimed), FAILED (one explicit
- * failure row) or UNRESOLVED (missing, named twice, or mapped to a target identity that another source also claims): an ambiguous
- * identity is never guessed, it blocks the child edges that need it.
+ * failed and missing records"). A source identity the stage does not contain refuses the whole receipt (FOREIGN_IDS). A child source whose
+ * parent identity is blocked (`blocked`) is BLOCKED_BY_PARENT, counted as failed, whether the receipt names it FAILED or omits it; a receipt
+ * that claims MATCHED for it is refused (CHILD_EDGE_BLOCKED). Within the membership every other identity gets one disposition: MATCHED (one
+ * row, a target identity no other source claimed), FAILED (one explicit failure row) or UNRESOLVED (missing, named twice, or mapped to a
+ * target identity that another source also claims): an ambiguous identity is never guessed, it blocks the child edges that need it.
  */
-export function validateStageReceipt(sourceIds: ReadonlyArray<string>, parsed: ParsedReceipt): ReceiptValidation {
+export function validateStageReceipt(sourceIds: ReadonlyArray<string>, parsed: ParsedReceipt, blocked: ReadonlySet<string> = new Set()): ReceiptValidation {
   const members = new Set(sourceIds);
   const foreign = new Set(parsed.rows.filter((r) => !members.has(r.sourceId)).map((r) => r.sourceId));
   if (foreign.size > 0) return { kind: "FOREIGN_IDS", count: foreign.size };
+  const claimedBlocked = [...new Set(parsed.rows.filter((r) => r.status === "MATCHED" && blocked.has(r.sourceId)).map((r) => r.sourceId))].sort();
+  if (claimedBlocked.length > 0) return { kind: "CHILD_EDGE_BLOCKED", sourceIds: claimedBlocked };
 
-  const bySource = new Map<string, Array<(typeof parsed.rows)[number]>>();
+  const bySource = new Map<string, ParsedReceiptRow[]>();
   for (const r of parsed.rows) bySource.set(r.sourceId, [...(bySource.get(r.sourceId) ?? []), r]);
   const claimants = new Map<string, Set<string>>();
   for (const r of parsed.rows) {
@@ -206,7 +266,10 @@ export function validateStageReceipt(sourceIds: ReadonlyArray<string>, parsed: P
   for (const sourceId of [...members].sort()) {
     const rows = bySource.get(sourceId) ?? [];
     const only = rows.length === 1 ? rows[0] : undefined;
-    if (only === undefined) {
+    if (blocked.has(sourceId)) {
+      mapping.push({ sourceId, disposition: "BLOCKED_BY_PARENT" });
+      failed += 1;
+    } else if (only === undefined) {
       mapping.push({ sourceId, disposition: "UNRESOLVED" });
       unresolved += 1;
     } else if (only.status === "FAILED") {
@@ -223,7 +286,6 @@ export function validateStageReceipt(sourceIds: ReadonlyArray<string>, parsed: P
   const result: ReceiptResult = unresolved > 0 ? "NEEDS_CORRECTION" : failed > 0 ? "PARTIAL_ACCOUNTED" : "COMPLETE";
   return { kind: "VALIDATED", mapping, matchedRows: matched, failedRows: failed, unresolvedRows: unresolved, result };
 }
-
 /**
  * KAURO_STAGE_IDENTITY_MAPPING_V1: the stage, its destination instance, its exact package and the complete source-to-target disposition
  * of every member bind together; a continuation names this digest, so it can only continue the identities that were validated.
@@ -249,4 +311,36 @@ export function stageIdentityMappingDigest(input: {
  */
 export function applyReceiptOutcome(result: ReceiptResult): ImportStageState {
   return result === "COMPLETE" ? "VERIFIED_SUCCESS" : result === "PARTIAL_ACCOUNTED" ? "RECEIPT_VALIDATING" : "NEEDS_CORRECTION";
+}
+
+/**
+ * A receipt reconciliation (R2-025, 05:115 "A different receipt for a finalized stage becomes a reconciliation request, not an overwrite"):
+ * one per (stage, content hash), born OPEN, append-only; the stage's identity and receipts stay as they were (migration 0083).
+ */
+export interface StageReceiptReconciliationRecord {
+  readonly reconciliationId: string;
+  readonly agencyId: AgencyId;
+  readonly projectId: ProjectId;
+  readonly stageId: string;
+  readonly contentHash: Sha256Hex;
+  readonly receiptUploadRef: ArtifactRef;
+  readonly state: "OPEN";
+  readonly openedByMembershipId: string;
+  readonly openedAt: UtcInstant;
+}
+
+export interface NewStageReceiptReconciliation {
+  readonly reconciliationId: string;
+  readonly agencyId: AgencyId;
+  readonly projectId: ProjectId;
+  readonly stageId: string;
+  readonly contentHash: Sha256Hex;
+  readonly receiptUploadRef: ArtifactRef;
+  readonly openedByMembershipId: string;
+}
+
+/** What the stage already holds for one content hash: the receipt revision with those bytes, or the reconciliation opened for them. */
+export interface StageReceiptStatus {
+  readonly receipt: StageReceiptRecord | null;
+  readonly reconciliation: StageReceiptReconciliationRecord | null;
 }

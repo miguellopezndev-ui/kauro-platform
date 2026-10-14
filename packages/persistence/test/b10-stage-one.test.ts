@@ -44,6 +44,8 @@ const STORED: Readonly<Record<string, { readonly vocabulary: string; readonly to
   "service_agreement_versions.agreement_kind": { vocabulary: "serviceAgreementKinds" },
   "service_agreement_versions.state": { vocabulary: "serviceAgreementStates" },
   "agency_agreement_acceptances.terms_kind": { vocabulary: "serviceAgreementKinds", token: "TERMS" },
+  // package B12 (0088): a suppression is recorded by a person or by the outreach service (the public opt-out)
+  "prospect_suppressions.recorded_by_service": { vocabulary: "suppressionServiceRecorders", token: "outreach-service" },
   "agency_agreement_acceptances.privacy_kind": { vocabulary: "serviceAgreementKinds", token: "PRIVACY" },
   "agency_closures.from_state": { vocabulary: "closureFromStates" },
   "agency_relationship_decisions.treatment": { vocabulary: "relationshipTreatments" },

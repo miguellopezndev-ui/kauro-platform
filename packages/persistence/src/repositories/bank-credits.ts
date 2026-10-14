@@ -208,6 +208,23 @@ export class PgBankCredits {
     return r.rows[0] ? creditOf(r.rows[0]) : null;
   }
 
+  /**
+   * The owner's credit queue (B12 D-B12S-3, GAP-API-9): the credits in one state, oldest first, keyset on (created_at, bank_credit_id) after
+   * `after` (exclusive), at most `limit` rows. Each row carries its keyset position at microsecond precision (the cursor's). No lock: a read.
+   */
+  async listCredits(state: string, after: { readonly createdAt: string; readonly id: string } | null, limit: number): Promise<ReadonlyArray<{ readonly credit: BankCreditRecord; readonly position: { readonly createdAt: string; readonly id: string } }>> {
+    const r = await execute<CreditRow & { position_at: string }>(
+      this.db,
+      `SELECT ${CREDIT_COLUMNS}, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS position_at
+       FROM kauro.bank_credits
+       WHERE state = $1 AND ($2::timestamptz IS NULL OR (created_at, bank_credit_id) > ($2::timestamptz, $3::uuid))
+       ORDER BY created_at, bank_credit_id
+       LIMIT $4`,
+      [state, after?.createdAt ?? null, after?.id ?? null, limit],
+    );
+    return r.rows.map((row) => ({ credit: creditOf(row), position: { createdAt: row.position_at, id: row.bank_credit_id } }));
+  }
+
   /** The credit identity lock Lc: the credit's row, FOR UPDATE, held to COMMIT. */
   async lockCredit(creditId: string): Promise<BankCreditRecord | null> {
     const r = await execute<CreditRow>(this.db, `SELECT ${CREDIT_COLUMNS} FROM kauro.bank_credits WHERE bank_credit_id = $1 FOR UPDATE`, [creditId]);
@@ -514,6 +531,34 @@ export class PgBankCredits {
   async attemptDeclaredWith(reference: string): Promise<boolean> {
     const r = await execute(this.db, "SELECT 1 FROM kauro.outbound_execution_attempts WHERE reference = $1", [reference]);
     return r.rows.length > 0;
+  }
+
+  /**
+   * Late evidence on a terminal attempt (DV1-08/DV1-10): a debit that carries the reference of an attempt the owner resolved NOT_EXECUTED
+   * contradicts that terminal fact. The source's refunds are frozen (X1/X4 refuse EXECUTION_FROZEN) and one REFUND_TERMINAL_CONTRADICTED case
+   * is opened for the attempt and line; the committed facts do not change. Answers whether such an attempt exists.
+   */
+  async contradictTerminalAttempt(caseId: string, freezeId: string, line: { readonly environment: string; readonly accountRef: string; readonly lineId: string; readonly reference: string; readonly evidenceHash: string }): Promise<boolean> {
+    const found = await execute<{ attempt_id: string; source_kind: string; source_id: string }>(
+      this.db,
+      "SELECT attempt_id, source_kind, source_id FROM kauro.outbound_execution_attempts WHERE reference = $1 AND state = 'NOT_EXECUTED' AND environment = $2 AND account_ref = $3",
+      [line.reference, line.environment, line.accountRef],
+    );
+    const a = found.rows[0];
+    if (a === undefined) return false;
+    await execute(
+      this.db,
+      `INSERT INTO kauro.bank_review_cases (case_id, kind, environment, account_ref, attempt_id, line_id, source_kind, source_id, detail_code, evidence_hash)
+       VALUES ($1, 'REFUND_TERMINAL_CONTRADICTED', $2, $3, $4, $5, $6, $7, 'DEBIT_AFTER_NOT_EXECUTED', $8) ON CONFLICT DO NOTHING`,
+      [caseId, line.environment, line.accountRef, a.attempt_id, line.lineId, a.source_kind, a.source_id, line.evidenceHash],
+    );
+    await execute(
+      this.db,
+      `INSERT INTO kauro.bank_source_freezes (freeze_id, environment, account_ref, source_kind, source_id, reason)
+       VALUES ($1, $2, $3, $4, $5, 'REFUND_TERMINAL_CONTRADICTED') ON CONFLICT DO NOTHING`,
+      [freezeId, line.environment, line.accountRef, a.source_kind, a.source_id],
+    );
+    return true;
   }
 
   /** Links a debit line to the RECORDED attempt that explains it (set once). */

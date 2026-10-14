@@ -6,7 +6,7 @@
  * seller's own, and the owner's answers are counts and identities, never a list of sellers.
  */
 import type { MoneyMinorUnits, Sha256Hex, UtcInstant } from "@kauro/contracts";
-import type { ServiceMode } from "@kauro/domain";
+import type { DraftState, IntentState, OutreachPurpose, SenderRoute, SenderState, ServiceMode } from "@kauro/domain";
 import type { AgencyView } from "../api/views.js";
 import type { QuoteView } from "../commerce/views.js";
 import type {
@@ -270,6 +270,47 @@ export interface StatementCorrectionView {
   readonly statement: CommissionStatementView;
 }
 
+// --- CMD054 OpenBreakglass, CMD055 RevokeBreakglass, the breakglass preview (package B16 lane L4) -------------------------------------
+
+/** CMD054: the grant as opened. It covers one project, gives a bounded preview only and expires 1800 s after the database's instant. */
+export interface BreakglassGrantView {
+  readonly grantId: string;
+  readonly scopeRef: string;
+  readonly agencyId: string;
+  readonly purpose: string;
+  readonly authorizationRef: string;
+  readonly authorizationKind: "SUPPORT_CASE" | "INCIDENT";
+  readonly state: "ACTIVE";
+  readonly openedAt: UtcInstant;
+  readonly expiresAt: UtcInstant;
+  readonly access: "PREVIEW_ONLY";
+  readonly version: number;
+}
+
+/**
+ * CMD055: the grant after its revocation. Every new read under it is refused at once (refreshRevoked); a bearer capability the providers
+ * already issued may live up to residualBearerLifetimeSeconds after revokedAt, never claimed zero (registry CMD055 failure clause).
+ */
+export interface BreakglassRevocationView {
+  readonly grantId: string;
+  readonly state: "REVOKED";
+  readonly revokedAt: UtcInstant;
+  readonly refreshRevoked: true;
+  readonly residualBearerLifetimeSeconds: number;
+  readonly residualBearerUntil: UtcInstant;
+  readonly version: number;
+}
+
+/** The breakglass preview: the bounded sample of an admitted table of the grant's project (at most 20 rows of 50 cells of 200 characters). */
+export interface BreakglassPreviewView {
+  readonly grantId: string;
+  readonly tableId: string;
+  readonly fileId: string;
+  readonly rows: ReadonlyArray<ReadonlyArray<string | null>>;
+  readonly truncated: boolean;
+  readonly expiresAt: UtcInstant;
+}
+
 // --- CMD056 RecordIncident, CMD057 AuthorizeRecovery (package B16) ---------------------------------------------------------------
 
 /** CMD056: the incident as recorded. A false positive is CLOSED with no responsibility and its severity says so; an actual one is DETECTED. */
@@ -321,4 +362,139 @@ export interface CapabilityRestrictionView {
   readonly incidentRef: string;
   readonly restrictedAt: UtcInstant;
   readonly newAdmissionBlocked: true;
+}
+
+// --- package B12 (outreach; K2): the TypeScript shapes of B12_VIEW_DEFINITIONS in commercial/response-schemas --------------------------
+// No view carries a recipient address, a subject, a body, a preview or a token (plan A17).
+
+export type SalesActivityKind = "REPLIED" | "BOUNCED" | "SUPPRESSED" | "HUMAN_SEND_OBSERVED" | "PROVIDER_ACCEPTED" | "SEND_UNCERTAIN";
+
+export interface OutreachDraftView {
+  readonly draftId: string;
+  readonly prospectId: string;
+  readonly senderIdentityRef: string;
+  readonly purpose: OutreachPurpose;
+  readonly contentHash: Sha256Hex;
+  readonly contentRef: Sha256Hex;
+  readonly provenanceEvidenceHash: Sha256Hex;
+  readonly version: number;
+  readonly state: DraftState;
+  readonly createdAt: UtcInstant;
+}
+
+export interface OutreachAuthorizationView {
+  readonly authorizationId: string;
+  readonly grantingActorId: string;
+  readonly senderIdentityRef: string;
+  readonly allowedContentHashes: ReadonlyArray<Sha256Hex>;
+  readonly validFrom: UtcInstant;
+  readonly expiresAt: UtcInstant;
+  readonly maximumSends: number;
+  readonly permissionEvidenceHash: Sha256Hex;
+  readonly policyVersion: string;
+  readonly revoked: boolean;
+}
+
+export interface OutreachSendView {
+  readonly draftId: string;
+  readonly draftState: DraftState;
+  readonly intentId: string;
+  readonly intentState: IntentState;
+  readonly authorizationId: string;
+  readonly payloadHash: Sha256Hex;
+  readonly queuedAt: UtcInstant;
+}
+
+export interface SalesActivityView {
+  readonly activityId: string;
+  readonly prospectId: string;
+  readonly draftId?: string;
+  readonly authorizationId?: string;
+  readonly kind: SalesActivityKind;
+  readonly occurredAt: UtcInstant;
+  readonly evidenceHash: Sha256Hex;
+  readonly providerMessageRef: string;
+  readonly recordedAt: UtcInstant;
+}
+
+export interface SalesActivityListView {
+  readonly items: ReadonlyArray<SalesActivityView>;
+}
+
+export interface OutreachContentView {
+  readonly contentRef: Sha256Hex;
+  readonly createdAt: UtcInstant;
+}
+
+export interface SalesResourceView {
+  readonly resourceId: string;
+  readonly familyId: string;
+  readonly version: number;
+  readonly state: "CURRENT" | "SUPERSEDED";
+  readonly contentRef: Sha256Hex;
+  readonly capabilityIds: ReadonlyArray<string>;
+  readonly createdAt: UtcInstant;
+}
+
+export interface SenderIdentityView {
+  readonly senderId: string;
+  readonly userId: string;
+  readonly route: SenderRoute;
+  readonly state: SenderState;
+  readonly createdAt: UtcInstant;
+  readonly updatedAt: UtcInstant;
+}
+
+export interface OutreachReviewItemView {
+  readonly draftId: string;
+  readonly draftVersion: number;
+  readonly contentHash: Sha256Hex;
+  readonly contactLabel: string;
+}
+
+export interface OutreachReviewView {
+  readonly reviewId: string;
+  readonly senderIdentityRef: string;
+  readonly digest: Sha256Hex;
+  readonly issuedAt: UtcInstant;
+  readonly expiresAt: UtcInstant;
+  readonly items: ReadonlyArray<OutreachReviewItemView>;
+}
+
+export interface OutreachChannelPolicyView {
+  readonly jurisdiction: string;
+  readonly purpose: OutreachPurpose;
+  readonly version: number;
+  readonly state: "IN_FORCE" | "WITHDRAWN";
+}
+
+export interface OutreachDiagnosisView {
+  readonly diagnosisId: string;
+  readonly personUserId: string;
+  readonly recordedAt: UtcInstant;
+}
+
+export interface OutreachMetricsView {
+  readonly accepted: number;
+  readonly uncertain: number;
+  readonly observedSent: number;
+  readonly bounced: number;
+  readonly replied: number;
+  readonly acceptedLessKnownBounces: number;
+  readonly pauseNumerator: number;
+  readonly pauseDenominator: number;
+}
+
+export interface ProspectSourceView {
+  readonly evidenceId: string;
+  readonly evidenceHash: Sha256Hex;
+  readonly observedOn: CalendarDate;
+  readonly segment: "AGENCY" | "COMPANY";
+  readonly createdAt: UtcInstant;
+}
+
+export interface ProspectContactView {
+  readonly contactId: string;
+  readonly channel: string;
+  readonly createdAt: UtcInstant;
 }

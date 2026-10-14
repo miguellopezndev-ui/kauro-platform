@@ -8,6 +8,15 @@
  *   POST /api/v1/operations/bank-routes/{routeId}/disable       disableBankRoute         (KAURO_OWNER)  200
  *   POST /api/v1/operations/bank-routes/{routeId}/details       replaceBankRouteDetails  (KAURO_OWNER)  200
  *   GET  /api/v1/operations/bank-routes/{routeId}               getBankRoute             (KAURO_OWNER)  200
+ *   POST /api/v1/operations/bank-accounts/{accountRef}/evidence-artifacts uploadBankEvidenceArtifact (KAURO_OWNER) 201, no key (B12)
+ *   GET  /api/v1/operations/bank-credits?state=&limit=&cursor=  listBankCredits          (KAURO_OWNER)  200 (B12 GAP-API-9)
+ *   POST /api/v1/operations/treasury-refunds/{treasuryRefundId}/approve  approveTreasuryRefund  (KAURO_OWNER)  200 (lane L-REFUND)
+ *   POST /api/v1/operations/refunds/{refundId}/execution-declarations   declareRefundExecution (KAURO_OWNER)  201 (lane L-REFUND, X1)
+ *   POST /api/v1/operations/execution-attempts/{attemptId}/records      recordRefundExecution  (KAURO_OWNER)  200 (lane L-REFUND, G2/G4)
+ *   POST /api/v1/operations/execution-attempts/{attemptId}/resolutions  resolveUncertainExecution (KAURO_OWNER) 200 (lane L-REFUND, X3)
+ *   POST /api/v1/operations/execution-attempts/{attemptId}/bounces      recordReturnBounce (KAURO_OWNER)  200 (lane L-REFUND, G3)
+ *   POST /api/v1/operations/execution-attempts/{attemptId}/resend-declarations  declareResendExecution (KAURO_OWNER) 201 (lane L-REFUND, X4)
+ *   GET  /api/v1/operations/execution-attempts                           listExecutionAttempts  (KAURO_OWNER)  200 (lane L-REFUND, the queue)
  *   GET  /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions  (agency member, X-Kauro-Agency) 200
  *   POST /api/v1/payment-orders/{orderId}/retirements          retireBankCheckout       (billing member, X-Kauro-Agency) 201
  *
@@ -16,8 +25,8 @@
  * Sec-Fetch-Site and CSRF rule; typed credential refusals; none: the anonymous denial, AUTHENTICATION_REQUIRED). Every reply carries Cache-Control: no-store (the server's hook);
  * the instructions never carry an ETag.
  */
-import type { BankInboundHandlers, BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest } from "@kauro/application";
-import { HEADERS, OPERATIONAL_ROUTES, admitEmptyRequest, admitHeaders, admitOperationalBody, operationalRouteResponses, problemOf, readTransferInstructions, repeatedHeaderNames, type CommerceRequestRuntime } from "@kauro/application";
+import type { BankEvidenceArtifactView, BankInboundHandlers, BankSettlementHandlers, InboundReadAnswer, UploadBankEvidenceBody, UploadBankEvidenceRequest, BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest, BankRefundHandlers } from "@kauro/application";
+import { CURSOR_PATTERN, HEADERS, OPERATIONAL_ROUTES, admitEmptyRequest, admitReadQuery, admitHeaders, admitOperationalBody, operationalRouteResponses, problemOf, readTransferInstructions, repeatedHeaderNames, type CommerceRequestRuntime } from "@kauro/application";
 import type { AgencyId, Clock, CorrelationId, Environment } from "@kauro/domain";
 import { DomainFailure, IDEMPOTENCY_KEY, isUuid } from "@kauro/domain";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -25,8 +34,14 @@ import type { RouteKit } from "../server.js";
 
 export interface BankRouteRouteDependencies {
   readonly handlers: BankRouteHandlers;
+  /** Lane L-REFUND: the owner refund commands of the route (CMD220 ApproveTreasuryRefund); absent, their routes are not served. */
+  readonly refunds?: BankRefundHandlers;
   /** The owner's inbound credit commands (lane PV1-INBOUND). */
   readonly inbound?: BankInboundHandlers;
+  /** B12 GAP-API-8: the owner's evidence upload (createBankEvidenceUpload of @kauro/application). */
+  readonly upload?: (request: UploadBankEvidenceRequest) => Promise<InboundReadAnswer<BankEvidenceArtifactView>>;
+  /** The owner's settlement observation (lane PV1-SETTLE, CMD215). */
+  readonly settlement?: BankSettlementHandlers;
   readonly runtime: CommerceRequestRuntime;
   readonly bank: BankRouteCollaborators | null;
   readonly validator: SchemaValidator;
@@ -36,6 +51,7 @@ export interface BankRouteRouteDependencies {
 }
 
 const REF_PATH = /^[A-Za-z0-9._:-]{1,128}$/;
+const CURSOR_SHAPE = new RegExp(CURSOR_PATTERN);
 const UUID_PATH = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function routeOf(operationId: string) {
@@ -124,6 +140,15 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
   command("enableBankRoute", "CMD203", (req) => deps.handlers.enable(req as never));
   command("disableBankRoute", "CMD204", (req) => deps.handlers.disable(req as never));
   command("replaceBankRouteDetails", "CMD205", (req) => deps.handlers.replaceDetails(req as never));
+  const refunds = deps.refunds;
+  if (refunds !== undefined) {
+    command("approveTreasuryRefund", "CMD220", (req) => refunds.approveTreasury(req as never));
+    command("declareRefundExecution", "CMD221", (req) => refunds.declareExecution(req as never));
+    command("recordRefundExecution", "CMD222", (req) => refunds.recordExecution(req as never));
+    command("resolveUncertainExecution", "CMD223", (req) => refunds.resolveExecution(req as never));
+    command("recordReturnBounce", "CMD224", (req) => refunds.recordBounce(req as never));
+    command("declareResendExecution", "CMD225", (req) => refunds.declareResend(req as never));
+  }
 
   const inbound = deps.inbound;
   if (inbound !== undefined) {
@@ -133,8 +158,50 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     command("importBankStatement", "CMD213", (req) => inbound.importStatement(req as never));
     command("retireBankCheckout", "CMD214", (req) => inbound.retire(req as never), true);
   }
+  const settlement = deps.settlement;
+  if (settlement !== undefined) command("recordBankSettlement", "CMD215", (req) => settlement.record(req as never));
 
-  function read(operationId: string, run: (request: FastifyRequest<{ Params: Record<string, string> }>, correlationId: CorrelationId, path: Readonly<Record<string, string>>, headers: Readonly<Record<string, string | undefined>>) => Promise<FastifyReplyAnswer>): void {
+  // B12 GAP-API-8: the owner's upload. Not journaled (no Idempotency-Key): the store is content-addressed, a retry answers the same
+  // reference. The same admission as a command otherwise: headers, the closed body schema, the path ref, the shared command boundary.
+  const upload = deps.upload;
+  if (upload !== undefined) {
+    const route = routeOf("uploadBankEvidenceArtifact");
+    app.route<{ Params: Record<string, string>; Body: Buffer | undefined }>({
+      method: route.method,
+      url: fastifyPath(route.path),
+      config: { responses: operationalRouteResponses(route.operationId) },
+      onRequest: async (request, r) => {
+        const early = admitHeaders({ headers: kit.singleValued(request.headers), repeatedHeaders: repeatedHeaderNames(request.raw.rawHeaders), correlationId: request.id as CorrelationId });
+        if (early !== null) return kit.sendProblem(r, early.problem);
+        return undefined;
+      },
+      handler: async (request, r) => {
+        const correlationId = request.id as CorrelationId;
+        const headers = kit.singleValued(request.headers);
+        const admitted = admitOperationalBody<UploadBankEvidenceBody>(route, { headers, repeatedHeaders: repeatedHeaderNames(request.raw.rawHeaders), correlationId, body: Buffer.isBuffer(request.body) ? request.body : null }, deps.validator);
+        if (admitted.kind === "PROBLEM") return kit.sendProblem(r, admitted.problem);
+        const path = pathIds(route.path, request.params, correlationId);
+        if (isProblem(path)) return kit.sendProblem(r, path);
+        const authenticated = await kit.subjectOrRefusal(request, headers, "UPLOAD_BANK_EVIDENCE", { correlationId, agencyId: null });
+        if (authenticated.kind === "PROBLEM") return kit.sendProblem(r, authenticated.problem);
+        const authority = kit.requestAuthority(request, headers, authenticated.subject.identity.userId);
+        return guarded(r, correlationId, async () => {
+          const answer = await upload({ correlationId, subject: authenticated.subject, authority, accountRef: path["accountRef"]!, body: admitted.body });
+          if (answer.kind === "PROBLEM") return kit.sendProblem(r, answer.problem);
+          return r.code(201).type(HEADERS.contentType).send(answer.view);
+        });
+      },
+    });
+  }
+
+  // a read takes its query one of two ways: a route that declares a query (listBankCredits) admits exactly its closed query (limit,
+  // cursor, the filter) through admitReadQuery; a read given an admitQuery (the settlement in-transit page) admits its own members
+  // through it; every other read takes none
+  function read(
+    operationId: string,
+    run: (request: FastifyRequest<{ Params: Record<string, string> }>, correlationId: CorrelationId, path: Readonly<Record<string, string>>, headers: Readonly<Record<string, string | undefined>>, query: { readonly limit: number; readonly cursor: string | null; readonly filter?: string | null }) => Promise<FastifyReplyAnswer>,
+    admitQuery?: (query: Readonly<Record<string, unknown>>, correlationId: CorrelationId) => Problem | null,
+  ): void {
     const route = routeOf(operationId);
     app.route<{ Params: Record<string, string> }>({
       method: route.method,
@@ -143,12 +210,26 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
       handler: async (request, r) => {
         const correlationId = request.id as CorrelationId;
         const headers = kit.singleValued(request.headers);
-        const refusal = admitEmptyRequest({ headers, repeatedHeaders: repeatedHeaderNames(request.raw.rawHeaders), correlationId, body: Buffer.isBuffer(request.body) ? request.body : null, query: request.query as Readonly<Record<string, unknown>> });
+        const raw = (request.query ?? {}) as Readonly<Record<string, unknown>>;
+        const takesQuery = route.query !== undefined || admitQuery !== undefined;
+        const refusal = admitEmptyRequest({ headers, repeatedHeaders: repeatedHeaderNames(request.raw.rawHeaders), correlationId, body: Buffer.isBuffer(request.body) ? request.body : null, query: takesQuery ? {} : raw });
         if (refusal !== null) return kit.sendProblem(r, refusal.problem);
+        let query: { readonly limit: number; readonly cursor: string | null; readonly filter?: string | null } = { limit: 0, cursor: null };
+        if (route.query !== undefined) {
+          try {
+            query = admitReadQuery({ paginated: true, filter: route.query.filter }, raw);
+          } catch (e) {
+            if (e instanceof DomainFailure) return kit.sendProblem(r, problemOf(e, correlationId));
+            throw e;
+          }
+        } else if (admitQuery !== undefined) {
+          const queryRefusal = admitQuery(raw, correlationId);
+          if (queryRefusal !== null) return kit.sendProblem(r, queryRefusal);
+        }
         const path = pathIds(route.path, request.params, correlationId);
         if (isProblem(path)) return kit.sendProblem(r, path);
         return guarded(r, correlationId, async () => {
-          const answer = await run(request, correlationId, path, headers);
+          const answer = await run(request, correlationId, path, headers, query);
           if (answer.kind === "PROBLEM") return kit.sendProblem(r, answer.problem);
           return r.code(200).type(HEADERS.contentType).send(answer.view);
         });
@@ -164,6 +245,14 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     return await deps.handlers.get({ correlationId, subject: authenticated.subject, routeId: path["routeId"]!, authority });
   });
 
+  if (refunds !== undefined) {
+    read("listExecutionAttempts", async (request, correlationId, _path, headers) => {
+      const authenticated = await kit.subjectOrRefusal(request, headers, "READ_EXECUTION_ATTEMPTS", { correlationId, agencyId: null });
+      if (authenticated.kind === "PROBLEM") return authenticated;
+      const authority = kit.requestAuthority(request, headers, authenticated.subject.identity.userId);
+      return await refunds.executionQueue({ correlationId, subject: authenticated.subject, authority });
+    });
+  }
   if (inbound !== undefined) {
     const ownerRead = async <View>(headers: Readonly<Record<string, string | undefined>>, request: FastifyRequest<{ Params: Record<string, string> }>, action: string, correlationId: CorrelationId, run: (r: { correlationId: CorrelationId; subject: never; authority: never }) => Promise<FastifyReplyAnswer>): Promise<FastifyReplyAnswer> => {
       const authenticated = await kit.subjectOrRefusal(request, headers, action, { correlationId, agencyId: null });
@@ -173,7 +262,30 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
       return answer.kind === "READ" ? { kind: "READ", view: { data: answer.view } } : answer;
     };
     read("getBankCredit", (request, correlationId, path, headers) => ownerRead(headers, request, "READ_BANK_CREDIT", correlationId, (r) => inbound.getCredit({ ...r, creditId: path["creditId"]! })));
+    read("listBankCredits", (request, correlationId, _path, headers, query) => ownerRead(headers, request, "LIST_BANK_CREDITS", correlationId, (r) => inbound.listCredits({ ...r, state: query.filter as never, limit: query.limit, cursor: query.cursor })));
     read("getBankOrderMatchKeys", (request, correlationId, path, headers) => ownerRead(headers, request, "READ_BANK_ORDER_MATCH_KEYS", correlationId, (r) => inbound.getMatchKeys({ ...r, orderId: path["orderId"]! })));
+    // lane PV1-SETTLE two-step (§3.4, §3.5): the owner's reads of its settlement intents; the in-transit page takes one query member, the
+    // sealed cursor of a previous page (any other member, a repeated one or a cursor of another shape is refused before the read)
+    if (settlement !== undefined) {
+      read("getBankSettlementRequest", (request, correlationId, path, headers) =>
+        ownerRead(headers, request, "READ_BANK_SETTLEMENT", correlationId, (r) => settlement.get({ ...r, environment: deps.environment, accountRef: path["accountRef"]!, requestId: path["requestId"]! })),
+      );
+      read(
+        "listBankSettlementsInTransit",
+        (request, correlationId, path, headers) => {
+          const cursor = (request.query as Readonly<Record<string, unknown>>)["cursor"];
+          return ownerRead(headers, request, "READ_BANK_SETTLEMENT", correlationId, (r) => settlement.list({ ...r, environment: deps.environment, accountRef: path["accountRef"]!, cursor: typeof cursor === "string" ? cursor : null }));
+        },
+        (query, correlationId) => {
+          for (const [name, value] of Object.entries(query)) {
+            if (name !== "cursor") return problemOf(new DomainFailure("INVALID_REQUEST", "read query refused", { reason: "SCHEMA_VIOLATION", fields: [{ field: "query", code: "UNKNOWN_FIELD" }] }), correlationId);
+            if (typeof value !== "string") return problemOf(new DomainFailure("INVALID_REQUEST", "read query refused", { reason: "SCHEMA_VIOLATION", fields: [{ field: "query.cursor", code: "TYPE" }] }), correlationId);
+            if (!CURSOR_SHAPE.test(value)) return problemOf(new DomainFailure("INVALID_REQUEST", "cursor is not of the cursor's shape", { reason: "CURSOR_INVALID" }), correlationId);
+          }
+          return null;
+        },
+      );
+    }
   }
 
   read("getTransferInstructions", async (request, correlationId, path, headers) => {

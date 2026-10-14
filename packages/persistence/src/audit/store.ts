@@ -434,6 +434,11 @@ export class PgAuditStore implements AuditStore {
   async recordSystemDraft(auditId: AuditId, draft: SystemDraft): Promise<SystemDraftRecord> {
     const audit = await this.getAudit(auditId);
     if (audit === null) throw new NotFoundFailure("audit");
+    // the audit's target after its shared transition lock, before the plan is born (B17 M13): a supersession in flight is ordered before
+    // the draft (and then refuses it) or after it (and then the plan stays, fenced by ApprovePlan); the birth trigger checks the same again
+    await execute(this.db, "SELECT kauro.await_transition('kauro.target_contracts', $1)", [audit.targetContractId]);
+    const target = await execute<{ superseded_at: unknown }>(this.db, "SELECT superseded_at FROM kauro.target_contracts WHERE agency_id = $1 AND contract_id = $2", [audit.agencyId, audit.targetContractId]);
+    if (target.rows[0]?.superseded_at !== null) throw new DomainFailure("TARGET_STALE", "the audit's target contract is no longer current; no system draft is born on it");
     // the draft DRAFT (v1) of exactly the audit's subject, created by the audit's requester (the database checks both, D8-AUD-4)
     await execute(
       this.db,
@@ -452,8 +457,8 @@ export class PgAuditStore implements AuditStore {
   async settleValidation(validationId: PlanValidationId, settlement: ValidationSettlement): Promise<ValidationSettled> {
     const settled = await execute<Row>(
       this.db,
-      `UPDATE kauro.plan_validations SET result = $2, receipt_hash = $3 WHERE validation_id = $1 AND result IS NULL RETURNING ${VALIDATION_COLUMNS}`,
-      [validationId, settlement.result, settlement.receiptHash],
+      `UPDATE kauro.plan_validations SET result = $2, receipt_hash = $3, refusal_reason = $4 WHERE validation_id = $1 AND result IS NULL RETURNING ${VALIDATION_COLUMNS}`,
+      [validationId, settlement.result, settlement.receiptHash, settlement.refusalReason ?? null],
     );
     const row = settled.rows[0];
     if (!row) throw new NotFoundFailure("unsettled validation intent");

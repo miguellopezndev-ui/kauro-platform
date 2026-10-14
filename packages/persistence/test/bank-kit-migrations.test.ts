@@ -7,6 +7,7 @@ import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import {
   BANK_CASE_KINDS,
+  BANK_CASE_SOURCE_KINDS,
   BANK_CREDIT_SOURCES,
   BANK_CREDIT_STATES,
   BANK_CREDIT_STATUSES,
@@ -107,6 +108,7 @@ test("the vocabulary table mirrors every closed domain list exactly (BANK_RAILS 
     EXECUTION_GATE_OUTCOME: EXECUTION_GATE_OUTCOMES,
     DEBIT_CORRELATION: DEBIT_CORRELATIONS,
     BANK_CASE_KIND: BANK_CASE_KINDS,
+    BANK_CASE_SOURCE_KIND: BANK_CASE_SOURCE_KINDS,
     STATEMENT_LINE_KIND: STATEMENT_LINE_KINDS,
     COVERAGE_STREAM: COVERAGE_STREAMS,
   };
@@ -124,6 +126,8 @@ test("the vocabulary table mirrors every closed domain list exactly (BANK_RAILS 
 const ENVIRONMENTS = ["SANDBOX", "LIVE"] as const;
 /** The source-freeze reasons: the two BANK_CASE_KINDS a freeze is opened for (a limited subset, not the whole list). */
 const FREEZE_REASONS = ["UNDECLARED_OUTBOUND", "REFUND_TERMINAL_CONTRADICTED"] as const;
+/** An execution offer opens a route-money case, never a settlement refusal (SETTLEMENT_REFUSED is the settlement intent's, 0079). */
+const OFFER_REVIEW_CASE_KINDS = BANK_CASE_KINDS.filter((k) => k !== "SETTLEMENT_REFUSED");
 const ENUM_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>> = {
   "outbound_execution_attempts.environment": ENVIRONMENTS,
   "outbound_execution_attempts.kind": EXECUTION_ATTEMPT_KINDS,
@@ -136,7 +140,7 @@ const ENUM_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>> = {
   "execution_offers.command": EXECUTION_OFFER_COMMANDS,
   "execution_offer_outcomes.gate_outcome": EXECUTION_GATE_OUTCOMES,
   "execution_offer_outcomes.footprint": ["RECORDED", "REVIEW"],
-  "execution_offer_outcomes.review_case_kind": BANK_CASE_KINDS,
+  "execution_offer_outcomes.review_case_kind": OFFER_REVIEW_CASE_KINDS,
   "statement_imports.environment": ENVIRONMENTS,
   "statement_coverage.stream": COVERAGE_STREAMS,
   "statement_lines.environment": ENVIRONMENTS,
@@ -148,7 +152,7 @@ const ENUM_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>> = {
   "bank_review_cases.kind": BANK_CASE_KINDS,
   "bank_review_cases.state": ["OPEN", "RESOLVED"],
   "bank_review_cases.environment": ENVIRONMENTS,
-  "bank_review_cases.source_kind": EXECUTION_SOURCE_KINDS,
+  "bank_review_cases.source_kind": BANK_CASE_SOURCE_KINDS,
 };
 
 interface EnumCheck {
@@ -307,7 +311,15 @@ test("the source union is closed: a CAPTURE source names agency, capture and ref
   await assert.rejects(attempt(oracle, { source_kind: "CAPTURE", bank_credit_id: null, treasury_refund_id: null }), (e: unknown) => sqlState(e) === "23502" || constraintOf(e) === "outbound_attempts_source_union");
   await assert.rejects(attempt(oracle, { kind: "RESEND" }), (e: unknown) => constraintOf(e) === "outbound_attempts_kind_parent");
   await assert.rejects(attempt(oracle, { parent_bounce_id: id() }), (e: unknown) => constraintOf(e) === "outbound_attempts_kind_parent");
-  await attempt(oracle, { kind: "RESEND", parent_bounce_id: id() });
+  // a RESEND names a bounce that exists and never exceeds it (0080): a stranger id is refused, a real bounce admits up to its cents
+  await assert.rejects(attempt(oracle, { kind: "RESEND", parent_bounce_id: id() }), (e: unknown) => sqlState(e) === "23514");
+  const creditId = id();
+  const treasuryId = id();
+  const sent = await attempt(oracle, { bank_credit_id: creditId, treasury_refund_id: treasuryId, state: "RECORDED", bank_execution_id: "exec-bounce-1", destination_proof: "DP_FULL", evidence_hash: SHA, recorded_at: new Date().toISOString() });
+  const bounceId = id();
+  await oracle.query("INSERT INTO kauro.outbound_return_bounces (bounce_id, attempt_id, environment, account_ref, source_kind, source_id, bounced_cents, evidence_hash, recorded_by) SELECT $1, attempt_id, environment, account_ref, source_kind, source_id, 10000, $3, $4 FROM kauro.outbound_execution_attempts WHERE attempt_id = $2", [bounceId, sent, SHA, id()]);
+  await assert.rejects(attempt(oracle, { kind: "RESEND", parent_bounce_id: bounceId, attempt_number: 2, bank_credit_id: creditId, treasury_refund_id: treasuryId, amount_cents: 10001 }), (e: unknown) => sqlState(e) === "23514");
+  await attempt(oracle, { kind: "RESEND", parent_bounce_id: bounceId, attempt_number: 2, bank_credit_id: creditId, treasury_refund_id: treasuryId });
   // a recipient version without its recipient is nothing (DP-RECIPIENT needs both)
   await assert.rejects(attempt(oracle, { recipient_version: "v1" }), (e: unknown) => constraintOf(e) === "outbound_attempts_recipient_version");
   // the reference is the platform's own format and unique

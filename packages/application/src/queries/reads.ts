@@ -211,16 +211,17 @@ function schemaViolation(field: string, code: "UNKNOWN_FIELD" | "TYPE" | "FORMAT
  * page); any other read takes nothing. A repeated member is refused. A cursor that is not of the cursor's shape cannot have been
  * issued here and is CURSOR_INVALID, as is one that does not verify (checked by the read, after access).
  */
-export function admitReadQuery(spec: ReadSpec<string>, query: Readonly<Record<string, unknown>>): ReadQuery {
+export function admitReadQuery(spec: Pick<ReadSpec<string>, "paginated"> & { readonly filter?: { readonly values: ReadonlyArray<string>; readonly default: string; readonly name?: string } }, query: Readonly<Record<string, unknown>>): ReadQuery {
+  const filterName = spec.filter?.name ?? "filter";
   let limit: number = REQUEST_LIMITS.pageDefault;
   let cursor: string | null = null;
   let filter: string | null = spec.filter?.default ?? null;
   for (const [name, value] of Object.entries(query)) {
     const field = QUERY_NAME.test(name) ? `query.${name}` : "query";
-    const known = name === "limit" || name === "cursor" || (name === "filter" && spec.filter !== undefined);
+    const known = name === "limit" || name === "cursor" || (name === filterName && spec.filter !== undefined);
     if (!spec.paginated || !known) throw schemaViolation(field, "UNKNOWN_FIELD");
     if (typeof value !== "string") throw schemaViolation(field, "TYPE");
-    if (name === "filter") {
+    if (name === filterName && spec.filter !== undefined) {
       // closed and case-sensitive: the five filter tokens, nothing coerced
       if (!(spec.filter?.values ?? []).includes(value)) throw schemaViolation(field, "ENUM");
       filter = value;

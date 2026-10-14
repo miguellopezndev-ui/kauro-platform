@@ -119,7 +119,15 @@ export type {
   AuthorityTombstoneState,
   AuthorityTombstone,
   AuthorityJournalPort,
+  RecoveryJournalKind,
+  RecoveryJournalEntry,
+  RecoveryJournalPort,
+  NotificationSenderPort,
+  PaymentObservationPort,
   CommercialScopeInspector,
 } from "./source-providers.js";
 export { AUTHORITY_TOMBSTONES } from "./source-providers.js";
+// B16 L5: ObjectStoragePort.signRead, the read-signing half of the object storage port (CMD038)
+export type { ObjectReadSigningPort, SignReadRequest, SignedRead } from "./object-read-signing.js";
+export { DOWNLOAD_URL_MAX_LIFETIME_SECONDS, READ_SIGNING_TIMEOUT_MS, ReadSigningTimeout } from "./object-read-signing.js";
 export type { IdentityTokenVerifier, IdentityTokenVerification, IdentityTokenDefect, VerifiedIdentityToken, WebSessionStore, WebSessionRecord, NewWebSession, FencedWebSession, SessionFence } from "./sessions.js";

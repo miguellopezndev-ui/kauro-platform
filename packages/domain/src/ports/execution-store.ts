@@ -43,6 +43,7 @@ import type {
 import type { AdmissionCandidate } from "../model/execution/scheduler.js";
 import type { DeliveryCountFacts } from "../model/execution/counts.js";
 import type { CommerceUnitOfWork, CommerceUnitOfWorkFactory } from "./commerce.js";
+import type { DownloadAuthorizationStore } from "./download-store.js";
 import type { ExecutionDiscovery } from "./execution-discovery.js";
 import type { LeaseRecord } from "./lease-store.js";
 import type { VersionedWrite } from "./repositories.js";
@@ -309,6 +310,8 @@ export interface ExecutionStore {
 export interface ExecutionUnitOfWork extends CommerceUnitOfWork {
   readonly execution: ExecutionStore;
   readonly executionDiscovery: ExecutionDiscovery;
+  /** The download authorizations of delivered packages (package B16 lane L5, CMD038; ports/download-store.ts). */
+  readonly downloads: DownloadAuthorizationStore;
   /**
    * The database's transaction time, kauro.server_now(), as an exact ISO-8601 instant with microseconds (D8-CLOCK-1): the clock a
    * request handler compares a deadline against (CMD036's source deadline), never the process clock. The same reading as

@@ -28,6 +28,8 @@ export type {
   FakeOutboundFields,
   FakeDebitFields,
   FakeStatementFields,
+  FakeSettlementFields,
+  FakeBankReceiptFields,
 } from "./bank-evidence-fake.js";
 export {
   BANK_FAKE_PROVIDER,
@@ -37,9 +39,15 @@ export {
   fakeCreditBytes,
   fakeOutboundBytes,
   fakeStatementBytes,
+  fakeSettlementBytes,
+  fakeBankReceiptBytes,
+  fakeRecipientBytes,
   classifyFakeCredit,
   classifyFakeOutbound,
   classifyFakeStatement,
+  classifyFakeSettlement,
+  classifyFakeBankReceipt,
+  classifyFakeRecipient,
 } from "./bank-evidence-fake.js";
 // the CONTRACT_FAKE account-details classifier of the bank-transfer route (lane L-ROUTE, R1)
 export { classifyFakeAccountDetails, contractFakeBankDetailsClassifier } from "./bank-details-fake.js";

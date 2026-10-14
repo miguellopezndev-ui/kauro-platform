@@ -29,6 +29,45 @@ function failure(e: unknown): DomainFailure {
   return e;
 }
 
+// FLAKY-UOW-TXLIMIT: no wait of this file is unbounded. A barrier a unit of work opens is raced against the unit itself, so a unit that fails
+// (or returns) before it opens the barrier fails the test with the unit's own outcome instead of hanging it at 0 % CPU; every other wait on a
+// unit, a holder or a poll ends at WAIT_BOUND_MS with a message naming it.
+const WAIT_BOUND_MS = 60_000;
+
+function outcomeOf(e: unknown): string {
+  if (isDomainFailure(e)) {
+    const cause = e.cause as { code?: unknown; message?: unknown } | undefined;
+    return `${e.code}: ${e.message}${cause === undefined ? "" : ` (cause ${String(cause.code ?? "")} ${String(cause.message ?? cause)})`}`;
+  }
+  return String(e);
+}
+
+async function bounded<T>(promise: Promise<T>, what: string, ms = WAIT_BOUND_MS): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new assert.AssertionError({ message: `${what}: not settled within ${ms} ms` })), ms);
+  });
+  try {
+    return await Promise.race([promise, expired]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Waits for a barrier `unit` opens; the unit settling first fails the wait with the unit's outcome. */
+async function reached(gate: { readonly wait: Promise<void> }, unit: Promise<unknown>, what: string, ms = WAIT_BOUND_MS): Promise<void> {
+  const settledFirst = unit.then(
+    (value) => {
+      throw new assert.AssertionError({ message: `${what}: the unit of work returned (${String(value)}) before it got there` });
+    },
+    (e: unknown) => {
+      throw new assert.AssertionError({ message: `${what}: the unit of work failed before it got there: ${outcomeOf(e)}` });
+    },
+  );
+  settledFirst.catch(() => undefined);
+  await bounded(Promise.race([gate.wait, settledFirst]), what, ms);
+}
+
 test("the harness applied every migration from an empty cluster and the pools run as unprivileged members of one runtime group", async () => {
   assert.equal(h.pg.migrations.applied.length, listMigrations().length);
   assert.equal(h.pg.migrations.skipped.length, 0);
@@ -209,12 +248,13 @@ test("SERIALIZABLE with bounded retries: a serialization failure re-runs the wor
     async (uow) => {
       await uow.endClients.list(A.agencyId, { limit: 100 });
       t1Read.open();
-      await gate.wait;
+      await bounded(gate.wait, "T1 waits for T2's read");
       await insertClient(uow, "serializable-1");
     },
     { isolation: "SERIALIZABLE", maxRetries: 0 },
   );
-  await t1Read.wait;
+  t1.catch(() => undefined);
+  await reached(t1Read, t1, "T1's read");
   const t2 = h.app.run(
     h.tenant(A.agencyId, owner),
     async (uow) => {
@@ -222,14 +262,14 @@ test("SERIALIZABLE with bounded retries: a serialization failure re-runs the wor
       await uow.endClients.list(A.agencyId, { limit: 100 });
       if (attemptsOfT2 === 1) {
         gate.open();
-        await t1;
+        await bounded(t1, "T1 inside T2's first attempt");
       }
       await insertClient(uow, "serializable-2");
     },
     { isolation: "SERIALIZABLE", maxRetries: 2 },
   );
-  await t1;
-  await t2;
+  await bounded(t1, "T1");
+  await bounded(t2, "T2");
   assert.equal(attemptsOfT2, 2, "the second unit of work was retried once after serialization_failure");
   const rows = await h.oracle.query("SELECT display_name FROM kauro.end_clients WHERE display_name LIKE 'serializable-%' ORDER BY 1");
   assert.deepEqual(rows.rows.map((r) => r.display_name), ["serializable-1", "serializable-2"]);
@@ -241,19 +281,20 @@ test("SERIALIZABLE with bounded retries: a serialization failure re-runs the wor
     async (uow) => {
       await uow.endClients.list(A.agencyId, { limit: 100 });
       read2.open();
-      await gate2.wait;
+      await bounded(gate2.wait, "U1 waits for the second read");
       await insertClient(uow, "serializable-3");
     },
     { isolation: "SERIALIZABLE", maxRetries: 0 },
   );
-  await read2.wait;
+  u1.catch(() => undefined);
+  await reached(read2, u1, "U1's read");
   await assert.rejects(
     h.app.run(
       h.tenant(A.agencyId, owner),
       async (uow) => {
         await uow.endClients.list(A.agencyId, { limit: 100 });
         gate2.open();
-        await u1;
+        await bounded(u1, "U1 inside the second unit");
         await insertClient(uow, "serializable-4");
       },
       { isolation: "SERIALIZABLE", maxRetries: 0 },
@@ -268,15 +309,16 @@ test("statement_timeout is transaction-local: a lock wait past the ceiling fails
   const holder = h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
     assert.notEqual(await uow.agencies.lock(A.agencyId), null);
     locked.open();
-    await release.wait;
+    await bounded(release.wait, "the holder waits for its release");
   });
-  await locked.wait;
+  holder.catch(() => undefined);
+  await reached(locked, holder, "the holder's lock");
   await assert.rejects(
     h.app.run(h.tenant(A.agencyId, owner), (uow) => uow.agencies.lock(A.agencyId), { statementTimeoutMs: 200 }),
     (e: unknown) => failure(e).code === "CAPACITY_UNAVAILABLE" && failure(e).retryable,
   );
   release.open();
-  await holder;
+  await bounded(holder, "the holder");
   for (let i = 0; i < 4; i++) {
     const { client } = await h.appPool.acquire();
     try {
@@ -294,9 +336,10 @@ test("work a caller gave up inside a unit of work (a bound elapsed) destroys its
   const holder = h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
     assert.notEqual(await uow.agencies.lock(A.agencyId), null);
     locked.open();
-    await release.wait;
+    await bounded(release.wait, "the holder waits for its release");
   });
-  await locked.wait;
+  holder.catch(() => undefined);
+  await reached(locked, holder, "the holder's lock");
   let abandonedPid = 0;
   let late: Promise<unknown> = Promise.resolve();
   const given = h.app.run(h.tenant(A.agencyId, owner), async (uow) => {
@@ -305,9 +348,12 @@ test("work a caller gave up inside a unit of work (a bound elapsed) destroys its
     // the call the caller starts and then gives up: it waits on the holder's lock and, were it ever answered, goes on to read
     late = uow.agencies.lock(A.agencyId).then(() => uow.endClients.countOpenProjects(uow.ids.next() as ClientId));
     late.catch(() => undefined);
+    const watched = Date.now() + WAIT_BOUND_MS;
     for (let seen = false; !seen; ) {
+      assert.ok(Date.now() < watched, `the abandoned call was not seen waiting on the lock within ${WAIT_BOUND_MS} ms`);
       await h.oracle.query("SELECT pg_stat_clear_snapshot()");
       seen = (await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1 AND wait_event_type = 'Lock'", [abandonedPid])).rows.length === 1;
+      if (!seen) await new Promise((resolve) => setTimeout(resolve, 10));
     }
     abandonWorkOf(uow, "the bound of the call elapsed");
     throw new DomainFailure("CAPACITY_UNAVAILABLE", "the call did not answer in time", { retryAfterSeconds: 1 }, true);
@@ -316,7 +362,7 @@ test("work a caller gave up inside a unit of work (a bound elapsed) destroys its
   // the answer comes while the holder still holds the lock: nothing queued a ROLLBACK behind the abandoned call
   const answered = await Promise.race([given.then(() => "committed", (e: unknown) => failure(e).code), new Promise<string>((resolve) => setTimeout(() => resolve("still waiting for the abandoned call"), 5_000))]);
   assert.equal(answered, "CAPACITY_UNAVAILABLE");
-  await assert.rejects(late, "the abandoned call fails on its destroyed connection, it never reads on a pooled one");
+  await assert.rejects(bounded(late, "the abandoned call"), (e: unknown) => !(e instanceof assert.AssertionError), "the abandoned call fails on its destroyed connection, it never reads on a pooled one");
   // ADV-8: the backend of the abandoned unit ends WHILE the holder still holds the lock it waited on (release is not open yet): the abandon
   // cancelled and terminated it, it did not wait for the lock to be granted or for its statement to time out, and its locks went with it
   try {
@@ -332,7 +378,7 @@ test("work a caller gave up inside a unit of work (a bound elapsed) destroys its
   } finally {
     release.open();
   }
-  await holder;
+  await bounded(holder, "the holder");
   for (let i = 0; i < 4; i++) {
     const { client } = await h.appPool.acquire();
     try {
@@ -447,7 +493,7 @@ test("a unit limited as a whole is ended by the database at its limit although e
       { statementTimeoutMs: 30_000 },
     );
     given.catch(() => undefined);
-    await armed.wait;
+    await reached(armed, given, "the limited unit arms its limit");
     const lockedAgency = async (): Promise<boolean> => {
       await h.oracle.query("BEGIN");
       try {
@@ -472,13 +518,13 @@ test("a unit limited as a whole is ended by the database at its limit although e
     }
     assert.equal(alive, false, "the database ended the limited unit's session at its limit (plus a margin), not when its second statement ended");
     assert.equal(await lockedAgency(), false, "and its agency lock is released");
-    await assert.rejects(given, "the unit failed: it can never commit what it did");
+    await assert.rejects(bounded(given, "the limited unit"), (e: unknown) => !(e instanceof assert.AssertionError), "the unit failed: it can never commit what it did");
   } finally {
     await second.query("ROLLBACK").catch(() => undefined);
     await first.query("ROLLBACK").catch(() => undefined);
     await second.end();
     await first.end();
-    await given.catch(() => undefined);
+    await bounded(given, "the limited unit at cleanup").catch(() => undefined);
   }
 });
 
@@ -546,4 +592,56 @@ test("the last active owner cannot be removed through the membership repository:
   });
   const count = await h.oracle.query("SELECT active_owner_count FROM kauro.agencies WHERE agency_id = $1", [ag.agencyId]);
   assert.equal(count.rows[0].active_owner_count, 1);
+});
+
+test("a barrier wait fails with the unit's own failure when the unit fails before opening it, and a wait that never settles ends at its bound (FLAKY-UOW-TXLIMIT)", async () => {
+  const never = barrier();
+  const unit = h.app.run(h.tenant(A.agencyId, owner), async () => {
+    throw new DomainFailure("CAPACITY_UNAVAILABLE", "failed before arming", { retryAfterSeconds: 1 }, true);
+  });
+  unit.catch(() => undefined);
+  const waited = reached(never, unit, "the arming barrier");
+  waited.catch(() => undefined);
+  await bounded(unit.catch(() => undefined), "the unit that fails before arming");
+  const settled = Date.now();
+  await assert.rejects(waited, (e: unknown) => e instanceof assert.AssertionError && e.message.includes("failed before it got there: CAPACITY_UNAVAILABLE"));
+  assert.ok(Date.now() - settled < 1_000, "the failure is reported as soon as the unit settles, not at the bound");
+  await assert.rejects(bounded(never.wait, "a barrier nobody opens", 200), (e: unknown) => e instanceof assert.AssertionError && e.message.includes("not settled within 200 ms"));
+});
+
+test("work given up while its unit COMMITs or ROLLs BACK leaves a clean pooled connection: its backend is never terminated afterwards, so the next unit on that connection runs (FLAKY-UOW-TXLIMIT)", async () => {
+  for (const at of ["COMMIT", "ROLLBACK"] as const) {
+    let pid = 0;
+    const outcome = await bounded(
+      h.app
+        .run(h.tenant(A.agencyId, owner), async (uow) => {
+          const client = (uow as unknown as { client: PoolClient }).client;
+          pid = Number((await client.query("SELECT pg_backend_pid() AS pid")).rows[0].pid);
+          // the caller's bound elapses while the unit ends: the abandon lands after the unit decided how to end and before it releases
+          const original = client.query;
+          client.query = ((...args: unknown[]) => {
+            if (args[0] === at) {
+              client.query = original;
+              abandonWorkOf(uow, `the bound elapsed during ${at}`);
+            }
+            return (original as (...a: unknown[]) => unknown).apply(client, args);
+          }) as typeof client.query;
+          if (at === "ROLLBACK") throw new DomainFailure("NOT_FOUND", "rolled back on purpose");
+          return "returned";
+        })
+        .then(
+          (v) => String(v),
+          (e: unknown) => failure(e).code,
+        ),
+      `the unit given up during ${at}`,
+    );
+    assert.equal(outcome, at === "COMMIT" ? "returned" : "NOT_FOUND", at);
+    // the clean connection went back to the pool: it is idle there, alive, and the next unit on the pool is served by it
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await h.oracle.query("SELECT pg_stat_clear_snapshot()");
+    assert.equal((await h.oracle.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [pid])).rows.length, 1, `the backend of a unit given up during ${at} is still alive in the pool`);
+    for (let i = 0; i < 4; i++) {
+      assert.notEqual(await bounded(h.app.run(h.tenant(A.agencyId, owner), (uow) => uow.agencies.lock(A.agencyId)), "a later unit"), null, `a later unit runs after ${at}`);
+    }
+  }
 });

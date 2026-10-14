@@ -9,7 +9,7 @@ import type { Sha256Hex } from "@kauro/contracts";
 import type { BankAccountRef, PaymentEnvironment } from "@kauro/domain";
 import { fakeCreditBytes, fakeOutboundBytes, fakeStatementBytes, type BankEvidenceFake, type FakeCreditFields, type FakeOutboundFields, type FakeStatementFields } from "@kauro/application/testing";
 import { connectionPid, openConnection, type FaultContext, type HarnessConnection, type Waiting } from "@kauro/persistence/testing";
-import { BANK_ACCOUNT, BANK_ENVIRONMENT, BANK_PAYEE_DIGEST, ROUTE_TIMING, bankEvidenceFake } from "./bank-constants-support.js";
+import { BANK_ACCOUNT, BANK_ENVIRONMENT, BANK_PAYEE_DIGEST, ROUTE_TIMING, bankEvidenceFake, testDestinationFingerprinter } from "./bank-constants-support.js";
 import { BankFixtures, integrationBankPurchase, staleFinanceWorker, type CreditVersion, type StaleWorker } from "./bank-fixtures-support.js";
 import { integrationWorld, type Agent, type IntegrationWorld } from "./integration-support.js";
 import type { Purchase } from "./commission-support.js";
@@ -30,9 +30,11 @@ export const BANK_HOLD_POINTS = {
   DECLARE_LOCKED: "bank:declare-locked",
   /** Inside SI2 with L1 and the identity locks taken, before the lines are written. */
   STATEMENT_LOCKED: "bank:statement-locked",
+  /** Inside CMD215 with L1, INBOUND and the payout cash lock taken, before the owner's re-judgement and the settlement row (PV1-SETTLE). */
+  SETTLEMENT_LOCKED: "bank:settlement-locked",
 } as const;
 
-export type HeldLockKind = "L1_OUTBOUND_STREAM" | "INBOUND_STREAM" | "L3_ATTEMPT_ROW";
+export type HeldLockKind = "L1_OUTBOUND_STREAM" | "INBOUND_STREAM" | "L3_ATTEMPT_ROW" | "PAYOUT_CASH";
 
 /** A lock a cell holds, in an open transaction, until it releases it. */
 export interface HeldLock {
@@ -97,6 +99,9 @@ export async function bankWorld(options: { readonly world?: IntegrationWorld; re
   const evidence = iw.bankEvidence?.evidence ?? bankEvidenceFake();
   // the api reads the bank route's details artifacts from this store (lane L-ROUTE; ApiAssembly.bank, bound at call time)
   iw.w.bank.evidence = evidence;
+  // lane L-REFUND: the test destination fingerprinter (S3) and the fake's credit classifier of the payer evidence
+  iw.w.bank.fingerprinter = testDestinationFingerprinter;
+  iw.w.bank.creditClassifier = evidence;
   const open = (login: BankLogin): Promise<HarnessConnection> => openConnection(iw.h.pg.clientConfig(login));
   const held = new Set<HeldLock>();
   const fixtures = new BankFixtures({ cw: iw, w: iw.w, owner: iw.owner, evidence, accountRef: BANK_ACCOUNT, environment: BANK_ENVIRONMENT, payeeDigest: BANK_PAYEE_DIGEST, buyers: iw.buyers });

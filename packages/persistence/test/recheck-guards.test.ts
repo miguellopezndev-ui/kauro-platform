@@ -174,7 +174,7 @@ test("N9: a plan's source and target are a sealed revision and a target contract
   const sameBodyInB = await tx(app, ctx(owner), (c) =>
     c.query(
       `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, created_at)
-       VALUES ($1, $2, $3, 'CLEAN', $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), now(), $8, 'R2-INITIAL', now())`,
+       VALUES ($1, $2, $3, 'CLEAN', $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), NULL, $8, 'R2-INITIAL', now())`,
       [ids.next(), A.agencyId, projectB, ids.next(), ids.next(), sha("bundle"), targetA.bodyHash, sha("authority-shared")],
     ),
   );
@@ -183,7 +183,7 @@ test("N9: a plan's source and target are a sealed revision and a target contract
     tx(app, ctx(owner), (c) =>
       c.query(
         `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, created_at)
-         VALUES ($1, $2, $3, 'CLEAN', $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), now(), $8, 'R2-INITIAL', now())`,
+         VALUES ($1, $2, $3, 'CLEAN', $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), NULL, $8, 'R2-INITIAL', now())`,
         [ids.next(), A.agencyId, projectA, ids.next(), ids.next(), sha("bundle"), targetA.bodyHash, sha("authority-again")],
       ),
     ),

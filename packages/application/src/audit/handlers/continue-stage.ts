@@ -4,7 +4,9 @@
  * target requires explicit recovery, not guessed IDs").
  *
  * Order: authorize (an approving role of an ACTIVE membership: the stored authority) → reserve → the stage (NOT_FOUND; a foreign stage,
- * another project's stage and a nonexistent one answer alike) and its row lock (FOR UPDATE) → the stage judged on the locked record:
+ * another project's stage and a nonexistent one answer alike) and its row lock (FOR NO KEY UPDATE) → the stage judged on the locked record
+ * (continued, version), then the reads and locks of section 4 (receipt; parents FOR SHARE ascending; their open reconciliations; the plan
+ * row; its approval's shared half; the plan's target after its shared half, the last await) → the effect clock → the judgments:
  *
  *   - already continued: 409 STAGE_ALREADY_CONTINUED naming where it stands, answered before the version is compared, so the loser of a
  *     race is told what became of the stage, not that it is stale;
@@ -15,18 +17,20 @@
  *   - the latest receipt's identity mapping digest recomputed from the stored mapping (RECEIPT_DIGEST_MISMATCH when it is not the stored
  *     digest) and the caller's validatedReceiptHash compared with it in constant time: a digest that is not the stage's current validated
  *     receipt is 409 STALE_VERSION (mismatch validatedReceiptHash), never a continuation of unseen identities;
- *   - every parent stage verified (PARENT_STAGE_NOT_VERIFIED), the stage's plan APPROVED (CHILD_PLAN_NOT_APPROVED) and the stage's target
- *     instance the project's current target (STAGE_TARGET_MISMATCH);
+ *   - every parent stage verified and inside its deadline (PARENT_STAGE_NOT_VERIFIED), no parent under an open receipt reconciliation
+ *     (PARENT_IDENTITY_UNDER_RECONCILIATION), the stage's plan APPROVED (CHILD_PLAN_NOT_APPROVED), the plan's target contract confirmed and
+ *     current (TARGET_STALE, R2-026) and the stage's target instance its instance (STAGE_TARGET_MISMATCH);
  *   - otherwise the continuation is recorded once with the approver's membership and the receipt digest, the database stamping the instant;
  *     a partial receipt's stage moves RECEIPT_VALIDATING to VERIFIED_PARTIAL (approved_partial_scope_accounted) → journal 200 with the stage.
  */
 import { digestEquals } from "@kauro/contracts";
 import type { ImportStageState, PlanId } from "@kauro/domain";
-import { DomainFailure, StaleVersionFailure, stageIdentityMappingDigest } from "@kauro/domain";
+import { DomainFailure, StaleVersionFailure, effectNowOf, stageIdentityMappingDigest } from "@kauro/domain";
 import { applied, checkExpectedVersion, requireMembership } from "../../commands/handlers/shared.js";
 import { CONTINUE_STAGE, type ContinueStageBody, type ContinueStageHandler } from "../contracts.js";
 import type { ImportStageView } from "../views.js";
 import { importStageView } from "./projections.js";
+import { parentsVerified } from "./submit-stage-receipt.js";
 import { runAuditCommand, versionAt, type AuditRuntime } from "./shared.js";
 
 export function continueStageHandler(runtime: AuditRuntime): ContinueStageHandler {
@@ -52,7 +56,18 @@ export function continueStageHandler(runtime: AuditRuntime): ContinueStageHandle
           }
           checkExpectedVersion(stage, envelope.body.expectedVersion);
 
-          const nowMs = Date.parse(await uow.serverInstant());
+          // the reads and locks, in the order of section 4 (CST): the receipt, the parents FOR SHARE ascending with their latest receipts and
+          // open reconciliations, the plan row (the lock CMD026 takes), its approval's shared transition half, then the plan's target
+          // contract after its shared transition half (the last await)
+          const receipt = await uow.importStages.latestReceipt(stage.stageId);
+          const parents = await uow.importStages.lockParents(stage.parentStageIds);
+          const reconciling = await uow.importStages.stagesUnderReconciliation(stage.parentStageIds);
+          const plan = await uow.plans.lock(stage.planId as PlanId);
+          if (plan?.approvalId !== undefined) await uow.execution.awaitTransition({ kind: "APPROVAL", key: plan.approvalId });
+          const target = plan ? await uow.targetContracts.lockCurrentByHash(membership.agencyId, stage.projectId, plan.targetContractHash) : null;
+          // r15/r25: the clock is read after the last await, and nothing is awaited between the judgments and the effect
+          const nowMs = Date.parse(await effectNowOf(uow));
+
           if (stage.state === "EXPIRED" || Date.parse(stage.expiresAt) <= nowMs) {
             throw new DomainFailure("PRECONDITION_FAILED", "the stage workflow expired", { reason: "STAGE_EXPIRED" });
           }
@@ -61,22 +76,19 @@ export function continueStageHandler(runtime: AuditRuntime): ContinueStageHandle
           }
 
           // the digest of the stored mapping, recomputed: a stored digest that is not it is an integrity failure, a caller digest that is not it is stale
-          const receipt = await uow.importStages.latestReceipt(stage.stageId);
           if (receipt === null) throw new StaleVersionFailure(stage.version, stage.state, { mismatch: ["validatedReceiptHash"] });
           const recomputed = stageIdentityMappingDigest({ stageId: stage.stageId, instanceId: receipt.instanceId, sourcePackageHash: receipt.sourcePackageHash, mapping: receipt.mapping });
           if (!digestEquals(recomputed, receipt.identityMappingHash)) throw new DomainFailure("INTEGRITY_FAILURE", "the stored receipt mapping is not the mapping its digest names", { reason: "RECEIPT_DIGEST_MISMATCH" });
           if (!digestEquals(envelope.body.validatedReceiptHash, recomputed)) throw new StaleVersionFailure(stage.version, stage.state, { mismatch: ["validatedReceiptHash"] });
 
-          // the parents the stage depends on, the plan it belongs to and the target it was prepared for
-          const parents = await uow.importStages.getMany(stage.parentStageIds);
-          const verified = parents.length === new Set(stage.parentStageIds).size && parents.every((p) => p.projectId === stage.projectId && (p.state === "VERIFIED_SUCCESS" || p.state === "VERIFIED_PARTIAL") && Date.parse(p.expiresAt) > nowMs);
-          if (!verified) throw new DomainFailure("PRECONDITION_FAILED", "a required parent stage is not verified", { reason: "PARENT_STAGE_NOT_VERIFIED" });
-          const plan = await uow.plans.get(stage.planId as PlanId);
+          // the parents the stage depends on (verified, inside their deadline, their identities settled), the plan it belongs to and its target
+          if (!parentsVerified(stage, parents, nowMs)) throw new DomainFailure("PRECONDITION_FAILED", "a required parent stage is not verified", { reason: "PARENT_STAGE_NOT_VERIFIED" });
+          if (reconciling.length > 0) throw new DomainFailure("PRECONDITION_FAILED", "a parent stage's identity is under reconciliation", { reason: "PARENT_IDENTITY_UNDER_RECONCILIATION" });
           if (!plan || plan.agencyId !== membership.agencyId || plan.projectId !== stage.projectId || plan.state !== "APPROVED") {
             throw new DomainFailure("PRECONDITION_FAILED", "the stage plan is not approved", { reason: "CHILD_PLAN_NOT_APPROVED" });
           }
-          const target = await uow.targetContracts.findLatestForProject(stage.projectId);
-          if (target === null || target.instanceId !== stage.instanceId) throw new DomainFailure("PRECONDITION_FAILED", "the stage target is not the project's current target", { reason: "STAGE_TARGET_MISMATCH" });
+          if (target === null || target.confirmedAt === undefined || target.supersededAt !== undefined) throw new DomainFailure("TARGET_STALE", "the plan's target contract is not confirmed and current");
+          if (target.instanceId !== stage.instanceId) throw new DomainFailure("PRECONDITION_FAILED", "the stage target is not the plan's current target", { reason: "STAGE_TARGET_MISMATCH" });
 
           const to: ImportStageState = stage.state === "RECEIPT_VALIDATING" ? "VERIFIED_PARTIAL" : "VERIFIED_SUCCESS";
           const continued = applied(await uow.importStages.recordContinuation(stage.stageId, envelope.body.expectedVersion, to, { membershipId: membership.membershipId, receiptHash: receipt.identityMappingHash }));

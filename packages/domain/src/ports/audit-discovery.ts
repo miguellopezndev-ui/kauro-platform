@@ -11,6 +11,7 @@
  */
 import type { AgencyId, PlanId, ProjectId, RequestId, RevisionId } from "../model/ids.js";
 import type { SourcePopulations } from "../model/source/records.js";
+import type { TargetBody } from "../model/target-contract.js";
 import type { AuditId, CostGrantId } from "../model/audit/ids.js";
 import type { AuditRecord, AuditState, CostGrantRecord, PlanValidationRecord } from "../model/audit/records.js";
 import type { ExecutionSourceGeneration } from "./execution-discovery.js";
@@ -116,6 +117,11 @@ export interface AuditDiscovery {
   openDraftValidations(auditId: AuditId): Promise<ReadonlyArray<DraftValidation>>;
   /** PLAN_VALIDATION's subject, in a unit bound to the plan's agency; null for a plan the control plane cannot see. */
   validationSubject(planId: PlanId): Promise<ValidationSubject | null>;
+  /**
+   * The body of the target contract the plan binds (its project's contract with the plan's targetContractHash), in a unit bound to the
+   * plan's agency; null when the control plane cannot see one. Read without a lock: the currency of the target is the database's (0084).
+   */
+  validationTarget(planId: PlanId): Promise<TargetBody | null>;
   /**
    * GRANT_RECONCILIATION's work, across agencies: a grant with a known usage to reconcile, an intent the database can no longer
    * send, an edge due on the server clock (expiry, exhaustion, room again) or a scope closed with nothing uncertain left.

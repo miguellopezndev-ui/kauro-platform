@@ -463,9 +463,9 @@ export const APPLICABILITY = {
   // package B09's request side (implementation mandate M4; docs/design/B09-case-map.md CMD028..CMD032)
   CMD028: {
     "legitimate state": [["cmd028-create-payment-order.test.ts", "OK: an AGENCY_BILLING member creates one order for an issued quote"]],
-    "wrong role": [["cmd028-create-payment-order.test.ts", "DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED"]],
-    "wrong agency": [["cmd028-create-payment-order.test.ts", "DENY: a foreign tenant's quote is NOT_FOUND"]],
-    "stale version": [["cmd028-create-payment-order.test.ts", "DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms"]],
+    "wrong role": [["cmd028-create-payment-order.test.ts", "R2-082: DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED"]],
+    "wrong agency": [["cmd028-create-payment-order.test.ts", "R2-082: DENY: a foreign tenant's quote is NOT_FOUND"]],
+    "stale version": [["cmd028-create-payment-order.test.ts", "R2-082: DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms"]],
     "duplicate request": [["cmd028-create-payment-order.test.ts", "RACE: an identical retry replays the one order"]],
     "changed-body same key": [["cmd028-create-payment-order.test.ts", "RACE: an identical retry replays the one order, the same key with another termsHash is 409 IDEMPOTENCY_CONFLICT"]],
     "invalid schema": [["b09-request-side.test.ts", "B09 admission: each served payment command refuses a malformed body at the boundary"]],
@@ -807,8 +807,57 @@ APPLICABILITY.CMD057 = {
   "lost response": [[OPERATIONS, CMD057_RACE]],
   "external uncertainty": "NOT_APPLICABLE: an authorization runs no restore (the control plane runs and releases it after its own checks); the candidate's edge, the recovery row, the step-up fact and the journal entry are rows of one database transaction (the registry lists no event for it)",
 };
+// package B16 lane L4's breakglass commands (registry CMD054 OpenBreakglass, CMD055 RevokeBreakglass; 08 "Breakglass"): the corporate
+// owner's, none reaches a provider
+const BREAKGLASS = "cmd054-cmd055-breakglass.test.ts";
+const CMD054_OK = "CMD054-OK: the corporate owner with a fresh step-up opens a breakglass grant over one project";
+const CMD054_DENY = "CMD054-DENY: no credential, an agency OWNER, a seller, a stale or foreign step-up";
+const CMD054_RACE = "CMD054-RACE: an identical retry replays the 201";
+const CMD055_OK = "CMD055-OK: the corporate owner revokes a live grant";
+const CMD055_DENY = "CMD055-DENY: no credential, an agency OWNER or a seller cannot revoke";
+const CMD055_RACE = "CMD055-RACE: an identical retry replays the 200";
+APPLICABILITY.CMD054 = {
+  "legitimate state": [[BREAKGLASS, CMD054_OK]],
+  "wrong role": [[BREAKGLASS, CMD054_DENY]],
+  "wrong agency": [[BREAKGLASS, CMD054_DENY]],
+  "stale version": "NOT_APPLICABLE: OpenBreakglass creates a grant and carries no expectedVersion (registry fields: scopeRef, purpose, assuranceProofRef, authorizationRef); the live grant of the scope is the conflict (BREAKGLASS_GRANT_LIVE with the current grant, CMD054-RACE)",
+  "duplicate request": [[BREAKGLASS, CMD054_RACE]],
+  "changed-body same key": [[BREAKGLASS, CMD054_RACE]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[BREAKGLASS, CMD054_RACE]],
+  "external uncertainty": "NOT_APPLICABLE: opening a grant reaches no provider; the grant, its ALLOW fact and the journal entry are rows of one database transaction (the registry lists no event for it)",
+};
+APPLICABILITY.CMD055 = {
+  "legitimate state": [[BREAKGLASS, CMD055_OK]],
+  "wrong role": [[BREAKGLASS, CMD055_DENY]],
+  "wrong agency": [[BREAKGLASS, CMD055_DENY]],
+  "stale version": [[BREAKGLASS, CMD055_DENY], [BREAKGLASS, CMD055_RACE]],
+  "duplicate request": [[BREAKGLASS, CMD055_RACE]],
+  "changed-body same key": [[BREAKGLASS, CMD055_RACE]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[BREAKGLASS, CMD055_RACE]],
+  "external uncertainty": "NOT_APPLICABLE: a revocation reaches no provider; every new read under the grant is refused at once and a bearer capability already issued lives at most the residual lifetime the answer states (never claimed zero); the revoked edge, its ALLOW fact and the journal entry are rows of one database transaction",
+};
 // CMD059 admits the operations service as its second principal: the service cases join the owner's
 for (const [cell, extra] of [["legitimate state", CMD059_SERVICE_OK], ["wrong role", CMD059_SERVICE_DENY], ["wrong agency", CMD059_SERVICE_DENY], ["duplicate request", CMD059_SERVICE_RACE], ["changed-body same key", CMD059_SERVICE_RACE], ["lost response", CMD059_SERVICE_RACE], ["stale version", CMD059_SERVICE_RACE]]) APPLICABILITY.CMD059[cell].push([OPERATIONS, extra]);
+
+// package B12 (outreach; kit K2): every command is registered with a NOT_BUILT stub. The generic cells (duplicate, changed body, schema, lost
+// response) are the pipeline's and hold already; the cells that depend on the handler read PLACEHOLDER until the serving lane replaces its row
+// with the cited OK/DENY/RACE tests (docs/design/B12-outreach-plan-cells.md); the PLACEHOLDER text is what the lane's done criteria grep for.
+const B12_PLACEHOLDER = "NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests";
+for (const id of ["CMD061", "CMD062", "CMD063", "CMD064", "PutOutreachContent", "PublishSalesResource", "RegisterSenderIdentity", "VerifySenderIdentity", "RecordSenderRevocation", "PrepareOutreachReview", "RecordOutreachDiagnosis", "RevokeOutreachAuthorization", "WithdrawOutreachChannelPolicy", "RecordProspectSource", "RecordProspectContact"]) {
+  APPLICABILITY[id] = {
+    "legitimate state": B12_PLACEHOLDER,
+    "wrong role": B12_PLACEHOLDER,
+    "wrong agency": B12_PLACEHOLDER,
+    "stale version": B12_PLACEHOLDER,
+    "duplicate request": common["duplicate request"],
+    "changed-body same key": common["changed-body same key"],
+    "invalid schema": common["invalid schema"],
+    "lost response": common["lost response"],
+    "external uncertainty": B12_PLACEHOLDER,
+  };
+}
 
 // package B09's served payment commands (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8 CMD030, CMD033, CMD034)
 const WEBHOOK = "cmd030-payment-webhook.test.ts";
@@ -875,6 +924,21 @@ APPLICABILITY.CMD037 = {
   "invalid schema": common["invalid schema"],
   "lost response": [[CANCEL_JOB, "RACE: an identical retry replays the 200"], [CANCEL_JOB, "RACE (S062): CancelJob through the route racing the publication"]],
   "external uncertainty": "NOT_APPLICABLE: CancelJob records the cancellation on the job row and calls no provider; the control plane's EXECUTION_CONTROL terminates the attempt by identity and observes until it is terminal or proved absent (mandate B08-CONTROL-EXECUTION), and a job that was published first answers JOB_ALREADY_READY (S062)",
+};
+
+// B16 lane L5: CMD038 AuthorizeDownload (docs/design/B16-case-map.md CMD038, R2-048, S048): the grant is one COMMIT; the provider signing
+// after it is a port call (the S3 presign half is PARTIAL(B15))
+const AUTHORIZE_DOWNLOAD = "cmd038-authorize-download.test.ts";
+APPLICABILITY.CMD038 = {
+  "legitimate state": [[AUTHORIZE_DOWNLOAD, "CMD038-OK: a reader authorizes two artifacts of an AVAILABLE package"], [AUTHORIZE_DOWNLOAD, "CMD038-OK (lifetime): the URL lifetime is least(900 s, the retention deadline - now)"]],
+  "wrong role": [[AUTHORIZE_DOWNLOAD, "CMD038-DENY: deleted/quarantined artifacts, a package not AVAILABLE, a stale step-up, a suspended member"], [AUTHORIZE_DOWNLOAD, "R2-048: after a role change no new URL"]],
+  "wrong agency": [[AUTHORIZE_DOWNLOAD, "S048 (download): another agency's package and a package that never existed answer identically"]],
+  "stale version": "NOT_APPLICABLE: AuthorizeDownload carries no expectedVersion (registry fields: artifactIds, assuranceProofRef); the project, the package and the governing retention record are read after their transition locks and FOR SHARE, and a fact that changed is refused with its own reason (PROJECT_NOT_OPEN, PACKAGE_NOT_AVAILABLE, ARTIFACT_UNAVAILABLE, RETENTION_EXPIRED, MEMBERSHIP_CHANGED), never with STALE_VERSION",
+  "duplicate request": [[AUTHORIZE_DOWNLOAD, "CMD038-RACE: issuance held at the package await against CMD042 and a package revocation, both orders"]],
+  "changed-body same key": [[AUTHORIZE_DOWNLOAD, "CMD038-RACE (TIMEOUT): the signer times out after COMMIT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[AUTHORIZE_DOWNLOAD, "CMD038-RACE: issuance held at the package await against CMD042 and a package revocation, both orders; crash after COMMIT before signing and a lost answer are recovered by the key"]],
+  "external uncertainty": [[AUTHORIZE_DOWNLOAD, "CMD038-RACE (TIMEOUT): the signer times out after COMMIT: the authorization is recorded ISSUE_UNCERTAIN and answered 503 SIGNING_UNCERTAIN"]],
 };
 
 // package B08's audit commands (mandate B08-COMMANDS-AUDIT; docs/design/B08-case-map.md CMD020, CMD021, CMD022, CMD024 and R2-044): each
@@ -1026,6 +1090,7 @@ export async function loadMatrixSources() {
     CMD044: "commands/handlers/create-support-case.ts",
     CMD042: "sources/handlers/request-deletion.ts",
     CMD060: "sources/handlers/request-retention-extension.ts",
+    CMD038: "execution/handlers/authorize-download.ts",
     CMD022: "audit/handlers/create-plan.ts",
   };
   const published = {};

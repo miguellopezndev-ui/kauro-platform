@@ -10,6 +10,7 @@ export function hostConfig(): HostConfig {
       KAURO_ENV: process.env["KAURO_ENV"],
       KAURO_PUBLIC_ORIGIN: process.env["KAURO_PUBLIC_ORIGIN"],
       KAURO_APP_ORIGIN: process.env["KAURO_APP_ORIGIN"],
+      KAURO_OPS_ORIGIN: process.env["KAURO_OPS_ORIGIN"],
     });
     // one line per process, the problem name only: a deployment that names its hosts wrongly serves no screen, and the operator must see why
     if (!cached.ok) console.error(`KAURO_HOST_CONFIG_INVALID ${cached.problem}`);

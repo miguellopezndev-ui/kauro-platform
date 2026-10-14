@@ -292,7 +292,7 @@ money nor authority. Re-run when 0050-0060 land: a planned trigger missing from 
 - `state_machines` (row 15; feeds authority) birth: [state_machines_frozen]; bound: `initial_state` [state_machines_frozen]; `machine` [state_machines_frozen].
 - `state_transitions` (row 15; feeds authority) birth: [state_transitions_frozen]; bound: `from_state` [state_transitions_frozen]; `machine` [state_transitions_frozen]; `to_state` [state_transitions_frozen].
 - `target_contracts` (row 28; feeds authority) birth: [target_contracts_lifetime]; imm: `agency_id` `body_hash` `contract_id` `project_id`; bound: `confirmed_at` [target_contracts_lifetime] NULL->now once, never cleared or moved (B14, SDP-38); `superseded_at` [target_contracts_lifetime] NULL->now once, only after confirmation, never cleared (B14, SDP-38).
-Residual B-LIFETIME-2 (feeds none): `domain_events` event evidence of versions (B06 binding 0005); no money or authority decision of this lane reads its values; `commerce_event_bindings` event-type registry for commerce events, append-only (0013:273-275); decides event typing only.
+Residual B-LIFETIME-2 (feeds none): `domain_events` event evidence of versions (B06 binding 0005), read outside the covered guards by ledger posting 0017:349 KP001 and first designation 0028:860 KA003, append-only 0005:61 and no-truncate 0077; `commerce_event_bindings` event-type registry for commerce events, append-only (0013:273-275); decides event typing only.
 
 ### 3c Planned enforcing triggers (the check requires each in its migration once that file exists)
 
@@ -324,7 +324,7 @@ RDS master is not assumed superuser). It fails if TEMPORARY or CREATE on the dat
 conditions.
 A2 Pool (src/pool.ts:100-105, 159-190): VERIFY_SQL refuses a login with TEMPORARY or CREATE on the database, CREATE on any schema, or
 `current_setting('session_replication_role') <> 'origin'`; `maxLifetimeSeconds: 600`. Data API does not run VERIFY_SQL (B14-R3).
-A3 No SECURITY DEFINER function in kauro migrations except ONE accepted exception (coordinator decision 2026-10-11): `kauro.register_bank_payment_route(uuid,text,text,uuid,text,text)` (0046, PV1 route registration, owner-gated command; owner-owned, fixed body, pinned search_path, CONFIGURED rows only), allowlisted by exact signature in the hardening migration and in the R17 catalog test; not a defect (R17; on 21b310f none, comments only 0001:6, 0008:14, 0032:8, 0033:9, 0034:15,
+A3 No SECURITY DEFINER function in kauro migrations except ONE accepted exception (coordinator decision 2026-10-11): `kauro.register_bank_payment_route(uuid,text,text,uuid,text,text)` (0046, PV1 route registration, owner-gated command; owned by the NOLOGIN kauro_route_registrar (0077; SH2-F1: USAGE on kauro, INSERT of the ten registration columns of payment_routes, SELECT of corporate_roles(user_id, role, state) and state_machines, nothing else; a future INSERT trigger of payment_routes that reads another table needs a registrar grant there, and the configure cells go red until it has one), fixed body, pinned search_path, CONFIGURED rows only), allowlisted by exact signature in the hardening migration and in the R17 catalog test; not a defect (R17; on 21b310f none, comments only 0001:6, 0008:14, 0032:8, 0033:9, 0034:15,
 0035:11, 0036:18).
 A4 Withdrawn (r3-r7): identity-closure audit, trusted identities, declared trigger/definer inventories, view/rule/callback analysis,
 audit cutover. Sessions, definers, views, rules or callbacks OUTSIDE the TCB can at most write values section B's facts justify;
@@ -334,6 +334,8 @@ oracle-created SECURITY INVOKER fixture (not `nestedAsSuperuser`); the copied ad
 attached and is written as runtime, keeping the cross-transaction assertion (admission-instants :218-250/:266-286); temporary
 shadows live in the tested runtime connection through a test login granted TEMPORARY by the oracle and revoked in finally
 (aggregate-kinds :445-470); the clock-reset helper keeps its hidden SELECT reset (fault-harness :1232-1239).
+A6 SH2-F2 (0077 + pool.ts VERIFY_SQL): a runtime principal (the 0060 definition) that is a member of any role other than itself and the seven groups fails the migration, and a login that is such a member or owns any object (pg_shdepend) is refused at acquire (B14-R1 one membership; 14_CLOUD:57).
+SH2-F3 (standing R17 gate, sec-hardening-2.test.ts): the plpgsql functions of kauro, kauro_meta and public that run dynamic SQL are exactly domain_events_bind_aggregate (registry identifiers, %I) and commission_lock_line_rows (literal row-mode allowlist); a new one fails the gate.
 
 ## B. Fact bindings
 
@@ -661,7 +663,7 @@ are done in this commit.
   and the template. Deferred out of the lane (lane SEC-HARDENING-2): Section A revokes and pool checks beyond the P2 failure
   conditions (about 50 min; risk low, not relied on). Deferred tests (lane B-LIFETIME-2, the B12 code still lands): SEC-Fnn for
   operational evidence no money or authority guard reads (processing_attempts launch/staging stamps, audit_steps evidence,
-  audits hashes and draft_plan_id; about 30 min; risk medium-low).
+  audits hashes and draft_plan_id; about 30 min; risk medium-low). Done in 0077 (SEC-HARDENING-2); SEC-F set D in B-LIFETIME-2 after L2a; BL2-F3 columns stay tier-1 in L4.
 - Q4 Section A is hardening; P2 states the guard-execution boundary and enforces the runtime half.
 - Q5 answered by the B7 registry table (11 attachments, scope, stamps).
 - Q6 REVERSED by the coordinator in r9: both `rolsuper` skips are removed (B10); D1 lists the fixture moves.

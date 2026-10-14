@@ -27,6 +27,7 @@ import { connectionPid, crashedAt, FaultPoints, INJECTED_STATEMENT_TIMEOUT_MS, L
 import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld } from "./bank-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { agentOf, planOf, quoted, type Agent } from "./integration-support.js";
+import { supersedeIn } from "./b17-target-supersession-support.js";
 import { call, completed, freshKey, outcome, rawEvent, routes, sessionPaths, type BrowserSession, type Reply } from "./support.js";
 
 let bw: BankWorld;
@@ -285,8 +286,11 @@ const disableIdentity = (a: Agent): Withdrawal => ({
 const supersedeTarget = (b: Buyer): Withdrawal => ({
   sql: async (holder) => {
     await holder.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [b.a.s.agency.agencyId, b.a.s.agency.ownerUserId]);
-    const moved = await holder.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE agency_id = $1 AND project_id = $2 AND superseded_at IS NULL", [b.a.s.agency.agencyId, projectOf(b)]);
-    assert.ok((moved.rowCount ?? 0) >= 1, "the target contract superseded");
+    const agencyId = b.a.s.agency.agencyId;
+    const current = await holder.query<{ contract_id: string }>("SELECT contract_id FROM kauro.target_contracts WHERE agency_id = $1 AND project_id = $2 AND confirmed_at IS NOT NULL AND superseded_at IS NULL", [agencyId, projectOf(b)]);
+    assert.ok(current.rows.length >= 1, "the target contract superseded");
+    // migration 0084: a contract is superseded only by a later confirmed observation of its instance (CMD019's shape)
+    for (const row of current.rows) await supersedeIn(holder, { agencyId, contractId: row.contract_id }, b.a.s.agency.ownerMembershipId);
   },
 });
 
@@ -2296,22 +2300,56 @@ async function withResumeHeld<T>(nth: number, hook: () => Promise<void>, fn: () 
  * other: the owner's step-ups are judged on that clock, so a world whose clock moved hours ahead configures no further route).
  */
 const movedWorlds = new Map<string, BankWorld>();
+const movedNames = new Set<string>();
 after(async () => {
   for (const w of movedWorlds.values()) await w.stop();
 });
-async function onMovedSessions<T>(name: string, fn: () => Promise<T>): Promise<T> {
+/** Builds the moved world `name` (a temporary cluster with every migration, and an api): once per name, never shared by two tests. */
+async function movedWorld(name: string): Promise<BankWorld> {
+  if (movedNames.has(name)) throw new Error(`the moved world ${name} is one test's own: another test already used it`);
+  movedNames.add(name);
+  const moved = await bankWorld({ sessions: true });
+  movedWorlds.set(name, moved);
+  return moved;
+}
+/** Stops the moved world `name` once its test settled: no cluster of a finished test stays alive for the rest of the file. */
+async function stopMoved(name: string): Promise<void> {
+  const moved = movedWorlds.get(name);
+  movedWorlds.delete(name);
+  await moved?.stop();
+}
+async function onWorld<T>(moved: BankWorld, fn: () => Promise<T>): Promise<T> {
   const main = bw;
-  let moved = movedWorlds.get(name);
-  if (moved === undefined) {
-    moved = await bankWorld({ sessions: true });
-    movedWorlds.set(name, moved);
-  }
   bw = moved;
   try {
     return await fn();
   } finally {
     bw = main;
   }
+}
+/** A plain test (no cell body bound) on a moved world of its own, built at its start and stopped once it settled. */
+async function onMovedSessions<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await onWorld(await movedWorld(name), fn);
+  } finally {
+    await stopMoved(name);
+  }
+}
+/**
+ * A fault cell on a moved world of its own (cell's id unless `id` names the matrix row, as advCell). The world is built BEFORE runCell
+ * starts the cell's body bound (CELL_TIMEOUT_MS bounds the cell's own steps, never the construction of a whole temporary cluster with every
+ * migration and an api: 38-46 s of the 90 s under CPU load, so a cell otherwise ~10 s timed out under host load; ADV-1 r6
+ * adv1r6-ended on 6b94ab6d) and stopped once the cell settled.
+ */
+function movedCell(world: string, title: string, fault: FaultKind, body: (ctx: FaultContext) => Promise<void>, id: string = title.split(" ")[1]!): void {
+  test(title, async () => {
+    const moved = await movedWorld(world);
+    try {
+      await runCell({ id, step: title.slice(title.indexOf(": ") + 2), fault, expect: title }, (ctx) => onWorld(moved, () => body(ctx)));
+    } finally {
+      await stopMoved(world);
+    }
+  });
 }
 
 test(`PV1R-02 DENY ACH-M-R2-EXPIRY (session expires during the cookie authentication's own store wait): a getBankRoute whose only authentication's session-store statement is held after its clock sample while the session crosses its idle expiry is refused 401 AUTHENTICATION_REQUIRED like the next request (the resume judges liveness at an instant read after the store returned); a session still live at release is served`, async () => {
@@ -2565,39 +2603,37 @@ async function readHeldAtSessionFence(what: string, read: () => Promise<Reply>, 
 }
 
 for (const ending of ["idle", "absolute"] as const) {
-  advCell(`ADV-1 DENY ACH-M-I3-REVOCATION (session ${ending} deadline passes after the effect-clock read): an instructions read whose final authentication answered with the session live and whose effect-clock read is held while the process clock passes the session's ${ending} deadline is refused 401 AUTHENTICATION_REQUIRED with no account or routing digits and no payment reference; the same hold with the session still live is served`, "ACH-M-I3-REVOCATION", "revocation", async (ctx) => {
-    await onMovedSessions(`adv1-${ending}`, async () => {
-      const IDLE_MS = 1_800_000;
-      const x = await issuedOrder(`adv1-${ending}`);
-      const session = await bw.iw.w.identity().signIn(x.b.a.billing);
-      const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
-      if (ending === "absolute") {
-        // kept in use (a read every 25 minutes touches it) until the absolute deadline (12 h, immutable) is about 10 minutes ahead: the idle deadline is then bound to it
-        const absolute = (await q<{ at: Date }>("SELECT absolute_expires_at AS at FROM kauro.web_sessions WHERE secret_sha256 = $1", [session.secretSha256]))[0]!.at.getTime();
-        while (absolute - bw.iw.w.processClock.nowMs() > 10 * 60_000 + 1_000) {
-          bw.iw.w.processClock.advance(Math.min(25 * 60_000, absolute - bw.iw.w.processClock.nowMs() - 10 * 60_000));
-          assert.equal(code(await cookieRead()), "200 SUCCESS -", "absolute: the session in use stays live");
-        }
-        const [row] = await q<{ idle: Date; abs: Date }>("SELECT idle_expires_at AS idle, absolute_expires_at AS abs FROM kauro.web_sessions WHERE secret_sha256 = $1", [session.secretSha256]);
-        assert.equal(row!.idle.getTime(), row!.abs.getTime(), "absolute: the idle deadline is bound to the absolute deadline");
+  movedCell(`adv1-${ending}`, `ADV-1 DENY ACH-M-I3-REVOCATION (session ${ending} deadline passes after the effect-clock read): an instructions read whose final authentication answered with the session live and whose effect-clock read is held while the process clock passes the session's ${ending} deadline is refused 401 AUTHENTICATION_REQUIRED with no account or routing digits and no payment reference; the same hold with the session still live is served`, "revocation", async (ctx) => {
+    const IDLE_MS = 1_800_000;
+    const x = await issuedOrder(`adv1-${ending}`);
+    const session = await bw.iw.w.identity().signIn(x.b.a.billing);
+    const cookieRead = (): Promise<Reply> => browserCall(session, { method: "GET", url: bankRoutes.instructions(x.orderId), agency: x.b.a.s.agency.agencyId });
+    if (ending === "absolute") {
+      // kept in use (a read every 25 minutes touches it) until the absolute deadline (12 h, immutable) is about 10 minutes ahead: the idle deadline is then bound to it
+      const absolute = (await q<{ at: Date }>("SELECT absolute_expires_at AS at FROM kauro.web_sessions WHERE secret_sha256 = $1", [session.secretSha256]))[0]!.at.getTime();
+      while (absolute - bw.iw.w.processClock.nowMs() > 10 * 60_000 + 1_000) {
+        bw.iw.w.processClock.advance(Math.min(25 * 60_000, absolute - bw.iw.w.processClock.nowMs() - 10 * 60_000));
+        assert.equal(code(await cookieRead()), "200 SUCCESS -", "absolute: the session in use stays live");
       }
-      // positive control: one second passes while the effect-clock read is held; the session (>= 9 minutes from its deadline) is still live and is served
-      const control = await readHeldAtEffectRead(ctx, `${ending} control`, cookieRead, async () => void bw.iw.w.processClock.advance(1_000));
-      assert.equal(code(control), "200 SUCCESS -", `${ending} control: a session still live at release is served`);
-      const v = control.json<InstructionsView>().instructions;
-      assert.deepEqual([v.accountNumber, v.routingNumber, v.reference], [ACCOUNT_DIGITS, "026073150", x.reference], `${ending} control: the account, the routing number and the reference`);
-      const advanceMs = ending === "idle" ? IDLE_MS + 60_000 : 11 * 60_000;
-      // the revocation is the process clock passing the deadline while the read is held at its effect-clock read; the next request is fenced by it
-      const held = (await ctx.revoked(`session ${ending} deadline passes while a read is held at its effect-clock read`, () => readHeldAtEffectRead(ctx, ending, cookieRead, async () => void bw.iw.w.processClock.advance(advanceMs))))!;
-      assert.equal(code(held), "401 AUTHENTICATION_REQUIRED -", `${ending}: a session that ended between the effect-clock read and the view gets the authentication refusal`);
-      noAccountDigits(held, `${ending} deadline passed after the effect-clock read`);
-      assert.ok(!held.text.includes(x.reference), `${ending}: no payment reference in the held read`);
-      const next = await ctx.fenced(`next request after the ${ending} deadline`, async () => {
-        throw new HeldReadAnswered(await cookieRead());
-      }, (e) => e instanceof HeldReadAnswered);
-      assert.equal(code((next as HeldReadAnswered).reply), "401 AUTHENTICATION_REQUIRED -", `${ending}: the next request is unauthenticated too`);
-    });
-  });
+      const [row] = await q<{ idle: Date; abs: Date }>("SELECT idle_expires_at AS idle, absolute_expires_at AS abs FROM kauro.web_sessions WHERE secret_sha256 = $1", [session.secretSha256]);
+      assert.equal(row!.idle.getTime(), row!.abs.getTime(), "absolute: the idle deadline is bound to the absolute deadline");
+    }
+    // positive control: one second passes while the effect-clock read is held; the session (>= 9 minutes from its deadline) is still live and is served
+    const control = await readHeldAtEffectRead(ctx, `${ending} control`, cookieRead, async () => void bw.iw.w.processClock.advance(1_000));
+    assert.equal(code(control), "200 SUCCESS -", `${ending} control: a session still live at release is served`);
+    const v = control.json<InstructionsView>().instructions;
+    assert.deepEqual([v.accountNumber, v.routingNumber, v.reference], [ACCOUNT_DIGITS, "026073150", x.reference], `${ending} control: the account, the routing number and the reference`);
+    const advanceMs = ending === "idle" ? IDLE_MS + 60_000 : 11 * 60_000;
+    // the revocation is the process clock passing the deadline while the read is held at its effect-clock read; the next request is fenced by it
+    const held = (await ctx.revoked(`session ${ending} deadline passes while a read is held at its effect-clock read`, () => readHeldAtEffectRead(ctx, ending, cookieRead, async () => void bw.iw.w.processClock.advance(advanceMs))))!;
+    assert.equal(code(held), "401 AUTHENTICATION_REQUIRED -", `${ending}: a session that ended between the effect-clock read and the view gets the authentication refusal`);
+    noAccountDigits(held, `${ending} deadline passed after the effect-clock read`);
+    assert.ok(!held.text.includes(x.reference), `${ending}: no payment reference in the held read`);
+    const next = await ctx.fenced(`next request after the ${ending} deadline`, async () => {
+      throw new HeldReadAnswered(await cookieRead());
+    }, (e) => e instanceof HeldReadAnswered);
+    assert.equal(code((next as HeldReadAnswered).reply), "401 AUTHENTICATION_REQUIRED -", `${ending}: the next request is unauthenticated too`);
+  }, "ACH-M-I3-REVOCATION");
 }
 
 // ADV-3: the I1/I2 read order (instructions.ts, the probe read, the facts and the source deadline, THEN the effect read): a deadline crossed
@@ -3014,30 +3050,26 @@ async function logoutBehindHeldRead(ctx: FaultContext, label: string, moveMs: nu
   return { held, standing, movedTo, session, done };
 }
 
-cell(`ADV-1 r6 DENY ACH-M-I3-REVOCATION (logout instant read after the row lock wait): a logout that waits on the session row held by a guarded read, with the process clock moving on while it waits, revokes at an instant read after its lock was granted: revoked_at is not before the read's touch (last_seen_at) nor before the instant the row was released, and the logout is answered 204`, "revocation", async (ctx) => {
-  await onMovedSessions("adv1r6-instant", async () => {
-    const r = await logoutBehindHeldRead(ctx, "adv1r6-instant", 5_000);
-    assert.equal(r.standing, "WAITING", "the logout waits on the session row the read holds");
-    assert.equal(code(r.held), "200 SUCCESS -", "the read, ordered before the logout, is served");
-    assert.equal(r.done.status, 204, `the logout commits (${code(r.done)})`);
-    const stamps = await sessionStampsOf(r.session);
-    assert.ok(stamps.revokedAt !== null, "the session is revoked");
-    assert.ok(stamps.revokedAt! >= stamps.lastSeen, `revoked_at (${stamps.revokedAt}) is not before the touch under the same lock (${stamps.lastSeen})`);
-    assert.ok(stamps.revokedAt! >= r.movedTo, `revoked_at (${stamps.revokedAt}) is read after the wait on the row, not before it (the clock stood at ${r.movedTo} when the row was released)`);
-  });
+movedCell("adv1r6-instant", `ADV-1 r6 DENY ACH-M-I3-REVOCATION (logout instant read after the row lock wait): a logout that waits on the session row held by a guarded read, with the process clock moving on while it waits, revokes at an instant read after its lock was granted: revoked_at is not before the read's touch (last_seen_at) nor before the instant the row was released, and the logout is answered 204`, "revocation", async (ctx) => {
+  const r = await logoutBehindHeldRead(ctx, "adv1r6-instant", 5_000);
+  assert.equal(r.standing, "WAITING", "the logout waits on the session row the read holds");
+  assert.equal(code(r.held), "200 SUCCESS -", "the read, ordered before the logout, is served");
+  assert.equal(r.done.status, 204, `the logout commits (${code(r.done)})`);
+  const stamps = await sessionStampsOf(r.session);
+  assert.ok(stamps.revokedAt !== null, "the session is revoked");
+  assert.ok(stamps.revokedAt! >= stamps.lastSeen, `revoked_at (${stamps.revokedAt}) is not before the touch under the same lock (${stamps.lastSeen})`);
+  assert.ok(stamps.revokedAt! >= r.movedTo, `revoked_at (${stamps.revokedAt}) is read after the wait on the row, not before it (the clock stood at ${r.movedTo} when the row was released)`);
 });
 
-cell(`ADV-1 r6 DENY ACH-M-I3-REVOCATION (idle deadline passes while the logout waits on the session row): a logout that waits on the row of a session whose idle deadline passes during the wait finds the session ENDED at its post-lock instant: the row is not marked revoked and no SESSION_REVOKE ALLOW fact is recorded; the logout is still answered 204`, "revocation", async (ctx) => {
-  await onMovedSessions("adv1r6-ended", async () => {
-    const r = await logoutBehindHeldRead(ctx, "adv1r6-ended", 31 * 60_000);
-    assert.equal(r.standing, "WAITING", "the logout waits on the session row the read holds");
-    assert.equal(code(r.held), "401 AUTHENTICATION_REQUIRED -", "the read judged after the idle deadline is refused");
-    assert.equal(r.done.status, 204, `the logout is answered 204 (${code(r.done)})`);
-    const stamps = await sessionStampsOf(r.session);
-    assert.equal(stamps.revokedAt, null, "an expired session is ended, not revoked");
-    const facts = await q<{ outcome: string }>("SELECT outcome FROM kauro.security_events WHERE action = 'SESSION_REVOKE' AND actor_id = $1", [r.session.view.userId]);
-    assert.deepEqual(facts, [], "no revocation fact for a session that ended before the revoking instant");
-  });
+movedCell("adv1r6-ended", `ADV-1 r6 DENY ACH-M-I3-REVOCATION (idle deadline passes while the logout waits on the session row): a logout that waits on the row of a session whose idle deadline passes during the wait finds the session ENDED at its post-lock instant: the row is not marked revoked and no SESSION_REVOKE ALLOW fact is recorded; the logout is still answered 204`, "revocation", async (ctx) => {
+  const r = await logoutBehindHeldRead(ctx, "adv1r6-ended", 31 * 60_000);
+  assert.equal(r.standing, "WAITING", "the logout waits on the session row the read holds");
+  assert.equal(code(r.held), "401 AUTHENTICATION_REQUIRED -", "the read judged after the idle deadline is refused");
+  assert.equal(r.done.status, 204, `the logout is answered 204 (${code(r.done)})`);
+  const stamps = await sessionStampsOf(r.session);
+  assert.equal(stamps.revokedAt, null, "an expired session is ended, not revoked");
+  const facts = await q<{ outcome: string }>("SELECT outcome FROM kauro.security_events WHERE action = 'SESSION_REVOKE' AND actor_id = $1", [r.session.view.userId]);
+  assert.deepEqual(facts, [], "no revocation fact for a session that ended before the revoking instant");
 });
 
 cell(`ADV-2 r6 DENY ACH-M-I2-REVOCATION (CMD028 replay judged under the session lock): the replay of a committed issuance key by a cookie session revoked (committed) before the replay's session lock is refused 401 AUTHENTICATION_REQUIRED and its body carries no transfer reference; the replay of the same key by a live session answers the stored response`, "revocation", async (ctx) => {
@@ -3149,28 +3181,24 @@ test("A r6 DENY ACH-M-R2-REVOCATION (revocation commits while the step-up waits 
   });
 });
 
-cell(`B r6 DENY ACH-M-I3-REVOCATION (replaced session revoked at an instant read after the row lock wait): a sign-in that replaces a session whose row is held by a guarded read, the process clock moving on while it waits, revokes the old session at an instant read after its lock was granted: revoked_at is not before the read's touch nor before the instant the row was released`, "revocation", async (ctx) => {
-  await onMovedSessions("advb-instant", async () => {
-    const r = await logoutBehindHeldRead(ctx, "advb-instant", 5_000, "replace");
-    assert.equal(r.standing, "WAITING", "the replacing sign-in waits on the old session row the read holds");
-    assert.equal(r.done.status, 201, `the sign-in opens its session (${code(r.done)})`);
-    const stamps = await sessionStampsOf(r.session);
-    assert.ok(stamps.revokedAt !== null, "the replaced session is revoked");
-    assert.ok(stamps.revokedAt! >= stamps.lastSeen, `revoked_at (${stamps.revokedAt}) is not before the touch (${stamps.lastSeen})`);
-    assert.ok(stamps.revokedAt! >= r.movedTo, `revoked_at (${stamps.revokedAt}) is read after the wait on the row (the clock stood at ${r.movedTo} when it was released)`);
-  });
+movedCell("advb-instant", `B r6 DENY ACH-M-I3-REVOCATION (replaced session revoked at an instant read after the row lock wait): a sign-in that replaces a session whose row is held by a guarded read, the process clock moving on while it waits, revokes the old session at an instant read after its lock was granted: revoked_at is not before the read's touch nor before the instant the row was released`, "revocation", async (ctx) => {
+  const r = await logoutBehindHeldRead(ctx, "advb-instant", 5_000, "replace");
+  assert.equal(r.standing, "WAITING", "the replacing sign-in waits on the old session row the read holds");
+  assert.equal(r.done.status, 201, `the sign-in opens its session (${code(r.done)})`);
+  const stamps = await sessionStampsOf(r.session);
+  assert.ok(stamps.revokedAt !== null, "the replaced session is revoked");
+  assert.ok(stamps.revokedAt! >= stamps.lastSeen, `revoked_at (${stamps.revokedAt}) is not before the touch (${stamps.lastSeen})`);
+  assert.ok(stamps.revokedAt! >= r.movedTo, `revoked_at (${stamps.revokedAt}) is read after the wait on the row (the clock stood at ${r.movedTo} when it was released)`);
 });
 
-cell(`B r6 DENY ACH-M-I3-REVOCATION (idle deadline of the replaced session passes while the sign-in waits on its row): the old session is ENDED, not revoked: no revoked_at, no SESSION_REVOKE fact; the sign-in still opens its session`, "revocation", async (ctx) => {
-  await onMovedSessions("advb-ended", async () => {
-    const r = await logoutBehindHeldRead(ctx, "advb-ended", 31 * 60_000, "replace");
-    assert.equal(r.standing, "WAITING", "the replacing sign-in waits on the old session row the read holds");
-    assert.equal(r.done.status, 201, `the sign-in opens its session (${code(r.done)})`);
-    const stamps = await sessionStampsOf(r.session);
-    assert.equal(stamps.revokedAt, null, "an expired session is ended, not revoked");
-    const facts = await q<{ outcome: string }>("SELECT outcome FROM kauro.security_events WHERE action = 'SESSION_REVOKE' AND actor_id = $1", [r.session.view.userId]);
-    assert.deepEqual(facts, [], "no revocation fact for a session that ended before the revoking instant");
-  });
+movedCell("advb-ended", `B r6 DENY ACH-M-I3-REVOCATION (idle deadline of the replaced session passes while the sign-in waits on its row): the old session is ENDED, not revoked: no revoked_at, no SESSION_REVOKE fact; the sign-in still opens its session`, "revocation", async (ctx) => {
+  const r = await logoutBehindHeldRead(ctx, "advb-ended", 31 * 60_000, "replace");
+  assert.equal(r.standing, "WAITING", "the replacing sign-in waits on the old session row the read holds");
+  assert.equal(r.done.status, 201, `the sign-in opens its session (${code(r.done)})`);
+  const stamps = await sessionStampsOf(r.session);
+  assert.equal(stamps.revokedAt, null, "an expired session is ended, not revoked");
+  const facts = await q<{ outcome: string }>("SELECT outcome FROM kauro.security_events WHERE action = 'SESSION_REVOKE' AND actor_id = $1", [r.session.view.userId]);
+  assert.deepEqual(facts, [], "no revocation fact for a session that ended before the revoking instant");
 });
 
 // === adversary r7 ADV-1 on 418f073: the 300 s re-authentication age is judged at the post-lock instant too ==================================

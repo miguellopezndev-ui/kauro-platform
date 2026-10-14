@@ -34,9 +34,25 @@ export const OPERATIONAL_WIRE: Readonly<Record<string, OperationalWire>> = Objec
   confirmBankCredit: entry("REQUIRED", true, "KAURO_OWNER"),
   attributeBankCredit: entry("REQUIRED", true, "KAURO_OWNER"),
   importBankStatement: entry("REQUIRED", true, "KAURO_OWNER"),
+  // Payments V1 settlement (CMD215): the owner's journaled, cookie-authenticated observation of one withdrawal (PV1-SETTLE D-SET-1)
+  recordBankSettlement: entry("REQUIRED", true, "KAURO_OWNER"),
   getBankCredit: entry("NONE", false, "KAURO_OWNER"),
+  getBankSettlementRequest: entry("NONE", false, "KAURO_OWNER"),
+  listBankSettlementsInTransit: entry("NONE", false, "KAURO_OWNER"),
   getBankOrderMatchKeys: entry("NONE", false, "KAURO_OWNER"),
   retireBankCheckout: entry("REQUIRED", true, "AGENCY_BILLING", true),
+  // B12 (D-B12S-2, D-B12S-3): the owner's content-addressed evidence upload is not journaled (the same bytes answer the same reference) but is an
+  // unsafe cookie request; the credit queue is an owner-only read
+  uploadBankEvidenceArtifact: entry("NONE", true, "KAURO_OWNER"),
+  listBankCredits: entry("NONE", false, "KAURO_OWNER"),
+  // Payments V1 owner refunds (lane L-REFUND, CMD220-CMD223): the owner's journaled, cookie-authenticated commands and the owner-only queue
+  approveTreasuryRefund: entry("REQUIRED", true, "KAURO_OWNER"),
+  declareRefundExecution: entry("REQUIRED", true, "KAURO_OWNER"),
+  recordRefundExecution: entry("REQUIRED", true, "KAURO_OWNER"),
+  resolveUncertainExecution: entry("REQUIRED", true, "KAURO_OWNER"),
+  recordReturnBounce: entry("REQUIRED", true, "KAURO_OWNER"),
+  declareResendExecution: entry("REQUIRED", true, "KAURO_OWNER"),
+  listExecutionAttempts: entry("NONE", false, "KAURO_OWNER"),
   // B11 A1: the agency owner records the buyer type once (CMD101), journaled and cookie-authenticated; the agency is the path id
   setBuyerType: entry("REQUIRED", true, "AGENCY_OWNER"),
 });

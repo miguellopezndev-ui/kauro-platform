@@ -3,21 +3,20 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B16-case-map.md",
-  "sha256": "7c3eb63d27e835da0c4893d86e09286ae0db73fffebd320bfb0c8ce5b2d18557"
+  "sha256": "7e0ae77aa98cd4cb0dec14e46ec78b882d5b5ac14463cdf5a9306f67cdafaf40"
  },
  "rows": [
   {
    "case": "S048",
-   "class": "PARTIAL",
+   "class": "EXECUTED_LOCAL",
    "test": [
-    "apps/api/test/b16-tenant-sweep.test.ts :: S048 sweep: every id route answers a foreign and a nonexistent id identically, with Cache-Control no-store"
+    "apps/api/test/b16-tenant-sweep.test.ts :: S048 sweep: every id route answers a foreign and a nonexistent id identically, with Cache-Control no-store",
+    "apps/api/test/cmd038-authorize-download.test.ts :: S048 (download): another agency's package and a package that never existed answer identically, and nothing of either leaks"
    ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [
-    "B16"
-   ],
-   "claimed": "OPEN -> L5 PARTIAL (PLANNED L5; target EXECUTED_LOCAL)"
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "S049",
@@ -60,34 +59,41 @@
   },
   {
    "case": "S064",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/control/test/b16-deletion-executor.test.ts :: S064: provider refuses one of three generations: receipt PARTIAL names the residual and the retry; never COMPLETE from deleted_at"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B14"
    ],
-   "claimed": "OPEN -> L3 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L3 PARTIAL (PLANNED L3; target PART(B14) EXECUTED_LOCAL)"
   },
   {
    "case": "S065",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/control/test/b16-restore.test.ts :: S065: a membership revoked and a project deleted after the backup stay revoked and deleted before any request"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B14"
    ],
-   "claimed": "OPEN -> L6 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L3 PARTIAL (PLANNED L3; target PART(B14) EXECUTED_LOCAL)"
   },
   {
    "case": "S071",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: S071: a seller, an agency OWNER on another agency and the corporate owner without a grant are refused raw CRM by URL and by DTO field; with a grant: preview only, expiring, audited",
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: REVOCATION (GAP-BG-7): a grant cannot survive the closure of its support case, the deletion request of its project or the closure of its agency — each makes the grant unusable at the next read, the record kept"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "S076",
@@ -127,34 +133,40 @@
   },
   {
    "case": "R2-048",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd038-authorize-download.test.ts :: R2-048: after a role change no new URL; an issued URL keeps its disclosed residual lifetime"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B15"
    ],
-   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L5 PARTIAL (PLANNED L5; target PART(B15) EXECUTED_LOCAL)"
   },
   {
    "case": "R2-049",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "packages/data-plane/test/b16-metadata-sim.test.ts :: R2-049 (SIM): the worker sandbox reaches no metadata endpoint and holds no broad credential; only the broker issues prefix-scoped capabilities"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B14"
    ],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target PART(B14) SIMULATED"
+   "claimed": "OPEN -> L4 PARTIAL (PLANNED L4; target PART(B14) SIMULATED: the local SIM half is executed, the provider half is BLOCKED_OWNER on the AWS account, D-14)"
   },
   {
    "case": "R2-050",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: R2-050: renewal after the 30-min expiry is refused, a new justified grant is required, the expired record kept — the expired grant reads nothing, the same justification (even with a fresh step-up) is a renewal and is refused, a new support case opens a new grant; a read whose grant lock wait crosses expiresAt is refused (GAP-BG-2, GAP-BG-3)"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-053",
@@ -229,65 +241,73 @@
   },
   {
    "case": "R2-074",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/control/test/b16-restore.test.ts :: R2-074: a sent notification identity in the journal is never dispatched again from the restored outbox"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [
-    "B14"
-   ],
-   "claimed": "OPEN -> L6 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-076",
-   "class": "PARTIAL",
+   "class": "EXECUTED_LOCAL",
    "test": [
-    "packages/persistence/test/adapters-leases.test.ts :: B06-R1: an expired JOB_ATTEMPT or MODEL_TASK lease that never stored a checkpoint cannot be resumed — another owner's takeover with no checkpoint or an invented one is REFUSED RESUME_WITHOUT_CHECKPOINT and the lease stays as its first owner left it; an OUTBOX_DISPATCH lease, which spends nothing, is still taken over without one, never with an invented one"
+    "packages/persistence/test/adapters-leases.test.ts :: B06-R1: an expired JOB_ATTEMPT or MODEL_TASK lease that never stored a checkpoint cannot be resumed — another owner's takeover with no checkpoint or an invented one is REFUSED RESUME_WITHOUT_CHECKPOINT and the lease stays as its first owner left it; an OUTBOX_DISPATCH lease, which spends nothing, is still taken over without one, never with an invented one",
+    "apps/control/test/b16-restore.test.ts :: R2-076 (restore): a RUNNING attempt in the backup is fenced and rerun under the same authorization; nothing resumes from scratch"
    ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [
-    "B14"
-   ],
-   "claimed": "OPEN -> L6 PARTIAL (PLANNED L6; target PART(B14) EXECUTED_LOCAL)"
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-123",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: R2-123: 72 h requested 24 h before the hard cap grants exactly the hard cap, discloses it and consumes the one extension"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-124",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: R2-124: a second extension and one after expiry are refused; no clock, access or tombstone changes"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-125",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: R2-125: an extension and a deletion of one project, both orders — the deletion first (held at its COMMIT): the extension waits at the project's transition lock and is refused RETENTION_EXPIRED, nothing written; the extension first (held at its COMMIT): the deletion waits and then completes, the record DELETING with the extended soft deadline kept; a later extension never revives access",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: CMD060-DENY (deletion): an extension against a record already DELETING, DELETED_WITH_RESIDUALS or DELETED is refused RETENTION_EXPIRED with nothing written, and the request role cannot write the extension row of a record in deletion",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: CMD060-RACE: an extension held at the record lock against RETENTION expiry, both orders — first the sweeper's CAS misses and nothing expires, then the extension refuses RETENTION_EXPIRED; two extensions of one project: one 200, one 409 EXTENSION_ALREADY_USED or STALE_VERSION",
+    "apps/api/test/cmd042-request-deletion.test.ts :: RACE (expiry): RETENTION expiring a record of the project during the request, both orders — the request holding the records first: the sweeper's CAS misses and the record stays DELETING; the sweeper first: the request waits at the record lock and takes the listed EXPIRED -> DELETING edge"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-126",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/control/test/b16-restore.test.ts :: R2-126: a restored earlier deadline never deletes data promised by a journaled extension; a later tombstone still wins"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [
-    "B14"
-   ],
-   "claimed": "OPEN -> L6 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD003-OK",
@@ -457,117 +477,162 @@
   },
   {
    "case": "CMD038-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038-OK: a reader authorizes two artifacts of an AVAILABLE package: one COMMIT writes the authorization and its artifact rows, download_authorization.issued.v1 and the journal entry; the URLs are signed after COMMIT, bound to the requester, valid for least(900 s, the retention deadline - now) and never journaled",
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038-OK (lifetime): the URL lifetime is least(900 s, the retention deadline - now): a deadline five minutes away bounds the expiry at the deadline"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B15"
    ],
-   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L5 PARTIAL (PLANNED L5; target PART(B15) EXECUTED_LOCAL)"
   },
   {
    "case": "CMD038-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038-DENY: deleted/quarantined artifacts, a package not AVAILABLE, a stale step-up, a suspended member and an unknown artifact deny with nothing written; a shared cache never reuses another user's URL (per-user Cache-Control no-store, URL bound to the requester)",
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038 PARTIAL: one artifact of three deleted or quarantined refuses the whole request; nothing is issued or signed",
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038 EXPIRY: the retention effective deadline crossed during the issuance's wait on the record is refused RETENTION_EXPIRED (judged at effect_now after the lock), nothing written",
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038 DENY (forged): a request session cannot insert an authorization for a package that is not AVAILABLE or longer than 900 s (KA094)"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B15"
    ],
-   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L5 PARTIAL (PLANNED L5; target PART(B15) EXECUTED_LOCAL)"
   },
   {
    "case": "CMD038-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038-RACE: issuance held at the package await against CMD042 and a package revocation, both orders; crash after COMMIT before signing and a lost answer are recovered by the key with the same scope; two keys are two authorizations",
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038-RACE (TIMEOUT): the signer times out after COMMIT: the authorization is recorded ISSUE_UNCERTAIN and answered 503 SIGNING_UNCERTAIN; the same key re-signs the same scope at the same expiry, never a broader one"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B15"
    ],
-   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L5 PARTIAL (PLANNED L5; target PART(B15) EXECUTED_LOCAL)"
   },
   {
    "case": "CMD042-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/control/test/b16-deletion-executor.test.ts :: CMD042-OK: the executor of a requested deletion deletes every registered object of the project by its generation, closes the published package DELETED and the records DELETED, completes the request and the project DELETED — tombstone journaled before any object delete; receipt COMPLETE_FOR_MANAGED_SCOPE excludes downloaded copies and CRM imports",
+    "apps/api/test/cmd042-request-deletion.test.ts :: CMD042-OK (request): the OWNER with a fresh step-up requests deletion of a project with a published package — 200 with the project DELETION_REQUESTED at the next version, one REQUESTED deletion request, every retention record of the project DELETING, project.deletion_requested.v1 routed to DELETION_EXECUTOR and AUTHORITY_JOURNAL (tombstone PROJECT_DELETION_REQUESTED) and the CMD042 journal entry in one COMMIT; the request deletes no object and discloses the receipt scope COMPLETE_FOR_MANAGED_SCOPE excluding downloaded copies and CRM imports",
+    "apps/api/test/cmd042-request-deletion.test.ts :: CMD042-OK (uploads): an upload in flight is cancelled in the request's COMMIT, its provider cancellation requested and its tombstone event published",
+    "apps/api/test/cmd042-request-deletion.test.ts :: CMD042-OK (revisions): every mutable revision (DRAFT, UPLOADING, INSPECTING, READY_TO_SEAL) is CANCELLED through cancel_revision in the request's COMMIT with its event; SEALED, REJECTED and EXPIRED are left as they are and no event names them",
+    "apps/control/test/b16-deletion-executor.test.ts :: CMD042-OK (retained by policy): a registered LEGAL_FINANCE or SECURITY object of the project is named in the receipt as retained by policy and never deleted"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD042-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd042-request-deletion.test.ts :: CMD042-DENY: foreign 404, VIEWER 403, no step-up, stale version, already DELETION_REQUESTED; a restored database replaying the journal cannot resurrect",
+    "apps/api/test/cmd042-request-deletion.test.ts :: CMD042-DENY (prevention): after DELETION_REQUESTED an upload reservation is refused PROJECT_DELETION_REQUESTED",
+    "apps/api/test/cmd042-request-deletion.test.ts :: CMD042-DENY (prevention): after DELETION_REQUESTED a StartAudit is refused PROJECT_DELETION_REQUESTED",
+    "apps/api/test/cmd042-request-deletion.test.ts :: CMD042-DENY (prevention): after DELETION_REQUESTED a payment order is refused PROJECT_DELETION_REQUESTED",
+    "apps/control/test/b16-deletion-executor.test.ts :: CMD042-DENY (prevention): after DELETION_REQUESTED a model dispatch is refused PROJECT_DELETION_REQUESTED",
+    "apps/api/test/cmd042-request-deletion.test.ts :: CMD042-DENY (revisions): a request handler cannot take a SEALED or CANCELLED revision to DELETED, nor forge dataset_revision.deleted.v1",
+    "apps/control/test/b16-deletion-executor.test.ts :: CMD042-DENY (revisions): the control role cannot take a SEALED revision to DELETED, nor a CANCELLED one before its project's deletion completed",
+    "apps/control/test/b16-deletion-executor.test.ts :: S064: provider refuses one of three generations: receipt PARTIAL names the residual and the retry; never COMPLETE from deleted_at"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD042-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/control/test/b16-deletion-executor.test.ts :: CMD042-RACE: deletion held at the project transition lock against a publication and a job admission, both orders — a package published first is enumerated and deleted, one published second never becomes AVAILABLE",
+    "apps/api/test/cmd042-request-deletion.test.ts :: RACE (expiry): RETENTION expiring a record of the project during the request, both orders — the request holding the records first: the sweeper's CAS misses and the record stays DELETING; the sweeper first: the request waits at the record lock and takes the listed EXPIRED -> DELETING edge",
+    "apps/api/test/cmd042-request-deletion.test.ts :: RACE (crash before COMMIT): a crash after the project, the deletion request and the records DELETING are written leaves the project OPEN, the records ACTIVE and nothing tombstoned; the same key then requests the deletion once",
+    "apps/api/test/cmd042-request-deletion.test.ts :: RACE (crash after COMMIT): the request's lost answer is recovered by the key; the project is DELETION_REQUESTED once with one deletion request and one tombstone event",
+    "apps/control/test/b16-deletion-executor.test.ts :: RACE (timeout): a provider delete that times out records DELETION_FAILED with the object as residual; DELETION_RETRIES finishes it",
+    "apps/control/test/b16-deletion-executor.test.ts :: RACE (crash after COMMIT): executor crash between object deletions resumes from recorded results; a missing object is an absence success, never recreated"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD054-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: CMD054-OK: the corporate owner with a fresh step-up opens a breakglass grant over one project for an OPEN support case of that project — 201 ACTIVE, preview only, expiring 1800 s after the database's instant, with its ALLOW fact and one journal entry; an ACTUAL incident naming the project justifies a grant too; the grant reads the table's bounded preview and every read is audited"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD054-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: CMD054-DENY: no credential, an agency OWNER, a seller, a stale or foreign step-up, a reused step-up (silent reuse), a support case of another project or agency, an unknown, closed or resolved authorization, a false-positive incident or one not naming the project, a project whose deletion was requested, and a body asking more than a scope (blanket raw access) are refused — nothing is written"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD054-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: CMD054-RACE: an identical retry replays the 201 and the same key with another body is 409 IDEMPOTENCY_CONFLICT; two opens of one scope yield one live grant and one 409 BREAKGLASS_GRANT_LIVE with the wait observed (both justifications real); a crash before COMMIT leaves no grant and the retry opens one; a crash after COMMIT is replayed, never a second grant; a fault at the journal append (the second write) leaves no grant (GAP-BG-4..6, GAP-BG-8)"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD055-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: CMD055-OK: the corporate owner revokes a live grant — 200 REVOKED with the reason, the database's instant and the residual bearer lifetime of capabilities already issued (900 s, never zero); the grant reads nothing more and the record is kept; another corporate owner may revoke a grant it does not hold"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD055-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: CMD055-DENY: no credential, an agency OWNER or a seller cannot revoke; an unknown grant is 404; a revoked grant is not revoked again and an expired one is not revoked at all (its record kept); a reason with a control character is 400 — and no answer ever claims a zero residual bearer lifetime"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD055-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: CMD055-RACE: an identical retry replays the 200; two revocations of one grant yield one revocation and one 409 BREAKGLASS_GRANT_NOT_ACTIVE with the wait observed; a revocation held at the grant lock against a preview read under the grant, both orders — read first completes, revoke first refuses (GAP-BG-1); a crash before COMMIT leaves the grant live and the retry revokes it once; a lock wait past the statement bound is CAPACITY_UNAVAILABLE and revokes nothing"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD056-OK",
@@ -604,16 +669,15 @@
   },
   {
    "case": "CMD057-OK",
-   "class": "PARTIAL",
+   "class": "EXECUTED_LOCAL",
    "test": [
-    "apps/api/test/cmd056-cmd057-operations.test.ts :: CMD057-OK: the owner with a fresh step-up authorizes a PREPARED restore candidate for its own deletion journal hash — 200 AUTHORIZED at the next candidate revision, one recovery row naming the owner, the proof and the hash, the journal and the step-up fact committed with it"
+    "apps/api/test/cmd056-cmd057-operations.test.ts :: CMD057-OK: the owner with a fresh step-up authorizes a PREPARED restore candidate for its own deletion journal hash — 200 AUTHORIZED at the next candidate revision, one recovery row naming the owner, the proof and the hash, the journal and the step-up fact committed with it",
+    "apps/control/test/b16-restore.test.ts :: CMD057-OK (run): the authorized candidate is restored, reconciled and released only after the checks"
    ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [
-    "B14"
-   ],
-   "claimed": "OPEN -> L6 PARTIAL (PLANNED L6; target PART(B14) EXECUTED_LOCAL)"
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD057-DENY",
@@ -639,30 +703,44 @@
   },
   {
    "case": "CMD060-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: CMD060-OK: one extension of a PAID_ORDINARY soft deadline by <=259200 s inside the hard cap: exact endpoint returned, hard_deadline unchanged, retention_record.extended.v1 and the journal entry written, RETENTION and GetRevision read the new effective deadline",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: consumer: the extension's event is routed once to AUTHORITY_JOURNAL as a RETENTION_EXTENDED tombstone and a replay routes nothing more"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD060-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: CMD060-DENY: a VIEWER or BILLING member, another agency, more than 259200 s, a stale version, an UNPAID-only project and no room before the hard cap are refused with nothing written; before the first package there is no soft deadline: NO_SOFT_DEADLINE, and a publication in flight makes the extension wait and answer STALE_VERSION",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: R2-124: a second extension and one after expiry are refused; no clock, access or tombstone changes",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: DENY (forged): a request session moving soft_deadline without an extension row is refused KA085",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: REVOCATION: a membership suspended before the extension is refused 403 MEMBERSHIP_SUSPENDED; one suspended in flight makes the extension wait on the authorizer and then refuses it, the record unchanged",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: CMD060-DENY (deletion): an extension against a record already DELETING, DELETED_WITH_RESIDUALS or DELETED is refused RETENTION_EXPIRED with nothing written, and the request role cannot write the extension row of a record in deletion"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD060-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: CMD060-RACE: an extension held at the record lock against RETENTION expiry, both orders — first the sweeper's CAS misses and nothing expires, then the extension refuses RETENTION_EXPIRED; two extensions of one project: one 200, one 409 EXTENSION_ALREADY_USED or STALE_VERSION",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: RACE (expiry): the extension's lock wait crosses the existing soft deadline — judged at effect_now after the record lock, refused SOFT_DEADLINE_PASSED, nothing written",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: RACE (crash before COMMIT): a crash after the journal row and the writes leaves the record unchanged and no extension; the same key then extends once",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: RACE (crash after COMMIT): the lost answer is recovered by the key; the extension is not consumed twice"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   }
  ]
 }

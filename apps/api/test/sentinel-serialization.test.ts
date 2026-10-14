@@ -24,7 +24,8 @@ const MARK = `snt${randomBytes(6).toString("hex")}`;
 const REASON_MARK = `SNTL_${MARK.toUpperCase()}`;
 
 let w: World;
-let projectId: ProjectId;
+/** One current target contract per project (migration 0084 rule (c)): each approvable subject gets a project of its own, so none supersedes another. */
+const projectOfItsOwn = async (): Promise<ProjectId> => (await w.project(w.A, w.clientA)).projectId;
 const people: Record<"founder" | "founder2" | "operator" | "admin" | "approver", Person> = {} as never;
 
 interface Sent {
@@ -35,7 +36,6 @@ const sent: Sent[] = [];
 
 before(async () => {
   w = await world();
-  projectId = (await w.project(w.A, w.clientA)).projectId;
   for (const role of ["founder", "founder2", "operator", "admin", "approver"] as const) people[role] = await w.person(`${MARK}-${role}`);
   await w.h.addMember(w.A, people.operator.userId, "OPERATOR");
   await w.h.addMember(w.A, people.admin.userId, "ADMIN");
@@ -120,8 +120,8 @@ test("CMD011 CreateProject: success, a closed-schema refusal, an unoffered mode 
 });
 
 test("CMD023 RevisePlan: success (the successor body carries a sentinel), a closed-schema refusal, a stale version and an unexpected exception carry no sentinel", async () => {
-  const revised = await w.approvable(w.A, projectId, `${MARK}-revise`);
-  const crashing = await w.approvable(w.A, projectId, `${MARK}-revise-crash`);
+  const revised = await w.approvable(w.A, await projectOfItsOwn(), `${MARK}-revise`);
+  const crashing = await w.approvable(w.A, await projectOfItsOwn(), `${MARK}-revise-crash`);
   const patch = w.plans.registerPatch(w.A.agencyId, { candidate: "Phone", reasonCode: REASON_MARK });
   const ok = await send("CMD023 success", { url: routes.revisePlan(revised.planId), token: people.operator.token, body: { expectedVersion: 4, decisionPatchArtifactRef: patch } });
   assert.equal(ok.status, 201);
@@ -135,8 +135,8 @@ test("CMD023 RevisePlan: success (the successor body carries a sentinel), a clos
 });
 
 test("CMD025 ApprovePlan and CMD026 WithdrawApproval: success, closed-schema refusals, a stale step-up, a non-controller and unexpected exceptions carry no sentinel — the step-up proof never comes back", async () => {
-  const approved = await w.approvable(w.A, projectId, `${MARK}-approve`);
-  const crashing = await w.approvable(w.A, projectId, `${MARK}-approve-crash`);
+  const approved = await w.approvable(w.A, await projectOfItsOwn(), `${MARK}-approve`);
+  const crashing = await w.approvable(w.A, await projectOfItsOwn(), `${MARK}-approve-crash`);
   const proof = await w.stepUp(people.approver);
   await schemaProblem("CMD025 schema", { url: routes.approvePlan(approved.planId), token: people.approver.token, body: { ...approvalBodyOf(approved, proof), ...FISHING } });
   const stale = await w.stepUp(people.approver, "STALE");

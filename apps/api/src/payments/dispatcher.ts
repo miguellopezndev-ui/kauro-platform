@@ -52,8 +52,18 @@ export interface DispatchPass {
   readonly deliveries: ReadonlyArray<{ readonly eventId: string; readonly eventType: string; readonly outcome: ConsumerOutcome | "RESCHEDULED" | "FAILED" | "DEAD_LETTER" | "FENCED"; readonly errorCode?: string }>;
 }
 
-function deliveryOf(d: OutboxDelivery): CommerceEventDelivery {
-  if (d.event.agencyId === null) throw new DomainFailure("INTEGRITY_FAILURE", `${d.event.eventType} ${d.event.eventId} is not an agency's commerce event`);
+/**
+ * The closed set of agency-less events the payment dispatcher delivers, to PAYMENT_SERVICE only (docs/design/PV1-SETTLE-two-step.md
+ * §3.0, F1): the owner's bank decisions the service consumes (D-ACH-16). Any other event without an agency is an INTEGRITY_FAILURE
+ * dead letter, as before (never a blanket null agency).
+ */
+export const AGENCY_LESS_PAYMENT_EVENT_TYPES: ReadonlySet<string> = new Set(["bank_credit.received.v1", "bank_credit.matched.v1", "settlement_request.recorded.v1"]);
+
+function deliveryOf(consumer: PaymentConsumerName, d: OutboxDelivery): CommerceEventDelivery {
+  if (d.event.agencyId === null) {
+    if (consumer !== "PAYMENT_SERVICE" || !AGENCY_LESS_PAYMENT_EVENT_TYPES.has(d.event.eventType)) throw new DomainFailure("INTEGRITY_FAILURE", `${d.event.eventType} ${d.event.eventId} is not an agency's commerce event`);
+    return { eventId: d.event.eventId, eventType: d.event.eventType, agencyId: null, aggregateId: d.event.aggregateId, aggregateVersion: d.event.aggregateVersion, payload: d.event.payload };
+  }
   return { eventId: d.event.eventId, eventType: d.event.eventType, agencyId: d.event.agencyId as AgencyId, aggregateId: d.event.aggregateId, aggregateVersion: d.event.aggregateVersion, payload: d.event.payload };
 }
 
@@ -94,7 +104,7 @@ export function createPaymentDispatcher(rt: PaymentRuntime, effects: ReadonlyArr
         let errorCode: string | undefined;
         let settle: { readonly kind: "DELIVERED" } | { readonly kind: "FAILED"; readonly code: string; readonly retryAt: UtcInstant | null };
         try {
-          outcome = await effect.handle(deliveryOf(d));
+          outcome = await effect.handle(deliveryOf(consumer, d));
           settle = { kind: "DELIVERED" };
         } catch (e) {
           if (e instanceof NotDueYet) {

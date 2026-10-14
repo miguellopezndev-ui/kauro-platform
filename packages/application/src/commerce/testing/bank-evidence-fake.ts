@@ -35,12 +35,15 @@ import type {
   Operational,
   OutboundEvidence,
   PaymentEnvironment,
+  BankReceiptEvidence,
+  SettlementEvidence,
   StatementDebit,
   StatementPage,
   UsdBankAccountDetails,
 } from "@kauro/domain";
 import { toUtcInstant } from "@kauro/domain";
 import type { BankEvidenceReadPortV1, BankEvidenceStore, StoredBankEvidence } from "../ports.js";
+import type { RecipientRecordEvidence } from "../bank/ports.js";
 import { CONTRACT_FAKE, FAKE_EVIDENCE_CLASS, instantOf, sha256Hex, uuidV8Of, type FakeCall } from "./labels.js";
 
 export const BANK_FAKE_PROVIDER = "contract-fake-bank";
@@ -49,7 +52,7 @@ export const BANK_FAKE_NORMALIZER = "contract-fake-bank-v1";
 
 // --- the fake's own artifact format -------------------------------------------------------------------------------------------------
 
-export type BankFakeKind = "CREDIT" | "OUTBOUND" | "STATEMENT";
+export type BankFakeKind = "CREDIT" | "OUTBOUND" | "STATEMENT" | "SETTLEMENT" | "BANK_RECEIPT" | "RECIPIENT";
 
 /** Fields of a credit line as an artifact states them; every optional field absent from the bytes is null in the classification. */
 export interface FakeCreditFields {
@@ -113,6 +116,31 @@ export interface FakeStatementFields {
   readonly coverageEnd: string;
   readonly credits: ReadonlyArray<FakeCreditFields>;
   readonly debits: ReadonlyArray<FakeDebitFields>;
+}
+
+/** A provider settlement record of the route account (ST1, PV1-SETTLE D-SET-2). */
+export interface FakeSettlementFields {
+  readonly currency: string;
+  readonly periodStart: string;
+  readonly periodEnd: string;
+  readonly withdrawalId: string;
+  readonly grossCents: bigint | null;
+  readonly feeCents: bigint | null;
+  readonly heldCents: bigint | null;
+  readonly withdrawnCents: bigint | null;
+  readonly observedAt: string;
+}
+
+/** The receiving bank's record of a withdrawal's arrival (ST1, D-SET-2). */
+export interface FakeBankReceiptFields {
+  readonly receivingAccountRef: string;
+  readonly withdrawalId: string;
+  readonly bankTransactionId: string;
+  readonly currency: string;
+  readonly receivedCents: bigint | null;
+  readonly bankAvailableCents: bigint | null;
+  readonly bookedAt: string;
+  readonly observedAt: string;
 }
 
 type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
@@ -190,6 +218,24 @@ export function fakeOutboundBytes(accountRef: string, o: FakeOutboundFields): Ui
 
 export function fakeStatementBytes(accountRef: string, s: FakeStatementFields): Uint8Array {
   return bytesOfJson({ format: BANK_FAKE_FORMAT, kind: "STATEMENT", accountRef, coverageStart: s.coverageStart, coverageEnd: s.coverageEnd, credits: s.credits.map(creditJson), debits: s.debits.map(debitJson) });
+}
+
+export function fakeSettlementBytes(accountRef: string, f: FakeSettlementFields): Uint8Array {
+  return bytesOfJson({
+    format: BANK_FAKE_FORMAT,
+    kind: "SETTLEMENT",
+    accountRef,
+    settlement: { currency: f.currency, periodStart: f.periodStart, periodEnd: f.periodEnd, withdrawalId: f.withdrawalId, grossCents: cents(f.grossCents), feeCents: cents(f.feeCents), heldCents: cents(f.heldCents), withdrawnCents: cents(f.withdrawnCents), observedAt: f.observedAt },
+  });
+}
+
+export function fakeBankReceiptBytes(accountRef: string, r: FakeBankReceiptFields): Uint8Array {
+  return bytesOfJson({
+    format: BANK_FAKE_FORMAT,
+    kind: "BANK_RECEIPT",
+    accountRef,
+    receipt: { receivingAccountRef: r.receivingAccountRef, withdrawalId: r.withdrawalId, bankTransactionId: r.bankTransactionId, currency: r.currency, receivedCents: cents(r.receivedCents), bankAvailableCents: cents(r.bankAvailableCents), bookedAt: r.bookedAt, observedAt: r.observedAt },
+  });
 }
 
 // --- pure classification (fail closed) ----------------------------------------------------------------------------------------------
@@ -391,6 +437,17 @@ export function classifyFakeCredit(evidence: StoredBankEvidence): EvidenceClassi
 export function classifyFakeOutbound(evidence: StoredBankEvidence): EvidenceClassification<OutboundEvidence> {
   return classify(evidence, "OUTBOUND", (doc, e) => outboundOf(sub(doc, "outbound"), e));
 }
+/** A recipient-record artifact (DP-RECIPIENT): the record id, its version (required: a record without a version proves nothing) and its full details. */
+export function fakeRecipientBytes(accountRef: string, r: { readonly recipientRef: string; readonly recipientVersion: string; readonly full: { readonly routingNumber: string; readonly accountNumber: string; readonly holderName: string } }): Uint8Array {
+  return bytesOfJson({ format: BANK_FAKE_FORMAT, kind: "RECIPIENT", accountRef, recipient: { recipientRef: r.recipientRef, recipientVersion: r.recipientVersion, full: { ...r.full } } });
+}
+export function classifyFakeRecipient(evidence: StoredBankEvidence): EvidenceClassification<RecipientRecordEvidence> {
+  return classify(evidence, "RECIPIENT", (doc, e) => {
+    const r = sub(doc, "recipient");
+    const f = sub(r, "full");
+    return { accountRef: e.accountRef, recipientRef: str(r, "recipientRef"), recipientVersion: str(r, "recipientVersion"), full: { routingNumber: str(f, "routingNumber"), accountNumber: str(f, "accountNumber"), holderName: str(f, "holderName") } };
+  });
+}
 export function classifyFakeStatement(evidence: StoredBankEvidence): EvidenceClassification<StatementPage> {
   return classify(evidence, "STATEMENT", (doc, e) => ({
     evidenceHash: e.sha256,
@@ -401,6 +458,48 @@ export function classifyFakeStatement(evidence: StoredBankEvidence): EvidenceCla
     credits: list(doc, "credits").map((c) => creditOf(c, e)),
     debits: list(doc, "debits").map((d) => debitOf(d, e)),
   }));
+}
+
+/** ST1: a settlement record names a real period and a withdrawal; every amount is stated (an absent figure is malformed, never 0). */
+export function classifyFakeSettlement(evidence: StoredBankEvidence): EvidenceClassification<SettlementEvidence> {
+  return classify(evidence, "SETTLEMENT", (doc, e) => {
+    const o = sub(doc, "settlement");
+    const periodStart = instant(o, "periodStart");
+    const periodEnd = instant(o, "periodEnd");
+    if (!(Date.parse(periodStart) < Date.parse(periodEnd))) throw new Malformed("period");
+    return {
+      evidenceHash: e.sha256,
+      artifactRef: e.artifactRef,
+      accountRef: e.accountRef,
+      currency: str(o, "currency"),
+      periodStart,
+      periodEnd,
+      withdrawalId: str(o, "withdrawalId"),
+      grossCents: centsOf(o, "grossCents"),
+      feeCents: centsOf(o, "feeCents"),
+      heldCents: centsOf(o, "heldCents"),
+      withdrawnCents: centsOf(o, "withdrawnCents"),
+      observedAt: instant(o, "observedAt"),
+    };
+  });
+}
+/** ST1: the receiving bank's receipt of a withdrawal, the only source of bank-available money. */
+export function classifyFakeBankReceipt(evidence: StoredBankEvidence): EvidenceClassification<BankReceiptEvidence> {
+  return classify(evidence, "BANK_RECEIPT", (doc, e) => {
+    const o = sub(doc, "receipt");
+    return {
+      evidenceHash: e.sha256,
+      artifactRef: e.artifactRef,
+      accountRef: str(o, "receivingAccountRef"),
+      withdrawalId: str(o, "withdrawalId"),
+      bankTransactionId: str(o, "bankTransactionId"),
+      currency: str(o, "currency"),
+      receivedCents: centsOf(o, "receivedCents"),
+      bankAvailableCents: centsOf(o, "bankAvailableCents"),
+      bookedAt: instant(o, "bookedAt"),
+      observedAt: instant(o, "observedAt"),
+    };
+  });
 }
 
 // --- the port, scripted -------------------------------------------------------------------------------------------------------------
@@ -424,6 +523,8 @@ export interface BankEvidenceFake extends BankEvidenceReadPortV1, BankEvidenceSt
   readonly integrationClass: typeof CONTRACT_FAKE;
   readonly evidenceClass: typeof FAKE_EVIDENCE_CLASS;
   readonly calls: ReadonlyArray<FakeCall>;
+  /** DP-RECIPIENT (DV1-10): classifies a recipient-record artifact of this fake. */
+  classifyRecipient(evidence: StoredBankEvidence): EvidenceClassification<RecipientRecordEvidence>;
   /** Stores bytes under their content address with the provenance the store assigns; the same bytes answer the same reference. */
   put(input: { readonly bytes: Uint8Array; readonly accountRef?: BankAccountRef; readonly authenticatedBy?: StoredBankEvidence["authenticatedBy"]; readonly normalizerVersion?: string }): Promise<{ readonly artifactRef: string; readonly sha256: Sha256Hex }>;
   /** Replaces the stored bytes without touching the envelope digest: the next read no longer matches its hash. */
@@ -518,7 +619,10 @@ export function createBankEvidenceFake(options: BankEvidenceFakeOptions): BankEv
     },
     classifyCredit: classifyFakeCredit,
     classifyOutbound: classifyFakeOutbound,
+    classifyRecipient: classifyFakeRecipient,
     classifyStatement: classifyFakeStatement,
+    classifySettlement: classifyFakeSettlement,
+    classifyBankReceipt: classifyFakeBankReceipt,
     async put(input) {
       const sha256 = sha256Hex(input.bytes);
       const artifactRef = uuidV8Of(sha256);

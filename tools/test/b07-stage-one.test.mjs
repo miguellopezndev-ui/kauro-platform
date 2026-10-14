@@ -20,6 +20,8 @@ const OWNERS = Object.freeze({
   SessionVaultPort: "packages/application/src/testing/contract-fake-session-vault.ts",
   AuthorityJournalPort: "packages/application/src/testing/contract-fake-authority-journal.ts",
   MalwareScannerPort: "packages/data-plane/src/testing/malware-scanner-fake.ts",
+  // B16 lane L5: the read signing of CMD038 AuthorizeDownload (packages/application/src/ports/object-read-signing.ts); the S3 presign is B15
+  ObjectReadSigningPort: "packages/application/src/testing/contract-fake-read-signer.ts",
 });
 
 /** Every TypeScript source of the workspace's packages and apps, production and test, outside build output and dependencies. */
@@ -58,21 +60,26 @@ test("B07 stage 1 is one implementation: each provider port has exactly one labe
   // beside B07's, the test-only subpath carries B11's identity provider fake (ContractFakeIdentityIssuer, owner mandate W2, B11 design
   // section 6): not a provider port of the source lifecycle, and the one fake of its own port; the four fakes of package B10's ports
   // (packages/application/src/commercial/testing; B10 design §11) are not source-lifecycle provider ports either: each has its own owner
-  // file there and is listed only so that an unlisted fake still fails this check
+  // file there and is listed only so that an unlisted fake still fails this check; the two send fakes of package B12's ports
+  // (packages/application/src/commercial/testing/outreach-send.ts, ContractFakeGmailSend and ContractFakeResend, SIMULATED) are
+  // listed for the same reason
   assert.deepEqual(exported.sort(), [
     "@kauro/application/testing ContractFakeAuthorityJournal",
     "@kauro/application/testing ContractFakeBankingCalendar",
     "@kauro/application/testing ContractFakeBuyerTypeReader",
+    "@kauro/application/testing ContractFakeGmailSend",
     "@kauro/application/testing ContractFakeIdentityIssuer",
     "@kauro/application/testing ContractFakeObjectStorage",
     "@kauro/application/testing ContractFakePayoutEvidence",
     "@kauro/application/testing ContractFakePreparationCompletion",
+    "@kauro/application/testing ContractFakeReadSigner",
+    "@kauro/application/testing ContractFakeResend",
     "@kauro/application/testing ContractFakeSessionVault",
     "@kauro/data-plane/testing ContractFakeMalwareScanner",
   ]);
   const fakes = entries["@kauro/application/testing"];
   const scanner = entries["@kauro/data-plane/testing"];
-  for (const token of [fakes.CONTRACT_FAKE_STORAGE_PROVIDER, fakes.CONTRACT_FAKE_VAULT_PROVIDER, fakes.CONTRACT_FAKE_JOURNAL_PROVIDER, scanner.FAKE_SCANNER_ENGINE, scanner.FAKE_SCANNER_ENGINE_VERSION, scanner.FAKE_SCANNER_SIGNATURE_VERSION]) {
+  for (const token of [fakes.CONTRACT_FAKE_STORAGE_PROVIDER, fakes.CONTRACT_FAKE_SIGNER_PROVIDER, fakes.CONTRACT_FAKE_VAULT_PROVIDER, fakes.CONTRACT_FAKE_JOURNAL_PROVIDER, scanner.FAKE_SCANNER_ENGINE, scanner.FAKE_SCANNER_ENGINE_VERSION, scanner.FAKE_SCANNER_SIGNATURE_VERSION]) {
     assert.match(token, /^contract-fake-/, "every token of a fake says it is one");
   }
   assert.equal(scanner.FAKE_SCANNER_EVIDENCE_CLASS, "SIMULATED");

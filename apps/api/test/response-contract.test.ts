@@ -171,6 +171,8 @@ test("R23: every served route declares its replies (the route inventory the Open
       // the two execution commands (B08 design §12): ExecuteProject answers the shared ACCEPTED envelope, CancelJob the job
       ["POST", "/api/v1/projects/:projectId/execute", "ExecuteProject", { 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
       ["POST", "/api/v1/jobs/:jobId/cancel", "CancelJob", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD037" } }],
+      // package B16 L5 (CMD038): a grant of short-lived read URLs over an AVAILABLE package's delivery copies, synchronous
+      ["POST", "/api/v1/packages/:packageId/download-authorizations", "AuthorizeDownload", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD038" } }],
       // the target contract commands (B17): CMD018 creates a DRAFT version (201), CMD019 confirms it (200)
       ["POST", "/api/v1/projects/:projectId/target-contracts", "CreateTargetContract", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD018" } }],
       ["POST", "/api/v1/target-contracts/:contractId/confirm", "ConfirmTargetContract", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD019" } }],
@@ -243,12 +245,38 @@ test("R23: every served route declares its replies (the route inventory the Open
       // package B18's capability governance (CMD058, CMD059): the corporate owner's, synchronous
       ["POST", "/api/v1/operations/capabilities/:capabilityId/versions", "ChangeCapability", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD058" } }],
       ["POST", "/api/v1/operations/capabilities/:capabilityId/restrict", "RestrictCapability", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD059" } }],
+      // package B16 lane L4: the breakglass grants (CMD054 answers 201, a created grant; CMD055 200)
+      ["POST", "/api/v1/operations/breakglass-grants", "OpenBreakglass", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD054" } }],
+      ["POST", "/api/v1/operations/breakglass-grants/:grantId/revoke", "RevokeBreakglass", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD055" } }],
       // package B16/B18 operations commands (CMD056, CMD057): CMD056 answers 201 (a created incident), CMD057 200
       ["POST", "/api/v1/operations/incidents", "RecordIncident", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD056" } }],
       ["POST", "/api/v1/operations/recoveries", "AuthorizeRecovery", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD057" } }],
       // package B10's statement and payout operations (mandate B10-STATEMENTS-PAYOUTS): the owner's approval and the statement read
       ["POST", "/api/v1/sales/statements/:statementId/approve-payout", "ApproveCommissionPayout", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD052" } }],
       ["GET", "/api/v1/sales/statements/:statementId", "GetCommissionStatement", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetCommissionStatement" } }],
+      // package B16 lane L4: the preview read under a breakglass grant, served after the statement read
+      ["GET", "/api/v1/operations/breakglass-grants/:grantId/tables/:tableId/preview", "PreviewTableUnderBreakglass", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:PreviewTableUnderBreakglass" } }],
+      // package B12's outreach routes (kit K2): every command and read is registered with a NOT_BUILT stub until its lane lands
+      ["POST", "/api/v1/ops/outreach/drafts", "PrepareOutreachDraft", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD061" } }],
+      ["POST", "/api/v1/ops/outreach/authorizations", "AuthorizeOutreach", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD062" } }],
+      ["POST", "/api/v1/ops/outreach/:draftId/send", "SendAuthorizedOutreach", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD063" } }],
+      ["POST", "/api/v1/ops/sales/activities", "RecordSalesActivity", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD064" } }],
+      ["POST", "/api/v1/ops/outreach/contents", "PutOutreachContent", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:PutOutreachContent" } }],
+      ["POST", "/api/v1/ops/sales/resources", "PublishSalesResource", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:PublishSalesResource" } }],
+      ["POST", "/api/v1/ops/outreach/senders", "RegisterSenderIdentity", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RegisterSenderIdentity" } }],
+      ["POST", "/api/v1/ops/outreach/senders/:senderId/verify", "VerifySenderIdentity", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:VerifySenderIdentity" } }],
+      ["POST", "/api/v1/ops/outreach/senders/:senderId/revoke", "RecordSenderRevocation", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordSenderRevocation" } }],
+      ["POST", "/api/v1/ops/outreach/reviews", "PrepareOutreachReview", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:PrepareOutreachReview" } }],
+      ["POST", "/api/v1/ops/outreach/diagnoses", "RecordOutreachDiagnosis", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordOutreachDiagnosis" } }],
+      ["POST", "/api/v1/ops/outreach/authorizations/:authorizationId/revoke", "RevokeOutreachAuthorization", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RevokeOutreachAuthorization" } }],
+      ["POST", "/api/v1/ops/outreach/policy-withdrawals", "WithdrawOutreachChannelPolicy", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:WithdrawOutreachChannelPolicy" } }],
+      ["POST", "/api/v1/ops/prospects/:prospectId/sources", "RecordProspectSource", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordProspectSource" } }],
+      ["POST", "/api/v1/ops/prospects/:prospectId/contacts", "RecordProspectContact", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordProspectContact" } }],
+      ["GET", "/api/v1/ops/outreach/drafts/:draftId", "GetOutreachDraft", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetOutreachDraft" } }],
+      ["GET", "/api/v1/ops/outreach/reviews/:reviewId", "GetOutreachReview", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetOutreachReview" } }],
+      ["GET", "/api/v1/ops/sales/prospects/:prospectId/activities", "ListSalesActivities", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListSalesActivities" } }],
+      ["GET", "/api/v1/ops/outreach/metrics", "GetOutreachMetrics", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetOutreachMetrics" } }],
+      ["GET", "/api/v1/ops/sales/resources/:resourceId", "GetSalesResource", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetSalesResource" } }],
       // the payment service's routes of package B09 (stage-2 mandate M3), served in every edition: the ACCEPTED envelope only
       // where a provider effect may stay unknown (CMD033)
       ["POST", "/api/v1/payments/webhooks/:provider", "ReceivePaymentWebhook", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD030" } }],
@@ -261,14 +289,29 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/operations/bank-routes/:routeId/disable", "disableBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:disableBankRoute:200" } }],
       ["POST", "/api/v1/operations/bank-routes/:routeId/details", "replaceBankRouteDetails", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:replaceBankRouteDetails:200" } }],
       // the inbound side (Payments V1, lane PV1-INBOUND): the owner's manual credit commands, the statement import and the retirement
+      // the owner refund commands (Payments V1, lane L-REFUND): the treasury approval, the declaration and the record of a manual execution
+      ["POST", "/api/v1/operations/treasury-refunds/:treasuryRefundId/approve", "approveTreasuryRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:approveTreasuryRefund:200" } }],
+      ["POST", "/api/v1/operations/refunds/:refundId/execution-declarations", "declareRefundExecution", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:declareRefundExecution:201" } }],
+      ["POST", "/api/v1/operations/execution-attempts/:attemptId/records", "recordRefundExecution", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:recordRefundExecution:200" } }],
+      ["POST", "/api/v1/operations/execution-attempts/:attemptId/resolutions", "resolveUncertainExecution", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:resolveUncertainExecution:200" } }],
+      ["POST", "/api/v1/operations/execution-attempts/:attemptId/bounces", "recordReturnBounce", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:recordReturnBounce:200" } }],
+      ["POST", "/api/v1/operations/execution-attempts/:attemptId/resend-declarations", "declareResendExecution", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:declareResendExecution:201" } }],
       ["POST", "/api/v1/operations/bank-accounts/:accountRef/credits", "enterBankCredit", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:enterBankCredit:201" } }],
       ["POST", "/api/v1/operations/bank-credits/:creditId/confirmations", "confirmBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:confirmBankCredit:200" } }],
       ["POST", "/api/v1/operations/bank-credits/:creditId/attributions", "attributeBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:attributeBankCredit:200" } }],
       ["POST", "/api/v1/operations/bank-accounts/:accountRef/statement-imports", "importBankStatement", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:importBankStatement:201" } }],
       ["POST", "/api/v1/payment-orders/:orderId/retirements", "retireBankCheckout", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:retireBankCheckout:201" } }],
+      ["POST", "/api/v1/operations/bank-accounts/:accountRef/settlements", "recordBankSettlement", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:recordBankSettlement:201" } }],
+      // lane B12-OWNER-SCREENS-1 (GAP-API-8): the owner's evidence-artifact upload, 201 stored and judged
+      ["POST", "/api/v1/operations/bank-accounts/:accountRef/evidence-artifacts", "uploadBankEvidenceArtifact", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:uploadBankEvidenceArtifact:201" } }],
       ["GET", "/api/v1/operations/bank-routes/:routeId", "getBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankRoute:200" } }],
+      ["GET", "/api/v1/operations/execution-attempts", "listExecutionAttempts", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:listExecutionAttempts:200" } }],
       ["GET", "/api/v1/operations/bank-credits/:creditId", "getBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankCredit:200" } }],
+      // lane B12-OWNER-SCREENS-1 (GAP-API-9): the owner's inbound-credit queue, filtered by state and paginated
+      ["GET", "/api/v1/operations/bank-credits", "listBankCredits", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:listBankCredits:200" } }],
       ["GET", "/api/v1/operations/bank-orders/:orderId/match-keys", "getBankOrderMatchKeys", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankOrderMatchKeys:200" } }],
+      ["GET", "/api/v1/operations/bank-accounts/:accountRef/settlements/:requestId", "getBankSettlementRequest", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankSettlementRequest:200" } }],
+      ["GET", "/api/v1/operations/bank-accounts/:accountRef/settlements", "listBankSettlementsInTransit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:listBankSettlementsInTransit:200" } }],
       ["GET", "/api/v1/payment-orders/:orderId/transfer-instructions", "getTransferInstructions", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getTransferInstructions:200" } }],
       // the commission group's service routes of package B10 (mandate B10-STATEMENTS-PAYOUTS), served in every edition, synchronous
       ["POST", "/api/v1/sales/commission-periods/:periodId/close", "CloseCommissionPeriod", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD051" } }],

@@ -21,8 +21,8 @@
  * FINANCE and FISCAL run in one SERVICE unit of work that adopts the delivery's agency through its stored operation (the order the
  * event names, or the refund); PAYMENT_SERVICE drives several units of work around its provider calls (no call inside a transaction).
  */
-import type { CommerceEventConsumer, CommerceEventDelivery, FiscalPlan } from "@kauro/application";
-import { planFiscalDocument, planPostings } from "@kauro/application";
+import type { CommerceEventConsumer, CommerceEventDelivery, FiscalIssuanceRuntime, FiscalPlan } from "@kauro/application";
+import { planFiscalDocument, planPostings, reconcileTaxDocument, validateWaitingCreditNotes } from "@kauro/application";
 import type { UtcInstant } from "@kauro/contracts";
 import type { AgencyId, CaptureId, CommerceUnitOfWork, CorrelationId, EventId, PaymentAttemptId, PaymentOrderId, RefundId, TaxDocumentId } from "@kauro/domain";
 import { COMMERCE_EVENT_SUBSCRIPTIONS, DomainFailure, NotFoundFailure, toUtcInstant, uuidV7Timestamp } from "@kauro/domain";
@@ -119,12 +119,25 @@ async function applyFiscalPlan(uow: CommerceUnitOfWork, plan: FiscalPlan, now: U
   }
 }
 
-export function fiscalConsumer(): CommerceEventConsumer {
+/** A point a test may pause the FISCAL consumer at (M19: a credit note's unlocked read of its invoice). */
+export type FiscalConsumerPoint = "CREDIT_NOTE_AFTER_INVOICE_READ" | "CREDIT_NOTE_AFTER_INVOICE_HALF";
+
+export interface FiscalConsumerOptions {
+  readonly hold?: (point: FiscalConsumerPoint, subjectId: string) => Promise<void>;
+}
+
+export function fiscalConsumer(options: FiscalConsumerOptions = {}): CommerceEventConsumer {
   return {
     consumer: "FISCAL",
     eventTypes: eventTypesOf("FISCAL"),
     async consume(uow, delivery, now) {
-      // a validated or uncertain document is the issuance command's (CMD035, package B15; Q-B09-6)
+      // an issued invoice validates the credit notes waiting for it (M6; M19, M20): the invoice's shared half, then the notes' rows
+      if (delivery.eventType === "tax_document.issued.v1") {
+        await adoptDelivery(uow, delivery);
+        causedBy(uow, delivery.eventId);
+        return (await validateWaitingCreditNotes(uow, delivery.aggregateId as TaxDocumentId, now)) > 0 ? "APPLIED" : "DUPLICATE";
+      }
+      // a validated, submitting or uncertain document is the issuance command's and its reconciler's (CMD035; reconcileFiscalDelivery)
       if (delivery.eventType !== "capture.completed.v1" && delivery.eventType !== "refund.completed.v1") return "NOT_APPLICABLE";
       const agencyId = await adoptDelivery(uow, delivery);
       causedBy(uow, delivery.eventId);
@@ -145,7 +158,17 @@ export function fiscalConsumer(): CommerceEventConsumer {
       }
       const refund = await c.refunds.get(delivery.aggregateId as RefundId);
       if (refund === null) throw new NotFoundFailure("refund");
-      const invoice = await c.taxDocuments.findLiveInvoice(refund.captureId);
+      // the global fiscal order (r21): profile S -> issuer S -> the invoice's shared half; the invoice re-read under the half, so an
+      // issuance concluding meanwhile is either seen ISSUED here or finds this note waiting when its issued.v1 is delivered (M19)
+      await c.fiscal.currentProfile(agencyId);
+      const unlocked = await c.taxDocuments.findLiveInvoice(refund.captureId);
+      await options.hold?.("CREDIT_NOTE_AFTER_INVOICE_READ", refund.refundId);
+      if (unlocked !== null) {
+        await c.fiscal.getIssuer(unlocked.issuerRef);
+        await c.taxDocuments.awaitTransition(unlocked.documentId);
+        await options.hold?.("CREDIT_NOTE_AFTER_INVOICE_HALF", refund.refundId);
+      }
+      const invoice = unlocked === null ? null : await c.taxDocuments.findLiveInvoice(refund.captureId);
       const existing = await c.taxDocuments.findLiveCreditNote(refund.refundId);
       return applyFiscalPlan(uow, planFiscalDocument({ kind: "CREDIT_NOTE", refund, invoice, existing }), now);
     },
@@ -157,7 +180,7 @@ export function fiscalConsumer(): CommerceEventConsumer {
  * reaches back to the sale resolves an unknown treatment; it never changes a known one (D-FISC-B6). Run in a SERVICE unit of work
  * that adopted the agency (through one of its stored operations); answers how many drafts moved.
  */
-export async function reevaluateBlockedDrafts(uow: CommerceUnitOfWork, now: UtcInstant, limit = 50): Promise<number> {
+export async function reevaluateBlockedDrafts(uow: CommerceUnitOfWork, now: UtcInstant, limit = 50, hold?: (point: "WAITING_NOTE_LOCKED", documentId: string) => Promise<void>): Promise<number> {
   const c = uow.commerce;
   const agencyId = uow.commerceScope;
   if (agencyId === null) throw new DomainFailure("INTEGRITY_FAILURE", "the blocked drafts of an agency are re-evaluated in its adopted scope");
@@ -173,7 +196,46 @@ export async function reevaluateBlockedDrafts(uow: CommerceUnitOfWork, now: UtcI
     const outcome = await applyFiscalPlan(uow, planFiscalDocument({ kind: "REEVALUATE", draft, capture, priced: quote.tax, saleProfile, issuer, invoice }), now);
     if (outcome === "APPLIED") moved += 1;
   }
+  // a credit note waiting for its invoice's issuance (M20): profile S -> issuer S -> the invoice's shared half -> the note's row, and
+  // validated only while still a draft (the issued.v1 consumer may have validated it first: once either way)
+  const profile = await c.fiscal.currentProfile(agencyId);
+  for (const waiting of await c.taxDocuments.listWaitingCreditNotes(limit)) {
+    const unlocked = await c.taxDocuments.findLiveInvoice(waiting.captureId);
+    if (unlocked === null) continue;
+    await c.fiscal.getIssuer(unlocked.issuerRef);
+    await c.taxDocuments.awaitTransition(unlocked.documentId);
+    const draft = await c.taxDocuments.lockForIssuance(waiting.documentId);
+    await hold?.("WAITING_NOTE_LOCKED", waiting.documentId);
+    if (draft === null || draft.state !== "DRAFT" || draft.blockedReason !== undefined) continue;
+    const invoice = await c.taxDocuments.findLiveInvoice(waiting.captureId);
+    const capture = await c.captures.get(draft.captureId);
+    const order = capture === null ? null : await c.orders.get(capture.orderId);
+    const quote = order === null ? null : await c.quotes.get(order.quoteId);
+    if (capture === null || quote === null) continue;
+    const saleProfile = capture.providerCompletedAt === undefined ? profile : await c.fiscal.saleProfileAt(agencyId, capture.providerCompletedAt);
+    const issuer = saleProfile === null ? null : await c.fiscal.getIssuer(saleProfile.operatorLegalRef);
+    const outcome = await applyFiscalPlan(uow, planFiscalDocument({ kind: "REEVALUATE", draft, capture, priced: quote.tax, saleProfile, issuer, invoice }), now);
+    if (outcome === "APPLIED") moved += 1;
+  }
   return moved;
+}
+
+/** How long a document whose submission is still unknown waits before it is observed again. */
+export const OBSERVE_AGAIN_SECONDS = 60;
+
+/**
+ * The FISCAL reconciler (M6; R2-084) on tax_document.submitting.v1 and tax_document.uncertain.v1: the document observed through every
+ * page of its route and concluded (reconcileTaxDocument); not due before its submit deadline (the delivery rescheduled to it), and
+ * observed again later while unknown. Several units of work around the provider's pages, none during a call (wired by L6-W).
+ */
+export async function reconcileFiscalDelivery(rt: FiscalIssuanceRuntime, delivery: CommerceEventDelivery, now: UtcInstant): Promise<ConsumerOutcome> {
+  if (delivery.eventType !== "tax_document.submitting.v1" && delivery.eventType !== "tax_document.uncertain.v1") return "NOT_APPLICABLE";
+  const orderId = delivery.payload["orderId"];
+  if (typeof orderId !== "string") throw new DomainFailure("INTEGRITY_FAILURE", `${delivery.eventType} ${delivery.eventId} names no order`);
+  const outcome = await reconcileTaxDocument(rt, { documentId: delivery.aggregateId as TaxDocumentId, scope: { kind: "PAYMENT_ORDER", key: orderId }, correlationId: delivery.eventId as unknown as CorrelationId });
+  if (outcome.kind === "NOT_DUE") throw new NotDueYet(outcome.deadline);
+  if (outcome.kind === "OBSERVING") throw new NotDueYet(toUtcInstant(Date.parse(now) + OBSERVE_AGAIN_SECONDS * 1000));
+  return "APPLIED";
 }
 
 // --- PAYMENT_SERVICE --------------------------------------------------------------------------------------------------------------

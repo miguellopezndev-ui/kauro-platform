@@ -32,10 +32,10 @@ import {
 } from "./support.js";
 
 let w: World;
-let projectId: ProjectId;
+/** One current target contract per project (migration 0084 rule (c)): each approvable subject gets a project of its own, so none supersedes another. */
+const projectOfItsOwn = async (): Promise<ProjectId> => (await w.project(w.A, w.clientA)).projectId;
 before(async () => {
   w = await world();
-  projectId = (await w.project(w.A, w.clientA)).projectId;
 });
 after(async () => {
   await w.stop();
@@ -56,10 +56,10 @@ async function sevenOperations(label: string): Promise<ReadonlyArray<Operation>>
   const founder = await w.person(`${label}-founder`);
   const toArchive = await w.h.endClient(w.A, w.authorityA, `${label} archive`);
   const otherClient = await w.h.endClient(w.A, w.authorityA, `${label} other`);
-  const toRevise = await w.approvable(w.A, projectId, `${label}-revise`);
-  const toApprove = await w.approvable(w.A, projectId, `${label}-approve`);
+  const toRevise = await w.approvable(w.A, await projectOfItsOwn(), `${label}-revise`);
+  const toApprove = await w.approvable(w.A, await projectOfItsOwn(), `${label}-approve`);
   const proof = await w.stepUp(w.approver);
-  const toWithdraw = await w.approvable(w.A, projectId, `${label}-withdraw`);
+  const toWithdraw = await w.approvable(w.A, await projectOfItsOwn(), `${label}-withdraw`);
   await approveThroughRoute(w, toWithdraw);
   const patch = (reasonCode: string) => w.plans.registerPatch(w.A.agencyId, { candidate: "Phone", reasonCode });
 
@@ -175,7 +175,7 @@ test("same key + same body → 200/201 replayed:true with the original body", as
 
   // the replay recovers the ORIGINAL durable result even after the aggregate moved on: an approval replayed after its
   // withdrawal still answers the approval as it was committed (plan APPROVED at version 5), not the current state
-  const plan = await w.approvable(w.A, projectId, "replay-after-change");
+  const plan = await w.approvable(w.A, await projectOfItsOwn(), "replay-after-change");
   const approve: Call = { url: routes.approvePlan(plan.planId), token: w.approver.token, key: freshKey("replay-after-change"), body: approvalBodyOf(plan, await w.stepUp(w.approver)) };
   const first = await call(w, approve);
   assert.equal(completed<{ plan: { state: string } }>(first, 201).data.plan.state, "APPROVED");
@@ -213,7 +213,7 @@ test("response lost after commit → retry with the same key returns the journal
 test("concurrent duplicate: two in-flight identical requests → exactly one effect and the same durable answer; after the first rolls back, the duplicate proceeds as the first", async () => {
   // A reserves the journal row of the key and holds (its transaction open); B, identical, blocks on the identity index
   // (observed waiting in pg_stat_activity); A commits; B reads the committed row and answers the same durable result
-  const plan = await w.approvable(w.A, projectId, "concurrent");
+  const plan = await w.approvable(w.A, await projectOfItsOwn(), "concurrent");
   const request: Call = { url: routes.approvePlan(plan.planId), token: w.approver.token, key: freshKey("concurrent"), body: approvalBodyOf(plan, await w.stepUp(w.approver)) };
   const hold = w.holds.arm("journal.reserved");
   const requestA = call(w, request);
@@ -242,7 +242,7 @@ test("concurrent duplicate: two in-flight identical requests → exactly one eff
 
   // after a rollback the duplicate proceeds as the first request: A reserves and holds, B blocks on the identity index, A dies
   // where it waits (before COMMIT: nothing of A persists), B's insert proceeds and B performs the one effect
-  const second = await w.approvable(w.A, projectId, "concurrent-rollback");
+  const second = await w.approvable(w.A, await projectOfItsOwn(), "concurrent-rollback");
   const retry: Call = { url: routes.approvePlan(second.planId), token: w.approver.token, key: freshKey("concurrent-rollback"), body: approvalBodyOf(second, await w.stepUp(w.approver)) };
   const holdFirst = w.holds.arm("journal.reserved");
   const dying = call(w, retry);

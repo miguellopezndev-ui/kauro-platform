@@ -8,10 +8,11 @@
 import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "../api/outcome-kit.js";
 import { CREATE_QUOTE_OUTCOMES } from "./quotes/outcomes.js";
 import type { CommercialServedRouteCommandId } from "./served.js";
-import { AUTHORIZE_RECOVERY_OUTCOMES, OPERATIONS_SERVICE_ACCESS, RECORD_INCIDENT_OUTCOMES } from "./operations/outcomes.js";
+import { AUTHORIZE_RECOVERY_OUTCOMES, BREAKGLASS_PREVIEW_OUTCOMES, OPEN_BREAKGLASS_OUTCOMES, OPERATIONS_SERVICE_ACCESS, RECORD_INCIDENT_OUTCOMES, REVOKE_BREAKGLASS_OUTCOMES } from "./operations/outcomes.js";
 import { CHANGE_CAPABILITY_OUTCOMES, RESTRICT_CAPABILITY_OUTCOMES } from "./capabilities/outcomes.js";
 import { ACTIVATE_SELLER_OUTCOMES, ASSIGN_ACCOUNT_OUTCOMES, CORPORATE_OWNER_ACCESS, TERMINATE_SELLER_OUTCOMES } from "./sellers/outcomes.js";
 import type { CommercialReadOperationId } from "./response-schemas.js";
+import * as B12 from "./outreach/outcomes.js";
 import {
   APPROVE_COMMISSION_PAYOUT_OUTCOMES,
   CLOSE_COMMISSION_PERIOD_OUTCOMES,
@@ -99,13 +100,40 @@ export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteC
   CMD053: closedCatalogue("CMD053", [...EVERY_SERVICE_ROUTE, ...PATH_IDS, ...COMMISSION_SERVICE_ACCESS, ...RECONCILE_COMMISSION_PAYOUT_OUTCOMES]),
   // the capability commands (package B18): the corporate owner, the path id, the command-layer outcomes of capabilities/outcomes
   // the operations commands (package B16/B18): CMD056 admits the owner or the operations service, CMD057 the owner with a step-up
+  // the breakglass commands (package B16 lane L4): the corporate owner; CMD054 with its step-up, CMD055 with the path grant id
+  CMD054: closedCatalogue("CMD054", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...OPEN_BREAKGLASS_OUTCOMES]),
+  CMD055: closedCatalogue("CMD055", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...REVOKE_BREAKGLASS_OUTCOMES]),
   CMD056: closedCatalogue("CMD056", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...OPERATIONS_SERVICE_ACCESS, ...RECORD_INCIDENT_OUTCOMES]),
   CMD057: closedCatalogue("CMD057", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...AUTHORIZE_RECOVERY_OUTCOMES]),
   CMD058: closedCatalogue("CMD058", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...CHANGE_CAPABILITY_OUTCOMES]),
   CMD059: closedCatalogue("CMD059", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...OPERATIONS_SERVICE_ACCESS, ...RESTRICT_CAPABILITY_OUTCOMES]),
+  // package B12 (outreach; K2): the ACTIVE seller or the owner (CMD061, CMD063, CMD064, content, source, contact), the owner alone (the rest)
+  CMD061: closedCatalogue("CMD061", [...EVERY_ROUTE, ...COOKIE_CSRF, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.PREPARE_OUTREACH_DRAFT_OUTCOMES]),
+  CMD062: closedCatalogue("CMD062", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...B12.AUTHORIZE_OUTREACH_OUTCOMES]),
+  CMD063: closedCatalogue("CMD063", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.SEND_AUTHORIZED_OUTREACH_OUTCOMES]),
+  CMD064: closedCatalogue("CMD064", [...EVERY_ROUTE, ...COOKIE_CSRF, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.RECORD_SALES_ACTIVITY_OUTCOMES]),
+  PutOutreachContent: closedCatalogue("PutOutreachContent", [...EVERY_ROUTE, ...COOKIE_CSRF, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.PUT_OUTREACH_CONTENT_OUTCOMES]),
+  PublishSalesResource: closedCatalogue("PublishSalesResource", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...B12.PUBLISH_SALES_RESOURCE_OUTCOMES]),
+  RegisterSenderIdentity: closedCatalogue("RegisterSenderIdentity", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...B12.REGISTER_SENDER_IDENTITY_OUTCOMES]),
+  VerifySenderIdentity: closedCatalogue("VerifySenderIdentity", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...B12.VERIFY_SENDER_IDENTITY_OUTCOMES]),
+  RecordSenderRevocation: closedCatalogue("RecordSenderRevocation", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...B12.RECORD_SENDER_REVOCATION_OUTCOMES]),
+  PrepareOutreachReview: closedCatalogue("PrepareOutreachReview", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...B12.PREPARE_OUTREACH_REVIEW_OUTCOMES]),
+  RecordOutreachDiagnosis: closedCatalogue("RecordOutreachDiagnosis", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...B12.RECORD_OUTREACH_DIAGNOSIS_OUTCOMES]),
+  RevokeOutreachAuthorization: closedCatalogue("RevokeOutreachAuthorization", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...B12.REVOKE_OUTREACH_AUTHORIZATION_OUTCOMES]),
+  WithdrawOutreachChannelPolicy: closedCatalogue("WithdrawOutreachChannelPolicy", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...B12.WITHDRAW_OUTREACH_CHANNEL_POLICY_OUTCOMES]),
+  RecordProspectSource: closedCatalogue("RecordProspectSource", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.RECORD_PROSPECT_SOURCE_OUTCOMES]),
+  RecordProspectContact: closedCatalogue("RecordProspectContact", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.RECORD_PROSPECT_CONTACT_OUTCOMES]),
 });
 
 /** The closed problem catalogue of each served B10 read route (GetCommissionStatement: no query, the path id, the seller's or owner's access). */
 export const COMMERCIAL_READ_OUTCOMES: Readonly<Record<CommercialReadOperationId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   GetCommissionStatement: closedCatalogue("GetCommissionStatement", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...GET_COMMISSION_STATEMENT_OUTCOMES]),
+  // the breakglass preview (package B16 lane L4): the corporate owner, the two path ids, no query (nothing widens the bounded sample)
+  PreviewTableUnderBreakglass: closedCatalogue("PreviewTableUnderBreakglass", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...CORPORATE_OWNER_ACCESS, ...BREAKGLASS_PREVIEW_OUTCOMES]),
+  // package B12 (K2): a seller reads only its own rows (RLS 0088), a foreign id answers NOT_FOUND like an unknown one
+  GetOutreachDraft: closedCatalogue("GetOutreachDraft", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.GET_OUTREACH_READ_OUTCOMES]),
+  GetOutreachReview: closedCatalogue("GetOutreachReview", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...CORPORATE_OWNER_ACCESS, ...B12.GET_OUTREACH_READ_OUTCOMES]),
+  ListSalesActivities: closedCatalogue("ListSalesActivities", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.GET_OUTREACH_READ_OUTCOMES]),
+  GetOutreachMetrics: closedCatalogue("GetOutreachMetrics", [...EVERY_READ, NO_QUERY, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS]),
+  GetSalesResource: closedCatalogue("GetSalesResource", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.GET_OUTREACH_READ_OUTCOMES]),
 });

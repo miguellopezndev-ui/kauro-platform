@@ -68,12 +68,15 @@ import {
 import type { PoolClient } from "pg";
 import { serverInstantOf } from "./source/rows.js";
 import { PgBankRoutes } from "./repositories/bank-routes.js";
+import { PgBankRefunds } from "./repositories/bank-refunds.js";
 import { PgBankCredits } from "./repositories/bank-credits.js";
+import { PgBankSettlements } from "./repositories/bank-settlements.js";
 import { PgSessionFence } from "./session-fence.js";
 import { PgBuyerTypes, PgProjectDashboard } from "./repositories/agency-app.js";
 import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
 import { PgExecutionDiscovery } from "./execution/discovery.js";
+import { PgDownloadAuthorizationStore } from "./execution/downloads.js";
 import { PgAuditReads, type ResolvedDecisionPatch } from "./audit/reads.js";
 import { PgAuditDiscovery } from "./audit/discovery.js";
 import { PgImportStageStore } from "./repositories/import-stages.js";
@@ -134,6 +137,12 @@ const COMMISSION_GROUP_SERVICES: ReadonlySet<string> = new Set(["commission-serv
 const OPERATIONS_GROUP_SERVICES: ReadonlySet<string> = new Set(["operations-service"]);
 
 /**
+ * The outreach service (package B12, plan A1/A14): the dispatcher units D2..D5 and the public opt-out run under kauro_outreach (0088), a
+ * group that holds no grant on any agency-scoped table.
+ */
+const OUTREACH_GROUP_SERVICES: ReadonlySet<string> = new Set(["outreach-service"]);
+
+/**
  * SYSTEM runs under the control plane, SERVICE under the payment service (package B09, D-CTX-B1) — or, for the commission and finance
  * services, under the commission service's group (package B10, D10-CTX-1) — and every other context under the request handlers.
  */
@@ -142,6 +151,7 @@ export function runtimeRoleOf(context: ExecutionContext): RuntimeRole {
     case "SYSTEM":
       return "kauro_control";
     case "SERVICE":
+      if (OUTREACH_GROUP_SERVICES.has(context.serviceId)) return "kauro_outreach";
       return COMMISSION_GROUP_SERVICES.has(context.serviceId) || OPERATIONS_GROUP_SERVICES.has(context.serviceId) ? "kauro_commission" : "kauro_payment";
     default:
       return "kauro_app";
@@ -224,7 +234,8 @@ export class PgUnitOfWork implements UnitOfWork {
   ) {
     this.context = context;
     this.ids = ids;
-    this.sessionFence = new PgSessionFence(client);
+    // a SERVICE unit of the payment service binds no person: its fence is the definer of migration 0081 (rule 16 for the bank owner commands)
+    this.sessionFence = new PgSessionFence(client, roleFor(context) === "kauro_payment" ? "SERVICE" : "REQUEST");
     this.buyerTypes = new PgBuyerTypes(client);
     this.projectDashboard = new PgProjectDashboard(client);
     this.agencies = new PgAgencyRepository(client);
@@ -320,6 +331,17 @@ export class PgUnitOfWork implements UnitOfWork {
     const at = r.rows[0]?.at;
     if (at === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the server answered no effect instant");
     return at as UtcInstant;
+  }
+
+  /**
+   * The exact effect instant of this unit of work (kauro.effect_now() to the microsecond, never rounded; PV1-SETTLE two-step §3.3 A6):
+   * what a step passes to a judgment the database makes at microseconds (kauro.settlement_request_refusal). Read once, after the locks.
+   */
+  async effectNow(): Promise<string> {
+    const r = await execute<{ at: string }>(this.client, "SELECT to_char(kauro.effect_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS at");
+    const at = r.rows[0]?.at;
+    if (at === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the server answered no effect instant");
+    return at;
   }
 
   /** Runs the registered pre-commit checks in registration order (the factory, once the work returned). */
@@ -562,8 +584,12 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
       }
       throw asFailure(e, context.correlationId);
     } finally {
+      // the backend is ended only when this release DESTROYS the client for its abandoned work. Work given up after the decision (during
+      // COMMIT or ROLLBACK) leaves a finished, clean connection that goes back to the pool: signalling its backend then would terminate a
+      // pooled connection another unit of work may already hold (FLAKY-UOW-TXLIMIT: a pid AND start fence cannot tell a reused backend apart)
+      const endBackend = destroy !== undefined && destroy === unit?.abandonedWork && backend !== null;
       client.release(destroy);
-      if (unit?.abandonedWork != null && backend !== null) await endAbandonedBackend(pool, backend);
+      if (endBackend && backend !== null) await endAbandonedBackend(pool, backend);
     }
   }
 }
@@ -659,6 +685,12 @@ export function bankCreditsOf(uow: UnitOfWork): PgBankCredits {
   return uow.bankCredits;
 }
 
+/** The settlement observations of the bank route in a commerce unit of work of this package (lane PV1-SETTLE). */
+export function bankSettlementsOf(uow: UnitOfWork): PgBankSettlements {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the bank settlements are read in a commerce unit of work of @kauro/persistence");
+  return uow.bankSettlements;
+}
+
 /** The agency's recorded buyer type in a unit of work of this package (B11 lane A1: CMD101 writes it, B10's BuyerTypeReader reads it). */
 export function buyerTypesOf(uow: UnitOfWork): PgBuyerTypes {
   if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the buyer types are read in a unit of work of @kauro/persistence");
@@ -677,10 +709,22 @@ export function bankRoutesOf(uow: UnitOfWork): PgBankRoutes {
   return uow.bankRoutes;
 }
 
+/** The manual-assisted refund tables in a commerce unit of work of this package (lane L-REFUND). */
+export function bankRefundsOf(uow: UnitOfWork): PgBankRefunds {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the bank refunds are read in a commerce unit of work of @kauro/persistence");
+  return uow.bankRefunds;
+}
+
 /** The effect instant of a commerce unit of work of this package (read after its locks). */
 export function effectInstantOf(uow: UnitOfWork): Promise<UtcInstant> {
   if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the effect instant is read in a commerce unit of work of @kauro/persistence");
   return uow.effectInstant();
+}
+
+/** The exact (microsecond) effect instant of a unit of work of this package (read after its locks; PV1-SETTLE two-step A6). */
+export function exactEffectNowOf(uow: UnitOfWork): Promise<string> {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the effect instant is read in a unit of work of @kauro/persistence");
+  return uow.effectNow();
 }
 
 /** The periodic pass's queries of a commerce unit of work of this package (D-PROTO-B4; stage-2 mandate M3). */
@@ -714,8 +758,12 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   readonly requestReads: PgCommerceRequestReads;
   /** The bank-transfer route's tables (migration 0046, lane L-ROUTE), read through bankRoutesOf(uow). */
   readonly bankRoutes: PgBankRoutes;
+  /** The manual-assisted refund tables of the bank-transfer route (migration 0080, lane L-REFUND), read through bankRefundsOf(uow). */
+  readonly bankRefunds: PgBankRefunds;
   /** The inbound credit, statement and order-state tables (migration 0063, lane PV1-INBOUND), read through bankCreditsOf(uow). */
   readonly bankCredits: PgBankCredits;
+  /** The settlement observations of the bank route (migration 0062, lane PV1-SETTLE), read through bankSettlementsOf(uow). */
+  readonly bankSettlements: PgBankSettlements;
   #scopeAgencyId: AgencyId | null = null;
   #financeAgencyId: AgencyId | null = null;
   #causation: CausationId | null = null;
@@ -730,7 +778,9 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
     this.paymentSweeps = new PgPaymentSweeps(client);
     this.requestReads = new PgCommerceRequestReads(client);
     this.bankRoutes = new PgBankRoutes(client);
+    this.bankRefunds = new PgBankRefunds(client);
     this.bankCredits = new PgBankCredits(client);
+    this.bankSettlements = new PgBankSettlements(client);
   }
 
   protected override onJournalEntry(entryId: JournalEntryId): void {
@@ -813,6 +863,8 @@ export interface CommercePools {
   readonly payment?: KauroPool;
   /** kauro_commission: the commission and finance services (package B10, D10-CTX-1). */
   readonly commission?: KauroPool;
+  /** kauro_outreach: the outreach service (package B12). */
+  readonly outreach?: KauroPool;
   /** kauro_control: SYSTEM contexts. */
   readonly control?: KauroPool;
 }
@@ -827,13 +879,14 @@ export class PgCommerceUnitOfWorkFactory extends PgUnitOfWorkFactory implements 
   readonly #pools: Readonly<Partial<Record<RuntimeRole, KauroPool>>>;
 
   constructor(pools: CommercePools, deps: UnitOfWorkDependencies) {
-    const any = pools.app ?? pools.payment ?? pools.commission ?? pools.control;
+    const any = pools.app ?? pools.payment ?? pools.commission ?? pools.outreach ?? pools.control;
     if (any === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "a commerce unit-of-work factory needs at least one verified pool");
     super(any, deps);
     const routes: Partial<Record<RuntimeRole, KauroPool>> = {};
     if (pools.app !== undefined) routes.kauro_app = pools.app;
     if (pools.payment !== undefined) routes.kauro_payment = pools.payment;
     if (pools.commission !== undefined) routes.kauro_commission = pools.commission;
+    if (pools.outreach !== undefined) routes.kauro_outreach = pools.outreach;
     if (pools.control !== undefined) routes.kauro_control = pools.control;
     this.#pools = routes;
   }
@@ -922,11 +975,14 @@ export class PgExecutionUnitOfWork extends PgCommerceUnitOfWork implements Execu
   readonly execution: PgExecutionStore;
   /** The control plane's discovery reads of execution work (mandate B08-CONTROL-EXECUTION, D8-CEX-1). */
   readonly executionDiscovery: PgExecutionDiscovery;
+  /** The download authorizations of delivered packages (package B16 lane L5, CMD038). */
+  readonly downloads: PgDownloadAuthorizationStore;
 
   constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {
     super(client, context, ids, clock);
     this.execution = new PgExecutionStore({ db: client, ids, events: this.events, provenance: () => this.provenance() });
     this.executionDiscovery = new PgExecutionDiscovery(client);
+    this.downloads = new PgDownloadAuthorizationStore(client);
   }
 }
 

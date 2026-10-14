@@ -24,6 +24,7 @@ export {
   EXECUTION_GATE_OUTCOMES,
   DEBIT_CORRELATIONS,
   BANK_CASE_KINDS,
+  BANK_CASE_SOURCE_KINDS,
   STATEMENT_LINE_KINDS,
   COVERAGE_STREAMS,
   DESTINATION_NORM_VERSION,
@@ -69,6 +70,8 @@ export type {
   StatementDebit,
   DebitPage,
   StatementPage,
+  SettlementEvidence,
+  BankReceiptEvidence,
 } from "./provider.js";
 export { EVIDENCE_REJECTION_CODES, OPERATIONAL_CODES, OUTBOUND_EVIDENCE_STATUSES, STATEMENT_DEBIT_STATUSES } from "./provider.js";
 export { PROVIDER_EXCEPTION_KINDS, providerRequestHash, providerRequestIdOf, providerScopeKey, DISPATCH_DEADLINE_SECONDS, PAYMENT_INTENT_DOMAIN, paymentIntentHash } from "./provider.js";
@@ -113,6 +116,7 @@ export {
   fundsAccountOf,
   capturePostings,
   providerFeePostings,
+  settlementPostings,
   movableBalanceOf,
   refundReturnOf,
   returnedCentsOf,
@@ -168,3 +172,11 @@ export {
   isTransferReference,
   transferWindowOf,
 } from "./bank-route.js";
+
+export type { TreasuryRefundEventType } from "./treasury-refund.js";
+export { TREASURY_REFUND_AGGREGATE_KINDS, TREASURY_REFUND_EVENT_TYPES, TREASURY_REFUND_EVENT_PAYLOAD_ALLOWLIST, TREASURY_REFUND_EVENT_SUBSCRIPTIONS } from "./treasury-refund.js";
+export type { OutboundAttemptEventType } from "./execution-attempt.js";
+export { OUTBOUND_ATTEMPT_AGGREGATE_KINDS, OUTBOUND_ATTEMPT_EVENT_TYPES, OUTBOUND_ATTEMPT_EVENT_PAYLOAD_ALLOWLIST, OUTBOUND_ATTEMPT_EVENT_SUBSCRIPTIONS, outboundReference } from "./execution-attempt.js";
+
+export type { DestinationInput, NormalizedDestination, DestinationNormalization, FingerprintParameters } from "./destination.js";
+export { normalizeDestination, canonicalDestinationMessage, DESTINATION_FINGERPRINT_DOMAIN, HOLDER_NAME_MAX_CODE_POINTS } from "./destination.js";

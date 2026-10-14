@@ -45,6 +45,8 @@ export const SQLSTATE = Object.freeze({
   FISCAL_VALIDATION_REFUSED: "KP011",
   REFUND_TAX_INCONSISTENT: "KP012",
   REPLACEMENT_REFUSED: "KP013",
+  // Payments V1 (migration 0080, lane L-REFUND): a manual-rail refund or treasury refund completed without its recorded execution
+  EXECUTION_EVIDENCE_MISSING: "KP014",
   // package B10 (migrations 0028..0031; docs/design/B10-commercial-domain.md §12): each stage-2 lane adds the KC codes its adapters
   // surface. B10-ADAPTERS-RECURRENCE: the designation's writes and the founding reservation's release (0028)
   DESIGNATION_REWRITE: "KC001",
@@ -89,12 +91,31 @@ export const SQLSTATE = Object.freeze({
   B16_L2_RETENTION_B: "KA086",
   B16_L3_PROJECT_DELETION_REQUESTED: "KA087",
   B16_L3_DELETION_EVIDENCE: "KA088",
-  B16_L4_BREAKGLASS_A: "KA089",
-  B16_L5_DOWNLOAD_A: "KA090",
-  B16_L6_RESTORE_A: "KA091",
-  B16_L6_RESTORE_B: "KA092",
+  // lane L4 (migration kauro.breakglass_grants_birth): the authorization does not justify the breakglass scope now
+  B16_L4_BREAKGLASS_SCOPE_UNAUTHORIZED: "KA089",
+  // L5 (CMD038, migration kauro.download_authorizations) raises KA094 from the top of the range down; L8 keeps one reserve at KA090
+  B16_L8_RESERVE_A: "KA090",
+  // L6 (0076): a claim while a restore holds the recovery gate closed; a restore step out of its journal order or unreconciled
+  B16_L6_RECOVERY_GATE: "KA091",
+  B16_L6_RESTORE_RECONCILIATION: "KA092",
   B16_L7_STAGE_RELEASE_A: "KA093",
-  B16_L8_RESERVE_A: "KA094",
+  B16_L5_DOWNLOAD_AUTHORIZATION: "KA094",
+  // package B12 (migration 0088, plan §3): the outreach bindings, the send fence (edges, claim columns, LOCK_NOT_HELD), the activity
+  // facts and the non-owner suppression of a prospect; KC028..KC037 the outreach refusals the database backs (rule 17)
+  OUTREACH_BINDING: "KA095",
+  SEND_FENCE: "KA096",
+  ACTIVITY_EVIDENCE: "KA097",
+  OUTREACH_SUPPRESSION_SCOPE: "KA098",
+  OUTREACH_ROUTE_FORBIDDEN: "KC028",
+  SEND_UNCERTAIN_UNRESOLVED: "KC029",
+  OUTREACH_GRANT_INVALID: "KC030",
+  SENDER_NOT_VERIFIED: "KC031",
+  OUTREACH_CAP_REACHED: "KC032",
+  RESOURCE_NOT_CURRENT: "KC033",
+  OUTREACH_PAUSED: "KC034",
+  OUTREACH_REVIEW_INVALID: "KC035",
+  OUTREACH_ALREADY_SENT: "KC036",
+  OUTREACH_CALENDAR_UNAVAILABLE: "KC037",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",
@@ -140,6 +161,8 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KP012: { code: "PRECONDITION_FAILED", reason: "REFUND_TAX_INCONSISTENT" },
   // the included source replacement is used, execution started, or the purchase is not intact (D-QUOTE-B6)
   KP013: { code: "PRECONDITION_FAILED", reason: "REPLACEMENT_NOT_ALLOWED" },
+  // never met by a handler that records the execution before the completion (ACH-ROUTE §7.22: never REFUNDED without execution evidence)
+  KP014: { code: "INTEGRITY_FAILURE", reason: "EXECUTION_EVIDENCE_MISSING" },
   // package B10 (D10-ERR-1): a designation or a qualifying purchase is written by the designation trigger alone and never rewritten;
   // a founding reservation is released only once its quote ended, naming how, with its slot freed (a race with a checkout meets it)
   KC001: { code: "INTEGRITY_FAILURE", reason: "DESIGNATION_REWRITE" },
@@ -185,8 +208,38 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KA083: { code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
   KA084: { code: "INTEGRITY_FAILURE", reason: "PUBLICATION_EVIDENCE_MISSING" },
   // package B16 L3 (migration 0071): nothing new enters a project whose deletion was requested; a deletion's closing facts need their evidence
+  // KA085 (0069): the soft deadline of a retention record moved without its extension row, a bypassing writer only
+  KA085: { code: "INTEGRITY_FAILURE" },
   KA087: { code: "PRECONDITION_FAILED", reason: "PROJECT_DELETION_REQUESTED" },
   KA088: { code: "INTEGRITY_FAILURE" },
+  // B16 lane L4 (CMD054): a grant whose support case or incident does not justify its project now (another project or agency, closed,
+  // resolved, a false positive, an incident not naming the project, a project on its way to deletion, a closed agency)
+  KA089: { code: "PRECONDITION_FAILED", reason: "BREAKGLASS_SCOPE_UNAUTHORIZED" },
+  // package B16 L6 (0076): a claim refused while a restore holds the recovery gate closed is retried once the gate opens; a restore
+  // step the database refuses (out of journal order, a payment conflict, a release without its run) is unreconciled consequences
+  KA091: { code: "CAPACITY_UNAVAILABLE", retryable: true },
+  KA092: { code: "PRECONDITION_FAILED", reason: "CONSEQUENCES_UNRECONCILED" },
+  // B16 L5 (0075): a download grant a request session wrote around CMD038 (package not AVAILABLE, changed membership, lifetime over 900 s,
+  // an artifact that is not a live delivery copy). Only a bypassing writer reaches it: an integrity failure like KA088, never a retry
+  KA094: { code: "INTEGRITY_FAILURE" },
+  // package B12 (migration 0088): a binding, an activity fact or a non-owner suppression a handler that follows the domain never breaks;
+  // a lost send fence (an edge, a claim column or a lock the writer did not hold) is the dispatcher's "lost", as KA080
+  KA095: { code: "INTEGRITY_FAILURE", reason: "OUTREACH_BINDING" },
+  KA096: { code: "PRECONDITION_FAILED", reason: "SEND_FENCED" },
+  KA097: { code: "INTEGRITY_FAILURE", reason: "ACTIVITY_EVIDENCE" },
+  KA098: { code: "INTEGRITY_FAILURE", reason: "OUTREACH_SUPPRESSION_SCOPE" },
+  // the outreach refusals (plan §3): the command's own outcome when a race moved the fact after its read; the uncovered calendar is a
+  // platform configuration gap (503, retryable once the calendar is extended)
+  KC028: { code: "PRECONDITION_FAILED", reason: "OUTREACH_ROUTE_FORBIDDEN" },
+  KC029: { code: "PRECONDITION_FAILED", reason: "SEND_UNCERTAIN_UNRESOLVED" },
+  KC030: { code: "PRECONDITION_FAILED", reason: "OUTREACH_GRANT_INVALID" },
+  KC031: { code: "PRECONDITION_FAILED", reason: "SENDER_NOT_VERIFIED" },
+  KC032: { code: "PRECONDITION_FAILED", reason: "OUTREACH_CAP_REACHED" },
+  KC033: { code: "PRECONDITION_FAILED", reason: "RESOURCE_NOT_CURRENT" },
+  KC034: { code: "PRECONDITION_FAILED", reason: "OUTREACH_PAUSED" },
+  KC035: { code: "PRECONDITION_FAILED", reason: "OUTREACH_REVIEW_INVALID" },
+  KC036: { code: "PRECONDITION_FAILED", reason: "OUTREACH_ALREADY_SENT" },
+  KC037: { code: "CAPACITY_UNAVAILABLE", reason: "OUTREACH_CALENDAR_UNAVAILABLE" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },
@@ -289,6 +342,11 @@ export const COMMERCIAL_UNIQUE_FAILURES: Readonly<Record<string, () => DomainFai
   prospects_one_live_per_organization: () => new DomainFailure("PRECONDITION_FAILED", "the organization already has a live prospect", { reason: "PROSPECT_EXISTS" }),
   attribution_claims_one_live_per_seller: () => new DomainFailure("PRECONDITION_FAILED", "the seller already has a live claim on the prospect", { reason: "CLAIM_EXISTS" }),
   attribution_allocations_one_per_agency: () => new DomainFailure("PRECONDITION_FAILED", "the agency already has a frozen attribution allocation", { reason: "ATTRIBUTION_EXISTS" }),
+  // CMD054 (migration 0074): two opens of one project race on its one live grant; a step-up proof opens one grant; one authorization opens
+  // one grant of a project — after its expiry a new justified grant is required (R2-050)
+  breakglass_grants_one_live_per_project: () => new DomainFailure("PRECONDITION_FAILED", "the project already holds a live breakglass grant", { reason: "BREAKGLASS_GRANT_LIVE" }),
+  breakglass_grants_proof_once: () => new DomainFailure("PRECONDITION_FAILED", "the step-up proof already opened a breakglass grant", { reason: "BREAKGLASS_PROOF_REUSED" }),
+  breakglass_grants_one_per_authorization: () => new DomainFailure("PRECONDITION_FAILED", "this authorization already opened a grant of the project: a new justified grant is required", { reason: "BREAKGLASS_RENEWAL_REFUSED" }),
   // CMD048: two first assignments of one agency race to open its sales account; the loser finds it opened at version 1 (D10-ASSIGN-3)
   sales_accounts_pkey: () => new StaleVersionFailure(1, "ASSIGNED"),
 });

@@ -1,0 +1,163 @@
+{
+  "verdict": "REJECT",
+  "summary": "Internal adversary review (it stands in for the Codex lane review) of pv1/settle at 5800876a, the diff 96682f8b..5800876a. The product code holds up. The lock order is acyclic: L1 OUTBOUND, then INBOUND, then payout-cash, then the request row FOR NO KEY UPDATE. CMD052 and CMD053 take the statement row and then payout-cash, which matches the P3 census. effectNow (A6) is read after the last lock, and no wait that matters to a judgment follows it. Double settlement is closed at four levels: the A5 consumed check under the row lock, the UNIQUE settlements.request_id, the live one-per-withdrawal and cross-account one-per-bank-transaction indexes, and the global payout-cash lock. received <= withdrawn is held in the domain and by CHECKs on both tables. FUNDS compares W+F with route_provider_available_cents, which equals the PSP_AVAILABLE credits. The kauro_app/kauro_payment split is real: column grants plus RLS. The 16(c) probe at version 1 is legitimate, not a dodge: RLS WITH CHECK runs before ExecConstraints, so a permissive policy would surface as 23502 or 23505 and the cell would go red. NEVER-RESEND holds because the lane has no outbound effect. Agency-less M1/P1 handlers adopt their scope from the stored order. The builder test changes are justified and none weakens an assertion: cell 21 order, causation id NOT NULL, a strict simulatedCrashOf, drain before recorded, and EVIDENCE 20(b) +1. The 5800876a harness fix only moves the world build out of runCell; ids, steps and bodies are unchanged and no world name is reused, so it does not hide a product timeout. FAIL on 3 MAJOR evidence findings. ADV-1: the case map is not updated, and R2-085 claims EXECUTED_LOCAL with a path that does not exist, against plan F2. ADV-2: no invariant oracle runs in the settlement and dispatch DB cells. ADV-3: no recorded red-proof for the cells the plan requires. Plus 6 MINOR findings.",
+  "verify_observed": "Not run by this adversary. The lane runs were not re-read as receipts here. No red-proof receipt for 82aa634d..5800876a exists under .kauro/reviews or docs/review. The 82aa634d red on 5d963424 proves only that the product was absent (trivially red), not that each cell fails with its named fix reverted.",
+  "omissions": 0,
+  "cases": [
+    { "id": "R2-085", "claimed_status": "EXECUTED_LOCAL (ACH-case-map.md:66)", "agree": false, "note": "The cited path packages/persistence/test/settlement-cells.test.ts does not exist; the tests are apps/api/test/settlement-cells.test.ts. Plan F2 requires R2-085 to stay PARTIAL -> B14-worker-host until a runner cell exists. ACH-case-map.md is not touched by the diff (ADV-1)." },
+    { "id": "SET-M-ST2-*", "claimed_status": "C (ACH-ROUTE 7.25)", "agree": true, "note": "Executed on real PostgreSQL through the real handler. ST2-PARTIAL overstates journal included (ADV-6)." },
+    { "id": "SET-M-ST3-*", "claimed_status": "C (ACH-ROUTE 7.25)", "agree": true, "note": "Executed on the real consumer and SERVICE unit. Red-proof per cell is missing (ADV-3); without the oracle the sums are checked in only 5 cells (ADV-2)." },
+    { "id": "ACH-D1..D4", "claimed_status": "C", "agree": true, "note": "Real dispatcher. The PAYMENT_SERVICE-only half of the agency-less predicate is uncovered (ADV-5)." }
+  ],
+  "findings": [
+    {
+      "id": "ADV-1", "severity": "MAJOR", "family": "evidence",
+      "title": "Case map not updated: R2-085 claims EXECUTED_LOCAL with a nonexistent test path; the plan PARTIAL status, SIMULATED delivery marks, tier-1 GAPs and caveats are missing",
+      "file": "docs/design/ACH-case-map.md", "line": 66,
+      "reproduction": "git diff 96682f8b..5800876a -- docs/design/ACH-case-map.md is empty. Line 66 reads: R2-085 (B15) | EXECUTED_LOCAL ST1/ST2 (packages/persistence/test/settlement-cells.test.ts ...). That file does not exist at 5800876a. PV1-SETTLE-two-step.md section 7 F2 requires R2-085 to be PARTIAL -> B14-worker-host until a runner cell exists, and the P5 SIMULATED delivery marks for the ACH-M-M1/P1 cells. GAP-SET-AVAIL-PRODUCER, GAP-SET-NEG-AVAIL, GAP-SET-REMAINDER and caveats C1-C7 appear only in the plan.",
+      "acceptance_criterion": "At the candidate, every case-map row the lane touches cites a test file that exists. R2-085 carries the status the plan decided, with the later package named. Every tier-1 GAP and caveat of the plan has a case-map row with C/GAP/N-A and a reason, and the counts agree with program.json.",
+      "failing_test": "Case-map lint (the platform case-map/matrix check run by ci-local): every cited test path must exist and every status must match the plan. At 5800876a it must fail on line 66; a rule check that does not fail is itself a gap (checklist 15).",
+      "scope": [
+        { "file": "docs/design/ACH-case-map.md", "line": 66, "why": "the R2-085 status and path are false" },
+        { "file": "docs/design/PV1-SETTLE-two-step.md", "line": 1, "why": "section 7 F2/P5, the GAP-SET-* rows and caveats C1-C7 to carry into the case map" },
+        { "file": "docs/design/ACH-ROUTE.md", "line": 1222, "why": "the 7.25 ST2/ST3 matrix rows must match the case map" }
+      ],
+      "status": "OPEN", "reviewer_omission": false
+    },
+    {
+      "id": "ADV-2", "severity": "MAJOR", "family": "money",
+      "title": "No invariant oracle in the settlement and dispatch DB cells: PSP_AVAILABLE >= 0, settlement <=> APPLIED, per-set balance and BANK_IN_TRANSIT >= 0 are checked in only 5 cells",
+      "file": "apps/api/test/settlement-cells.test.ts", "line": 163,
+      "reproduction": "grep invariantsAfterEach in apps/api/test/settlement-cells.test.ts and ach-dispatch-cells.test.ts returns nothing. Cells 10(c)/(d) run the CMD052/CMD053 statement paths and the B10 oracle never runs after them. assertBalanced (settlement-support.ts:278) is called in 5 cells only. A product change that, for example, posts the fee twice, or keeps markApplied when the settlement insert is lost, would pass every cell that does not call assertBalanced or deepEqual the postings.",
+      "acceptance_criterion": "After every DB cell in both files, an oracle asserts: (i) every settlement posting set balances; (ii) PSP_AVAILABLE >= 0 and BANK_IN_TRANSIT >= 0 per route; (iii) outcome APPLIED <=> exactly one settlement with that request_id; (iv) REFUSED <=> one SETTLEMENT_REFUSED case cited; (v) received <= withdrawn on every row; plus the B10 kit oracle.",
+      "failing_test": "Mutant: in applySettlementRequest, double the PROCESSOR_EXPENSE line (or skip the BANK_CASH credit). Today only the cells that call assertBalanced or a postings deepEqual go red. With the oracle registered via invariantsAfterEach, every cell that applies goes red.",
+      "scope": [
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 163, "why": "the cell suite has no invariantsAfterEach" },
+        { "file": "apps/api/test/ach-dispatch-cells.test.ts", "line": 1, "why": "D1-D4 deliver settlement and bank events with no oracle" },
+        { "file": "apps/api/test/settlement-support.ts", "line": 278, "why": "assertBalanced is the oracle seed but is opt-in" }
+      ],
+      "status": "OPEN", "reviewer_omission": false
+    },
+    {
+      "id": "ADV-3", "severity": "MAJOR", "family": "evidence",
+      "title": "No red-proof record for the cells the plan requires (D1-D3 on K0a, 2(1), 2(3), 10, 12, 16(c), 18, 20)",
+      "file": "apps/api/test/settlement-cells.test.ts", "line": 446,
+      "reproduction": "No pv1-settle redproof record exists under .kauro/reviews or docs/review. The only red claim is the 82aa634d commit on 5d963424, where the product is absent, so every cell is trivially red. That does not show that a cell fails with its named fix reverted (CLAUDE.md rule 3; checklist 7). Static reading says the cells probably kill their mutants: 10(a) without the A5 consumed check gets STALE_VERSION -> FAILED, not DUPLICATE; 10(b) with the funds read before A2 sees negative available; 12(ii) with effectNow before A4 gets created_at = T1; 20(a) without A1b gets APPLIED. This is unproven.",
+      "acceptance_criterion": "For each listed cell there is a red-proof record naming the reverted fix (A5 consumed check, A2 ordering, A6 after the last lock, A1b re-read, the RLS split for 16(c), the forbid triggers for 18, the PAYMENT_SERVICE predicate for D1-D3), the sha on which it failed and the failing assertion text. Each turns green on 5800876a.",
+      "failing_test": "node repos/pv1-settle/tools/red-proof.mjs <mutant-sha> 5800876a --tests apps/api/test/settlement-cells.test.ts (via run-heavy kind redproof, clone-run.sh), once per mutant commit; each must report the named cell red.",
+      "scope": [
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 446, "why": "10(a) A5 consumed check" },
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 469, "why": "10(b) funds after the locks" },
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 619, "why": "12(ii) effectNow after the last lock" },
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 813, "why": "16(c) the kauro_app write refusal" },
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 906, "why": "18 forged rows" },
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 966, "why": "20 A1b evidence re-read" },
+        { "file": "apps/api/test/ach-dispatch-cells.test.ts", "line": 1, "why": "D1-D3 agency-less predicate on base K0a" }
+      ],
+      "status": "OPEN", "reviewer_omission": false
+    },
+    {
+      "id": "ADV-4", "severity": "MINOR", "family": "revocation",
+      "title": "16(c) probe moved to version 1: legitimate, but the realistic forged version-2 shape (KA002 from domain_events_bind_aggregate) is no longer asserted",
+      "file": "apps/api/test/settlement-cells.test.ts", "line": 834,
+      "reproduction": "The probe inserts the forged event at version 1 with causation_id NULL and accepts error 42501 or rows 0. At version 1 the RLS check fires before constraints, so the probe is real. But a kauro_app writer forging the next version (2) of a live request was the earlier shape, and its refusal by the aggregate binding is no longer exercised.",
+      "acceptance_criterion": "The cell asserts both shapes: version 1 is refused with 42501 or 0 rows (RLS), and the next version of an existing request is refused (42501 or KA002), each with the error code named.",
+      "failing_test": "Make the domain_events/outbox owner-insert policy permissive for kauro_app: the version-1 probe must go red (23502 or 23505 instead of 42501), and the version-2 probe must go red as well.",
+      "scope": [
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 834, "why": "the accepted refusal set" },
+        { "file": "packages/persistence/migrations/0071_bank_settlement.sql", "line": 228, "why": "the owner INSERT policy of recorded.v1" },
+        { "file": "packages/persistence/migrations/0071_bank_settlement.sql", "line": 232, "why": "the outbox owner insert policy" }
+      ],
+      "status": "OPEN", "reviewer_omission": false
+    },
+    {
+      "id": "ADV-5", "severity": "MINOR", "family": "tenant",
+      "title": "The consumer-is-PAYMENT_SERVICE half of the agency-less predicate is uncovered",
+      "file": "apps/api/src/payments/dispatcher.ts", "line": 64,
+      "reproduction": "Delete the consumer-not-PAYMENT_SERVICE term of the predicate at dispatcher.ts:64. An enumerated agency-less event (for example settlement_request.recorded.v1) would then be handed to FINANCE or FISCAL with agency null. No D-cell forges such an outbox row for those consumers, so every test stays green.",
+      "acceptance_criterion": "An agency-less event delivered to any consumer other than PAYMENT_SERVICE ends INTEGRITY_FAILURE, with no effect, for each of the three enumerated types.",
+      "failing_test": "ach-dispatch-cells: insert outbox rows for FINANCE and FISCAL carrying each AGENCY_LESS type with agency null; dispatch; assert INTEGRITY_FAILURE and no consumer effect. Red when the term is removed.",
+      "scope": [
+        { "file": "apps/api/src/payments/dispatcher.ts", "line": 64, "why": "the predicate" },
+        { "file": "apps/api/src/payments/dispatcher.ts", "line": 60, "why": "the enumerated set" },
+        { "file": "apps/api/src/payments/consumers.ts", "line": 233, "why": "the paymentServiceEffect default goes to bankHandlerOf" }
+      ],
+      "status": "OPEN", "reviewer_omission": false
+    },
+    {
+      "id": "ADV-6", "severity": "MINOR", "family": "partial",
+      "title": "ST2-PARTIAL excludes the journal from its footprint compare, but 7.25 claims the whole footprint (journal included) rolled back (checklist 13 false claim)",
+      "file": "apps/api/test/settlement-cells.test.ts", "line": 432,
+      "reproduction": "settlement-support.ts:276 sameButJournal replaces the journal of the observed footprint with the baseline journal, so a journal row left behind after a failure at event_insert, outbox_insert or journal_final passes the compare. ACH-ROUTE.md:1222 says journal included.",
+      "acceptance_criterion": "Either the cell asserts the journal state after each injected failure (no committed journal row, or the documented FAILED journal row with its exact shape), or 7.25 states precisely what is excluded and why.",
+      "failing_test": "Mutant: commit the journal row in its own transaction before the event insert. The cell must go red at event_insert.",
+      "scope": [
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 432, "why": "the ST2-PARTIAL compare" },
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 172, "why": "the same helper in the ST2 refusal cells" },
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 196, "why": "the same helper" },
+        { "file": "apps/api/test/settlement-support.ts", "line": 276, "why": "sameButJournal" },
+        { "file": "docs/design/ACH-ROUTE.md", "line": 1222, "why": "the claim" }
+      ],
+      "status": "OPEN", "reviewer_omission": false
+    },
+    {
+      "id": "ADV-7", "severity": "MINOR", "family": "evidence",
+      "title": "An apply auto-resolves earlier refused cases, including EVIDENCE_MISMATCH (possible tampering), with no resolution reason; resolved_at is the transaction-start clock",
+      "file": "packages/persistence/src/repositories/bank-settlements.ts", "line": 343,
+      "reproduction": "Record with tampered facts, giving REFUSED EVIDENCE_MISMATCH and an OPEN case. Re-record the same withdrawal correctly and apply it. resolveRefusedCases sets every SETTLEMENT_REFUSED case of the withdrawal to RESOLVED, with no reason that says the tamper was superseded rather than reviewed. resolved_at is kauro.server_now, the transaction start, not the effect instant.",
+      "acceptance_criterion": "Either EVIDENCE_MISMATCH cases are not auto-resolved (they stay OPEN for a human), or the resolution records its cause (the superseding request id) and the effect instant. The choice is decided in the plan and tested.",
+      "failing_test": "Cell: a 20(a) refusal, then a correct re-record and apply; assert the EVIDENCE_MISMATCH case is in the decided state with its resolution cause.",
+      "scope": [
+        { "file": "packages/persistence/src/repositories/bank-settlements.ts", "line": 340, "why": "resolveRefusedCases" },
+        { "file": "packages/application/src/commerce/bank/settlement.ts", "line": 621, "why": "the A8 apply calls it" },
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 1023, "why": "cell 21 covers FUNDS_UNAVAILABLE only" }
+      ],
+      "status": "OPEN", "reviewer_omission": false
+    },
+    {
+      "id": "ADV-8", "severity": "MINOR", "family": "money",
+      "title": "The in-transit page omits APPLIED receipt-less settlements (the money actually in BANK_IN_TRANSIT), and a receipt can never be attached later; GAP-SET-REMAINDER should name it",
+      "file": "packages/persistence/src/repositories/bank-settlements.ts", "line": 439,
+      "reproduction": "Cell 19, second half (receivedCents null), applies: BANK_IN_TRANSIT is debited W and not cleared. inTransit lists only RECORDED and REFUSED requests, so this amount is invisible on the owner page. The live one-per-withdrawal index refuses a second request carrying the receipt, so no path ever clears it.",
+      "acceptance_criterion": "The owner can see every uncleared BANK_IN_TRANSIT amount, or the plan names the gap with its later package, and the R2 15:101 mapping says exactly what the page shows.",
+      "failing_test": "Cell: apply a receipt-less request; the owner surface (or a documented GAP row) shows its W as in transit.",
+      "scope": [
+        { "file": "packages/persistence/src/repositories/bank-settlements.ts", "line": 439, "why": "the page query" },
+        { "file": "apps/api/test/settlement-cells.test.ts", "line": 954, "why": "cell 19 receipt-less apply" },
+        { "file": "docs/design/PV1-SETTLE-two-step.md", "line": 1, "why": "GAP-SET-REMAINDER wording" }
+      ],
+      "status": "OPEN", "reviewer_omission": false
+    },
+    {
+      "id": "ADV-9", "severity": "MINOR", "family": "money",
+      "title": "Event payloads convert bigint cents with Number: precision is lost above 2^53",
+      "file": "packages/application/src/commerce/bank/settlement.ts", "line": 659,
+      "reproduction": "settlement.recorded.v1 and the refusal event carry Number of request.withdrawnCents, feeCents and receivedCents. Amounts above 9007199254740991 cents are silently rounded in the event while the row keeps the exact bigint.",
+      "acceptance_criterion": "Event cent fields are exact: either strings, or a bound enforced at intake that keeps every amount below 2^53, with a test.",
+      "failing_test": "Unit: build the payload for withdrawnCents = 2^53 + 1 (bigint) and assert the event value equals the row value.",
+      "scope": [
+        { "file": "packages/application/src/commerce/bank/settlement.ts", "line": 616, "why": "refusal event payload" },
+        { "file": "packages/application/src/commerce/bank/settlement.ts", "line": 659, "why": "applied event payload" }
+      ],
+      "status": "OPEN", "reviewer_omission": false
+    }
+  ],
+  "family_coverage": [
+    { "scope": "lock order L1 > INBOUND > payout-cash > request row (settlement.ts:584-587)", "test": "SET-M-ST3-RACE 10(a)/(b) (settlement-cells.test.ts:446, :469)", "closed": false, "note": "red-proof missing (ADV-3)" },
+    { "scope": "A6 effectNow after the last lock (settlement.ts:589)", "test": "SET-M-ST3-EXPIRY 12(ii) (settlement-cells.test.ts:619, :654)", "closed": false, "note": "red-proof missing (ADV-3)" },
+    { "scope": "A1b evidence re-read (settlement.ts, applySettlementRequest)", "test": "SET-M-ST3-EVIDENCE 20 (settlement-cells.test.ts:966)", "closed": false, "note": "red-proof missing (ADV-3)" },
+    { "scope": "kauro_app/kauro_payment split (0071_bank_settlement.sql:209-245)", "test": "16(c) (settlement-cells.test.ts:813-854)", "closed": false, "note": "ADV-4, ADV-3" },
+    { "scope": "forged rows (0071_bank_settlement.sql:268-341)", "test": "SET-M-ST3-BIND 18 (settlement-cells.test.ts:906)", "closed": false, "note": "red-proof missing (ADV-3)" },
+    { "scope": "agency-less predicate (dispatcher.ts:64)", "test": "ach-dispatch-cells D1-D4", "closed": false, "note": "PAYMENT_SERVICE half uncovered (ADV-5)" },
+    { "scope": "ST2 partial rollback (settlement.ts:430)", "test": "SET-M-ST2-PARTIAL (settlement-cells.test.ts:412)", "closed": false, "note": "journal excluded (ADV-6)" },
+    { "scope": "money invariants per DB cell", "test": "none (assertBalanced in 5 cells)", "closed": false, "note": "ADV-2" },
+    { "scope": "case map R2-085 (ACH-case-map.md:66)", "test": "none", "closed": false, "note": "ADV-1" },
+    { "scope": "5800876a harness movedWorld (ach-route-cells.test.ts)", "test": "ach-route-cells, ids and steps unchanged", "closed": true, "note": "no product timeout hidden" }
+  ],
+  "residuals_judged": [
+    { "item": "C1 no owner re-check at apply (bounded by the 900 s REQUEST_STALE)", "judgement": "accepted as disclosed, with cells 16(a)/(d); must still be listed in the Codex prompt" },
+    { "item": "builder test changes (cell 21 order, causation NOT NULL, strict simulatedCrashOf, drain before recorded, 20(b) +1)", "judgement": "accepted: each tightens or reorders, none weakens an assertion" },
+    { "item": "rule 24 cited by the mandate", "judgement": "FAILURE-MATRIX-TEMPLATE.md has rules 1-23 only (unchanged since b729e1d1); the race-at-a-real-lock requirement is rules 1/13 plus adversary checklist 12" },
+    { "item": "mutant red-proofs", "judgement": "not run by this adversary (heavy; needs mutant commits); the static kill analysis is in ADV-3" }
+  ]
+}

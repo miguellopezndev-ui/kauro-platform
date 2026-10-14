@@ -38,6 +38,7 @@ import type {
 import { COMMERCE_POLICY_VERSION, DomainFailure, IdempotencyConflictFailure, NotFoundFailure, StaleVersionFailure, commandRequestDigest, toUtcInstant } from "@kauro/domain";
 import type { PaymentRuntime } from "./runtime.js";
 import { causedBy } from "./runtime.js";
+import { bankRefundsOf, bankRoutesOf } from "@kauro/persistence";
 
 /** A service command as the route admitted it: the verified service identity, the idempotency key, the path ids and the closed body. */
 export interface ServiceCommandRequest<Body> {
@@ -88,7 +89,13 @@ export async function recordServiceDenial(rt: PaymentRuntime, context: ServiceCo
  * The access decision of a service command (design §3.4): the verified identity holds PAYMENT_SERVICE in this deployment's
  * environment, then the stored operation resolves through the scope index. Returns the adopted agency, or the recorded refusal.
  */
-async function serviceAccess<View>(rt: PaymentRuntime, action: string, request: ServiceCommandRequest<unknown>, stored: { readonly kind: "REFUND" | "PAYMENT_ORDER"; readonly key: string }): Promise<{ readonly agencyId: AgencyId } | Rejection<View>> {
+async function serviceAccess<View>(
+  rt: PaymentRuntime,
+  action: string,
+  request: ServiceCommandRequest<unknown>,
+  stored: { readonly kind: "REFUND" | "PAYMENT_ORDER"; readonly key: string },
+  refuse?: (uow: CommerceUnitOfWork, adopted: AgencyId | null) => Promise<DomainFailure | null>,
+): Promise<{ readonly agencyId: AgencyId } | Rejection<View>> {
   const context = serviceContext(request.identity, request.correlationId);
   const decision = rt.authorizer.authorizeService({ identity: request.identity, role: "PAYMENT_SERVICE", deploymentEnvironment: rt.environment });
   if (decision.kind === "DENY") {
@@ -96,7 +103,13 @@ async function serviceAccess<View>(rt: PaymentRuntime, action: string, request: 
     await recordServiceDenial(rt, context, action, failure);
     return rejection(failure, request.correlationId);
   }
-  const agencyId = await rt.assembly.commerce.run(context, (uow) => uow.adoptScope(stored.kind, stored.key));
+  const adopted = await rt.assembly.commerce.run(context, async (uow) => {
+    const agency = await uow.adoptScope(stored.kind, stored.key);
+    return { agency, refused: refuse === undefined ? null : await refuse(uow, agency) };
+  });
+  // a refusal of the command itself (read-only, before any journal entry: nothing is written)
+  if (adopted.refused !== null) return rejection(adopted.refused, request.correlationId);
+  const agencyId = adopted.agency;
   if (agencyId === null) {
     // a foreign and a nonexistent stored operation look alike: nothing is adopted, nothing written but the denial
     const failure = new NotFoundFailure(stored.kind === "REFUND" ? "refund" : "payment_order");
@@ -161,10 +174,26 @@ function refundHooks(rt: PaymentRuntime, refundId: RefundId): ProviderCommandHoo
   };
 }
 
+/**
+ * NEVER-RESEND at CMD033 (ACH-ROUTE §7.22 "Other entry points", D-ACH-19/20, FC-RAIL): the automated executor never dispatches a refund of
+ * the manual rail — a refund whose destination the owner's approval captured (F2), a refund of an order paid by bank transfer, or a
+ * route-scope treasury refund of a bank credit (BANK_CREDIT) — whatever its state: 409 MANUAL_RAIL_NO_AUTOMATED_OUTBOUND, read-only, before
+ * any journal entry, so nothing is written. Its money moves only by the owner's declared execution (X1/X4) and recorded evidence (G2).
+ */
+async function manualRailRefusal(uow: CommerceUnitOfWork, refundId: RefundId, adopted: AgencyId | null): Promise<DomainFailure | null> {
+  const repo = bankRefundsOf(uow);
+  const manual = new DomainFailure("PRECONDITION_FAILED", "a manual-rail refund is executed only by the owner's declared execution, never by the automated executor", { reason: "MANUAL_RAIL_NO_AUTOMATED_OUTBOUND" });
+  if (adopted === null) return (await repo.treasuryRefund(refundId)) !== null ? manual : null;
+  if ((await repo.destinationOf("CAPTURE", refundId)) !== null) return manual;
+  const refund = await uow.commerce.refunds.get(refundId);
+  if (refund !== null && (await bankRoutesOf(uow).instructionsOf(refund.orderId)) !== null) return manual;
+  return null;
+}
+
 /** CMD033 ExecuteRefund: the provider-effect protocol with the payment service as its principal (design §8 CMD033). */
 export async function executeRefund(rt: PaymentRuntime, request: ServiceCommandRequest<ExecuteRefundBody>): Promise<CommandResult<ExecuteRefundView>> {
   const refundId = request.path["refundId"] as RefundId;
-  const access = await serviceAccess<ExecuteRefundView>(rt, EXECUTE_REFUND.id, request, { kind: "REFUND", key: refundId });
+  const access = await serviceAccess<ExecuteRefundView>(rt, EXECUTE_REFUND.id, request, { kind: "REFUND", key: refundId }, (uow, adopted) => manualRailRefusal(uow, refundId, adopted));
   if ("kind" in access) return access;
   const context = serviceContext(request.identity, request.correlationId);
   const adapter = rt.assembly.provider;

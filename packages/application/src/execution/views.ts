@@ -39,3 +39,32 @@ export interface JobView {
   readonly publishedPackageId?: string;
   readonly permittedActions: ReadonlyArray<ExecutionResourceAction>;
 }
+
+/** One granted artifact: what it is and its read URL (a bearer secret bound to the requester; never journaled, never logged). */
+export interface DownloadArtifactView {
+  readonly artifactId: string;
+  readonly role: string;
+  readonly byteLength: number;
+  readonly sha256: string;
+  readonly url: string;
+}
+
+/**
+ * CMD038 AuthorizeDownload (package B16 lane L5; R2-048, S048): one grant of short-lived read URLs over delivery copies of an AVAILABLE
+ * package. expiresAt = least(issuedAt + 900 s, the governing retention deadline); a URL cannot be revoked at the provider before it
+ * (providerRevocation UNAVAILABLE: a role change or a revocation stops new URLs, an issued one keeps its disclosed residual lifetime).
+ */
+export interface DownloadView {
+  readonly authorizationId: string;
+  readonly packageId: string;
+  readonly projectId: string;
+  readonly version: number;
+  readonly issuedAt: UtcInstant;
+  readonly expiresAt: UtcInstant;
+  readonly lifetimeSeconds: number;
+  readonly providerRevocation: "UNAVAILABLE";
+  readonly artifacts: ReadonlyArray<DownloadArtifactView>;
+}
+
+/** The journaled grant: the view without its URLs (the journal never holds a bearer secret; every answer re-signs it). */
+export type DownloadGrantView = Omit<DownloadView, "artifacts"> & { readonly artifacts: ReadonlyArray<Omit<DownloadArtifactView, "url">> };

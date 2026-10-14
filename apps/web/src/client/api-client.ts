@@ -69,6 +69,9 @@ export interface CallInput {
 }
 
 const PATH_VALUE = /^[A-Za-z0-9_-]{1,128}$/;
+/** B12 D-B12S-4: a *Ref path parameter (a bank account reference) is the server's REF_PATH; "." and ".." are never a path segment. */
+const REF_VALUE = /^[A-Za-z0-9._:-]{1,128}$/;
+const pathValueOk = (name: string, value: string): boolean => (name.endsWith("Ref") ? REF_VALUE.test(value) && value !== "." && value !== ".." : PATH_VALUE.test(value));
 const AGENCY_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{16,128}$/;
 const CORRELATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -77,7 +80,7 @@ function urlFor(descriptor: WireDescriptor, input: CallInput): string {
   let path = descriptor.path;
   for (const name of descriptor.pathParameters) {
     const value = input.path?.[name];
-    if (value === undefined || !PATH_VALUE.test(value)) throw new RangeError(`path parameter ${name} of ${descriptor.operationId} is missing or malformed`);
+    if (value === undefined || !pathValueOk(name, value)) throw new RangeError(`path parameter ${name} of ${descriptor.operationId} is missing or malformed`);
     path = path.replace(`{${name}}`, encodeURIComponent(value));
   }
   if (path.includes("{")) throw new RangeError(`${descriptor.operationId} has a path parameter its descriptor does not list`);

@@ -89,7 +89,7 @@ export interface AuditWorld {
   /** CMD012's write: a successor revision supersedes the subject's sealed source, with its events (to EXECUTION_CONTROL). */
   supersedeSource(subject: AuditSubject): Promise<void>;
   /** A plan of the subject by the request handlers, DRAFT -> VALIDATION_REQUIRED (v2), with its events. */
-  plan(subject: AuditSubject, seed: string): Promise<{ readonly planId: PlanId; readonly bodyHash: Sha256Hex }>;
+  plan(subject: AuditSubject, seed: string, shape?: (base: PlanBody) => PlanBody): Promise<{ readonly planId: PlanId; readonly bodyHash: Sha256Hex }>;
   /** CMD024's write: the plan's next validation intent at its version, VALIDATION_REQUIRED -> VALIDATING with plan.validating.v1. */
   requestValidation(subject: AuditSubject, planId: string, expectedVersion: number): Promise<PlanValidationRecord>;
   /** CMD023's writes: the plan SUPERSEDED at its version by a successor DRAFT with another body; returns the successor. */
@@ -211,8 +211,8 @@ export async function openAuditWorld(w: ExecutionWorld): Promise<AuditWorld> {
       });
     },
 
-    async plan(s, seed) {
-      const body = planBodyOf(s, seed);
+    async plan(s, seed, shape = (base) => base) {
+      const body = shape(planBodyOf(s, seed));
       const planId = ids.next() as PlanId;
       const bodyHash = structuredDigest(DOMAINS.PLAN_BODY, 1, body);
       await h.app.run(tenantOf(s), async (uow) => {

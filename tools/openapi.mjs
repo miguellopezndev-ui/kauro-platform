@@ -150,6 +150,23 @@ export function runtimeSchemas(sources) {
 
 // --- generation ----------------------------------------------------------------------------------------------------------
 
+/** The registry-shaped description of a B12 operation no catalogue id names (plan companion §R): gate G-UX_PRIVATE, idempotency REQUIRED. */
+function b12RegistryLessCommand(spec) {
+  const who = spec.role === "KAURO_OWNER" ? "the ACTIVE corporate owner" : "the ACTIVE seller or the corporate owner";
+  return {
+    id: spec.id,
+    name: spec.name,
+    method: spec.method,
+    path: spec.path,
+    idempotency: "REQUIRED",
+    gate: "G-UX_PRIVATE",
+    testIds: [],
+    precondition: `The caller is ${who}${spec.stepUp ? " with a fresh step-up" : ""}; the closed outcome catalogue lists every refusal (docs/design/B12-outreach-plan-cells.md §R).`,
+    effect: "One transaction commits the record the operation names and its transition; a retry with the same key answers the first outcome (docs/design/B12-outreach-plan-cells.md §R).",
+    failure: "A refusal of the closed outcome catalogue; nothing is recorded.",
+  };
+}
+
 function pathParameters(path) {
   return [...path.matchAll(/\{([A-Za-z]+)\}/g)].map((m) => m[1]);
 }
@@ -167,6 +184,8 @@ export function generateOpenApi(sources) {
   const { application, domain, registryCommands, provenance, operationalRoutes } = sources;
   const { byId, defs } = runtimeSchemas(sources);
   const ID = { type: "string", pattern: application.RESPONSE_FIELD_VOCABULARY.UUID_PATTERN };
+  // B12 D-B12S-4: a *Ref path value (a bank account reference) is what apps/api bank-route-routes admits, REF_PATH; every other a UUID
+  const REF = { type: "string", pattern: "^[A-Za-z0-9._:-]{1,128}$" };
   const components = { schemas: {}, parameters: {}, headers: {}, securitySchemes: {} };
   const addComponent = (name, schema, schemaId) => {
     if (name in components.schemas) throw new Error(`component ${name} is generated twice`);
@@ -516,7 +535,10 @@ export function generateOpenApi(sources) {
   // application contracts exactly as the payment routes are; a command no lane serves yet is not documented
   for (const spec of Object.values(application.COMMERCIAL_COMMANDS)) {
     if (!application.isServedCommercialCommand(spec.id)) continue;
-    const command = registryCommands.find((c) => c.id === spec.id);
+    // package B12: an operation no catalogue id names (domain B12_OPERATIONS) is specified by plan companion §R and has no registry row; a
+    // catalogue id must still equal its registry row
+    const registryLess = application.isB12RegistryLessOperation(spec.id);
+    const command = registryCommands.find((c) => c.id === spec.id) ?? (registryLess ? b12RegistryLessCommand(spec) : undefined);
     if (!command) throw new Error(`${spec.id} is served but absent from the registry`);
     if (spec.method !== command.method || spec.path !== command.path || spec.name !== command.name) {
       throw new Error(`${spec.id}: the application spec (${spec.method} ${spec.path} ${spec.name}) differs from the registry (${command.method} ${command.path} ${command.name})`);
@@ -561,7 +583,7 @@ Failure: ${command.failure}`,
       "x-kauro-step-up": spec.stepUp ? "REQUIRED" : "NEVER",
       "x-kauro-gate": command.gate,
       "x-kauro-cases": command.testIds ?? [],
-      "x-kauro-package": "B10",
+      "x-kauro-package": application.isB12CommercialCommand(spec.id) ? "B12" : "B10",
       // the commission group's service commands (CMD051, CMD053) authenticate a verified service identity, every other a person
       security: [{ [spec.principal === "COMMERCIAL_SERVICE" ? "serviceAuth" : "bearerAuth"]: [] }],
       parameters: [
@@ -587,7 +609,7 @@ Failure: ${command.failure}`,
       "x-kauro-read": true,
       "x-kauro-role": spec.role,
       "x-kauro-scope": spec.scope,
-      "x-kauro-package": "B10",
+      "x-kauro-package": application.isB12CommercialRead(operationId) ? "B12" : "B10",
       security: [{ bearerAuth: [] }],
       parameters: [
         ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id; a statement the caller may not read answers as an id nobody holds.", schema: ID })),
@@ -632,10 +654,22 @@ Failure: ${command.failure}`,
     // an unsafe route the session cookie authenticates carries the CSRF token; the fit inquiry names the Origin it demands
     const unsafe = route.method === "POST";
     // the wire record (B11 P0, D-GEN-1) says which headers the api demands of the route; the path parameters are the template's own, a UUID
+    // (a *Ref one: a reference of the REF pattern); a route that declares a query documents its filter, limit and cursor (B12 D-B12S-3)
     const wire = application.OPERATIONAL_WIRE[route.operationId];
     if (route.path.startsWith("/api/v1/")) {
       operation.parameters = [
-        ...pathParameters(route.path).map((name) => ({ name, in: "path", required: true, description: "Path id (a UUID).", schema: ID })),
+        ...pathParameters(route.path).map((name) =>
+          name.endsWith("Ref")
+            ? { name, in: "path", required: true, description: "Path reference (letters, digits and . _ : -, at most 128).", schema: REF }
+            : { name, in: "path", required: true, description: "Path id (a UUID).", schema: ID },
+        ),
+        ...(route.query !== undefined
+          ? [
+              { name: route.query.filter.name, in: "query", required: false, description: "The list's filter; a value not listed is SCHEMA_VIOLATION (ENUM). The cursor is bound to it.", schema: { type: "string", enum: [...route.query.filter.values], default: route.query.filter.default } },
+              { $ref: "#/components/parameters/PageLimit" },
+              { $ref: "#/components/parameters/PageCursor" },
+            ]
+          : []),
         ...(wire?.idempotency === "REQUIRED" ? [{ $ref: "#/components/parameters/IdempotencyKey" }] : []),
         ...(wire?.agencySelector === true ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
         { $ref: "#/components/parameters/CorrelationId" },

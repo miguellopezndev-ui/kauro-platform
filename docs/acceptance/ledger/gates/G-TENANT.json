@@ -7,7 +7,7 @@
   {
    "case": "S048",
    "package": "B16",
-   "claimed": "PARTIAL",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -31,7 +31,7 @@
   {
    "case": "S071",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -47,7 +47,7 @@
   {
    "case": "R2-048",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -183,7 +183,7 @@
   {
    "case": "CMD038-OK",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -191,7 +191,7 @@
   {
    "case": "CMD038-DENY",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -199,7 +199,7 @@
   {
    "case": "CMD038-RACE",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null

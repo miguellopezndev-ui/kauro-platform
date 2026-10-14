@@ -35,6 +35,22 @@ const COMMAND_SPECIFIC: Readonly<Record<ExecutionCommandId, ReadonlyArray<Proble
     outcome("COMMAND", "PRECONDITION_FAILED", "JOB_TERMINAL", "the job already ended (FAILED, CANCELLED or EXPIRED): a cancellation has nothing left to stop", { current: "ALWAYS" }),
     outcome("COMMAND", "PRECONDITION_FAILED", "JOB_ALREADY_READY", "the publication committed first (S062): the job is READY and current names its package; a cancellation never rolls a package back", { current: "ALWAYS" }),
   ],
+  CMD038: [
+    NOT_VISIBLE("the package"),
+    outcome("COMMAND", "NOT_FOUND", "ARTIFACT_NOT_FOUND", "an artifact id is not a delivery copy of this package (another package's and a nonexistent one look alike): nothing is granted"),
+    // the step-up a download needs (the same three refusals as CMD025's)
+    outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_MISSING", "no step-up proof, or not a step-up proof"),
+    outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_NOT_OWNED", "the proof is not the caller's"),
+    outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_STALE", "the step-up is older than the freshness window or expired"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "PROJECT_NOT_OPEN", "the package's project is not OPEN (closed or being deleted, CMD042): no new URL"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "PACKAGE_NOT_AVAILABLE", "the package is not AVAILABLE (revoked, retired or deleted): no new URL; a URL issued earlier keeps its disclosed residual lifetime"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "ARTIFACT_UNAVAILABLE", "a requested artifact's object is deleted, being deleted or quarantined: the whole request is refused, nothing is granted"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "RETENTION_EXPIRED", "the governing retention record's effective deadline is reached on the database clock (judged after its lock): no new URL"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "DOWNLOAD_AUTHORIZATION_EXPIRED", "a retry with the same key after the grant's expiry: the grant is never re-signed beyond expiresAt; request a new one with a new key"),
+    outcome("COMMAND", "NOT_AUTHORIZED", "MEMBERSHIP_CHANGED", "the requester's membership changed after the grant was recorded (R2-048): no URL is signed for it"),
+    outcome("COMMAND", "CAPACITY_UNAVAILABLE", "SIGNING_UNCERTAIN", "the provider did not answer the signing within its bound: the grant is recorded ISSUE_UNCERTAIN; retry with the same key to re-sign the same scope at the same expiry"),
+    outcome("COMMAND", "CAPACITY_UNAVAILABLE", "DOWNLOAD_SIGNER_UNAVAILABLE", "no read signer is bound in this deployment: nothing was written"),
+  ],
 });
 
 function commandCatalogue(command: ExecutionCommandId): ReadonlyArray<ProblemOutcome> {
@@ -45,6 +61,7 @@ function commandCatalogue(command: ExecutionCommandId): ReadonlyArray<ProblemOut
 export const EXECUTION_COMMAND_OUTCOMES: Readonly<Record<ExecutionCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   CMD036: commandCatalogue("CMD036"),
   CMD037: commandCatalogue("CMD037"),
+  CMD038: commandCatalogue("CMD038"),
 });
 
 /** The closed problem catalogue of each read of the package (a job of another agency and a nonexistent one answer alike). */

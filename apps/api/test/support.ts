@@ -35,8 +35,20 @@ import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
 import type { ApprovePlanView, AssuranceVerifier, AuthenticatedSubject, B06Collaborators, B07Collaborators, BuyerTypeReader, LateFailureSink, ProviderCallTimer, CommerceRequestCollaborators, CoreServices, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator, QuoteCollaborators, SessionView } from "@kauro/application";
-import { ContractFakeIdentityIssuer, ContractFakeObjectStorage, ContractFakeSessionVault, contractFakeBankDetailsClassifier } from "@kauro/application/testing";
-import type { BankEvidenceStore } from "@kauro/application";
+import { ContractFakeIdentityIssuer, ContractFakeObjectStorage, ContractFakeReadSigner, ContractFakeSessionVault, contractFakeBankDetailsClassifier } from "@kauro/application/testing";
+import type { BankCreditClassifier, BankEvidenceStore, DestinationFingerprinter } from "@kauro/application";
+
+/**
+ * The bank collaborators a world binds after start-up (read at call time by the api): the restricted evidence store (bankWorld binds its
+ * CONTRACT_FAKE store), lane L-REFUND's destination fingerprinter and payer-evidence classifier, and the named point the owner refund commands
+ * pass between their evidence read and their unit (statementsWorld routes it to the cell's points).
+ */
+export interface BankBinding {
+  evidence: BankEvidenceStore | null;
+  fingerprinter: DestinationFingerprinter | null;
+  creditClassifier: BankCreditClassifier | null;
+  hold: ((point: string) => Promise<void>) | null;
+}
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
   AgencyId,
@@ -65,6 +77,7 @@ import type {
   ValidationReceiptId,
 } from "@kauro/domain";
 import { createIdGenerator, identityUserId, payloadDigest, toUtcInstant } from "@kauro/domain";
+import { confirmedContract, supersede } from "./b17-target-supersession-support.js";
 import { PgWebSessionStore } from "@kauro/persistence";
 import { ROLES, raceStatementTimeoutMs, serverNow, startHarness, waitForLockWait, type AgencyFixture, type Harness, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import {
@@ -418,10 +431,12 @@ export interface World {
   readonly processClock: MovableClock;
   /** The labelled contract fakes the source lifecycle's provider ports are bound to (SIMULATED; B07-PROVIDER-FAKES). */
   readonly storage: ContractFakeObjectStorage;
+  /** B16 L5: the labelled contract fake of ObjectStoragePort.signRead the api signs CMD038's download URLs with (SIMULATED). */
+  readonly signer: ContractFakeReadSigner;
   readonly vault: ContractFakeSessionVault;
   readonly internalErrors: Array<{ correlationId: string; error: unknown }>;
   /** The bank-transfer route's restricted evidence store, bound after start-up (bank-support.ts bankWorld binds its CONTRACT_FAKE store). */
-  readonly bank: { evidence: BankEvidenceStore | null; hold: ((point: string) => Promise<void>) | null };
+  readonly bank: BankBinding;
   /** Agency A (DRAFT) and its people. */
   readonly A: AgencyFixture;
   readonly owner: Person;
@@ -639,6 +654,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const tokens = new Map<string, AuthenticatedSubject>();
   const internalErrors: Array<{ correlationId: string; error: unknown }> = [];
   const storage = new ContractFakeObjectStorage();
+  const signer = new ContractFakeReadSigner();
   const vault = new ContractFakeSessionVault();
   const sourceBase: B07Collaborators = { providers: { storage, vault, origin: TEST_ORIGIN }, preview: null, commercialScope: commercialScopeInspector };
   const sources = options.sources ? { ...sourceBase, ...options.sources(sourceBase) } : sourceBase;
@@ -669,13 +685,13 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const { artifacts: _artifacts, patchCompiler: _patchCompiler, disclosures: _disclosures, ...withoutPlanServices } = configured;
   const collaborators: Partial<B06Collaborators> = options.realPlanServices === true ? withoutPlanServices : configured;
 
-  const bank: { evidence: BankEvidenceStore | null; hold: ((point: string) => Promise<void>) | null } = { evidence: null, hold: null };
+  const bank: BankBinding = { evidence: null, fingerprinter: null, creditClassifier: null, hold: null };
   const app = assembleApi({
     environment: "LOCAL",
     oneTimeDelivery: ({ command, view, secrets }) => {
       if (command === "CMD003") deliveredInvitations.set((view as { invitationId: string }).invitationId, secrets["invitationToken"] ?? "");
     },
-    bank: { evidence: () => bank.evidence, classifier: () => contractFakeBankDetailsClassifier, hold: (point) => (bank.hold === null ? Promise.resolve() : bank.hold(point)) },
+    bank: { evidence: () => bank.evidence, classifier: () => contractFakeBankDetailsClassifier, fingerprinter: () => bank.fingerprinter, creditClassifier: () => bank.creditClassifier, hold: (point) => (bank.hold === null ? Promise.resolve() : bank.hold(point)) },
     unitOfWork: (options.wrapUnitOfWork ?? ((f) => f))(instrumentedFactory(db.unitOfWork, holds, stats)),
     database: db,
     authenticator: createBearerTokenAuthenticator(tokens),
@@ -691,6 +707,8 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     clock: apiClock,
     ids,
     onInternalError: (correlationId, error) => internalErrors.push({ correlationId, error }),
+    // B16 L5: CMD038 signs read URLs with the labelled contract fake (SIMULATED; the S3 presign adapter is B15's)
+    readSigner: signer,
     ...(sessionAssembly !== undefined ? { sessions: sessionAssembly } : {}),
     ...(options.logger !== undefined ? { logger: options.logger } : {}),
   });
@@ -766,6 +784,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     storage,
     vault,
     internalErrors,
+    signer,
     bank,
     A,
     owner,
@@ -829,13 +848,10 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     async targetContract(agency, projectId, opts = {}) {
       const contractId = ids.next();
       const targetContractHash = sha(`target-${contractId}`);
-      await w.asTenant(agency, async (c) => {
-        await c.query(
-          `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, superseded_at, created_at)
-           VALUES ($1, $2, $3, $10, $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), now(), $8, 'R2-INITIAL', $9, now())`,
-          [contractId, agency.agencyId, projectId, ids.next(), ids.next(), sha("bundle"), targetContractHash, sha(`authority-${contractId}`), opts.superseded ? new Date() : null, opts.mode ?? "CLEAN"],
-        );
-      });
+      // 0084: a request session bears only drafts, so the confirmed fixture is the oracle's; a re-observation of the project supersedes
+      // its current contract (one current per project), and `superseded` is superseded at once by a newer confirmed observation
+      await confirmedContract(oracle, { agencyId: agency.agencyId, projectId, mode: opts.mode ?? "CLEAN", membershipId: agency.ownerMembershipId, targetContractHash, contractId });
+      if (opts.superseded) await supersede(oracle, { agencyId: agency.agencyId, contractId }, agency.ownerMembershipId);
       return { contractId, targetContractHash };
     },
 

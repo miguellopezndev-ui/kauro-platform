@@ -24,6 +24,7 @@ import type { CommandId, UtcInstant } from "@kauro/contracts";
 import type { AgencyId, BankCreditRecord, CausationId, CommerceUnitOfWork, CorrelationId, OperatorContext, PaymentOrderId, StatementPage, UserId } from "@kauro/domain";
 import { BANK_CREDIT_RAILS, DomainFailure, NotFoundFailure, PROVIDER_CALL_TIMEOUT_MS, StaleVersionFailure, actorOf } from "@kauro/domain";
 import { judgedUnderHold, type RequestAuthority } from "../../api/authority.js";
+import { openCursor, sealCursor, type CursorBinding } from "../../api/cursor.js";
 import type { AuthenticatedSubject, CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { problemOf, type Problem } from "../../api/problems.js";
 import type { StoredBankEvidence } from "../ports.js";
@@ -100,6 +101,10 @@ export interface BankCreditView {
 export interface BankCreditCommandView {
   readonly credit: BankCreditView;
 }
+export interface BankCreditPageView {
+  readonly credits: ReadonlyArray<BankCreditView>;
+  readonly nextCursor: string | null;
+}
 export interface BankMatchKeysView {
   readonly keys: {
     readonly orderId: string;
@@ -113,8 +118,8 @@ export interface BankMatchKeysView {
   };
 }
 
-export const BANK_INBOUND_COMMAND_IDS = Object.freeze({ enter: "CMD210", confirm: "CMD211", attribute: "CMD212", statement: "CMD213", retire: "CMD214" } as const);
-type InboundCommandId = (typeof BANK_INBOUND_COMMAND_IDS)[keyof typeof BANK_INBOUND_COMMAND_IDS];
+export const BANK_INBOUND_COMMAND_IDS = Object.freeze({ enter: "CMD210", confirm: "CMD211", attribute: "CMD212", statement: "CMD213", retire: "CMD214", settle: "CMD215" } as const);
+export type InboundCommandId = (typeof BANK_INBOUND_COMMAND_IDS)[keyof typeof BANK_INBOUND_COMMAND_IDS];
 export const inboundCommandOf = (id: InboundCommandId): RunnableCommand => ({ id, journalScope: "OPERATOR_IDENTITY", digestOmits: ["authorizationRef"] });
 
 export function bankCreditView(c: BankCreditRecord): BankCreditView {
@@ -225,6 +230,8 @@ export interface BankInboundHandlers {
   attribute(request: BankRouteRequest<AttributeBankCreditBody>): Promise<CommandResult<BankCreditCommandView>>;
   getCredit(request: InboundReadRequest & { readonly creditId: string }): Promise<InboundReadAnswer<BankCreditCommandView>>;
   getMatchKeys(request: InboundReadRequest & { readonly orderId: string }): Promise<InboundReadAnswer<BankMatchKeysView>>;
+  /** B12 GAP-API-9: the owner's credit queue of one state, oldest first, keyset-paginated under a cursor bound to the owner and the state. */
+  listCredits(request: InboundReadRequest & { readonly state: BankCreditRecord["state"]; readonly limit: number; readonly cursor: string | null }): Promise<InboundReadAnswer<BankCreditPageView>>;
   /** CMD213 SI1+SI2: the owner imports a statement's coverage, its lines and their exceptions. */
   importStatement(request: BankRouteRequest<ImportStatementBody>): Promise<CommandResult<StatementImportCommandView>>;
   /** CMD214: the agency's billing member retires its open bank checkout (E1's retirement half). */
@@ -239,6 +246,7 @@ export type InboundReadAnswer<View> = { readonly kind: "READ"; readonly view: Vi
 
 export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: BankInboundCollaborators): BankInboundHandlers {
   const replayVersion = (view: BankCreditCommandView): number => view.credit.version;
+  const cursorKey = co.cursorKey ?? co.random(32);
 
   async function authorizeOwner(uow: CommerceUnitOfWork, envelope: CommandEnvelope<unknown>, what: string): Promise<void> {
     const decision = await runtime.commerceAuthorizer.authorizeOperator(uow, { identity: envelope.subject.identity, role: "KAURO_OWNER" });
@@ -513,6 +521,8 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
             }
             if (linked !== null) continue;
             orphans++;
+            // late evidence on a terminal fact: the debit carries the reference of an attempt resolved NOT_EXECUTED (the facts do not change)
+            if (d.reference !== null) await repo.contradictTerminalAttempt(uow.ids.next(), uow.ids.next(), { environment, accountRef, lineId: w.lineId, reference: d.reference, evidenceHash: page.evidenceHash });
             // a Kauro refund reference with no declaration at all is an execution before any declaration (§7.28 SI2-UNDECLARED)
             const undeclared = d.reference !== null && REFUND_REFERENCE.test(d.reference) && !(await repo.attemptDeclaredWith(d.reference));
             await repo.openLineCase(uow.ids.next(), undeclared ? "UNDECLARED_OUTBOUND" : "RECORD_REQUIRED", { environment, accountRef, lineId: w.lineId, evidenceHash: page.evidenceHash }, undeclared ? "DEBIT_BEFORE_DECLARATION" : "DEBIT_NOT_RECORDED");
@@ -549,6 +559,21 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
       const credit = await co.credits(uow).credit(request.creditId);
       if (credit === null) throw new NotFoundFailure("bank credit");
       return { credit: bankCreditView(credit) };
+    }),
+
+    listCredits: (request) => ownerRead(request, "LIST_BANK_CREDITS", async (uow): Promise<BankCreditPageView> => {
+      // the cursor is bound to the list, the owner and the state: reused with another state or by another owner it is refused
+      const binding: CursorBinding = { operation: "listBankCredits", userId: request.subject.identity.userId, agencyId: null, filter: request.state };
+      let after: { readonly createdAt: string; readonly id: string } | null = null;
+      if (request.cursor !== null) {
+        after = openCursor(cursorKey, binding, request.cursor);
+        if (after === null) throw new DomainFailure("INVALID_REQUEST", "the cursor was not issued for this list", { reason: "CURSOR_INVALID" });
+      }
+      const rows = await co.credits(uow).listCredits(request.state, after, request.limit + 1);
+      const page = rows.slice(0, request.limit);
+      const last = page[page.length - 1];
+      const nextCursor = rows.length > request.limit && last !== undefined ? sealCursor(cursorKey, binding, last.position) : null;
+      return { credits: page.map((r) => bankCreditView(r.credit)), nextCursor };
     }),
 
     getMatchKeys: (request) => ownerRead(request, "READ_BANK_ORDER_MATCH_KEYS", async (uow): Promise<BankMatchKeysView> => {

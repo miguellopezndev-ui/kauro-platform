@@ -2,9 +2,8 @@
  "package": "B15",
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
-  "file": null,
-  "registry": "packages/contracts/registry/program.json",
-  "note": "no case map yet: no evidence claimed"
+  "file": "docs/design/B15-case-map.md",
+  "sha256": "305176bbcff228be1d94faa1313a69d14c5b4b0456a7191d9bde460009d37e6a"
  },
  "rows": [
   {
@@ -13,31 +12,54 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PART(pv1/refund-build) NOT_EXECUTED; target b-DEF"
   },
   {
    "case": "R2-082",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd028-create-payment-order.test.ts :: R2-082: DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms, expired price, no deliverable capacity (CAPACITY_UNAVAILABLE), unqualified route, unreviewed treatment — is refused before any intent or provider call"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-083",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "SIMULATED",
+   "test": [
+    "apps/api/test/b15-fiscal-issuance.test.ts :: R2-083: DENY a PROVIDER_API issuer that is not QUALIFIED or has no entitlement evidence (FISCAL_PROVIDER_ENTITLEMENT_UNVERIFIED), nothing submitted",
+    "apps/api/test/b15-fiscal-bridge.test.ts :: R2-083: OK a MANUAL_BRIDGE issuer prepares the lawful bridge action (ACTION_PREPARED) and claims no issuance",
+    "apps/api/test/b15-fiscal-bridge.test.ts :: R2-083: crash after the ACTION_PREPARED commit: SUBMITTING with bridge_action_ref, observed later, never ISSUED by assumption",
+    "apps/api/test/b15-fiscal-bridge.test.ts :: CMD035-DENY: a MANUAL_BRIDGE issuer whose legal facts are only owner-declared is refused (ISSUER_FACTS_UNCONFIRMED) beside the confirmed sibling"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "SIMULATED (executed locally at b7001a86 against the labelled fiscal page fake); live half PART D-14 (kept by B15: the live provider run, owner-gated)"
   },
   {
    "case": "R2-084",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "SIMULATED",
+   "test": [
+    "apps/api/test/b15-fiscal-issuance.test.ts :: R2-084: RACE (timeout) an invoice issued before the timeout and listed on page 3 is found by exact identity before any replacement",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: R2-084: a timeout on page k proves nothing; UNCERTAIN stays, and a re-observation re-reads every page",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: R2-084: a partial page set never proves absence",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: R2-084: RACE (expiry) NOT_FOUND observed before the submit deadline is not proof: UNCERTAIN, no second submit; an absence observed from after the deadline allows REJECTED",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: R2-084: the reconciler returns RETRY before the deadline and concludes after it"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "SIMULATED (executed locally at b7001a86 against the labelled fiscal page fake); live half PART R2-083"
   },
   {
    "case": "R2-085",
@@ -45,7 +67,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PART(pv1 ACH settlement observation) NOT_EXECUTED; target b-DEF"
   },
   {
    "case": "R2-133",
@@ -53,31 +78,69 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B12"
+   ],
+   "claimed": "PART(pv1/caveats + B12 L-SEND) NOT_EXECUTED; target b-DEF"
   },
   {
    "case": "CMD035-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "SIMULATED",
+   "test": [
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-OK: FISCAL_SERVICE issues a VALIDATED document; legal number, provider id, DIAN acceptance and verification reference recorded; ISSUED"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "SIMULATED (executed locally at b7001a86 against the labelled fiscal page fake); live half PART R2-083"
   },
   {
    "case": "CMD035-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-DENY: RACE (expiry) the issuer valid_until passes while CMD035 waits on the document exclusive half: FISCAL_ISSUER_NOT_IN_FORCE, VALIDATED unchanged, no submit call",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-DENY: RACE (revocation) each issuer column changed while CMD035 holds the issuer shared half, both orders",
+    "apps/api/test/b15-fiscal-profile.test.ts :: CMD035-DENY: RACE (revocation) a profile re-review against CMD035 at the profile half, both orders",
+    "apps/api/test/b15-fiscal-profile.test.ts :: CMD035-DENY: RACE (expiry) the profile valid_until passes while CMD035 waits on the document shared half: FISCAL_PROFILE_NOT_IN_FORCE, VALIDATED unchanged, no submit call",
+    "apps/api/test/b15-fiscal-profile.test.ts :: CMD035-DENY: an unreviewed treatment, a profile or issuer mismatch, unconfirmed issuer facts, an unqualified route, an issuer or profile not in force and an unreconciled prior submission write nothing",
+    "apps/api/test/b15-fiscal-bridge.test.ts :: CMD035-DENY: a MANUAL_BRIDGE issuer whose legal facts are only owner-declared is refused (ISSUER_FACTS_UNCONFIRMED) beside the confirmed sibling"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL: SIMULATED (executed locally at b7001a86 against the labelled fiscal page fake); role and agency half (route wiring) B15 lane L6-W"
   },
   {
    "case": "CMD035-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: the same key replays, a conflicting key is refused, two issuers on one document yield one submission, crash after the SUBMITTING commit reconciles",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: two issuers held at the document row, both orders: one submit call",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: CRASH before COMMIT: VALIDATED, no hash, no submit call",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: crash after the SUBMITTING commit reconciles: the retry observes, never submits again",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: a submit timeout concludes UNCERTAIN, never REJECTED",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: crash before the conclusion's COMMIT: SUBMITTING stays and the reconciler observes, never submits again",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: crash after the ISSUED commit: replay answers ISSUED",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: PARTIAL the issued.v1 event insert fails after ISSUED: full rollback",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: X2: a provider-found document whose fiscal acceptance is pending stays UNCERTAIN (not ISSUED); a correction-required rejection is not terminal",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: the reconciler against the concluder, both orders: one terminal state",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: TIMEOUT a lock wait past INJECTED_STATEMENT_TIMEOUT_MS is retryable, nothing written",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: a refund credit-note draft against the invoice issuance, both orders held at the invoice transition half: the note ends VALIDATED with the legal number",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: REEVALUATE holds a waiting credit note while CMD035 concludes ISSUED: no deadlock, the note validates once",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: issued.v1 re-delivered validates nothing twice",
+    "apps/api/test/b15-fiscal-issuance.test.ts :: CMD035-RACE: the second credit note's validation fails: neither validated",
+    "apps/api/test/b15-fiscal-profile.test.ts :: CMD035-RACE: REEVALUATE, recordProfile and CMD035 at once, opposite orders forced: no deadlock"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "PARTIAL: SIMULATED (executed locally at b7001a86 against the labelled fiscal page fake); role and agency half (route wiring) B15 lane L6-W"
   }
  ]
 }

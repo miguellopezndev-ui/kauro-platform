@@ -102,6 +102,8 @@ export interface Harness {
    * commercial unit-of-work factory of the stage-2 lanes; the schema tests use the pool's login directly.
    */
   readonly commissionPool: KauroPool;
+  /** Outreach-service pool (login role in kauro_outreach; package B12, 0088): the dispatcher units D2..D5 and the public opt-out. */
+  readonly outreachPool: KauroPool;
   /**
    * The execution unit-of-work factory of package B08 (ExecutionUnitOfWorkFactory; D8-XPKG-10): the commerce factory's routing with
    * the control plane's pool too — TENANT on the request handlers', SYSTEM on the control plane's, SERVICE on the payment service's
@@ -221,6 +223,7 @@ export async function start(options: { readonly migrationsDir?: string } = {}): 
   const ingressPool = createPool({ ...base, max: 2, user: ROLES.ingressLogin, applicationName: "kauro-test-ingress" });
   const paymentPool = createPool({ ...base, max: 2, user: ROLES.paymentLogin, applicationName: "kauro-test-payment" });
   const commissionPool = createPool({ ...base, max: 2, user: ROLES.commissionLogin, applicationName: "kauro-test-commission" });
+  const outreachPool = createPool({ ...base, max: 2, user: ROLES.outreachLogin, applicationName: "kauro-test-outreach" });
   const inboxIngress = new PgInboxIngress(ingressPool, () => ids.next());
   const transactionConfig = { clock, defaultStatementTimeoutMs: raceStatementTimeoutMs() };
   const app = createUnitOfWorkFactory(appPool, transactionConfig);
@@ -292,6 +295,7 @@ export async function start(options: { readonly migrationsDir?: string } = {}): 
     payment,
     commerce,
     commissionPool,
+    outreachPool,
     execution,
     audit,
     oracle,
@@ -470,6 +474,7 @@ export async function start(options: { readonly migrationsDir?: string } = {}): 
       await ingressPool.end();
       await paymentPool.end();
       await commissionPool.end();
+      await outreachPool.end();
       await pg.stop();
     },
   };

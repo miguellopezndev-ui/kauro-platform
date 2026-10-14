@@ -4,9 +4,9 @@
  * inspector, the application origin), the pipeline itself — B06's `runCommandIn` in a `runSource` unit of work, so every command
  * keeps D-PIPE-1's order (access decision → journal reserve or replay → execute → journal commit) — and the instant helpers.
  *
- * Instants (D-CLOCK-1, D-PERS-1): every lifecycle instant is the database's transaction time, read back exactly (microseconds);
- * a deadline is compared with the server clock of the same unit of work (`uow.serverInstant()`), never with the process clock;
- * a view truncates an instant to manual 10's millisecond utc primitive.
+ * Instants (D-CLOCK-1, D-PERS-1): every lifecycle instant is the database's transaction time (stamps), read back exactly
+ * (microseconds); a deadline is judged at the effect instant `effectNowOf(uow)` (kauro.effect_now(), 0038) read after the unit's last
+ * await before the judgment, never with `uow.serverInstant()` nor the process clock (CLOCK-SWEEP-B07); a view truncates an instant to manual 10's millisecond utc primitive.
  */
 import type { UtcInstant } from "@kauro/contracts";
 import type { SourceUnitOfWork, SourceUnitOfWorkFactory } from "@kauro/domain";
@@ -84,8 +84,9 @@ function micros(instant: string): number {
 }
 
 /**
- * Whether a deadline has been reached on the server clock of this unit of work (`uow.serverInstant()`, D-CLOCK-1), compared to the
- * microsecond whatever the fractional digits of either instant.
+ * Whether a deadline has been reached at `serverNow`, the effect instant of this unit of work (`effectNowOf(uow)`, read after its
+ * last await before the judgment; D-CLOCK-1, CLOCK-SWEEP-B07), compared to the microsecond whatever the fractional digits of either
+ * instant.
  */
 export function reachedOnServer(deadline: string, serverNow: string): boolean {
   return micros(serverNow) >= micros(deadline);

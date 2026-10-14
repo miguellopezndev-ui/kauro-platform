@@ -128,7 +128,7 @@ test("B09 seeds: the machines, edges and initial states equal the registry (Paym
   assert.deepEqual(kinds.rows.map((k) => k.aggregate_kind), [...AGGREGATE_KINDS].sort());
   for (const k of kinds.rows) {
     const col = await su.query("SELECT 1 FROM information_schema.columns WHERE table_schema = 'kauro' AND table_name = $1 AND column_name IN ($2, 'version', 'agency_id')", [k.table_name, k.id_column]);
-    assert.equal(col.rowCount, k.id_column === "agency_id" ? 2 : 3, `${k.aggregate_kind}: ${k.table_name}.${k.id_column}, version and agency_id exist`);
+    assert.equal(col.rowCount, k.id_column === "agency_id" || k.aggregate_kind === "outreach_send_intent" ? 2 : 3, `${k.aggregate_kind}: ${k.table_name}.${k.id_column}, version and agency_id exist`);
   }
   // the R2-INITIAL bands and tiers of the database are the vendored registry policy's, band by band and at every boundary
   const pricing = (policy() as { pricing: { bands: Array<Record<string, number>>; repeatTiers: Array<{ minimum: number; bps: number }>; foundingDiscountBps: number } }).pricing;
@@ -394,7 +394,8 @@ test("CMD031/CMD032 boundaries: the agency files its own request; only a corpora
   const agencyReview = await within(app, tenant(A), (c) => c.query("UPDATE kauro.refunds SET state = 'REJECTED', version = 2, rejection_code = 'NOPE', rejected_by_user_id = $2, rejected_at = now() WHERE refund_id = $1", [refundId, alice]));
   assert.equal(agencyReview.rowCount, 0, "the agency reviews none of its refunds");
   const serviceReview = await within(payment, service(A.agencyId), (c) => c.query("UPDATE kauro.refunds SET state = 'REJECTED', version = 2 WHERE refund_id = $1", [refundId])).catch((e: unknown) => e);
-  assert.ok(sqlState(serviceReview) === "42501" || (serviceReview as { rowCount?: number }).rowCount === 0, "the payment service reviews nothing");
+  // since 0080 the payment service may APPROVE with an owner act of its own transaction; a rejection is refused by the review trigger (KP007), never applied
+  assert.ok(sqlState(serviceReview) === "42501" || sqlState(serviceReview) === "KP007" || (serviceReview as { rowCount?: number }).rowCount === 0, `the payment service reviews nothing: ${String(sqlState(serviceReview))}`);
   // a person without an ACTIVE KAURO_OWNER grant sees nothing in a finance scope (NOT_FOUND alike), the requester is refused
   // (KP008), a REPEATABLE READ approval is refused before it waits (KP009), an amount above the capture is refused (KP003)
   await assert.rejects(approveRefund(app, assurance, bob, A, refundId, { serviceCents: 97125, taxCents: 0 }), (e) => (e as { code?: string }).code === "NO_ROW");
@@ -406,8 +407,8 @@ test("CMD031/CMD032 boundaries: the agency files its own request; only a corpora
   await approveRefund(app, assurance, kora, A, refundId, { serviceCents: 97125, taxCents: 0 });
   const approved = await h.oracle.query("SELECT state, approved_service_cents, approved_by_user_id FROM kauro.refunds WHERE refund_id = $1", [refundId]);
   assert.deepEqual(approved.rows[0], { state: "APPROVED", approved_service_cents: "97125", approved_by_user_id: kora });
-  // the intent is immutable once recorded
-  await assert.rejects(within(payment, service(A.agencyId), (c) => c.query("UPDATE kauro.refunds SET approved_service_cents = 1 WHERE refund_id = $1", [refundId])), refusedWith("42501"));
+  // the intent is immutable once recorded (since 0080 the payment service holds the column for the approval; the immutability trigger refuses the re-pointing, KA004)
+  await assert.rejects(within(payment, service(A.agencyId), (c) => c.query("UPDATE kauro.refunds SET approved_service_cents = 1 WHERE refund_id = $1", [refundId])), refusedWith("KA004"));
 });
 
 test("CMD032-RACE (D-REF-B3): an approval and a reversal of the same capture are ordered — the approval that waited for the reversal sees it and commits nothing", async () => {

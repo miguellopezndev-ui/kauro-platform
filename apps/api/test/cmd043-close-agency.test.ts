@@ -612,6 +612,7 @@ test("STEPUP-AT-COMMIT RACE (EXPIRY): a step-up proof that expires while the clo
   const shortLived = await w.h.recordStepUp(s.owner.userId as UserId, { issuedAt: toUtcInstant((await serverMs()) - 15 * 60_000 + 4_000) });
   const holder = await w.h.pg.connect("postgres");
   const before = await footprint(s.agency.agencyId);
+  const denialsBefore = (await w.securityEvents("CMD043")).length;
   try {
     await holder.query("BEGIN");
     // the agency's SHARED transition half: the access phase and the body's step-up check pass beside it, the closure's exclusive half waits
@@ -626,5 +627,11 @@ test("STEPUP-AT-COMMIT RACE (EXPIRY): a step-up proof that expires while the clo
   }
   assert.deepEqual(await footprint(s.agency.agencyId), before, "nothing committed: the agency, its obligations, no closure, event or journal entry as they were");
   assert.equal((await agencyRow(s.agency.agencyId))?.state, "ACTIVE");
+  // the refusal at the commit is audited (B10-stepup-at-commit-matrix F1 EXPIRY): exactly one DENY fact of the owner in the agency's stream
+  assert.deepEqual(
+    (await w.securityEvents("CMD043")).slice(denialsBefore).map((f) => [f.outcome, f.reason, f.assuranceClass, f.agencyId, f.actorId]),
+    [["DENY", "STEP_UP_STALE", "STEP_UP", s.agency.agencyId, s.owner.userId]],
+    "the commit-time refusal is recorded once as the owner's DENY STEP_UP_STALE fact",
+  );
   assert.equal(completed<AgencyClosureView>(await close(s, { proof: await w.stepUp(s.owner) }), 200).data.agency.state, "CLOSING", "a proof fresh at the commit closes the agency");
 });

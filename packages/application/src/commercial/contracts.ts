@@ -16,6 +16,7 @@
  * Every command is gated G-COMMERCIAL and requires an Idempotency-Key (the catalogue). B10 has no provider effect of its own: the
  * one payout provider reached, the evidence verifier of CMD053, is a port that runs outside any transaction (design §11).
  */
+import type { B12OperationId } from "@kauro/domain";
 import type {
   AgencyActivationView,
   AgencyClosureView,
@@ -33,9 +34,11 @@ import type {
   CapabilityRestrictionView,
   IncidentView,
   RecoveryAuthorizationView,
+  BreakglassGrantView,
+  BreakglassRevocationView,
 } from "./views.js";
 
-export type CommercialCommandId = "CMD002" | "CMD027" | "CMD043" | "CMD045" | "CMD046" | "CMD047" | "CMD048" | "CMD049" | "CMD050" | "CMD051" | "CMD052" | "CMD053" | "CMD056" | "CMD057" | "CMD058" | "CMD059";
+export type CommercialCommandId = "CMD002" | "CMD027" | "CMD043" | "CMD045" | "CMD046" | "CMD047" | "CMD048" | "CMD049" | "CMD050" | "CMD051" | "CMD052" | "CMD053" | "CMD054" | "CMD055" | "CMD056" | "CMD057" | "CMD058" | "CMD059" | "CMD061" | "CMD062" | "CMD063" | "CMD064" | B12OperationId;
 
 export type CommercialPrincipalKind = "AGENCY_MEMBER" | "SELLER" | "SELLER_OR_OWNER" | "CORPORATE_OPERATOR" | "COMMERCIAL_SERVICE";
 
@@ -47,7 +50,7 @@ export interface CommercialCommandSpec<Body> {
   readonly method: "POST";
   readonly path: string;
   /** The catalogue role (commands.json through @kauro/contracts, brand-mapped: KAURO_OWNER). */
-  readonly role: "AGENCY_OWNER" | "AGENCY_BILLING" | "ACTIVE_SELLER_OR_OWNER" | "ACTIVE_SELLER" | "KAURO_OWNER" | "OPERATIONS_SERVICE_OR_OWNER" | "COMMISSION_SERVICE" | "FINANCE_SERVICE";
+  readonly role: "AGENCY_OWNER" | "AGENCY_BILLING" | "ACTIVE_SELLER_OR_OWNER" | "ACTIVE_SELLER" | "KAURO_OWNER" | "KAURO_OWNER_OR_SECURITY_SERVICE" | "OPERATIONS_SERVICE_OR_OWNER" | "COMMISSION_SERVICE" | "FINANCE_SERVICE" | "ASSIGNED_SELLER_OR_OWNER" | "OWNER" | "ASSIGNED_SELLER_OWNER_OR_RECONCILER";
   readonly principal: CommercialPrincipalKind;
   /**
    * The database role of the command's unit of work: kauro_app for a request handler (TENANT for an agency member, OPERATOR for a
@@ -377,6 +380,60 @@ export const RECONCILE_COMMISSION_PAYOUT = spec<ReconcileCommissionPayoutBody>({
   stepUp: false,
 });
 
+// --- CMD054 OpenBreakglass, CMD055 RevokeBreakglass (package B16 lane L4; gate G-SECURITY) ----------------------------------------------
+
+export interface OpenBreakglassBody {
+  /** The ONE project the grant covers (a grant is never blanket raw-data access). */
+  readonly scopeRef: string;
+  readonly purpose: string;
+  /** A fresh step-up proof of the opening owner (08), used once. */
+  readonly assuranceProofRef: string;
+  /** The support case of that project, or the actual incident naming it, that justifies the grant. */
+  readonly authorizationRef: string;
+}
+export type OpenBreakglassResult = BreakglassGrantView;
+export const OPEN_BREAKGLASS = spec<OpenBreakglassBody>({
+  id: "CMD054",
+  name: "OpenBreakglass",
+  method: "POST",
+  path: "/api/v1/operations/breakglass-grants",
+  role: "KAURO_OWNER",
+  principal: "CORPORATE_OPERATOR",
+  runtimeRole: "kauro_app",
+  scope: "CORPORATE",
+  aggregateParam: null,
+  scopeKind: null,
+  expectedVersionRequired: false,
+  authorityHashFields: [],
+  fields: ["scopeRef", "purpose", "assuranceProofRef", "authorizationRef"],
+  stepUp: true,
+});
+
+export interface RevokeBreakglassBody {
+  readonly reasonCode: string;
+}
+export type RevokeBreakglassResult = BreakglassRevocationView;
+/**
+ * The registry role is KAURO_OWNER_OR_SECURITY_SERVICE; this lane serves the owner's path. The security service's principal (a verified
+ * service identity with its own journal stream) is not bound yet: GAP-BG-SVC in docs/design/B16-case-map.md.
+ */
+export const REVOKE_BREAKGLASS = spec<RevokeBreakglassBody>({
+  id: "CMD055",
+  name: "RevokeBreakglass",
+  method: "POST",
+  path: "/api/v1/operations/breakglass-grants/{grantId}/revoke",
+  role: "KAURO_OWNER_OR_SECURITY_SERVICE",
+  principal: "CORPORATE_OPERATOR",
+  runtimeRole: "kauro_app",
+  scope: "CORPORATE",
+  aggregateParam: "grantId",
+  scopeKind: null,
+  expectedVersionRequired: false,
+  authorityHashFields: [],
+  fields: ["reasonCode"],
+  stepUp: false,
+});
+
 // --- CMD056 RecordIncident, CMD057 AuthorizeRecovery (package B16; gate G-RECOVERY) ------------------------------------------------
 
 export interface RecordIncidentBody {
@@ -475,6 +532,302 @@ export const RESTRICT_CAPABILITY = spec<RestrictCapabilityBody>({
   stepUp: false,
 });
 
+// --- package B12 (outreach): CMD061..CMD064 and the registry-less operations (K2) ----------------------------------------------------
+// Registered once by the kit so that the lanes replace handler bodies only. CMD061..CMD064 carry the registry fields (gate G-UX_PRIVATE,
+// idempotency REQUIRED; a test proves them against commands.json). The operations without a catalogue id are journaled under their own
+// name (domain B12_OPERATIONS; 0088 widens command_journal.operation by that explicit list) and are specified by plan companion §R.
+// Deliberate, recorded differences from the registry field lists (decisions K2-3, K2-4):
+// - CMD062 also carries assuranceProofRef: the plan binds the review to the step-up proof it was issued under and judges the step-up at COMMIT,
+//   and the registry lists no proof field; the proof travels like every other step-up command's, in the body.
+// - contentRef is the hex SHA-256 content address of kauro.outreach_contents (0088), not a UUID.
+
+export interface PrepareOutreachDraftBody {
+  readonly prospectId: string;
+  readonly senderIdentityRef: string;
+  readonly purpose: "REQUESTED_REPLY" | "INDIVIDUAL_PROSPECT_CONTACT" | "FOLLOW_UP";
+  readonly contentRef: string;
+  readonly provenanceEvidenceHash: string;
+}
+export const PREPARE_OUTREACH_DRAFT = spec<PrepareOutreachDraftBody>({
+  id: "CMD061",
+  name: "PrepareOutreachDraft",
+  method: "POST",
+  path: "/api/v1/ops/outreach/drafts",
+  role: "ASSIGNED_SELLER_OR_OWNER",
+  principal: "SELLER_OR_OWNER",
+  runtimeRole: "kauro_app",
+  scope: "CORPORATE",
+  aggregateParam: null,
+  scopeKind: null,
+  expectedVersionRequired: false,
+  authorityHashFields: [],
+  fields: ["prospectId", "senderIdentityRef", "purpose", "contentRef", "provenanceEvidenceHash"],
+  stepUp: false,
+});
+
+export interface AuthorizeOutreachBody {
+  readonly senderIdentityRef: string;
+  readonly allowedContentHashes: ReadonlyArray<string>;
+  readonly validFrom: string;
+  readonly expiresAt: string;
+  readonly maximumSends: number;
+  readonly permissionEvidenceHash: string;
+  readonly assuranceProofRef: string;
+}
+export const AUTHORIZE_OUTREACH = spec<AuthorizeOutreachBody>({
+  id: "CMD062",
+  name: "AuthorizeOutreach",
+  method: "POST",
+  path: "/api/v1/ops/outreach/authorizations",
+  role: "OWNER",
+  principal: "CORPORATE_OPERATOR",
+  runtimeRole: "kauro_app",
+  scope: "CORPORATE",
+  aggregateParam: null,
+  scopeKind: null,
+  expectedVersionRequired: false,
+  authorityHashFields: ["permissionEvidenceHash"],
+  fields: ["senderIdentityRef", "allowedContentHashes", "validFrom", "expiresAt", "maximumSends", "permissionEvidenceHash", "assuranceProofRef"],
+  stepUp: true,
+});
+
+export interface SendAuthorizedOutreachBody {
+  readonly expectedVersion: number;
+  readonly authorizationId: string;
+  readonly contentHash: string;
+}
+export const SEND_AUTHORIZED_OUTREACH = spec<SendAuthorizedOutreachBody>({
+  id: "CMD063",
+  name: "SendAuthorizedOutreach",
+  method: "POST",
+  path: "/api/v1/ops/outreach/{draftId}/send",
+  role: "ASSIGNED_SELLER_OR_OWNER",
+  principal: "SELLER_OR_OWNER",
+  runtimeRole: "kauro_app",
+  scope: "CORPORATE",
+  aggregateParam: "draftId",
+  scopeKind: null,
+  expectedVersionRequired: true,
+  authorityHashFields: ["contentHash"],
+  fields: ["expectedVersion", "authorizationId", "contentHash"],
+  stepUp: false,
+});
+
+export interface SalesActivityInput {
+  readonly prospectId: string;
+  readonly draftId?: string;
+  readonly kind: "REPLIED" | "BOUNCED" | "SUPPRESSED" | "HUMAN_SEND_OBSERVED";
+  readonly occurredAt: string;
+  readonly evidenceHash: string;
+  readonly providerMessageRef: string;
+  readonly observation?: "SENT" | "NOT_SENT";
+  readonly suppressionKeyKind?: "ORGANIZATION" | "CONTACT";
+  readonly suppressionReason?: "OPT_OUT" | "COMPLAINT" | "REFUSAL" | "DISQUALIFIED";
+}
+export interface RecordSalesActivityBody {
+  readonly activity: SalesActivityInput;
+}
+export const RECORD_SALES_ACTIVITY = spec<RecordSalesActivityBody>({
+  id: "CMD064",
+  name: "RecordSalesActivity",
+  method: "POST",
+  path: "/api/v1/ops/sales/activities",
+  role: "ASSIGNED_SELLER_OWNER_OR_RECONCILER",
+  principal: "SELLER_OR_OWNER",
+  runtimeRole: "kauro_app",
+  scope: "CORPORATE",
+  aggregateParam: null,
+  scopeKind: null,
+  expectedVersionRequired: false,
+  authorityHashFields: [],
+  fields: ["activity"],
+  stepUp: false,
+});
+
+/** The operations of plan companion §R that no catalogue id names: seller or owner (content, source, contact) and owner-only (the rest). */
+function b12Operation<Body>(s: {
+  readonly id: B12OperationId;
+  readonly path: string;
+  readonly owner: boolean;
+  readonly aggregateParam?: string;
+  readonly expectedVersionRequired?: boolean;
+  readonly stepUp?: boolean;
+  readonly fields: ReadonlyArray<keyof Body & string>;
+}): CommercialCommandSpec<Body> {
+  return spec<Body>({
+    id: s.id,
+    name: s.id,
+    method: "POST",
+    path: s.path,
+    role: s.owner ? "KAURO_OWNER" : "ACTIVE_SELLER_OR_OWNER",
+    principal: s.owner ? "CORPORATE_OPERATOR" : "SELLER_OR_OWNER",
+    runtimeRole: "kauro_app",
+    scope: "CORPORATE",
+    aggregateParam: s.aggregateParam ?? null,
+    scopeKind: null,
+    expectedVersionRequired: s.expectedVersionRequired ?? false,
+    authorityHashFields: [],
+    fields: s.fields,
+    stepUp: s.stepUp ?? false,
+  });
+}
+
+export interface PutOutreachContentBody {
+  readonly subject: string;
+  readonly body: string;
+}
+export const PUT_OUTREACH_CONTENT = b12Operation<PutOutreachContentBody>({ id: "PutOutreachContent", path: "/api/v1/ops/outreach/contents", owner: false, fields: ["subject", "body"] });
+
+export interface PublishSalesResourceBody {
+  readonly familyId: string;
+  /** The family's current version the publisher read; 0 publishes the first version of a new family. */
+  readonly expectedVersion: number;
+  readonly contentRef: string;
+  readonly capabilityIds: ReadonlyArray<string>;
+  readonly assuranceProofRef: string;
+}
+export const PUBLISH_SALES_RESOURCE = b12Operation<PublishSalesResourceBody>({
+  id: "PublishSalesResource",
+  path: "/api/v1/ops/sales/resources",
+  owner: true,
+  expectedVersionRequired: true,
+  stepUp: true,
+  fields: ["familyId", "expectedVersion", "contentRef", "capabilityIds", "assuranceProofRef"],
+});
+
+export interface RegisterSenderIdentityBody {
+  readonly userId: string;
+  readonly address: string;
+  readonly route: "GMAIL_API" | "RESEND_TRANSACTIONAL";
+  readonly consentEvidenceRef?: string;
+  readonly assuranceProofRef: string;
+}
+export const REGISTER_SENDER_IDENTITY = b12Operation<RegisterSenderIdentityBody>({
+  id: "RegisterSenderIdentity",
+  path: "/api/v1/ops/outreach/senders",
+  owner: true,
+  stepUp: true,
+  fields: ["userId", "address", "route", "consentEvidenceRef", "assuranceProofRef"],
+});
+
+export interface VerifySenderIdentityBody {
+  readonly verificationEvidenceHash: string;
+}
+export const VERIFY_SENDER_IDENTITY = b12Operation<VerifySenderIdentityBody>({
+  id: "VerifySenderIdentity",
+  path: "/api/v1/ops/outreach/senders/{senderId}/verify",
+  owner: true,
+  aggregateParam: "senderId",
+  fields: ["verificationEvidenceHash"],
+});
+
+export type RecordSenderRevocationBody = Record<string, never>;
+export const RECORD_SENDER_REVOCATION = b12Operation<RecordSenderRevocationBody>({
+  id: "RecordSenderRevocation",
+  path: "/api/v1/ops/outreach/senders/{senderId}/revoke",
+  owner: true,
+  aggregateParam: "senderId",
+  fields: [],
+});
+
+export interface PrepareOutreachReviewBody {
+  readonly senderIdentityRef: string;
+  readonly draftIds: ReadonlyArray<string>;
+  readonly assuranceProofRef: string;
+}
+export const PREPARE_OUTREACH_REVIEW = b12Operation<PrepareOutreachReviewBody>({
+  id: "PrepareOutreachReview",
+  path: "/api/v1/ops/outreach/reviews",
+  owner: true,
+  stepUp: true,
+  fields: ["senderIdentityRef", "draftIds", "assuranceProofRef"],
+});
+
+export interface RecordOutreachDiagnosisBody {
+  readonly personUserId: string;
+  readonly evidenceHash: string;
+  readonly assuranceProofRef: string;
+}
+export const RECORD_OUTREACH_DIAGNOSIS = b12Operation<RecordOutreachDiagnosisBody>({
+  id: "RecordOutreachDiagnosis",
+  path: "/api/v1/ops/outreach/diagnoses",
+  owner: true,
+  stepUp: true,
+  fields: ["personUserId", "evidenceHash", "assuranceProofRef"],
+});
+
+export type RevokeOutreachAuthorizationBody = Record<string, never>;
+export const REVOKE_OUTREACH_AUTHORIZATION = b12Operation<RevokeOutreachAuthorizationBody>({
+  id: "RevokeOutreachAuthorization",
+  path: "/api/v1/ops/outreach/authorizations/{authorizationId}/revoke",
+  owner: true,
+  aggregateParam: "authorizationId",
+  fields: [],
+});
+
+export interface WithdrawOutreachChannelPolicyBody {
+  readonly jurisdiction: string;
+  readonly purpose: "REQUESTED_REPLY" | "INDIVIDUAL_PROSPECT_CONTACT" | "FOLLOW_UP";
+  readonly expectedVersion: number;
+  readonly assuranceProofRef: string;
+}
+export const WITHDRAW_OUTREACH_CHANNEL_POLICY = b12Operation<WithdrawOutreachChannelPolicyBody>({
+  id: "WithdrawOutreachChannelPolicy",
+  path: "/api/v1/ops/outreach/policy-withdrawals",
+  owner: true,
+  expectedVersionRequired: true,
+  stepUp: true,
+  fields: ["jurisdiction", "purpose", "expectedVersion", "assuranceProofRef"],
+});
+
+export interface RecordProspectSourceBody {
+  readonly evidenceHash: string;
+  readonly sourceUrlDigest: string;
+  readonly observedOn: string;
+  readonly lawfulBasis: string;
+  readonly segment: "AGENCY" | "COMPANY";
+}
+export const RECORD_PROSPECT_SOURCE = b12Operation<RecordProspectSourceBody>({
+  id: "RecordProspectSource",
+  path: "/api/v1/ops/prospects/{prospectId}/sources",
+  owner: false,
+  aggregateParam: "prospectId",
+  fields: ["evidenceHash", "sourceUrlDigest", "observedOn", "lawfulBasis", "segment"],
+});
+
+export interface RecordProspectContactBody {
+  readonly contactLabel: string;
+  readonly roleLabel?: string;
+  readonly channel: string;
+  readonly address: string;
+}
+export const RECORD_PROSPECT_CONTACT = b12Operation<RecordProspectContactBody>({
+  id: "RecordProspectContact",
+  path: "/api/v1/ops/prospects/{prospectId}/contacts",
+  owner: false,
+  aggregateParam: "prospectId",
+  fields: ["contactLabel", "roleLabel", "channel", "address"],
+});
+
+/** The B12 routes of the kit, in registration order (CMD061..CMD064 first, then plan companion §R). */
+export const B12_COMMERCIAL_COMMANDS = Object.freeze({
+  CMD061: PREPARE_OUTREACH_DRAFT,
+  CMD062: AUTHORIZE_OUTREACH,
+  CMD063: SEND_AUTHORIZED_OUTREACH,
+  CMD064: RECORD_SALES_ACTIVITY,
+  PutOutreachContent: PUT_OUTREACH_CONTENT,
+  PublishSalesResource: PUBLISH_SALES_RESOURCE,
+  RegisterSenderIdentity: REGISTER_SENDER_IDENTITY,
+  VerifySenderIdentity: VERIFY_SENDER_IDENTITY,
+  RecordSenderRevocation: RECORD_SENDER_REVOCATION,
+  PrepareOutreachReview: PREPARE_OUTREACH_REVIEW,
+  RecordOutreachDiagnosis: RECORD_OUTREACH_DIAGNOSIS,
+  RevokeOutreachAuthorization: REVOKE_OUTREACH_AUTHORIZATION,
+  WithdrawOutreachChannelPolicy: WITHDRAW_OUTREACH_CHANNEL_POLICY,
+  RecordProspectSource: RECORD_PROSPECT_SOURCE,
+  RecordProspectContact: RECORD_PROSPECT_CONTACT,
+} as const);
+
 export const COMMERCIAL_COMMANDS = Object.freeze({
   CMD002: ACTIVATE_AGENCY,
   CMD027: CREATE_QUOTE,
@@ -488,8 +841,11 @@ export const COMMERCIAL_COMMANDS = Object.freeze({
   CMD051: CLOSE_COMMISSION_PERIOD,
   CMD052: APPROVE_COMMISSION_PAYOUT,
   CMD053: RECONCILE_COMMISSION_PAYOUT,
+  CMD054: OPEN_BREAKGLASS,
+  CMD055: REVOKE_BREAKGLASS,
   CMD056: RECORD_INCIDENT,
   CMD057: AUTHORIZE_RECOVERY,
   CMD058: CHANGE_CAPABILITY,
   CMD059: RESTRICT_CAPABILITY,
+  ...B12_COMMERCIAL_COMMANDS,
 } as const);

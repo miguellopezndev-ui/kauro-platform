@@ -28,21 +28,42 @@ after(async () => {
 
 // --- classification ------------------------------------------------------------------------------------------------------------------
 
+/**
+ * The owner of a migration by its file stem (the name after the number): provisional numbers are renumbered at the batch
+ * (tools/renumber-migration.mjs rewrites the number, never the stem), so a lane's files are keyed by stem, not by number.
+ */
+const OWNER_BY_STEM: Readonly<Record<string, string>> = {
+  b17_stage_receipt_reconciliations: "B17",
+  b17_target_supersession: "B17",
+  b15_tax_document_issuance: "B15",
+  b17_plan_validation_target_read: "B17",
+  b17_capability_importer_tool: "B17",
+  b12_outreach: "B12",
+};
+const stemOfTag = (tag: string): string | undefined => {
+  const file = readdirSync(MIGRATIONS_DIR).find((f) => f.startsWith(`${tag}_`) && f.endsWith(".sql"));
+  return file === undefined ? undefined : file.slice(tag.length + 1, -".sql".length);
+};
+
 /** The package owning each migration file (its header; 0001-0007 the B06 foundation; 0023's deadline gates are B05's, D5-20). */
 function ownerOfFile(tag: string): string {
+  const stem = stemOfTag(tag);
+  if (stem !== undefined && OWNER_BY_STEM[stem] !== undefined) return OWNER_BY_STEM[stem]!;
   const n = Number(tag);
   if (n <= 8 || n === 54 || n === 67) return "B06";
-  if ((n >= 9 && n <= 12) || n === 18 || n === 20) return "B07";
+  if ((n >= 9 && n <= 12) || n === 18 || n === 20 || n === 82) return "B07";
   if ((n >= 13 && n <= 17) || n === 19 || n === 53) return "B09";
   if (n === 21 || n === 22 || n === 24 || n === 44) return "B08";
   if (n === 23 || n === 58 || n === 61 || n === 66 || n === 68 || n === 70) return "B05";
   if (n >= 25 && n <= 27) return "B11";
-  if ((n >= 28 && n <= 43) || n === 48 || n === 49 || n === 56 || n === 57) return "B10";
-  if (n === 45 || n === 46 || n === 47 || n === 55) return "PV1";
+  if ((n >= 28 && n <= 43) || n === 48 || n === 49 || n === 56 || n === 57 || n === 73) return "B10";
+  if (n === 45 || n === 46 || n === 47 || n === 55 || n === 72 || n === 79 || n === 80 || n === 81) return "PV1";
   if (n === 50 || n === 52) return "B17";
   if (n === 51 || n === 59) return "B18";
   if (n === 60) return "SEC-DEPTH";
-  if (n === 69 || n === 71) return "B16";
+  if (n === 69 || n === 71 || (n >= 74 && n <= 76)) return "B16";
+  if (n === 77) return "SEC-HARDENING-2";
+  if (n === 78) return "SEC-OWNER-POLICY-FORALL";
   return "UNKNOWN";
 }
 const fileTag = (at: string): string => at.split(":")[0]!;
@@ -174,6 +195,11 @@ const CK3_PATHS = [
   "packages/application/src/audit",
   "packages/data-plane/src/cores",
   "packages/application/src/adapters/cores/intelligence",
+  // package B12 (lane K1, plan §W): the outreach domain, writers, lease fence and application kit (the dispatcher, a LeaseStore caller, is not here)
+  "packages/domain/src/commercial/outreach.ts",
+  "packages/persistence/src/outreach-access.ts",
+  "packages/persistence/src/repositories/commercial-outreach.ts",
+  "packages/application/src/commercial/outreach",
 ];
 /** The product's server code (the process clocks are exactly the four injection points). apps/web is the browser client. */
 const PRODUCT_ROOTS = ["packages/application/src", "packages/authorization/src", "packages/contracts/src", "packages/data-plane/src", "packages/domain/src", "packages/persistence/src", "packages/reports/src", "apps/api/src", "apps/control/src"];

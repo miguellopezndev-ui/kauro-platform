@@ -8,6 +8,7 @@ import type { CommandResult, ExecuteRefundBody, ExecuteRefundView, PurchaseRebin
 import type { AgencyId, Clock, Environment, IdGenerator } from "@kauro/domain";
 import type { PaymentServiceAssembly } from "./assembly.js";
 import "./bank-inbound-service.js";
+import "./bank-settlement-service.js";
 import { fiscalConsumer, financeConsumer, paymentServiceEffect, unitOfWorkEffect, type DeliveryEffect } from "./consumers.js";
 import { createPaymentDispatcher, type PaymentDispatcher } from "./dispatcher.js";
 import { sourceLineageReader } from "../edition.js";
@@ -68,15 +69,18 @@ export { PAYMENT_SERVICE_ID, PROVIDER_INGRESS_ID, SERVICE_AUDIENCE } from "./run
 export type { PaymentRuntime } from "./runtime.js";
 export { NotDueYet, recordServiceDenial, storeProviderQuery, watchAttempt } from "./service-commands.js";
 export type { ServiceCommandRequest } from "./service-commands.js";
-export { AWAIT_INVOICE_SECONDS, eventTypesOf, financeConsumer, fiscalConsumer, paymentServiceEffect, recordedAtOf, reevaluateBlockedDrafts, refundExecutionKey, unitOfWorkEffect } from "./consumers.js";
+export { AWAIT_INVOICE_SECONDS, OBSERVE_AGAIN_SECONDS, eventTypesOf, financeConsumer, fiscalConsumer, paymentServiceEffect, recordedAtOf, reconcileFiscalDelivery, reevaluateBlockedDrafts, refundExecutionKey, unitOfWorkEffect } from "./consumers.js";
+export type { FiscalConsumerOptions, FiscalConsumerPoint } from "./consumers.js";
 export type { ConsumerOutcome, DeliveryEffect, PaymentConsumerName } from "./consumers.js";
 export { registerBankDeliveryHandler } from "./consumers.js";
 export type { BankDeliveryHandler } from "./consumers.js";
-export { DISPATCH_LEASE_DEADLINE, DISPATCH_LEASE_SECONDS, MAX_DELIVERY_ATTEMPTS, OUTBOX_CLAIM_SECONDS, createPaymentDispatcher, leaseResourceOf } from "./dispatcher.js";
+export { AGENCY_LESS_PAYMENT_EVENT_TYPES, DISPATCH_LEASE_DEADLINE, DISPATCH_LEASE_SECONDS, MAX_DELIVERY_ATTEMPTS, OUTBOX_CLAIM_SECONDS, createPaymentDispatcher, leaseResourceOf } from "./dispatcher.js";
 export type { DispatchPass, PaymentDispatcher } from "./dispatcher.js";
 export { CLAIM_NEVER_COMMITTED, CLAIM_WINDOW_SECONDS, cancelUnclaimed } from "./sweep.js";
 export type { SweepPass } from "./sweep.js";
 export { BANK_SWEEP_NAMES, registerBankSweep } from "./sweep.js";
+// lane L-REFUND: X2 registers the EXECUTION_WINDOW bank sweep when this module loads
+export { EXECUTION_WINDOW_BATCH, EXECUTION_WINDOW_LAPSED, executionWindowPass, lapseAttempt } from "./execution-window.js";
 export type { BankSweep, BankSweepName } from "./sweep.js";
 export { applyInboxRecord, settleConflict } from "./webhook.js";
 export type { InboxPass, WebhookOutcome, WebhookRequest } from "./webhook.js";

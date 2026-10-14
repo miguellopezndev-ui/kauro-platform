@@ -15,7 +15,7 @@
 import type { ConsumerOutcome, OutboxConsumer } from "@kauro/application";
 import type { AgencyId, DomainEventRecord, PlanBody, PlanId, PlanValidationRecord, SystemContext, ValidationReceiptId, ValidationSubject } from "@kauro/domain";
 import { EXECUTION_SERVICES, applied, type ExecutionStep } from "../execution/work.js";
-import type { PlanValidator } from "./receipts.js";
+import { refusalReasonOf, type PlanValidator } from "./receipts.js";
 import { StepRefused, channelOf, guarded, inAgency, serverNowIn, type AuditWorkDependencies } from "./work.js";
 
 const SERVICE = EXECUTION_SERVICES.PLAN_VALIDATION;
@@ -47,7 +47,8 @@ export class PlanValidation implements OutboxConsumer {
         if (intent.origin !== "COMMAND") throw new StepRefused("SYSTEM_DRAFT_INTENT");
         if (subject.planState !== "VALIDATING") throw new StepRefused("PLAN_NOT_VALIDATING");
         const source = await uow.auditDiscovery.validationSource(agencyId, intent.revisionHash);
-        return { subject, intent, source, startedAt: await uow.executionDiscovery.serverNow() };
+        const target = await uow.auditDiscovery.validationTarget(planId);
+        return { subject, intent, source, target, startedAt: await uow.executionDiscovery.serverNow() };
       });
       const judged = await this.deps.validator.run({
         subject: { agencyId, planId, planHash: seen.intent.planHash, revisionHash: seen.intent.revisionHash, targetContractHash: seen.intent.targetContractHash },
@@ -56,9 +57,10 @@ export class PlanValidation implements OutboxConsumer {
         startedAt: seen.startedAt,
         cancellation: this.channel(seen.subject, seen.intent),
         source: seen.source,
+        target: seen.target,
         completedAt: () => serverNowIn(this.deps, SERVICE, agencyId),
       });
-      const settlement = judged.kind === "RECEIPT" ? { result: judged.receipt.result, receiptHash: judged.receipt.receiptHash } : { result: "ERROR" as const, receiptHash: null };
+      const settlement = judged.kind === "RECEIPT" ? { result: judged.receipt.result, receiptHash: judged.receipt.receiptHash } : { result: "ERROR" as const, receiptHash: null, refusalReason: refusalReasonOf(judged.reason) };
       return inAgency(this.deps, SERVICE, agencyId, async (uow) => {
         // only the intent still unsettled settles; the store's own update settles it once (a concurrent settlement misses it)
         const current = (await uow.audits.validationsOf(planId)).find((v) => v.validationId === seen.intent.validationId);

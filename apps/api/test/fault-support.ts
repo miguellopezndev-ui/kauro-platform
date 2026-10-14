@@ -16,7 +16,7 @@ import { PgCommercialUnitOfWork, PgCommercialUnitOfWorkFactory } from "@kauro/pe
 import { crashableFactory, instrumentPort, raceStatementTimeoutMs, runtimeRoleOf, type FaultPoints, type HarnessConnection, type SqlSession } from "@kauro/persistence/testing";
 import { clock } from "./support.js";
 
-export type RouteRole = "kauro_app" | "kauro_payment" | "kauro_commission" | "kauro_control";
+export type RouteRole = "kauro_app" | "kauro_payment" | "kauro_commission" | "kauro_control" | "kauro_outreach";
 
 /** A statement of the unit of work that a cell instruments: `<db.label>.before` and `.after` points around it. */
 export interface SqlStep {
@@ -41,6 +41,8 @@ interface Route {
   readonly invocation?: Invocation;
   /** The unit of work this route serves (its statement log), once the invocation numbered it. */
   readonly unit?: UnitLog;
+  /** Lane L-REFUND: the payment service's commerce units (wrapCommerce) are routed over the same connection too (the bank owner commands run as kauro_payment). */
+  readonly payment?: boolean;
 }
 
 /**
@@ -78,6 +80,8 @@ export interface UnitLog {
 export interface Routing {
   readonly target?: number;
   readonly log?: UnitLog[];
+  /** Route the payment service's commerce units (wrapCommerce) over the connection as well (lane L-REFUND: a bank owner command's SERVICE units). */
+  readonly payment?: boolean;
 }
 
 type AnyFactory = { run(context: ExecutionContext, work: (uow: never) => Promise<unknown>, options?: unknown): Promise<unknown> };
@@ -153,7 +157,7 @@ function poolOf(route: Route, role: RouteRole): unknown {
 
 class RoutedFactory extends PgCommercialUnitOfWorkFactory {
   constructor(private readonly route: Route, private readonly stand: () => { readonly at: string } | null, statementTimeoutMs: number | null, private readonly clockOf: () => StepClockOf | null = () => null) {
-    super({ app: poolOf(route, "kauro_app"), payment: poolOf(route, "kauro_payment"), commission: poolOf(route, "kauro_commission"), control: poolOf(route, "kauro_control") } as never, { clock, random: (n) => new Uint8Array(randomBytes(n)), defaultStatementTimeoutMs: statementTimeoutMs ?? raceStatementTimeoutMs() });
+    super({ app: poolOf(route, "kauro_app"), payment: poolOf(route, "kauro_payment"), commission: poolOf(route, "kauro_commission"), outreach: poolOf(route, "kauro_outreach"), control: poolOf(route, "kauro_control") } as never, { clock, random: (n) => new Uint8Array(randomBytes(n)), defaultStatementTimeoutMs: statementTimeoutMs ?? raceStatementTimeoutMs() });
   }
 
   // the routed unit of work is the production one: the factory's own createUnitOfWork, with the price policies production binds (deps
@@ -186,11 +190,23 @@ class RoutedFactory extends PgCommercialUnitOfWorkFactory {
  * the controlled instant (clock.onServer, its consumption proven by the server probes around the next statement) and that instant is read
  * back. Without a step clock the unit's own effect instant answers, unchanged. Test harness only.
  */
-function repositioned<U extends object>(uow: U, clockOf: () => StepClockOf | null, session?: SqlSession): U {
+function repositioned<U extends object>(uow: U, clockOf: () => StepClockOf | null, session?: SqlSession, exactOnly = false): U {
   return new Proxy(uow, {
     get(target, prop) {
       const value: unknown = Reflect.get(target, prop, target);
-      if (prop === "effectInstant" && typeof value === "function") {
+      // the exact (µs) effect instant of the settlement apply (PgUnitOfWork.effectNow, PV1-SETTLE two-step A6): the same repositioning,
+      // read back to the microsecond (the cell's controlled instant exactly, never that instant plus the statement's elapsed time)
+      if (prop === "effectNow" && typeof value === "function") {
+        return async () => {
+          const clock = clockOf();
+          if (clock === null) return (value as () => Promise<string>).call(target);
+          const client = session ?? (target as unknown as { client: SqlSession }).client;
+          await clock.onServer(client);
+          const r = await client.query<{ at: string }>(`SELECT to_char(kauro.server_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at`);
+          return r.rows[0]!.at;
+        };
+      }
+      if (!exactOnly && prop === "effectInstant" && typeof value === "function") {
         return async () => {
           const clock = clockOf();
           if (clock === null) return (value as () => Promise<string>).call(target);
@@ -294,7 +310,7 @@ export class FaultRouting {
    * into `routing.log` (B10-KIT-SUITES section 3).
    */
   on<T>(conn: HarnessConnection, role: RouteRole, points: FaultPoints, steps: ReadonlyArray<SqlStep>, fn: () => Promise<T>, routing: Routing = {}): Promise<T> {
-    return this.#als.run({ conn, role, points, steps, seen: new Map(), invocation: { seq: 0, target: routing.target ?? null, log: routing.log ?? [] } }, fn);
+    return this.#als.run({ conn, role, points, steps, seen: new Map(), invocation: { seq: 0, target: routing.target ?? null, log: routing.log ?? [] }, ...(routing.payment === true ? { payment: true } : {}) }, fn);
   }
 
   /**
@@ -324,10 +340,20 @@ export class FaultRouting {
     return this.#pay.run({ points }, fn);
   }
 
-  /** The payment service's commerce unit-of-work factory (paymentWorld's wrapCommerce): traced and crashable inside `onPayment`. */
+  /**
+   * Passes the named point of the routed invocation running now (a no-op outside one): a bank owner command's hold between its evidence read
+   * and its unit (lane L-REFUND `bank:gate-read`), paused or crashed by the cell that armed it.
+   */
+  async pass(point: string): Promise<void> {
+    const route = this.#als.getStore();
+    if (route !== undefined) await route.points.pass(point);
+  }
+
+  /** The payment service's commerce unit-of-work factory (paymentWorld's wrapCommerce): traced and crashable inside `onPayment`; routed inside `on` with `payment`. */
   wrapCommerce<F extends object>(inner: F): F {
     return new Proxy(inner, {
       get: (target, prop) => {
+        if (prop === "run" && this.#als.getStore()?.payment === true) return Reflect.get(this.wrap(target), "run");
         const value: unknown = Reflect.get(target, prop, target);
         if (typeof value !== "function") return value;
         if (prop !== "run") return (value as (...a: unknown[]) => unknown).bind(target);
@@ -354,8 +380,10 @@ export class FaultRouting {
               target,
               context,
               async (uow: object) => {
-                if ((context as { kind?: string }).kind === "SERVICE" && this.clock !== null) await this.clock.onServer((uow as { client: SqlSession }).client);
-                return work(uow);
+                if ((context as { kind?: string }).kind !== "SERVICE" || this.clock === null) return work(uow);
+                await this.clock.onServer((uow as { client: SqlSession }).client);
+                // the settlement apply's exact effect instant is repositioned too (its effectInstant stays the unit's own, as before)
+                return work(repositioned(uow, () => this.clock, undefined, true));
               },
               ...rest,
             );
@@ -366,8 +394,9 @@ export class FaultRouting {
               target,
               context,
               async (uow: object) => {
-                if ((context as { kind?: string }).kind === "SERVICE" && this.clock !== null) await this.clock.onServer((uow as { client: SqlSession }).client);
-                return work(tracedUnit(uow, route.points, this.dbFaults));
+                if ((context as { kind?: string }).kind !== "SERVICE" || this.clock === null) return work(tracedUnit(uow, route.points, this.dbFaults));
+                await this.clock.onServer((uow as { client: SqlSession }).client);
+                return work(repositioned(tracedUnit(uow, route.points, this.dbFaults), () => this.clock, (uow as { client: SqlSession }).client, true));
               },
               ...rest,
             ),

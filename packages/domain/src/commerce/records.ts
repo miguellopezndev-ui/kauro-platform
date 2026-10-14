@@ -716,8 +716,13 @@ export const BANK_CASE_KINDS = [
   "MATCH_REVIEW",
   "PROVIDER_TIME_UNVERIFIED",
   "RECORD_REQUIRED",
+  // the apply of a recorded settlement intent refused it (lane PV1-SETTLE two-step §3.3; R2 15:153 a case with amount and age)
+  "SETTLEMENT_REFUSED",
 ] as const;
 export type BankCaseKind = (typeof BANK_CASE_KINDS)[number];
+/** The subject a bank review case names (0045 source_kind): a source of route money, or a recorded settlement intent (PV1-SETTLE). */
+export const BANK_CASE_SOURCE_KINDS = ["CAPTURE", "BANK_CREDIT", "SETTLEMENT_REQUEST"] as const;
+export type BankCaseSourceKind = (typeof BANK_CASE_SOURCE_KINDS)[number];
 /** The kinds of line an imported statement carries (SI2): an incoming credit or an outgoing debit. */
 export const STATEMENT_LINE_KINDS = ["CREDIT", "DEBIT"] as const;
 export type StatementLineKind = (typeof STATEMENT_LINE_KINDS)[number];

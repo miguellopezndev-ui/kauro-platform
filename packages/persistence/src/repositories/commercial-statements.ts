@@ -947,14 +947,16 @@ export class PgStatementRepository implements StatementRepository {
     await this.lockStatementRow(owner.rows[0].statement_id);
     // the intent leaves (or re-enters) the unsettled set under the cash basis lock (D10-GAP-1)
     await lockPayoutCash(this.db);
+    // the instants are the effect's, read after the cash lock's wait (kauro.effect_now(), template rule 15; B10-CMD053-SETTLED-AT): a
+    // settlement that waited behind a concurrent holder never records an instant before the holder released the basis
     // SETTLED, FAILED and RETURNED keep the evidence of the matching reconciliation recorded for that kind (the database checks it at COMMIT)
     const r = await execute<IntentRow>(
       this.db,
       `UPDATE kauro.payout_intents p SET state = $3, version = p.version + 1,
-         submitted_at = CASE WHEN $3 = 'SUBMITTED' THEN kauro.server_now() ELSE p.submitted_at END,
-         settled_at = CASE WHEN $3 = 'SETTLED' THEN kauro.server_now() ELSE p.settled_at END,
-         failed_at = CASE WHEN $3 = 'FAILED' THEN kauro.server_now() ELSE p.failed_at END,
-         returned_at = CASE WHEN $3 = 'RETURNED' THEN kauro.server_now() ELSE p.returned_at END,
+         submitted_at = CASE WHEN $3 = 'SUBMITTED' THEN kauro.effect_now() ELSE p.submitted_at END,
+         settled_at = CASE WHEN $3 = 'SETTLED' THEN kauro.effect_now() ELSE p.settled_at END,
+         failed_at = CASE WHEN $3 = 'FAILED' THEN kauro.effect_now() ELSE p.failed_at END,
+         returned_at = CASE WHEN $3 = 'RETURNED' THEN kauro.effect_now() ELSE p.returned_at END,
          evidence_hash = CASE WHEN $3 IN ('SETTLED', 'FAILED', 'RETURNED')
            THEN (SELECT x.evidence_hash FROM kauro.payout_reconciliations x WHERE x.intent_id = p.intent_id AND x.evidence_kind = $3 ORDER BY x.recorded_at DESC, x.reconciliation_id DESC LIMIT 1)
            ELSE p.evidence_hash END

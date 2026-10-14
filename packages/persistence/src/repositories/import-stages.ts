@@ -1,6 +1,6 @@
 /**
  * Import stages and their receipts over `pg` (package B17: CMD040 SubmitStageReceipt, CMD041 ContinueStage; migration 0052). The stage
- * rows are the stage compiler's; here the request handlers read them, serialize on them (FOR UPDATE: the one serialization point of a
+ * rows are the stage compiler's; here the request handlers read them, serialize on them (FOR NO KEY UPDATE: the one serialization point of a
  * receipt or a continuation), append receipt revisions and advance a stage under its version fence. The database stamps every instant
  * (validated_at, continued_at) and its guard refuses an unlisted edge, a changed binding and a second continuation.
  */
@@ -15,11 +15,15 @@ import {
   type ImportStageStore,
   type MembershipId,
   type NewStageReceipt,
+  type NewStageReceiptReconciliation,
   type PlanId,
   type ProjectId,
   type ReceiptMappingRow,
   type ReceiptResult,
+  type StageParentEdge,
+  type StageReceiptReconciliationRecord,
   type StageReceiptRecord,
+  type StageReceiptStatus,
   type VersionedWrite,
 } from "@kauro/domain";
 import { execute, instant, int, optionalInstant, optionalText, withOptional, type Queryable } from "../sql.js";
@@ -39,6 +43,7 @@ interface StageRow {
   expires_at: Date;
   instance_id: string;
   source_ids: string[];
+  parent_edges: StageParentEdge[];
   version: number | string;
   continued_at: Date | null;
   continued_by_membership_id: string | null;
@@ -46,7 +51,7 @@ interface StageRow {
 }
 
 const STAGE_COLUMNS =
-  "stage_id, agency_id, project_id, plan_id, sequence, object_api_name, operation, state, parent_stage_ids, package_hash, receipt_required, expires_at, instance_id, source_ids, version, continued_at, continued_by_membership_id, continuation_receipt_hash";
+  "stage_id, agency_id, project_id, plan_id, sequence, object_api_name, operation, state, parent_stage_ids, package_hash, receipt_required, expires_at, instance_id, source_ids, parent_edges, version, continued_at, continued_by_membership_id, continuation_receipt_hash";
 
 function stageRecord(r: StageRow): ImportStageRecord {
   const base: ImportStageRecord = {
@@ -64,6 +69,7 @@ function stageRecord(r: StageRow): ImportStageRecord {
     expiresAt: instant(r.expires_at),
     instanceId: r.instance_id,
     sourceIds: r.source_ids,
+    parentEdges: r.parent_edges,
     version: int(r.version),
   };
   const continuedAt = optionalInstant(r.continued_at);
@@ -88,7 +94,7 @@ interface ReceiptRow {
   unresolved_rows: number | string;
   result: ReceiptResult;
   mapping: ReceiptMappingRow[];
-  validated_at: Date;
+  validated_at: Date | string;
   validator_version: string;
   submitted_by_membership_id: string;
 }
@@ -119,6 +125,34 @@ function receiptRecord(r: ReceiptRow): StageReceiptRecord {
   };
 }
 
+interface ReconciliationRow {
+  reconciliation_id: string;
+  agency_id: string;
+  project_id: string;
+  stage_id: string;
+  content_hash: string;
+  receipt_upload_ref: string;
+  state: "OPEN";
+  opened_by_membership_id: string;
+  opened_at: Date | string;
+}
+
+const RECONCILIATION_COLUMNS = "reconciliation_id, agency_id, project_id, stage_id, content_hash, receipt_upload_ref, state, opened_by_membership_id, opened_at";
+
+function reconciliationRecord(r: ReconciliationRow): StageReceiptReconciliationRecord {
+  return {
+    reconciliationId: r.reconciliation_id,
+    agencyId: r.agency_id as AgencyId,
+    projectId: r.project_id as ProjectId,
+    stageId: r.stage_id,
+    contentHash: r.content_hash as Sha256Hex,
+    receiptUploadRef: r.receipt_upload_ref as ArtifactRef,
+    state: r.state,
+    openedByMembershipId: r.opened_by_membership_id,
+    openedAt: instant(r.opened_at),
+  };
+}
+
 export class PgImportStageStore implements ImportStageStore {
   constructor(private readonly db: Queryable) {}
 
@@ -128,7 +162,7 @@ export class PgImportStageStore implements ImportStageStore {
   }
 
   async lock(stageId: string): Promise<ImportStageRecord | null> {
-    const r = await execute<StageRow>(this.db, `SELECT ${STAGE_COLUMNS} FROM kauro.import_stages WHERE stage_id = $1 FOR UPDATE`, [stageId]);
+    const r = await execute<StageRow>(this.db, `SELECT ${STAGE_COLUMNS} FROM kauro.import_stages WHERE stage_id = $1 FOR NO KEY UPDATE`, [stageId]);
     return r.rows[0] ? stageRecord(r.rows[0]) : null;
   }
 
@@ -136,6 +170,57 @@ export class PgImportStageStore implements ImportStageStore {
     if (stageIds.length === 0) return [];
     const r = await execute<StageRow>(this.db, `SELECT ${STAGE_COLUMNS} FROM kauro.import_stages WHERE stage_id = ANY($1::uuid[]) ORDER BY stage_id`, [[...stageIds]]);
     return r.rows.map(stageRecord);
+  }
+
+  async lockParents(stageIds: ReadonlyArray<string>): Promise<ReadonlyArray<ImportStageRecord>> {
+    if (stageIds.length === 0) return [];
+    const r = await execute<StageRow>(this.db, `SELECT ${STAGE_COLUMNS} FROM kauro.import_stages WHERE stage_id = ANY($1::uuid[]) ORDER BY stage_id FOR SHARE`, [[...new Set(stageIds)]]);
+    return r.rows.map(stageRecord);
+  }
+
+  async latestReceipts(stageIds: ReadonlyArray<string>): Promise<ReadonlyMap<string, StageReceiptRecord>> {
+    if (stageIds.length === 0) return new Map();
+    const r = await execute<ReceiptRow>(
+      this.db,
+      `SELECT DISTINCT ON (stage_id) ${RECEIPT_COLUMNS} FROM kauro.stage_receipts WHERE stage_id = ANY($1::uuid[]) ORDER BY stage_id, revision DESC`,
+      [[...new Set(stageIds)]],
+    );
+    return new Map(r.rows.map((row) => [row.stage_id, receiptRecord(row)]));
+  }
+
+  async stagesUnderReconciliation(stageIds: ReadonlyArray<string>): Promise<ReadonlyArray<string>> {
+    if (stageIds.length === 0) return [];
+    const r = await execute<{ stage_id: string }>(
+      this.db,
+      "SELECT DISTINCT stage_id FROM kauro.stage_receipt_reconciliations WHERE stage_id = ANY($1::uuid[]) AND state = 'OPEN' ORDER BY stage_id",
+      [[...new Set(stageIds)]],
+    );
+    return r.rows.map((row) => row.stage_id);
+  }
+
+  async receiptStatus(stageId: string, contentHash: Sha256Hex): Promise<StageReceiptStatus> {
+    const r = await execute<{ receipt: ReceiptRow | null; reconciliation: ReconciliationRow | null }>(
+      this.db,
+      `SELECT (SELECT to_jsonb(x) FROM (SELECT ${RECEIPT_COLUMNS} FROM kauro.stage_receipts WHERE stage_id = $1 AND receipt_file_hash = $2) x) AS receipt,
+              (SELECT to_jsonb(y) FROM (SELECT ${RECONCILIATION_COLUMNS} FROM kauro.stage_receipt_reconciliations WHERE stage_id = $1 AND content_hash = $2) y) AS reconciliation`,
+      [stageId, contentHash],
+    );
+    const row = r.rows[0];
+    const receipt = row?.receipt ? receiptRecord(row.receipt) : null;
+    const reconciliation = row?.reconciliation ? reconciliationRecord(row.reconciliation) : null;
+    return { receipt, reconciliation };
+  }
+
+  async openReconciliation(input: NewStageReceiptReconciliation): Promise<StageReceiptReconciliationRecord> {
+    const r = await execute<ReconciliationRow>(
+      this.db,
+      `INSERT INTO kauro.stage_receipt_reconciliations (reconciliation_id, agency_id, project_id, stage_id, content_hash, receipt_upload_ref, opened_by_membership_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${RECONCILIATION_COLUMNS}`,
+      [input.reconciliationId, input.agencyId, input.projectId, input.stageId, input.contentHash, input.receiptUploadRef, input.openedByMembershipId],
+    );
+    const row = r.rows[0];
+    if (!row) throw new DomainFailure("INTEGRITY_FAILURE", "the receipt reconciliation was not recorded");
+    return reconciliationRecord(row);
   }
 
   async latestReceipt(stageId: string): Promise<StageReceiptRecord | null> {

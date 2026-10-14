@@ -522,6 +522,7 @@ settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh st
 | CMD060 RequestRetentionExtension | POST /api/v1/projects/{projectId}/retention-extensions | AGENCY_OWNER_OR_ADMIN | AGENCY_HEADER | — |  | retention_record.extended.v1 | retention_record.extended.v1 → AUTHORITY_JOURNAL |
 | CMD036 ExecuteProject | POST /api/v1/projects/{projectId}/execute | AGENCY_OPERATOR | AGENCY_HEADER | — | Job (initial QUEUED) | processing_job.queued.v1 | processing_job.queued.v1 → JOB_EXECUTION |
 | CMD037 CancelJob | POST /api/v1/jobs/{jobId}/cancel | AGENCY_OPERATOR | AGENCY_HEADER | — | Job cancel_command | processing_job.cancel_requested.v1 | processing_job.cancel_requested.v1 → EXECUTION_CONTROL |
+| CMD038 AuthorizeDownload | POST /api/v1/packages/{packageId}/download-authorizations | AGENCY_READER | AGENCY_HEADER | fresh |  | download_authorization.issued.v1 | — |
 | CMD018 CreateTargetContract | POST /api/v1/projects/{projectId}/target-contracts | AGENCY_OPERATOR | AGENCY_HEADER | — |  |  | — |
 | CMD019 ConfirmTargetContract | POST /api/v1/target-contracts/{contractId}/confirm | AGENCY_APPROVER | AGENCY_HEADER | — |  |  | — |
 | CMD040 SubmitStageReceipt | POST /api/v1/projects/{projectId}/import-stages/{stageId}/receipts | AGENCY_OPERATOR | AGENCY_HEADER | — | ImportStage receipt_submitted; ImportStage corrected_receipt_admitted |  | — |
@@ -549,10 +550,27 @@ settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh st
 | CMD051 CloseCommissionPeriod | POST /api/v1/sales/commission-periods/{periodId}/close | COMMISSION_SERVICE | STORED_OPERATION | — | CommissionLine statement_closed |  | — |
 | CMD052 ApproveCommissionPayout | POST /api/v1/sales/statements/{statementId}/approve-payout | KAURO_OWNER | CORPORATE | fresh |  |  | — |
 | CMD053 ReconcileCommissionPayout | POST /api/v1/sales/statements/{statementId}/reconcile-payout | FINANCE_SERVICE | STORED_OPERATION | — | CommissionLine settled_payout_evidence; CommissionLine payout_blocked |  | — |
+| CMD054 OpenBreakglass | POST /api/v1/operations/breakglass-grants | KAURO_OWNER | CORPORATE | fresh |  |  | — |
+| CMD055 RevokeBreakglass | POST /api/v1/operations/breakglass-grants/{grantId}/revoke | KAURO_OWNER_OR_SECURITY_SERVICE | CORPORATE | — |  |  | — |
 | CMD056 RecordIncident | POST /api/v1/operations/incidents | OPERATIONS_SERVICE_OR_OWNER | CORPORATE | — |  |  | — |
 | CMD057 AuthorizeRecovery | POST /api/v1/operations/recoveries | KAURO_OWNER | CORPORATE | fresh |  |  | — |
 | CMD058 ChangeCapability | POST /api/v1/operations/capabilities/{capabilityId}/versions | KAURO_OWNER | CORPORATE | — |  |  | — |
 | CMD059 RestrictCapability | POST /api/v1/operations/capabilities/{capabilityId}/restrict | OPERATIONS_SERVICE_OR_OWNER | CORPORATE | — | Capability material_counterexample |  | — |
+| CMD061 PrepareOutreachDraft | POST /api/v1/ops/outreach/drafts | ASSIGNED_SELLER_OR_OWNER | CORPORATE | — |  |  | — |
+| CMD062 AuthorizeOutreach | POST /api/v1/ops/outreach/authorizations | OWNER | CORPORATE | fresh |  |  | — |
+| CMD063 SendAuthorizedOutreach | POST /api/v1/ops/outreach/{draftId}/send | ASSIGNED_SELLER_OR_OWNER | CORPORATE | — |  | outreach.send_intended.v1 | outreach.send_intended.v1 → OUTREACH_SENDER |
+| CMD064 RecordSalesActivity | POST /api/v1/ops/sales/activities | ASSIGNED_SELLER_OWNER_OR_RECONCILER | CORPORATE | — |  |  | — |
+| PutOutreachContent PutOutreachContent | POST /api/v1/ops/outreach/contents | ACTIVE_SELLER_OR_OWNER | CORPORATE | — |  |  | — |
+| PublishSalesResource PublishSalesResource | POST /api/v1/ops/sales/resources | KAURO_OWNER | CORPORATE | fresh |  |  | — |
+| RegisterSenderIdentity RegisterSenderIdentity | POST /api/v1/ops/outreach/senders | KAURO_OWNER | CORPORATE | fresh |  |  | — |
+| VerifySenderIdentity VerifySenderIdentity | POST /api/v1/ops/outreach/senders/{senderId}/verify | KAURO_OWNER | CORPORATE | — |  |  | — |
+| RecordSenderRevocation RecordSenderRevocation | POST /api/v1/ops/outreach/senders/{senderId}/revoke | KAURO_OWNER | CORPORATE | — |  |  | — |
+| PrepareOutreachReview PrepareOutreachReview | POST /api/v1/ops/outreach/reviews | KAURO_OWNER | CORPORATE | fresh |  |  | — |
+| RecordOutreachDiagnosis RecordOutreachDiagnosis | POST /api/v1/ops/outreach/diagnoses | KAURO_OWNER | CORPORATE | fresh |  |  | — |
+| RevokeOutreachAuthorization RevokeOutreachAuthorization | POST /api/v1/ops/outreach/authorizations/{authorizationId}/revoke | KAURO_OWNER | CORPORATE | — |  |  | — |
+| WithdrawOutreachChannelPolicy WithdrawOutreachChannelPolicy | POST /api/v1/ops/outreach/policy-withdrawals | KAURO_OWNER | CORPORATE | fresh |  |  | — |
+| RecordProspectSource RecordProspectSource | POST /api/v1/ops/prospects/{prospectId}/sources | ACTIVE_SELLER_OR_OWNER | CORPORATE | — |  |  | — |
+| RecordProspectContact RecordProspectContact | POST /api/v1/ops/prospects/{prospectId}/contacts | ACTIVE_SELLER_OR_OWNER | CORPORATE | — |  |  | — |
 
 ## 2a. The source-lifecycle routes (B07)
 
@@ -985,6 +1003,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | NO_SEMANTIC_CHANGE | — | always | COMMAND | the patch compiles to the body the plan already has |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | TARGET_STALE | — | — | — | COMMAND | the plan's target contract was superseded (R2-026): no revision is born on it; its re-check plan is the way on |
 | 422 | INTEGRITY_FAILURE | BODY_DIGEST_MISMATCH | — | — | COMMAND | a plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10) |
 | 422 | INTEGRITY_FAILURE | CORE_SERVICES_UNAVAILABLE | — | — | COMMAND | no adapter of the Intelligence core is bound in this edition (D8-PORT-1): nothing was written |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
@@ -1574,6 +1593,55 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
+### CMD038 AuthorizeDownload
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_MISSING | — | — | ASSURANCE | no step-up proof, or not a step-up proof |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is not the caller's |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_STALE | — | — | ASSURANCE | the step-up is older than the freshness window or expired |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_CHANGED | — | — | COMMAND | the requester's membership changed after the grant was recorded (R2-048): no URL is signed for it |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the package is not visible to the caller's agency |
+| 404 | NOT_FOUND | ARTIFACT_NOT_FOUND | — | — | COMMAND | an artifact id is not a delivery copy of this package (another package's and a nonexistent one look alike): nothing is granted |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | PROJECT_NOT_OPEN | — | — | COMMAND | the package's project is not OPEN (closed or being deleted, CMD042): no new URL |
+| 409 | PRECONDITION_FAILED | PACKAGE_NOT_AVAILABLE | — | — | COMMAND | the package is not AVAILABLE (revoked, retired or deleted): no new URL; a URL issued earlier keeps its disclosed residual lifetime |
+| 409 | PRECONDITION_FAILED | ARTIFACT_UNAVAILABLE | — | — | COMMAND | a requested artifact's object is deleted, being deleted or quarantined: the whole request is refused, nothing is granted |
+| 409 | PRECONDITION_FAILED | RETENTION_EXPIRED | — | — | COMMAND | the governing retention record's effective deadline is reached on the database clock (judged after its lock): no new URL |
+| 409 | PRECONDITION_FAILED | DOWNLOAD_AUTHORIZATION_EXPIRED | — | — | COMMAND | a retry with the same key after the grant's expiry: the grant is never re-signed beyond expiresAt; request a new one with a new key |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | SIGNING_UNCERTAIN | — | — | COMMAND | the provider did not answer the signing within its bound: the grant is recorded ISSUE_UNCERTAIN; retry with the same key to re-sign the same scope at the same expiry |
+| 503 | CAPACITY_UNAVAILABLE | DOWNLOAD_SIGNER_UNAVAILABLE | — | — | COMMAND | no read signer is bound in this deployment: nothing was written |
+
 ### CMD018 CreateTargetContract
 
 | Status | Code | Reason | Field codes | current | Layer | Meaning |
@@ -1700,7 +1768,9 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | RECEIPT_INSTANCE_MISMATCH | — | — | COMMAND | the receipt was produced for another target instance than the stage's |
 | 409 | PRECONDITION_FAILED | RECEIPT_PACKAGE_MISMATCH | — | — | COMMAND | sourcePackageHash is not the stage's exact package |
 | 409 | PRECONDITION_FAILED | RECEIPT_FOREIGN_IDS | — | — | COMMAND | the receipt names source identities that are not members of the stage: nothing was recorded |
-| 409 | PRECONDITION_FAILED | RECEIPT_ALREADY_SUBMITTED | — | — | COMMAND | these exact receipt bytes were already submitted for the stage: a correction is new evidence |
+| 409 | PRECONDITION_FAILED | RECEIPT_FOREIGN_STAGE | — | — | COMMAND | a receipt row's correlation key is not this stage's for its source identity: the receipt belongs to another stage (R2-024), nothing was recorded |
+| 409 | PRECONDITION_FAILED | PARENT_STAGE_NOT_VERIFIED | — | — | COMMAND | a required parent stage is not verified, or its workflow lapsed: a child receipt binds only to verified parent identities |
+| 409 | PRECONDITION_FAILED | CHILD_EDGE_BLOCKED | — | — | COMMAND | the receipt claims MATCHED for a child source whose parent identity is not MATCHED in the parent's latest receipt (R2-023): nothing was recorded |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
@@ -1745,9 +1815,11 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | PARENT_STAGE_NOT_VERIFIED | — | — | COMMAND | a required parent stage is not verified, or its workflow lapsed |
 | 409 | PRECONDITION_FAILED | CHILD_PLAN_NOT_APPROVED | — | — | COMMAND | the plan the stage belongs to is not an APPROVED plan |
 | 409 | PRECONDITION_FAILED | STAGE_TARGET_MISMATCH | — | — | COMMAND | the stage's target instance is not the project's current target: explicit recovery, not guessed IDs |
+| 409 | PRECONDITION_FAILED | PARENT_IDENTITY_UNDER_RECONCILIATION | — | — | COMMAND | a parent stage holds an open receipt reconciliation: its identities are not settled, so no child continues from them (R2-023, R2-025) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 422 | INTEGRITY_FAILURE | RECEIPT_DIGEST_MISMATCH | — | — | COMMAND | the stored receipt mapping is not the mapping its digest names |
+| 422 | TARGET_STALE | — | — | — | COMMAND | the target contract the stage's plan binds is no longer a confirmed, current contract (R2-026): nothing was continued |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
@@ -1875,6 +1947,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 422 | INTEGRITY_FAILURE | BODY_DIGEST_MISMATCH | — | — | COMMAND | a compiled plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10) |
+| 422 | TARGET_STALE | — | — | — | COMMAND | the audit's target contract was superseded (R2-026): no plan is born on it |
 | 422 | INTEGRITY_FAILURE | CORE_SERVICES_UNAVAILABLE | — | — | COMMAND | no adapter of the Intelligence core is bound in this edition (D8-PORT-1): nothing was written |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
@@ -2121,6 +2194,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is another identity's |
 | 403 | ASSURANCE_REQUIRED | POLICY_NOT_APPLICABLE | — | — | ASSURANCE | the named standing policy does not cover this refund (origin, phase, scope or validity): a policy is referenced, never invented |
 | 404 | NOT_FOUND | — | — | — | ACCESS | the stored operation is unknown to the operator's finance scope: a foreign and a nonexistent id answer alike |
+| 404 | NOT_FOUND | EVIDENCE_NOT_FOUND | — | — | COMMAND | the destination evidence is not in the restricted store |
 | 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
 | 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
 | 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the refund's current version; the current safe version and state come back |
@@ -2128,10 +2202,16 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | CAPTURE_NOT_REFUNDABLE | — | — | COMMAND | the capture is not COMPLETED (reversed captures already returned the money) |
 | 409 | PRECONDITION_FAILED | REFUND_EXCEEDS_REMAINING | — | — | COMMAND | the amounts exceed the reconciled remaining capture, given every committed refund (CMD032 failure) |
 | 409 | PRECONDITION_FAILED | REFUND_TAX_INCONSISTENT | RANGE | — | COMMAND | taxCents is not the tax the approved service releases under the sale's reviewed rule, given every committed refund (D-REF-B6) |
+| 409 | IDEMPOTENCY_CONFLICT | BODY_CONFLICT | — | — | COMMAND | the Idempotency-Key was used for another body of this approval (the authorization reference aside) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | INTEGRITY_FAILURE | DESTINATION_NOT_CAPTURED | — | — | COMMAND | the refund's order was paid by bank transfer and the approval names no destination and destination evidence |
+| 422 | INTEGRITY_FAILURE | DESTINATION_INVALID | — | — | COMMAND | the destination does not normalize (destination-norm-v1: routing, account or holder name) |
+| 422 | INTEGRITY_FAILURE | DESTINATION_UNPROVEN | — | — | COMMAND | the destination evidence is not a classified payer artifact of the source's account |
+| 422 | INTEGRITY_FAILURE | HASH_MISMATCH | — | — | COMMAND | the destination evidence is not the artifact the approval cites, or its stored bytes no longer match their digest |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | EVIDENCE_UNAVAILABLE | — | — | COMMAND | the destination evidence could not be read within its bound, or no store, classifier or fingerprinter is bound; retry with the same key |
 
 ### CMD033 ExecuteRefund
 
@@ -2160,6 +2240,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | CAPTURE_NOT_REFUNDABLE | — | — | COMMAND | the capture was reversed: the authorization lapsed and no refund is dispatched |
 | 409 | PAYMENT_PENDING | REFUND_IN_PROGRESS | — | — | COMMAND | a submission of this refund is in flight under another key |
 | 409 | PAYMENT_UNCERTAIN | REFUND_UNCERTAIN | — | — | COMMAND | a prior submission may have refunded: reconcile it (CMD034) before any new dispatch |
+| 409 | PRECONDITION_FAILED | MANUAL_RAIL_NO_AUTOMATED_OUTBOUND | — | — | COMMAND | the refund is on the manual rail: only the owner's declared execution and its recorded evidence move its money |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 422 | INTEGRITY_FAILURE | PROVIDER_SERVICES_UNAVAILABLE | — | — | COMMAND | no payment provider adapter is bound in this edition (a deployment before B15 answers this inside the unit of work; nothing is written) |
@@ -2656,6 +2737,77 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | PAYOUT_EVIDENCE_UNAVAILABLE | — | — | COMMAND | the payout evidence verifier did not answer within its bound or failed: nothing changed and the same key retries (D10-GAP-6) |
 
+### CMD054 OpenBreakglass
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_MISSING | — | — | ASSURANCE | no step-up proof, or not a step-up proof |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is not the caller's |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_STALE | — | — | ASSURANCE | the step-up is older than the freshness window or expired |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | BREAKGLASS_SCOPE_UNAUTHORIZED | — | — | COMMAND | the support case or incident does not justify this project now: another project's or agency's, closed, resolved, a false positive, an incident not naming the project, a project whose deletion was requested, a closed agency, or nothing the owner may name |
+| 409 | PRECONDITION_FAILED | BREAKGLASS_GRANT_LIVE | — | sometimes | COMMAND | the project already holds a live grant; a concurrent open that lost the race answers without the current grant |
+| 409 | PRECONDITION_FAILED | BREAKGLASS_RENEWAL_REFUSED | — | — | COMMAND | this authorization already opened a grant of the project: after its expiry a new justified grant is required, the expired record is kept (R2-050) |
+| 409 | PRECONDITION_FAILED | BREAKGLASS_PROOF_REUSED | — | — | COMMAND | the step-up proof already opened a grant: a proof is never silently reused |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD055 RevokeBreakglass
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the grant is unknown |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | BREAKGLASS_GRANT_NOT_ACTIVE | — | always | COMMAND | the grant is already revoked or lapsed: it is not revoked again |
+| 409 | PRECONDITION_FAILED | BREAKGLASS_GRANT_EXPIRED | — | — | COMMAND | the grant's 1800 seconds have passed: it reads nothing and its record is kept as it was |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
 ### CMD056 RecordIncident
 
 | Status | Code | Reason | Field codes | current | Layer | Meaning |
@@ -2790,6 +2942,538 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
 | 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the capability current version; the current safe version and state come back |
 | 409 | PRECONDITION_FAILED | CAPABILITY_NOT_RESTRICTABLE | — | always | COMMAND | the capability is already SUSPENDED or still in DESIGN: there is nothing to restrict |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD061 PrepareOutreachDraft
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE seller row and no ACTIVE KAURO_OWNER grant, read after their transition locks |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the prospect, the sender identity or the content is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | SENDER_NOT_VERIFIED | — | — | COMMAND | the sender identity is not VERIFIED (KC031) |
+| 409 | PRECONDITION_FAILED | SENDER_REVOKED | — | — | COMMAND | the sender identity was revoked |
+| 409 | PRECONDITION_FAILED | SOURCE_EVIDENCE_INVALID | — | — | COMMAND | provenanceEvidenceHash is not the caller own source evidence for this prospect |
+| 409 | PRECONDITION_FAILED | PROSPECT_SUPPRESSED | — | — | COMMAND | the organization key or the contact key is suppressed (KC016) |
+| 409 | PRECONDITION_FAILED | OUTREACH_PAUSED | — | — | COMMAND | the sending person is paused after a bounce, a complaint or an opt-out until the owner records a diagnosis (KC034) |
+| 409 | PRECONDITION_FAILED | OUTREACH_JURISDICTION_UNREVIEWED | — | — | COMMAND | the jurisdiction of the purpose has no reviewed channel policy, or it was withdrawn (A13) |
+| 409 | PRECONDITION_FAILED | OUTREACH_COMPLIANCE_UNCONFIGURED | — | — | COMMAND | the postal address or the opt-out origin is not configured (A15) |
+| 409 | PRECONDITION_FAILED | RESOURCE_NOT_CURRENT | — | — | COMMAND | the content cites a sales resource that is no longer current (KC033) |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD062 AuthorizeOutreach
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_MISSING | — | — | ASSURANCE | no step-up proof, or not a step-up proof |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is not the caller's |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_STALE | — | — | ASSURANCE | the step-up is older than the freshness window or expired |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the sender identity or the review is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | OUTREACH_REVIEW_INVALID | — | — | COMMAND | the contents, count or window do not match the server-issued review confirmed under this step-up, or the review was used or is stale (KC035) |
+| 409 | PRECONDITION_FAILED | SENDER_NOT_VERIFIED | — | — | COMMAND | the sender identity is not VERIFIED (KC031) |
+| 409 | PRECONDITION_FAILED | SENDER_REVOKED | — | — | COMMAND | the sender identity was revoked |
+| 409 | PRECONDITION_FAILED | OUTREACH_ROUTE_FORBIDDEN | — | — | COMMAND | the sender route may not carry the purpose (KC028) |
+| 409 | PRECONDITION_FAILED | OUTREACH_JURISDICTION_UNREVIEWED | — | — | COMMAND | the jurisdiction of the purpose has no reviewed channel policy, or it was withdrawn (A13) |
+| 409 | PRECONDITION_FAILED | OUTREACH_COMPLIANCE_UNCONFIGURED | — | — | COMMAND | the postal address or the opt-out origin is not configured (A15) |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD063 SendAuthorizedOutreach
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE seller row and no ACTIVE KAURO_OWNER grant, read after their transition locks |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the draft or the authorization is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the draft current version; the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | DRAFT_CLOSED | — | always | COMMAND | the draft is CANCELLED or otherwise closed |
+| 409 | PRECONDITION_FAILED | OUTREACH_ALREADY_SENT | — | always | COMMAND | an intent of this draft was already accepted (KC036) |
+| 409 | PRECONDITION_FAILED | OUTREACH_GRANT_INVALID | — | — | COMMAND | the authorization is revoked, expired, exhausted or does not cover this content hash on the database clock (KC030) |
+| 409 | PRECONDITION_FAILED | OUTREACH_ROUTE_FORBIDDEN | — | — | COMMAND | the sender route may not carry this purpose (KC028) |
+| 409 | PRECONDITION_FAILED | SENDER_NOT_VERIFIED | — | — | COMMAND | the sender identity is not VERIFIED (KC031) |
+| 409 | PRECONDITION_FAILED | SENDER_REVOKED | — | — | COMMAND | the sender identity was revoked |
+| 409 | PRECONDITION_FAILED | PROSPECT_SUPPRESSED | — | — | COMMAND | the organization key or the contact key is suppressed (KC016) |
+| 409 | PRECONDITION_FAILED | SEND_UNCERTAIN_UNRESOLVED | — | — | COMMAND | an earlier send of the prospect is uncertain and unresolved (KC029) |
+| 409 | PRECONDITION_FAILED | OUTREACH_CAP_REACHED | — | — | COMMAND | the person or day cap is reached (KC032) |
+| 409 | PRECONDITION_FAILED | OUTSIDE_BUSINESS_DAY | — | — | COMMAND | a first contact outside a business day of the calendar (KC032) |
+| 409 | PRECONDITION_FAILED | CADENCE_CLOSED | — | — | COMMAND | the cadence window is closed or a stop fact exists (KC032) |
+| 409 | PRECONDITION_FAILED | FIRST_NOT_SENT | — | — | COMMAND | a follow-up has no sent first contact (KC032) |
+| 409 | PRECONDITION_FAILED | OUTREACH_PAUSED | — | — | COMMAND | the sending person is paused until the owner records a diagnosis (KC034) |
+| 409 | PRECONDITION_FAILED | OUTREACH_CALENDAR_UNAVAILABLE | — | — | COMMAND | the date is not covered by the business calendar (KC037) |
+| 409 | PRECONDITION_FAILED | OUTREACH_JURISDICTION_UNREVIEWED | — | — | COMMAND | the channel policy was withdrawn or never reviewed (A13) |
+| 409 | PRECONDITION_FAILED | OUTREACH_COMPLIANCE_UNCONFIGURED | — | — | COMMAND | the postal address or the opt-out origin is not configured (A15) |
+| 409 | PRECONDITION_FAILED | RESOURCE_NOT_CURRENT | — | — | COMMAND | a cited sales resource is no longer current (KC033) |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### CMD064 RecordSalesActivity
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE seller row and no ACTIVE KAURO_OWNER grant, read after their transition locks |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the prospect or the draft is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | SOURCE_EVIDENCE_INVALID | — | — | COMMAND | evidenceHash is not the caller own evidence for this prospect, or the activity is dated after the database clock |
+| 409 | PRECONDITION_FAILED | DRAFT_CLOSED | — | sometimes | COMMAND | the draft cannot take the activity: it is closed |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### PutOutreachContent PutOutreachContent
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE seller row and no ACTIVE KAURO_OWNER grant, read after their transition locks |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### PublishSalesResource PublishSalesResource
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_MISSING | — | — | ASSURANCE | no step-up proof, or not a step-up proof |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is not the caller's |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_STALE | — | — | ASSURANCE | the step-up is older than the freshness window or expired |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the content or a capability is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the resource family current version; the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | CAPABILITY_NOT_ACCEPTED | — | sometimes | COMMAND | a described capability has no independent acceptance: copy never promises it |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### RegisterSenderIdentity RegisterSenderIdentity
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_MISSING | — | — | ASSURANCE | no step-up proof, or not a step-up proof |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is not the caller's |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_STALE | — | — | ASSURANCE | the step-up is older than the freshness window or expired |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the person is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | OUTREACH_ROUTE_FORBIDDEN | — | — | COMMAND | the route needs the person consent evidence it lacks, or may not be registered for this person (KC028) |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### VerifySenderIdentity VerifySenderIdentity
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the sender identity is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | SENDER_REVOKED | — | always | COMMAND | the sender identity was revoked and cannot be verified |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### RecordSenderRevocation RecordSenderRevocation
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the sender identity is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### PrepareOutreachReview PrepareOutreachReview
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_MISSING | — | — | ASSURANCE | no step-up proof, or not a step-up proof |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is not the caller's |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_STALE | — | — | ASSURANCE | the step-up is older than the freshness window or expired |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the sender identity or a draft is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | DRAFT_CLOSED | — | sometimes | COMMAND | a draft is closed and cannot be reviewed |
+| 409 | PRECONDITION_FAILED | SENDER_NOT_VERIFIED | — | — | COMMAND | the sender identity is not VERIFIED (KC031) |
+| 409 | PRECONDITION_FAILED | SENDER_REVOKED | — | — | COMMAND | the sender identity was revoked |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### RecordOutreachDiagnosis RecordOutreachDiagnosis
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_MISSING | — | — | ASSURANCE | no step-up proof, or not a step-up proof |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is not the caller's |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_STALE | — | — | ASSURANCE | the step-up is older than the freshness window or expired |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the person is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### RevokeOutreachAuthorization RevokeOutreachAuthorization
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the authorization is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### WithdrawOutreachChannelPolicy WithdrawOutreachChannelPolicy
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE KAURO_OWNER grant (read after its transition lock): an agency member, a seller and an unknown caller are refused alike |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_MISSING | — | — | ASSURANCE | no step-up proof, or not a step-up proof |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is not the caller's |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_STALE | — | — | ASSURANCE | the step-up is older than the freshness window or expired |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the channel policy is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the channel policy current version; the current safe version and state come back |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### RecordProspectSource RecordProspectSource
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE seller row and no ACTIVE KAURO_OWNER grant, read after their transition locks |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the prospect is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | SOURCE_EVIDENCE_INVALID | — | — | COMMAND | the observation is dated after the database clock, or the lawful basis is not one the policy lists |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+
+### RecordProspectContact RecordProspectContact
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE seller row and no ACTIVE KAURO_OWNER grant, read after their transition locks |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the prospect is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | PROSPECT_SUPPRESSED | — | — | COMMAND | the contact key is suppressed (KC016) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
@@ -3124,6 +3808,20 @@ the check proves every citation resolves to an existing test.
 | lost response | `cmd037-cancel-job.test.ts` :: "RACE: an identical retry replays the 200…"<br>`cmd037-cancel-job.test.ts` :: "RACE (S062): CancelJob through the route racing the publication…" |
 | external uncertainty | NOT_APPLICABLE: CancelJob records the cancellation on the job row and calls no provider; the control plane's EXECUTION_CONTROL terminates the attempt by identity and observes until it is terminal or proved absent (mandate B08-CONTROL-EXECUTION), and a job that was published first answers JOB_ALREADY_READY (S062) |
 
+### CMD038 AuthorizeDownload
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd038-authorize-download.test.ts` :: "CMD038-OK: a reader authorizes two artifacts of an AVAILABLE package…"<br>`cmd038-authorize-download.test.ts` :: "CMD038-OK (lifetime): the URL lifetime is least(900 s, the retention deadline - now)…" |
+| wrong role | `cmd038-authorize-download.test.ts` :: "CMD038-DENY: deleted/quarantined artifacts, a package not AVAILABLE, a stale step-up, a suspended member…"<br>`cmd038-authorize-download.test.ts` :: "R2-048: after a role change no new URL…" |
+| wrong agency | `cmd038-authorize-download.test.ts` :: "S048 (download): another agency's package and a package that never existed answer identically…" |
+| stale version | NOT_APPLICABLE: AuthorizeDownload carries no expectedVersion (registry fields: artifactIds, assuranceProofRef); the project, the package and the governing retention record are read after their transition locks and FOR SHARE, and a fact that changed is refused with its own reason (PROJECT_NOT_OPEN, PACKAGE_NOT_AVAILABLE, ARTIFACT_UNAVAILABLE, RETENTION_EXPIRED, MEMBERSHIP_CHANGED), never with STALE_VERSION |
+| duplicate request | `cmd038-authorize-download.test.ts` :: "CMD038-RACE: issuance held at the package await against CMD042 and a package revocation, both orders…" |
+| changed-body same key | `cmd038-authorize-download.test.ts` :: "CMD038-RACE (TIMEOUT): the signer times out after COMMIT…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd038-authorize-download.test.ts` :: "CMD038-RACE: issuance held at the package await against CMD042 and a package revocation, both orders; crash after COMMIT before signing and a lost answer are recovered by the key…" |
+| external uncertainty | `cmd038-authorize-download.test.ts` :: "CMD038-RACE (TIMEOUT): the signer times out after COMMIT: the authorization is recorded ISSUE_UNCERTAIN and answered 503 SIGNING_UNCERTAIN…" |
+
 ### CMD018 CreateTargetContract
 
 | Mutation | Applicability |
@@ -3241,9 +3939,9 @@ the check proves every citation resolves to an existing test.
 | Mutation | Applicability |
 | --- | --- |
 | legitimate state | `cmd028-create-payment-order.test.ts` :: "OK: an AGENCY_BILLING member creates one order for an issued quote…" |
-| wrong role | `cmd028-create-payment-order.test.ts` :: "DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED…" |
-| wrong agency | `cmd028-create-payment-order.test.ts` :: "DENY: a foreign tenant's quote is NOT_FOUND…" |
-| stale version | `cmd028-create-payment-order.test.ts` :: "DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms…" |
+| wrong role | `cmd028-create-payment-order.test.ts` :: "R2-082: DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED…" |
+| wrong agency | `cmd028-create-payment-order.test.ts` :: "R2-082: DENY: a foreign tenant's quote is NOT_FOUND…" |
+| stale version | `cmd028-create-payment-order.test.ts` :: "R2-082: DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms…" |
 | duplicate request | `cmd028-create-payment-order.test.ts` :: "RACE: an identical retry replays the one order…" |
 | changed-body same key | `cmd028-create-payment-order.test.ts` :: "RACE: an identical retry replays the one order, the same key with another termsHash is 409 IDEMPOTENCY_CONFLICT…" |
 | invalid schema | `b09-request-side.test.ts` :: "B09 admission: each served payment command refuses a malformed body at the boundary…" |
@@ -3502,6 +4200,34 @@ the check proves every citation resolves to an existing test.
 | lost response | `cmd053-reconcile-commission-payout.test.ts` :: "RACE: an identical retry replays the 200, the same key with other evidence is 409 IDEMPOTENCY_CONFLICT, two reconciliations of one intent yield one settlement with the wait observed, and a crash before COMMIT…" |
 | external uncertainty | `cmd053-reconcile-commission-payout.test.ts` :: "DENY: a user token or the commission service is a wrong service identity (403) and an intent of another statement a foreign scope (404); then one missing prerequisite at a time — evidence of another reference, destination or amount PAYOUT_EVIDENCE_MISMATCH, SUBMITTED-only evidence PAYOUT_NOT_SETTLED…" |
 
+### CMD054 OpenBreakglass
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd054-cmd055-breakglass.test.ts` :: "CMD054-OK: the corporate owner with a fresh step-up opens a breakglass grant over one project…" |
+| wrong role | `cmd054-cmd055-breakglass.test.ts` :: "CMD054-DENY: no credential, an agency OWNER, a seller, a stale or foreign step-up…" |
+| wrong agency | `cmd054-cmd055-breakglass.test.ts` :: "CMD054-DENY: no credential, an agency OWNER, a seller, a stale or foreign step-up…" |
+| stale version | NOT_APPLICABLE: OpenBreakglass creates a grant and carries no expectedVersion (registry fields: scopeRef, purpose, assuranceProofRef, authorizationRef); the live grant of the scope is the conflict (BREAKGLASS_GRANT_LIVE with the current grant, CMD054-RACE) |
+| duplicate request | `cmd054-cmd055-breakglass.test.ts` :: "CMD054-RACE: an identical retry replays the 201…" |
+| changed-body same key | `cmd054-cmd055-breakglass.test.ts` :: "CMD054-RACE: an identical retry replays the 201…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd054-cmd055-breakglass.test.ts` :: "CMD054-RACE: an identical retry replays the 201…" |
+| external uncertainty | NOT_APPLICABLE: opening a grant reaches no provider; the grant, its ALLOW fact and the journal entry are rows of one database transaction (the registry lists no event for it) |
+
+### CMD055 RevokeBreakglass
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd054-cmd055-breakglass.test.ts` :: "CMD055-OK: the corporate owner revokes a live grant…" |
+| wrong role | `cmd054-cmd055-breakglass.test.ts` :: "CMD055-DENY: no credential, an agency OWNER or a seller cannot revoke…" |
+| wrong agency | `cmd054-cmd055-breakglass.test.ts` :: "CMD055-DENY: no credential, an agency OWNER or a seller cannot revoke…" |
+| stale version | `cmd054-cmd055-breakglass.test.ts` :: "CMD055-DENY: no credential, an agency OWNER or a seller cannot revoke…"<br>`cmd054-cmd055-breakglass.test.ts` :: "CMD055-RACE: an identical retry replays the 200…" |
+| duplicate request | `cmd054-cmd055-breakglass.test.ts` :: "CMD055-RACE: an identical retry replays the 200…" |
+| changed-body same key | `cmd054-cmd055-breakglass.test.ts` :: "CMD055-RACE: an identical retry replays the 200…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `cmd054-cmd055-breakglass.test.ts` :: "CMD055-RACE: an identical retry replays the 200…" |
+| external uncertainty | NOT_APPLICABLE: a revocation reaches no provider; every new read under the grant is refused at once and a bearer capability already issued lives at most the residual lifetime the answer states (never claimed zero); the revoked edge, its ALLOW fact and the journal entry are rows of one database transaction |
+
 ### CMD056 RecordIncident
 
 | Mutation | Applicability |
@@ -3557,6 +4283,216 @@ the check proves every citation resolves to an existing test.
 | invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
 | lost response | `cmd058-cmd059-capabilities.test.ts` :: "CMD059-RACE: an identical retry replays the 200…"<br>`cmd056-cmd057-operations.test.ts` :: "CMD059-RACE (operations service): an identical retry replays the 200…" |
 | external uncertainty | NOT_APPLICABLE: a restriction reaches no provider; the SUSPENDED edge, the restriction evidence and the journal entry are rows of one database transaction, and routing the work of a paid project to recovery or refund is the recovery commands' own step |
+
+### CMD061 PrepareOutreachDraft
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### CMD062 AuthorizeOutreach
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### CMD063 SendAuthorizedOutreach
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### CMD064 RecordSalesActivity
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### PutOutreachContent PutOutreachContent
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### PublishSalesResource PublishSalesResource
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### RegisterSenderIdentity RegisterSenderIdentity
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### VerifySenderIdentity VerifySenderIdentity
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### RecordSenderRevocation RecordSenderRevocation
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### PrepareOutreachReview PrepareOutreachReview
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### RecordOutreachDiagnosis RecordOutreachDiagnosis
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### RevokeOutreachAuthorization RevokeOutreachAuthorization
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### WithdrawOutreachChannelPolicy WithdrawOutreachChannelPolicy
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### RecordProspectSource RecordProspectSource
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+
+### RecordProspectContact RecordProspectContact
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong role | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| wrong agency | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| stale version | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…" |
+| external uncertainty | NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests |
 
 ## 5. The manual-10 reads (re-check finding N16)
 

@@ -16,6 +16,7 @@ import type { ProcessingJobId } from "@kauro/domain";
 import { admitJob, barrier, controlOf, endJob, launchJob, stageJob, verifyJob } from "@kauro/persistence/testing";
 import { accepted, read, readData, type PaymentsWorld } from "./commerce-support.js";
 import { call, freshKey, ids, rawEvent, routes, type Reply } from "./support.js";
+import { supersedeProject } from "./b17-target-supersession-support.js";
 import { controlWriter, tenantWriter } from "./writers.js";
 
 // --- routes and the wire shapes ------------------------------------------------------------------------------------------------------
@@ -310,7 +311,7 @@ export async function withdrawApproval(pw: PaymentsWorld, sale: Pick<Sale, "plan
 
 /** The target contract of the purchase superseded, as a newer confirmation of the project's contract would (B08 observation and confirmation). */
 export async function supersedeTarget(pw: PaymentsWorld, sale: Pick<Sale, "projectId">): Promise<void> {
-  await pw.w.asTenant(pw.w.A, (c) => c.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE agency_id = $1 AND project_id = $2", [pw.w.A.agencyId, sale.projectId]));
+  await supersedeProject(pw.w.h.oracle, pw.w.A.agencyId, sale.projectId, pw.w.A.ownerMembershipId);
 }
 
 /** Agency A moved to a state by its owner acting as itself (the agency machine's edges; the transition lock is taken by the database). */

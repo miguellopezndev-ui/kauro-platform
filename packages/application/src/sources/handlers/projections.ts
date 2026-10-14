@@ -23,7 +23,7 @@ import type {
   SourceUnitOfWork,
   UploadSessionRecord,
 } from "@kauro/domain";
-import { AGENCY_OPEN_STATES, DomainFailure, INPUT_ENVELOPE, REVISION_MUTABLE_STATES, REVISION_SELECTABLE_STATES, REVISION_UPLOAD_STATES, UPLOAD_LIVE_STATES, UPLOAD_TOMBSTONE_STATES, inventoryHashOf, isOffered, roleSatisfies } from "@kauro/domain";
+import { AGENCY_OPEN_STATES, DomainFailure, INPUT_ENVELOPE, REVISION_MUTABLE_STATES, REVISION_SELECTABLE_STATES, REVISION_UPLOAD_STATES, UPLOAD_LIVE_STATES, UPLOAD_TOMBSTONE_STATES, effectNowOf, inventoryHashOf, isOffered, roleSatisfies } from "@kauro/domain";
 import { B07_COMMANDS, type B07CommandId } from "../contracts.js";
 import type { SourceResourceAction } from "../response-views.js";
 import type {
@@ -153,6 +153,7 @@ export interface RevisionFacts {
   readonly evaluation: SelectionEvaluationRecord | null;
   /** The revision's current inventory hash (KAURO_SOURCE_INVENTORY_V1, D-SEL-3), for a revision whose inventory can still change. */
   readonly inventoryHash: Sha256Hex | null;
+  /** The effect instant (effectNowOf, kauro.effect_now()) read as the last await of revisionFacts: the blockers judge deadlines at it (D-CS-2). */
   readonly serverNow: string;
 }
 
@@ -167,7 +168,7 @@ export async function revisionFacts(uow: SourceUnitOfWork, revision: SourceRevis
   const records = await uow.sources.retention.recordsFor(revision.revisionId);
   const evaluation = revision.selectionHash === undefined ? null : await uow.sources.evaluations.latestFor(revision.revisionId, revision.selectionHash);
   const inventoryHash = REVISION_MUTABLE_STATES.has(revision.state) ? inventoryHashOf(await uow.sources.revisions.inventory(revision.revisionId)) : null;
-  return { revision, project, agency, capabilityOffered: capability !== null && isOffered(capability), uploads, files, records, evaluation, inventoryHash, serverNow: await uow.serverInstant() };
+  return { revision, project, agency, capabilityOffered: capability !== null && isOffered(capability), uploads, files, records, evaluation, inventoryHash, serverNow: await effectNowOf(uow) };
 }
 
 /**

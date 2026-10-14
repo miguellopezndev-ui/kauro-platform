@@ -10,7 +10,7 @@ import { after, before, test } from "node:test";
 import type { ValidatePort } from "@kauro/application";
 import { AttemptEnvelopeFailure, GenerationSourceReader } from "@kauro/data-plane";
 import type { RowCounts } from "@kauro/contracts";
-import { deliveryManifestHashOf, issuedDeliveryManifestOf, type AgencyId, type AuditUnitOfWork, type DeliveryArtifactRecord, type ExecutionAuthorityFacts, type ExecutionContext, type ProcessingJobId, type PlanBody, type ProcessingJobRecord, type SystemContext, type UnitOfWorkOptions, type ValidationReceiptId, type ValidationSource } from "@kauro/domain";
+import { deliveryManifestHashOf, issuedDeliveryManifestOf, type AgencyId, type AuditUnitOfWork, type DeliveryArtifactRecord, type ExecutionAuthorityFacts, type ExecutionContext, type ProcessingJobId, type PlanBody, type ProcessingJobRecord, type SystemContext, type TargetBody, type UnitOfWorkOptions, type ValidationReceiptId, type ValidationSource } from "@kauro/domain";
 import { PlanValidator, planBodyHashOf, type AuditUnits } from "../src/index.js";
 import { TEST_LIMITS, ids, sha, startExecutionWorld, verifiedPrivate, type ExecutionWorld, type Purchase } from "./support/execution-world.js";
 
@@ -199,6 +199,9 @@ test("ROWCOUNTS-PRODUCER OK (validator source): PlanValidator hands the core a r
 
   const plan = (await w.h.oracle.query("SELECT body FROM kauro.plans WHERE plan_id = $1", [p.planId])).rows[0];
   const body = plan.body as PlanBody;
+  // the plan's own target (B17 L2: the run carries the target body whose digest is the subject's targetContractHash)
+  const t = (await w.h.oracle.query("SELECT mode, instance_id, importer_profile_id, importer_version, objects, observed_at, authority_evidence_hash, capability_version, body_hash FROM kauro.target_contracts WHERE contract_id = $1", [p.contractId])).rows[0];
+  const target = { mode: t.mode, instanceId: t.instance_id, importerProfileId: t.importer_profile_id, importerVersion: t.importer_version, objects: t.objects, observedAt: new Date(t.observed_at).toISOString(), authorityEvidenceHash: t.authority_evidence_hash, capabilityVersion: t.capability_version } as unknown as TargetBody;
   const seen: Array<{ readonly billable: number | undefined; readonly generations: unknown }> = [];
   let readBytes = false;
   const validate: ValidatePort = {
@@ -218,12 +221,13 @@ test("ROWCOUNTS-PRODUCER OK (validator source): PlanValidator hands the core a r
   const validator = new PlanValidator({ validate, receipts: w.receipts, corePackageHash: sha("rc-src-core"), limits: TEST_LIMITS, storage: w.storage, scratchRoot: w.scratchRoot });
   const run = (s: ValidationSource | null) =>
     validator.run({
-      subject: { agencyId: A.agencyId, planId: p.planId, planHash: planBodyHashOf(body), revisionHash: p.revisionHash, targetContractHash: sha("rc-src-target") },
+      subject: { agencyId: A.agencyId, planId: p.planId, planHash: planBodyHashOf(body), revisionHash: p.revisionHash, targetContractHash: t.body_hash },
       body,
       receiptId: ids.next() as ValidationReceiptId,
       startedAt: w.now(),
       cancellation: { check: () => Promise.resolve("CONTINUE" as const) },
       source: s,
+      target,
       completedAt: () => Promise.resolve(w.now()),
     });
   const first = await run(source);

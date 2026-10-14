@@ -15,12 +15,14 @@
  */
 import { COMMERCE_FAILURE_REASONS } from "../commerce/failure-reasons.js";
 import { COMMERCIAL_FAILURE_REASONS } from "../commercial/failure-reasons.js";
+import { OUTREACH_FAILURE_REASONS } from "../commercial/outreach.js";
 import { EXECUTION_FAILURE_REASONS } from "./execution/failure-reasons.js";
 import { AUDIT_FAILURE_REASONS } from "./audit/failure-reasons.js";
 import { TARGET_FAILURE_REASONS } from "./target-contract.js";
 import { IMPORT_STAGE_FAILURE_REASONS } from "./import-stage.js";
 import { CAPABILITY_FAILURE_REASONS } from "./capability-governance.js";
 import { RECOVERY_FAILURE_REASONS } from "./operations-recovery.js";
+import { BREAKGLASS_FAILURE_REASONS } from "./breakglass.js";
 
 export const FAILURE_CODES = [
   "INVALID_REQUEST",
@@ -132,6 +134,16 @@ export const RETENTION_EXTENSION_FAILURE_REASONS = [
 
 /** The refusals of CMD042 RequestDeletion and its prevention guards (package B16 lane L3, KA087), appended after the retention-extension reasons. */
 export const DELETION_FAILURE_REASONS = ["PROJECT_DELETION_REQUESTED"] as const;
+/** The refusals of CMD038 AuthorizeDownload (package B16 lane L5; R2-048, S048), appended after the breakglass reasons. */
+export const DOWNLOAD_FAILURE_REASONS = [
+  "ARTIFACT_NOT_FOUND",
+  "ARTIFACT_UNAVAILABLE",
+  "PACKAGE_NOT_AVAILABLE",
+  "MEMBERSHIP_CHANGED",
+  "SIGNING_UNCERTAIN",
+  "DOWNLOAD_SIGNER_UNAVAILABLE",
+  "DOWNLOAD_AUTHORIZATION_EXPIRED",
+] as const;
 
 export const FAILURE_REASONS = [
   // authorization (08 "Identity is not permission")
@@ -334,6 +346,12 @@ export const FAILURE_REASONS = [
   ...RETENTION_EXTENSION_FAILURE_REASONS,
   // managed deletion of a project (package B16 lane L3: CMD042 RequestDeletion)
   ...DELETION_FAILURE_REASONS,
+  // breakglass (package B16 lane L4: CMD054 OpenBreakglass, CMD055 RevokeBreakglass, the breakglass preview; R2-050, S071)
+  ...BREAKGLASS_FAILURE_REASONS,
+  // download authorizations (package B16 lane L5: CMD038 AuthorizeDownload; R2-048, S048)
+  ...DOWNLOAD_FAILURE_REASONS,
+  // outreach (package B12: CMD061..CMD064, the dispatcher D2..D5; KA095..KA098, KC028..KC037)
+  ...OUTREACH_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

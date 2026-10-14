@@ -88,3 +88,8 @@ export type { TestClock, FakeAccount, FakeAccountSpec, FakeSignIn, FakeRefusal, 
 
 // B10 (agency recurrence and commission domain) adds its four fakes beside them; same rules: one owner per fake, labelled, never bound.
 export * from "../commercial/testing/index.js";
+
+// Package B16 lane L5's labelled contract fake of ObjectStoragePort.signRead (ObjectReadSigningPort; CMD038 AuthorizeDownload): one owner
+// (B16-L5), label CONTRACT FAKE, evidence class SIMULATED, never bound by a composition root; the S3 presign adapter is B15's.
+export { CONTRACT_FAKE_SIGNER_PROVIDER, ContractFakeReadSigner } from "./contract-fake-read-signer.js";
+export type { ReadSignerCall, ReadSignerFault, ReadSignerVerdict } from "./contract-fake-read-signer.js";

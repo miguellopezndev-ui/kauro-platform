@@ -122,6 +122,8 @@ export interface ValidationRequest {
 export interface ValidationSettlement {
   readonly result: PlanValidationResult;
   readonly receiptHash: Sha256Hex | null;
+  /** Why an ERROR settled (a contract failure's token: an importer-profile or digest refusal, ...); learned once, only with ERROR (0084). */
+  readonly refusalReason?: string;
 }
 
 /** A settled intent; `current` says whether it was the plan's latest and so moved the plan (VALIDATED or back to VALIDATION_REQUIRED). */

@@ -29,6 +29,7 @@ import { SOURCE_ROUTES } from "../sources/contracts.js";
 import type { B07CommandId } from "../sources/contracts.js";
 import type { SourceIntakeId, SourceReadId } from "../sources/outcomes.js";
 import { SESSION_URL_MEMBER, SESSION_URL_VIEW, SOURCE_COMMAND_RESPONSES, SOURCE_VIEW_DEFINITIONS } from "../sources/response-views.js";
+import { CURSOR_PATTERN } from "./cursor.js";
 import { LABEL_PATTERN, TEXT_PATTERN } from "./request-schemas.js";
 import { READINESS_BLOCKERS } from "./views.js";
 import { PROJECT_PHASES, PROJECT_REQUIRED_ACTIONS } from "../agency/dashboard-vocabulary.js";
@@ -745,6 +746,20 @@ export interface OperationalRoute {
   readonly responses: Readonly<Record<string, OperationalResponse>>;
   /** The body the route admits, when it takes one (strict JSON, closed schema, admitted like a command's body). */
   readonly request?: OperationalRequest;
+  /**
+   * The closed query of a paginated operational read (B12 D-B12S-3): limit (1..api.pageMaximum, default api.pageDefault), cursor, and its one
+   * filter member by name, its values and the one an absent member means. A route without it takes no query parameter.
+   */
+  readonly query?: OperationalQuery;
+  /**
+   * The body parser's string bound for this route when it is not api.maxStringLength (B12 D-B12S-2: the upload's base64 content, exactly
+   * its schema's maxLength). The body's byte bound (api.jsonBytes) is never raised.
+   */
+  readonly maxStringLength?: number;
+}
+
+export interface OperationalQuery {
+  readonly filter: { readonly name: string; readonly values: ReadonlyArray<string>; readonly default: string };
 }
 
 /** The reply of GET /livez: the process is live; nothing else is checked (14 "Monitoring and service health"). */
@@ -1098,6 +1113,155 @@ export const BANK_ROUTE_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Ob
   }),
 ] satisfies ReadonlyArray<OperationalRoute>);
 
+// --- the manual-assisted refunds of the bank-transfer route (lane L-REFUND; ACH-ROUTE r12 §7.13-§7.22, D-24 A) ---------------------------
+const BANK_MONEY = { type: "string", pattern: "^(0|[1-9][0-9]{0,15})$" } as const;
+/** A manual-rail destination as typed (destination-norm-v1 judges it); never echoed back, never stored. */
+export const BANK_REFUND_DESTINATION_SCHEMA: JsonSchema = closedObject(["routingNumber", "accountNumber", "holderName"], {
+  routingNumber: { type: "string", minLength: 1, maxLength: 32 },
+  accountNumber: { type: "string", minLength: 1, maxLength: 64 },
+  holderName: { type: "string", maxLength: 512 },
+});
+export const BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA: JsonSchema = closedObject(["artifactRef", "evidenceHash"], { artifactRef: BANK_UUID, evidenceHash: BANK_HASH });
+/** DP-RECIPIENT at X1/X4 (DV1-10): the provider recipient record (id and version, both required) and its stored recipient-record artifact. */
+const BANK_PROVIDER_REF = { type: "string", minLength: 1, maxLength: 256, pattern: "^[A-Za-z0-9._:-]+$" } as const;
+export const BANK_RECIPIENT_BINDING_SCHEMA: JsonSchema = closedObject(["recipientRef", "recipientVersion", "artifactRef", "evidenceHash"], { recipientRef: BANK_PROVIDER_REF, recipientVersion: BANK_PROVIDER_REF, artifactRef: BANK_UUID, evidenceHash: BANK_HASH });
+/** The COMPLETED envelope of CMD220: the treasury refund after its approval (the destination only by its last four). */
+export const TREASURY_REFUND_COMMAND_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1 },
+  replayed: { type: "boolean" },
+  data: closedObject(["treasuryRefund"], {
+    treasuryRefund: closedObject(["treasuryRefundId", "state", "version", "amountCents", "bankCreditId", "destinationLast4"], {
+      treasuryRefundId: BANK_UUID,
+      state: { type: "string", enum: ["REQUESTED", "APPROVED", "SUBMITTING", "UNCERTAIN", "COMPLETED", "FAILED", "REJECTED"] },
+      version: BANK_VERSION,
+      amountCents: BANK_MONEY,
+      bankCreditId: BANK_UUID,
+      destinationLast4: { type: "string", pattern: "^[0-9]{1,4}$" },
+    }),
+  }),
+});
+/** An execution attempt as the owner sees it: the destination by its last four and holder only, never the full account. */
+const EXECUTION_ATTEMPT_VIEW_SCHEMA: JsonSchema = closedObject(["attemptId", "kind", "state", "reference", "amountCents", "currency", "declaredAt", "sourceKind", "sourceId", "destination", "bankExecutionId"], {
+  attemptId: BANK_UUID,
+  kind: { type: "string", enum: ["RETURN", "RESEND"] },
+  state: { type: "string", enum: ["DECLARED", "UNCERTAIN", "RECORDED", "NOT_EXECUTED"] },
+  reference: { type: "string", minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" },
+  amountCents: BANK_MONEY,
+  currency: { type: "string", enum: ["USD"] },
+  declaredAt: BANK_UTC,
+  sourceKind: { type: "string", enum: ["CAPTURE", "BANK_CREDIT"] },
+  sourceId: BANK_UUID,
+  destination: closedObject(["accountLast4", "holderName"], { accountLast4: { type: "string", pattern: "^[0-9]{1,4}$" }, holderName: { type: "string", maxLength: 512 } }),
+  bankExecutionId: { type: ["string", "null"], minLength: 1, maxLength: 256, pattern: "^[A-Za-z0-9._:-]+$" },
+});
+const REFUND_STATE_VIEW_SCHEMA: JsonSchema = { type: ["object", "null"], additionalProperties: false, required: ["state", "version"], properties: { state: { type: "string", minLength: 1, maxLength: 64 }, version: BANK_VERSION } };
+const executionEnvelope = (data: JsonSchema): JsonSchema =>
+  closedObject(["kind", "version", "replayed", "data"], { kind: { type: "string", enum: ["COMPLETED"] }, version: { type: "integer", minimum: 1 }, replayed: { type: "boolean" }, data });
+export const DECLARE_EXECUTION_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(closedObject(["attempt", "refund"], { attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA, refund: REFUND_STATE_VIEW_SCHEMA }));
+export const RECORD_EXECUTION_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(closedObject(["attempt", "refund", "offerId"], { attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA, refund: REFUND_STATE_VIEW_SCHEMA, offerId: BANK_UUID }));
+export const RESOLVE_EXECUTION_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(closedObject(["attempt", "refund", "offerId"], { attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA, refund: REFUND_STATE_VIEW_SCHEMA, offerId: { type: ["string", "null"], pattern: BANK_UUID.pattern } }));
+export const RECORD_BOUNCE_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(
+  closedObject(["attempt", "bounce"], {
+    attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA,
+    bounce: closedObject(["bounceId", "bouncedCents", "payableCents"], { bounceId: BANK_UUID, bouncedCents: BANK_MONEY, payableCents: BANK_MONEY }),
+  }),
+);
+export const EXECUTION_QUEUE_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], {
+  data: closedObject(["items"], {
+    items: {
+      type: "array",
+      maxItems: 500,
+      items: closedObject(["attemptId", "kind", "state", "sourceKind", "amountCents", "currency", "reference", "declaredAt", "destination"], {
+        attemptId: BANK_UUID,
+        kind: { type: "string", enum: ["RETURN", "RESEND"] },
+        state: { type: "string", enum: ["DECLARED"] },
+        sourceKind: { type: "string", enum: ["CAPTURE", "BANK_CREDIT"] },
+        amountCents: BANK_MONEY,
+        currency: { type: "string", enum: ["USD"] },
+        reference: { type: "string", minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" },
+        declaredAt: BANK_UTC,
+        destination: closedObject(["accountLast4", "holderName"], { accountLast4: { type: "string", pattern: "^[0-9]{1,4}$" }, holderName: { type: "string", maxLength: 512 } }),
+      }),
+    },
+  }),
+});
+const OWNER_REFUND_AUTHORITY = "KAURO_OWNER with a fresh step-up judged at the database clock; Idempotency-Key (journal of the owner identity)";
+export const BANK_REFUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
+  Object.freeze({
+    operationId: "approveTreasuryRefund",
+    method: "POST" as const,
+    path: "/api/v1/operations/treasury-refunds/{treasuryRefundId}/approve",
+    summary: "Approve the route-scope refund of an unassigned bank credit for the manual rail, with the destination read from the payer evidence (APPROVED)",
+    authority: "ACH-ROUTE r12 §7.13-§7.14 (F1, F2), D-ACH-19, D-24 A; KAURO_OWNER with a fresh step-up judged at the database clock; Idempotency-Key (journal of the owner identity)",
+    request: Object.freeze({
+      contentType: "application/json" as const,
+      schema: closedObject(["expectedVersion", "serviceCents", "taxCents", "authorizationRef"], {
+        expectedVersion: BANK_VERSION,
+        serviceCents: BANK_MONEY,
+        taxCents: BANK_MONEY,
+        authorizationRef: BANK_UUID,
+        destination: BANK_REFUND_DESTINATION_SCHEMA,
+        destinationEvidence: BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA,
+      }),
+    }),
+    responses: Object.freeze({ "200": Object.freeze({ description: "The treasury refund after the approval (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: TREASURY_REFUND_COMMAND_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "declareRefundExecution",
+    method: "POST" as const,
+    path: "/api/v1/operations/refunds/{refundId}/execution-declarations",
+    summary: "Declare the manual transfer of an approved refund (CAPTURE refund or BANK_CREDIT treasury refund): the refund SUBMITTING, one DECLARED attempt with its reference (NEVER-RESEND)",
+    authority: "ACH-ROUTE r12 §7.21 (X1), DV1-08, D-24 A; " + OWNER_REFUND_AUTHORITY,
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["expectedVersion", "amountCents", "authorizationRef"], { expectedVersion: BANK_VERSION, amountCents: BANK_MONEY, recipient: BANK_RECIPIENT_BINDING_SCHEMA, authorizationRef: BANK_UUID }) }),
+    responses: Object.freeze({ "201": Object.freeze({ description: "The DECLARED attempt and the refund after the declaration (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: DECLARE_EXECUTION_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "recordRefundExecution",
+    method: "POST" as const,
+    path: "/api/v1/operations/execution-attempts/{attemptId}/records",
+    summary: "Record the send receipt of a declared attempt: the receipt read, classified and matched (amount, time, reference, destination); a proof records the attempt and completes the refund, a refusal opens its review case",
+    authority: "ACH-ROUTE r12 §7.22 (G1, G2, G4), D-24 A; " + OWNER_REFUND_AUTHORITY,
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["evidence", "authorizationRef"], { evidence: BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA, authorizationRef: BANK_UUID }) }),
+    responses: Object.freeze({ "200": Object.freeze({ description: "The RECORDED attempt, the refund after it and the offer of this key (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: RECORD_EXECUTION_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "resolveUncertainExecution",
+    method: "POST" as const,
+    path: "/api/v1/operations/execution-attempts/{attemptId}/resolutions",
+    summary: "Resolve an UNCERTAIN attempt: EXECUTED records it through the receipt gate (G1/G2/G4) and completes the refund; NOT_EXECUTED, only after the window and the coverage lag with the outbound coverage complete and no correlated or unexplained debit, marks it NOT_EXECUTED and a RETURN's refund FAILED (NEVER-RESEND: the attempt is never re-sent)",
+    authority: "ACH-ROUTE r12 §7.22 (X3), D-24 A; " + OWNER_REFUND_AUTHORITY,
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["outcome", "authorizationRef"], { outcome: { type: "string", enum: ["EXECUTED", "NOT_EXECUTED"] }, evidence: BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA, authorizationRef: BANK_UUID }) }),
+    responses: Object.freeze({ "200": Object.freeze({ description: "The resolved attempt, the refund after it and the offer of this key (null for NOT_EXECUTED) (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: RESOLVE_EXECUTION_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "recordReturnBounce",
+    method: "POST" as const,
+    path: "/api/v1/operations/execution-attempts/{attemptId}/bounces",
+    summary: "Record that the money of a RECORDED transfer came back (once per transfer, B at most the transfer): the bounce row, its RETURN_BOUNCED case and the open payable a resend may re-send",
+    authority: "ACH-ROUTE r12 §7.22 (G3), DV1-08; " + OWNER_REFUND_AUTHORITY,
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["bouncedCents", "evidence", "authorizationRef"], { bouncedCents: BANK_MONEY, evidence: BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA, authorizationRef: BANK_UUID }) }),
+    responses: Object.freeze({ "200": Object.freeze({ description: "The bounced attempt (still RECORDED) and the bounce with the open payable it leaves (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: RECORD_BOUNCE_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "declareResendExecution",
+    method: "POST" as const,
+    path: "/api/v1/operations/execution-attempts/{attemptId}/resend-declarations",
+    summary: "Declare the re-send of a bounced transfer's open payable: one DECLARED RESEND attempt with its reference (NEVER-RESEND: refused while an attempt of the source is DECLARED or UNCERTAIN); the refund stays COMPLETED",
+    authority: "ACH-ROUTE r12 §7.21 (X4), DV1-08, D-24 A; " + OWNER_REFUND_AUTHORITY,
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["amountCents", "authorizationRef"], { amountCents: BANK_MONEY, recipient: BANK_RECIPIENT_BINDING_SCHEMA, authorizationRef: BANK_UUID }) }),
+    responses: Object.freeze({ "201": Object.freeze({ description: "The DECLARED RESEND attempt and the refund as it stands (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: DECLARE_EXECUTION_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "listExecutionAttempts",
+    method: "GET" as const,
+    path: "/api/v1/operations/execution-attempts",
+    summary: "The owner queue: the DECLARED attempts to send, oldest first, with the destination by its last four and holder",
+    authority: "ACH-ROUTE r12 §7.21, D-24 A; KAURO_OWNER",
+    responses: Object.freeze({ "200": Object.freeze({ description: "The DECLARED attempts (at most 500).", contentType: JSON_CONTENT_TYPE, schema: EXECUTION_QUEUE_RESPONSE_SCHEMA }) }),
+  }),
+] satisfies ReadonlyArray<OperationalRoute>);
+
 // --- the inbound side of the bank-transfer route (Payments V1, lane PV1-INBOUND; ACH-ROUTE r12 §7.5-§7.12, §7.23) ------------------------------
 const BANK_CENTS = { type: "string", pattern: "^(0|[1-9][0-9]{0,15})$" } as const;
 const BANK_CREDIT_VIEW_SCHEMA: JsonSchema = closedObject(["creditId", "accountRef", "bankTransactionId", "state", "version", "source", "rail", "grossCents", "feeCents", "currency", "reference", "orderId", "captureId"], {
@@ -1132,6 +1296,33 @@ export const BANK_MATCH_KEYS_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"]
     providerTimeToleranceMs: { type: "integer", minimum: 0 },
     accountRef: BANK_REF,
   }) }) });
+/** The credit states the owner's queue lists (kauro.bank_credits.state). */
+export const BANK_CREDIT_STATES = ["DRAFT_MANUAL", "OBSERVED", "MATCH_REVIEW", "MATCHED", "APPLIED", "RETURN_REVIEW"] as const;
+/** The decoded size bound of an owner upload (B12 D-B12S-2) and the base64 text that encodes it. */
+export const BANK_EVIDENCE_MAX_BYTES = 524_288;
+export const BANK_EVIDENCE_MEDIA_TYPES = ["application/json", "application/pdf", "text/csv"] as const;
+/** The base64 length of BANK_EVIDENCE_MAX_BYTES + 1 bytes' upper bound: an oversized artifact reaches the handler's size refusal. */
+const BANK_EVIDENCE_BASE64_MAX_LENGTH = Math.ceil(BANK_EVIDENCE_MAX_BYTES / 3) * 4;
+const BANK_EVIDENCE_UPLOAD_REQUEST_SCHEMA: JsonSchema = closedObject(["mediaType", "contentBase64", "evidenceHash"], {
+  mediaType: { type: "string", enum: [...BANK_EVIDENCE_MEDIA_TYPES] },
+  contentBase64: { type: "string", maxLength: BANK_EVIDENCE_BASE64_MAX_LENGTH, pattern: "^[A-Za-z0-9+/]*={0,2}$" },
+  evidenceHash: BANK_HASH,
+});
+const BANK_EVIDENCE_UPLOAD_RESPONSE_SCHEMA: JsonSchema = closedObject(["artifact"], {
+  artifact: closedObject(["artifactRef", "evidenceHash", "sizeBytes", "mediaType", "accountRef"], {
+    artifactRef: BANK_REF,
+    evidenceHash: BANK_HASH,
+    sizeBytes: { type: "integer", minimum: 1, maximum: BANK_EVIDENCE_MAX_BYTES },
+    mediaType: { type: "string", enum: [...BANK_EVIDENCE_MEDIA_TYPES] },
+    accountRef: BANK_REF,
+  }),
+});
+const BANK_CREDIT_PAGE_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], {
+  data: closedObject(["credits", "nextCursor"], {
+    credits: { type: "array", maxItems: 100, items: BANK_CREDIT_VIEW_SCHEMA },
+    nextCursor: { type: ["string", "null"], pattern: CURSOR_PATTERN },
+  }),
+});
 const creditCommand = (operationId: string, path: string, summary: string, status: "200" | "201", request: JsonSchema): OperationalRoute =>
   Object.freeze({
     operationId,
@@ -1162,6 +1353,80 @@ export const STATEMENT_IMPORT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind"
       orphans: STATEMENT_COUNT,
       balanced: { type: "boolean" },
     }),
+  }),
+});
+const BANK_CENTS_OR_NULL = { type: ["string", "null"], pattern: "^(0|[1-9][0-9]{0,15})$" } as const;
+const SETTLEMENT_VIEW_SCHEMA: JsonSchema = closedObject(["settlementId", "accountRef", "withdrawalId", "currency", "periodStart", "periodEnd", "withdrawnCents", "feeCents", "receivedCents", "bankAvailableCents", "bankEvidence", "observedAt"], {
+  settlementId: BANK_UUID,
+  accountRef: BANK_REF,
+  withdrawalId: BANK_REF,
+  currency: { type: "string", enum: ["USD"] },
+  periodStart: BANK_UTC,
+  periodEnd: BANK_UTC,
+  withdrawnCents: BANK_CENTS,
+  feeCents: BANK_CENTS,
+  receivedCents: BANK_CENTS_OR_NULL,
+  bankAvailableCents: BANK_CENTS,
+  bankEvidence: { type: "boolean" },
+  observedAt: BANK_UTC,
+});
+const SETTLEMENT_REFUSAL_REASON = { type: ["string", "null"], enum: ["EVIDENCE_MISMATCH", "REQUEST_STALE", "COVERAGE_END_IN_FUTURE", "CURRENCY_MISMATCH", "WITHDRAWAL_ALREADY_SETTLED", "FUNDS_UNAVAILABLE", null] } as const;
+/** The PAYMENT_SERVICE outbox state of an intent's recorded.v1 (NONE: no record, which a recorded intent never lacks). */
+const SETTLEMENT_DELIVERY = { type: "string", enum: ["PENDING", "CLAIMED", "DELIVERED", "RETRYABLE", "DEAD_LETTER", "NONE"] } as const;
+const BANK_CASE_ID_OR_NULL = { type: ["string", "null"], pattern: BANK_UUID.pattern } as const;
+/** CMD215's 201 (two-step, D-SET-10): the owner's recorded intent; the payment service applies it on delivery. */
+export const BANK_SETTLEMENT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1 },
+  replayed: { type: "boolean" },
+  data: closedObject(["settlementRequest"], {
+    settlementRequest: closedObject(["requestId", "accountRef", "withdrawalId", "state", "requestedAt"], {
+      requestId: BANK_UUID,
+      accountRef: BANK_REF,
+      withdrawalId: BANK_REF,
+      state: { type: "string", enum: ["RECORDED"] },
+      requestedAt: BANK_UTC,
+    }),
+  }),
+});
+/** getBankSettlementRequest: one intent of the account, its outcome, its delivery and (APPLIED) its settlement. */
+export const BANK_SETTLEMENT_REQUEST_READ_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], {
+  data: closedObject(["settlementRequest"], {
+    settlementRequest: closedObject(["requestId", "accountRef", "withdrawalId", "state", "reason", "requestedAt", "consumedAt", "reviewCaseId", "delivery", "settlement"], {
+      requestId: BANK_UUID,
+      accountRef: BANK_REF,
+      withdrawalId: BANK_REF,
+      state: { type: "string", enum: ["RECORDED", "APPLIED", "REFUSED"] },
+      reason: SETTLEMENT_REFUSAL_REASON,
+      requestedAt: BANK_UTC,
+      consumedAt: { type: ["string", "null"], pattern: BANK_UTC.pattern },
+      reviewCaseId: BANK_CASE_ID_OR_NULL,
+      delivery: SETTLEMENT_DELIVERY,
+      settlement: { ...SETTLEMENT_VIEW_SCHEMA, type: ["object", "null"] },
+    }),
+  }),
+});
+/** listBankSettlementsInTransit: the account's unapplied intents and its unresolved refusals and its applied intents without a receipt (the money still in BANK_IN_TRANSIT), in record order (plan §3.5). */
+export const BANK_SETTLEMENTS_IN_TRANSIT_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], {
+  data: closedObject(["items", "nextCursor"], {
+    items: {
+      type: "array",
+      maxItems: 100,
+      items: closedObject(["requestId", "withdrawalId", "state", "reason", "withdrawnCents", "receivedCents", "feeCents", "requestedAt", "ageSeconds", "delivery", "reviewCaseId"], {
+        requestId: BANK_UUID,
+        withdrawalId: BANK_REF,
+        state: { type: "string", enum: ["RECORDED", "REFUSED", "APPLIED"] },
+        reason: SETTLEMENT_REFUSAL_REASON,
+        withdrawnCents: BANK_CENTS,
+        receivedCents: BANK_CENTS_OR_NULL,
+        feeCents: BANK_CENTS,
+        requestedAt: BANK_UTC,
+        ageSeconds: { type: "integer", minimum: 0 },
+        delivery: SETTLEMENT_DELIVERY,
+        reviewCaseId: BANK_CASE_ID_OR_NULL,
+      }),
+    },
+    nextCursor: { type: ["string", "null"], pattern: CURSOR_PATTERN, maxLength: 600 },
   }),
 });
 export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
@@ -1205,6 +1470,40 @@ export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = 
     responses: Object.freeze({ "201": Object.freeze({ description: "The import (COMPLETED envelope; an identical replay answers the journaled reply). BALANCED only with zero orphan debits.", contentType: JSON_CONTENT_TYPE, schema: STATEMENT_IMPORT_RESPONSE_SCHEMA }) }),
   }),
   Object.freeze({
+    operationId: "recordBankSettlement",
+    method: "POST" as const,
+    path: "/api/v1/operations/bank-accounts/{accountRef}/settlements",
+    summary: "Record a settlement observation from the provider's settlement record and, when the money arrived, the receiving bank's receipt (no typed figure)",
+    authority: "ACH-ROUTE r12 §7.25 (ST1, ST2), R2-085, PV1-SETTLE D-SET-1; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+    request: Object.freeze({
+      contentType: "application/json" as const,
+      schema: closedObject(["artifactRef", "evidenceHash", "receipt", "authorizationRef"], {
+        artifactRef: BANK_REF,
+        evidenceHash: BANK_HASH,
+        // the receiving bank's receipt, or null while the money is in transit (R2-085)
+        receipt: { ...closedObject(["artifactRef", "evidenceHash"], { artifactRef: BANK_REF, evidenceHash: BANK_HASH }), type: ["object", "null"] },
+        authorizationRef: BANK_UUID,
+      }),
+    }),
+    responses: Object.freeze({ "201": Object.freeze({ description: "The recorded settlement intent (COMPLETED envelope; an identical replay answers the journaled reply). No money moves here: the payment service applies the intent on delivery, or refuses it with a review case.", contentType: JSON_CONTENT_TYPE, schema: BANK_SETTLEMENT_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "getBankSettlementRequest",
+    method: "GET" as const,
+    path: "/api/v1/operations/bank-accounts/{accountRef}/settlements/{requestId}",
+    summary: "One settlement intent of the account as the corporate owner sees it: its outcome, its delivery to the payment service and its settlement",
+    authority: "ACH-ROUTE r12 §7.25 (ST3), PV1-SETTLE two-step §3.4; KAURO_OWNER",
+    responses: Object.freeze({ "200": Object.freeze({ description: "The intent and its outcome.", contentType: JSON_CONTENT_TYPE, schema: BANK_SETTLEMENT_REQUEST_READ_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "listBankSettlementsInTransit",
+    method: "GET" as const,
+    path: "/api/v1/operations/bank-accounts/{accountRef}/settlements",
+    summary: "The account's settlement intents in transit (recorded, whatever their delivery state) and its refusals whose review case is not resolved, with their figures and age; query `cursor` continues a page",
+    authority: "R2 15 (money in transit is visible with its amount and age; a refusal is never silently abandoned), PV1-SETTLE two-step §3.5; KAURO_OWNER",
+    responses: Object.freeze({ "200": Object.freeze({ description: "One page (at most 100, in record order).", contentType: JSON_CONTENT_TYPE, schema: BANK_SETTLEMENTS_IN_TRANSIT_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
     operationId: "getBankCredit",
     method: "GET" as const,
     path: "/api/v1/operations/bank-credits/{creditId}",
@@ -1219,6 +1518,26 @@ export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = 
     summary: "The keys the matching compares a credit with: the order's frozen reference, amount, accepted payer and deadline",
     authority: "ACH-ROUTE r12 §7.9; KAURO_OWNER",
     responses: Object.freeze({ "200": Object.freeze({ description: "The match keys.", contentType: JSON_CONTENT_TYPE, schema: BANK_MATCH_KEYS_RESPONSE_SCHEMA }) }),
+  }),
+  // B12 owner screens lane 1 (docs/design/B12-owner-screens.md D-B12S-2, D-B12S-3; GAP-API-8, GAP-API-9)
+  Object.freeze({
+    operationId: "uploadBankEvidenceArtifact",
+    method: "POST" as const,
+    path: "/api/v1/operations/bank-accounts/{accountRef}/evidence-artifacts",
+    summary: "Store a bank artifact the owner holds (account details, a credit, a statement) in the restricted store for the account: its reference and hash, which a command then cites",
+    authority: "B12 D-B12S-2 (GAP-API-8); ACH-ROUTE r12 §6 (the store assigns the provenance); KAURO_OWNER; content-addressed, no Idempotency-Key",
+    request: Object.freeze({ contentType: JSON_CONTENT_TYPE, schema: BANK_EVIDENCE_UPLOAD_REQUEST_SCHEMA }),
+    maxStringLength: BANK_EVIDENCE_BASE64_MAX_LENGTH,
+    responses: Object.freeze({ "201": Object.freeze({ description: "The artifact is stored (the same bytes answer the same reference). It grants nothing: a command that cites it re-reads it by hash and judges it.", contentType: JSON_CONTENT_TYPE, schema: BANK_EVIDENCE_UPLOAD_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "listBankCredits",
+    method: "GET" as const,
+    path: "/api/v1/operations/bank-credits",
+    summary: "The bank credits in one state, oldest first, in keyset pages: the owner's queue of drafts to confirm and credits to review",
+    authority: "B12 D-B12S-3 (GAP-API-9); ACH-ROUTE r12 §7.5-§7.9; KAURO_OWNER",
+    query: Object.freeze({ filter: Object.freeze({ name: "state", values: Object.freeze([...BANK_CREDIT_STATES]), default: "MATCH_REVIEW" }) }),
+    responses: Object.freeze({ "200": Object.freeze({ description: "One page of the queue; nextCursor continues it (null on the last page).", contentType: JSON_CONTENT_TYPE, schema: BANK_CREDIT_PAGE_RESPONSE_SCHEMA }) }),
   }),
 ] satisfies ReadonlyArray<OperationalRoute>);
 
@@ -1302,6 +1621,7 @@ export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze
     }),
   }),
   ...BANK_ROUTE_OPERATIONAL_ROUTES,
+  ...BANK_REFUND_OPERATIONAL_ROUTES,
   ...BANK_INBOUND_OPERATIONAL_ROUTES,
   ...AGENCY_APP_OPERATIONAL_ROUTES,
 ] satisfies ReadonlyArray<OperationalRoute>);
