@@ -253,6 +253,7 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/operations/recoveries", "AuthorizeRecovery", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD057" } }],
       // package B10's statement and payout operations (mandate B10-STATEMENTS-PAYOUTS): the owner's approval and the statement read
       ["POST", "/api/v1/sales/statements/:statementId/approve-payout", "ApproveCommissionPayout", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD052" } }],
+      ["GET", "/api/v1/sales/home", "GetSellerHome", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetSellerHome" } }],
       ["GET", "/api/v1/sales/statements/:statementId", "GetCommissionStatement", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetCommissionStatement" } }],
       // package B16 lane L4: the preview read under a breakglass grant, served after the statement read
       ["GET", "/api/v1/operations/breakglass-grants/:grantId/tables/:tableId/preview", "PreviewTableUnderBreakglass", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:PreviewTableUnderBreakglass" } }],

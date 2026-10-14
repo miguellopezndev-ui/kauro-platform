@@ -11,6 +11,7 @@
  * of the checks: the first blocker is the answer of a command.
  */
 import type { Capability, UtcInstant } from "@kauro/contracts";
+import { canonicalBytes, rawDigest } from "@kauro/contracts";
 import type { AgencyState } from "../model/agency.js";
 import type { PlanRecord } from "../model/aggregates.js";
 import { OFFERED_CAPABILITY_STATES } from "../model/aggregates.js";
@@ -198,9 +199,43 @@ export interface ReplacementFacts {
   readonly replacementsIncluded: number;
   /** The replacement revision is SEALED and its lineage in the project reaches the replaced revision (SourceLineageReader, B07). */
   readonly lineageReachesReplaced: boolean;
+  /** Why the purchase is re-bound (migration 0084 purchase_rebindings reason_code); absent: the included source replacement. */
+  readonly reason?: RebindingReason;
+  /**
+   * The replacement quote's target contract is confirmed and not superseded, read after its shared transition half (the purchased
+   * subject's chain, commerce-subject.ts): a CMD019 supersession committed while the re-binder waited refuses it (R2-026, meeting M3).
+   * Absent: not judged by the caller.
+   */
+  readonly replacementTargetCurrent?: boolean;
+  /** TARGET_DRIFT_REPAIR only (R2-026 REPAIR, M8): what the 0084 guard re-checks under the replaced entitlement's exclusive half. */
+  readonly drift?: {
+    /** The paid quote's target contract is superseded (a repair re-binds only from a drifted target). */
+    readonly replacedTargetSuperseded: boolean;
+    /** The replacement quote's plan is the re-check plan of the paid quote's plan (plans.recheck_of_plan_id, born by CMD019). */
+    readonly rechecksPaidPlan: boolean;
+    /** The same revision, mode, band and terms version as the paid quote (a repair changes the target only, never the scope or price). */
+    readonly keepsPaidScope: boolean;
+  };
 }
 
-export type ReplacementBlocker = "EXECUTION_STARTED" | "PURCHASE_NOT_INTACT" | "NOT_A_REPLACEMENT" | "ALLOWANCE_USED" | "LINEAGE_MISSING";
+/** The reasons a paid capture is re-bound to a replacement quote (migration 0084 purchase_rebindings_reason_code_check). */
+export type RebindingReason = "PRE_EXECUTION_SOURCE_REPLACEMENT" | "TARGET_DRIFT_REPAIR";
+
+/** The revocation code of the entitlement a re-binding replaces, per reason (migration 0084 purchase_rebindings_complete). */
+export function rebindingRevocationCode(reason: RebindingReason): "SOURCE_REPLACED" | "TARGET_REPAIRED" {
+  return reason === "TARGET_DRIFT_REPAIR" ? "TARGET_REPAIRED" : "SOURCE_REPLACED";
+}
+
+/**
+ * KAURO_TARGET_REPAIR_V1: the lineage evidence of a drift repair, the SHA-256 of the closed wrapper {domain, version, payload} over the
+ * replaced and the replacing target body hashes under the canonical profile; migration 0084 kauro.target_repair_lineage_hash computes
+ * the same bytes (both members are lowercase hex).
+ */
+export function targetRepairLineageHash(oldBodyHash: string, newBodyHash: string): string {
+  return rawDigest(canonicalBytes({ domain: "KAURO_TARGET_REPAIR_V1", version: 1, payload: { oldBodyHash, newBodyHash } }));
+}
+
+export type ReplacementBlocker = "EXECUTION_STARTED" | "PURCHASE_NOT_INTACT" | "NOT_A_REPLACEMENT" | "ALLOWANCE_USED" | "LINEAGE_MISSING" | "TARGET_NOT_CURRENT" | "CAPABILITY_RESTRICTED";
 
 /**
  * The included pre-execution source replacement (16 "Scope changes and credits": one replacement after revalidation, provided no
@@ -212,8 +247,16 @@ export function replacementBlockers(f: ReplacementFacts): ReadonlyArray<Replacem
   if (f.authorizationState !== "ACTIVE") out.push("EXECUTION_STARTED");
   if (!f.captureAlonePays || f.refundOpenOrCommitted) out.push("PURCHASE_NOT_INTACT");
   if (f.replacedQuoteState !== "ACCEPTED_FOR_CHECKOUT" || f.replacement.state !== "ISSUED" || !f.replacement.replacesTheQuote) out.push("NOT_A_REPLACEMENT");
-  if (f.replacementsUsed >= f.replacementsIncluded) out.push("ALLOWANCE_USED");
-  if (!f.lineageReachesReplaced) out.push("LINEAGE_MISSING");
+  if (f.reason === "TARGET_DRIFT_REPAIR") {
+    // a repair spends no included source replacement (0084: the allowance counts only PRE_EXECUTION_SOURCE_REPLACEMENT) and its lineage
+    // is the target's, not the source's: a repair only from a superseded target, to the re-check plan's quote, at the paid scope
+    const d = f.drift;
+    if (d === undefined || !d.replacedTargetSuperseded || !d.rechecksPaidPlan || !d.keepsPaidScope) out.push("NOT_A_REPLACEMENT");
+  } else {
+    if (f.replacementsUsed >= f.replacementsIncluded) out.push("ALLOWANCE_USED");
+    if (!f.lineageReachesReplaced) out.push("LINEAGE_MISSING");
+  }
+  if (f.replacementTargetCurrent === false) out.push("TARGET_NOT_CURRENT");
   return out;
 }
 

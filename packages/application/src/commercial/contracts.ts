@@ -17,6 +17,7 @@
  * one payout provider reached, the evidence verifier of CMD053, is a port that runs outside any transaction (design §11).
  */
 import type { B12OperationId } from "@kauro/domain";
+import { B12_PRODUCER_COMMANDS } from "./sellers/owner-tools/contracts.js";
 import type {
   AgencyActivationView,
   AgencyClosureView,
@@ -50,7 +51,7 @@ export interface CommercialCommandSpec<Body> {
   readonly method: "POST";
   readonly path: string;
   /** The catalogue role (commands.json through @kauro/contracts, brand-mapped: KAURO_OWNER). */
-  readonly role: "AGENCY_OWNER" | "AGENCY_BILLING" | "ACTIVE_SELLER_OR_OWNER" | "ACTIVE_SELLER" | "KAURO_OWNER" | "KAURO_OWNER_OR_SECURITY_SERVICE" | "OPERATIONS_SERVICE_OR_OWNER" | "COMMISSION_SERVICE" | "FINANCE_SERVICE" | "ASSIGNED_SELLER_OR_OWNER" | "OWNER" | "ASSIGNED_SELLER_OWNER_OR_RECONCILER";
+  readonly role: "AGENCY_OWNER" | "AGENCY_BILLING" | "ACTIVE_SELLER_OR_OWNER" | "ACTIVE_SELLER" | "SELLER_SELF" | "KAURO_OWNER" | "KAURO_OWNER_OR_SECURITY_SERVICE" | "OPERATIONS_SERVICE_OR_OWNER" | "COMMISSION_SERVICE" | "FINANCE_SERVICE" | "ASSIGNED_SELLER_OR_OWNER" | "OWNER" | "ASSIGNED_SELLER_OWNER_OR_RECONCILER";
   readonly principal: CommercialPrincipalKind;
   /**
    * The database role of the command's unit of work: kauro_app for a request handler (TENANT for an agency member, OPERATOR for a
@@ -547,6 +548,8 @@ export interface PrepareOutreachDraftBody {
   readonly purpose: "REQUESTED_REPLY" | "INDIVIDUAL_PROSPECT_CONTACT" | "FOLLOW_UP";
   readonly contentRef: string;
   readonly provenanceEvidenceHash: string;
+  /** The CURRENT sales resources the draft cites (A8, R2-135; amendment of L-DRAFT to K2's body: optional, outreach_draft_resources). */
+  readonly resourceIds?: ReadonlyArray<string>;
 }
 export const PREPARE_OUTREACH_DRAFT = spec<PrepareOutreachDraftBody>({
   id: "CMD061",
@@ -848,4 +851,6 @@ export const COMMERCIAL_COMMANDS = Object.freeze({
   CMD058: CHANGE_CAPABILITY,
   CMD059: RESTRICT_CAPABILITY,
   ...B12_COMMERCIAL_COMMANDS,
+  // package B12 lane L-OWNER: the owner tools (plan companion §P), journaled under their own names
+  ...B12_PRODUCER_COMMANDS,
 } as const);

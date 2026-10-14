@@ -364,12 +364,15 @@ export const PUBLIC_COPY = {
   "unsubscribe.meta.title": "Communication preferences",
   "unsubscribe.meta.description": "Stop optional messages from Kauro. This page explains what can be turned off and which notices are always sent to you.",
   "unsubscribe.title": "Stop optional messages.",
-  "unsubscribe.unavailable.heading": "This page cannot stop messages yet",
-  "unsubscribe.unavailable.body": "Turning off optional messages from this link is not available yet. This page has not changed any setting and has not recorded any choice.",
-  "unsubscribe.ask.body": "To stop optional messages now, write to us and name the address that should stop receiving them.",
+  "unsubscribe.form.heading": "Stop optional messages from this sender",
+  "unsubscribe.form.body": "Press the button to stop the optional messages that came with this link. It stops them for the address that received the message and does nothing else.",
+  "unsubscribe.submit.cta": "Stop optional messages",
+  "unsubscribe.done.heading": "Optional messages stopped",
+  "unsubscribe.done.body": "We received your request. Optional messages to this address are stopped.",
+  "unsubscribe.failed.body": "The request could not be sent. Check your connection and press the button again; it is safe to repeat.",
+  "unsubscribe.limited.body": "Too many requests came from this network. Wait a few minutes and press the button again.",
   "unsubscribe.essential.heading": "Notices you will still receive",
   "unsubscribe.essential.body": "Notices about an account, a payment, your files or a support case are not optional messages. They are kept apart, and this page never turns them off.",
-  "unsubscribe.ask.cta": "Write to us",
 } as const satisfies Readonly<Record<string, string>>;
 
 export type PublicCopyId = keyof typeof PUBLIC_COPY;

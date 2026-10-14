@@ -420,6 +420,12 @@ export interface PurchaseRebindingRepository {
   record(rebinding: PurchaseRebindingRecord): Promise<PurchaseRebindingRecord>;
   listForCapture(captureId: CaptureId): Promise<ReadonlyArray<PurchaseRebindingRecord>>;
   findTo(quoteId: QuoteId): Promise<PurchaseRebindingRecord | null>;
+  /**
+   * R2-026 REPAIR (M8): whether the paid quote's target contract is superseded and the replacement's plan is the re-check plan of the
+   * paid plan (plans.recheck_of_plan_id, born by CMD019). Plain reads: the 0084 purchase_rebindings_guard re-checks both under the
+   * replaced entitlement's exclusive half.
+   */
+  driftOf(input: { readonly projectId: ProjectId; readonly paidPlanId: PlanId; readonly paidTargetContractHash: Sha256Hex; readonly replacementPlanId: PlanId }): Promise<{ readonly replacedTargetSuperseded: boolean; readonly rechecksPaidPlan: boolean }>;
 }
 
 export interface CommercialAuthorizationRepository {

@@ -1576,6 +1576,39 @@ export const AGENCY_APP_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Ob
   }),
 ] satisfies ReadonlyArray<OperationalRoute>);
 
+/**
+ * The public opt-out (package B12, lane L-ACT; plan "Public opt-out", GAP-API-B12-3/4, D-B12O-13/21). Both routes live on the List-Unsubscribe URI
+ * of a message and read no credential. The POST takes the RFC 8058 one-click body (application/x-www-form-urlencoded or multipart/form-data), which
+ * is admitted by @kauro/application admitOneClickOptOut on this route alone, so it declares no JSON request. The GET answers a body-less 303 to the
+ * human page of R2 UI49 (/unsubscribe/{token}) and writes nothing.
+ */
+export const OUTREACH_OPT_OUT_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
+  Object.freeze({
+    operationId: "getOutreachOptOut",
+    method: "GET",
+    path: "/api/v1/public/outreach/opt-out/{token}",
+    summary: "The List-Unsubscribe link of a sales message: a link scanner's GET changes nothing and is sent to the human page",
+    authority: 'owner manual 18 "Communication compliance"; R2 UI49 "Communication preferences"; B12 plan D-B12O-21',
+    responses: Object.freeze({
+      "303": Object.freeze({ description: "See Other: the human page /unsubscribe/{token}. No body, no media type, nothing written.", contentType: null, schema: null }),
+    }),
+  }),
+  Object.freeze({
+    operationId: "postOutreachOptOut",
+    method: "POST",
+    path: "/api/v1/public/outreach/opt-out/{token}",
+    summary: "RFC 8058 one-click unsubscribe: suppresses the contact of the message that carried the token",
+    authority: 'owner manual 18 "Communication compliance"; RFC 8058 s.3; B12 plan D-B12O-12/13',
+    responses: Object.freeze({
+      "200": Object.freeze({
+        description: "Received. The same answer for a known and an unknown token; the contact of a known token is suppressed. Never a redirect.",
+        contentType: JSON_CONTENT_TYPE,
+        schema: Object.freeze({ type: "object", additionalProperties: false, required: ["status"], properties: { status: { type: "string", enum: ["RECEIVED"] } } }),
+      }),
+    }),
+  }),
+] satisfies ReadonlyArray<OperationalRoute>);
+
 export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
   Object.freeze({
     operationId: "getLiveness",
@@ -1624,6 +1657,7 @@ export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze
   ...BANK_REFUND_OPERATIONAL_ROUTES,
   ...BANK_INBOUND_OPERATIONAL_ROUTES,
   ...AGENCY_APP_OPERATIONAL_ROUTES,
+  ...OUTREACH_OPT_OUT_OPERATIONAL_ROUTES,
 ] satisfies ReadonlyArray<OperationalRoute>);
 
 export function operationalResponseSchemaId(operationId: string, status: string): OperationalResponseSchemaId {
@@ -1682,7 +1716,7 @@ function operationalRoots(routes: ReadonlyArray<OperationalRoute>): Record<Opera
       // a reply without a body (204) declares neither a media type nor a schema; any other declares both
       if ((response.schema === null) !== (response.contentType === null)) refuse(`operational route ${route.operationId} ${status} declares a body schema without a media type, or the reverse`);
       if (response.schema === null) {
-        if (status !== "204") refuse(`operational route ${route.operationId} declares ${status} without a body; only 204 has none`);
+        if (status !== "204" && status !== "303") refuse(`operational route ${route.operationId} declares ${status} without a body; only 204 and the opt-out 303 have none`);
         continue;
       }
       const id = operationalResponseSchemaId(route.operationId, status);

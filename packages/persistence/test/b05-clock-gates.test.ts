@@ -35,10 +35,14 @@ after(async () => {
 const OWNER_BY_STEM: Readonly<Record<string, string>> = {
   b17_stage_receipt_reconciliations: "B17",
   b17_target_supersession: "B17",
+  b17_target_repair_terms: "B17",
   b15_tax_document_issuance: "B15",
   b17_plan_validation_target_read: "B17",
   b17_capability_importer_tool: "B17",
   b12_outreach: "B12",
+  b12_seller_scope: "B12",
+  b12_opt_out_misses: "B12",
+  b12_owner_tools: "B12",
 };
 const stemOfTag = (tag: string): string | undefined => {
   const file = readdirSync(MIGRATIONS_DIR).find((f) => f.startsWith(`${tag}_`) && f.endsWith(".sql"));
@@ -215,6 +219,8 @@ const LEASE_CALLERS = [
   "apps/api/src/commissions/dispatcher.ts#heartbeat2",
   "apps/api/src/payments/dispatcher.ts#claim1",
   "apps/api/src/payments/dispatcher.ts#heartbeat1",
+  "apps/api/src/outreach/dispatcher.ts#claim1",
+  "apps/api/src/outreach/dispatcher.ts#heartbeat1",
   "apps/control/src/dispatcher.ts#claim1",
 ];
 const PROCESS_CLOCK = /\bDate\.now\s*\(|\bnew\s+Date\s*\(\s*\)|\bperformance\.now\s*\(|\bprocess\.hrtime\b/g;

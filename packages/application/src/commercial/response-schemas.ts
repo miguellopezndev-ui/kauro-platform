@@ -29,6 +29,7 @@ import {
 import { VIEW_MEMBER_KIT } from "../api/view-kit.js";
 import { MONEY_PATTERN } from "../commerce/response-schemas.js";
 import { COMMERCIAL_VIEW_VOCABULARY as V } from "./vocabulary.js";
+import { B12_PRODUCER_COMMAND_RESPONSES, B12_PRODUCER_VIEW_DEFINITIONS } from "./sellers/owner-tools/views.js";
 
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
 const { ID, VERSION, HASH, UTC, COUNT, LABEL, UUID_PATTERN } = RESPONSE_FIELD_VOCABULARY;
@@ -174,6 +175,7 @@ export const B12_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze
       familyId: platform(true, ID, "The resource family."),
       version: platform(true, VERSION, "The version inside the family."),
       state: platform(true, enumOf(["CURRENT", "SUPERSEDED"]), "CURRENT is the one version drafts may cite."),
+      currentResourceId: platform(true, ID, "The CURRENT resource of the family (this one while it is CURRENT)."),
       contentRef: platform(true, CONTENT_REF, "The stored content of this version."),
       capabilityIds: platform(true, { type: "array", maxItems: 50, items: ID }, "The capabilities the resource describes."),
       createdAt: platform(true, UTC, "The instant the version was published."),
@@ -280,6 +282,32 @@ export const B12_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze
       contactId: platform(true, ID, "The contact record."),
       channel: platform(true, TOKEN, "The channel of the contact."),
       createdAt: platform(true, UTC, "The instant the contact was recorded."),
+    },
+  },
+  {
+    name: "SellerHomeStatementView",
+    description: "GetSellerHome: one statement line of the seller's home (the amounts of the seller's own statement; never a customer, a contact or a destination).",
+    contract: null,
+    withheld: {},
+    members: {
+      statementId: platform(true, ID, "The seller's own statement."),
+      periodStart: platform(true, DATE, "First day of the statement's period."),
+      periodEnd: platform(true, DATE, "Last day of the statement's period."),
+      state: platform(true, enumOf(V.statementStates), "The statement's lifecycle state."),
+      payableCents: platform(true, MONEY, "The statement's payable amount, in minor units."),
+      heldCents: platform(true, MONEY, "The held amount, in minor units."),
+    },
+  },
+  {
+    name: "SellerHomeView",
+    description: "GetSellerHome: what a seller (ACTIVE, SUSPENDED or TERMINATED) sees first: its state, the actions that state permits, its own statements and the support route (R2-066). No prospect, contact, draft or other seller's data.",
+    contract: null,
+    withheld: {},
+    members: {
+      sellerState: platform(true, enumOf(["ACTIVE", "SUSPENDED", "TERMINATED"]), "The seller's lifecycle state."),
+      permittedActions: platform(true, { type: "array", maxItems: 20, items: TOKEN }, "The actions the state permits; empty for a TERMINATED seller (statements and support only)."),
+      statements: platform(true, { type: "array", maxItems: 500, items: ref("SellerHomeStatementView") }, "The seller's own statements, newest first."),
+      supportRoute: platform(true, { type: ["string", "null"], maxLength: 254 }, "The configured support route, or null when none is configured (shown as not configured)."),
     },
   },
 ] satisfies ReadonlyArray<ViewDefinition>);
@@ -695,6 +723,7 @@ export const COMMERCIAL_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object
     },
   },
   ...B12_VIEW_DEFINITIONS,
+  ...B12_PRODUCER_VIEW_DEFINITIONS,
 ] satisfies ReadonlyArray<ViewDefinition>);
 
 /** The success reply of each B10 command: status and the view its COMPLETED envelope carries. B10 answers synchronously, except CMD027's replacement whose re-binding timed out (ACCEPTED). */
@@ -734,6 +763,8 @@ export const COMMERCIAL_COMMAND_RESPONSES = Object.freeze({
   WithdrawOutreachChannelPolicy: { status: 200, view: "OutreachChannelPolicyView", accepted: false },
   RecordProspectSource: { status: 201, view: "ProspectSourceView", accepted: false },
   RecordProspectContact: { status: 201, view: "ProspectContactView", accepted: false },
+  // package B12 lane L-OWNER: the owner tools (plan companion §P), all synchronous
+  ...B12_PRODUCER_COMMAND_RESPONSES,
 } as const);
 export type CommercialServedCommandId = keyof typeof COMMERCIAL_COMMAND_RESPONSES;
 
@@ -802,6 +833,16 @@ export const COMMERCIAL_READ_ROUTES = Object.freeze({
     action: "READ_SALES_RESOURCE",
     summary: "One version of an approved sales resource and whether it is still current",
     authority: "owner manual 12 \"Resources and training\"; R2-135; B12 plan §2 Reads",
+  },
+  // package B12 lane L-HOME (R2-066): the seller's home, served to a seller in any state
+  GetSellerHome: {
+    path: "/api/v1/sales/home",
+    scope: "CORPORATE",
+    role: "OWN_SELLER_ANY_STATE",
+    view: "SellerHomeView",
+    action: "READ_SELLER_HOME",
+    summary: "The seller's home: its state, permitted actions, own statements and support route; a terminated seller keeps it",
+    authority: "owner manual 12 \"Seller onboarding and access lifecycle\"; R2-066; B12 plan §2 Reads",
   },
 } as const);
 export type CommercialReadOperationId = keyof typeof COMMERCIAL_READ_ROUTES;

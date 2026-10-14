@@ -31,6 +31,8 @@ import {
   type IdGenerator,
   type NewAccountAssignment,
   type NewProspect,
+  type NewProspectContact,
+  type NewProspectSourceEvidence,
   type NewSellerTermination,
   type OffsetTerms,
   type PayoutDestinationId,
@@ -529,16 +531,16 @@ export class PgSalesRepository implements SalesRepository {
 
   /** The session's own source evidence by hash, of either segment (CMD045 accepts no other recorder's: SOURCE_EVIDENCE_INVALID). */
   async sourceEvidence(evidenceHash: Sha256Hex): Promise<ProspectSourceEvidenceRecord | null> {
-    const r = await execute<{ evidence_hash: string; seller_id: string | null; recorded_by_user_id: string; source_url_digest: string; observed_on: string; lawful_basis: string; segment: ProspectSegment; recorded_at: string }>(
+    const r = await execute<{ evidence_id: string; evidence_hash: string; seller_id: string | null; recorded_by_user_id: string; source_url_digest: string; observed_on: string; lawful_basis: string; segment: ProspectSegment; recorded_at: string }>(
       this.db,
-      `SELECT evidence_hash, seller_id, recorded_by_user_id, source_url_digest, observed_on::text AS observed_on, lawful_basis, segment, ${canonical("created_at", "recorded_at")}
+      `SELECT evidence_id, evidence_hash, seller_id, recorded_by_user_id, source_url_digest, observed_on::text AS observed_on, lawful_basis, segment, ${canonical("created_at", "recorded_at")}
          FROM kauro.prospect_source_evidence WHERE recorded_by_user_id = kauro.current_user_id() AND evidence_hash = $1`,
       [evidenceHash],
     );
     const e = r.rows[0];
     if (e === undefined) return null;
     return defined<ProspectSourceEvidenceRecord>(
-      { evidenceHash: e.evidence_hash, recordedByUserId: e.recorded_by_user_id as UserId, sourceUrlDigest: e.source_url_digest, observedOn: e.observed_on, lawfulBasis: e.lawful_basis, segment: e.segment, recordedAt: instantOf(e.recorded_at) },
+      { evidenceId: e.evidence_id, evidenceHash: e.evidence_hash, recordedByUserId: e.recorded_by_user_id as UserId, sourceUrlDigest: e.source_url_digest, observedOn: e.observed_on, lawfulBasis: e.lawful_basis, segment: e.segment, recordedAt: instantOf(e.recorded_at) },
       { recordedBySellerId: optionalString<SellerId>(e.seller_id) },
     );
   }
@@ -552,6 +554,44 @@ export class PgSalesRepository implements SalesRepository {
     );
     const c = r.rows[0];
     return c === undefined ? null : { contactRef: c.contact_id as ProspectContactRef, contactKey: c.contact_key, recordedAt: instantOf(c.recorded_at) };
+  }
+
+  /**
+   * B12 RecordProspectSource: the caller's evidence appended at the server's instant (prospect_source_evidence_record: a seller's own row or the
+   * owner's; one per recorder and hash). The segment is AGENCY or COMPANY (0064); the row is never read for ranking (D-33).
+   */
+  async recordSourceEvidence(evidence: NewProspectSourceEvidence): Promise<ProspectSourceEvidenceRecord> {
+    const r = await execute<{ evidence_id: string; evidence_hash: string; seller_id: string | null; recorded_by_user_id: string; source_url_digest: string; observed_on: string; lawful_basis: string; segment: ProspectSegment; recorded_at: string }>(
+      this.db,
+      `INSERT INTO kauro.prospect_source_evidence (evidence_id, recorded_by_user_id, seller_id, evidence_hash, source_url_digest, observed_on, lawful_basis, segment, created_at)
+       VALUES ($1, kauro.current_user_id(), $2, $3, $4, $5::date, $6, $7, kauro.server_now())
+       RETURNING evidence_id, evidence_hash, seller_id, recorded_by_user_id, source_url_digest, observed_on::text AS observed_on, lawful_basis, segment, ${canonical("created_at", "recorded_at")}`,
+      [evidence.evidenceId, evidence.sellerId ?? null, evidence.evidenceHash, evidence.sourceUrlDigest, evidence.observedOn, evidence.lawfulBasis, evidence.segment],
+    );
+    const e = r.rows[0];
+    if (e === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the source evidence insert returned no row");
+    return defined<ProspectSourceEvidenceRecord>(
+      { evidenceId: e.evidence_id, evidenceHash: e.evidence_hash, recordedByUserId: e.recorded_by_user_id as UserId, sourceUrlDigest: e.source_url_digest, observedOn: e.observed_on, lawfulBasis: e.lawful_basis, segment: e.segment, recordedAt: instantOf(e.recorded_at) },
+      { recordedBySellerId: optionalString<SellerId>(e.seller_id) },
+    );
+  }
+
+  /**
+   * B12 RecordProspectContact: the restricted contact, then the address behind its key (0072: the database repeats the KAURO_PROSPECT_CONTACT_V1
+   * derivation, KA095). Both statements run in the caller's one transaction, so a failure at the address insert rolls the contact back.
+   */
+  async recordContact(contact: NewProspectContact): Promise<ProspectContactRecord> {
+    const r = await execute<{ contact_id: string; contact_key: string; recorded_at: string }>(
+      this.db,
+      `INSERT INTO kauro.prospect_contacts (contact_id, recorded_by_user_id, contact_key, contact_label, role_label, channel, created_at)
+       VALUES ($1, kauro.current_user_id(), $2, $3, $4, $5, kauro.server_now())
+       RETURNING contact_id, contact_key, ${canonical("created_at", "recorded_at")}`,
+      [contact.contactId, contact.contactKey, contact.contactLabel, contact.roleLabel ?? null, contact.channel],
+    );
+    const c = r.rows[0];
+    if (c === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the contact insert returned no row");
+    await execute(this.db, "INSERT INTO kauro.prospect_contact_addresses (contact_id, recorded_by_user_id, address) VALUES ($1, kauro.current_user_id(), $2)", [contact.contactId, contact.address]);
+    return { contactRef: c.contact_id as ProspectContactRef, contactKey: c.contact_key, recordedAt: instantOf(c.recorded_at) };
   }
 
   /** The first suppression by the organization key, or by the contact key when one is given (KC016 repeats both). */

@@ -163,5 +163,23 @@ export type { ConnectionSecurityInput, DatabaseTls, VerifiedSslOptions } from ".
 // package B12 (lane K1): the outreach writers with their T2 subjects, the ordered advisory locks and the effect_now lease fence (plan §L)
 export { PgOutreachWriters } from "./repositories/commercial-outreach.js";
 export type { OutreachIntentKeys, NewOutreachIntent, IntentAnswer } from "./repositories/commercial-outreach.js";
+export { PgOwnerToolStore, PgControlPlaneRecords, ownerToolsOf, manifestHashOf } from "./repositories/commercial-owner-tools.js";
+export type { OwnerToolSeller, OwnerToolSellerState, OwnerToolAgreement, OwnerToolDestination, OwnerToolRecord, PayoutDestinationState, ShareClaim, NewAgreement, NewAllocation } from "./repositories/commercial-owner-tools.js";
 export { OutreachLocks, holdOutreachLease } from "./outreach-access.js";
+// package B12 (lane L-DRAFT): drafts, contents and sales resources (CMD061, PutOutreachContent, PublishSalesResource and the reads)
+export { PgOutreachDrafts } from "./repositories/commercial-outreach-drafts.js";
+export type { PrepareDraftInput, PublishResourceInput } from "./repositories/commercial-outreach-drafts.js";
+export { outreachDraftsOf } from "./outreach-drafts-access.js";
 export type { OutreachLockMode } from "./outreach-access.js";
+// package B12 (lane L-AUTH): the review, grant, revocation and policy-withdrawal SQL with its accessor
+export { PgOutreachAuth } from "./repositories/commercial-outreach-auth.js";
+export type { AuthSenderFact, AuthDraftFact, ReviewItemInput, ReviewRecordFact, GrantFacts, AuthorizationFact, PolicyFact } from "./repositories/commercial-outreach-auth.js";
+export { outreachAuthOf } from "./outreach-auth-access.js";
+// package B12 (lane L-SEND): CMD063, the dispatcher's D2..D5 units and the D3 start gate
+export { PgOutreachSend, OutreachRefusal, capSubReason } from "./repositories/commercial-outreach-send.js";
+export type { SendActor, SealFacts, SealCheck, QueueSendInput, QueuedSend, ClaimVerdict, ClaimedSubmission, StartGate, OutcomeAnswer } from "./repositories/commercial-outreach-send.js";
+export { outreachSendOf, outreachSendersOf } from "./outreach-send-access.js";
+export { PgOutreachSenders, type SenderRecord, type RegisterSenderInput } from "./repositories/commercial-outreach-senders.js";
+// package B12 (lane L-ACT): CMD064, the reads, the diagnosis and the public opt-out (plan §2)
+export { PgActivityStore, PgOptOutStore, outreachActivityOf, OUTREACH_SERVICE_ID } from "./repositories/commercial-activity.js";
+export type { ActivityRequest, ActivityRow, MetricsRow, DiagnosisRequest } from "./repositories/commercial-activity.js";

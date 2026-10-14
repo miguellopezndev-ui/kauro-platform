@@ -19,6 +19,9 @@ export const OPERATIONAL_WIRE: Readonly<Record<string, OperationalWire>> = Objec
   revokeCurrentSession: entry("NONE", true, null),
   createStepUp: entry("NONE", true, null),
   createInquiry: entry("NONE", false, null),
+  // B12 L-ACT: the public opt-out reads no credential and is not journaled (the RFC 8058 body is the whole request)
+  getOutreachOptOut: entry("NONE", false, null),
+  postOutreachOptOut: entry("NONE", false, null),
   // Payments V1 bank routes: the owner's five commands are journaled and cookie-authenticated; the route read is owner-only
   configureBankRoute: entry("REQUIRED", true, "KAURO_OWNER"),
   verifyBankRoute: entry("REQUIRED", true, "KAURO_OWNER"),

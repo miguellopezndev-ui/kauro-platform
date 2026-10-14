@@ -636,7 +636,7 @@ interface RebindingRow {
   from_authorization_id: string;
   to_quote_id: string;
   allowance_ordinal: number;
-  reason_code: "PRE_EXECUTION_SOURCE_REPLACEMENT";
+  reason_code: "PRE_EXECUTION_SOURCE_REPLACEMENT" | "TARGET_DRIFT_REPAIR";
   lineage_evidence_hash: string;
   requested_by_membership_id: string;
   created_at: Date;
@@ -689,5 +689,21 @@ export class PgPurchaseRebindingRepository implements PurchaseRebindingRepositor
   async findTo(quoteId: QuoteId): Promise<PurchaseRebindingRecord | null> {
     const r = await execute<RebindingRow>(this.db, `SELECT ${REBINDING_COLUMNS} FROM kauro.purchase_rebindings WHERE to_quote_id = $1`, [quoteId]);
     return r.rows[0] ? rebindingRecord(r.rows[0]) : null;
+  }
+
+  /**
+   * R2-026 REPAIR (M8): the paid quote's target superseded and the replacement's plan the re-check of the paid plan, read plainly in the
+   * caller's unit (kauro_app sees both tables; kauro_payment holds the 0013 target-contract columns and 0084's plans.recheck_of_plan_id).
+   * The 0084 purchase_rebindings_guard re-checks both under the replaced entitlement's exclusive half.
+   */
+  async driftOf(input: { readonly projectId: ProjectId; readonly paidPlanId: PlanId; readonly paidTargetContractHash: Sha256Hex; readonly replacementPlanId: PlanId }): Promise<{ readonly replacedTargetSuperseded: boolean; readonly rechecksPaidPlan: boolean }> {
+    const r = await execute<{ superseded: boolean; rechecks: boolean }>(
+      this.db,
+      `SELECT EXISTS (SELECT 1 FROM kauro.target_contracts t WHERE t.project_id = $1 AND t.body_hash = $2 AND t.superseded_at IS NOT NULL) AS superseded,
+              EXISTS (SELECT 1 FROM kauro.plans p WHERE p.project_id = $1 AND p.plan_id = $3 AND p.recheck_of_plan_id = $4) AS rechecks`,
+      [input.projectId, input.paidTargetContractHash, input.replacementPlanId, input.paidPlanId],
+    );
+    const row = r.rows[0];
+    return { replacedTargetSuperseded: row?.superseded === true, rechecksPaidPlan: row?.rechecks === true };
   }
 }

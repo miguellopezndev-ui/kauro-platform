@@ -15,3 +15,20 @@ export {
 } from "./calendar.js";
 export { OUTREACH_HANDLERS, OutreachNotBuilt, type OutreachHandlerName } from "./handlers.js";
 export { B12_SERVED_READ_IDS, createOutreachStubCommandHandlers, createOutreachStubReadHandlers, isB12CommercialCommand, isB12CommercialRead, isB12RegistryLessOperation, type B12CommandId, type B12ReadId } from "./routes.js";
+// lane L-AUTH: CMD062, PrepareOutreachReview, GetOutreachReview, RevokeOutreachAuthorization, WithdrawOutreachChannelPolicy
+export { createOutreachAuthCommandHandlers, createOutreachAuthReadHandlers, type OutreachAuthCommandHandlers } from "./auth-handlers.js";
+export type { OutreachAuthStore, OutreachAuthCollaborators } from "./auth-store.js";
+export { outreachReviewDigest, OUTREACH_REVIEW_DOMAIN } from "./prepare-review.js";
+export { createOutreachDraftCommandHandlers, createOutreachDraftReadHandlers, type OutreachDraftCollaborators, type OutreachDraftStore } from "./draft-handlers.js";
+export { sendHandler, SEND_AUTHORIZED_OUTREACH_OPERATION } from "./send.js";
+export { registerSenderIdentityHandler, verifySenderIdentityHandler, recordSenderRevocationHandler } from "./sender-identity.js";
+export type { OutreachSendStore, OutreachSendCollaborators, OutreachSealer, SendSealFacts, SendActor, QueueSendRequest, QueuedSendRecord, OutreachSenderStore, OutreachSenderCollaborators, SenderRecordView } from "./send-store.js";
+// lane L-ACT (CMD064, ListSalesActivities, GetOutreachMetrics, RecordOutreachDiagnosis, the public opt-out)
+export type { ActivityCollaborators, OutreachActivityStore, RecordActivityRequest, RecordDiagnosisRequest } from "./activity-ports.js";
+export { recordActivityHandler, checkActivityShape } from "./record-activity.js";
+export { listSalesActivitiesHandler } from "./list-activities.js";
+export { getOutreachMetricsHandler } from "./metrics.js";
+export { recordOutreachDiagnosisHandler } from "./diagnosis.js";
+export { admitOneClickOptOut, OPT_OUT_BODY_LIMIT_BYTES, type OneClickAdmission } from "./opt-out-admission.js";
+export { mintOptOutToken, readOptOutToken, optOutByToken, networkDigestOf, OPT_OUT_MISS_LIMIT, OPT_OUT_MISS_WINDOW_SECONDS, type OptOutKey, type OptOutStore, type OptOutOutcome, type OptOutAnswer, type OptOutDependencies } from "./opt-out.js";
+export { createActivityCommandHandlers, createActivityReadHandlers } from "./activity-handlers.js";

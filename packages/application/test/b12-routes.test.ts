@@ -1,6 +1,6 @@
 // Package B12 kit K2: every B12 route is registered once (specs, closed request schemas, views, outcome catalogues, served lists) and bound to
 // a NOT_BUILT stub, so the lanes replace handler bodies only. The four catalogue commands equal their registry rows; the operations no
-// catalogue id names are exactly the domain's B12_OPERATIONS minus the producer operations (L-OWNER, GAP: no designed wire shape yet).
+// catalogue id names are exactly the domain's B12_OPERATIONS minus the producer operations, which lane L-OWNER registers beside them (sellers/owner-tools).
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { COMMANDS } from "@kauro/contracts";
@@ -40,10 +40,14 @@ test("CMD061..CMD064 equal their registry rows: name, method, path, role, gate G
   assert.equal(COMMERCIAL_COMMANDS.CMD062.stepUp, true, "AuthorizeOutreach demands a fresh step-up (plan A16)");
 });
 
-test("the registry-less operations are exactly the outreach operations of the domain; the producer operations are a recorded GAP (no route, no spec)", () => {
+test("the registry-less operations are exactly the outreach operations of the domain; the producer operations are the owner tools' (L-OWNER), each with its own spec and no registry row", () => {
   const registryLess = Object.keys(COMMERCIAL_COMMANDS).filter((id) => isB12RegistryLessOperation(id));
   assert.deepEqual(registryLess.sort(), [...B12_OUTREACH_OPERATIONS].filter((op) => !(CATALOGUE as ReadonlyArray<string>).includes(op)).sort());
-  for (const op of B12_PRODUCER_OPERATIONS) assert.equal(isB12CommercialCommand(op), false, `${op} is L-OWNER's and has no designed wire shape`);
+  for (const op of B12_PRODUCER_OPERATIONS) {
+    assert.equal(isB12CommercialCommand(op), false, `${op} is L-OWNER's, not an outreach route`);
+    assert.ok(op in COMMERCIAL_COMMANDS, `${op} has its owner-tool spec`);
+    assert.equal(COMMANDS.some((c) => c.id === op || c.name === op), false, `${op} has no registry row`);
+  }
   for (const id of registryLess) assert.equal(COMMANDS.some((c) => c.id === id || c.name === id), false, `${id} has no registry row`);
 });
 

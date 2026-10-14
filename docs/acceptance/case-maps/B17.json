@@ -3,7 +3,7 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B17-case-map.md",
-  "sha256": "f8fd754ba5ddf68ce2ba26885a6f473128485f06620a7ed7b64ce3fc8c3e772c"
+  "sha256": "4b30c6a284c62ec5d9858a75dac5ef0eb3152e1a8f13755967b450189665a9aa"
  },
  "rows": [
   {
@@ -164,12 +164,25 @@
     "apps/api/test/b17-target-drift.test.ts :: R2-026: RACE ExecuteProject against CMD019 at the project row, both orders: no job runs on a superseded contract and nothing is consumed",
     "apps/api/test/b17-target-drift.test.ts :: R2-026: RACE ApprovePlan against CMD019, both orders: every APPROVED plan on a superseded contract has its re-check plan, or the approval was refused",
     "apps/api/test/b17-target-drift.test.ts :: R2-026: RACE RevisePlan against CMD019, both orders",
-    "apps/api/test/b17-target-drift.test.ts :: R2-026: RACE two confirms of two newer contracts of one project at the project row: exactly one current, the later observation wins"
+    "apps/api/test/b17-target-drift.test.ts :: R2-026: RACE two confirms of two newer contracts of one project at the project row: exactly one current, the later observation wins",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: OK an ACTIVE authorization re-binds at no charge to a plan revalidated against the newer contract with the same scope and price; CMD036 then queues",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: RACE the payments rebinder re-binds an authorization while CMD019 supersedes its target, both orders: no authorization is issued on an already superseded contract; one issued before is paused and offered REPAIR",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: TIMEOUT a lock wait in the drift replacement is retryable, nothing written",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: CRASH before COMMIT of the drift quote: no quote, the authorization ACTIVE",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: RACE (crash after COMMIT) the drift quote answer is lost; the same key returns it",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: RETRY a second drift replacement of the same superseded quote is refused (the from-quote is SUPERSEDED)",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: RACE (revocation) CMD026 withdraws the re-check plan approval while CreateQuote waits on its approval half: refused",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: RACE drift repair against a refund request on the same capture at the capture_refunds half (0015:742), both orders: the refund request lands on the new authorization, or the repair is refused PURCHASE_NOT_INTACT",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: CRASH before COMMIT after the new authorization insert: old authorization ACTIVE, 0 rebindings",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: RACE (crash after COMMIT) the rebind answer is lost; the replay returns the one rebinding",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: RETRY the same rebind replays; 1 rebinding",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: PARTIAL the new authorization insert fails after the revoke: full rollback, old authorization ACTIVE",
+    "apps/api/test/b17-target-rebind.test.ts :: R2-026: RACE (revocation) the capability is revoked while the rebinder holds its shared half: REFUSED"
    ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "PART(L7 REPAIR half until L7 is C) EXECUTED_LOCAL"
+   "claimed": "PART(L7 T7 compiled, first run at batch; admission race 0015:740 todo, control-plane driver) EXECUTED_LOCAL"
   },
   {
    "case": "CMD018-OK",

@@ -98,7 +98,8 @@ export function getCommissionStatementHandler(runtime: CommerceRequestRuntime, c
         const view = await runtime.unitOfWork.run(context, async (uow) => {
           const owner = await co.authorizer.authorizeCorporateOwner(uow, { identity: request.subject.identity });
           if (owner.kind === "DENY") {
-            const seller = await co.authorizer.authorizeSeller(uow, { identity: request.subject.identity });
+            // a TERMINATED seller keeps its own statements (R2-066): the statement seller check admits ACTIVE, SUSPENDED and TERMINATED
+            const seller = await co.authorizer.authorizeStatementSeller(uow, { identity: request.subject.identity });
             if (seller.kind === "DENY") {
               denied = true;
               throw CommerceAccessDenied.of(spec.action, owner.reason === "CORPORATE_ROLE_MISSING" ? seller : owner);

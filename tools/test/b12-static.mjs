@@ -18,6 +18,8 @@ export const B12_SOURCE_ROOTS = [
   "packages/application/src/commercial/prospects/contact-key.ts",
   "packages/application/src/commercial/testing/outreach-send.ts",
   "apps/api/src/outreach",
+  "packages/application/src/commercial/sellers/owner-tools",
+  "packages/persistence/src/repositories/commercial-owner-tools.ts",
 ];
 /** The B12 migration (0088, renumbered at the batch C merge). */
 export const B12_MIGRATION = "packages/persistence/migrations/0088_b12_outreach.sql";

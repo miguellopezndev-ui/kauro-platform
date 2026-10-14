@@ -152,7 +152,7 @@ export function runtimeSchemas(sources) {
 
 /** The registry-shaped description of a B12 operation no catalogue id names (plan companion §R): gate G-UX_PRIVATE, idempotency REQUIRED. */
 function b12RegistryLessCommand(spec) {
-  const who = spec.role === "KAURO_OWNER" ? "the ACTIVE corporate owner" : "the ACTIVE seller or the corporate owner";
+  const who = spec.role === "KAURO_OWNER" ? "the ACTIVE corporate owner" : spec.role === "SELLER_SELF" ? "the seller the record names, in any state" : "the ACTIVE seller or the corporate owner";
   return {
     id: spec.id,
     name: spec.name,
@@ -537,7 +537,8 @@ export function generateOpenApi(sources) {
     if (!application.isServedCommercialCommand(spec.id)) continue;
     // package B12: an operation no catalogue id names (domain B12_OPERATIONS) is specified by plan companion §R and has no registry row; a
     // catalogue id must still equal its registry row
-    const registryLess = application.isB12RegistryLessOperation(spec.id);
+    // the producer operations of lane L-OWNER (companion §P) are registry-less too, outside the outreach kit (isB12RegistryLessOperation)
+    const registryLess = application.isB12RegistryLessOperation(spec.id) || application.B12_PRODUCER_SERVED_IDS.includes(spec.id);
     const command = registryCommands.find((c) => c.id === spec.id) ?? (registryLess ? b12RegistryLessCommand(spec) : undefined);
     if (!command) throw new Error(`${spec.id} is served but absent from the registry`);
     if (spec.method !== command.method || spec.path !== command.path || spec.name !== command.name) {

@@ -145,6 +145,8 @@ export type {
   AgencyLifecycleRepository,
   SellerChange,
   NewProspect,
+  NewProspectSourceEvidence,
+  NewProspectContact,
   NewAccountAssignment,
   NewSellerTermination,
   SalesRepository,
