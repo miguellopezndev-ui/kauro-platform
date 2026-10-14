@@ -36,6 +36,7 @@ const OWNER_BY_STEM: Readonly<Record<string, string>> = {
   b17_stage_receipt_reconciliations: "B17",
   b17_target_supersession: "B17",
   b15_tax_document_issuance: "B15",
+  b17_capability_importer_tool: "B17",
 };
 const stemOfTag = (tag: string): string | undefined => {
   const file = readdirSync(MIGRATIONS_DIR).find((f) => f.startsWith(`${tag}_`) && f.endsWith(".sql"));

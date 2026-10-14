@@ -163,6 +163,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0073_b17_target_supersession.sql",
     // B15 L0D: tax document issuance facts, the widened issuer half, the SUBMITTING backstop, FISCAL subscriptions (CMD035, R2-083/084; provisional number)
     "0074_b15_tax_document_issuance.sql",
+    // B17 L4: the importer tool a capability claims, compared with the tool a vendor qualification tested (S078; provisional number)
+    "0075_b17_capability_importer_tool.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

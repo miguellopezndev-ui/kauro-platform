@@ -24,19 +24,24 @@ const versionsUrl = (capabilityId: string): string => `/api/v1/operations/capabi
 const change = (capabilityId: string, body: Record<string, unknown>): Promise<Reply> => call(pw.w, { url: versionsUrl(capabilityId), token: pw.kora.token, agency: null, key: freshKey("b17-vendor"), body });
 
 /** A capability of `kind` (a TOOL, or a MODE with its mode) walked to QUALIFIED_INTERNAL (a versionable state). */
-async function capability(label: string, kind: "TOOL" | "MODE" = "TOOL", mode: string | null = null): Promise<string> {
+async function capability(label: string, kind: "TOOL" | "MODE" = "TOOL", mode: string | null = null, claim: string | null = kind === "TOOL" ? CLAIMED_TOOL : null): Promise<string> {
+  // the importer tool the capability claims (0075): the catalogue tool id; a version of it must be backed by a qualification that tested exactly it
   const id = ids.next();
   await pw.w.h.oracle.query(
-    `INSERT INTO kauro.capabilities (capability_id, version, kind, mode, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, 'DESIGN', $5, '[]'::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
-    [id, `B17-${label}`, kind, mode, sha(`profile-${label}`)],
+    `INSERT INTO kauro.capabilities (capability_id, version, kind, mode, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at, importer_tool)
+     VALUES ($1, $2, $3, $4, 'DESIGN', $5, '[]'::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now(), $6)`,
+    [id, `B17-${label}`, kind, mode, sha(`profile-${label}`), claim],
   );
   await pw.w.h.publishCapability(id as never, "QUALIFIED_INTERNAL");
   return id;
 }
 
+const CLAIMED_TOOL = "SALESFORCE_DATA_LOADER";
+
 interface Qualification {
   readonly capabilityId: string;
+  /** The tool the qualification actually tested (default: the claimed importer tool). */
+  readonly tool?: string;
   readonly profileHash: string;
   readonly exportBack?: string | null;
   readonly result?: "PASS" | "FAIL";
@@ -46,8 +51,8 @@ async function qualification(label: string, q: Qualification): Promise<string> {
   const evidence = sha(`evidence-${label}`);
   await pw.w.h.oracle.query(
     `INSERT INTO kauro.vendor_qualifications (evidence_hash, capability_id, tool, profile_hash, envelope, export_back_evidence_hash, result)
-     VALUES ($1, $2, 'Data Loader', $3, '{"object":"Contact","operation":"UPSERT"}'::jsonb, $4, $5)`,
-    [evidence, q.capabilityId, q.profileHash, q.exportBack === undefined ? sha(`export-back-${label}`) : q.exportBack, q.result ?? "PASS"],
+     VALUES ($1, $2, $6, $3, '{"object":"Contact","operation":"UPSERT"}'::jsonb, $4, $5)`,
+    [evidence, q.capabilityId, q.profileHash, q.exportBack === undefined ? sha(`export-back-${label}`) : q.exportBack, q.result ?? "PASS", q.tool ?? CLAIMED_TOOL],
   );
   return evidence;
 }
@@ -85,13 +90,33 @@ test("S078: DENY a capability version whose qualification evidence is unknown (Q
   completed<CapabilityVersionView>(await change(id, { expectedVersion: 1, profileHash, qualificationEvidenceRefs: [known] }), 200);
 });
 
-test("S078: DENY a qualification of another tool alone (QUALIFICATION_TOOL_MISMATCH)", async () => {
-  const other = await capability("tool-mismatch-other");
-  await denyAlone("tool-mismatch", (_id, profileHash) => ({ capabilityId: other, profileHash }), "QUALIFICATION_TOOL_MISMATCH");
+test("S078: DENY a REST qualification of a claimed Data Loader alone (QUALIFICATION_TOOL_MISMATCH)", async () => {
+  // R2 S078: "REST was tested but Data Loader compatibility is claimed": every other predicate holds (this capability, its profile, PASS, export-back)
+  await denyAlone("tool-mismatch", (id, profileHash) => ({ capabilityId: id, profileHash, tool: "REST" }), "QUALIFICATION_TOOL_MISMATCH");
+});
+
+test("S078: DENY a capability that claims no importer tool alone (QUALIFICATION_TOOL_MISMATCH): there is nothing for a qualification to match", async () => {
+  const id = await capability("no-claim", "TOOL", null, null);
+  const profileHash = sha("new-profile-no-claim");
+  const before = await state(id);
+  const q = await qualification("no-claim-q", { capabilityId: id, profileHash });
+  assert.equal(outcome(pw.w, await change(id, { expectedVersion: 1, profileHash, qualificationEvidenceRefs: [q] })), "409 PRECONDITION_FAILED QUALIFICATION_TOOL_MISMATCH");
+  assert.deepEqual(await state(id), before);
+});
+
+test("S078: DENY the claimed importer tool changing once learned (0075, 23514)", async () => {
+  const id = await capability("claim-once");
+  await assert.rejects(pw.w.h.oracle.query("UPDATE kauro.capabilities SET importer_tool = 'REST' WHERE capability_id = $1", [id]), (e: { code?: string }) => e.code === "23514");
 });
 
 test("S078: DENY profile mismatch alone (QUALIFICATION_PROFILE_MISMATCH)", async () => {
   await denyAlone("profile-mismatch", (id) => ({ capabilityId: id, profileHash: sha("a-different-profile") }), "QUALIFICATION_PROFILE_MISMATCH");
+});
+
+test("S078: DENY a qualification made for another capability alone (QUALIFICATION_PROFILE_MISMATCH)", async () => {
+  // same tool tested, same profile hash, PASS, export-back: only the capability the acceptance was made for differs
+  const other = await capability("capability-mismatch-other");
+  await denyAlone("capability-mismatch", (_id, profileHash) => ({ capabilityId: other, profileHash }), "QUALIFICATION_PROFILE_MISMATCH");
 });
 
 test("S078: DENY an export-back-less qualification alone (QUALIFICATION_EXPORT_BACK_MISSING)", async () => {

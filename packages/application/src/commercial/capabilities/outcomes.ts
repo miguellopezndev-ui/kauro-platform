@@ -16,8 +16,8 @@ export const CHANGE_CAPABILITY_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.
   outcome("COMMAND", "PRECONDITION_FAILED", "CAPABILITY_PROFILE_UNCHANGED", "the profile hash is one the capability or one of its versions already holds"),
   // S078: the qualification predicates, one reason each (a CLEAN mode capability is outside them)
   outcome("COMMAND", "PRECONDITION_FAILED", "QUALIFICATION_EVIDENCE_UNKNOWN", "a cited qualification evidence hash is not a recorded vendor qualification"),
-  outcome("COMMAND", "PRECONDITION_FAILED", "QUALIFICATION_TOOL_MISMATCH", "a cited qualification was recorded for another tool"),
-  outcome("COMMAND", "PRECONDITION_FAILED", "QUALIFICATION_PROFILE_MISMATCH", "a cited qualification covers another profile than the version's profile hash"),
+  outcome("COMMAND", "PRECONDITION_FAILED", "QUALIFICATION_TOOL_MISMATCH", "a cited qualification tested another tool than the importer tool the capability claims"),
+  outcome("COMMAND", "PRECONDITION_FAILED", "QUALIFICATION_PROFILE_MISMATCH", "a cited qualification covers another capability or another profile than the version's profile hash"),
   outcome("COMMAND", "PRECONDITION_FAILED", "QUALIFICATION_FAILED", "a cited qualification did not pass"),
   outcome("COMMAND", "PRECONDITION_FAILED", "QUALIFICATION_EXPORT_BACK_MISSING", "a cited qualification has no export-back evidence"),
 ]);

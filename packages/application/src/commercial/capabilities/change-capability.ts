@@ -64,8 +64,11 @@ export function changeCapabilityHandler(runtime: CommerceRequestRuntime, co: Cap
             const cited = evidenceHashes.map((h) => found.get(h));
             if (cited.some((q) => q === undefined)) refuse("QUALIFICATION_EVIDENCE_UNKNOWN", "a cited qualification evidence hash is not a recorded vendor qualification");
             const rows = cited.flatMap((q) => (q === undefined ? [] : [q]));
-            if (rows.some((q) => q.capabilityId !== capabilityId)) refuse("QUALIFICATION_TOOL_MISMATCH", "a cited qualification was recorded for another tool");
-            if (rows.some((q) => q.profileHash !== profileHash)) refuse("QUALIFICATION_PROFILE_MISMATCH", "a cited qualification covers another profile");
+            // S078 "REST was tested but Data Loader compatibility is claimed": the tool tested equals the importer tool the capability claims
+            // (a capability claiming none has nothing to match)
+            if (rows.some((q) => capability.importerTool === null || q.tool !== capability.importerTool)) refuse("QUALIFICATION_TOOL_MISMATCH", "a cited qualification tested another tool than the importer tool the capability claims");
+            // the profile the version names, on the capability the acceptance was made for (a qualification of another capability covers another profile)
+            if (rows.some((q) => q.capabilityId !== capabilityId || q.profileHash !== profileHash)) refuse("QUALIFICATION_PROFILE_MISMATCH", "a cited qualification covers another capability or profile");
             if (rows.some((q) => q.result !== "PASS")) refuse("QUALIFICATION_FAILED", "a cited qualification did not pass");
             if (rows.some((q) => q.exportBackEvidenceHash === null)) refuse("QUALIFICATION_EXPORT_BACK_MISSING", "a cited qualification has no export-back evidence");
           }

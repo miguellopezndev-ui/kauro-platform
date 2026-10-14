@@ -33,10 +33,12 @@ interface CapabilityRow {
   profile_hash: string;
   kind: CapabilityGovernanceRecord["kind"];
   mode: CapabilityGovernanceRecord["mode"];
+  importer_tool: string | null;
 }
 interface QualificationRow {
   evidence_hash: string;
   capability_id: string;
+  tool: string;
   profile_hash: string;
   export_back_evidence_hash: string | null;
   result: "PASS" | "FAIL";
@@ -61,9 +63,9 @@ export class PgCapabilityGovernanceRepository implements CapabilityGovernanceRep
   constructor(private readonly db: Queryable) {}
 
   async lockCapability(capabilityId: CapabilityId): Promise<CapabilityGovernanceRecord | null> {
-    const r = await execute<CapabilityRow>(this.db, "SELECT capability_id, revision, state, profile_hash, kind, mode FROM kauro.capabilities WHERE capability_id = $1 FOR NO KEY UPDATE", [capabilityId]);
+    const r = await execute<CapabilityRow>(this.db, "SELECT capability_id, revision, state, profile_hash, kind, mode, importer_tool FROM kauro.capabilities WHERE capability_id = $1 FOR NO KEY UPDATE", [capabilityId]);
     const row = r.rows[0];
-    return row ? { capabilityId: row.capability_id as CapabilityId, revision: Number(row.revision), state: row.state, profileHash: row.profile_hash as Sha256Hex, kind: row.kind, mode: row.mode } : null;
+    return row ? { capabilityId: row.capability_id as CapabilityId, revision: Number(row.revision), state: row.state, profileHash: row.profile_hash as Sha256Hex, kind: row.kind, mode: row.mode, importerTool: row.importer_tool } : null;
   }
 
   /** The vendor_qualifications rows (insert-only, immutable: no lock) carrying these evidence hashes; the owner session reads them (0073 policy). */
@@ -71,12 +73,13 @@ export class PgCapabilityGovernanceRepository implements CapabilityGovernanceRep
     if (evidenceHashes.length === 0) return [];
     const r = await execute<QualificationRow>(
       this.db,
-      "SELECT evidence_hash, capability_id, profile_hash, export_back_evidence_hash, result FROM kauro.vendor_qualifications WHERE evidence_hash = ANY($1::text[])",
+      "SELECT evidence_hash, capability_id, tool, profile_hash, export_back_evidence_hash, result FROM kauro.vendor_qualifications WHERE evidence_hash = ANY($1::text[])",
       [evidenceHashes],
     );
     return r.rows.map((row) => ({
       evidenceHash: row.evidence_hash as Sha256Hex,
       capabilityId: row.capability_id as CapabilityId,
+      tool: row.tool,
       profileHash: row.profile_hash as Sha256Hex,
       exportBackEvidenceHash: row.export_back_evidence_hash as Sha256Hex | null,
       result: row.result,

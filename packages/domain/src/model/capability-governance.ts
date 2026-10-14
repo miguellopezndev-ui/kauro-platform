@@ -44,6 +44,8 @@ export interface CapabilityGovernanceRecord {
   /** The capability kind and (MODE only) its mode: the scope of the S078 qualification predicates. */
   readonly kind: "MODE" | "OBJECT" | "OPERATION" | "TOOL" | "ENVELOPE";
   readonly mode: "CLEAN" | "HUBSPOT" | "SALESFORCE" | null;
+  /** The importer tool the capability claims (0075; an importer-profile catalogue tool id), null when it claims none. */
+  readonly importerTool: string | null;
 }
 
 /**
@@ -59,6 +61,8 @@ export interface VendorQualificationRecord {
   readonly evidenceHash: Sha256Hex;
   /** The capability (the tool) the acceptance was made for. */
   readonly capabilityId: CapabilityId;
+  /** The tool the qualification actually tested (vendor_qualifications.tool), compared exactly with the capability's claimed importer tool. */
+  readonly tool: string;
   readonly profileHash: Sha256Hex;
   readonly exportBackEvidenceHash: Sha256Hex | null;
   readonly result: "PASS" | "FAIL";

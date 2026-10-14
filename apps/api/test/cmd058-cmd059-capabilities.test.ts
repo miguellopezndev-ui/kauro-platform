@@ -32,8 +32,8 @@ async function capability(label: string, state: PathState = "QUALIFIED_INTERNAL"
   const { w } = pw;
   const id = ids.next();
   await w.h.oracle.query(
-    `INSERT INTO kauro.capabilities (capability_id, version, kind, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at)
-     VALUES ($1, $2, 'TOOL', 'DESIGN', $3, '[]'::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
+    `INSERT INTO kauro.capabilities (capability_id, version, kind, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at, importer_tool)
+     VALUES ($1, $2, 'TOOL', 'DESIGN', $3, '[]'::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now(), 'SALESFORCE_DATA_LOADER')`,
     [id, `B18-${label}`, sha(`profile-${label}`)],
   );
   if (state !== "DESIGN") await w.h.publishCapability(id as never, state);
@@ -60,7 +60,7 @@ async function qualify(capabilityId: string, body: Record<string, unknown>): Pro
     if (typeof ref !== "string") continue;
     await pw.w.h.oracle.query(
       `INSERT INTO kauro.vendor_qualifications (evidence_hash, capability_id, tool, profile_hash, envelope, export_back_evidence_hash, result)
-       SELECT $1, capability_id, 'Data Loader', $3, '{"object":"Contact","operation":"UPSERT"}'::jsonb, $4, 'PASS' FROM kauro.capabilities WHERE capability_id = $2 AND kind = 'TOOL'
+       SELECT $1, capability_id, 'SALESFORCE_DATA_LOADER', $3, '{"object":"Contact","operation":"UPSERT"}'::jsonb, $4, 'PASS' FROM kauro.capabilities WHERE capability_id = $2 AND kind = 'TOOL'
        ON CONFLICT (evidence_hash) DO NOTHING`,
       [ref, capabilityId, profileHash, sha(`export-back-${ref}`)],
     );
