@@ -1396,7 +1396,7 @@ function operationalRoots(routes: ReadonlyArray<OperationalRoute>): Record<Opera
       // a reply without a body (204) declares neither a media type nor a schema; any other declares both
       if ((response.schema === null) !== (response.contentType === null)) refuse(`operational route ${route.operationId} ${status} declares a body schema without a media type, or the reverse`);
       if (response.schema === null) {
-        if (status !== "204") refuse(`operational route ${route.operationId} declares ${status} without a body; only 204 has none`);
+        if (status !== "204" && status !== "303") refuse(`operational route ${route.operationId} declares ${status} without a body; only 204 and the opt-out 303 have none`);
         continue;
       }
       const id = operationalResponseSchemaId(route.operationId, status);
