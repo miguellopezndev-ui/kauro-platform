@@ -207,7 +207,7 @@ test("Home: the job line, one call to action, the sample and pricing beside it, 
   assert.match(text, /The free data health check creates no obligation to buy\./);
   assert.ok(text.indexOf("View the synthetic sample") > 0 && hrefsOf(html).includes(ROUTE.sample) && hrefsOf(html).includes(ROUTE.pricing));
   const ai = text.indexOf(PERMITTED_AI_SENTENCE);
-  assert.ok(ai > text.indexOf("What your agency receives") && ai > text.indexOf("What Kauro does not do"), "the AI sentence comes after the offer and the limits");
+  assert.ok(ai > text.indexOf("What your team receives") && ai > text.indexOf("What Kauro does not do"), "the AI sentence comes after the offer and the limits");
   assert.ok(text.indexOf(HEALTH_CHECK_CTA) < ai, "the call to action comes before it");
   assert.equal(headings(html).some((heading) => /\bAI\b/.test(heading.text)), false, "no AI in a headline");
   for (const claim of ["never connects to or changes a live CRM", "does not connect to, change or delete records in a live CRM", "prepared for import, and never as imported"]) assert.ok(text.includes(claim), claim);
@@ -233,7 +233,7 @@ test("How it works: six steps in an ordered list, the check bounded and free, ap
   const text = textOf(html);
   assert.equal(count(html, "<ol"), 1);
   assert.equal((/<ol[\s\S]*?<\/ol>/.exec(html)?.[0].match(/<li[\s>]/g) ?? []).length, 6);
-  assert.deepEqual(headings(html).filter((heading) => heading.level === 3).map((heading) => heading.text), ["Upload your source files", "Get the free data health check", "Your agency decides", "Review the quote and pay", "Kauro prepares the delivery", "Your team imports"]);
+  assert.deepEqual(headings(html).filter((heading) => heading.level === 3).map((heading) => heading.text), ["Upload your source files", "Get the free data health check", "You decide", "Review the quote and pay", "Kauro prepares the delivery", "Your team imports"]);
   for (const claim of ["free and creates no obligation to buy", "is bounded", "A duplicate candidate is never treated as a confirmed duplicate", "cannot approve anything", "The server prices the project", "confirmed by the payment provider", "Kauro does not write to your CRM at any step"]) assert.ok(text.includes(claim), claim);
   assert.doesNotMatch(text, /\b(minutes|hours)\b/i, "the check names no duration");
   assert.ok(hrefsOf(html).includes(ROUTE.services));
@@ -323,7 +323,7 @@ test("Pricing: every price is an indicative band until the server quotes, tax is
     "From USD 695 for up to 50,000 billable source units.",
     "From USD 1,295 for up to 50,000 billable source units.",
     "From USD 1,495 for up to 50,000 billable source units.",
-    "5%, 10% and 15% off a new quote for an agency that has bought before.",
+    "5%, 10% and 15% off a new quote for a customer that has bought before.",
     "The unit is a billable source unit",
     "counted before any duplicates are unified",
     "Splitting a file into several files does not lower the count",
@@ -405,7 +405,7 @@ test("Data handling: what is processed, isolation, what a model sees, who decide
   const text = textOf(html);
   assert.deepEqual(headings(html).filter((heading) => heading.level === 2).map((heading) => heading.text), [
     "What Kauro processes",
-    "How agencies are kept apart",
+    "How customers are kept apart",
     "What a model may see",
     "Who decides",
     "How long each kind of data stays",
@@ -425,7 +425,7 @@ test("Data handling: what is processed, isolation, what a model sees, who decide
     "A defect in Kauro's work can be reported for 30 days after the package is prepared, and Kauro aims to repair a verified material defect within 5 business days.",
     "a claim made after they are removed may need the exact source files to be uploaded again",
     "Do not upload credentials or secrets, full payment card data, or health data.",
-    "A request for another agency's project is answered exactly like a request for a project that does not exist.",
+    "A request for another customer's project is answered exactly like a request for a project that does not exist.",
     "it receives only a limited context that Kauro selects, never your files as a whole. It cannot approve a change and it cannot write to your CRM.",
     "A copy you downloaded stays with you",
     "has not been through an independent security certification and does not claim one",
@@ -497,7 +497,7 @@ test("Help: an index of seven static guides that link to their sections, each wi
   const targets = hrefsOf(index);
   assert.deepEqual(targets, ["#guide-files", "#guide-target", "#guide-approval", "#guide-payment", "#guide-stages", "#guide-retention", "#guide-support"]);
   assert.deepEqual(headings(html).filter((heading) => heading.level === 2).map((heading) => heading.text), ["Prepare your files", "Confirm your target settings", "Approve the plan", "Pay for a project", "Import in stages and return receipts", "How long files stay", "Ask for help"]);
-  assert.match(text, /Guide version 1\.0, last changed 2026-09-29/);
+  assert.match(text, /Guide version 1\.1, last changed 2026-10-13/);
   for (const claim of ["up to 50 files, up to 2 GB for each file, up to 800 columns in a table", "180 days after the last confirmation", "The quote stays valid for 14 days", "Pressing Enter never approves anything", "An arbitrary file marked as a success is not proof", "Never email a CRM export or a password"]) assert.ok(text.includes(claim), claim);
   assert.ok(hrefsOf(html).includes(ROUTE.contact));
   assert.doesNotMatch(html, /<form|<input|<button|type="search"/, "search is not offered yet");
