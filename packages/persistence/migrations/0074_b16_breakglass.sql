@@ -26,13 +26,30 @@ CREATE OR REPLACE FUNCTION kauro.breakglass_scope_grant() RETURNS uuid
   LANGUAGE sql STABLE SECURITY INVOKER SET search_path = pg_catalog AS
 $$ SELECT NULLIF(current_setting('kauro.breakglass_grant_id', true), '')::uuid $$;
 
+-- No breakglass policy names another relation: a relation named in a policy expression is locked when any query on the policy's table is
+-- planned, by every session, so a tenant's agency read would wait on a lock of kauro.projects (FLAKY-UOW-TXLIMIT, batch B). The lookups
+-- sit in PL/pgSQL functions instead, which plan their statement at its first execution, after the early return a session outside a
+-- corporate owner's breakglass scope takes: such a session never touches the other relation.
+CREATE OR REPLACE FUNCTION kauro.breakglass_scope_agency() RETURNS uuid
+  LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = pg_catalog AS
+$$
+DECLARE
+  scope uuid := kauro.breakglass_scope_project();
+  agency uuid;
+BEGIN
+  IF scope IS NULL OR NOT kauro.acting_corporate_owner() THEN
+    RETURN NULL;
+  END IF;
+  SELECT p.agency_id INTO agency FROM kauro.projects p WHERE p.project_id = scope;
+  RETURN agency;
+END
+$$;
+
 -- The facts a breakglass scope is judged on, visible to the corporate owner only for the project the session names.
 CREATE POLICY projects_breakglass_scope ON kauro.projects FOR SELECT TO kauro_app
   USING (kauro.acting_corporate_owner() AND project_id = kauro.breakglass_scope_project());
 CREATE POLICY agencies_breakglass_scope ON kauro.agencies FOR SELECT TO kauro_app
-  USING (kauro.acting_corporate_owner() AND EXISTS (
-    SELECT 1 FROM kauro.projects p WHERE p.agency_id = agencies.agency_id AND p.project_id = kauro.breakglass_scope_project()
-  ));
+  USING (kauro.acting_corporate_owner() AND agency_id = kauro.breakglass_scope_agency());
 CREATE POLICY support_cases_breakglass_scope ON kauro.support_cases FOR SELECT TO kauro_app
   USING (kauro.acting_corporate_owner() AND project_id = kauro.breakglass_scope_project());
 
@@ -159,21 +176,50 @@ $$
   )
 $$;
 
+-- Whether the corporate owner's session sees the parent row of a source table, column or object under its own policies (the visible
+-- source file, or table); false at once for any other session, before the parent relation is touched (see breakglass_scope_agency).
+CREATE OR REPLACE FUNCTION kauro.breakglass_file_visible(p_file uuid, p_agency uuid) RETURNS boolean
+  LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NOT kauro.acting_corporate_owner() THEN
+    RETURN false;
+  END IF;
+  RETURN EXISTS (SELECT 1 FROM kauro.source_files f WHERE f.file_id = p_file AND f.agency_id = p_agency);
+END
+$$;
+
+CREATE OR REPLACE FUNCTION kauro.breakglass_table_visible(p_table uuid, p_agency uuid) RETURNS boolean
+  LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NOT kauro.acting_corporate_owner() THEN
+    RETURN false;
+  END IF;
+  RETURN EXISTS (SELECT 1 FROM kauro.source_tables t WHERE t.table_id = p_table AND t.agency_id = p_agency);
+END
+$$;
+
+CREATE OR REPLACE FUNCTION kauro.breakglass_object_visible(p_object uuid, p_agency uuid) RETURNS boolean
+  LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NOT kauro.acting_corporate_owner() THEN
+    RETURN false;
+  END IF;
+  RETURN EXISTS (SELECT 1 FROM kauro.source_files f WHERE f.accepted_object_id = p_object AND f.agency_id = p_agency);
+END
+$$;
+
 -- The rows a breakglass preview reads, and only those: the admitted file, its tables and columns, and its accepted object.
 CREATE POLICY source_files_breakglass_read ON kauro.source_files FOR SELECT TO kauro_app
   USING (state = 'ADMITTED' AND kauro.breakglass_covers(agency_id, project_id));
 CREATE POLICY source_tables_breakglass_read ON kauro.source_tables FOR SELECT TO kauro_app
-  USING (kauro.acting_corporate_owner() AND EXISTS (
-    SELECT 1 FROM kauro.source_files f WHERE f.file_id = source_tables.file_id AND f.agency_id = source_tables.agency_id
-  ));
+  USING (kauro.acting_corporate_owner() AND kauro.breakglass_file_visible(file_id, agency_id));
 CREATE POLICY source_table_columns_breakglass_read ON kauro.source_table_columns FOR SELECT TO kauro_app
-  USING (kauro.acting_corporate_owner() AND EXISTS (
-    SELECT 1 FROM kauro.source_tables t WHERE t.table_id = source_table_columns.table_id AND t.agency_id = source_table_columns.agency_id
-  ));
+  USING (kauro.acting_corporate_owner() AND kauro.breakglass_table_visible(table_id, agency_id));
 CREATE POLICY stored_objects_breakglass_read ON kauro.stored_objects FOR SELECT TO kauro_app
-  USING (kauro.acting_corporate_owner() AND EXISTS (
-    SELECT 1 FROM kauro.source_files f WHERE f.accepted_object_id = stored_objects.object_id AND f.agency_id = stored_objects.agency_id
-  ));
+  USING (kauro.acting_corporate_owner() AND kauro.breakglass_object_visible(object_id, agency_id));
 
 CREATE TABLE kauro.breakglass_accesses (
   access_id            uuid PRIMARY KEY CHECK (kauro.is_uuid_v7(access_id)),
