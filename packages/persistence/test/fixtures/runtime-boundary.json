@@ -503,6 +503,13 @@
           "updated_at"
         ]
       },
+      "kauro.retention_records": {
+        "UPDATE": [
+          "effective_deadline",
+          "soft_deadline",
+          "version"
+        ]
+      },
       "kauro.sales_accounts": {
         "UPDATE": [
           "current_assignment_id",
@@ -5214,6 +5221,30 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
+    "retention_extensions/retention_extensions_control_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_control"
+      ],
+      "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))"
+    },
+    "retention_extensions/retention_extensions_tenant_insert": {
+      "check": "((agency_id = kauro.current_agency_id()) AND (requested_by_user_id = kauro.current_user_id()) AND (created_at = kauro.server_now()) AND (EXISTS ( SELECT 1\n   FROM kauro.retention_records r\n  WHERE ((r.agency_id = retention_extensions.agency_id) AND (r.retention_id = retention_extensions.retention_id) AND (r.project_id = retention_extensions.project_id) AND (r.class = ANY (ARRAY['PAID_ORDINARY'::text, 'PAID_STAGED'::text])) AND (r.state = 'ACTIVE'::text) AND (r.soft_deadline = retention_extensions.previous_soft_deadline) AND (r.hard_deadline = retention_extensions.hard_deadline)))))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null
+    },
+    "retention_extensions/retention_extensions_tenant_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
+    },
     "retention_records/retention_records_control_expire": {
       "check": "((agency_id = kauro.current_agency_id()) AND (state = 'EXPIRED'::text))",
       "command": "UPDATE",
@@ -5251,6 +5282,14 @@
       "command": "SELECT",
       "roles": [
         "kauro_payment"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "retention_records/retention_records_tenant_extend": {
+      "check": "((agency_id = kauro.current_agency_id()) AND (class = ANY (ARRAY['PAID_ORDINARY'::text, 'PAID_STAGED'::text])) AND (state = 'ACTIVE'::text))",
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
@@ -6690,6 +6729,10 @@
         "INSERT",
         "SELECT"
       ],
+      "kauro.retention_extensions": [
+        "INSERT",
+        "SELECT"
+      ],
       "kauro.retention_records": [
         "INSERT",
         "SELECT"
@@ -7210,6 +7253,9 @@
       ],
       "kauro.retention_anchors": [
         "INSERT",
+        "SELECT"
+      ],
+      "kauro.retention_extensions": [
         "SELECT"
       ],
       "kauro.retention_records": [

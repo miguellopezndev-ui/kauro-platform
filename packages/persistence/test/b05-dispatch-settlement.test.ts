@@ -1318,7 +1318,7 @@ test("L21 DENY commit order (sabotage): request_journal carries exactly two defe
     assert.ok(live.includes(`CONSTRAINT = '${name}'`), `${name} raised by the live schema`);
     assert.equal(sqlstateSource.split(`  ${name}: {`).length - 1, 1, `${name} mapped once in sqlstate.ts`);
   }
-  // ADR-B05-IJR-1's claimed names (0069): each index or constraint declared once, each prefix raised by its one function only
+  // ADR-B05-IJR-1's claimed names (0070): each index or constraint declared once, each prefix raised by its one function only
   const relations = (await env.h.oracle.query("SELECT relname FROM pg_class WHERE relnamespace = 'kauro'::regnamespace UNION ALL SELECT conname FROM pg_constraint WHERE connamespace = 'kauro'::regnamespace")).rows.map((r) => r.relname as string);
   for (const name of ["request_journal_one_attempt_per_fence", "request_journal_one_live_core_attempt", "model_tasks_one_per_core_request"]) {
     assert.ok(relations.filter((n) => n === name).length >= 1, `${name} declared`);
@@ -1408,7 +1408,7 @@ test("L22 OK migration on a live pool: 00NN applied by the migration runner as t
           { relname: "pool_liability_gates", forced: true },
         ],
       );
-      // the migrations after 00NN applied in turn (the product admission writes their columns, 0069's model_tasks.core_run_id), then
+      // the migrations after 00NN applied in turn (the product admission writes their columns, 0070's model_tasks.core_run_id), then
       // the pool's next admission and DISPATCHING edge commit
       const laterMigrations = all.filter((m) => m.version > target.version);
       for (const m of laterMigrations) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
@@ -1616,7 +1616,7 @@ test("S19b DENY pool clause alone (forged, rule 12): in the temporary cluster th
   }
 });
 
-// --- ADR-B05-IJR-1 (lane IJR; migration 0069 provisional): one IC request key is one model task, each IC invocation one request row ---
+// --- ADR-B05-IJR-1 (lane IJR; migration 0070 provisional): one IC request key is one model task, each IC invocation one request row ---
 
 /** The server's message of a refusal, through the product's translation (its cause). */
 function pgMessage(e: unknown): string {

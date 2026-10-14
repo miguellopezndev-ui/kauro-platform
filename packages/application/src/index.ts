@@ -13,7 +13,7 @@ export type { CommandEnvelope, CommandResult, AuthenticatedSubject, CompletedRes
 export type { CredentialHold, RequestAuthority } from "./api/authority.js";
 export { credentialEnded, judgedUnderHold } from "./api/authority.js";
 export { HEADERS, PRIVATE_CACHE_POLICY, REQUEST_LIMITS, SINGLE_VALUED_HEADERS, isSuccess } from "./api/envelope.js";
-export type { AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView, ReadinessBlocker, AgencyMembershipView, TeamMemberView, SupportCaseView, InviteMemberView, AcceptInvitationView, TransferOwnershipView, Page } from "./api/views.js";
+export type { AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView, ReadinessBlocker, AgencyMembershipView, TeamMemberView, SupportCaseView, RetentionExtensionView, InviteMemberView, AcceptInvitationView, TransferOwnershipView, Page } from "./api/views.js";
 export { READINESS_BLOCKERS } from "./api/views.js";
 export type { ReadinessFacts } from "./api/projections.js";
 export { agencyView, membershipView, endClientView, projectView, planView, approvalView, readinessBlockersOf, agencyMembershipView, teamMemberView, supportCaseView } from "./api/projections.js";
@@ -148,7 +148,8 @@ export type {
   TeamCommandId,
 } from "./commands/contracts.js";
 export { INVITE_MEMBER, ACCEPT_INVITATION, CHANGE_MEMBERSHIP, REVOKE_MEMBERSHIP, TRANSFER_OWNERSHIP, TEAM_COMMANDS } from "./commands/contracts.js";
-export { CREATE_AGENCY, CREATE_CLIENT, ARCHIVE_CLIENT, CREATE_PROJECT, REVISE_PLAN, APPROVE_PLAN, WITHDRAW_APPROVAL, B06_COMMANDS, CREATE_SUPPORT_CASE, SUPPORT_COMMANDS } from "./commands/contracts.js";
+export { CREATE_AGENCY, CREATE_CLIENT, ARCHIVE_CLIENT, CREATE_PROJECT, REVISE_PLAN, APPROVE_PLAN, WITHDRAW_APPROVAL, B06_COMMANDS, CREATE_SUPPORT_CASE, SUPPORT_COMMANDS, REQUEST_RETENTION_EXTENSION, RETENTION_COMMANDS } from "./commands/contracts.js";
+export type { RequestRetentionExtensionBody, RequestRetentionExtensionHandler, RetentionCommandId } from "./commands/contracts.js";
 export type { CommandRuntime, CommandContext, CommandOutcome, AcceptedOutcome, UnitOfWorkRunner, VersionOfView, UnauthenticatedRequest, IdentityFact } from "./commands/runtime.js";
 export { runCommand, runCommandIn, settleCommandFailure, contextOf, identityOf, refuseUnauthenticated, refuseAnonymously, recordDenialFact, recordIdentityFact, ALLOW_REASONS } from "./commands/runtime.js";
 export type { PresentedCredential } from "./sessions/protocol.js";

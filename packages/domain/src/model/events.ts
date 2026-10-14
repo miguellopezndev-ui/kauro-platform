@@ -86,6 +86,8 @@ export const EVENT_TYPES = [
   // retention records (platform machine RetentionRecord, decision D-RET-2)
   "retention_record.created.v1",
   "retention_record.expired.v1",
+  // the one explicit soft-deadline extension of a project (B16 CMD060; migration 0069, provisional)
+  "retention_record.extended.v1",
   // admitted source files (platform machine SourceFile, decision D-FILE-1; an aggregate since B07-F9): the admission recorded by
   // UPLOAD_INSPECTION and its revocation, which the execution consumer and the agency must learn of
   "source_file.admitted.v1",
@@ -179,6 +181,7 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "project.current_revision_changed.v1": ["projectId", "agencyId", "currentRevisionId", "previousRevisionId", "changedByMembershipId"],
   "retention_record.created.v1": ["retentionId", "agencyId", "projectId", "revisionId", "retentionClass", "anchorEvidenceHash", "policyVersion"],
   "retention_record.expired.v1": ["retentionId", "agencyId", "projectId", "revisionId", "retentionClass"],
+  "retention_record.extended.v1": ["retentionId", "agencyId", "projectId", "revisionId", "extensionId", "retentionClass", "requestedSeconds", "grantedSeconds", "cappedAtHardDeadline"],
   "source_file.admitted.v1": ["fileId", "agencyId", "projectId", "originRevisionId", "originUploadId", "inspectionReceiptHash", "bytes", "format"],
   // the revisions whose selection or seal names the file travel as ids so EXECUTION_CONTROL (B08) can revoke stale authority
   "source_file.admission_revoked.v1": ["fileId", "agencyId", "projectId", "revocationReason", "selectedByRevisionIds", "sealedByRevisionIds"],
@@ -252,6 +255,9 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   { eventType: "dataset_revision.expired.v1", consumer: "EXECUTION_CONTROL" },
   { eventType: "dataset_revision.expired.v1", consumer: "AUTHORITY_JOURNAL" },
   { eventType: "dataset_revision.deleted.v1", consumer: "AUTHORITY_JOURNAL" },
+  // the one contractual extension of a soft deadline is a durable fact outside the restore boundary (14; B16 CMD060, GAP-RET-10): a
+  // restored database never forgets it was used, so a second one cannot be granted
+  { eventType: "retention_record.extended.v1", consumer: "AUTHORITY_JOURNAL" },
   ...COMMERCE_EVENT_SUBSCRIPTIONS,
   // processing authority (package B08 §11): admission, launch and verification to JOB_EXECUTION, a cancellation to EXECUTION_CONTROL,
   // every terminal outcome and a package's availability to the agency

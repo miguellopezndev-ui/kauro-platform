@@ -4,7 +4,7 @@
  * docs/design/B06-domain-db-authz.md §7; handlers implementing these contracts belong to the B06 implementation mandate.
  */
 import type { ServiceMode, SupportCategory } from "@kauro/domain";
-import type { AcceptInvitationView, AgencyView, ApprovalView, EndClientView, InviteMemberView, MembershipView, PlanView, ProjectView, SupportCaseView, TransferOwnershipView } from "../api/views.js";
+import type { AcceptInvitationView, AgencyView, ApprovalView, EndClientView, InviteMemberView, MembershipView, PlanView, ProjectView, RetentionExtensionView, SupportCaseView, TransferOwnershipView } from "../api/views.js";
 import type { CommandHandler, CommandSpec } from "../ports/command-handler.js";
 import type { ActiveWorkSummary, CompletedExternalAction } from "../ports/work-inspectors.js";
 
@@ -216,6 +216,37 @@ export const SUPPORT_COMMANDS = Object.freeze({
   CMD044: CREATE_SUPPORT_CASE,
 } as const);
 export type SupportCommandId = keyof typeof SUPPORT_COMMANDS;
+
+// --- CMD060 RequestRetentionExtension (B16 lane L2; docs/design/B16-L2-failure-matrix.md) -----------------------------------
+
+export interface RequestRetentionExtensionBody {
+  readonly expectedVersion: number;
+  /** 1..259200 (registry: at most 259200 seconds within the original hard cap). */
+  readonly requestedSeconds: number;
+  readonly purpose: string;
+  /** The terms version the requester accepts; it must be the version the agency accepted. */
+  readonly termsVersion: string;
+}
+export const REQUEST_RETENTION_EXTENSION: CommandSpec<RequestRetentionExtensionBody> = spec<RequestRetentionExtensionBody>({
+  id: "CMD060",
+  name: "RequestRetentionExtension",
+  method: "POST",
+  path: "/api/v1/projects/{projectId}/retention-extensions",
+  role: "AGENCY_OWNER_OR_ADMIN",
+  scope: "AGENCY_HEADER",
+  aggregateParam: "projectId",
+  expectedVersionRequired: true,
+  stepUpRequired: false,
+  authorityHashFields: [],
+  fields: ["expectedVersion", "requestedSeconds", "purpose", "termsVersion"],
+});
+export type RequestRetentionExtensionHandler = CommandHandler<RequestRetentionExtensionBody, RetentionExtensionView>;
+
+/** The retention package's commands (B16): served beside the others, which stay closed sets. */
+export const RETENTION_COMMANDS = Object.freeze({
+  CMD060: REQUEST_RETENTION_EXTENSION,
+} as const);
+export type RetentionCommandId = keyof typeof RETENTION_COMMANDS;
 
 // --- the team commands of package B16 (G-TENANT): CMD003..CMD007 ------------------------------------------------------------
 // Behaviour: docs/design/B16-team-commands.md (decisions D-TEAM-n and the failure matrix); domain rules are

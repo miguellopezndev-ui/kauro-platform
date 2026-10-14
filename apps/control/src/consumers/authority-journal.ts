@@ -24,6 +24,7 @@ import {
   type AgencyId,
   type CausationId,
   type DomainEventRecord,
+  type RetentionId,
   type RevisionId,
   type SourceFileId,
   type SourceUnitOfWork,
@@ -39,7 +40,7 @@ export interface AuthorityJournalDependencies {
 }
 
 /** The aggregate each routed event's subject is (the tombstone's subject is the event's aggregate). */
-const SUBJECT_KIND: Readonly<Record<keyof typeof AUTHORITY_TOMBSTONES, "upload_session" | "dataset_revision" | "source_file">> = Object.freeze({
+const SUBJECT_KIND: Readonly<Record<keyof typeof AUTHORITY_TOMBSTONES, "upload_session" | "dataset_revision" | "source_file" | "retention_record">> = Object.freeze({
   "upload_session.cancelled.v1": "upload_session",
   "upload_session.expired.v1": "upload_session",
   "upload_session.rejected.v1": "upload_session",
@@ -49,6 +50,7 @@ const SUBJECT_KIND: Readonly<Record<keyof typeof AUTHORITY_TOMBSTONES, "upload_s
   "dataset_revision.expired.v1": "dataset_revision",
   "dataset_revision.deleted.v1": "dataset_revision",
   "source_file.admission_revoked.v1": "source_file",
+  "retention_record.extended.v1": "retention_record",
 });
 
 /** What the subject is now: its current state, the revision its authority belonged to and the instant of its terminal transition. */
@@ -119,6 +121,15 @@ export class AuthorityJournal implements OutboxConsumer {
         const file = await uow.sources.files.get(event.aggregateId as SourceFileId);
         if (file === null) return null;
         return { state: file.state, revisionId: file.originRevisionId, terminalAt: file.revokedAt };
+      }
+      case "retention_record": {
+        // B16 CMD060: the fact is the project's one extension row (no later transition removes it); the record itself may have
+        // expired since, so its own state is not the tombstone's state
+        const record = await uow.sources.retention.recordById(event.aggregateId as RetentionId);
+        if (record === null || record.revisionId === undefined) return null;
+        const extension = await uow.sources.retention.extensionOfProject(record.projectId);
+        if (extension === null || extension.retentionId !== record.retentionId) return null;
+        return { state: "EXTENDED", revisionId: record.revisionId, terminalAt: undefined };
       }
       default:
         return null;

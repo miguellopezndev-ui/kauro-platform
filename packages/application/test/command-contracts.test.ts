@@ -10,8 +10,10 @@ import { B06_COMMANDS, REQUEST_SCHEMAS, REQUEST_SCHEMA_IDS, REQUEST_SCHEMA_PREFI
 const IN_SCOPE = ["CMD001", "CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026"] as const;
 /** B16's five team commands (CMD003-CMD007). */
 const TEAM = ["CMD003", "CMD004", "CMD005", "CMD006", "CMD007"] as const;
-/** The B06 commands, CMD044 of the support package (B11 W4) and the B16 team commands, whose request schemas are checked against the catalogue too. */
-const WITH_SUPPORT = [...IN_SCOPE, "CMD044", ...TEAM] as const;
+/** B16 lane L2's retention extension (CMD060). */
+const RETENTION = ["CMD060"] as const;
+/** The B06 commands, CMD044 of the support package (B11 W4) and the B16 team and retention commands, whose request schemas are checked against the catalogue too. */
+const WITH_SUPPORT = [...IN_SCOPE, "CMD044", ...TEAM, ...RETENTION] as const;
 
 test("every in-scope spec matches the catalogue entry: method, path, role, fields in order", () => {
   for (const id of IN_SCOPE) {
@@ -31,7 +33,7 @@ test("every in-scope spec matches the catalogue entry: method, path, role, field
 });
 
 test("request schemas are closed 2020-12 objects whose properties are exactly the catalogue fields, typed by the field vocabulary", () => {
-  const typeOf: Record<string, string> = { label: "string", id: "string", version: "integer", hash: "string", text: "string", listText: "array" };
+  const typeOf: Record<string, string> = { label: "string", id: "string", version: "integer", hash: "string", text: "string", listText: "array", count: "integer" };
   for (const id of WITH_SUPPORT) {
     const catalogue = COMMANDS.find((c) => c.id === id)!;
     const s = REQUEST_SCHEMAS[id];
