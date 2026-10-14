@@ -50,6 +50,7 @@ import { createIdGenerator, toUtcInstant, type Clock, type Environment, type IdG
 import { IsolatedContainerInspector, IsolatedSelectionEvaluator } from "@kauro/data-plane";
 import { createPool, createUnitOfWorkFactory, type DatabaseEnvironment, type KauroPool, type PoolErrorSink } from "@kauro/persistence";
 import { AuthorityJournal } from "./consumers/authority-journal.js";
+import { DeletionExecutor, MANAGED_ZONES } from "./consumers/deletion-executor.js";
 import { SelectionEvaluation } from "./consumers/selection-evaluation.js";
 import { StorageLifecycle } from "./consumers/storage-lifecycle.js";
 import { UploadInspection } from "./consumers/upload-inspection.js";
@@ -110,6 +111,8 @@ export interface ControlConsumers {
   readonly selectionEvaluation: SelectionEvaluation;
   readonly storageLifecycle: StorageLifecycle;
   readonly authorityJournal: AuthorityJournal;
+  /** B16 CMD042: deletes a requested project's managed objects and writes the receipt. */
+  readonly deletionExecutor: DeletionExecutor;
 }
 
 export interface ControlSweepers {
@@ -146,11 +149,13 @@ export function assembleControlPlane(options: ControlPlaneOptions): ControlPlane
   const { units, providers, parsers } = options;
   const retryAfterSeconds = options.retryAfterSeconds ?? 60;
   const dispatcher = new PgOutboxDispatcher({ units, ids, ownerId: options.leaseOwnerId ?? (ids.next() as LeaseOwnerId), ...options.dispatcher });
+  const authorityJournal = new AuthorityJournal({ journal: providers.journal, retryAfterSeconds });
   const consumers: ControlConsumers = {
     uploadInspection: new UploadInspection({ storage: providers.storage, scanner: providers.scanner, inspector: parsers.inspector, scratchRoot: join(options.scratchRoot, "inspection"), retryAfterSeconds }),
     selectionEvaluation: new SelectionEvaluation({ storage: providers.storage, evaluator: parsers.evaluator, retryAfterSeconds }),
     storageLifecycle: new StorageLifecycle({ storage: providers.storage, vault: providers.vault, retryAfterSeconds }),
-    authorityJournal: new AuthorityJournal({ journal: providers.journal, retryAfterSeconds }),
+    authorityJournal,
+    deletionExecutor: new DeletionExecutor({ storage: providers.storage, journal: authorityJournal, execution: () => execution, locationPolicy: new LocationPolicy({ ids, storage: providers.storage, zones: MANAGED_ZONES }), retryAfterSeconds }),
   };
   const sweepers: ControlSweepers = {
     uploadDeadlines: new UploadDeadlines({ ids }),
@@ -194,7 +199,7 @@ export function assembleControlPlane(options: ControlPlaneOptions): ControlPlane
         for (const sweeper of [execution.sweepers.jobDeadlines, execution.sweepers.auditDeadlines, execution.sweepers.attemptMonitor]) sweeps[sweeper.name] = await sweeper.sweep(execution.units, limit);
       }
       const dispatched: Record<string, DispatchCounts> = {};
-      for (const consumer of [consumers.uploadInspection, consumers.selectionEvaluation, consumers.storageLifecycle, consumers.authorityJournal]) dispatched[consumer.consumer] = await drain(consumer, now, Math.min(limit, 100));
+      for (const consumer of [consumers.uploadInspection, consumers.selectionEvaluation, consumers.storageLifecycle, consumers.authorityJournal, consumers.deletionExecutor]) dispatched[consumer.consumer] = await drain(consumer, now, Math.min(limit, 100));
       if (execution !== null) {
         const { jobExecution, executionControl, auditOrchestration, planValidation } = execution.consumers;
         for (const consumer of [jobExecution, executionControl, auditOrchestration, planValidation]) dispatched[consumer.consumer] = await drain(consumer, now, Math.min(limit, 100));

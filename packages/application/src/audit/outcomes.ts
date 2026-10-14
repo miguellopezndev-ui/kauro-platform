@@ -63,6 +63,7 @@ const COMMAND_SPECIFIC: Readonly<Record<AuditCommandId, ReadonlyArray<ProblemOut
   ],
   CMD020: [
     NOT_VISIBLE("the revision"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "PROJECT_DELETION_REQUESTED", "the project's deletion was requested: it starts no audit"),
     outcome("COMMAND", "PRECONDITION_FAILED", "REVISION_NOT_SEALED", "the revision is not SEALED: a draft, a locked or a rejected revision has no immutable manifest to audit; current names its version and state", { current: "ALWAYS" }),
     outcome("COMMAND", "SOURCE_EXPIRED", null, "the sealed revision is no longer available (EXPIRED, DELETED, or its retention deadline was reached, D8-STALE-1)"),
     outcome("COMMAND", "TARGET_STALE", null, "the target contract is not a confirmed, current contract of the revision's project (D8-STALE-1)"),

@@ -69,6 +69,7 @@ const SUBJECT_BLOCKERS: ReadonlyArray<ProblemOutcome> = Object.freeze([
 const COMMAND_SPECIFIC: Readonly<Record<CommerceCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   CMD028: [
     NOT_VISIBLE("the quote"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "PROJECT_DELETION_REQUESTED", "the project's deletion was requested: it takes no payment order"),
     outcome("COMMAND", "STALE_VERSION", "HASH_MISMATCH", "termsHash is not the quote's terms: current.mismatch names it and the UI reloads the terms it displayed", { current: "ALWAYS" }),
     outcome("COMMAND", "PRECONDITION_FAILED", "QUOTE_NOT_ACTIVE", "the quote is not ISSUED or ACCEPTED_FOR_CHECKOUT", { current: "ALWAYS" }),
     outcome("COMMAND", "PRECONDITION_FAILED", "QUOTE_EXPIRED", "the price expired: checkout is blocked and a new quote is required", { current: "ALWAYS" }),

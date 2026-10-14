@@ -23,6 +23,8 @@ const LABEL = { type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PAT
 const VERSION = { type: "integer", minimum: 1, maximum: 9007199254740991 } as const;
 /** requestedSeconds of CMD060: 1..259200 (registry: at most 259200 seconds; 09: seventy-two hours). */
 const EXTENSION_SECONDS = { type: "integer", minimum: 1, maximum: 259200 } as const;
+/** reasonCode of CMD042: the contract's four triggers and the customer's end-of-service choice (A-15). */
+const DELETION_REASON = { type: "string", enum: ["RETENTION", "AGENCY_REQUEST", "ACCOUNT_CLOSURE", "INCIDENT", "END_OF_SERVICE"] } as const;
 const HASH = { type: "string", pattern: "^[0-9a-f]{64}$" } as const;
 const MODE = { type: "string", enum: ["CLEAN", "HUBSPOT", "SALESFORCE"] } as const;
 const SUPPORT_CATEGORY = { type: "string", enum: ["PRODUCT_DEFECT", "IMPORT_GUIDANCE", "BILLING", "PRIVACY", "SECURITY", "GENERAL"] } as const;
@@ -95,6 +97,8 @@ export const REQUEST_SCHEMAS = Object.freeze({
   CMD005: schema("CMD005", ["expectedVersion", "role", "assuranceProofRef"], { expectedVersion: VERSION, role: LABEL, assuranceProofRef: ID }),
   CMD006: schema("CMD006", ["expectedVersion", "reasonCode"], { expectedVersion: VERSION, reasonCode: LABEL }),
   CMD007: schema("CMD007", ["expectedVersion", "newOwnerMembershipId", "assuranceProofRef"], { expectedVersion: VERSION, newOwnerMembershipId: ID, assuranceProofRef: ID }),
+  /** RequestDeletion (B16 L3): the project's deletion; the step-up is re-judged at COMMIT. */
+  CMD042: schema("CMD042", ["expectedVersion", "reasonCode", "assuranceProofRef"], { expectedVersion: VERSION, reasonCode: DELETION_REASON, assuranceProofRef: ID }),
   /** RequestRetentionExtension (B16 L2): the one explicit extension, at most 72 h; the hard cap is not a request member and never moves. */
   CMD060: schema("CMD060", ["expectedVersion", "requestedSeconds", "purpose", "termsVersion"], { expectedVersion: VERSION, requestedSeconds: EXTENSION_SECONDS, purpose: LABEL, termsVersion: LABEL }),
 } as const);

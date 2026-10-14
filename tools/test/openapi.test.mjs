@@ -106,6 +106,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/plans/{planId}/revisions RevisePlan",
       "POST /api/v1/plans/{planId}/validate ValidatePlan",
       "POST /api/v1/plans/{planId}/withdraw WithdrawApproval",
+      "POST /api/v1/projects/{projectId}/deletion-requests RequestDeletion",
       "POST /api/v1/projects/{projectId}/execute ExecuteProject",
       "POST /api/v1/projects/{projectId}/import-stages/{stageId}/continue ContinueStage",
       "POST /api/v1/projects/{projectId}/import-stages/{stageId}/receipts SubmitStageReceipt",

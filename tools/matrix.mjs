@@ -584,6 +584,18 @@ export const APPLICABILITY = {
     "invalid schema": common["invalid schema"],
     "lost response": [...common["lost response"], ["cmd060-request-retention-extension.test.ts", "RACE (crash after COMMIT): the lost answer is recovered by the key"]],
   },
+  // B16 lane L3: CMD042 RequestDeletion (docs/design/B16-L3-failure-matrix.md); the executor half is apps/control/test/b16-deletion-executor.test.ts
+  CMD042: {
+    ...common,
+    "legitimate state": [["cmd042-request-deletion.test.ts", "CMD042-OK (request): the OWNER with a fresh step-up"]],
+    "wrong role": [["cmd042-request-deletion.test.ts", "CMD042-DENY: foreign 404, VIEWER 403"], ROLE_MATRIX],
+    "wrong agency": [["cmd042-request-deletion.test.ts", "CMD042-DENY: foreign 404, VIEWER 403"]],
+    "stale version": [["cmd042-request-deletion.test.ts", "CMD042-DENY: foreign 404, VIEWER 403"]],
+    "duplicate request": [...common["duplicate request"], ["cmd042-request-deletion.test.ts", "RETRY: an identical replay answers 200 byte for byte"]],
+    "changed-body same key": [...common["changed-body same key"], ["cmd042-request-deletion.test.ts", "RETRY: an identical replay answers 200 byte for byte"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [...common["lost response"], ["cmd042-request-deletion.test.ts", "RACE (crash after COMMIT): the request's lost answer is recovered by the key"]],
+  },
   // package B10's agency lifecycle (mandate B10-AGENCY-LIFECYCLE; docs/design/B10-case-map.md CMD002, CMD043): neither reaches a provider
   CMD002: {
     "legitimate state": [["cmd002-activate-agency.test.ts", "OK: the agency's OWNER activates its DRAFT agency"]],
@@ -1012,6 +1024,7 @@ export async function loadMatrixSources() {
     CMD016: "sources/handlers/select-input-tables.ts",
     CMD017: "sources/handlers/seal-revision.ts",
     CMD044: "commands/handlers/create-support-case.ts",
+    CMD042: "sources/handlers/request-deletion.ts",
     CMD060: "sources/handlers/request-retention-extension.ts",
     CMD022: "audit/handlers/create-plan.ts",
   };

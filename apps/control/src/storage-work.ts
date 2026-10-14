@@ -35,7 +35,7 @@ export type DeletionOutcome =
  * observed: its deletion is recorded ALREADY_ABSENT — an object that arrives under its name later is an unregistered generation,
  * registered RESIDUAL and deleted by OBJECT_INVENTORY (09 "periodic provider inventory detects objects missing from that registry").
  */
-export async function executeDeletion(storage: ObjectStoragePort, units: SourceUnitOfWorkFactory, item: WorkItem, objectId: StoredObjectId): Promise<DeletionOutcome> {
+export async function executeDeletion(storage: ObjectStoragePort, units: SourceUnitOfWorkFactory, item: WorkItem, objectId: StoredObjectId, managed = false): Promise<DeletionOutcome> {
   const pending = await units.runSource(boundTo(item), async (uow) => {
     const object = await uow.sources.objects.get(objectId);
     if (object === null) return null;
@@ -45,7 +45,7 @@ export async function executeDeletion(storage: ObjectStoragePort, units: SourceU
   if (pending === null) return { kind: "NOT_PENDING" };
   // an accepted generation may be held by a seal (D-HOLD-1): the provider refuses to delete a held generation, so the hold nothing
   // needs any more is released first (a hold still needed makes the delete fail, DELETION_FAILED, and DELETION_RETRIES comes back)
-  if (pending.zone === "ACCEPTED" && pending.generation !== undefined) await releaseBeforeDeletion(storage, units, item, pending);
+  if (pending.zone === "ACCEPTED" && pending.generation !== undefined) await releaseBeforeDeletion(storage, units, item, pending, managed);
   let result: DeletionResult;
   if (pending.generation === undefined) result = "ALREADY_ABSENT";
   else {
@@ -140,10 +140,12 @@ export async function releaseObjectHolds(storage: ObjectStoragePort, units: Sour
  * VERIFIED (migration 0020), so it can clear no later hold. The deletion's own answer decides the rest (a generation still held fails
  * the delete, recorded DELETION_FAILED and retried).
  */
-async function releaseBeforeDeletion(storage: ObjectStoragePort, units: SourceUnitOfWorkFactory, item: WorkItem, object: StoredObjectRecord): Promise<void> {
+async function releaseBeforeDeletion(storage: ObjectStoragePort, units: SourceUnitOfWorkFactory, item: WorkItem, object: StoredObjectRecord, managed = false): Promise<void> {
   try {
     const released = await releaseObjectHolds(storage, units, item, object.objectId);
-    if (released.kind !== "NONE" || object.generation === undefined) return;
+    // a project deletion releases the holds the platform's own seal placed (above) and never a hold it holds no record of: the provider's
+    // refusal is the residual the receipt names, with DELETION_RETRIES as its retry
+    if (managed || released.kind !== "NONE" || object.generation === undefined) return;
     const seen = await withTimeout(storage.stat(locationOf(object), object.objectName), PROVIDER_CALL_TIMEOUT_MS);
     if (seen === null || seen.generation !== object.generation || seen.temporaryHold !== true || seen.metageneration === undefined) return;
     await withTimeout(storage.releaseHold(locationOf(object), object.objectName, object.generation, seen.metageneration), PROVIDER_CALL_TIMEOUT_MS);
@@ -176,6 +178,7 @@ export async function requestAndDelete(
   item: WorkItem,
   objects: ReadonlyArray<StoredObjectRecord>,
   reason: string,
+  managed = false,
 ): Promise<ReadonlyArray<{ readonly objectId: StoredObjectId; readonly outcome: DeletionOutcome }>> {
   const candidates = objects.filter((o) => o.state !== "DELETED");
   if (candidates.length === 0) return [];
@@ -196,14 +199,18 @@ export async function requestAndDelete(
       const current = await uow.sources.objects.get(objectId);
       if (current?.state === "INTENDED") await uow.sources.objects.observe(objectId, { generation: seen.generation, bytes: seen.bytes, observedAt: seen.observedAt, late: true });
     }
-    await uow.sources.objects.requestDeletion(
-      candidates.filter((o) => o.state !== "DELETION_REQUESTED" && o.state !== "DELETION_FAILED").map((o) => o.objectId),
-      reason,
-      await uow.serverInstant(),
-    );
+    const requestable = candidates.filter((o) => o.state !== "DELETION_REQUESTED" && o.state !== "DELETION_FAILED").map((o) => o.objectId);
+    // a project deletion (B16 CMD042) is the one caller that deletes accepted generations of admitted files: its own repository method, never the lifecycle's
+    if (managed) await uow.sources.deletions.requestManagedDeletion(requestable, reason);
+    else await uow.sources.objects.requestDeletion(requestable, reason, await uow.serverInstant());
   });
   const out: Array<{ readonly objectId: StoredObjectId; readonly outcome: DeletionOutcome }> = [];
-  for (const o of candidates) out.push({ objectId: o.objectId, outcome: await executeDeletion(storage, units, item, o.objectId) });
+  for (const o of candidates) {
+    const outcome = await executeDeletion(storage, units, item, o.objectId, managed);
+    out.push({ objectId: o.objectId, outcome });
+    // a project deletion stops at the first result it could not record: the redelivery resumes from what is recorded
+    if (managed && outcome.kind === "PENDING") break;
+  }
   return out;
 }
 

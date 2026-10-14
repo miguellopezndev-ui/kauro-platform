@@ -204,6 +204,24 @@ export interface SupportCaseView {
 }
 
 /**
+ * CMD042 RequestDeletion: the project's one deletion request and the exact scope it discloses (09 "Early deletion", "Deletion
+ * receipts"): the managed scope is deleted by the control plane and reported in receipts; what stays outside it is named.
+ */
+export interface DeletionRequestView {
+  readonly deletionId: string;
+  readonly projectId: string;
+  readonly state: "REQUESTED";
+  readonly reasonCode: string;
+  readonly requestedAt: UtcInstant;
+  readonly projectState: "DELETION_REQUESTED";
+  /** The project's version after the request (the aggregate the command edited). */
+  readonly projectVersion: number;
+  readonly scope: { readonly revisionIds: ReadonlyArray<string>; readonly retentionIds: ReadonlyArray<string>; readonly packageVersionIds: ReadonlyArray<string> };
+  readonly receiptScope: "COMPLETE_FOR_MANAGED_SCOPE";
+  readonly excludedFromManagedScope: ReadonlyArray<string>;
+}
+
+/**
  * CMD060 RequestRetentionExtension: the one extension of a project's soft access deadline and its exact capped endpoint (09 "Quotes,
  * reuploads and retention": never beyond the original hard cap; R2-123 the cap is disclosed). The hard deadline is shown unchanged.
  */

@@ -18,6 +18,7 @@ const NOT_VISIBLE = (what: string): ProblemOutcome => outcome("COMMAND", "NOT_FO
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what}'s current version; the current safe version and state come back`, { current: "ALWAYS" });
 const SERVICES = outcome("COMMAND", "INTEGRITY_FAILURE", "SOURCE_SERVICES_UNAVAILABLE", "no object-storage adapter is bound in this edition (until the integration package binds one, D-SAPI-6); nothing was reserved");
 const PROJECT_NOT_OPEN = outcome("COMMAND", "PRECONDITION_FAILED", "PROJECT_NOT_OPEN", "the project is not OPEN (closed or being deleted): it takes no new revision or upload", { current: "ALWAYS" });
+const PROJECT_DELETION_REQUESTED = outcome("COMMAND", "PRECONDITION_FAILED", "PROJECT_DELETION_REQUESTED", "the project's deletion was requested: it takes no new upload", { current: "ALWAYS" });
 const NOT_OWNED = outcome("COMMAND", "NOT_AUTHORIZED", "UPLOAD_NOT_OWNED", "the upload belongs to another requester of the agency (catalogue: the upload belongs to the caller)");
 const UPLOADS_UNRESOLVED = outcome("COMMAND", "PRECONDITION_FAILED", "UPLOADS_UNRESOLVED", "a reservation, session or verification of the revision is still open: selection and seal need a settled inventory (D-SEL-3)", { current: "ALWAYS" });
 
@@ -36,6 +37,7 @@ const COMMAND_SPECIFIC: Readonly<Record<B07CommandId, ReadonlyArray<ProblemOutco
     STALE("revision"),
     outcome("COMMAND", "PRECONDITION_FAILED", "AGENCY_NOT_ACTIVE", "customer data enters only an ACTIVE agency (07: DRAFT permits identity and agreement setup, not customer-data execution; B06 D-CMD-2)", { current: "ALWAYS" }),
     PROJECT_NOT_OPEN,
+    PROJECT_DELETION_REQUESTED,
     outcome("COMMAND", "CAPABILITY_UNAVAILABLE", "MODE_NOT_OFFERED", "the project's mode is no longer offered (09 Upload reservation: the project capability is checked)"),
     outcome("COMMAND", "PRECONDITION_FAILED", "REVISION_NOT_ACCEPTING_UPLOADS", "the revision is not DRAFT or UPLOADING: adding a file after inspection or sealing needs a new revision", { current: "ALWAYS" }),
     outcome("COMMAND", "INVALID_REQUEST", "EMPTY_DECLARATION", "declaredBytes is 0: an upload declares its length", { fieldCodes: ["RANGE"] }),

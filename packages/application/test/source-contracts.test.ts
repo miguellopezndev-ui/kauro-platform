@@ -277,7 +277,9 @@ test("B07-F8: every event routed to AUTHORITY_JOURNAL produces exactly one tombs
   // expire later): its tombstone is proven by the project's extension row, so it is the only one without a machine state (EXTENDED)
   const extensionEvents = Object.entries(AUTHORITY_TOMBSTONES).filter(([eventType]) => eventType.startsWith("retention_record."));
   assert.deepEqual(extensionEvents, [["retention_record.extended.v1", { kind: "RETENTION_EXTENDED", state: "EXTENDED" }]]);
-  const entries = Object.entries(AUTHORITY_TOMBSTONES).filter(([eventType]) => !eventType.startsWith("retention_record.")).map(([eventType, t]) => {
+  // B16 CMD042: a project's requested deletion is likewise a durable fact (its request row), not a state of a source machine
+  assert.deepEqual(Object.entries(AUTHORITY_TOMBSTONES).filter(([eventType]) => eventType.startsWith("project.")), [["project.deletion_requested.v1", { kind: "PROJECT_DELETION_REQUESTED", state: "DELETION_REQUESTED" }]]);
+  const entries = Object.entries(AUTHORITY_TOMBSTONES).filter(([eventType]) => !eventType.startsWith("retention_record.") && !eventType.startsWith("project.")).map(([eventType, t]) => {
     const name = subjectMachine[eventType.slice(0, eventType.indexOf("."))];
     assert.ok(name !== undefined, `${eventType} names a tombstoned subject`);
     tombstoned.set(name, (tombstoned.get(name) ?? new Set<string>()).add(t.state));

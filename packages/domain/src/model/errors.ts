@@ -130,6 +130,9 @@ export const RETENTION_EXTENSION_FAILURE_REASONS = [
   "NO_EXTENSION_ROOM",
 ] as const;
 
+/** The refusals of CMD042 RequestDeletion and its prevention guards (package B16 lane L3, KA087), appended after the retention-extension reasons. */
+export const DELETION_FAILURE_REASONS = ["PROJECT_DELETION_REQUESTED"] as const;
+
 export const FAILURE_REASONS = [
   // authorization (08 "Identity is not permission")
   "SUBJECT_UNAUTHENTICATED",
@@ -329,6 +332,8 @@ export const FAILURE_REASONS = [
   ...RECOVERY_FAILURE_REASONS,
   // the one soft-deadline extension of a project (package B16 lane L2: CMD060 RequestRetentionExtension; R2-123, R2-124)
   ...RETENTION_EXTENSION_FAILURE_REASONS,
+  // managed deletion of a project (package B16 lane L3: CMD042 RequestDeletion)
+  ...DELETION_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

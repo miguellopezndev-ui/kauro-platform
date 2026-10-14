@@ -71,7 +71,7 @@ const NARROW_SUMMARY = Object.freeze({ minLength: 20, pattern: TEXT_PATTERN });
  * (docs/design/B07-upload-source-lifecycle.md §9.5: served routes move from x-kauro-planned to paths), and CMD044 of the support
  * package (B11 W4).
  */
-export type ServedCommandId = "CMD001" | "CMD003" | "CMD004" | "CMD005" | "CMD006" | "CMD007" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId | ExecutionCommandId | AuditCommandId | "CMD044" | "CMD060";
+export type ServedCommandId = "CMD001" | "CMD003" | "CMD004" | "CMD005" | "CMD006" | "CMD007" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId | ExecutionCommandId | AuditCommandId | "CMD044" | "CMD042" | "CMD060";
 export type CommandResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}${ServedCommandId}`;
 export type AcceptedResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}accepted`;
 export type OperationalResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}op:${string}`;
@@ -452,6 +452,33 @@ const B06_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
     },
   },
   {
+    name: "DeletionRequestView",
+    description: "CMD042 RequestDeletion result: the project's one deletion request, the project now DELETION_REQUESTED, and the exact scope the control plane will delete. The receipt will be COMPLETE_FOR_MANAGED_SCOPE only; downloaded copies and CRM imports stay outside the managed scope and are named (09 Early deletion, Deletion receipts).",
+    contract: null,
+    withheld: {},
+    members: {
+      deletionId: platform(true, ID, "The deletion request (one per project)."),
+      projectId: platform(true, ID, "The project."),
+      state: platform(true, { type: "string", enum: ["REQUESTED"] }, "The request's state at the answer."),
+      reasonCode: platform(true, { type: "string", enum: ["RETENTION", "AGENCY_REQUEST", "ACCOUNT_CLOSURE", "INCIDENT", "END_OF_SERVICE"] }, "Why the deletion was requested."),
+      requestedAt: platform(true, UTC, "The server's instant of the request."),
+      projectState: platform(true, { type: "string", enum: ["DELETION_REQUESTED"] }, "The project's state after the request."),
+      projectVersion: platform(true, VERSION, "The project's version after the request."),
+      scope: platform(
+        true,
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["revisionIds", "retentionIds", "packageVersionIds"],
+          properties: { revisionIds: { type: "array", maxItems: 10000, items: ID }, retentionIds: { type: "array", maxItems: 10000, items: ID }, packageVersionIds: { type: "array", maxItems: 10000, items: ID } },
+        },
+        "The exact scope: every revision, retention record and package version of the project.",
+      ),
+      receiptScope: platform(true, { type: "string", enum: ["COMPLETE_FOR_MANAGED_SCOPE"] }, "What the final receipt will attest."),
+      excludedFromManagedScope: platform(true, { type: "array", maxItems: 8, items: { type: "string", enum: ["CUSTOMER_DOWNLOADED_COPIES", "EXTERNAL_CRM_IMPORTS"] } }, "What stays outside the managed scope, named."),
+    },
+  },
+  {
     name: "RetentionExtensionView",
     description: "CMD060 RequestRetentionExtension result: the project's one soft-deadline extension and its exact endpoint. The endpoint is capped at the hard deadline when the request would pass it (cappedAtHardDeadline), and the hard deadline is shown unchanged (09 Quotes, reuploads and retention; R2-123).",
     contract: null,
@@ -551,6 +578,7 @@ export const COMMAND_RESPONSES: Readonly<Record<ServedCommandId, CommandReply>> 
   CMD026: { status: 200, view: "WithdrawApprovalView" },
   ...SOURCE_COMMAND_RESPONSES,
   CMD044: { status: 201, view: "SupportCaseView" },
+  CMD042: { status: 200, view: "DeletionRequestView" },
   CMD060: { status: 200, view: "RetentionExtensionView" },
   ...EXECUTION_COMMAND_RESPONSES,
   ...AUDIT_COMMAND_RESPONSES,

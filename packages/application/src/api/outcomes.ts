@@ -52,7 +52,7 @@ const NOT_CONTROLLER = outcome("COMMAND", "NOT_AUTHORIZED", "NOT_APPROVAL_CONTRO
 
 /** The command-specific outcomes, by served command (design §8; reference/COMMAND_CATALOGUE preconditions and failures). */
 /** The commands this module catalogues itself: B06's seven and B11's CMD044 (B07's come composed from sources/outcomes). */
-type CatalogueCommandId = B06CommandId | "CMD044" | "CMD060" | TeamCommandId;
+type CatalogueCommandId = B06CommandId | "CMD042" | "CMD044" | "CMD060" | TeamCommandId;
 
 const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   CMD001: [
@@ -163,6 +163,12 @@ const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<Proble
     outcome("COMMAND", "PRECONDITION_FAILED", "RECIPIENT_NOT_ACTIVE", "the successor's membership is not ACTIVE"),
     outcome("COMMAND", "PRECONDITION_FAILED", "NO_SEMANTIC_CHANGE", "the successor already owns the agency"),
   ],
+  CMD042: [
+    ...STEP_UP_REFUSALS,
+    NOT_VISIBLE("the project"),
+    STALE("project"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "PROJECT_DELETION_REQUESTED", "the project's deletion was already requested (one request per project); nothing changed", { current: "ALWAYS" }),
+  ],
   CMD060: [
     NOT_VISIBLE("the project"),
     STALE("retention record"),
@@ -181,8 +187,8 @@ const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<Proble
   ],
 });
 
-const TENANT_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD003", "CMD005", "CMD006", "CMD007", "CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044", "CMD060"]);
-const HEADER_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD005", "CMD006", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044", "CMD060"]);
+const TENANT_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD003", "CMD005", "CMD006", "CMD007", "CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD042", "CMD044", "CMD060"]);
+const HEADER_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD005", "CMD006", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD042", "CMD044", "CMD060"]);
 /** Routes with an id in the path and no tenant selector at all: CMD004 (the invitation names its agency, never the request). */
 const PATH_ONLY_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD004"]);
 
@@ -222,6 +228,7 @@ export const COMMAND_OUTCOMES: Readonly<Record<ServedCommandId, ReadonlyArray<Pr
   CMD025: catalogueOf("CMD025"),
   CMD026: catalogueOf("CMD026"),
   ...SOURCE_COMMAND_OUTCOMES,
+  CMD042: catalogueOf("CMD042"),
   CMD044: catalogueOf("CMD044"),
   CMD060: catalogueOf("CMD060"),
   ...EXECUTION_COMMAND_OUTCOMES,
