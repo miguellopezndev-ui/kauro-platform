@@ -559,6 +559,13 @@ function factsMatch(r: SettlementRequestRecord, v: VerifiedSettlement): boolean 
   );
 }
 
+/** ADV-9: a cents figure into an event payload (a count: safe integers only); a bigint that Number() would round throws instead of publishing a wrong amount. */
+function exactCents(v: bigint): number {
+  const n = Number(v);
+  if (!Number.isSafeInteger(n) || BigInt(n) !== v) throw new DomainFailure("INTEGRITY_FAILURE", "a settlement figure does not fit an exact event count");
+  return n;
+}
+
 /**
  * ST3: applies the owner's intent on delivery of its recorded.v1, in the payment service's unit of work. A1 the intent (absent:
  * NOT_APPLICABLE; consumed: DUPLICATE); A1b its artifacts re-read and re-classified outside the locks (an unbound store is
@@ -567,13 +574,6 @@ function factsMatch(r: SettlementRequestRecord, v: VerifiedSettlement): boolean 
  * instant; A7 the refusals in order; A8 the settlement, its event, its posting set, the intent APPLIED and the earlier refusals' cases
  * resolved. A refusal writes its review case, the intent REFUSED and refused.v1, and is the delivery's applied outcome.
  */
-/** ADV-9: a cents figure into an event payload (a count: safe integers only); a bigint that Number() would round throws instead of publishing a wrong amount. */
-function exactCents(v: bigint): number {
-  const n = Number(v);
-  if (!Number.isSafeInteger(n) || BigInt(n) !== v) throw new DomainFailure("INTEGRITY_FAILURE", "a settlement figure does not fit an exact event count");
-  return n;
-}
-
 export async function applySettlementRequest(uow: CommerceUnitOfWork, ports: SettlementApplyPorts, delivery: { readonly eventId: string; readonly requestId: string }): Promise<SettlementApplyOutcome> {
   const repo = ports.settlements;
   const seen = await repo.requestOf(delivery.requestId);
