@@ -273,6 +273,7 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/operations/bank-credits/:creditId/attributions", "attributeBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:attributeBankCredit:200" } }],
       ["POST", "/api/v1/operations/bank-accounts/:accountRef/statement-imports", "importBankStatement", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:importBankStatement:201" } }],
       ["POST", "/api/v1/payment-orders/:orderId/retirements", "retireBankCheckout", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:retireBankCheckout:201" } }],
+      ["POST", "/api/v1/operations/bank-accounts/:accountRef/settlements", "recordBankSettlement", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:recordBankSettlement:201" } }],
       // lane B12-OWNER-SCREENS-1 (GAP-API-8): the owner's evidence-artifact upload, 201 stored and judged
       ["POST", "/api/v1/operations/bank-accounts/:accountRef/evidence-artifacts", "uploadBankEvidenceArtifact", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:uploadBankEvidenceArtifact:201" } }],
       ["GET", "/api/v1/operations/bank-routes/:routeId", "getBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankRoute:200" } }],
@@ -280,6 +281,8 @@ test("R23: every served route declares its replies (the route inventory the Open
       // lane B12-OWNER-SCREENS-1 (GAP-API-9): the owner's inbound-credit queue, filtered by state and paginated
       ["GET", "/api/v1/operations/bank-credits", "listBankCredits", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:listBankCredits:200" } }],
       ["GET", "/api/v1/operations/bank-orders/:orderId/match-keys", "getBankOrderMatchKeys", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankOrderMatchKeys:200" } }],
+      ["GET", "/api/v1/operations/bank-accounts/:accountRef/settlements/:requestId", "getBankSettlementRequest", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankSettlementRequest:200" } }],
+      ["GET", "/api/v1/operations/bank-accounts/:accountRef/settlements", "listBankSettlementsInTransit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:listBankSettlementsInTransit:200" } }],
       ["GET", "/api/v1/payment-orders/:orderId/transfer-instructions", "getTransferInstructions", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getTransferInstructions:200" } }],
       // the commission group's service routes of package B10 (mandate B10-STATEMENTS-PAYOUTS), served in every edition, synchronous
       ["POST", "/api/v1/sales/commission-periods/:periodId/close", "CloseCommissionPeriod", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD051" } }],

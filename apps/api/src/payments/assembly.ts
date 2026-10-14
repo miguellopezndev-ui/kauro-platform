@@ -14,7 +14,7 @@
  * is bound, and without one the webhook answers PROVIDER_UNKNOWN (no provider is configured) and the service routes find no
  * verified service identity (AUTHENTICATION_REQUIRED, with the anonymous denial recorded).
  */
-import type { DurableOperation, FiscalDocumentBridge, PaymentProviderAdapter, ProtocolPoint, ProviderEvidenceStore, ServiceAuthenticator, WebhookVerifier } from "@kauro/application";
+import type { BankEvidenceClassifier, BankEvidenceStore, DurableOperation, FiscalDocumentBridge, PaymentProviderAdapter, ProtocolPoint, ProviderEvidenceStore, ServiceAuthenticator, WebhookVerifier } from "@kauro/application";
 import type { Clock, CommerceUnitOfWorkFactory, Environment, InboxIngress, RandomBytes } from "@kauro/domain";
 import { createIdGenerator } from "@kauro/domain";
 import type { IngressFactRecorder, KauroPool, PoolErrorSink, RuntimeRole } from "@kauro/persistence";
@@ -30,6 +30,11 @@ export interface PaymentServiceAdapters {
   readonly serviceAuthenticator: ServiceAuthenticator;
   /** The fiscal adapter/bridge (prepare only in B09; issuance is CMD035, B15). */
   readonly fiscalBridge?: FiscalDocumentBridge;
+  /**
+   * The restricted bank evidence store and its classifier the settlement apply re-reads (docs/design/PV1-SETTLE-two-step.md §3.0, A1b;
+   * composition.ts's `bank` shape); absent, or either null, the apply answers CAPACITY_UNAVAILABLE (retried, then DEAD_LETTER).
+   */
+  readonly bank?: { readonly evidence: () => BankEvidenceStore | null; readonly classifier: () => BankEvidenceClassifier | null };
 }
 
 /** The command a hold point belongs to. */

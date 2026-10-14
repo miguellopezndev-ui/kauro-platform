@@ -118,8 +118,8 @@ export interface BankMatchKeysView {
   };
 }
 
-export const BANK_INBOUND_COMMAND_IDS = Object.freeze({ enter: "CMD210", confirm: "CMD211", attribute: "CMD212", statement: "CMD213", retire: "CMD214" } as const);
-type InboundCommandId = (typeof BANK_INBOUND_COMMAND_IDS)[keyof typeof BANK_INBOUND_COMMAND_IDS];
+export const BANK_INBOUND_COMMAND_IDS = Object.freeze({ enter: "CMD210", confirm: "CMD211", attribute: "CMD212", statement: "CMD213", retire: "CMD214", settle: "CMD215" } as const);
+export type InboundCommandId = (typeof BANK_INBOUND_COMMAND_IDS)[keyof typeof BANK_INBOUND_COMMAND_IDS];
 export const inboundCommandOf = (id: InboundCommandId): RunnableCommand => ({ id, journalScope: "OPERATOR_IDENTITY", digestOmits: ["authorizationRef"] });
 
 export function bankCreditView(c: BankCreditRecord): BankCreditView {

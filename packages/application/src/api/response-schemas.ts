@@ -31,6 +31,7 @@ import type { SourceIntakeId, SourceReadId } from "../sources/outcomes.js";
 import { SESSION_URL_MEMBER, SESSION_URL_VIEW, SOURCE_COMMAND_RESPONSES, SOURCE_VIEW_DEFINITIONS } from "../sources/response-views.js";
 import { CURSOR_PATTERN } from "./cursor.js";
 import { LABEL_PATTERN, TEXT_PATTERN } from "./request-schemas.js";
+import { CURSOR_PATTERN } from "./cursor.js";
 import { READINESS_BLOCKERS } from "./views.js";
 import { PROJECT_PHASES, PROJECT_REQUIRED_ACTIONS } from "../agency/dashboard-vocabulary.js";
 import {
@@ -1206,6 +1207,80 @@ export const STATEMENT_IMPORT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind"
     }),
   }),
 });
+const BANK_CENTS_OR_NULL = { type: ["string", "null"], pattern: "^(0|[1-9][0-9]{0,15})$" } as const;
+const SETTLEMENT_VIEW_SCHEMA: JsonSchema = closedObject(["settlementId", "accountRef", "withdrawalId", "currency", "periodStart", "periodEnd", "withdrawnCents", "feeCents", "receivedCents", "bankAvailableCents", "bankEvidence", "observedAt"], {
+  settlementId: BANK_UUID,
+  accountRef: BANK_REF,
+  withdrawalId: BANK_REF,
+  currency: { type: "string", enum: ["USD"] },
+  periodStart: BANK_UTC,
+  periodEnd: BANK_UTC,
+  withdrawnCents: BANK_CENTS,
+  feeCents: BANK_CENTS,
+  receivedCents: BANK_CENTS_OR_NULL,
+  bankAvailableCents: BANK_CENTS,
+  bankEvidence: { type: "boolean" },
+  observedAt: BANK_UTC,
+});
+const SETTLEMENT_REFUSAL_REASON = { type: ["string", "null"], enum: ["EVIDENCE_MISMATCH", "REQUEST_STALE", "COVERAGE_END_IN_FUTURE", "CURRENCY_MISMATCH", "WITHDRAWAL_ALREADY_SETTLED", "FUNDS_UNAVAILABLE", null] } as const;
+/** The PAYMENT_SERVICE outbox state of an intent's recorded.v1 (NONE: no record, which a recorded intent never lacks). */
+const SETTLEMENT_DELIVERY = { type: "string", enum: ["PENDING", "CLAIMED", "DELIVERED", "RETRYABLE", "DEAD_LETTER", "NONE"] } as const;
+const BANK_CASE_ID_OR_NULL = { type: ["string", "null"], pattern: BANK_UUID.pattern } as const;
+/** CMD215's 201 (two-step, D-SET-10): the owner's recorded intent; the payment service applies it on delivery. */
+export const BANK_SETTLEMENT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1 },
+  replayed: { type: "boolean" },
+  data: closedObject(["settlementRequest"], {
+    settlementRequest: closedObject(["requestId", "accountRef", "withdrawalId", "state", "requestedAt"], {
+      requestId: BANK_UUID,
+      accountRef: BANK_REF,
+      withdrawalId: BANK_REF,
+      state: { type: "string", enum: ["RECORDED"] },
+      requestedAt: BANK_UTC,
+    }),
+  }),
+});
+/** getBankSettlementRequest: one intent of the account, its outcome, its delivery and (APPLIED) its settlement. */
+export const BANK_SETTLEMENT_REQUEST_READ_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], {
+  data: closedObject(["settlementRequest"], {
+    settlementRequest: closedObject(["requestId", "accountRef", "withdrawalId", "state", "reason", "requestedAt", "consumedAt", "reviewCaseId", "delivery", "settlement"], {
+      requestId: BANK_UUID,
+      accountRef: BANK_REF,
+      withdrawalId: BANK_REF,
+      state: { type: "string", enum: ["RECORDED", "APPLIED", "REFUSED"] },
+      reason: SETTLEMENT_REFUSAL_REASON,
+      requestedAt: BANK_UTC,
+      consumedAt: { type: ["string", "null"], pattern: BANK_UTC.pattern },
+      reviewCaseId: BANK_CASE_ID_OR_NULL,
+      delivery: SETTLEMENT_DELIVERY,
+      settlement: { ...SETTLEMENT_VIEW_SCHEMA, type: ["object", "null"] },
+    }),
+  }),
+});
+/** listBankSettlementsInTransit: the account's unapplied intents and its unresolved refusals and its applied intents without a receipt (the money still in BANK_IN_TRANSIT), in record order (plan §3.5). */
+export const BANK_SETTLEMENTS_IN_TRANSIT_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], {
+  data: closedObject(["items", "nextCursor"], {
+    items: {
+      type: "array",
+      maxItems: 100,
+      items: closedObject(["requestId", "withdrawalId", "state", "reason", "withdrawnCents", "receivedCents", "feeCents", "requestedAt", "ageSeconds", "delivery", "reviewCaseId"], {
+        requestId: BANK_UUID,
+        withdrawalId: BANK_REF,
+        state: { type: "string", enum: ["RECORDED", "REFUSED", "APPLIED"] },
+        reason: SETTLEMENT_REFUSAL_REASON,
+        withdrawnCents: BANK_CENTS,
+        receivedCents: BANK_CENTS_OR_NULL,
+        feeCents: BANK_CENTS,
+        requestedAt: BANK_UTC,
+        ageSeconds: { type: "integer", minimum: 0 },
+        delivery: SETTLEMENT_DELIVERY,
+        reviewCaseId: BANK_CASE_ID_OR_NULL,
+      }),
+    },
+    nextCursor: { type: ["string", "null"], pattern: CURSOR_PATTERN, maxLength: 600 },
+  }),
+});
 export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
   Object.freeze({
     operationId: "retireBankCheckout",
@@ -1245,6 +1320,40 @@ export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = 
     authority: "ACH-ROUTE r12 §7.23 (SI1, SI2), §7.28; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
     request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["artifactRef", "evidenceHash", "authorizationRef"], { artifactRef: BANK_REF, evidenceHash: BANK_HASH, authorizationRef: BANK_UUID }) }),
     responses: Object.freeze({ "201": Object.freeze({ description: "The import (COMPLETED envelope; an identical replay answers the journaled reply). BALANCED only with zero orphan debits.", contentType: JSON_CONTENT_TYPE, schema: STATEMENT_IMPORT_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "recordBankSettlement",
+    method: "POST" as const,
+    path: "/api/v1/operations/bank-accounts/{accountRef}/settlements",
+    summary: "Record a settlement observation from the provider's settlement record and, when the money arrived, the receiving bank's receipt (no typed figure)",
+    authority: "ACH-ROUTE r12 §7.25 (ST1, ST2), R2-085, PV1-SETTLE D-SET-1; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+    request: Object.freeze({
+      contentType: "application/json" as const,
+      schema: closedObject(["artifactRef", "evidenceHash", "receipt", "authorizationRef"], {
+        artifactRef: BANK_REF,
+        evidenceHash: BANK_HASH,
+        // the receiving bank's receipt, or null while the money is in transit (R2-085)
+        receipt: { ...closedObject(["artifactRef", "evidenceHash"], { artifactRef: BANK_REF, evidenceHash: BANK_HASH }), type: ["object", "null"] },
+        authorizationRef: BANK_UUID,
+      }),
+    }),
+    responses: Object.freeze({ "201": Object.freeze({ description: "The recorded settlement intent (COMPLETED envelope; an identical replay answers the journaled reply). No money moves here: the payment service applies the intent on delivery, or refuses it with a review case.", contentType: JSON_CONTENT_TYPE, schema: BANK_SETTLEMENT_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "getBankSettlementRequest",
+    method: "GET" as const,
+    path: "/api/v1/operations/bank-accounts/{accountRef}/settlements/{requestId}",
+    summary: "One settlement intent of the account as the corporate owner sees it: its outcome, its delivery to the payment service and its settlement",
+    authority: "ACH-ROUTE r12 §7.25 (ST3), PV1-SETTLE two-step §3.4; KAURO_OWNER",
+    responses: Object.freeze({ "200": Object.freeze({ description: "The intent and its outcome.", contentType: JSON_CONTENT_TYPE, schema: BANK_SETTLEMENT_REQUEST_READ_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "listBankSettlementsInTransit",
+    method: "GET" as const,
+    path: "/api/v1/operations/bank-accounts/{accountRef}/settlements",
+    summary: "The account's settlement intents in transit (recorded, whatever their delivery state) and its refusals whose review case is not resolved, with their figures and age; query `cursor` continues a page",
+    authority: "R2 15 (money in transit is visible with its amount and age; a refusal is never silently abandoned), PV1-SETTLE two-step §3.5; KAURO_OWNER",
+    responses: Object.freeze({ "200": Object.freeze({ description: "One page (at most 100, in record order).", contentType: JSON_CONTENT_TYPE, schema: BANK_SETTLEMENTS_IN_TRANSIT_RESPONSE_SCHEMA }) }),
   }),
   Object.freeze({
     operationId: "getBankCredit",

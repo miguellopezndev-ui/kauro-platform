@@ -24,6 +24,7 @@ export {
   EXECUTION_GATE_OUTCOMES,
   DEBIT_CORRELATIONS,
   BANK_CASE_KINDS,
+  BANK_CASE_SOURCE_KINDS,
   STATEMENT_LINE_KINDS,
   COVERAGE_STREAMS,
   DESTINATION_NORM_VERSION,
@@ -69,6 +70,8 @@ export type {
   StatementDebit,
   DebitPage,
   StatementPage,
+  SettlementEvidence,
+  BankReceiptEvidence,
 } from "./provider.js";
 export { EVIDENCE_REJECTION_CODES, OPERATIONAL_CODES, OUTBOUND_EVIDENCE_STATUSES, STATEMENT_DEBIT_STATUSES } from "./provider.js";
 export { PROVIDER_EXCEPTION_KINDS, providerRequestHash, providerRequestIdOf, providerScopeKey, DISPATCH_DEADLINE_SECONDS, PAYMENT_INTENT_DOMAIN, paymentIntentHash } from "./provider.js";
@@ -113,6 +116,7 @@ export {
   fundsAccountOf,
   capturePostings,
   providerFeePostings,
+  settlementPostings,
   movableBalanceOf,
   refundReturnOf,
   returnedCentsOf,

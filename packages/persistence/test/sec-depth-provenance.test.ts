@@ -9,15 +9,18 @@ let h: Harness;
 before(async () => { h = await start(); });
 after(async () => { await h.stop(); });
 
-test("SEC-DEPTH catalog (R17, definers): the only SECURITY DEFINER routine of kauro, kauro_meta and public is the justified, registrar-owned (kauro_route_registrar), search_path-pinned registration of a bank payment route, executable by kauro_app alone", async () => {
+test("SEC-DEPTH catalog (R17, definers): the only SECURITY DEFINER routines of kauro, kauro_meta and public are the justified, registrar-owned (kauro_route_registrar), search_path-pinned registration of a bank payment route (executable by kauro_app alone) and the read-only provider-available balance of a payment route (PV1-SETTLE D-SET-5, executable by kauro_payment alone)", async () => {
   const r = await h.oracle.query<{ sig: string; owner: string; config: string[] | null; runtime: string[] }>(
     `SELECT p.oid::regprocedure::text AS sig, pg_get_userbyid(p.proowner) AS owner, p.proconfig AS config,
             ARRAY(SELECT g FROM unnest(ARRAY['kauro_app','kauro_control','kauro_assurance','kauro_validator','kauro_ingress','kauro_payment','kauro_commission']) g
                    WHERE has_function_privilege(g, p.oid, 'EXECUTE') ORDER BY g) AS runtime
        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-      WHERE p.prosecdef AND n.nspname IN ('kauro', 'kauro_meta', 'public')`,
+      WHERE p.prosecdef AND n.nspname IN ('kauro', 'kauro_meta', 'public') ORDER BY 1`,
   );
-  assert.deepEqual(r.rows, [{ sig: "kauro.register_bank_payment_route(uuid,text,text,uuid,text,text)", owner: "kauro_route_registrar", config: ["search_path=pg_catalog, pg_temp"], runtime: ["kauro_app"] }]);
+  assert.deepEqual(r.rows, [
+    { sig: "kauro.register_bank_payment_route(uuid,text,text,uuid,text,text)", owner: "kauro_route_registrar", config: ["search_path=pg_catalog, pg_temp"], runtime: ["kauro_app"] },
+    { sig: "kauro.route_provider_available_cents(uuid,text)", owner: "kauro_owner", config: ["search_path=pg_catalog, pg_temp"], runtime: ["kauro_payment"] },
+  ]);
   const publicExec = await h.oracle.query("SELECT 1 FROM pg_proc p, aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a WHERE p.prosecdef AND a.grantee = 0 AND a.privilege_type = 'EXECUTE'");
   assert.equal(publicExec.rowCount, 0, "no SECURITY DEFINER routine is executable by PUBLIC");
 });

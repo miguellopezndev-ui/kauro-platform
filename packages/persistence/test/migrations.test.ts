@@ -171,6 +171,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0077_sec_hardening_2.sql",
     // SEC OWNER-POLICY-FORALL-2: every FOR ALL policy wider than its role's grants becomes one policy per granted command (provisional number)
     "0078_sec_policy_per_command.sql",
+    // Payments V1 PV1-SETTLE: the bank-route settlement observation (CMD215), its event and the route's provider-available read (provisional number)
+    "0071_bank_settlement.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
@@ -231,9 +233,20 @@ test("runtime roles are neither owners nor superusers and have no BYPASSRLS; the
     }
     // SECURITY DEFINER requires specific justification (08): the one function is the registration of a bank route's payment route
     // (migration 0046, coordinator decision #2 of lane L-ROUTE: payment_routes stays closed to every runtime role; the function checks the
-    // caller's ACTIVE KAURO_OWNER grant and writes CONFIGURED rows only), with a pinned search_path
-    const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef");
-    assert.deepEqual(definers.rows, [{ proname: "register_bank_payment_route", proconfig: ["search_path=pg_catalog, pg_temp"] }]);
+    // caller's ACTIVE KAURO_OWNER grant and writes CONFIGURED rows only), and the read-only provider-available balance of a payment route
+    // (migration 0062, PV1-SETTLE D-SET-5: the payment service cannot read another agency's postings, the funds guard needs the route's
+    // whole PSP_AVAILABLE; executable by kauro_payment only), each with a pinned search_path
+    const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef ORDER BY p.proname");
+    assert.deepEqual(definers.rows, [
+      { proname: "register_bank_payment_route", proconfig: ["search_path=pg_catalog, pg_temp"] },
+      { proname: "route_provider_available_cents", proconfig: ["search_path=pg_catalog, pg_temp"] },
+    ]);
+    const available = await su.query<{ role: string; can: boolean }>(
+      "SELECT r.rolname AS role, has_function_privilege(r.oid, 'kauro.route_provider_available_cents(uuid, text)', 'EXECUTE') AS can FROM pg_roles r WHERE r.rolname IN ('kauro_app', 'kauro_payment', 'kauro_control', 'kauro_assurance', 'kauro_validator', 'kauro_ingress') ORDER BY 1",
+    );
+    assert.deepEqual(available.rows.filter((r) => r.can).map((r) => r.role), ["kauro_payment"], "the provider-available read is the payment service's only");
+    const provolatile = await su.query<{ v: string }>("SELECT provolatile AS v FROM pg_proc WHERE oid = 'kauro.route_provider_available_cents(uuid, text)'::regprocedure");
+    assert.equal(provolatile.rows[0]?.v, "s", "a STABLE read: it writes nothing");
     // request handlers never hold DELETE on any table
     const deletes = await su.query<{ table_name: string }>(
       "SELECT table_name FROM information_schema.role_table_grants WHERE grantee = 'kauro_app' AND privilege_type = 'DELETE' AND table_schema = 'kauro'",

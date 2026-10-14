@@ -7,7 +7,7 @@
 import type { BankRouteDetails, EvidenceClassification } from "@kauro/domain";
 import type { BankEvidenceClassifier } from "../bank/inbound-ports.js";
 import type { StoredBankEvidence } from "../ports.js";
-import { BANK_FAKE_FORMAT, BANK_FAKE_NORMALIZER, classifyFakeCredit, classifyFakeStatement } from "./bank-evidence-fake.js";
+import { BANK_FAKE_FORMAT, BANK_FAKE_NORMALIZER, classifyFakeBankReceipt, classifyFakeCredit, classifyFakeSettlement, classifyFakeStatement } from "./bank-evidence-fake.js";
 import { sha256Hex } from "./labels.js";
 
 type Obj = Readonly<Record<string, unknown>>;
@@ -68,4 +68,4 @@ export function classifyFakeAccountDetails(evidence: StoredBankEvidence): Eviden
 }
 
 /** The CONTRACT_FAKE classifier as the port the route commands read. */
-export const contractFakeBankDetailsClassifier: BankEvidenceClassifier = Object.freeze({ classifyAccountDetails: classifyFakeAccountDetails, classifyCredit: classifyFakeCredit, classifyStatement: classifyFakeStatement });
+export const contractFakeBankDetailsClassifier: BankEvidenceClassifier = Object.freeze({ classifyAccountDetails: classifyFakeAccountDetails, classifyCredit: classifyFakeCredit, classifyStatement: classifyFakeStatement, classifySettlement: classifyFakeSettlement, classifyBankReceipt: classifyFakeBankReceipt });

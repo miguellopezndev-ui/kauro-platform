@@ -87,6 +87,8 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   statement_import: ["statement_imports", "import_id"],
   // package B16 lane L5 (0075, provisional): one download authorization per CMD038 grant
   download_authorization: ["download_authorizations", "authorization_id"],
+  settlement: ["settlements", "settlement_id"],
+  settlement_request: ["settlement_requests", "request_id"],
 });
 
 // every runtime login of this branch: B06 five, package B09's payment service and package B10's commission service

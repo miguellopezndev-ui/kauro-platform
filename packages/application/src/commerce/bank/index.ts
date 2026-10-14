@@ -9,3 +9,27 @@ export type { EnterBankCreditBody, ConfirmBankCreditBody, AttributeBankCreditBod
 export type { BankEvidenceMediaType, UploadBankEvidenceBody, UploadBankEvidenceRequest, BankEvidenceArtifactView } from "./evidence-upload.js";
 export { createBankEvidenceUpload, bytesAreOfType } from "./evidence-upload.js";
 export { BANK_INBOUND_COMMAND_IDS, bankCreditView, createBankInboundHandlers, publishCreditEvent, publishOrderStateEvent } from "./inbound.js";
+export type {
+  SettlementEvidenceClassifier,
+  SettlementEvidenceCollaborators,
+  SettlementArtifacts,
+  VerifiedSettlement,
+  BankSettlementRepository,
+  NewBankSettlementInput,
+  BankSettlementCollaborators,
+  RecordSettlementBody,
+  SettlementView,
+  SettlementRequestCommandView,
+  SettlementRequestView,
+  SettlementInTransitView,
+  SettlementInTransitItemView,
+  SettlementReadRequest,
+  SettlementRequestRecord,
+  SettlementRequestOutcome,
+  SettlementRefusalReason,
+  NewSettlementRequestInput,
+  SettlementApplyPorts,
+  SettlementApplyOutcome,
+  BankSettlementHandlers,
+} from "./settlement.js";
+export { BANK_HOLD_SETTLEMENT_LOCKED, SETTLEMENT_CURRENCY, SETTLEMENT_REQUEST_STALE_SECONDS, SETTLEMENT_IN_TRANSIT_PAGE, applySettlementRequest, createBankSettlementHandlers, readSettlementEvidence } from "./settlement.js";

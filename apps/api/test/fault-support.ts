@@ -186,11 +186,23 @@ class RoutedFactory extends PgCommercialUnitOfWorkFactory {
  * the controlled instant (clock.onServer, its consumption proven by the server probes around the next statement) and that instant is read
  * back. Without a step clock the unit's own effect instant answers, unchanged. Test harness only.
  */
-function repositioned<U extends object>(uow: U, clockOf: () => StepClockOf | null, session?: SqlSession): U {
+function repositioned<U extends object>(uow: U, clockOf: () => StepClockOf | null, session?: SqlSession, exactOnly = false): U {
   return new Proxy(uow, {
     get(target, prop) {
       const value: unknown = Reflect.get(target, prop, target);
-      if (prop === "effectInstant" && typeof value === "function") {
+      // the exact (µs) effect instant of the settlement apply (PgUnitOfWork.effectNow, PV1-SETTLE two-step A6): the same repositioning,
+      // read back to the microsecond (the cell's controlled instant exactly, never that instant plus the statement's elapsed time)
+      if (prop === "effectNow" && typeof value === "function") {
+        return async () => {
+          const clock = clockOf();
+          if (clock === null) return (value as () => Promise<string>).call(target);
+          const client = session ?? (target as unknown as { client: SqlSession }).client;
+          await clock.onServer(client);
+          const r = await client.query<{ at: string }>(`SELECT to_char(kauro.server_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at`);
+          return r.rows[0]!.at;
+        };
+      }
+      if (!exactOnly && prop === "effectInstant" && typeof value === "function") {
         return async () => {
           const clock = clockOf();
           if (clock === null) return (value as () => Promise<string>).call(target);
@@ -354,8 +366,10 @@ export class FaultRouting {
               target,
               context,
               async (uow: object) => {
-                if ((context as { kind?: string }).kind === "SERVICE" && this.clock !== null) await this.clock.onServer((uow as { client: SqlSession }).client);
-                return work(uow);
+                if ((context as { kind?: string }).kind !== "SERVICE" || this.clock === null) return work(uow);
+                await this.clock.onServer((uow as { client: SqlSession }).client);
+                // the settlement apply's exact effect instant is repositioned too (its effectInstant stays the unit's own, as before)
+                return work(repositioned(uow, () => this.clock, undefined, true));
               },
               ...rest,
             );
@@ -366,8 +380,9 @@ export class FaultRouting {
               target,
               context,
               async (uow: object) => {
-                if ((context as { kind?: string }).kind === "SERVICE" && this.clock !== null) await this.clock.onServer((uow as { client: SqlSession }).client);
-                return work(tracedUnit(uow, route.points, this.dbFaults));
+                if ((context as { kind?: string }).kind !== "SERVICE" || this.clock === null) return work(tracedUnit(uow, route.points, this.dbFaults));
+                await this.clock.onServer((uow as { client: SqlSession }).client);
+                return work(repositioned(tracedUnit(uow, route.points, this.dbFaults), () => this.clock, (uow as { client: SqlSession }).client, true));
               },
               ...rest,
             ),

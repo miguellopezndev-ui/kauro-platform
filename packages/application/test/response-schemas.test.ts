@@ -189,6 +189,9 @@ test("R23: the validator compiles the COMPLETED envelope of every served command
     ["POST", "/api/v1/operations/bank-credits/{creditId}/confirmations", "confirmBankCredit", ["200"]],
     ["POST", "/api/v1/operations/bank-credits/{creditId}/attributions", "attributeBankCredit", ["200"]],
     ["POST", "/api/v1/operations/bank-accounts/{accountRef}/statement-imports", "importBankStatement", ["201"]],
+    ["POST", "/api/v1/operations/bank-accounts/{accountRef}/settlements", "recordBankSettlement", ["201"]],
+    ["GET", "/api/v1/operations/bank-accounts/{accountRef}/settlements/{requestId}", "getBankSettlementRequest", ["200"]],
+    ["GET", "/api/v1/operations/bank-accounts/{accountRef}/settlements", "listBankSettlementsInTransit", ["200"]],
     ["GET", "/api/v1/operations/bank-credits/{creditId}", "getBankCredit", ["200"]],
     ["GET", "/api/v1/operations/bank-orders/{orderId}/match-keys", "getBankOrderMatchKeys", ["200"]],
     // B12 owner screens lane 1 (D-B12S-2, D-B12S-3): the owner's evidence upload and the credit queue

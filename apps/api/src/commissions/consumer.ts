@@ -71,13 +71,19 @@ async function accrueOnEvent(rt: CommissionRuntime, uow: PgCommercialUnitOfWork,
   return { found: true, applied: mirrored || converted > 0 || accrual.created > 0, applicable: accrual.applicable };
 }
 
+/** The delivery's agency: COMMISSIONS consumes agencies' events only (its dispatcher refuses an agency-less event first). */
+function agencyOf(delivery: CommerceEventDelivery): AgencyId {
+  if (delivery.agencyId === null) throw new DomainFailure("INTEGRITY_FAILURE", `${delivery.eventType} ${delivery.eventId} is not an agency's commerce event`);
+  return delivery.agencyId;
+}
+
 export function commissionsConsumer(rt: CommissionRuntime): CommissionsConsumer {
   const eventTypes = [...COMMERCE_EVENT_SUBSCRIPTIONS, ...COMMERCIAL_EVENT_SUBSCRIPTIONS].filter((s) => s.consumer === COMMISSIONS_CONSUMER).map((s) => s.eventType);
   return {
     consumer: COMMISSIONS_CONSUMER,
     eventTypes,
     handle(delivery, fence) {
-      return inAgency(rt, delivery.agencyId, delivery.eventId, async (uow): Promise<ConsumerOutcome> => {
+      return inAgency(rt, agencyOf(delivery), delivery.eventId, async (uow): Promise<ConsumerOutcome> => {
         const outcome = await applyEffect(uow);
         if (fence !== undefined) {
           if (rt.hold !== null) await rt.hold("DELIVERY_BEFORE_COMMIT", { eventId: delivery.eventId, ownerId: fence.ownerId });
@@ -87,7 +93,7 @@ export function commissionsConsumer(rt: CommissionRuntime): CommissionsConsumer 
       });
 
       async function applyEffect(uow: PgCommercialUnitOfWork): Promise<ConsumerOutcome> {
-        const agencyId = delivery.agencyId;
+        const agencyId = agencyOf(delivery);
         // every COMMISSIONS delivery takes the open periods first (design 10; D10-STMT-4, B10G-R5): a close holds its period FOR UPDATE, so
         // a delivery commits before the close reads (and its record is delivered, or the close refuses INPUTS_UNRECONCILED) or after the
         // close commits (its line, created after the close, is the next statement's input); never between the close's guard and its COMMIT

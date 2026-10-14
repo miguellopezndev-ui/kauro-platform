@@ -7,6 +7,7 @@ import type { UtcInstant } from "@kauro/contracts";
 import type { BankCreditRecord, BankTransferInstructionRecord, EvidenceClassification, IncomingCredit, StatementPage } from "@kauro/domain";
 import type { StoredBankEvidence } from "../ports.js";
 import type { BankDetailsClassifier, BankRouteCollaborators } from "./ports.js";
+import type { SettlementEvidenceClassifier } from "./settlement.js";
 
 export type BankStreamName = "INBOUND" | "OUTBOUND";
 
@@ -120,7 +121,7 @@ export interface BankCreditRepository {
 }
 
 /** Classifies an owner-supplied credit or statement artifact (R1): pure, fail-closed, never a partial value. */
-export interface BankEvidenceClassifier extends BankDetailsClassifier {
+export interface BankEvidenceClassifier extends BankDetailsClassifier, SettlementEvidenceClassifier {
   classifyCredit(evidence: StoredBankEvidence): EvidenceClassification<IncomingCredit>;
   classifyStatement(evidence: StoredBankEvidence): EvidenceClassification<StatementPage>;
 }

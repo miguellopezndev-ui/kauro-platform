@@ -63,7 +63,7 @@ Lanes (PAYMENTS-V1-REPLAN §9): KIT, L-ROUTE, L-INBOUND, L-REFUND, L-SETTLE, S-B
 | CMD029-*, CMD030-*, CMD033-*, CMD034-* (B09) | PARTIAL, remaining B15 (some B08/B10) | **DEFERRED** automated rail (DV1-09); the bank equivalents are C6/P1, C5/C6, X1/G2/NR, SI2/C6; CMD034-DENY's R2-085 half → ST1/ST2 | existing titles; `refund-generic-v1.test.ts` NR/FC-RAIL titles |
 | S060 (B09) | PARTIAL, remaining B10 | unchanged | B09 map |
 | R2-061 (B15) | — | local reordering EXECUTED_LOCAL: `packages/persistence/test/ach-refund-cells.test.ts` :: "RACE ACH-M-G6-RACE (reorder): Apply incoming-credit reversal", "RACE ACH-M-P3-RACE (reorder): FINANCE return-booking consumer", `ach-inbound-cells.test.ts` :: "RACE ACH-M-SI2-RACE (both orders): Import statement coverage"; webhook half **DEFERRED** | §1 |
-| R2-085 (B15) | — | EXECUTED_LOCAL ST1/ST2 (`packages/persistence/test/settlement-cells.test.ts`, SET-M titles in ACH-ROUTE §7.25); LIVE Wise → Bancolombia after D-14 | L-SETTLE |
+| R2-085 (B15) | PARTIAL, remaining B14-worker-host | two-step settlement EXECUTED_LOCAL (PV1-SETTLE): ST1/ST2/ST3 in `apps/api/test/settlement-cells.test.ts` and delivery D1-D5 in `apps/api/test/ach-dispatch-cells.test.ts` (SET-M titles in ACH-ROUTE §7.25), money oracle INV-SET-1..7 after every cell (`apps/api/test/settlement-oracle.ts`); no production host runs the payment dispatcher yet (only `apps/api/src/payments/index.ts` builds it), so R2-085 stays below EXECUTED_LOCAL until a runner cell exists (plan F2, docs/design/PV1-SETTLE-two-step.md §7); LIVE Wise -> Bancolombia after D-14 | L-SETTLE |
 | R2-082..R2-084, CMD035-* (B15) | — | unchanged (fiscal adapter, S-B) | B15 map |
 | S066 (B11) | per B11 map | EXECUTED_LOCAL `apps/web/test/operation-runner.test.ts` S066 title + "RACE ACH-M-I2-CRASH-AFTER (lost answer): Issue transfer instructions"; LIVE in ACH-LIVE-01 issuance | B11 map (S-E) |
 | CMD052, CMD053, R2-103, R2-104 (B10) | per B10 map | unchanged EXECUTED_LOCAL; live payout → lane PAYOUT-MANUAL, LATER 2026-11-30 (first PAYABLE line ≥ Dec-2026, R2 17) | B10 map |
@@ -73,6 +73,25 @@ Lanes (PAYMENTS-V1-REPLAN §9): KIT, L-ROUTE, L-INBOUND, L-REFUND, L-SETTLE, S-B
 Simulator self-tests kept in `packages/application/test/commerce-fakes.test.ts` ("PayPal Orders v2 contract fake: …",
 "WebhookVerifier contract fake: …", "R2-080 (Windows flake …)") are labelled **"simulator self-test, not V1 rail evidence"**; they
 stay because every accepted B09/B10 test uses the simulator (deleting them would edit accepted B09 files).
+
+## 2b. PV1-SETTLE two-step (R2-085): SIMULATED marks, open gaps, caveats
+Source: docs/design/PV1-SETTLE-two-step.md (§3 P5, §4, §8). Kept here so the map, not the design, is the record.
+- **SIMULATED delivery (P5)**: the cells that drove M1/P1 without the dispatcher (`deliverToService` in `apps/api/test/inbound-lane-support.ts` calls
+  `paymentServiceEffect().handle` with an oracle-built delivery): ACH-M-M1-{RACE,TIMEOUT,EXPIRY,RETRY,REVOCATION,PARTIAL} and
+  ACH-M-P1-{RACE,TIMEOUT,EXPIRY,RETRY,REVOCATION,PARTIAL} in `apps/api/test/ach-inbound-cells.test.ts`. The handler is EXECUTED_LOCAL, the
+  delivery is SIMULATED; the real-dispatcher delivery is proven by `ach-dispatch-cells.test.ts` D2 (ACH-M-DSP-OK, received -> matched -> APPLIED).
+  E1, E1R, P2, P1D and FC use it as fixture setup only.
+- **GAP-SET-AVAIL-PRODUCER** (tier 1, D-ACH-11): no producer of PSP_AVAILABLE on a bank route; every live V1 apply is REFUSED FUNDS_UNAVAILABLE (+ case) until it exists.
+- **GAP-SET-NEG-AVAIL** (tier 1, rule 11): FINANCE writers of PSP_AVAILABLE do not take payout-cash; unreachable on a bank route (P2). Oracle INV-SET-2 watches it.
+- **GAP-SET-REMAINDER** (tier 1, D-SET-9): received money below the withdrawal stays in BANK_IN_TRANSIT (W - R) until a later observation; no V1 command closes the remainder (PV1-SETTLE.md D-SET-9). The in-transit page keeps showing it.
+- **GAP-SET-HOST** (F2): no production host runs the payment dispatcher; owner lane B14-worker-host, before B19. Keeps R2-085 PARTIAL.
+- **Caveats** (decisions; cell in parentheses): C1 revocation after the record does not cancel an apply within 900 s, beyond it REQUEST_STALE (cells 16(a), 16(d));
+  C2 artifact-to-facts binding is the apply's evidence re-read, the store is not a table (cell 20); C3 inherited, session liveAt at the process clock, out of lane;
+  C4 inherited B10, CMD053 stamps settled_at at transaction start (pair cell 10(d)); C5 FUNDS_UNAVAILABLE is terminal; C6 notifications of agency-less
+  bank events run on another dispatcher, inherited; C7 inherited, outbox_records_owner_bank FOR ALL lets the owner update its credit/import outbox rows,
+  not extended to settlement_request (cell 16(c)); the bank_credit half is flagged to PV1-INBOUND.
+- **Behaviors fixed by the adversary of 5800876a**: an apply never auto-resolves an EVIDENCE_MISMATCH case (it stays OPEN, cell 20); the in-transit page also lists an
+  APPLIED settlement without a bank receipt (money still in BANK_IN_TRANSIT, cells 19/21); settlement event cents are exact safe integers.
 
 ## 3. Gates (r8, PV1 Addendum)
 

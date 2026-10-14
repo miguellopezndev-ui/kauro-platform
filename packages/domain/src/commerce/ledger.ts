@@ -199,3 +199,25 @@ export function isBalanced(ls: ReadonlyArray<PostingLine>): boolean {
   for (const l of ls) net += l.direction === "DEBIT" ? l.amountCents : -l.amountCents;
   return net === 0n;
 }
+
+/**
+ * A settlement observation (PV1-SETTLE D-SET-6; R2-085; D-LEDGER-B5): the provider's release of a withdrawal moves it from the
+ * provider's available balance into bank money in transit, the withdrawal's fee is the provider's expense out of the same balance, and
+ * only a receiving bank's receipt moves money in transit into bank cash. Gross and held are facts of the observation, never posted here
+ * (their own sources post them). A receipt beyond the withdrawal is refused (no bank cash from imaginary liquidity).
+ */
+export function settlementPostings(withdrawnCents: bigint, feeCents: bigint, receivedCents: bigint): ReadonlyArray<PostingLine> {
+  assertMoney(withdrawnCents);
+  assertMoney(feeCents);
+  assertMoney(receivedCents);
+  if (withdrawnCents === 0n) throw new RangeError("a settlement observation releases a withdrawal");
+  if (receivedCents > withdrawnCents) throw new RangeError("a receipt cannot exceed the withdrawal it cites");
+  return lines(
+    line("BANK_IN_TRANSIT", "DEBIT", withdrawnCents),
+    line("PSP_AVAILABLE", "CREDIT", withdrawnCents),
+    line("PROCESSOR_EXPENSE", "DEBIT", feeCents),
+    line("PSP_AVAILABLE", "CREDIT", feeCents),
+    line("BANK_CASH", "DEBIT", receivedCents),
+    line("BANK_IN_TRANSIT", "CREDIT", receivedCents),
+  );
+}

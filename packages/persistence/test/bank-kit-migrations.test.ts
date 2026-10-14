@@ -7,6 +7,7 @@ import { after, before, test } from "node:test";
 import type { Client } from "pg";
 import {
   BANK_CASE_KINDS,
+  BANK_CASE_SOURCE_KINDS,
   BANK_CREDIT_SOURCES,
   BANK_CREDIT_STATES,
   BANK_CREDIT_STATUSES,
@@ -107,6 +108,7 @@ test("the vocabulary table mirrors every closed domain list exactly (BANK_RAILS 
     EXECUTION_GATE_OUTCOME: EXECUTION_GATE_OUTCOMES,
     DEBIT_CORRELATION: DEBIT_CORRELATIONS,
     BANK_CASE_KIND: BANK_CASE_KINDS,
+    BANK_CASE_SOURCE_KIND: BANK_CASE_SOURCE_KINDS,
     STATEMENT_LINE_KIND: STATEMENT_LINE_KINDS,
     COVERAGE_STREAM: COVERAGE_STREAMS,
   };
@@ -124,6 +126,8 @@ test("the vocabulary table mirrors every closed domain list exactly (BANK_RAILS 
 const ENVIRONMENTS = ["SANDBOX", "LIVE"] as const;
 /** The source-freeze reasons: the two BANK_CASE_KINDS a freeze is opened for (a limited subset, not the whole list). */
 const FREEZE_REASONS = ["UNDECLARED_OUTBOUND", "REFUND_TERMINAL_CONTRADICTED"] as const;
+/** An execution offer opens a route-money case, never a settlement refusal (SETTLEMENT_REFUSED is the settlement intent's, 0071). */
+const OFFER_REVIEW_CASE_KINDS = BANK_CASE_KINDS.filter((k) => k !== "SETTLEMENT_REFUSED");
 const ENUM_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>> = {
   "outbound_execution_attempts.environment": ENVIRONMENTS,
   "outbound_execution_attempts.kind": EXECUTION_ATTEMPT_KINDS,
@@ -136,7 +140,7 @@ const ENUM_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>> = {
   "execution_offers.command": EXECUTION_OFFER_COMMANDS,
   "execution_offer_outcomes.gate_outcome": EXECUTION_GATE_OUTCOMES,
   "execution_offer_outcomes.footprint": ["RECORDED", "REVIEW"],
-  "execution_offer_outcomes.review_case_kind": BANK_CASE_KINDS,
+  "execution_offer_outcomes.review_case_kind": OFFER_REVIEW_CASE_KINDS,
   "statement_imports.environment": ENVIRONMENTS,
   "statement_coverage.stream": COVERAGE_STREAMS,
   "statement_lines.environment": ENVIRONMENTS,
@@ -148,7 +152,7 @@ const ENUM_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>> = {
   "bank_review_cases.kind": BANK_CASE_KINDS,
   "bank_review_cases.state": ["OPEN", "RESOLVED"],
   "bank_review_cases.environment": ENVIRONMENTS,
-  "bank_review_cases.source_kind": EXECUTION_SOURCE_KINDS,
+  "bank_review_cases.source_kind": BANK_CASE_SOURCE_KINDS,
 };
 
 interface EnumCheck {

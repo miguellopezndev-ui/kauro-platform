@@ -117,6 +117,14 @@ export const COMMERCE_FAILURE_REASONS = [
   // the owner's evidence upload (B12 D-B12S-2, GAP-API-8): refused before the restricted store is called
   "ARTIFACT_SIZE_INVALID",
   "ARTIFACT_TYPE_MISMATCH",
+  // settlement observations (lane PV1-SETTLE; ACH-ROUTE §7.25, docs/design/PV1-SETTLE.md D-SET-3, D-SET-4)
+  "CURRENCY_MISMATCH",
+  "RECEIPT_MISMATCH",
+  "SETTLEMENT_INCONSISTENT",
+  "WITHDRAWAL_ALREADY_SETTLED",
+  // the two-step apply of a recorded settlement intent (lane PV1-SETTLE; docs/design/PV1-SETTLE-two-step.md §3.3 A7)
+  "REQUEST_STALE",
+  "EVIDENCE_MISMATCH",
 ] as const;
 
 export type CommerceFailureReason = (typeof COMMERCE_FAILURE_REASONS)[number];
