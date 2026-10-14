@@ -1,0 +1,9 @@
+name: planted
+on: push
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate
+        run: |
+          pnpm run gate 2>&1 | tee gate.log
