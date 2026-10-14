@@ -57,13 +57,19 @@ CREATE CONSTRAINT TRIGGER settlements_event_per_version AFTER INSERT ON kauro.se
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.withdrawal_id IS NOT NULL) EXECUTE FUNCTION kauro.require_event_for_version('settlement', 'settlement_id');
 
 -- the payment service's agency-less events and outbox records: 0061's two kinds and the settlement (decision #1)
-DROP POLICY domain_events_payment_bank ON kauro.domain_events;
-CREATE POLICY domain_events_payment_bank ON kauro.domain_events FOR ALL TO kauro_payment
-  USING (agency_id IS NULL AND aggregate_kind IN ('bank_credit', 'statement_import', 'settlement'))
+-- (batch C: 0078 SEC OWNER-POLICY-FORALL-2 split 0063's FOR ALL policies into one per granted command, *_read and *_record; the
+-- settlement kind widens both of each pair, the same predicates as before the split)
+DROP POLICY domain_events_payment_bank_read ON kauro.domain_events;
+DROP POLICY domain_events_payment_bank_record ON kauro.domain_events;
+CREATE POLICY domain_events_payment_bank_read ON kauro.domain_events FOR SELECT TO kauro_payment
+  USING (agency_id IS NULL AND aggregate_kind IN ('bank_credit', 'statement_import', 'settlement'));
+CREATE POLICY domain_events_payment_bank_record ON kauro.domain_events FOR INSERT TO kauro_payment
   WITH CHECK (agency_id IS NULL AND aggregate_kind IN ('bank_credit', 'statement_import', 'settlement') AND split_part(event_type, '.', 1) = aggregate_kind);
-DROP POLICY outbox_records_payment_bank ON kauro.outbox_records;
-CREATE POLICY outbox_records_payment_bank ON kauro.outbox_records FOR ALL TO kauro_payment
-  USING (EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = outbox_records.event_id AND e.agency_id IS NULL AND e.aggregate_kind IN ('bank_credit', 'statement_import', 'settlement')))
+DROP POLICY outbox_records_payment_bank_read ON kauro.outbox_records;
+DROP POLICY outbox_records_payment_bank_record ON kauro.outbox_records;
+CREATE POLICY outbox_records_payment_bank_read ON kauro.outbox_records FOR SELECT TO kauro_payment
+  USING (EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = outbox_records.event_id AND e.agency_id IS NULL AND e.aggregate_kind IN ('bank_credit', 'statement_import', 'settlement')));
+CREATE POLICY outbox_records_payment_bank_record ON kauro.outbox_records FOR INSERT TO kauro_payment
   WITH CHECK (EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = outbox_records.event_id AND e.agency_id IS NULL AND e.aggregate_kind IN ('bank_credit', 'statement_import', 'settlement')));
 
 -- --- the provider-available balance of a route (D-SET-5) ---------------------------------------------------------------------------------
