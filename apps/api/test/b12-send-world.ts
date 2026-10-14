@@ -224,6 +224,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
     onBackgroundFailure: (correlationId: string, error: unknown) => void background.push({ correlationId, error }),
   };
   let statementTimeout: number | null = null;
+  const dispatchers = new Map<string, Dispatcher>();
 
   /** One transaction of a runtime role under a person's OPERATOR context on the TEST CLOCK at `at` (a fixture standing in for a lane's route). */
   const within = async <T>(userId: string, at: string, fn: (c: Client) => Promise<T>): Promise<T> => {
@@ -411,6 +412,9 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       return body.subReason ?? body.details?.subReason ?? null;
     },
     dispatcher(name = "dispatcher") {
+      // one dispatcher (one lease owner) per name: a second owner would find the lease HELD until it expires
+      const known = dispatchers.get(name);
+      if (known !== undefined) return known;
       const d: OutreachDispatcher = createOutreachDispatcher(runtime);
       let fence: number | null = null;
       const admitted = new Map<string, Parameters<OutreachDispatcher["submit"]>[0]>();
@@ -461,6 +465,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
         },
         takeOver,
       };
+      dispatchers.set(name, adapter);
       return adapter;
     },
     async open(login) {
