@@ -6,7 +6,7 @@
 // fails until the lane builds prepare-draft.ts and its world; every race cell fails under its §M control (KAURO_B12_CONTROL=<id>) at its
 // forbidden-effect assertion (a draft born after the conflicting writer committed).
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
+import { after, before } from "node:test";
 import { connectionPid, type FaultContext } from "@kauro/persistence/testing";
 import { outreachBindingHash } from "@kauro/domain";
 import {
@@ -14,6 +14,7 @@ import {
   draftsOfProspect, draftWorld, eventsOfProspect, failing, familyRows, holdSubject, intentsOfDraft, journalStates, keyOf, ORDERS, OUTCOME, policyStates, prepareDraft,
   publish, putContent, raceAtWrite, ROUTES, safeContent, sellerState, senderState, settledValue, statusCode, suppressedKeys, T0, tokenOf, W, type DraftBody, type DraftWorld, type GrantP, type Order,
   type ProspectP, type RaceResult, type ResourceP, type SellerP, type Settled,
+  draftTest as test,
 } from "./b12-draft-support.js";
 import type { UnitLog } from "./fault-support.js";
 import type { Reply } from "./support.js";

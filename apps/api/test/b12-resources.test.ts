@@ -5,11 +5,12 @@
 // title fails until the lane builds publish-resource.ts / resources.ts and its world; GAP-PU-1 fails under KAURO_B12_CONTROL=M40 (L6 and
 // the co-guards T7, family/version UNIQUE and the edge trigger removed: two CURRENT versions of the family) and GAP-PU-2 under PU-2.
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
+import { after, before } from "node:test";
 import {
   answerOf, asDraft, capabilityState, cell, claimsOf, completedOf, contentIdOf, corporateRoleState, draftAnswerOf, draftBodyOf, draftResources, draftRow, draftsOfProspect,
   draftWorld, failing, familyRows, intentsOfDraft, journalStates, keyOf, ORDERS, OUTCOME, prepareDraft, publish, raceAtWrite, revokeOwnerActor, ROUTES, safeContent, STALE,
   statusCode, T0, W, type DraftWorld, type GrantP, type Order, type Person, type RaceResult, type ResourceP, type Settled,
+  draftTest as test,
 } from "./b12-draft-support.js";
 import type { Reply } from "./support.js";
 

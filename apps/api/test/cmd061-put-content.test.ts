@@ -23,7 +23,7 @@ after(async () => {
 });
 
 const replyOf = (s: Settled<unknown>, what: string): Reply => answerOf(s, what) as Reply;
-const idOf = (reply: Reply, what: string): string => completedOf<{ contentId: string }>(reply, 201, what).data.contentId;
+const idOf = (reply: Reply, what: string): string => completedOf<{ contentRef: string }>(reply, 201, what).data.contentRef;
 
 cell("GAP-PC-1 two puts of one body: one row, both 201 same id", "race", async (ctx) => {
   const runs: Array<{ order: Order; content: { subject: string; body: string }; a: SellerP; b: SellerP; race: RaceResult<unknown, unknown> }> = [];
