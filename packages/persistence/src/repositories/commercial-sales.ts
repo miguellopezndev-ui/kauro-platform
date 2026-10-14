@@ -527,7 +527,7 @@ export class PgSalesRepository implements SalesRepository {
 
   // prospects ---------------------------------------------------------------------------------------------------------------------
 
-  /** The session's own AGENCY-segment source evidence by hash (CMD045 accepts no other: SOURCE_EVIDENCE_INVALID). */
+  /** The session's own source evidence by hash, of either segment (CMD045 accepts no other recorder's: SOURCE_EVIDENCE_INVALID). */
   async sourceEvidence(evidenceHash: Sha256Hex): Promise<ProspectSourceEvidenceRecord | null> {
     const r = await execute<{ evidence_hash: string; seller_id: string | null; recorded_by_user_id: string; source_url_digest: string; observed_on: string; lawful_basis: string; segment: ProspectSegment; recorded_at: string }>(
       this.db,

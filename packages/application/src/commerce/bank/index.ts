@@ -3,6 +3,10 @@ export type { ConfigureBankRouteBody, VerifyBankRouteBody, EnableBankRouteBody, 
 export { BANK_ROUTE_COMMAND_IDS, createBankRouteHandlers, readRouteDetails, bankPayeeDigest, bankRouteView } from "./route-config.js";
 export type { BankTransferView, TransferInstructionsView } from "./instructions.js";
 export { issueBankTransfer, isBankTransferRequest, readTransferInstructions } from "./instructions.js";
+export type { BankCreditRepository, BankEvidenceClassifier, BankInboundCollaborators, BankStreamName, BankCreditChangeInput, NewBankCreditInput } from "./inbound-ports.js";
+export { BANK_HOLD_GATE_READ, BANK_HOLD_STATEMENT_LOCKED } from "./inbound-ports.js";
+export type { EnterBankCreditBody, ConfirmBankCreditBody, AttributeBankCreditBody, BankCreditView, BankCreditCommandView, BankMatchKeysView, BankInboundHandlers, RetireBankCheckoutBody, RecordedRetirementView, InboundReadRequest, InboundReadAnswer, ImportStatementBody, StatementImportView, StatementImportCommandView } from "./inbound.js";
+export { BANK_INBOUND_COMMAND_IDS, bankCreditView, createBankInboundHandlers, publishCreditEvent, publishOrderStateEvent } from "./inbound.js";
 export type { ApproveTreasuryRefundBody, TreasuryRefundView, OwnerRefundDependencies, RefundDestinationFields, RefundDestinationEvidenceFields } from "./approve-destination.js";
 export { BANK_REFUND_COMMAND_IDS, treasuryRefundAuthorizationHash } from "./approve-destination.js";
 export type { BankRefundHandlers, DeclareRefundExecutionBody, RecordExecutionBody, ExecutionAttemptView, DeclareExecutionView, RecordExecutionView, ExecutionQueueItemView, ExecutionQueueView, ExecutionQueueRequest, RefundStateView } from "./execute-refund.js";

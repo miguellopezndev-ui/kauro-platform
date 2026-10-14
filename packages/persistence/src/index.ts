@@ -32,9 +32,12 @@ export { PgAssuranceProofRecorder, PgValidationReceiptRecorder } from "./evidenc
 export { PgWebSessionStore, WEB_SESSION_STATEMENT_TIMEOUT_MS } from "./web-sessions.js";
 export type { StoredWebSession, NewStoredWebSession } from "./web-sessions.js";
 export { PgSessionFence } from "./session-fence.js";
+export { PgBuyerTypes, PgProjectDashboard, type PgBuyerTypeRecord, type PgProjectDashboardRow, type PgDashboardFilter } from "./repositories/agency-app.js";
 export type { LockedSession } from "./session-fence.js";
-export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf, bankRoutesOf, bankRefundsOf, sessionFenceOf, effectInstantOf } from "./unit-of-work.js";
+export { createUnitOfWorkFactory, PgUnitOfWorkFactory, PgUnitOfWork, PgSourceUnitOfWork, createCommerceUnitOfWorkFactory, PgCommerceUnitOfWorkFactory, PgCommerceUnitOfWork, commercialInspectionsOf, purchasedSubjectsOf, paymentSweepsOf, commerceRequestReadsOf, commercialSourceReadsOf, sourceStoreOf, commercialAuthorizationsOf, bankRoutesOf, bankCreditsOf, bankRefundsOf, sessionFenceOf, effectInstantOf, buyerTypesOf, projectDashboardOf } from "./unit-of-work.js";
 export { PgBankRoutes } from "./repositories/bank-routes.js";
+export { PgBankCredits } from "./repositories/bank-credits.js";
+export type { NewBankCredit, BankCreditChange, BankCreditWrite, BankStream, NewStatementImport, NewStatementLine, StatementLineWrite, BankCheckoutRetirementRecord } from "./repositories/bank-credits.js";
 export type { NewBankRoute, NewBankRouteVersion, NewTransferInstructions } from "./repositories/bank-routes.js";
 export { PgBankRefunds } from "./repositories/bank-refunds.js";
 export type { OwnerAuthorityRow, TreasuryRefundRow, NewRefundDestination, TreasuryApproval } from "./repositories/bank-refunds.js";

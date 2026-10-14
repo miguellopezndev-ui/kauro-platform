@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
-import { AGGREGATE_KINDS, AUDIT_AGGREGATE_KINDS, BANK_ROUTE_AGGREGATE_KINDS, COMMERCE_AGGREGATE_KINDS, EXECUTION_AGGREGATE_KINDS, TREASURY_REFUND_AGGREGATE_KINDS, OUTBOUND_ATTEMPT_AGGREGATE_KINDS, type AggregateKind, type UserId } from "@kauro/domain";
+import { AGGREGATE_KINDS, AUDIT_AGGREGATE_KINDS, BANK_CREDIT_AGGREGATE_KINDS, BANK_ROUTE_AGGREGATE_KINDS, COMMERCE_AGGREGATE_KINDS, EXECUTION_AGGREGATE_KINDS, TREASURY_REFUND_AGGREGATE_KINDS, OUTBOUND_ATTEMPT_AGGREGATE_KINDS, type AggregateKind, type UserId } from "@kauro/domain";
 import { RUNTIME_ROLES } from "../src/index.js";
 import { ROLES, sealSourceRevision, startHarness, type AgencyFixture, type Harness } from "../src/testing/index.js";
 import { constraintOf, event, ids, plan, project, sha, sourceSessions, sqlState, supportCase, tx, type PlanFixture } from "./support.js";
@@ -37,10 +37,10 @@ let carolInA: string;
  */
 // package B08's kinds (processing_job, package_version; audit, cost_grant) bind through the same unchanged function and are walked by
 // its own schema tests (execution-migrations.test.ts, execution-adapters.test.ts; audit-migrations.test.ts, audit-adapters.test.ts)
-type WalkedKind = Exclude<AggregateKind, (typeof COMMERCE_AGGREGATE_KINDS)[number] | (typeof EXECUTION_AGGREGATE_KINDS)[number] | (typeof AUDIT_AGGREGATE_KINDS)[number] | (typeof BANK_ROUTE_AGGREGATE_KINDS)[number] | (typeof TREASURY_REFUND_AGGREGATE_KINDS)[number] | (typeof OUTBOUND_ATTEMPT_AGGREGATE_KINDS)[number]>;
+type WalkedKind = Exclude<AggregateKind, (typeof COMMERCE_AGGREGATE_KINDS)[number] | (typeof EXECUTION_AGGREGATE_KINDS)[number] | (typeof AUDIT_AGGREGATE_KINDS)[number] | (typeof BANK_ROUTE_AGGREGATE_KINDS)[number] | (typeof BANK_CREDIT_AGGREGATE_KINDS)[number] | (typeof TREASURY_REFUND_AGGREGATE_KINDS)[number] | (typeof OUTBOUND_ATTEMPT_AGGREGATE_KINDS)[number]>;
 const WALKED_KINDS: ReadonlyArray<WalkedKind> = AGGREGATE_KINDS.filter(
   (k): k is WalkedKind =>
-    !(COMMERCE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(EXECUTION_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(AUDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_ROUTE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(TREASURY_REFUND_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(OUTBOUND_ATTEMPT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k),
+    !(COMMERCE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(EXECUTION_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(AUDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_ROUTE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_CREDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(TREASURY_REFUND_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(OUTBOUND_ATTEMPT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k),
 );
 const ofA = new Map<WalkedKind, { readonly id: string; readonly version: number }>();
 
@@ -78,9 +78,14 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   // Payments V1 bank-transfer route (0046, lane L-ROUTE; walked by apps/api/test/ach-route-cells.test.ts)
   bank_route: ["bank_routes", "route_id"],
   bank_transfer_instruction: ["bank_transfer_instructions", "order_id"],
-  // Payments V1 treasury refund of an unassigned credit (0060, lane L-REFUND; walked by apps/api/test/ach-refund-cells.test.ts)
+  // package B11 lane A1 (0062): the agency's buyer type, one row per agency keyed by it
+  agency_buyer_type: ["agency_buyer_types", "agency_id"],
+  // Payments V1 inbound credits (0063, lane PV1-INBOUND)
+  bank_credit: ["bank_credits", "bank_credit_id"],
+  statement_import: ["statement_imports", "import_id"],
+  // Payments V1 treasury refund of an unassigned credit (0071, lane L-REFUND; walked by apps/api/test/ach-refund-cells.test.ts)
   treasury_refund: ["treasury_refunds", "treasury_refund_id"],
-  // Payments V1 outbound execution attempt (0060 slice 2, lane L-REFUND; walked by apps/api/test/refund-generic-cells.test.ts)
+  // Payments V1 outbound execution attempt (0071 slice 2, lane L-REFUND; walked by apps/api/test/refund-generic-cells.test.ts)
   outbound_execution_attempt: ["outbound_execution_attempts", "attempt_id"],
 });
 
@@ -154,6 +159,14 @@ before(async () => {
     await c.query("UPDATE kauro.plans SET state = 'APPROVED', approval_id = $2, version = 5 WHERE plan_id = $1 AND version = 4", [p.planId, approvalId]);
     await event(c, { aggregateKind: "plan", aggregateId: p.planId, aggregateVersion: 5, agencyId: A.agencyId, eventType: "plan.approved.v1", actorUserId: approver, payload: { planId: p.planId, agencyId: A.agencyId, approvalId } });
   });
+  // B11 lane A1: CMD101's writes as the owner's own session — the buyer type (v1, written once) and its event
+  await tx(app, { agencyId: A.agencyId, userId: alice }, async (c) => {
+    await c.query(
+      "INSERT INTO kauro.agency_buyer_types (agency_id, buyer_type, for_economic_activity, recorded_by_user_id, recorded_by_membership_id, recorded_at, version) VALUES ($1, 'agency', true, $2, $3, now(), 1)",
+      [A.agencyId, A.ownerUserId, A.ownerMembershipId],
+    );
+    await event(c, { aggregateKind: "agency_buyer_type", aggregateId: A.agencyId, aggregateVersion: 1, agencyId: A.agencyId, eventType: "agency_buyer_type.recorded.v1", actorUserId: alice, payload: { agencyId: A.agencyId } });
+  });
   const idOf: Record<WalkedKind, string> = {
     agency: A.agencyId,
     membership: approverMembership,
@@ -166,6 +179,7 @@ before(async () => {
     source_file: source.fileId,
     retention_record: source.retentionId,
     support_case: (await supportCase(app, A, projectId)).caseId,
+    agency_buyer_type: A.agencyId,
   };
   for (const kind of WALKED_KINDS) {
     const [table, column] = TABLE_OF[kind];
@@ -462,7 +476,10 @@ test("the binding cannot be redirected by a session search_path: neither tempora
     await refusedInSavepoint(c, () => eventOf(c, "shadow_kind", client.id, 1, A.agencyId), "KA006", undefined, `${where}: a shadow kind`);
   };
   const before_ = await eventCount();
-  // (1) temporary tables of the request handlers' own session, searched first
+  // (1) temporary tables of the request handlers' own session, searched first. Since 0060 no runtime login holds TEMPORARY: the
+  // oracle grants it to this test's login for the duration of the assertion and revokes it in finally (SEC-DEPTH A5)
+  await h.oracle.query("DO $g$ BEGIN EXECUTE format('GRANT TEMPORARY ON DATABASE %I TO kauro_app_test', current_database()); END $g$");
+  try {
   await tx(app, { agencyId: A.agencyId, userId: alice }, async (c) => {
     await c.query("CREATE TEMP TABLE aggregate_kinds (aggregate_kind text, table_name text, id_column text, owner_package text) ON COMMIT DROP");
     await c.query("INSERT INTO pg_temp.aggregate_kinds VALUES ('end_client', 'end_clients', 'client_id', 'B06'), ('shadow_kind', 'end_clients', 'client_id', 'B06')");
@@ -474,6 +491,9 @@ test("the binding cannot be redirected by a session search_path: neither tempora
     assert.equal((await c.query("SELECT count(*)::int AS n FROM end_clients WHERE client_id = $1", [phantom])).rows[0].n, 1);
     await probes(c, "temporary tables");
   });
+  } finally {
+    await h.oracle.query("DO $g$ BEGIN EXECUTE format('REVOKE TEMPORARY ON DATABASE %I FROM kauro_app_test', current_database()); END $g$");
+  }
   // (2) a schema an adversary controls, put first by the session
   await h.oracle.query("CREATE SCHEMA shadow");
   try {

@@ -1,4 +1,4 @@
--- Migration 0060: the corporate owner's approval of a manual-rail refund, applied by the payment service (Payments V1, lane L-REFUND, slice 1:
+-- Migration 0071: the corporate owner's approval of a manual-rail refund, applied by the payment service (Payments V1, lane L-REFUND, slice 1:
 -- F2 `Kapprove`; docs/design/ACH-ROUTE.md r12 §7.13-§7.14 F1/F2, D-ACH-16, D-ACH-19; DV1-10, DV1-11). Provisional number (renumbered at merge).
 --
 -- Every bank outbound command runs its units of work as the payment service (kauro_payment), so the owner's authority is judged where the
@@ -113,7 +113,7 @@ DECLARE
 BEGIN
   IF reviewer IS NULL THEN
     -- no session person: only the payment service applying a corporate owner's step-up approval judged in this very transaction by
-    -- kauro.bank_owner_authority, of a refund whose destination is captured (Payments V1 F2; 0060)
+    -- kauro.bank_owner_authority, of a refund whose destination is captured (Payments V1 F2; 0071)
     IF NOT pg_catalog.pg_has_role(current_user, 'kauro_payment', 'USAGE') OR NEW.state <> 'APPROVED' OR NEW.authorization_kind IS DISTINCT FROM 'OWNER_STEP_UP' OR NEW.authorization_policy_id IS NOT NULL
        OR NOT kauro.bank_owner_acted(NEW.approved_by_user_id, NEW.authorization_proof_ref) THEN
       RAISE EXCEPTION 'CORPORATE_ROLE_MISSING: refund % is reviewed by a person', OLD.refund_id USING ERRCODE = 'KP007';

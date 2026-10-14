@@ -50,6 +50,7 @@ export interface NewTransferInstructionsInput {
   readonly transferExpiresAt: UtcInstant;
   readonly sendBy: UtcInstant;
   readonly issuedAt: UtcInstant;
+  readonly acceptedPayerDigest?: string | null;
 }
 
 /** The route tables in the caller's unit of work (persistence PgBankRoutes). */

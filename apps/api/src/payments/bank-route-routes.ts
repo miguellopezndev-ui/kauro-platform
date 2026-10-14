@@ -13,15 +13,16 @@
  *   POST /api/v1/operations/execution-attempts/{attemptId}/records      recordRefundExecution  (KAURO_OWNER)  200 (lane L-REFUND, G2/G4)
  *   GET  /api/v1/operations/execution-attempts                           listExecutionAttempts  (KAURO_OWNER)  200 (lane L-REFUND, the queue)
  *   GET  /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions  (agency member, X-Kauro-Agency) 200
+ *   POST /api/v1/payment-orders/{orderId}/retirements          retireBankCheckout       (billing member, X-Kauro-Agency) 201
  *
  * Admission of a POST: the envelope headers, the closed request schema, an Idempotency-Key, the path ids; then the person's
  * authentication through the server's shared command boundary with the actual method (PV1R-01: an unsafe cookie request's Origin,
  * Sec-Fetch-Site and CSRF rule; typed credential refusals; none: the anonymous denial, AUTHENTICATION_REQUIRED). Every reply carries Cache-Control: no-store (the server's hook);
  * the instructions never carry an ETag.
  */
-import type { BankRefundHandlers, BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest } from "@kauro/application";
+import type { BankInboundHandlers, BankRefundHandlers, BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest } from "@kauro/application";
 import { HEADERS, OPERATIONAL_ROUTES, admitEmptyRequest, admitHeaders, admitOperationalBody, operationalRouteResponses, problemOf, readTransferInstructions, repeatedHeaderNames, type CommerceRequestRuntime } from "@kauro/application";
-import type { Clock, CorrelationId, Environment } from "@kauro/domain";
+import type { AgencyId, Clock, CorrelationId, Environment } from "@kauro/domain";
 import { DomainFailure, IDEMPOTENCY_KEY, isUuid } from "@kauro/domain";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { RouteKit } from "../server.js";
@@ -30,6 +31,8 @@ export interface BankRouteRouteDependencies {
   readonly handlers: BankRouteHandlers;
   /** Lane L-REFUND: the owner refund commands of the route (CMD220 ApproveTreasuryRefund); absent, their routes are not served. */
   readonly refunds?: BankRefundHandlers;
+  /** The owner's inbound credit commands (lane PV1-INBOUND). */
+  readonly inbound?: BankInboundHandlers;
   readonly runtime: CommerceRequestRuntime;
   readonly bank: BankRouteCollaborators | null;
   readonly validator: SchemaValidator;
@@ -38,6 +41,7 @@ export interface BankRouteRouteDependencies {
   readonly refuseUnauthenticated: (action: string, request: UnauthenticatedRequest) => Promise<Problem>;
 }
 
+const REF_PATH = /^[A-Za-z0-9._:-]{1,128}$/;
 const UUID_PATH = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function routeOf(operationId: string) {
@@ -64,7 +68,7 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     const out: Record<string, string> = {};
     for (const name of path.match(/\{([a-zA-Z]+)\}/g)?.map((m) => m.slice(1, -1)) ?? []) {
       const value = params[name];
-      if (value === undefined || !UUID_PATH.test(value)) return invalid("PATH_ID_INVALID", correlationId);
+      if (value === undefined || !(name.endsWith("Ref") ? REF_PATH : UUID_PATH).test(value)) return invalid("PATH_ID_INVALID", correlationId);
       out[name] = value;
     }
     return out;
@@ -81,7 +85,7 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     }
   }
 
-  function command(operationId: string, action: string, run: (request: BankRouteRequest<unknown>) => Promise<CommandResult<unknown>>): void {
+  function command(operationId: string, action: string, run: (request: BankRouteRequest<unknown> & { readonly agencyId: AgencyId | null }) => Promise<CommandResult<unknown>>, tenant = false): void {
     const route = routeOf(operationId);
     app.route<{ Params: Record<string, string>; Body: Buffer | undefined }>({
       method: route.method,
@@ -102,15 +106,19 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
         if (!IDEMPOTENCY_KEY.test(key)) return kit.sendProblem(r, invalid("IDEMPOTENCY_KEY_INVALID", correlationId));
         const path = pathIds(route.path, request.params, correlationId);
         if (isProblem(path)) return kit.sendProblem(r, path);
+        // a tenant command names its agency (X-Kauro-Agency); an owner command names none
+        const selector = tenant ? headers[HEADERS.agency] : undefined;
+        if (tenant && (selector === undefined || !isUuid(selector))) return kit.sendProblem(r, invalid("AGENCY_SELECTOR_INVALID", correlationId));
+        const agencyId = (selector ?? null) as AgencyId | null;
         // PV1R-01: the shared command boundary's authentication with the request's actual method (the unsafe cookie request's Origin,
         // Sec-Fetch-Site and session CSRF rule; typed credential refusals), before the handler runs and before any journal reservation
-        const authenticated = await kit.subjectOrRefusal(request, headers, action, { correlationId, agencyId: null });
+        const authenticated = await kit.subjectOrRefusal(request, headers, action, { correlationId, agencyId });
         if (authenticated.kind === "PROBLEM") return kit.sendProblem(r, authenticated.problem);
         const subject = authenticated.subject;
         // rule 16 (PV1R-07 r4): the command fences the caller's credential FOR SHARE in its own unit and judges it at COMMIT (that COMMIT is the release)
         const authority = kit.requestAuthority(request, headers, subject.identity.userId);
         return guarded(r, correlationId, async () => {
-          const result: CommandResult<unknown> = await run({ environment: deps.environment, correlationId, idempotencyKey: key, subject, path, body: admitted.body, receivedAt: deps.clock.now(), authority });
+          const result: CommandResult<unknown> = await run({ environment: deps.environment, correlationId, idempotencyKey: key, subject, path, body: admitted.body, receivedAt: deps.clock.now(), authority, agencyId });
           return replyOf(kit, r, result);
         });
       },
@@ -127,6 +135,15 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     command("approveTreasuryRefund", "CMD220", (req) => refunds.approveTreasury(req as never));
     command("declareRefundExecution", "CMD221", (req) => refunds.declareExecution(req as never));
     command("recordRefundExecution", "CMD222", (req) => refunds.recordExecution(req as never));
+  }
+
+  const inbound = deps.inbound;
+  if (inbound !== undefined) {
+    command("enterBankCredit", "CMD210", (req) => inbound.enter(req as never));
+    command("confirmBankCredit", "CMD211", (req) => inbound.confirm(req as never));
+    command("attributeBankCredit", "CMD212", (req) => inbound.attribute(req as never));
+    command("importBankStatement", "CMD213", (req) => inbound.importStatement(req as never));
+    command("retireBankCheckout", "CMD214", (req) => inbound.retire(req as never), true);
   }
 
   function read(operationId: string, run: (request: FastifyRequest<{ Params: Record<string, string> }>, correlationId: CorrelationId, path: Readonly<Record<string, string>>, headers: Readonly<Record<string, string | undefined>>) => Promise<FastifyReplyAnswer>): void {
@@ -166,6 +183,17 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
       const authority = kit.requestAuthority(request, headers, authenticated.subject.identity.userId);
       return await refunds.executionQueue({ correlationId, subject: authenticated.subject, authority });
     });
+  }
+  if (inbound !== undefined) {
+    const ownerRead = async <View>(headers: Readonly<Record<string, string | undefined>>, request: FastifyRequest<{ Params: Record<string, string> }>, action: string, correlationId: CorrelationId, run: (r: { correlationId: CorrelationId; subject: never; authority: never }) => Promise<FastifyReplyAnswer>): Promise<FastifyReplyAnswer> => {
+      const authenticated = await kit.subjectOrRefusal(request, headers, action, { correlationId, agencyId: null });
+      if (authenticated.kind === "PROBLEM") return authenticated;
+      const authority = kit.requestAuthority(request, headers, authenticated.subject.identity.userId);
+      const answer = await run({ correlationId, subject: authenticated.subject as never, authority: authority as never });
+      return answer.kind === "READ" ? { kind: "READ", view: { data: answer.view } } : answer;
+    };
+    read("getBankCredit", (request, correlationId, path, headers) => ownerRead(headers, request, "READ_BANK_CREDIT", correlationId, (r) => inbound.getCredit({ ...r, creditId: path["creditId"]! })));
+    read("getBankOrderMatchKeys", (request, correlationId, path, headers) => ownerRead(headers, request, "READ_BANK_ORDER_MATCH_KEYS", correlationId, (r) => inbound.getMatchKeys({ ...r, orderId: path["orderId"]! })));
   }
 
   read("getTransferInstructions", async (request, correlationId, path, headers) => {

@@ -8,6 +8,7 @@ import type { B07Handlers } from "../contracts.js";
 import { cancelUploadHandler } from "./cancel-upload.js";
 import { completeUploadHandler } from "./complete-upload.js";
 import { createRevisionHandler } from "./create-revision.js";
+import { requestRetentionExtensionHandler, type RetentionHandlers } from "./request-retention-extension.js";
 import { reserveUploadHandler } from "./reserve-upload.js";
 import { sealRevisionHandler } from "./seal-revision.js";
 import { selectInputTablesHandler } from "./select-input-tables.js";
@@ -24,6 +25,12 @@ export function createB07Handlers(runtime: SourceRuntime, collaborators: B07Coll
   });
 }
 
+/** The retention package's commands (B16 L2): CMD060 on the source runtime (it edits the source store's retention record). */
+export function createRetentionHandlers(runtime: SourceRuntime): RetentionHandlers {
+  return Object.freeze({ CMD060: requestRetentionExtensionHandler(runtime) });
+}
+
+export type { RetentionHandlers } from "./request-retention-extension.js";
 export type { B07Collaborators, SourcePreview, SourceProviders, SourceRuntime } from "./shared.js";
 export { createSourceReadHandlers, NOT_REQUESTER, type SourceReadHandlers, type SourceReadRuntime } from "./reads.js";
 export { createSourceIntakeHandlers, SOURCE_INTAKE_ROUTES, type IntakeHandler, type IntakeRequest, type IntakeResult, type IntakeSpec, type SourceIntakeHandlers } from "./intake.js";

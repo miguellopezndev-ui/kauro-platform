@@ -480,7 +480,7 @@ test("B07 tables force row-level security, belong to the migrator, grant no DELE
     assert.equal((await oracleRow<{ ok: boolean }>("SELECT has_table_privilege('kauro_app', $1, 'INSERT') AS ok", [`kauro.${table}`])).ok, false, table);
   }
   // still no SECURITY DEFINER function anywhere, but the two the payment migrations add (the same exact allowlist as migrations.test.ts):
-  // 0046's registration of a bank route's payment route and 0060's owner authority of a manual-rail refund, each with a pinned search_path
+  // 0046's registration of a bank route's payment route and 0071's owner authority of a manual-rail refund, each with a pinned search_path
   const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef ORDER BY p.proname");
   assert.deepEqual(definers.rows, [
     { proname: "bank_owner_authority", proconfig: ["search_path=pg_catalog, pg_temp"] },

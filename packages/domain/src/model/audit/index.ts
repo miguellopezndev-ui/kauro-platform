@@ -39,8 +39,8 @@ export type {
   PlanValidationResult,
   PlanValidationRecord,
 } from "./records.js";
-export { grantAvailableCents, grantFunds, poolFundsAudit, auditAbsoluteDeadlineOf, interpretationDeadlineOf } from "./grants.js";
-export { AUDIT_DIGEST_DOMAINS, decisionArtifactHashOf, modelTaskCheckpointOf, modelTaskJournalEventHashOf } from "./digests.js";
+export { grantAvailableCents, grantFunds, poolFundsAudit, auditAbsoluteDeadlineOf, interpretationDeadlineOf, MICROS_PER_CENT, centsOfMicros, postedCentsOf, excessMicrosOf } from "./grants.js";
+export { AUDIT_DIGEST_DOMAINS, decisionArtifactHashOf, dispatchSettlementHashOf, modelTaskCheckpointOf, modelTaskJournalEventHashOf } from "./digests.js";
 export type { PlannedModelTask } from "./digests.js";
 export {
   AUDIT_EVENT_TYPES,

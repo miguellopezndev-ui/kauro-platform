@@ -159,6 +159,8 @@ export interface NewTransferInstructions {
   readonly transferExpiresAt: UtcInstant;
   readonly sendBy: UtcInstant;
   readonly issuedAt: UtcInstant;
+  /** sha256 of the order's accepted billing identity, frozen at issuance (M1 compares the credit's payer with it). */
+  readonly acceptedPayerDigest?: string | null;
 }
 
 export class PgBankRoutes {
@@ -287,10 +289,10 @@ export class PgBankRoutes {
   async insertInstructions(i: NewTransferInstructions): Promise<BankTransferInstructionRecord | null> {
     const r = await execute<InstructionRow>(
       this.db,
-      `INSERT INTO kauro.bank_transfer_instructions (order_id, agency_id, version, route_id, route_version, environment, account_ref, reference, amount_cents, currency, order_state, transfer_expires_at, send_by, issued_at)
-       VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, 'USD', 'AWAITING_TRANSFER', $9, $10, $11)
+      `INSERT INTO kauro.bank_transfer_instructions (order_id, agency_id, version, route_id, route_version, environment, account_ref, reference, amount_cents, currency, order_state, transfer_expires_at, send_by, issued_at, accepted_payer_digest)
+       VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, 'USD', 'AWAITING_TRANSFER', $9, $10, $11, $12)
        ON CONFLICT ON CONSTRAINT bank_transfer_instructions_reference_unique DO NOTHING RETURNING ${INSTRUCTION_COLUMNS}`,
-      [i.orderId, i.agencyId, i.routeId, i.routeVersion, i.environment, i.accountRef, i.reference, i.amountCents.toString(), i.transferExpiresAt, i.sendBy, i.issuedAt],
+      [i.orderId, i.agencyId, i.routeId, i.routeVersion, i.environment, i.accountRef, i.reference, i.amountCents.toString(), i.transferExpiresAt, i.sendBy, i.issuedAt, i.acceptedPayerDigest ?? null],
     );
     return r.rows[0] ? instructionOf(r.rows[0]) : null;
   }

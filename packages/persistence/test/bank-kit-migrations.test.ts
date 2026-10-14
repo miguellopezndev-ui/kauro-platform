@@ -25,7 +25,7 @@ import {
   STATEMENT_LINE_KINDS,
 } from "@kauro/domain";
 import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
-import { constraintOf, sqlState } from "./support.js";
+import { constraintOf, event, sqlState } from "./support.js";
 
 let pg: TemporaryPostgres;
 let oracle: Client;
@@ -342,7 +342,11 @@ test("execution offers are unique per (attempt, command, key) and append-only fo
 
 test("a statement line is unique by the bank's own identity and a credit never carries an execution id or a link; a debit always has an amount", async () => {
   const imp = id();
+  // an import is an aggregate with an event per version (0060): it is born with its statement_import.recorded.v1 in one transaction
+  await oracle.query("BEGIN");
   await oracle.query("INSERT INTO kauro.statement_imports (import_id, environment, account_ref, artifact_ref, evidence_hash, normalizer_version, idempotency_key, imported_by) VALUES ($1, 'SANDBOX', 'acct-kit-1', 'artifact-s1', $2, 'norm-1', 'import-key-1', $3)", [imp, SHA, id()]);
+  await event(oracle, { aggregateKind: "statement_import", aggregateId: imp, aggregateVersion: 1, agencyId: null, eventType: "statement_import.recorded.v1", actorUserId: null });
+  await oracle.query("COMMIT");
   await assert.rejects(oracle.query("INSERT INTO kauro.statement_imports (import_id, environment, account_ref, artifact_ref, evidence_hash, normalizer_version, idempotency_key, imported_by) VALUES ($1, 'SANDBOX', 'acct-kit-1', 'artifact-s1', $2, 'norm-1', 'import-key-2', $3)", [id(), SHA, id()]), (e: unknown) => constraintOf(e) === "statement_imports_one_per_artifact");
   await oracle.query("INSERT INTO kauro.statement_coverage (import_id, stream, covered_from, covered_to) VALUES ($1, 'INBOUND', '2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z'), ($1, 'OUTBOUND', '2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z')", [imp]);
   await assert.rejects(oracle.query("INSERT INTO kauro.statement_coverage (import_id, stream, covered_from, covered_to) VALUES ($1, 'INBOUND', '2026-10-02T00:00:00Z', '2026-10-02T00:00:00Z')", [imp]), (e: unknown) => sqlState(e) === "23505" || sqlState(e) === "23514");

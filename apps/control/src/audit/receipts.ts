@@ -13,10 +13,10 @@
  * meanwhile. Only the settlement of the current intent moves the plan (D8-PLAN-2).
  */
 import { join } from "node:path";
-import type { CancellationChannel, CoreEvidenceClass, ExecutionLimits, ValidatePort, ValidateResult } from "@kauro/application";
+import { attemptIdentityOf, attemptStagingPrefixOf, stagedManifestObjectNameOf, type AttemptCapability, type CancellationChannel, type CoreEvidenceClass, type ExecutionLimits, type ObjectStoragePort, type ValidatePort, type ValidateResult } from "@kauro/application";
 import { DOMAINS, canonicalBytes, isSha256Hex, rawDigest, structuredDigest, type RowCounts, type Sha256Hex, type UtcInstant } from "@kauro/contracts";
-import { AttemptScratchStore } from "@kauro/data-plane";
-import type { AgencyId, Environment, PlanBody, PlanId, ValidationReceiptId, ValidationReceiptRecord } from "@kauro/domain";
+import { AttemptEnvelopeFailure, AttemptScratchStore, GenerationSourceReader } from "@kauro/data-plane";
+import type { AgencyId, Environment, PlanBody, PlanId, ValidationReceiptId, ValidationReceiptRecord, ValidationSource } from "@kauro/domain";
 import { PgValidationReceiptRecorder, createPool, type DatabaseEnvironment, type PoolErrorSink } from "@kauro/persistence";
 
 /** The validator's write path: one append-only receipt, recorded by kauro_validator (persistence's PgValidationReceiptRecorder). */
@@ -166,6 +166,13 @@ export interface ValidationRun {
   readonly receiptId: ValidationReceiptId;
   readonly startedAt: UtcInstant;
   readonly cancellation: CancellationChannel;
+  /**
+   * The sealed revision the plan binds (AuditDiscovery.validationSource, read in the caller's unit): the core reads exactly its sealed
+   * ACCEPTED generations and is told its frozen billable units (B05 L1v), so the receipt's populations are the core's count of the
+   * revision's own source and the delivery refuses any other (deliveryRowCountsOf, COUNTS_MISMATCH). Absent, not SEALED or without
+   * frozen populations: nothing is validated (VALIDATION_SOURCE_UNAVAILABLE).
+   */
+  readonly source: ValidationSource | null;
   /** The server's instant once the validator answered (a unit of its own, D8-CLOCK-1). */
   readonly completedAt: () => Promise<UtcInstant>;
 }
@@ -178,6 +185,8 @@ export class PlanValidator {
       readonly receipts: ValidationReceipts;
       readonly corePackageHash: Sha256Hex;
       readonly limits: ExecutionLimits;
+      /** The object storage the sealed ACCEPTED generations are read from (B07's port). */
+      readonly storage: ObjectStoragePort;
       /** An absolute directory: each validation owns, and removes, a scratch directory of its own under it. */
       readonly scratchRoot: string;
     },
@@ -189,9 +198,26 @@ export class PlanValidator {
    */
   async run(run: ValidationRun): Promise<ReceiptJudgement> {
     if (planBodyHashOf(run.body) !== run.subject.planHash) return { kind: "CONTRACT_FAILURE", reason: "BODY_DIGEST_MISMATCH", evidenceClass: "EXECUTED_LOCAL" };
+    const sealed = run.source;
+    if (sealed === null || sealed.revisionState !== "SEALED" || sealed.populations === null || sealed.acceptedGenerations.length === 0) {
+      return { kind: "CONTRACT_FAILURE", reason: "VALIDATION_SOURCE_UNAVAILABLE", evidenceClass: "EXECUTED_LOCAL" };
+    }
+    // the read-only capability of this validation over exactly the revision's sealed ACCEPTED generations: nothing is written under it
+    const stagingPrefix = attemptStagingPrefixOf(run.subject.agencyId, sealed.projectId, run.subject.planId, run.receiptId);
+    const capability: AttemptCapability = {
+      agencyId: run.subject.agencyId,
+      projectId: sealed.projectId,
+      jobId: run.subject.planId,
+      attemptId: run.receiptId,
+      identity: attemptIdentityOf(run.receiptId),
+      stagingPrefix,
+      manifestObjectName: stagedManifestObjectNameOf(stagingPrefix, run.receiptId),
+      acceptedGenerations: sealed.acceptedGenerations.map((g) => ({ objectName: g.objectName, generation: g.generation, sha256: g.sha256, byteLength: g.byteLength })),
+    };
     const scratch = new AttemptScratchStore({ root: join(this.deps.scratchRoot, "validation"), attemptId: run.receiptId, quotaBytes: this.deps.limits.scratchBudgetBytes });
     let answer: ValidateResult;
     try {
+      const source = new GenerationSourceReader({ capability, storage: this.deps.storage });
       answer = await this.deps.validate.validate({
         revisionHash: run.subject.revisionHash,
         planBody: run.body,
@@ -199,7 +225,12 @@ export class PlanValidator {
         targetContractHash: run.subject.targetContractHash,
         scratch,
         cancellation: run.cancellation,
+        controls: { limits: this.deps.limits, source, billableSourceUnits: sealed.populations.billableSourceUnits, cancellation: run.cancellation },
       });
+    } catch (e) {
+      // a sealed generation that is longer, shorter, other or gone, or outside the capability: the source's integrity failed
+      if (e instanceof AttemptEnvelopeFailure) return { kind: "CONTRACT_FAILURE", reason: e.terminalCause, evidenceClass: "EXECUTED_LOCAL" };
+      throw e;
     } finally {
       scratch.dispose();
     }

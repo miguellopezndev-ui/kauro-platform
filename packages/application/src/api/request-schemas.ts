@@ -21,9 +21,13 @@ const ID = { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}
 export const LABEL_PATTERN = "^[^\\u0000-\\u001f\\u007f-\\u009f]+$";
 const LABEL = { type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PATTERN } as const;
 const VERSION = { type: "integer", minimum: 1, maximum: 9007199254740991 } as const;
+/** requestedSeconds of CMD060: 1..259200 (registry: at most 259200 seconds; 09: seventy-two hours). */
+const EXTENSION_SECONDS = { type: "integer", minimum: 1, maximum: 259200 } as const;
 const HASH = { type: "string", pattern: "^[0-9a-f]{64}$" } as const;
 const MODE = { type: "string", enum: ["CLEAN", "HUBSPOT", "SALESFORCE"] } as const;
 const SUPPORT_CATEGORY = { type: "string", enum: ["PRODUCT_DEFECT", "IMPORT_GUIDANCE", "BILLING", "PRIVACY", "SECURITY", "GENERAL"] } as const;
+/** The raw single-use invitation token: 32 random bytes in base64url is 43 characters; the bound admits nothing but that alphabet (CMD004). */
+const INVITATION_TOKEN = { type: "string", minLength: 16, maxLength: 512, pattern: "^[A-Za-z0-9_-]+$" } as const;
 /**
  * A text: at least one visible character, and no control character but the tab, the line feed and the carriage return (the
  * Unicode Cc set minus U+0009, U+000A and U+000D; U+0000 is refused with the rest), which is what the support_cases summary
@@ -80,6 +84,19 @@ export const REQUEST_SCHEMAS = Object.freeze({
    * cite (D-SUP-2): a non-empty list is a schema violation, and the column keeps the registry bound of ten.
    */
   CMD044: schema("CMD044", ["category", "summary"], { category: SUPPORT_CATEGORY, summary: SUPPORT_SUMMARY, evidenceRefs: { type: "array", maxItems: 0, items: ID } }),
+  /**
+   * The team commands of B16 (G-TENANT). CMD003 names the intended identity (an id) and the role (a label: the closed role set is
+   * the domain's, so a client-invented role is an ENUM refusal of the handler, not a schema accident). CMD004 carries the raw
+   * single-use token and nothing else: the agency is the one the caller's own invitation names. CMD005/CMD007 carry the step-up
+   * proof; CMD006 the reason.
+   */
+  CMD003: schema("CMD003", ["expectedVersion", "intendedIdentityRef", "role"], { expectedVersion: VERSION, intendedIdentityRef: ID, role: LABEL }),
+  CMD004: schema("CMD004", ["invitationToken"], { invitationToken: INVITATION_TOKEN }),
+  CMD005: schema("CMD005", ["expectedVersion", "role", "assuranceProofRef"], { expectedVersion: VERSION, role: LABEL, assuranceProofRef: ID }),
+  CMD006: schema("CMD006", ["expectedVersion", "reasonCode"], { expectedVersion: VERSION, reasonCode: LABEL }),
+  CMD007: schema("CMD007", ["expectedVersion", "newOwnerMembershipId", "assuranceProofRef"], { expectedVersion: VERSION, newOwnerMembershipId: ID, assuranceProofRef: ID }),
+  /** RequestRetentionExtension (B16 L2): the one explicit extension, at most 72 h; the hard cap is not a request member and never moves. */
+  CMD060: schema("CMD060", ["expectedVersion", "requestedSeconds", "purpose", "termsVersion"], { expectedVersion: VERSION, requestedSeconds: EXTENSION_SECONDS, purpose: LABEL, termsVersion: LABEL }),
 } as const);
 
 export type RequestSchemaCommand = keyof typeof REQUEST_SCHEMAS;

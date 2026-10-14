@@ -21,7 +21,6 @@ export const PERMITTED_AI_SENTENCE =
   "Before any CRM or AI project, your data needs to be clean, deduplicated and with every change explained. The free data health check shows you the exact numbers.";
 export const HEALTH_CHECK_NAME = "Free data health check";
 export const HEALTH_CHECK_CTA = "Request a free data health check";
-export const IN_HOUSE_SENTENCE = "In-house CRM and data teams can use Kauro too.";
 
 interface PhraseRule {
   readonly rule: string;
@@ -67,7 +66,7 @@ export function lintText(id: string, text: string, options: LintOptions): readon
   return found;
 }
 
-/** The rules that need the message id: surfaces, the one permitted AI sentence, required names and the once-only Pricing sentence. */
+/** The rules that need the message id: surfaces, the one permitted AI sentence and the required names (A3 3.7's once-on-Pricing sentence was retired by D-33). */
 export function lintCatalogue(entries: Readonly<Record<string, string>>, options: LintOptions): readonly CopyViolation[] {
   const found: CopyViolation[] = [];
   for (const [id, text] of Object.entries(entries)) {
@@ -85,9 +84,6 @@ export function lintCatalogue(entries: Readonly<Record<string, string>>, options
   };
   need("health-check.title", HEALTH_CHECK_NAME, `A3-3.2 the free step is named "${HEALTH_CHECK_NAME}"`);
   need("public.cta.request-health-check.cta", HEALTH_CHECK_CTA, `A3-3.2 the call to action is "${HEALTH_CHECK_CTA}"`);
-  const inHouse = Object.entries(entries).filter(([, text]) => text.includes(IN_HOUSE_SENTENCE));
-  if (inHouse.length !== 1) found.push({ id: "(catalogue)", rule: "A3-3.7 the in-house sentence appears exactly once", text: `${inHouse.length} times` });
-  for (const [id, text] of inHouse) if (!id.startsWith("pricing.")) found.push({ id, rule: "A3-3.7 the in-house sentence appears on Pricing only", text });
   return found;
 }
 

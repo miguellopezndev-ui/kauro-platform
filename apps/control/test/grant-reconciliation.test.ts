@@ -73,7 +73,7 @@ test("GRANT_RECONCILIATION keeps an unknown usage reserved, releases only a prov
         providerProfileId: ids.next() as Id,
         maximumCostCents: 50n,
       });
-      const out = await uow.audits.beginDispatch(task.modelTaskId, { requestId: ids.next() as RequestId, ownerId: owner, requestHash: sha(`request-${key}`), reservedCents: 50n });
+      const out = await uow.audits.beginDispatch(task.modelTaskId, { requestId: ids.next() as RequestId, ownerId: owner, requestHash: sha(`request-${key}`), reservedCents: 50n, stepFence: step.step.fence });
       assert.equal(out.kind, "RESERVED");
       if (out.kind !== "RESERVED") throw new Error("not reserved");
       return out.request;

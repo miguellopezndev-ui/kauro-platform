@@ -1557,8 +1557,9 @@ advCell(`ADV-PV1R-3 DENY ACH-M-I3-REVOCATION (bank order state): the transfer in
       await released;
     }, () => ctx.operation(`projection held (order ${state})`, () => readInstructions(x.b, x.orderId)));
     await atRead;
+    // 0062: an EXPIRED edge names its cause; before the deadline that cause is a retirement (CMD214 consumed by the payment service)
     await ctx.revoked(`order ${state}`, async () => {
-      const moved = await bw.iw.h.oracle.query("UPDATE kauro.bank_transfer_instructions SET order_state = $2 WHERE order_id::text = $1 AND order_state = 'AWAITING_TRANSFER'", [x.orderId, state]);
+      const moved = await bw.iw.h.oracle.query("UPDATE kauro.bank_transfer_instructions SET order_state = $2, expiry_cause = CASE WHEN $2 = 'EXPIRED' THEN 'RETIRED' END WHERE order_id::text = $1 AND order_state = 'AWAITING_TRANSFER'", [x.orderId, state]);
       assert.equal(moved.rowCount, 1, `the bank order moved AWAITING_TRANSFER -> ${state}`);
     });
     go();

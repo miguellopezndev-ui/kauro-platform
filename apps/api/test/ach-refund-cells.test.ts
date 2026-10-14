@@ -454,7 +454,11 @@ for (const [code, label] of [["F1", "Approve outbound return"], ["G1", "Record e
       const s = await subject(scope, `${code}-expiry-${scope}`);
       const a = await s.artifact();
       const proof = await L().iw.h.recordStepUp(L().owner.userId as never);
-      const expiresAt = (await q<{ e: Date }>("SELECT expires_at AS e FROM kauro.assurance_proofs WHERE proof_id = $1", [proof]))[0]!.e.toISOString();
+      const issued = (await q<{ i: Date; e: Date }>("SELECT issued_at AS i, expires_at AS e FROM kauro.assurance_proofs WHERE proof_id = $1", [proof]))[0]!;
+      const expiresAt = issued.e.toISOString();
+      // the step clock stands at the cell's start: a subject set up for longer than the proof's one-second back-dating would put the
+      // operation before the proof's issue (STEP_UP_STALE at the offer, never reaching the read); the proof is valid when the read starts
+      if (Date.parse(ctx.clock.at(0)) < issued.i.getTime()) ctx.clock.set(issued.i);
       ctx.deadline(expiresAt, `${scope}: proof validity`);
       const pause = ctx.points.pause("bank:gate-read");
       const running = ctx.operation(`${scope}: ${code} whose proof expires during its read`, (op) => onFresh(ctx, async () => { L().iw.faults.clock = op.clock; try { return await s.read(a, { proof }); } finally { L().iw.faults.clock = null; } }));

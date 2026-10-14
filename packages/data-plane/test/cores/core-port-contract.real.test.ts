@@ -5,7 +5,10 @@ import { test } from "node:test";
 import { loadConfig } from "@kauro/migration-core";
 import type { ArtifactWriter, ExecutionSubject } from "@kauro/application";
 import { CORE_PORT_CONTRACT, type CorePortBackend } from "@kauro/application/testing/cores";
-import { MigrationCoreAdapter, attemptScratchDirectoryOf } from "../../src/index.js";
+import { MigrationCoreAdapter, attemptScratchDirectoryOf, coreTimersOf } from "../../src/index.js";
+
+/** The wall clock of a test (CK3 scans product code only). */
+const WALL_TIMERS = coreTimersOf({ nowMs: () => Date.now() });
 import { attemptFixture, limitsOf, manualChannel, sha } from "../support/attempt.js";
 import { CONTACTS_CSV, configDocument, hostIoOf, inputRef, memorySource, memoryWriter, resolverOf, tempRoot } from "../support/core-config.js";
 
@@ -25,9 +28,9 @@ function backendOver(root: string): CorePortBackend {
     n += 1;
     const attempt = attemptFixture(100 + n);
     mkdirSync(attemptScratchDirectoryOf(root, attempt.attemptId), { recursive: true });
-    return new MigrationCoreAdapter({ attemptId: attempt.attemptId, scratchRoot: root, inputs: resolverOf([inputRef("contacts.csv", CONTACTS_CSV)]), corePackageHash: sha("core"), pollIntervalMs: 50 });
+    return new MigrationCoreAdapter({ attemptId: attempt.attemptId, scratchRoot: root, inputs: resolverOf([inputRef("contacts.csv", CONTACTS_CSV)]), corePackageHash: sha("core"), timers: WALL_TIMERS, pollIntervalMs: 50 });
   };
-  const verifier = new MigrationCoreAdapter({ attemptId: fixture.attemptId, scratchRoot: root, inputs: resolverOf([]), corePackageHash: sha("core") });
+  const verifier = new MigrationCoreAdapter({ attemptId: fixture.attemptId, scratchRoot: root, inputs: resolverOf([]), corePackageHash: sha("core"), timers: WALL_TIMERS });
   return {
     evidenceClass: "EXECUTED_LOCAL",
     coreVersion: "3.0.0",

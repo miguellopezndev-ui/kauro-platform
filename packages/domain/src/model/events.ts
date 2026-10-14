@@ -11,6 +11,7 @@
 import type { DomainEvent, Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { canonicalBytes, isSha256Hex, rawDigest } from "@kauro/contracts";
 import { COMMERCE_AGGREGATE_KINDS, COMMERCE_CONSUMERS, COMMERCE_EVENT_PAYLOAD_ALLOWLIST, COMMERCE_EVENT_SUBSCRIPTIONS, COMMERCE_EVENT_TYPES } from "../commerce/events.js";
+import { BANK_CREDIT_AGGREGATE_KINDS, BANK_CREDIT_EVENT_PAYLOAD_ALLOWLIST, BANK_CREDIT_EVENT_SUBSCRIPTIONS, BANK_CREDIT_EVENT_TYPES } from "../commerce/bank-credit.js";
 import { BANK_ROUTE_AGGREGATE_KINDS, BANK_ROUTE_EVENT_PAYLOAD_ALLOWLIST, BANK_ROUTE_EVENT_SUBSCRIPTIONS, BANK_ROUTE_EVENT_TYPES } from "../commerce/bank-route.js";
 import { TREASURY_REFUND_AGGREGATE_KINDS, TREASURY_REFUND_EVENT_PAYLOAD_ALLOWLIST, TREASURY_REFUND_EVENT_SUBSCRIPTIONS, TREASURY_REFUND_EVENT_TYPES } from "../commerce/treasury-refund.js";
 import { OUTBOUND_ATTEMPT_AGGREGATE_KINDS, OUTBOUND_ATTEMPT_EVENT_PAYLOAD_ALLOWLIST, OUTBOUND_ATTEMPT_EVENT_SUBSCRIPTIONS, OUTBOUND_ATTEMPT_EVENT_TYPES } from "../commerce/execution-attempt.js";
@@ -87,6 +88,8 @@ export const EVENT_TYPES = [
   // retention records (platform machine RetentionRecord, decision D-RET-2)
   "retention_record.created.v1",
   "retention_record.expired.v1",
+  // the one explicit soft-deadline extension of a project (B16 CMD060; migration 0069, provisional)
+  "retention_record.extended.v1",
   // admitted source files (platform machine SourceFile, decision D-FILE-1; an aggregate since B07-F9): the admission recorded by
   // UPLOAD_INSPECTION and its revocation, which the execution consumer and the agency must learn of
   "source_file.admitted.v1",
@@ -95,6 +98,8 @@ export const EVENT_TYPES = [
   ...COMMERCE_EVENT_TYPES,
   // Support (B11 CMD044: a case is born OPEN; the summary never travels in an event, D-SUP-5)
   "support_case.opened.v1",
+  // Agency buyer type (B11 CMD101 SetBuyerType, migration 0062: recorded once, before the first quote; R2 A3 3.7)
+  "agency_buyer_type.recorded.v1",
   // Processing authority (package B08, model/execution/events.ts; migrations 0021 and 0022)
   ...EXECUTION_EVENT_TYPES,
   // Audit authority (package B08, model/audit/events.ts; migration 0023)
@@ -103,9 +108,11 @@ export const EVENT_TYPES = [
   ...COMMERCIAL_EVENT_TYPES,
   // Payments V1 bank-transfer route (commerce/bank-route.ts; migration 0046, lane L-ROUTE)
   ...BANK_ROUTE_EVENT_TYPES,
-  // Payments V1 route-scope treasury refunds (commerce/treasury-refund.ts; migration 0060, lane L-REFUND)
+  // Payments V1 inbound credits (commerce/bank-credit.ts; migration 0063, lane PV1-INBOUND)
+  ...BANK_CREDIT_EVENT_TYPES,
+  // Payments V1 route-scope treasury refunds (commerce/treasury-refund.ts; migration 0071, lane L-REFUND)
   ...TREASURY_REFUND_EVENT_TYPES,
-  // Payments V1 outbound execution attempts (commerce/execution-attempt.ts; migration 0060 slice 2, lane L-REFUND)
+  // Payments V1 outbound execution attempts (commerce/execution-attempt.ts; migration 0071 slice 2, lane L-REFUND)
   ...OUTBOUND_ATTEMPT_EVENT_TYPES,
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -116,9 +123,9 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * column; the persistence tests prove the two lists equal. A package that adds an aggregate registers its kind with one INSERT in
  * its own migration and adds it here (B07: upload_session, source_file, retention_record, registered by migrations 0009, 0010 and
  * 0012; B09: the commerce kinds, registered by migrations 0013..0017; B08: processing_job and package_version, registered by
- * migrations 0021 and 0022, and audit and cost_grant, registered by migration 0023; B11: support_case, registered by migration 0026).
+ * migrations 0021 and 0022, and audit and cost_grant, registered by migration 0023; B11: support_case, registered by migration 0026, and agency_buyer_type, registered by migration 0062).
  */
-export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS, "support_case", ...BANK_ROUTE_AGGREGATE_KINDS, ...TREASURY_REFUND_AGGREGATE_KINDS, ...OUTBOUND_ATTEMPT_AGGREGATE_KINDS] as const;
+export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS, "support_case", ...BANK_ROUTE_AGGREGATE_KINDS, "agency_buyer_type", ...BANK_CREDIT_AGGREGATE_KINDS, ...TREASURY_REFUND_AGGREGATE_KINDS, ...OUTBOUND_ATTEMPT_AGGREGATE_KINDS] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 
 /** Keys each event type may carry (07: references and safe counts only). */
@@ -180,6 +187,7 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "project.current_revision_changed.v1": ["projectId", "agencyId", "currentRevisionId", "previousRevisionId", "changedByMembershipId"],
   "retention_record.created.v1": ["retentionId", "agencyId", "projectId", "revisionId", "retentionClass", "anchorEvidenceHash", "policyVersion"],
   "retention_record.expired.v1": ["retentionId", "agencyId", "projectId", "revisionId", "retentionClass"],
+  "retention_record.extended.v1": ["retentionId", "agencyId", "projectId", "revisionId", "extensionId", "retentionClass", "requestedSeconds", "grantedSeconds", "cappedAtHardDeadline"],
   "source_file.admitted.v1": ["fileId", "agencyId", "projectId", "originRevisionId", "originUploadId", "inspectionReceiptHash", "bytes", "format"],
   // the revisions whose selection or seal names the file travel as ids so EXECUTION_CONTROL (B08) can revoke stale authority
   "source_file.admission_revoked.v1": ["fileId", "agencyId", "projectId", "revocationReason", "selectedByRevisionIds", "sealedByRevisionIds"],
@@ -187,6 +195,8 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   ...COMMERCE_EVENT_PAYLOAD_ALLOWLIST,
   // nextReviewAt is a canonical UTC instant, admitted by the payload gate (D-SUP-5); the summary and the evidence are never in it
   "support_case.opened.v1": ["caseId", "projectId", "category", "severity", "nextReviewAt"],
+  // the buyer type and the owner's affirmation travel as the two enumerated facts, with the recording membership's id
+  "agency_buyer_type.recorded.v1": ["agencyId", "buyerType", "forEconomicActivity", "recordedByMembershipId"],
   // processing authority (package B08, model/execution/events.ts)
   ...EXECUTION_EVENT_PAYLOAD_ALLOWLIST,
   // audit authority (package B08, model/audit/events.ts)
@@ -195,6 +205,7 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   ...COMMERCIAL_EVENT_PAYLOAD_ALLOWLIST,
   // Payments V1 bank-transfer route (commerce/bank-route.ts): references, hashes and tokens only
   ...BANK_ROUTE_EVENT_PAYLOAD_ALLOWLIST,
+  ...BANK_CREDIT_EVENT_PAYLOAD_ALLOWLIST,
   // Payments V1 treasury refunds (commerce/treasury-refund.ts): references and hashes only
   ...TREASURY_REFUND_EVENT_PAYLOAD_ALLOWLIST,
   // Payments V1 outbound execution attempts (commerce/execution-attempt.ts): references, hashes, tokens, instants and counts only
@@ -254,6 +265,9 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   { eventType: "dataset_revision.expired.v1", consumer: "EXECUTION_CONTROL" },
   { eventType: "dataset_revision.expired.v1", consumer: "AUTHORITY_JOURNAL" },
   { eventType: "dataset_revision.deleted.v1", consumer: "AUTHORITY_JOURNAL" },
+  // the one contractual extension of a soft deadline is a durable fact outside the restore boundary (14; B16 CMD060, GAP-RET-10): a
+  // restored database never forgets it was used, so a second one cannot be granted
+  { eventType: "retention_record.extended.v1", consumer: "AUTHORITY_JOURNAL" },
   ...COMMERCE_EVENT_SUBSCRIPTIONS,
   // processing authority (package B08 §11): admission, launch and verification to JOB_EXECUTION, a cancellation to EXECUTION_CONTROL,
   // every terminal outcome and a package's availability to the agency
@@ -265,6 +279,8 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   ...COMMERCIAL_EVENT_SUBSCRIPTIONS,
   // Payments V1 bank-transfer route (commerce/bank-route.ts): the owner and the buyer are notified
   ...BANK_ROUTE_EVENT_SUBSCRIPTIONS,
+  // Payments V1 inbound credits (commerce/bank-credit.ts)
+  ...BANK_CREDIT_EVENT_SUBSCRIPTIONS,
   // Payments V1 treasury refunds (commerce/treasury-refund.ts): the owner is notified
   ...TREASURY_REFUND_EVENT_SUBSCRIPTIONS,
   // Payments V1 outbound execution attempts (commerce/execution-attempt.ts): the owner is notified

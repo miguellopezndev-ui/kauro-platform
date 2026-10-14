@@ -45,7 +45,7 @@ export const SQLSTATE = Object.freeze({
   FISCAL_VALIDATION_REFUSED: "KP011",
   REFUND_TAX_INCONSISTENT: "KP012",
   REPLACEMENT_REFUSED: "KP013",
-  // Payments V1 (migration 0060, lane L-REFUND): a manual-rail refund or treasury refund completed without its recorded execution
+  // Payments V1 (migration 0071, lane L-REFUND): a manual-rail refund or treasury refund completed without its recorded execution
   EXECUTION_EVIDENCE_MISSING: "KP014",
   // package B10 (migrations 0028..0031; docs/design/B10-commercial-domain.md §12): each stage-2 lane adds the KC codes its adapters
   // surface. B10-ADAPTERS-RECURRENCE: the designation's writes and the founding reservation's release (0028)
@@ -84,6 +84,19 @@ export const SQLSTATE = Object.freeze({
   CAPACITY_LEDGER: "KA082",
   GRANT_UNFUNDED: "KA083",
   PUBLICATION_EVIDENCE: "KA084",
+  // package B16 (tenant isolation, retention, deletion, breakglass, download, restore): KA085..KA094 are RESERVED for lanes L2..L8, named by
+  // lane so two lanes never pick the same code (tools/test/ka-codes.test.mjs). A lane that raises one renames its constant to the
+  // refusal it names, adds its MAP entry and its migration, and keeps the value.
+  B16_L2_RETENTION_A: "KA085",
+  B16_L2_RETENTION_B: "KA086",
+  B16_L3_DELETION_A: "KA087",
+  B16_L3_DELETION_B: "KA088",
+  B16_L4_BREAKGLASS_A: "KA089",
+  B16_L5_DOWNLOAD_A: "KA090",
+  B16_L6_RESTORE_A: "KA091",
+  B16_L6_RESTORE_B: "KA092",
+  B16_L7_STAGE_RELEASE_A: "KA093",
+  B16_L8_RESERVE_A: "KA094",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",
@@ -246,6 +259,12 @@ export const AUDIT_CONSTRAINT_FAILURES: Readonly<Record<string, { readonly sqlSt
   cost_grants_audit_ceiling: { sqlState: "23514", code: "BUDGET_EXHAUSTED", reason: "GRANT_CEILING" },
   audits_one_per_subject: { sqlState: "23505", code: "PRECONDITION_FAILED", reason: "AUDIT_EXISTS" },
   audits_one_live_per_agency: { sqlState: "23505", code: "ADMISSION_LIMITED", reason: "AUDIT_CONCURRENCY_LIMITED", retryable: true },
+  // B05 D5-11 (migration 0061): the pool's liability gate and the dispatch-time expiry clauses
+  pool_liability_open: { sqlState: "KA083", code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
+  grant_expired_at_dispatch: { sqlState: "KA083", code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
+  pool_expired_at_dispatch: { sqlState: "KA083", code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
+  pool_liability_gate_absent: { sqlState: "KA006", code: "INTEGRITY_FAILURE", reason: "LIFECYCLE_BINDING_MISSING" },
+  pool_liability_gate_scope: { sqlState: "KA006", code: "INTEGRITY_FAILURE", reason: "COMMITMENT_ISOLATION" },
 });
 
 /**

@@ -143,6 +143,24 @@ export interface NewModelTask {
   readonly minimizedRequestHash: Sha256Hex;
   readonly providerProfileId: Id;
   readonly maximumCostCents: bigint;
+  /**
+   * ADR-B05-IJR-1: a task the Intelligence Core dispatches is ONE request key (one prepared envelope, `minimizedRequestHash` its
+   * request hash) of one core run, unique per audit; every core admission of the task names that run, that key and that hash (KA004
+   * MODEL_TASK_BINDING otherwise). Planned again, the same run and key must carry the same identity (INTEGRITY_FAILURE otherwise).
+   */
+  readonly core?: { readonly runId: Id; readonly requestKey: string };
+}
+
+/**
+ * What the Intelligence Core admitted for one dispatch (package B05 D5-11): its run, its reservation, its request key and the exact
+ * maximum charge in micro-dollars; the intent then reserves ceil(maxChargeMicros / 10,000) cents. (run, reservation) is the admission's
+ * idempotency key: the same maximum again is a replay (REPLAYED), another one IDEMPOTENCY_CONFLICT.
+ */
+export interface CoreAdmission {
+  readonly runId: Id;
+  readonly reservationId: string;
+  readonly requestKey: string;
+  readonly maxChargeMicros: bigint;
 }
 
 /** One dispatch intent of a model task: the physical attempt the MODEL_TASK lease's owner reserves before any send. */
@@ -151,18 +169,46 @@ export interface DispatchIntent {
   readonly ownerId: LeaseOwnerId;
   readonly requestHash: Sha256Hex;
   readonly reservedCents: bigint;
+  /** B05 D5-18: the fence of the INTERPRET step that admits the intent (the audit's current fence; KA080 otherwise, at reservation and at send). */
+  readonly stepFence: number;
+  /** B05 D5-11: the core's admission; when present `reservedCents` must be ceil(core.maxChargeMicros / 10,000). */
+  readonly core?: CoreAdmission;
 }
+
+/** IC's settlement of one admitted reservation (B05 D5-11; IC kernel/admission.ts Settlement). */
+export interface DispatchSettlement {
+  readonly runId: Id;
+  readonly reservationId: string;
+  readonly state: "COMMITTED" | "AMBIGUOUS" | "RELEASED";
+  readonly chargeMicros: bigint;
+  readonly usageKnown: boolean;
+}
+
+/**
+ * The answer to a settlement (D5-11): NO_REQUEST when the (run, reservation) was never admitted (nothing written); REPLAYED when the
+ * same settlement is already recorded; RECORDED otherwise, with the settlement actually recorded (a RELEASED the request's state does not
+ * admit is recorded AMBIGUOUS, its reservation held) and the excess over the admitted maximum opened as a liability (0 when none).
+ * Another body for a COMMITTED or RELEASED settlement is IDEMPOTENCY_CONFLICT / REQUEST_DIGEST_DIFFERS ("SETTLEMENT_CONFLICT"), no write.
+ */
+export type SettlementOutcome =
+  | { readonly kind: "NO_REQUEST" }
+  | { readonly kind: "REPLAYED"; readonly request: RequestJournalRecord; readonly recorded: DispatchSettlement["state"] }
+  | { readonly kind: "RECORDED"; readonly request: RequestJournalRecord; readonly recorded: DispatchSettlement["state"]; readonly liabilityMicros: bigint };
 
 /**
  * The answer to a dispatch intent (D8-AUD-3): a response already stored for the task is returned before any new intent
  * (STORED_RESPONSE); an attempt of the lease's current fence is answered as it stands (IN_FLIGHT); another owner's live lease is HELD;
- * otherwise the intent is RESERVED on the audit's grant at the lease's fence.
+ * otherwise the intent is RESERVED on the audit's grant at the lease's fence. For a core admission (ADR-B05-IJR-1 K-5) the stored
+ * response is looked for again after the lease wait, IN_FLIGHT is the task's live (RESERVED or DISPATCHING) attempt at any fence, and a
+ * failed, cancelled or uncertain attempt leaves room for the next invocation at the same fence.
  */
 export type DispatchOutcome =
   | { readonly kind: "STORED_RESPONSE"; readonly request: RequestJournalRecord }
   | { readonly kind: "IN_FLIGHT"; readonly request: RequestJournalRecord; readonly lease: LeaseRecord }
   | { readonly kind: "HELD"; readonly lease: LeaseRecord }
-  | { readonly kind: "RESERVED"; readonly request: RequestJournalRecord; readonly lease: LeaseRecord };
+  | { readonly kind: "RESERVED"; readonly request: RequestJournalRecord; readonly lease: LeaseRecord }
+  /** B05 D5-11: the same core admission (run, reservation, maximum) already reserved: its request, nothing new. */
+  | { readonly kind: "REPLAYED"; readonly request: RequestJournalRecord };
 
 /** One event appended to the core's journal of `runId` by the INTERPRET step at `stepFence`, when the journal has `expectedLength`. */
 export interface JournalAppend {
@@ -236,6 +282,24 @@ export interface AuditStore {
   transitionGrant(grantId: CostGrantId, expectedVersion: number, to: GrantEdge): Promise<VersionedWrite<CostGrantRecord>>;
   /** A request's known usage settled: its reservation leaves the grant's reserved cents and `actualCents` joins its spend. */
   reconcileRequest(requestId: RequestId, actualCents: bigint): Promise<CostGrantRecord>;
+  /**
+   * B05 D5-11: provider evidence in micro-dollars for a request (cents evidence is cents * 10,000 exactly). A core-admitted request posts
+   * min(ceil(micros / 10,000), reserved) cents and opens the excess over its admitted maximum as a liability, recording settlement
+   * COMMITTED; an equal value again is idempotent (the grant as it stands); a request without a core admission posts ceil(micros / 10,000).
+   */
+  reconcileRequestMicros(requestId: RequestId, chargeMicros: bigint): Promise<CostGrantRecord>;
+  /** B05 D5-11 settle, under LOCK-B05-1 (the funding grant, then the request; never the pool row). */
+  settleDispatch(settlement: DispatchSettlement): Promise<SettlementOutcome>;
+  /**
+   * B05 D5-18 branch (a): a DISPATCHING request its owner can no longer send (audit not interpreting, deadline passed, lease fence moved)
+   * moves to UNCERTAIN in one statement, its reservation held; false when the row is not such a request.
+   */
+  markStaleDispatchUncertain(requestId: RequestId): Promise<boolean>;
+  /**
+   * B05 D5-18 branch (b): a FAILED request carrying non-acceptance evidence with usage UNKNOWN is reconciled at 0 and its settlement
+   * recorded RELEASED (a core request); the grant as it stands after.
+   */
+  releaseNonAccepted(requestId: RequestId): Promise<CostGrantRecord>;
 }
 
 /**

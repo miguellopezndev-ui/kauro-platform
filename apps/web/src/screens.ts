@@ -7,6 +7,7 @@
 // agency-less APP screens (Agency setup, Agency switcher, Sign in, Accept invitation) keep their registry routes; the payment page names its
 // order (`/payments/{orderId}`) because the provider's return URL names the agency and the order. Registry routes are internal names (A3 1.4).
 import type { MessageId } from "./copy/en.ts";
+import { IMPLEMENTED_BY_AREA } from "./screens/implemented/index.ts";
 
 export type Origin = "PUBLIC" | "APP";
 
@@ -70,11 +71,11 @@ export const SCREENS: readonly Screen[] = [
 
 /**
  * The screens whose page exists in this build. A navigation entry appears only for one of these (11 "Every navigation link resolves to
- * real content or an explicitly unavailable feature"); the mandate that lands a screen adds its id here, and a test refuses an id
+ * real content or an explicitly unavailable feature"); the mandate that lands a screen adds its id to its area module under screens/implemented/, and a test refuses an id
  * without its page file and a page file without its id. The public screens are W5a's: UI01-UI08, UI48 and UI49 are pages, and the
  * legal documents UI45-UI47 are route handlers that answer the whole document (D-LEGAL-1).
  */
-export const IMPLEMENTED_SCREENS: ReadonlySet<string> = new Set<string>(["UI18", "UI23", "UI24", "UI01", "UI02", "UI03", "UI04", "UI05", "UI06", "UI07", "UI08", "UI45", "UI46", "UI47", "UI48", "UI49"]);
+export const IMPLEMENTED_SCREENS: ReadonlySet<string> = new Set<string>(Object.values(IMPLEMENTED_BY_AREA).flat());
 
 export interface NavigationEntry {
   readonly screen: string;

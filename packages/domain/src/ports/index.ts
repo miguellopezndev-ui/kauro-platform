@@ -37,7 +37,8 @@ export type {
   SecurityEventRepository,
 } from "./repositories.js";
 export type { LeaseStore, LeaseRecord, LeaseClaim, ClaimOutcome, LeaseResourceKind } from "./lease-store.js";
-export type { RequestJournal, RequestJournalRecord, RequestReservation } from "./request-journal.js";
+export type { RequestJournal, RequestJournalRecord, RequestReservation, NonAcceptanceEvidence } from "./request-journal.js";
+export { NON_ACCEPTANCE_EVIDENCES } from "./request-journal.js";
 export type {
   InboxDelivery,
   IngressOutcome,
@@ -206,6 +207,9 @@ export type {
   NewModelTask,
   DispatchIntent,
   DispatchOutcome,
+  CoreAdmission,
+  DispatchSettlement,
+  SettlementOutcome,
   JournalAppend,
   JournalAppendOutcome,
   NewDecisionArtifact,
@@ -216,7 +220,7 @@ export type {
   AuditUnitOfWorkFactory,
 } from "./audit-store.js";
 // the control plane's discovery of audit work (package B08, mandate B08-CONTROL-AUDIT)
-export type { AuditRef, GrantRef, AuditSource, DraftValidation, ValidationSubject, GrantScope, GrantUsage, AuditDiscovery } from "./audit-discovery.js";
+export type { AuditRef, GrantRef, AuditSource, ValidationSource, DraftValidation, ValidationSubject, GrantScope, GrantUsage, AuditDiscovery } from "./audit-discovery.js";
 // import stages and their receipts (package B17: CMD040, CMD041)
 export type { ImportStageStore } from "./import-stage-store.js";
 // the stored core documents and plan bindings (package B05 L3, migration 0058)

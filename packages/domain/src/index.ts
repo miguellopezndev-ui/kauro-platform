@@ -250,3 +250,5 @@ export * from "./model/capability-governance.js";
 export * from "./model/operations-recovery.js";
 // import stages and their receipts (package B17: CMD040, CMD041)
 export * from "./model/import-stage.js";
+// PAID_STAGED retention deadlines of a staged import workflow (package B16 lane L7: R2-054, R2-055; mirror of migration 0062)
+export * from "./model/staged-retention.js";

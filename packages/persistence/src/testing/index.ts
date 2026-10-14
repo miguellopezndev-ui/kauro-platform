@@ -91,10 +91,17 @@ export {
   endJob,
 } from "./execution-fixtures.js";
 export type { FixtureArtifact } from "./execution-fixtures.js";
+export { consumeThroughExecution, deliverThroughExecution } from "./execution-delivery.js";
+export type { ConsumedThroughExecution, DeliveredThroughExecution } from "./execution-delivery.js";
+// SEC-DEPTH-PROVENANCE kit: the superuser-nested probe (P1) and the slow-check hook
+export { nestedAsSuperuser, nestedAsInvoker, slowCheckHook } from "./depth-probe.js";
+export type { DepthProbe } from "./depth-probe.js";
 // audit authority (package B08, mandate B08-PERSISTENCE-AUDIT): the owner's funding act of the platform's model pool (Q8-1)
 export { fundPlatformPool } from "./audit-fixtures.js";
 export type { FundedPoolOptions } from "./audit-fixtures.js";
 // the common fault harness (docs/design/FAULT-HARNESS.md): controlled clock, crash and pause points, interleavings, matrix cells
 export * from "./faults/index.js";
+// the runtime role a unit of work's context logs in as (the api harness routes the payment service's units only over a connection of that role)
+export { runtimeRoleOf } from "../unit-of-work.js";
 export { B10_INVARIANTS, assertInvariants, invariantsAfterEach, invariantRows } from "./invariants.js";
 export type { Invariant } from "./invariants.js";

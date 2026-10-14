@@ -33,11 +33,13 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const CASE_MAP_PATH = join(root, "docs", "design", "B06-case-map.md");
 export const B09_CASE_MAP_PATH = join(root, "docs", "design", "B09-case-map.md");
+export const B16_CASE_MAP_PATH = join(root, "docs", "design", "B16-case-map.md");
 
 /** The case maps a bundle seals: the package whose registry cases each maps, its repository path and its file. */
 export const CASE_MAPS = [
   { package: "B06", file: "docs/design/B06-case-map.md", path: CASE_MAP_PATH },
   { package: "B09", file: "docs/design/B09-case-map.md", path: B09_CASE_MAP_PATH },
+  { package: "B16", file: "docs/design/B16-case-map.md", path: B16_CASE_MAP_PATH },
 ];
 
 /** The suites of `pnpm run test`, each exactly as its package's test script runs it (the check refuses a drifted script). */
@@ -47,7 +49,7 @@ export const SUITES = [
   { name: "application", cwd: "packages/application", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
   { name: "persistence", cwd: "packages/persistence", script: 'node --test --test-reporter=spec --test-concurrency=2 "dist/test/**/*.test.js"', args: ["--test-concurrency=2", "dist/test/**/*.test.js"] },
   { name: "authorization", cwd: "packages/authorization", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
-  { name: "data-plane", cwd: "packages/data-plane", script: 'node --test --test-reporter=spec "dist/test/**/*.test.js"', args: ["dist/test/**/*.test.js"] },
+  { name: "data-plane", cwd: "packages/data-plane", script: 'node --test --test-timeout=300000 --test-reporter=spec "dist/test/**/*.test.js"', args: ["--test-timeout=300000", "dist/test/**/*.test.js"] },
   { name: "api", cwd: "apps/api", script: 'node --test --test-reporter=spec --test-concurrency=3 "dist/test/**/*.test.js"', args: ["--test-concurrency=3", "dist/test/**/*.test.js"] },
   { name: "control", cwd: "apps/control", script: 'node --test --test-reporter=spec --test-concurrency=2 "dist/test/**/*.test.js"', args: ["--test-concurrency=2", "dist/test/**/*.test.js"] },
   // package B11: the design tokens and accessible primitives, and the web runtime's node:test suites (the browser suite is outside verify)

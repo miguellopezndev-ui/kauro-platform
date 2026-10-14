@@ -7,6 +7,7 @@
 import type { CommandResult, ExecuteRefundBody, ExecuteRefundView, PurchaseRebinder, ReconcilePaymentBody, ReconcilePaymentView, SchemaValidator } from "@kauro/application";
 import type { AgencyId, Clock, Environment, IdGenerator } from "@kauro/domain";
 import type { PaymentServiceAssembly } from "./assembly.js";
+import "./bank-inbound-service.js";
 import { fiscalConsumer, financeConsumer, paymentServiceEffect, unitOfWorkEffect, type DeliveryEffect } from "./consumers.js";
 import { createPaymentDispatcher, type PaymentDispatcher } from "./dispatcher.js";
 import { sourceLineageReader } from "../edition.js";

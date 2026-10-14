@@ -106,6 +106,14 @@ export const COMMERCE_FAILURE_REASONS = [
   "INSTRUCTIONS_EXPIRED",
   // I3: an existing visible order whose instructions are not readable (bank order not open, details expired; coordinator ruling RR-2)
   "INSTRUCTIONS_NOT_AVAILABLE",
+  // inbound credits (lane PV1-INBOUND; ACH-ROUTE §7.4-§7.12): manual entry, attribution, statement import
+  "CREDIT_ALREADY_ENTERED",
+  "CREDIT_EVIDENCE_MISMATCH",
+  "COVERAGE_END_IN_FUTURE",
+  "COVERAGE_OUTSIDE_ROUTE_VERSION",
+  "STATEMENT_ALREADY_IMPORTED",
+  "PROVIDER_INCONSISTENCY",
+  "ATTRIBUTION_NOT_OVERRIDABLE",
   // an idempotency key of a bank owner command reused with another request body (lane L-REFUND; the journal conflict named, never a new effect)
   "BODY_CONFLICT",
   // a manual-rail refund or treasury refund COMPLETED without the RECORDED attempt that is its execution evidence (lane L-REFUND; SQLSTATE KP014)

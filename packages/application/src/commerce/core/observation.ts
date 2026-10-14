@@ -135,6 +135,11 @@ export interface ObservationFacts {
   readonly approvalHosts: ReadonlyArray<string>;
   /** MAX_ATTEMPTS_PER_OPERATION (D-PROTO-B3). */
   readonly maxAttempts: number;
+  /**
+   * A blocker of the issuance the caller judged under its own locks at the effect instant, beside the subject's (a bank credit's
+   * transfer deadline, provider time, route or retired checkout; ACH-ROUTE §7.10 P1, DV1-06): the capture stands without authority.
+   */
+  readonly authorityBlocker?: string | null;
 }
 
 export interface ObservationInput {
@@ -1183,7 +1188,8 @@ class Planner {
       if (authorizesObligation(this.order, capture)) {
         if (!quoteEntitled) {
           const completedAt = capture.providerCompletedAt ?? this.now;
-          const blockers = issuanceBlockers(this.facts.quote, this.facts.subject, this.facts.currentProfile, completedAt, this.now);
+          const own = this.facts.authorityBlocker;
+          const blockers: ReadonlyArray<string> = [...(own !== undefined && own !== null ? [own] : []), ...issuanceBlockers(this.facts.quote, this.facts.subject, this.facts.currentProfile, completedAt, this.now)];
           const subject = this.facts.subject;
           if (blockers.length === 0 && subject !== null && subject.approval !== null && subject.capability !== null) this.issue(capture, completedAt);
           else {

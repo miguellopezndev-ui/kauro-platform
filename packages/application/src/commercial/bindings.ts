@@ -28,11 +28,15 @@ export class UnrecordedBuyerTypeReader implements BuyerTypeReader {
 export const realProviderCallTimer: ProviderCallTimer = {
   start(ms: number) {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const startedAt = performance.now();
+    // expired: the bound timer itself has fired (no process clock is read here: the four injection points stay the only ones, CK3)
+    let fired = false;
     const elapsed = new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, ms);
+      timer = setTimeout(() => {
+        fired = true;
+        resolve();
+      }, ms);
     });
-    return { elapsed, cancel: () => clearTimeout(timer), expired: () => performance.now() - startedAt >= ms };
+    return { elapsed, cancel: () => clearTimeout(timer), expired: () => fired };
   },
 };
 

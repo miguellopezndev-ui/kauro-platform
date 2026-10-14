@@ -9,7 +9,8 @@
  * with kauro.server_now() in SQL (D8-CLOCK-1): no method takes an instant from its caller. The pg implementation is
  * @kauro/persistence's; the writes stay the AuditStore's.
  */
-import type { AgencyId, PlanId, RequestId, RevisionId } from "../model/ids.js";
+import type { AgencyId, PlanId, ProjectId, RequestId, RevisionId } from "../model/ids.js";
+import type { SourcePopulations } from "../model/source/records.js";
 import type { AuditId, CostGrantId } from "../model/audit/ids.js";
 import type { AuditRecord, AuditState, CostGrantRecord, PlanValidationRecord } from "../model/audit/records.js";
 import type { ExecutionSourceGeneration } from "./execution-discovery.js";
@@ -31,6 +32,20 @@ export interface GrantRef {
 export interface AuditSource {
   readonly revisionState: string;
   readonly acceptedGenerations: ReadonlyArray<ExecutionSourceGeneration>;
+}
+
+/**
+ * What a validation reads (B05 L1v): the sealed revision a plan binds (by its agency and manifest hash), the sealed manifest's exact
+ * ACCEPTED generations and the populations frozen before capture, so the core counts the revision's own source and is told its
+ * billable units; null when the agency has no such revision.
+ */
+export interface ValidationSource {
+  readonly projectId: ProjectId;
+  readonly revisionId: RevisionId;
+  readonly revisionState: string;
+  readonly acceptedGenerations: ReadonlyArray<ExecutionSourceGeneration>;
+  /** null while a population is not frozen. */
+  readonly populations: SourcePopulations | null;
 }
 
 /** An open validation intent of an audit's system draft (D8-AUD-4), with the draft's body and state. */
@@ -70,6 +85,8 @@ export interface GrantScope {
  * database's own verdict that it can never be sent (D8-GRANT-2): a RESERVED intent of a model task whose audit no longer interprets,
  * whose interpretation deadline passed on the server clock, or whose MODEL_TASK lease moved to another fence — exactly the refusals of
  * the check before SEND_STARTED (migration 0023, request_journal_model_task_send). Any other intent may have reached its provider.
+ * B05 S09: a core reservation its core RELEASED unsent is listed too (still RESERVED, its usage already reconciled at 0; a settled
+ * row is refused the DISPATCHING edge) and is provablyUnsent.
  */
 export interface GrantUsage {
   readonly requestId: RequestId;
@@ -80,6 +97,10 @@ export interface GrantUsage {
   readonly reservedCents: bigint;
   readonly actualCents: bigint | null;
   readonly provablyUnsent: boolean;
+  /** B05 D5-18 branch (a): DISPATCHING and no longer sendable by its owner (the UNSENDABLE predicate). */
+  readonly staleDispatch: boolean;
+  /** B05 D5-18 branch (b): FAILED with non-acceptance evidence and usage UNKNOWN. */
+  readonly nonAccepted: boolean;
 }
 
 export interface AuditDiscovery {
@@ -89,6 +110,8 @@ export interface AuditDiscovery {
   liveAuditsOfRevision(agencyId: AgencyId, revisionId: RevisionId): Promise<ReadonlyArray<AuditRef>>;
   /** PROFILE's inputs, in a unit bound to the audit's agency: its revision's state and sealed ACCEPTED generations. */
   auditSource(audit: AuditRecord): Promise<AuditSource>;
+  /** A validation's source (ValidationSource), in a unit bound to the agency. */
+  validationSource(agencyId: AgencyId, revisionHash: string): Promise<ValidationSource | null>;
   /** The unsettled validation intents of the audit's system drafts, in a unit bound to its agency. */
   openDraftValidations(auditId: AuditId): Promise<ReadonlyArray<DraftValidation>>;
   /** PLAN_VALIDATION's subject, in a unit bound to the plan's agency; null for a plan the control plane cannot see. */
