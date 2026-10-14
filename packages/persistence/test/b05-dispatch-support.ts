@@ -77,6 +77,9 @@ export interface Run {
   readonly stepFence: number;
   readonly stepId: string;
   readonly candidateManifestHash: string;
+  /** The audited subject's hashes (a system draft's plan body and its receipt name them). */
+  readonly revisionHash: string;
+  readonly targetContractHash: string;
 }
 
 let agencySeq = 0;
@@ -109,7 +112,7 @@ export async function interpretingRun(env: DispatchEnv, tag: string, pool: strin
   const advanced = await h.audit.run(controlOf(ag.agencyId), (uow) => uow.audits.advanceAudit(input.auditId, 2, { to: "INTERPRETING", profileEvidenceHash: sha(`${name}-profile`), candidateManifestHash }));
   assert.equal(advanced.kind, "APPLIED");
   const interpret = await h.audit.run(controlOf(ag.agencyId), (uow) => uow.audits.claimStep(input.auditId, "INTERPRET", ids.next() as AuditStepId));
-  return { ag, auditId: input.auditId, grantId: input.grantId, pool, stepFence: interpret.step.fence, stepId: interpret.step.stepId, candidateManifestHash };
+  return { ag, auditId: input.auditId, grantId: input.grantId, pool, stepFence: interpret.step.fence, stepId: interpret.step.stepId, candidateManifestHash, revisionHash: input.revisionHash, targetContractHash: input.targetContractHash };
 }
 
 /** One model task of the run admitted through beginDispatch with a core admission of `maxChargeMicros`. */

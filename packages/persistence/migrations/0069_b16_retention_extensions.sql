@@ -1,4 +1,4 @@
--- Migration 0066: B16 lane L2, CMD060 RequestRetentionExtension.
+-- Migration 0069: B16 lane L2, CMD060 RequestRetentionExtension.
 --
 -- 09 "Quotes, reuploads and retention", R2-123/R2-124, plan conflict C1: a project's soft access deadline may be extended ONCE, by at
 -- most 259200 seconds, never past the original hard cap; the hard deadline never moves.

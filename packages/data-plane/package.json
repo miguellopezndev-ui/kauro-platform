@@ -36,6 +36,7 @@
     "@kauro/application": "workspace:*",
     "@kauro/contracts": "workspace:*",
     "@kauro/domain": "workspace:*",
+    "@kauro/intelligence-core": "workspace:*",
     "@kauro/migration-core": "workspace:*"
   },
   "devDependencies": {

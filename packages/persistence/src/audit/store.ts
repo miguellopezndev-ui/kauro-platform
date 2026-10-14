@@ -783,8 +783,9 @@ export class PgAuditStore implements AuditStore {
     if (settlement.state === "AMBIGUOUS") return ambiguous();
     if (settlement.state === "RELEASED") {
       if (row.state === "RESERVED" && row.usage_state === "UNKNOWN") {
-        // never sent: the reservation goes back, and the row leaves RESERVED (CANCELLED) so it can be neither sent nor block the grant's close
-        await record("RELEASED", ", state = 'CANCELLED', usage_state = 'RECONCILED', actual_cents = 0", []);
+        // never sent: the reservation goes back and the row stays RESERVED (S09, D5-18 table row 1); a settled row is never sent
+        // (markDispatching and request_journal_dispatch_from_reserved refuse it) and GRANT_RECONCILIATION cancels it, moving no cent
+        await record("RELEASED", ", usage_state = 'RECONCILED', actual_cents = 0", []);
         await this.postToGrant(grantId, reserved, 0n);
         return answer("RECORDED", "RELEASED", 0n);
       }

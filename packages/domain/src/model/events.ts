@@ -86,7 +86,7 @@ export const EVENT_TYPES = [
   // retention records (platform machine RetentionRecord, decision D-RET-2)
   "retention_record.created.v1",
   "retention_record.expired.v1",
-  // the one explicit soft-deadline extension of a project (B16 CMD060; migration 0066, provisional)
+  // the one explicit soft-deadline extension of a project (B16 CMD060; migration 0069, provisional)
   "retention_record.extended.v1",
   // admitted source files (platform machine SourceFile, decision D-FILE-1; an aggregate since B07-F9): the admission recorded by
   // UPLOAD_INSPECTION and its revocation, which the execution consumer and the agency must learn of

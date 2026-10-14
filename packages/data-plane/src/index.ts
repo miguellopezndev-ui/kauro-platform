@@ -47,7 +47,12 @@ export {
   platformTargetModeOf,
   removeOrphanStepScratch,
   rowCountsOf,
+  EffectsResidentLimitExceeded,
+  FullValidationRefused,
   type CoreAdapterHooks,
+  type FullValidationOutcome,
+  type FullValidationRequest,
   type MigrationCoreAdapterOptions,
 } from "./cores/migration-core-adapter.js";
-export { SYSTEM_TIMERS, type CoreTimers } from "./cores/operation.js";
+export { CoreFullDatasetValidation, type CoreFullDatasetValidationOptions } from "./cores/full-dataset-validation.js";
+export { coreTimersOf, type CoreTimers } from "./cores/operation.js";

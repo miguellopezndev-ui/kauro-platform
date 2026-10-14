@@ -186,6 +186,9 @@ importers:
       '@kauro/domain':
         specifier: workspace:*
         version: link:../domain
+      '@kauro/intelligence-core':
+        specifier: workspace:*
+        version: link:../intelligence-core
       '@kauro/migration-core':
         specifier: workspace:*
         version: link:../migration-core
