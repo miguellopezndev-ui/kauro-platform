@@ -176,7 +176,11 @@ SELECT current_user AS login_role,
        has_database_privilege(current_user, current_database(), 'TEMPORARY') AS database_temporary,
        has_database_privilege(current_user, current_database(), 'CREATE') AS database_create,
        EXISTS (SELECT 1 FROM pg_namespace s WHERE has_schema_privilege(current_user, s.oid, 'CREATE')) AS schema_create,
-       current_setting('session_replication_role') AS replication_role
+       current_setting('session_replication_role') AS replication_role,
+       ARRAY(SELECT b.rolname::text FROM pg_catalog.pg_roles b
+              WHERE b.oid <> r.oid AND NOT b.rolname = ANY($1) AND pg_has_role(current_user, b.oid, 'MEMBER') ORDER BY 1) AS other_roles,
+       EXISTS (SELECT 1 FROM pg_catalog.pg_shdepend d
+                WHERE d.refclassid = 'pg_authid'::regclass AND d.refobjid = r.oid AND d.deptype = 'o') AS owns_objects
 FROM pg_catalog.pg_roles r WHERE r.rolname = current_user`;
 
 interface VerifyRow {
@@ -191,6 +195,8 @@ interface VerifyRow {
   database_create: boolean;
   schema_create: boolean;
   replication_role: string;
+  other_roles: string[];
+  owns_objects: boolean;
 }
 
 function isRuntimeRole(value: string): value is RuntimeRole {
@@ -303,6 +309,11 @@ export class KauroPool {
     const [role, ...others] = row.groups.filter(isRuntimeRole);
     if (role === undefined) return refuse("a member of no runtime group");
     if (others.length > 0) return refuse(`a member of more than one runtime group (${[role, ...others].join(", ")})`);
+    // SEC-HARDENING-2 SH2-F2 (B14-R1: a runtime login holds exactly one membership; 14_CLOUD:57 "only required database roles"): a login
+    // that is also a member of any other role (the migrator, a superuser or BYPASSRLS role, the route registrar) could SET ROLE into it,
+    // and one owning any object in any database of the cluster is an owner; checked after the group messages, which stay first
+    if (row.other_roles.length > 0) return refuse(`a member of a non-runtime role (${row.other_roles.join(", ")})`);
+    if (row.owns_objects) return refuse("the owner of a database object");
     const connection: VerifiedConnection = { role, loginRole: row.login_role };
     this.#verified.set(client, connection);
     return { client, connection };

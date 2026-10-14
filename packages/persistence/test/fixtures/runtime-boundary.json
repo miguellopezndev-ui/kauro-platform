@@ -3197,9 +3197,9 @@
       "check": null,
       "command": "SELECT",
       "roles": [
-        "kauro_owner"
+        "kauro_route_registrar"
       ],
-      "using": "true"
+      "using": "(user_id = (NULLIF(current_setting('kauro.user_id'::text, true), ''::text))::uuid)"
     },
     "corporate_roles/corporate_roles_self_read": {
       "check": null,
@@ -4523,7 +4523,7 @@
       "check": "((state = 'CONFIGURED'::text) AND (integration_class = ANY (ARRAY['CONTRACT_FAKE'::text, 'PROVIDER'::text])) AND (qualification_evidence_hashes = '[]'::jsonb) AND (valid_from IS NULL))",
       "command": "INSERT",
       "roles": [
-        "kauro_owner"
+        "kauro_route_registrar"
       ],
       "using": null
     },
