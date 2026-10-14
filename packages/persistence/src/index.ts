@@ -178,3 +178,6 @@ export { PgOutreachSend, OutreachRefusal, capSubReason } from "./repositories/co
 export type { SendActor, SealFacts, SealCheck, QueueSendInput, QueuedSend, ClaimVerdict, ClaimedSubmission, StartGate, OutcomeAnswer } from "./repositories/commercial-outreach-send.js";
 export { outreachSendOf, outreachSendersOf } from "./outreach-send-access.js";
 export { PgOutreachSenders, type SenderRecord, type RegisterSenderInput } from "./repositories/commercial-outreach-senders.js";
+// package B12 (lane L-ACT): CMD064, the reads, the diagnosis and the public opt-out (plan §2)
+export { PgActivityStore, PgOptOutStore, outreachActivityOf, OUTREACH_SERVICE_ID } from "./repositories/commercial-activity.js";
+export type { ActivityRequest, ActivityRow, MetricsRow, DiagnosisRequest } from "./repositories/commercial-activity.js";

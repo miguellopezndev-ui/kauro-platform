@@ -1,21 +1,18 @@
-// UI49 Communication preferences, reached from the link in a message as /unsubscribe/{token}. Until B12 delivers the unsubscribe
-// path, the page is explicitly unavailable: it changes nothing, records nothing, and never reads the token in the address (the route file
-// does not read its params, and the test holds that). It offers a written route instead and names the notices that are not optional.
+// UI49 Communication preferences, reached from the link in a message as /unsubscribe/{token}. One form stops the optional messages of the
+// message that carried the link (B12 opt-out); the token appears only in the form's action, never in the page text. Rendering issues no
+// request. It names the notices that are not optional and never turns those off.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY } from "../../copy/public.ts";
-import { LinkButton, PageHead, Section } from "../parts.tsx";
-import { ROUTE } from "../site.ts";
+import { OptOutForm } from "../opt-out-form.tsx";
+import { PageHead, Section } from "../parts.tsx";
 
-export function UnsubscribePage(): ReactElement {
+export function UnsubscribePage({ token }: { readonly token: string }): ReactElement {
   return (
     <>
       <PageHead title={PUBLIC_COPY["unsubscribe.title"]} />
-      <Section id="unsubscribe-unavailable" heading={PUBLIC_COPY["unsubscribe.unavailable.heading"]}>
-        <p>{PUBLIC_COPY["unsubscribe.unavailable.body"]}</p>
-        <p>{PUBLIC_COPY["unsubscribe.ask.body"]}</p>
-        <div className="kauro-site-actions">
-          <LinkButton href={ROUTE.contact}>{PUBLIC_COPY["unsubscribe.ask.cta"]}</LinkButton>
-        </div>
+      <Section id="unsubscribe-form" heading={PUBLIC_COPY["unsubscribe.form.heading"]}>
+        <p>{PUBLIC_COPY["unsubscribe.form.body"]}</p>
+        <OptOutForm token={token} />
       </Section>
       <Section id="unsubscribe-essential" heading={PUBLIC_COPY["unsubscribe.essential.heading"]}>
         <p>{PUBLIC_COPY["unsubscribe.essential.body"]}</p>

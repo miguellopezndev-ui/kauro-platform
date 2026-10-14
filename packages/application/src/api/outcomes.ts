@@ -367,6 +367,15 @@ export const OPERATIONAL_OUTCOMES: Readonly<Record<string, ReadonlyArray<Problem
     outcome("COMMAND", "ADMISSION_LIMITED", "INQUIRY_RATE_LIMITED", "the client-address hash has 5 accepted inquiries in the trailing hour, or the e-mail hash has 3 in the trailing day; retryAfterSeconds says when the first leaves the window (D-PUB-3)"),
     ...PLATFORM_OUTCOMES,
   ]),
+  // the public opt-out (B12 lane L-ACT): no credential is read; the unknown token answers the same 200
+  getOutreachOptOut: closedCatalogue("getOutreachOptOut", [...TRANSPORT_OUTCOMES, NO_BODY, ...PLATFORM_OUTCOMES]),
+  postOutreachOptOut: closedCatalogue("postOutreachOptOut", [
+    ...TRANSPORT_OUTCOMES,
+    outcome("ADMISSION", "INVALID_REQUEST", "CONTENT_TYPE_UNSUPPORTED", "the body is neither application/x-www-form-urlencoded nor multipart/form-data (RFC 8058 s.3.2): nothing is written"),
+    outcome("ADMISSION", "INVALID_REQUEST", "SCHEMA_VIOLATION", "the body is not exactly List-Unsubscribe=One-Click (one part for multipart, at most 1 KiB): nothing is written", { fieldCodes: ["FORMAT"] }),
+    outcome("COMMAND", "ADMISSION_LIMITED", "INQUIRY_RATE_LIMITED", "the client network made more than 20 unknown-token requests in 60 s (a valid token is never counted); retryAfterSeconds says when to retry"),
+    ...PLATFORM_OUTCOMES,
+  ]),
   // the agency app (B11 lane A1): CMD101 SetBuyerType, a command of the shared pipeline served as an operational route
   setBuyerType: closedCatalogue("setBuyerType", [
     ...EVERY_ROUTE,

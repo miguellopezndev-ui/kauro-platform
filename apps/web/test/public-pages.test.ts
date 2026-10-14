@@ -10,7 +10,7 @@
 //     line, no savings amount, and every dollar figure is a band price of the policy;
 //   - availability comes from the publication and from nothing else: a service the publication does not list is never described as open,
 //     and a publication that cannot be read makes no statement about any service;
-//   - the unsubscribe page changes nothing and never reads the token.
+//   - the unsubscribe page is one form whose action carries the token and which posts the RFC 8058 body (UI49).
 // The publication is a value built with parsePublication from the api's published shape (CONTRACT_FAKE: no api is involved).
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -34,6 +34,7 @@ import { StatusPage } from "../src/public/pages/status.tsx";
 import { SupportedServicesPage } from "../src/public/pages/supported-services.tsx";
 import { ContactPage } from "../src/public/pages/contact.tsx";
 import { UnsubscribePage } from "../src/public/pages/unsubscribe.tsx";
+import { submitOptOut } from "../src/public/opt-out.ts";
 import { NavList, SiteFrame } from "../src/public/frame.tsx";
 import { BANDS, formatUsd } from "../src/public/pricing-bands.ts";
 import { RETENTION_ROWS } from "../src/public/retention.ts";
@@ -69,6 +70,7 @@ interface PageCase {
   readonly html: (read: Publication) => string;
 }
 
+const TOKEN = "1.0123456789abcdef0123456789abcdef.AbC-_dEf";
 const PAGES: readonly PageCase[] = [
   { key: "home", screen: "UI01", html: (read) => render(createElement(HomePage, { publication: read, signInHref: SIGN_IN })) },
   { key: "how", screen: "UI02", html: () => render(createElement(HowItWorksPage)) },
@@ -79,7 +81,7 @@ const PAGES: readonly PageCase[] = [
   { key: "contact", screen: "UI07", html: () => render(createElement(ContactPage)) },
   { key: "status", screen: "UI08", html: (read) => render(createElement(StatusPage, { publication: read })) },
   { key: "help", screen: "UI48", html: () => render(createElement(HelpPage)) },
-  { key: "unsubscribe", screen: "UI49", html: () => render(createElement(UnsubscribePage)) },
+  { key: "unsubscribe", screen: "UI49", html: () => render(createElement(UnsubscribePage, { token: TOKEN })) },
 ];
 const page = (key: PageKey): PageCase => {
   const found = PAGES.find((candidate) => candidate.key === key);
@@ -504,26 +506,43 @@ test("Help: an index of seven static guides that link to their sections, each wi
 
 // ---- Unsubscribe ----------------------------------------------------------------------------------------------------------------------
 
-test("Communication preferences: the page says it cannot stop messages yet, changes nothing, and offers a written route instead", () => {
+test("UI49 (form): one POST form to the api opt-out route carries exactly the RFC 8058 body, the token only in its action, and rendering issues no request", () => {
   const html = page("unsubscribe").html(ALL);
   const text = textOf(html);
-  assert.match(text, /This page cannot stop messages yet/);
-  assert.match(text, /Turning off optional messages from this link is not available yet\. This page has not changed any setting and has not recorded any choice\./);
-  assert.match(text, /Notices about an account, a payment, your files or a support case are not optional messages\./);
-  assert.doesNotMatch(html, /<form|<input|<button|<select|<textarea/, "nothing on the page can be pressed to stop a message");
-  assert.doesNotMatch(text, /you have been unsubscribed|preferences (saved|updated)|successfully/i, "no success is claimed");
-  assert.deepEqual(hrefsOf(html), [ROUTE.contact]);
+  assert.equal(count(html, "<form"), 1);
+  assert.match(html, /<form[^>]*method="post"/);
+  assert.match(html, new RegExp(`action="/api/v1/public/outreach/opt-out/${TOKEN.replaceAll(".", "\.")}"`));
+  assert.match(html, /enctype="application/x-www-form-urlencoded"/i);
+  assert.equal(count(html, "<input"), 1);
+  assert.match(html, /<input[^>]*type="hidden"[^>]*name="List-Unsubscribe"[^>]*value="One-Click"/);
+  assert.equal(text.includes(TOKEN), false, "the token is never page text");
+  assert.match(text, /Stop optional messages/);
+  assert.match(text, /Notices about an account, a payment, your files or a support case are not optional messages./);
+  assert.doesNotMatch(text, /you have been unsubscribed|successfully/i, "no success is claimed before the api answers 200");
 });
 
-test("the unsubscribe route never reads the token it is reached with, and no public route reads a cookie, a header or the environment", () => {
-  const route = readFileSync(join(webRoot, "src", "app", "(public)", "unsubscribe", "[token]", "page.tsx"), "utf8");
-  assert.equal(/\bparams\b/.test(route), false, "the token in the address is not read");
-  assert.equal(/\btoken\b/.test(route.replaceAll(/\/\/.*$/gm, "")), false);
-  const sources = walk(join(webRoot, "src", "app", "(public)")).filter((file) => /\.(ts|tsx)$/.test(file));
+test("UI49 (submit): posts exactly the RFC body without credentials and confirms only on a 200", async () => {
+  const seen: Array<{ url: string; init: RequestInit }> = [];
+  const answer = (status: number): typeof fetch => (async (url: string | URL | Request, init?: RequestInit) => {
+    seen.push({ url: String(url), init: init ?? {} });
+    return new Response("{}", { status });
+  }) as typeof fetch;
+  assert.equal(await submitOptOut(TOKEN, answer(200)), "DONE");
+  assert.equal(seen[0]?.url, `/api/v1/public/outreach/opt-out/${TOKEN}`);
+  assert.equal(seen[0]?.init.method, "POST");
+  assert.equal(seen[0]?.init.body, "List-Unsubscribe=One-Click");
+  assert.equal(seen[0]?.init.credentials, "omit");
+  assert.equal(await submitOptOut(TOKEN, answer(429)), "LIMITED");
+  for (const status of [303, 400, 415, 500]) assert.equal(await submitOptOut(TOKEN, answer(status)), "FAILED", String(status));
+  assert.equal(await submitOptOut(TOKEN, (async () => { throw new Error("offline"); }) as typeof fetch), "FAILED");
+});
+
+test("no public route reads a cookie, a header or the environment", () => {
+  const sources = walk(join(webRoot, "src", "app", "(public)")).filter((file) => /.(ts|tsx)$/.test(file));
   assert.ok(sources.length >= 12, "the public routes are there");
   for (const file of sources) {
     const source = readFileSync(file, "utf8");
-    assert.equal(/\b(cookies|headers)\(/.test(source) || /process\.env/.test(source), false, `${relative(webRoot, file)} reads no request state and no environment`);
+    assert.equal(/(cookies|headers)(/.test(source) || /process.env/.test(source), false, `${relative(webRoot, file)} reads no request state and no environment`);
   }
 });
 
