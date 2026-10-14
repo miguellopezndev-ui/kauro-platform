@@ -23,7 +23,7 @@ import type { FastifyInstance } from "fastify";
 import type { LateFailureSink, BankEvidenceClassifier, BankEvidenceStore, BankInboundCollaborators } from "@kauro/application";
 import { createBankInboundHandlers, createBankRouteHandlers, realProviderCallTimer } from "@kauro/application";
 import type { AssuranceVerifier, AuditReadRuntime, AuditRuntime, B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators, ProviderCallTimer } from "@kauro/application";
-import { RecordedBuyerTypeReader, SESSION_POLICY_VERSION, createAgencyAppHandlers, type AgencyAppStores, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createRetentionHandlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, createTeamHandlers, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createCapabilityCommandHandlers, createOperationsCommandHandlers, createQuoteHandlers, createStatementRequestHandlers, createOutreachStubCommandHandlers, createOutreachStubReadHandlers, problemOf, recordOperatorDenial } from "@kauro/application";
+import { RecordedBuyerTypeReader, SESSION_POLICY_VERSION, createAgencyAppHandlers, type AgencyAppStores, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createRetentionHandlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createProspectIntakeHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, createTeamHandlers, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createCapabilityCommandHandlers, createOperationsCommandHandlers, createQuoteHandlers, createStatementRequestHandlers, createOutreachStubCommandHandlers, createOutreachStubReadHandlers, problemOf, recordOperatorDenial } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { UtcInstant } from "@kauro/contracts";
 import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
@@ -421,12 +421,15 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const commercial = createAgencyLifecycleHandlers(commerceRuntime, { lifecycle: agencyLifecycleOf, activeWork: collaborators.activeWork, assurance: createAssuranceVerifier(), ...(assembly.commercial?.providerTimer !== undefined ? { providerTimer: assembly.commercial.providerTimer } : {}), ...(assembly.commercial?.onLateFailure !== undefined ? { onLateFailure: assembly.commercial.onLateFailure } : {}) });
   // package B10: the prospect, claim and attribution commands (CMD045, CMD046, CMD047) in the caller's OPERATOR context, over the sales and
   // attribution adapters, the commercial authorizer's principals (the seller row and the owner grant, read after their transition locks)
-  const prospects = createProspectHandlers(commerceRuntime, {
+  const prospectCollaborators = {
     authorizer: createCommercialAuthorizer({ principals: { binding: "PLATFORM", sellerOf: async (uow, userId) => commercialPrincipalsOf(uow).sellerOf(userId), ownerGrantOf: async (uow, userId) => commercialPrincipalsOf(uow).ownerGrantOf(userId) } }),
     sales: salesOf,
     attribution: attributionOf,
     orderPrecedesClaim: agencyOrderPrecedesClaim,
-  });
+  };
+  const prospects = createProspectHandlers(commerceRuntime, prospectCollaborators);
+  // package B12 lane L-SOURCE: RecordProspectSource and RecordProspectContact replace their NOT_BUILT stubs
+  const outreachCommands = { ...createOutreachStubCommandHandlers(), ...createProspectIntakeHandlers(commerceRuntime, prospectCollaborators) };
   // package B10: the seller commands (CMD048, CMD049, CMD050) on the same runtime, over the sales and attribution adapters, the commercial
   // authorizer (the corporate owner's grant) and the step-up verifier
   const sellers = createSellerCommandHandlers(commerceRuntime, { sales: salesOf, attribution: attributionOf, authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }), assurance: createAssuranceVerifier() });
@@ -468,7 +471,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     reads: { ...createReadHandlers(readRuntime), ...createSourceReadHandlers(readRuntime, sources), ...createExecutionReadHandlers(readRuntime), ...createAuditReadHandlers(readRuntime) },
     intakes: { ...createSourceIntakeHandlers(readRuntime), ...createAuditIntakeHandlers(readRuntime) },
     commercial: {
-      commands: [...Object.values(commercial), ...Object.values(quotes), ...Object.values(prospects), ...Object.values(sellers), ...Object.values(capabilities), ...Object.values(operations), statements.CMD052, ...Object.values(createOutreachStubCommandHandlers())] as ReadonlyArray<CommercialCommandHandler<unknown, unknown>>,
+      commands: [...Object.values(commercial), ...Object.values(quotes), ...Object.values(prospects), ...Object.values(sellers), ...Object.values(capabilities), ...Object.values(operations), statements.CMD052, ...Object.values(outreachCommands)] as ReadonlyArray<CommercialCommandHandler<unknown, unknown>>,
       reads: [statements.GetCommissionStatement, ...Object.values(createOutreachStubReadHandlers())] as ReadonlyArray<CommercialReadHandler<unknown>>,
       ...(serviceAuthenticator !== undefined ? { serviceAuthenticator } : {}),
     },
