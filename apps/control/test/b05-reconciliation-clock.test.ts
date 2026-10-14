@@ -82,7 +82,8 @@ async function admit(run: Run, maxChargeMicros: bigint): Promise<Adm> {
       taskKey: sha(`task-${x.core.reservationId}`),
       candidateManifestHash: run.manifest as never,
       policyHash: sha("model-policy"),
-      minimizedRequestHash: sha(`minimized-${x.core.reservationId}`),
+      minimizedRequestHash: sha(`request-${x.core.reservationId}`),
+      core: { runId: x.core.runId, requestKey: x.core.requestKey },
       providerProfileId: ids.next() as Id,
       maximumCostCents: 40n,
     });

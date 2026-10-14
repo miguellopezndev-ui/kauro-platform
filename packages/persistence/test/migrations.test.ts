@@ -153,6 +153,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0068_dispatch_from_unsettled_reserved.sql",
     // B16 L2 CMD060: the one retention extension, its guard path B (KA085) and the request role update grant (provisional number)
     "0069_b16_retention_extensions.sql",
+    // package B05 IJR: one IC request key is one model task, each IC invocation one request row (ADR-B05-IJR-1; provisional number)
+    "0070_b05_model_task_request_key.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
