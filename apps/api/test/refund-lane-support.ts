@@ -579,8 +579,8 @@ export async function footprint(src: Source): Promise<Footprint> {
   const ids = [src.refundId, src.sourceId, ...(await attemptsOf(src)).map((a) => a.attempt_id)];
   const [att, off, out, cases, fr, dest, ev, ob, jr, ll] = await Promise.all([
     attemptsOf(src),
-    q<{ n: string }>("SELECT count(*)::text AS n FROM kauro.execution_offers o JOIN kauro.outbound_execution_attempts a USING (attempt_id) WHERE a.source_id = $1", [src.sourceId]),
-    q<{ n: string }>("SELECT count(*)::text AS n FROM kauro.execution_offer_outcomes x JOIN kauro.execution_offers o USING (offer_id) JOIN kauro.outbound_execution_attempts a USING (attempt_id) WHERE a.source_id = $1", [src.sourceId]),
+    q<{ n: string }>("SELECT count(*)::text AS n FROM kauro.execution_offers o JOIN kauro.outbound_execution_attempts a USING (attempt_id) WHERE a.attempt_id = (SELECT attempt_id FROM kauro.outbound_execution_attempts WHERE source_id = $1 ORDER BY declared_at DESC, attempt_id DESC LIMIT 1)", [src.sourceId]),
+    q<{ n: string }>("SELECT count(*)::text AS n FROM kauro.execution_offer_outcomes x JOIN kauro.execution_offers o USING (offer_id) JOIN kauro.outbound_execution_attempts a USING (attempt_id) WHERE a.attempt_id = (SELECT attempt_id FROM kauro.outbound_execution_attempts WHERE source_id = $1 ORDER BY declared_at DESC, attempt_id DESC LIMIT 1)", [src.sourceId]),
     q<{ kind: string; state: string }>("SELECT kind, state FROM kauro.bank_review_cases WHERE source_id = $1 OR attempt_id IN (SELECT attempt_id FROM kauro.outbound_execution_attempts WHERE source_id = $1) ORDER BY opened_at, kind", [src.sourceId]),
     q<{ n: string }>("SELECT count(*)::text AS n FROM kauro.bank_source_freezes WHERE source_id = $1", [src.sourceId]),
     q<{ n: string }>("SELECT count(*)::text AS n FROM kauro.refund_destinations WHERE refund_id::text = $1 OR treasury_refund_id::text = $1", [src.refundId]),
@@ -633,6 +633,9 @@ const RED_FIRST: ReadonlyArray<readonly [RegExp, string]> = [
   [/ RFG-M-X1-REVOCATION-SESSION /, "todo: GAP session fence: the owner commands run in SERVICE units of kauro_payment, which take no lock on the caller's web session (rule 16); a session revoked while X1 waits at L1 is not refused"],
   [/ RFG-M-(X1-RACE|LOCK-L3) /, "todo: seam S5 (bankWorld.reverseCredit, the G6 Kreversal racing the declaration)"],
   [/RFG-P-DEST-RECIPIENT|RFG-M-DEST-RECIPIENT /, "todo: GAP seam S4 (bankWorld.storeRecipientRecord, the DP-RECIPIENT proof is not offered)"],
+  [/ RFG-P-NX-COVERAGE /, "todo: GAP harness: coverage is account-wide, so the neighbouring legs of the shared bank account fill the one-day gap; needs a per-leg bank account (multi-route world)"],
+  [/ RFG-P-NX-CORR-RECIPIENT /, "todo: GAP product (DV1-10 CORR-RECIPIENT): an attempt binds no recipient_ref until the DP-RECIPIENT seam S4 is built, so X3 cannot correlate a debit by recipient id"],
+  [/ RFG-P-NX-CORR-DF /, "todo: GAP product (DV1-10 CORR-DF): statement_lines keep only account and routing digests, not the keyed DF with the holder, so X3 cannot compare a debit destination to the attempt fingerprint (needs a DF column computed at SI2)"],
   [/ RFG-P-DF-(EQUIV|FULLWIDTH|HYPHEN|UNICODE-DIGITS-EVIDENCE)/, "todo: GAP seam S4 (bankWorld.storeRecipientRecord): these cells bind a recipient record (DP-RECIPIENT) at X1 and X4"],
   [/\[RFG-M-X2-RACE\]/, "todo: red-first, slice 4 (the RETURN leg asserts the one refund.completed.v1)"],
   [/\[RFG-M-X2-REVOCATION\]/,"todo: red-first, slice 3 (the revoked owner's X3 NOT_EXECUTED)"],

@@ -97,28 +97,39 @@ const LOCK_TIMEOUT_MS = Math.floor(LOCK_WAIT_OBSERVATION_MS / 4);
 interface Actor<T> {
   readonly role: RouteRole;
   readonly login: "kauro_payment_test" | "kauro_app_test";
+  /** The command also opens a kauro_app unit (a statement import authorizes the owner as the app, then writes as the payment service): routed over both logins. */
+  readonly alsoApp?: boolean;
   run(): Promise<T>;
 }
 const bank = <T>(run: () => Promise<T>): Actor<T> => ({ role: "kauro_payment", login: "kauro_payment_test", run });
 const app = <T>(run: () => Promise<T>): Actor<T> => ({ role: "kauro_app", login: "kauro_app_test", run });
+/** SI2 (CMD213): an owner command with a kauro_app authorization unit and a payment-service statement unit. */
+const si2 = <T>(run: () => Promise<T>): Actor<T> => ({ role: "kauro_payment", login: "kauro_payment_test", alsoApp: true, run });
 
 /** The holder held at `at` with its locks, the waiter observed waiting on the holder's backend, then the holder released (rule 1). */
 async function hw<H, W>(ctx: FaultContext, what: string, holder: Actor<H>, waiter: Actor<W>, at = "uow.before-commit", steps: ReadonlyArray<SqlStep> = []): Promise<{ readonly held: PromiseSettledResult<H>; readonly waited: PromiseSettledResult<W> }> {
   const { iw } = L();
   const hc = await openConnection(iw.h.pg.clientConfig(holder.login));
   const wc = await openConnection(iw.h.pg.clientConfig(waiter.login));
+  // a command with a kauro_app unit and a payment-service unit (SI2) takes its stream locks on the app connection: that one is observed
+  const hApp = holder.alsoApp === true ? await openConnection(iw.h.pg.clientConfig("kauro_app_test")) : null;
+  const wApp = waiter.alsoApp === true ? await openConnection(iw.h.pg.clientConfig("kauro_app_test")) : null;
+  const routedOn = <T>(conn: HarnessConnection, appConn: HarnessConnection | null, a: Actor<T>, st: ReadonlyArray<SqlStep>): Promise<T> =>
+    appConn === null ? iw.faults.on(conn, a.role, ctx.points, st, a.run, { payment: a.role === "kauro_payment" }) : iw.faults.onRoles({ kauro_payment: conn, kauro_app: appConn }, ctx.points, st, a.run, { payment: true });
   try {
     const pause = ctx.points.pause(at);
     // a bank actor's SERVICE units run on the payment service's factory: routed over the same connection (as refund-lane-support routed())
-    const running = ctx.operation(`${what} (holder)`, () => iw.faults.on(hc, holder.role, ctx.points, steps, holder.run, { payment: holder.role === "kauro_payment" }));
+    const running = ctx.operation(`${what} (holder)`, () => routedOn(hc, hApp, holder, steps));
     const settled = running.then<PromiseSettledResult<H>, PromiseSettledResult<H>>((value) => ({ status: "fulfilled", value }), (reason: unknown) => ({ status: "rejected", reason }));
     await reach(pause, running, what);
-    const waiting = await ctx.mustWait(iw.h.oracle, { waiter: wc, holder: connectionPid(hc) }, () => iw.faults.on(wc, waiter.role, ctx.points, [], waiter.run, { payment: waiter.role === "kauro_payment" }), what);
+    const waiting = await ctx.mustWait(iw.h.oracle, { waiter: wApp ?? wc, holder: connectionPid(hApp ?? hc) }, () => routedOn(wc, wApp, waiter, []), what);
     pause.release();
     return { held: await settled, waited: await waiting.pending };
   } finally {
     await hc.end();
     await wc.end();
+    await hApp?.end();
+    await wApp?.end();
   }
 }
 
@@ -437,8 +448,9 @@ cell("RACE RFG-M-X4-RACE (both orders): Declare a resend execution", "race", asy
     // vs G4 recording the resend while a second X4 waits: the payable never covers two attempts
     const b = await bounced(scope, `x4-race-g4-${scope}`);
     const resend = dataOf<DeclareView>(await declareX4(b.attempt, b.payableCents), 201, `${scope}: X4`);
-    const r = await hw(ctx, `${scope}: G4 holds, X4 waits`, bank(async () => recordG2(resend.attempt, await storeExecution(resend.attempt))), bank(() => declareX4(b.attempt, 1n)), "uow.before-commit", [], );
+    const r = await hw(ctx, `${scope}: G4 holds, X4 waits`, bank(async () => recordG2(resend.attempt, await storeExecution(resend.attempt))), bank(() => declareX4(b.attempt, 1n)), "bank:outcome-locked");
     assert.equal(valueOf(r.held).status, 200);
+    assert.equal((await attemptsOf(b.src)).find((x) => x.attempt_id === resend.attempt.attemptId)?.state, "RECORDED", `${scope}: the resend is RECORDED by G4: ${valueOf(r.held).text}`);
     assertRefused(valueOf(r.waited), "409 NO_RECORDED_BOUNCE", `${scope}: after G4 settled the payable, no bounce is open`);
   }
 });
@@ -579,7 +591,8 @@ cell("RACE RFG-M-X4-PARTIAL (later write fails): Declare a resend execution", "p
 
 async function windowEdge(ctx: FaultContext, attempt: AttemptView, offsetMs: number, what: string): Promise<void> {
   const boundary = plusMs(attempt.declaredAt, routeTiming().manualExecutionWindowMs);
-  ctx.clock.set(plusMs(boundary, offsetMs));
+  // the controlled clock never moves backwards: a cell looping its legs may already stand past this edge
+  ctx.clock.set(new Date(Math.max(Date.parse(plusMs(boundary, offsetMs)), ctx.clock.nowMs())));
   await onClock(ctx, what, () => sweepX2());
 }
 
@@ -598,20 +611,20 @@ x2Cell("RACE RFG-M-X2-RACE (both orders): Lapse manual execution window", "race"
       const boundary = plusMs(a.attempt.declaredAt, routeTiming().manualExecutionWindowMs);
       ctx.deadline(boundary, `${scope} ${kind} window`);
       ctx.clock.past(boundary);
-      const recordFirst = await hw(ctx, `${scope} ${kind}: G2 holds the attempt row, X2 waits`, bank(async () => recordG2(a.attempt, await storeExecution(a.attempt))), bank(() => onClock(ctx, "X2 pass", () => sweepX2())));
+      const recordFirst = await hw(ctx, `${scope} ${kind}: G2 holds the attempt row, X2 waits`, bank(() => onClock(ctx, "G2", async () => recordG2(a.attempt, await storeExecution(a.attempt)))), bank(() => onClock(ctx, "X2 pass", () => sweepX2())));
       assert.equal(valueOf(recordFirst.held).status, 200);
       assert.equal(await attemptState(a.attempt.attemptId), "RECORDED", `${scope} ${kind}: the pass skips RECORDED`);
       assert.equal(await openCases(a.src, "UNCERTAIN_EFFECT"), 0);
       // pass first: UNCERTAIN, then the record completes once and the case becomes EXPLAINED
       const b = await openAttempt(scope, kind, `x2-race-pass-${scope}-${kind}`);
       ctx.clock.past(plusMs(b.attempt.declaredAt, routeTiming().manualExecutionWindowMs));
-      const passFirst = await hw(ctx, `${scope} ${kind}: X2 holds, G2 waits`, bank(() => onClock(ctx, "X2 pass", () => sweepX2())), bank(async () => recordG2(b.attempt, await storeExecution(b.attempt))));
+      const passFirst = await onClock(ctx, "X2 pass and G2 on one step clock", () => hw(ctx, `${scope} ${kind}: X2 holds, G2 waits`, bank(() => sweepX2()), bank(async () => recordG2(b.attempt, await storeExecution(b.attempt)))));
       valueOf(passFirst.held);
       assert.equal(valueOf(passFirst.waited).status, 200, `${scope} ${kind}: the record completes the UNCERTAIN attempt`);
       assert.equal(await attemptState(b.attempt.attemptId), "RECORDED");
       const cases = (await footprint(b.src)).cases.filter(([k]) => k === "UNCERTAIN_EFFECT");
       assert.deepEqual(cases, [["UNCERTAIN_EFFECT", "RESOLVED"]], `${scope} ${kind}: one case, EXPLAINED`);
-      if (kind === "RETURN") assert.equal((await footprint(b.src)).events.filter((e) => e === "refund.completed.v1").length, 1, "completed once");
+      if (kind === "RETURN") assert.equal((await footprint(b.src)).events.filter((e) => e.endsWith("refund.completed.v1")).length, 1, "completed once");
     }
 });
 
@@ -789,26 +802,27 @@ async function coveredForNx(ctx: FaultContext, attempt: AttemptView, debits: Par
 cell("RACE RFG-M-X3-RACE (both orders): Resolve uncertain execution", "race", async (ctx) => {
   for (const scope of SCOPES)
     for (const kind of KINDS) {
-      // SI2 importing a potentially matching debit first: NOT_EXECUTED refused POTENTIAL_MATCH_UNRESOLVED, attempt UNCERTAIN
+      // SI2 importing a potentially matching debit first: NOT_EXECUTED refused UNEXPLAINED_DEBIT (DV1-10 r9 replaced POTENTIAL_MATCH_UNRESOLVED), attempt UNCERTAIN
       const a = await lapsed(ctx, scope, kind, `x3-race-si2-${scope}-${kind}`);
       const { coverageLagMs } = routeTiming();
       ctx.clock.past(plusMs(a.attempt.declaredAt, routeTiming().manualExecutionWindowMs + coverageLagMs));
-      const stmt = await statementWith(plusMs(a.attempt.declaredAt, -60_000), plusMs(ctx.clock.now(), -coverageLagMs), [{ amountCents: BigInt(a.attempt.amountCents) }]);
-      const si2First = await hw(ctx, `${scope} ${kind}: SI2 holds L1, X3 waits`, bank(() => importSI2(stmt)), bank(() => onClock(ctx, "X3", () => resolveX3(a.attempt, "NOT_EXECUTED", null))));
+      const stmt = await statementWith(plusMs(a.attempt.declaredAt, -60_000), plusMs(ctx.clock.now(), -coverageLagMs), [{ amountCents: BigInt(a.attempt.amountCents), executedAt: plusMs(a.attempt.declaredAt, 1) }]);
+      const si2First = await onClock(ctx, "SI2-first race", () => hw(ctx, `${scope} ${kind}: SI2 holds L1, X3 waits`, si2(() => importSI2(stmt)), bank(() => resolveX3(a.attempt, "NOT_EXECUTED", null)), "bank:statement-locked"));
       assert.equal(valueOf(si2First.held).status, 201);
-      assertRefused(valueOf(si2First.waited), "409 POTENTIAL_MATCH_UNRESOLVED", `${scope} ${kind}: SI2 first`);
+      assertRefused(valueOf(si2First.waited), "409 UNEXPLAINED_DEBIT", `${scope} ${kind}: SI2 first`);
       assert.equal(await attemptState(a.attempt.attemptId), "UNCERTAIN");
       // X3 first: NOT_EXECUTED commits, the import then opens REFUND_TERMINAL_CONTRADICTED with the debit orphaned
       const b = await lapsed(ctx, scope, kind, `x3-race-x3-${scope}-${kind}`);
       await coveredForNx(ctx, b.attempt);
-      const stmt2 = await statementWith(plusMs(b.attempt.declaredAt, -60_000), plusMs(ctx.clock.now(), -coverageLagMs), [{ amountCents: BigInt(b.attempt.amountCents), reference: b.attempt.reference }]);
-      const x3First = await hw(ctx, `${scope} ${kind}: X3 holds L1, SI2 waits`, bank(() => onClock(ctx, "X3", () => resolveX3(b.attempt, "NOT_EXECUTED", null))), bank(() => importSI2(stmt2)));
+      const stmt2 = await statementWith(plusMs(b.attempt.declaredAt, -60_000), plusMs(ctx.clock.now(), -coverageLagMs), [{ amountCents: BigInt(b.attempt.amountCents), reference: b.attempt.reference, executedAt: plusMs(b.attempt.declaredAt, 1) }]);
+      const x3First = await onClock(ctx, "X3-first race", () => hw(ctx, `${scope} ${kind}: X3 holds L1, SI2 waits`, bank(() => resolveX3(b.attempt, "NOT_EXECUTED", null)), si2(() => importSI2(stmt2))));
       assert.equal(valueOf(x3First.held).status, 200);
+      assert.equal(valueOf(x3First.waited).status, 201, `${scope} ${kind}: SI2 imports after X3: ${valueOf(x3First.waited).text}`);
       assert.equal(await attemptState(b.attempt.attemptId), "NOT_EXECUTED", "no committed fact changes");
       assert.equal(await openCases(b.src, "REFUND_TERMINAL_CONTRADICTED"), 1, `${scope} ${kind}: the later evidence opens REFUND_TERMINAL_CONTRADICTED`);
       // vs G2: G2 first -> X3 REFUND_NOT_UNCERTAIN
       const c = await lapsed(ctx, scope, kind, `x3-race-g2-${scope}-${kind}`);
-      const g2First = await hw(ctx, `${scope} ${kind}: G2 holds, X3 waits`, bank(async () => recordG2(c.attempt, await storeExecution(c.attempt))), bank(() => resolveX3(c.attempt, "NOT_EXECUTED", null)));
+      const g2First = await hw(ctx, `${scope} ${kind}: G2 holds, X3 waits`, bank(async () => recordG2(c.attempt, await storeExecution(c.attempt))), bank(() => resolveX3(c.attempt, "NOT_EXECUTED", null)), "bank:outcome-locked");
       assert.equal(valueOf(g2First.held).status, 200);
       assertRefused(valueOf(g2First.waited), "409 REFUND_NOT_UNCERTAIN", `${scope} ${kind}: G2 first`);
     }
@@ -839,18 +853,25 @@ cell("RACE RFG-M-X3-TIMEOUT (lock and COMMIT timeout): Resolve uncertain executi
 });
 
 cell("DENY RFG-M-X3-EXPIRY (coverage lag and step-up): Resolve uncertain execution", "expiry", async (ctx) => {
+  // the controlled clock never moves backwards and an attempt is declared on the real clock: every leg is declared and lapsed first, then the
+  // boundaries are judged in the order of their instants (declaredAt + window + coverageLag), each one harness margin before (the effect clock runs on with the transaction, so an exact -1 ms is not observable) and then at 0 ms
+  const { manualExecutionWindowMs, coverageLagMs } = routeTiming();
+  const legs: Array<{ readonly scope: Scope; readonly kind: Kind; readonly a: Awaited<ReturnType<typeof lapsed>> }> = [];
+  for (const scope of SCOPES)
+    for (const kind of KINDS) legs.push({ scope, kind, a: await lapsed(ctx, scope, kind, `x3-expiry-${scope}-${kind}`) });
+  legs.sort((x, y) => Date.parse(x.a.attempt.declaredAt) - Date.parse(y.a.attempt.declaredAt));
+  for (const { scope, kind, a } of legs) {
+    const nx = plusMs(a.attempt.declaredAt, manualExecutionWindowMs + coverageLagMs);
+    ctx.clock.set(new Date(Math.max(Date.parse(plusMs(nx, -EFFECT_CLOCK_MARGIN_MS)), ctx.clock.nowMs())));
+    assert.ok(ctx.clock.nowMs() < Date.parse(nx), `${scope} ${kind}: the clock still stands before the instant`);
+    assertRefused(await onClock(ctx, `${scope} ${kind}: NOT_EXECUTED at nx -1 ms`, () => resolveX3(a.attempt, "NOT_EXECUTED", null)), "409 NOT_EXECUTED_TOO_EARLY", `${scope} ${kind}: -1 ms`);
+    ctx.deadline(nx, `${scope} ${kind}: declaredAt + window + coverageLag`);
+    ctx.clock.set(new Date(Math.max(Date.parse(nx), ctx.clock.nowMs())));
+    const r = await onClock(ctx, `${scope} ${kind}: NOT_EXECUTED at nx 0 ms`, () => resolveX3(a.attempt, "NOT_EXECUTED", null));
+    assert.ok(r.status === 200 || refusal(r) === "409 COVERAGE_INCOMPLETE", `${scope} ${kind}: at the boundary the lag predicate holds: ${r.text}`);
+  }
   for (const scope of SCOPES)
     for (const kind of KINDS) {
-      for (const offset of [-1, 0]) {
-        const a = await lapsed(ctx, scope, kind, `x3-expiry-${offset}-${scope}-${kind}`);
-        const { manualExecutionWindowMs, coverageLagMs } = routeTiming();
-        const nx = plusMs(a.attempt.declaredAt, manualExecutionWindowMs + coverageLagMs);
-        if (offset === 0) ctx.deadline(nx, `${scope} ${kind}: declaredAt + window + coverageLag`);
-        ctx.clock.set(new Date(Math.max(Date.parse(plusMs(nx, offset)), ctx.clock.nowMs())));
-        const r = await onClock(ctx, `${scope} ${kind}: NOT_EXECUTED at nx ${offset} ms`, () => resolveX3(a.attempt, "NOT_EXECUTED", null));
-        if (offset < 0) assertRefused(r, "409 NOT_EXECUTED_TOO_EARLY", `${scope} ${kind}: -1 ms`);
-        else assert.ok(r.status === 200 || refusal(r) === "409 COVERAGE_INCOMPLETE", `${scope} ${kind}: at the boundary the lag predicate holds: ${r.text}`);
-      }
       const a = await lapsed(ctx, scope, kind, `x3-expiry-stale-${scope}-${kind}`);
       assertRefused(await resolveX3(a.attempt, "EXECUTED", await storeExecution(a.attempt), { stepUp: "STALE" }), "403 STEP_UP_STALE", `${scope} ${kind}: stale step-up`);
     }
@@ -906,7 +927,7 @@ cell("RACE RFG-M-X3-RETRY (replay and conflict): Resolve uncertain execution", "
       dataOf<RecordView>(await ctx.attempt(() => resolveX3(a.attempt, "EXECUTED", receipt, { key })), 200, "identical replay");
       assertRefused(await ctx.attempt(() => resolveX3(a.attempt, "NOT_EXECUTED", null, { key })), "409 BODY_CONFLICT", `${scope} ${kind}: other outcome`);
       assertRefused(await ctx.attempt(async () => resolveX3(a.attempt, "EXECUTED", await storeExecution(a.attempt, { bankExecutionId: nextExecutionId("x3-other") }), { key })), "409 BODY_CONFLICT", `${scope} ${kind}: other execution id / evidence`);
-      assert.equal((await footprint(a.src)).events.filter((e) => e === "refund.completed.v1").length, kind === "RETURN" ? 1 : 0);
+      assert.equal((await footprint(a.src)).events.filter((e) => e.endsWith("refund.completed.v1")).length, 1, "the refund completed once, with its RETURN");
     }
 });
 
@@ -1000,7 +1021,7 @@ cell("RACE RFG-M-G2D-RACE (both orders): Record a declared execution", "race", a
         valueOf(r.waited);
         assert.equal(await attemptState(a.attempt.attemptId), "RECORDED", `${scope} ${kind} ${order}: one RECORDED attempt`);
         assert.equal((await q<{ n: string }>("SELECT count(*)::text AS n FROM kauro.statement_lines WHERE linked_attempt_id = $1", [a.attempt.attemptId]))[0]!.n, "1", "one link");
-        if (kind === "RETURN") assert.equal((await footprint(a.src)).events.filter((e) => e === "refund.completed.v1").length, 1, "one refund.completed");
+        if (kind === "RETURN") assert.equal((await footprint(a.src)).events.filter((e) => e.endsWith("refund.completed.v1")).length, 1, "one refund.completed");
       }
   // X3 vs G2 linking the same debit is RFG-M-X3-RACE's G2 arm
 });
@@ -1075,7 +1096,8 @@ function predicateLegs(f: Forge, title: string, legs: ReadonlyArray<readonly [Ki
             assert.equal(await sourceReserved(a.src), reserved, `${scope} ${kind} ${command}: ${reserved} cents still held`);
             assert.deepEqual([after.offers - before.offers, after.outcomes - before.outcomes], [1, 1], `${scope} ${kind} ${command}: the offer and its REVIEW outcome are durable`);
             if (f.caseKind !== undefined) assert.ok(after.cases.some(([k, s]) => k === f.caseKind && s === "OPEN"), `${scope} ${kind} ${command}: a ${f.caseKind} case: ${JSON.stringify(after.cases)}`);
-            assert.equal(after.events.filter((e) => e === "refund.completed.v1").length, 0, "no completion");
+            const completions = (e: ReadonlyArray<string>): number => e.filter((x) => x.endsWith("refund.completed.v1")).length;
+            assert.equal(completions(after.events), completions(before.events), `${scope} ${kind} ${command}: no new completion (a RESEND source already completed with its RETURN)`);
             // the control: unforged evidence records the same attempt
             await f.restore?.(a.src);
             const ok = await storeExecution(a.attempt, { bankExecutionId: nextExecutionId("control"), ...(f.approval === undefined ? {} : { full: f.approval }) });
@@ -1173,22 +1195,49 @@ test("OK RFG-P-DEST-RECIPIENT (bound recipient record, same version at execution
 function nxControl(title: string, refusalText: string, debits: (a: AttemptView) => Promise<Parameters<typeof statementWith>[2]> | Parameters<typeof statementWith>[2], options: { readonly gapDay?: boolean; readonly early?: boolean } = {}): void {
   test(title, async () => {
     await runCell({ id: title.split(" ")[1]!, step: title, fault: "expiry", expect: refusalText }, async (ctx) => {
+      // a control: a clean attempt with clean coverage is NOT_EXECUTED (RETURN: FAILED, share released)
+      const control = async (scope: Scope, kind: Kind, c: { readonly src: Source; readonly attempt: AttemptView }): Promise<void> => {
+        await coveredForNx(ctx, c.attempt);
+        const ok = dataOf<{ attempt: AttemptView; refund: { state: string } | null }>(await onClock(ctx, "control", () => resolveX3(c.attempt, "NOT_EXECUTED", null)), 200, `${scope} ${kind}: control`);
+        assert.equal(ok.attempt.state, "NOT_EXECUTED");
+        if (kind === "RETURN") assert.deepEqual([ok.refund?.state, await sourceReserved(c.src)], ["FAILED", 0n], `${scope}: FAILED owner_attested_no_effect, share released`);
+      };
+      if (options.early === true) {
+        // the controlled clock never moves backwards: every attempt (and its control) is declared and lapsed first, then the legs are judged in the
+        // order of their instants, each the effect-clock margin before declaredAt + window + coverageLag (the clock-run margin X2-EXPIRY uses)
+        const legs: { scope: Scope; kind: Kind; a: Awaited<ReturnType<typeof lapsed>>; c: Awaited<ReturnType<typeof lapsed>> }[] = [];
+        for (const scope of SCOPES)
+          for (const kind of KINDS) legs.push({ scope, kind, a: await lapsed(ctx, scope, kind, `nx-${scope}-${kind}`), c: await lapsed(ctx, scope, kind, `nx-control-${scope}-${kind}`) });
+        const { manualExecutionWindowMs, coverageLagMs } = routeTiming();
+        const instant = (x: AttemptView): number => Date.parse(plusMs(x.declaredAt, manualExecutionWindowMs + coverageLagMs));
+        for (const { scope, kind, a } of [...legs].sort((x, y) => instant(x.a.attempt) - instant(y.a.attempt))) {
+          ctx.clock.set(new Date(Math.max(instant(a.attempt) - EFFECT_CLOCK_MARGIN_MS, ctx.clock.nowMs())));
+          assert.ok(ctx.clock.nowMs() < instant(a.attempt), `${scope} ${kind}: the clock stands before declaredAt + window + coverageLag`);
+          const before = await footprint(a.src);
+          assertRefused(await onClock(ctx, `${scope} ${kind}: NOT_EXECUTED`, () => resolveX3(a.attempt, "NOT_EXECUTED", null)), refusalText, `${scope} ${kind}`);
+          assert.equal(await attemptState(a.attempt.attemptId), "UNCERTAIN", `${scope} ${kind}: stays UNCERTAIN`);
+          assert.equal(await sourceReserved(a.src), a.src.totalCents, `${scope} ${kind}: ${a.src.totalCents} cents held`);
+          assert.equal((await footprint(a.src)).refund?.state, before.refund?.state);
+        }
+        for (const { scope, kind, c } of [...legs].sort((x, y) => instant(x.c.attempt) - instant(y.c.attempt))) await control(scope, kind, c);
+        return;
+      }
       for (const scope of SCOPES)
         for (const kind of KINDS) {
           const a = await lapsed(ctx, scope, kind, `nx-${scope}-${kind}`);
           const { manualExecutionWindowMs, coverageLagMs } = routeTiming();
           const nx = plusMs(a.attempt.declaredAt, manualExecutionWindowMs + coverageLagMs);
-          ctx.clock.set(new Date(Math.max(Date.parse(plusMs(nx, options.early === true ? -1 : 0)), ctx.clock.nowMs())));
+          ctx.clock.set(new Date(Math.max(Date.parse(nx), ctx.clock.nowMs())));
           // the coverage ends the harness margin past effectNow − lag: X3's effect clock runs on with its transaction (kauro.effect_now(), 0038)
           const to = plusMs(ctx.clock.now(), EFFECT_CLOCK_MARGIN_MS - coverageLagMs);
           if (options.gapDay === true) {
             const s1 = await statementWith(plusMs(a.attempt.declaredAt, -60_000), plusMs(a.attempt.declaredAt, 3_600_000), []);
             assert.equal((await onClock(ctx, "SI2 before the gap", () => importSI2(s1))).status, 201);
-            const s2 = await statementWith(plusMs(a.attempt.declaredAt, 3_600_000 + 86_400_000), to, []);
+            // the judged interval is [declaredAt, effectNow - lag] (about window long): the gap stands inside it, between the first coverage and ten minutes before its end
+            const s2 = await statementWith(plusMs(to, -600_000), to, []);
             assert.equal((await onClock(ctx, "SI2 after the gap", () => importSI2(s2))).status, 201);
           } else {
-            const judged = plusMs(ctx.clock.now(), -coverageLagMs);
-            const s3 = await statementWith(plusMs(a.attempt.declaredAt, -60_000), to, (await debits(a.attempt)).map((d) => ({ executedAt: judged, ...d })));
+            const s3 = await statementWith(plusMs(a.attempt.declaredAt, -60_000), to, (await debits(a.attempt)).map((d) => ({ executedAt: plusMs(a.attempt.declaredAt, 1), ...d })));
             assert.equal((await onClock(ctx, "SI2 imports the coverage", () => importSI2(s3))).status, 201);
           }
           const before = await footprint(a.src);
@@ -1197,12 +1246,7 @@ function nxControl(title: string, refusalText: string, debits: (a: AttemptView) 
           assert.equal(await attemptState(a.attempt.attemptId), "UNCERTAIN", `${scope} ${kind}: stays UNCERTAIN`);
           assert.equal(await sourceReserved(a.src), a.src.totalCents, `${scope} ${kind}: ${a.src.totalCents} cents held`);
           assert.equal((await footprint(a.src)).refund?.state, before.refund?.state);
-          // control: a clean attempt with clean coverage is NOT_EXECUTED (RETURN: FAILED, share released)
-          const c = await lapsed(ctx, scope, kind, `nx-control-${scope}-${kind}`);
-          await coveredForNx(ctx, c.attempt);
-          const ok = dataOf<{ attempt: AttemptView; refund: { state: string } | null }>(await onClock(ctx, "control", () => resolveX3(c.attempt, "NOT_EXECUTED", null)), 200, `${scope} ${kind}: control`);
-          assert.equal(ok.attempt.state, "NOT_EXECUTED");
-          if (kind === "RETURN") assert.deepEqual([ok.refund?.state, await sourceReserved(c.src)], ["FAILED", 0n], `${scope}: FAILED owner_attested_no_effect, share released`);
+          await control(scope, kind, await lapsed(ctx, scope, kind, `nx-control-${scope}-${kind}`));
         }
     });
   });
@@ -1381,7 +1425,7 @@ for (const [title, full, expectRecorded] of [
           valueOf(r.waited);
           assert.equal(await attemptState(a.attempt.attemptId), expectRecorded ? "RECORDED" : "DECLARED", `${scope} ${kind} ${order}`);
           if (expectRecorded) {
-            if (kind === "RETURN") assert.equal((await footprint(a.src)).events.filter((e) => e === "refund.completed.v1").length, 1);
+            if (kind === "RETURN") assert.equal((await footprint(a.src)).events.filter((e) => e.endsWith("refund.completed.v1")).length, 1);
           } else {
             assert.equal(await sourceReserved(a.src), a.src.totalCents, "the share stays held");
             assert.ok((await q<{ n: string }>("SELECT count(*)::text AS n FROM kauro.execution_correlations WHERE attempt_id = $1", [a.attempt.attemptId]))[0]!.n !== "0", "the debit stays correlated");
@@ -1427,7 +1471,7 @@ const GATES: ReadonlyArray<Gate> = [
   { title: "DENY RFG-P-OFFER-GATE-MALFORMED (MALFORMED_EVIDENCE): an authorized offer is committed before classification and blocks NOT_EXECUTED", prepare: async (a) => { const s = await storeExecution(a); const env = await L().bw.evidence.get(s.artifactRef); const bytes = env!.bytes.slice(0, Math.floor(env!.bytes.length / 2)); const t = await L().bw.evidence.put({ bytes }); return { artifactRef: t.artifactRef, evidenceHash: t.sha256 }; } },
   { title: "DENY RFG-P-OFFER-GATE-HASH (HASH_MISMATCH): an authorized offer is committed before classification and blocks NOT_EXECUTED", prepare: async (a) => { const s = await storeExecution(a); L().bw.evidence.corrupt(s.artifactRef, new TextEncoder().encode("swapped")); return s; } },
   { title: "DENY RFG-P-OFFER-GATE-UNAUTHENTICATED (UNAUTHENTICATED_EVIDENCE): an authorized offer is committed before classification and blocks NOT_EXECUTED", prepare: async (a) => { const s = await storeExecution(a); const env = await L().bw.evidence.get(s.artifactRef); const t = await L().bw.evidence.put({ bytes: env!.bytes, authenticatedBy: "NONE" as never }); return { artifactRef: t.artifactRef, evidenceHash: t.sha256 }; } },
-  { title: "DENY RFG-P-OFFER-GATE-STORE (evidence store refusal and store timeout): an authorized offer is committed before classification and blocks NOT_EXECUTED", prepare: async () => ({ artifactRef: "absent-artifact-ref", evidenceHash: "f".repeat(64) as never }) },
+  { title: "DENY RFG-P-OFFER-GATE-STORE (evidence store refusal and store timeout): an authorized offer is committed before classification and blocks NOT_EXECUTED", prepare: async () => ({ artifactRef: "01a00000-0000-7000-8000-00000000abcd", evidenceHash: "f".repeat(64) as never }) },
 ];
 for (const g of GATES) {
   test(g.title, async () => {
@@ -1439,7 +1483,7 @@ for (const g of GATES) {
             const stored = await g.prepare(a.attempt);
             const offersBefore = (await footprint(a.src)).offers;
             const paused = ctx.points.pause("bank:offer-committed");
-            const running = command === "RECORD" ? recordG2(a.attempt, stored) : resolveX3(a.attempt, "EXECUTED", stored);
+            const running = onFresh(ctx, () => (command === "RECORD" ? recordG2(a.attempt, stored) : resolveX3(a.attempt, "EXECUTED", stored)));
             await reach(paused, running, `${scope} ${kind} ${command}: the offer point`);
             assert.equal((await footprint(a.src)).offers, offersBefore + 1, `${scope} ${kind} ${command}: the offer is committed before the evidence is read`);
             paused.release();
@@ -1461,12 +1505,12 @@ cell("RACE RFG-M-OFFER-RACE (both orders): Koffer for attempt A against X3 NOT_E
     for (const kind of KINDS) {
       const a = await lapsed(ctx, scope, kind, `offer-race-a-${scope}-${kind}`);
       await coveredForNx(ctx, a.attempt);
-      const koffer = await hw(ctx, `${scope} ${kind}: Koffer first`, bank(async () => recordG2(a.attempt, await storeExecution(a.attempt, { full: null, accountLast4: null }))), bank(() => onClock(ctx, "X3", () => resolveX3(a.attempt, "NOT_EXECUTED", null))), "uow.before-commit", [], );
+      const koffer = await hw(ctx, `${scope} ${kind}: Koffer first`, bank(() => onClock(ctx, "Koffer", async () => recordG2(a.attempt, await storeExecution(a.attempt, { full: null, accountLast4: null })))), bank(() => onClock(ctx, "X3", () => resolveX3(a.attempt, "NOT_EXECUTED", null))), "uow.before-commit", [], );
       valueOf(koffer.held);
       assertRefused(valueOf(koffer.waited), "409 CONTRADICTORY_EVIDENCE", `${scope} ${kind}: Koffer first`);
       const b = await lapsed(ctx, scope, kind, `offer-race-b-${scope}-${kind}`);
       await coveredForNx(ctx, b.attempt);
-      const x3 = await hw(ctx, `${scope} ${kind}: X3 first`, bank(() => onClock(ctx, "X3", () => resolveX3(b.attempt, "NOT_EXECUTED", null))), bank(async () => recordG2(b.attempt, await storeExecution(b.attempt))));
+      const x3 = await hw(ctx, `${scope} ${kind}: X3 first`, bank(() => onClock(ctx, "X3", () => resolveX3(b.attempt, "NOT_EXECUTED", null))), bank(() => onClock(ctx, "Koffer", async () => recordG2(b.attempt, await storeExecution(b.attempt)))));
       assert.equal(valueOf(x3.held).status, 200);
       assert.equal((await footprint(b.src)).offers, 1, "Koffer commits its row");
       assert.equal(await openCases(b.src, "REFUND_TERMINAL_CONTRADICTED"), 1);
@@ -1480,11 +1524,20 @@ cell("RACE RFG-M-OFFER-OUTCOME-RACE (both orders): the outcome transaction of A 
       for (const order of ["outcome first", "X3 first"]) {
         const a = await lapsed(ctx, scope, kind, `outcome-race-${scope}-${kind}`);
         await coveredForNx(ctx, a.attempt);
-        const rec = bank(async () => recordG2(a.attempt, await storeExecution(a.attempt, { full: null, accountLast4: null })));
+        const rec = bank(() => onClock(ctx, "outcome", async () => recordG2(a.attempt, await storeExecution(a.attempt, { full: null, accountLast4: null }))));
         const x3 = bank(() => onClock(ctx, "X3", () => resolveX3(a.attempt, "NOT_EXECUTED", null)));
-        const r = order === "outcome first" ? await hw(ctx, `${scope} ${kind} ${order}`, rec, x3, "target.before-commit") : await hw(ctx, `${scope} ${kind} ${order}`, x3, rec);
-        const x3Reply = order === "outcome first" ? valueOf(r.waited) : valueOf(r.held);
-        assertRefused(x3Reply as Reply, "409 CONTRADICTORY_EVIDENCE", `${scope} ${kind} ${order}`);
+        if (order === "outcome first") {
+          const r = await hw(ctx, `${scope} ${kind} ${order}`, rec, x3, "bank:outcome-locked");
+          assertRefused(valueOf(r.waited) as Reply, "409 CONTRADICTORY_EVIDENCE", `${scope} ${kind} ${order}`);
+        } else {
+          // X3 first: the Koffer row is committed (the record stands between its offer and its outcome) when X3 judges the attempt
+          const paused = ctx.points.pause("bank:gate-read");
+          const running = onClock(ctx, "Koffer", () => onFresh(ctx, async () => recordG2(a.attempt, await storeExecution(a.attempt, { full: null, accountLast4: null }))));
+          await reach(paused, running, `${scope} ${kind} ${order}: the offer point`);
+          assertRefused(await onClock(ctx, "X3", () => resolveX3(a.attempt, "NOT_EXECUTED", null)), "409 CONTRADICTORY_EVIDENCE", `${scope} ${kind} ${order}`);
+          paused.release();
+          await running;
+        }
         assert.equal(await attemptState(a.attempt.attemptId), "UNCERTAIN");
       }
 });
