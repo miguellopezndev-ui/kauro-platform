@@ -43,6 +43,11 @@ interface Row {
 const COLUMNS = `sender_id, user_id, address, route, state, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS updated_at`;
 const recordOf = (r: Row): SenderRecord => ({ senderId: r.sender_id, userId: r.user_id, address: r.address, route: r.route, state: r.state, createdAt: r.created_at, updatedAt: r.updated_at });
 
+function uniqueViolation(e: unknown): boolean {
+  const raw = e instanceof DomainFailure ? (e.cause as { code?: unknown } | undefined) : (e as { code?: unknown } | undefined);
+  return raw?.code === "23505";
+}
+
 export class PgOutreachSenders {
   constructor(private readonly db: Queryable) {}
 
@@ -62,13 +67,19 @@ export class PgOutreachSenders {
     if ((await execute(this.db, "SELECT 1 FROM kauro.sender_identities WHERE address = $1 AND route = $2", [address, i.route])).rowCount !== 0) {
       throw new DomainFailure("IDEMPOTENCY_CONFLICT", "a sender identity of this address and route is already recorded");
     }
-    const r = await execute<Row>(
-      this.db,
-      `INSERT INTO kauro.sender_identities (sender_id, user_id, address, route, consent_evidence_ref, recorded_by_user_id)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${COLUMNS}`,
-      [i.senderId, i.userId, address, i.route, i.consentEvidenceRef, i.recordedByUserId],
-    );
-    return recordOf(r.rows[0]!);
+    try {
+      const r = await execute<Row>(
+        this.db,
+        `INSERT INTO kauro.sender_identities (sender_id, user_id, address, route, consent_evidence_ref, recorded_by_user_id)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${COLUMNS}`,
+        [i.senderId, i.userId, address, i.route, i.consentEvidenceRef, i.recordedByUserId],
+      );
+      return recordOf(r.rows[0]!);
+    } catch (e) {
+      // the second of two concurrent registrations waits on the first's uncommitted unique key, then reads it committed (GAP-RS-1): the same one 409
+      if (uniqueViolation(e)) throw new DomainFailure("IDEMPOTENCY_CONFLICT", "a sender identity of this address and route is already recorded");
+      throw e;
+    }
   }
 
   /** L7 X, then the locked row: the judgment and the write of verify / revoke. */
