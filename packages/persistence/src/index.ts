@@ -154,3 +154,7 @@ export { PgOutreachWriters } from "./repositories/commercial-outreach.js";
 export type { OutreachIntentKeys, NewOutreachIntent, IntentAnswer } from "./repositories/commercial-outreach.js";
 export { OutreachLocks, holdOutreachLease } from "./outreach-access.js";
 export type { OutreachLockMode } from "./outreach-access.js";
+// package B12 (lane L-SEND): CMD063, the dispatcher's D2..D5 units and the D3 start gate
+export { PgOutreachSend, OutreachRefusal, capSubReason } from "./repositories/commercial-outreach-send.js";
+export type { SendActor, SealFacts, SealCheck, QueueSendInput, QueuedSend, ClaimVerdict, ClaimedSubmission, StartGate, OutcomeAnswer } from "./repositories/commercial-outreach-send.js";
+export { outreachSendOf } from "./outreach-send-access.js";

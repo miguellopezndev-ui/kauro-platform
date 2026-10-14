@@ -19,10 +19,10 @@ import { DomainFailure, type OutreachLock, type OutreachPurpose, type SenderRout
 import type { OutreachLockMode, OutreachLocks } from "../outreach-access.js";
 import { execute, type Queryable } from "../sql.js";
 
-type Need = readonly [OutreachLock, string, OutreachLockMode];
+export type Need = readonly [OutreachLock, string, OutreachLockMode];
 
 /** Refuses a write whose subjects are not all held (an S need is met by S or X; an X need only by X). */
-function requireHeld(locks: OutreachLocks, what: string, needs: ReadonlyArray<Need>): void {
+export function requireHeld(locks: OutreachLocks, what: string, needs: ReadonlyArray<Need>): void {
   for (const [lock, subject, mode] of needs) {
     const held = locks.taken.some((t) => t.lock === lock && t.subject === subject && (mode === "S" || t.mode === "X"));
     if (!held) throw new DomainFailure("INTEGRITY_FAILURE", `${what} needs ${lock} ${mode} of ${subject} held before it writes (plan §L T2)`);
@@ -80,7 +80,7 @@ export class PgOutreachWriters {
   }
 
   /** D2 refusals: QUEUED -> NOT_SENT | CANCELLED (L3 S, L4 S|X, L4g S, L10 X), and the draft to the state its lane decides (CANCELLED, DRAFT, SUPPRESSED). */
-  async refuseQueued(locks: OutreachLocks, i: OutreachIntentKeys, state: "NOT_SENT" | "CANCELLED", outcomeReason: string, draftState: "CANCELLED" | "DRAFT" | "SUPPRESSED"): Promise<boolean> {
+  async refuseQueued(locks: OutreachLocks, i: OutreachIntentKeys, state: "NOT_SENT" | "CANCELLED", outcomeReason: string, draftState: "CANCELLED" | "DRAFT" | "SUPPRESSED" | "PROVIDER_ACCEPTED"): Promise<boolean> {
     requireHeld(locks, "D2 refusal", [["L3", i.prospectId, "S"], ["L4", i.personUserId, "S"], ["L4g", i.authorizationId, "S"], ["L10", i.draftId, "X"]]);
     const r = await execute(this.db, "UPDATE kauro.outreach_send_intents SET state = $2, outcome_reason = $3 WHERE intent_id = $1 AND state = 'QUEUED'", [i.intentId, state, outcomeReason]);
     if (r.rowCount !== 1) return false;
