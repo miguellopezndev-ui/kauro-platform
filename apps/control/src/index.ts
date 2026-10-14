@@ -73,3 +73,10 @@ export { GrantReconciliation } from "./audit/grants.js";
 export { AuditCancellations } from "./audit/cancellation.js";
 export { PlanValidator, judgeReceipt, openValidatorReceipts, planBodyHashOf, validationReceiptHashOf, VALIDATION_RECEIPT_DOMAIN } from "./audit/receipts.js";
 export type { ValidationReceipts, ReceiptJudgement, ValidatedSubject, ValidationRun, ValidatorDatabaseConfig } from "./audit/receipts.js";
+// package B16 L6: the restore runner, the recovery journal's tail and NOTIFICATIONS with its journaled dispatch identity
+export { RestoreRunner, RestoreStepRefused, planHashOf } from "./recovery/restore-runner.js";
+export type { RestorePlan, RestoredDatabase, RestoreTarget, RestoreOutcome, RestoreRunnerDependencies } from "./recovery/restore-runner.js";
+export { RecoveryJournalTail, tailedEntryOf, RECOVERY_JOURNAL_TAIL_SOURCE, TAILED_EVENT_TYPES } from "./recovery/journal-tail.js";
+export type { RecoveryJournalTailDependencies } from "./recovery/journal-tail.js";
+export { NotificationJournal, notificationIdentityOf, NOTIFICATIONS_CONSUMER } from "./consumers/notification-journal.js";
+export type { NotificationJournalDependencies } from "./consumers/notification-journal.js";

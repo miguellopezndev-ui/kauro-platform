@@ -165,6 +165,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0071_b16_breakglass.sql",
     // B16 L5 CMD038: download authorizations, their KA094 guard and the package transition lock (provisional number)
     "0074_b16_download_authorizations.sql",
+    // B16 L6: the recovery gate every claim reads FOR SHARE, the restore run, its applied journal entries and observations (provisional number)
+    "0071_b16_recovery_gate.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
