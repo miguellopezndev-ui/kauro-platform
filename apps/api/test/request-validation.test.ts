@@ -266,7 +266,7 @@ test("exactly the fourteen catalogue routes and the selection manifest intake ar
   assert.deepEqual(inventory.filter((r) => r.method === "GET" && bankGets.has(r.url)).map((r) => r.url).sort(), [...bankGets].sort());
   // lane PV1 L-INBOUND (ACH-ROUTE r12 §7.5, §7.9, §7.12, §7.23): the manual credit, statement import and checkout retirement commands as
   // POST and the credit and match-key reads as GET, named here exactly
-  for (const path of ["/api/v1/operations/bank-accounts/:accountRef/credits", "/api/v1/operations/bank-credits/:creditId/confirmations", "/api/v1/operations/bank-credits/:creditId/attributions", "/api/v1/operations/bank-accounts/:accountRef/statement-imports", "/api/v1/payment-orders/:orderId/retirements"]) bankPosts.add(path);
+  for (const path of ["/api/v1/operations/bank-accounts/:accountRef/credits", "/api/v1/operations/bank-credits/:creditId/confirmations", "/api/v1/operations/bank-credits/:creditId/attributions", "/api/v1/operations/bank-accounts/:accountRef/statement-imports", "/api/v1/payment-orders/:orderId/retirements", "/api/v1/operations/bank-accounts/:accountRef/settlements"]) bankPosts.add(path);
   for (const path of ["/api/v1/operations/bank-credits/:creditId", "/api/v1/operations/bank-orders/:orderId/match-keys"]) bankGets.add(path);
   assert.deepEqual(inventory.filter((r) => r.method === "POST" && bankPosts.has(r.url)).map((r) => r.url).sort(), [...bankPosts].sort());
   assert.deepEqual(inventory.filter((r) => r.method === "GET" && bankGets.has(r.url)).map((r) => r.url).sort(), [...bankGets].sort());

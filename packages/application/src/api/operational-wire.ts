@@ -34,6 +34,8 @@ export const OPERATIONAL_WIRE: Readonly<Record<string, OperationalWire>> = Objec
   confirmBankCredit: entry("REQUIRED", true, "KAURO_OWNER"),
   attributeBankCredit: entry("REQUIRED", true, "KAURO_OWNER"),
   importBankStatement: entry("REQUIRED", true, "KAURO_OWNER"),
+  // Payments V1 settlement (CMD215): the owner's journaled, cookie-authenticated observation of one withdrawal (PV1-SETTLE D-SET-1)
+  recordBankSettlement: entry("REQUIRED", true, "KAURO_OWNER"),
   getBankCredit: entry("NONE", false, "KAURO_OWNER"),
   getBankOrderMatchKeys: entry("NONE", false, "KAURO_OWNER"),
   retireBankCheckout: entry("REQUIRED", true, "AGENCY_BILLING", true),

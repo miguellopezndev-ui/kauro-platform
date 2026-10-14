@@ -10191,9 +10191,17 @@
             }
           },
           {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "KAURO_OWNER",
         "requestBody": {
           "required": true,
           "content": {
