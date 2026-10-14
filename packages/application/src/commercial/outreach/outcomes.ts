@@ -5,6 +5,7 @@
  * A foreign row answers NOT_FOUND, never a state (the seller reads only its own prospects and drafts; RLS 0072).
  */
 import { problemOutcome as outcome, type ProblemOutcome } from "../../api/outcome-kit.js";
+import type { FailureReason } from "@kauro/domain";
 
 const STEP_UP: ReadonlyArray<ProblemOutcome> = Object.freeze([
   outcome("ASSURANCE", "ASSURANCE_REQUIRED", "STEP_UP_MISSING", "no step-up proof, or not a step-up proof"),
@@ -19,119 +20,9 @@ export const OUTREACH_SELLER_OR_OWNER_ACCESS: ReadonlyArray<ProblemOutcome> = Ob
 
 const STALE = (what: string): ProblemOutcome => outcome("COMMAND", "STALE_VERSION", null, `expectedVersion is not the ${what} current version; the current safe version and state come back`, { current: "ALWAYS" });
 const NOT_FOUND = (what: string): ProblemOutcome => outcome("COMMAND", "NOT_FOUND", null, `${what} is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike`);
-const PRE = (reason: string, why: string, current?: "ALWAYS" | "SOMETIMES"): ProblemOutcome =>
+const PRE = (reason: FailureReason, why: string, current?: "ALWAYS" | "SOMETIMES"): ProblemOutcome =>
   outcome("COMMAND", "PRECONDITION_FAILED", reason, why, current !== undefined ? { current } : undefined);
 
-/** CMD061 PrepareOutreachDraft: the prospect, the sender, the stored content, the source evidence, the suppression and the pause. */
-export const PREPARE_OUTREACH_DRAFT_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  NOT_FOUND("the prospect, the sender identity or the content"),
-  PRE("SENDER_NOT_SENDABLE", "the sender identity is not VERIFIED or was revoked"),
-  PRE("PROVENANCE_EVIDENCE_INVALID", "provenanceEvidenceHash is not the caller's own source evidence for this prospect"),
-  PRE("PROSPECT_SUPPRESSED", "the organization key or the contact key is suppressed (KC016)"),
-  PRE("OUTREACH_PAUSED", "the sending person is paused after a bounce, a complaint or an opt-out until the owner records a diagnosis"),
-  PRE("CONTENT_CHECK_FAILED", "the stored content fails a deterministic check: it does not name the sender, the purpose or the opt-out, or it carries a forbidden claim"),
-]);
-
-/** CMD062 AuthorizeOutreach: the step-up, the review the owner confirmed, the sender and the window. */
-export const AUTHORIZE_OUTREACH_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  ...STEP_UP,
-  NOT_FOUND("the sender identity or the review"),
-  PRE("REVIEW_MISMATCH", "the contents, count or window do not match the server-issued review the owner confirmed under this step-up"),
-  PRE("SENDER_NOT_SENDABLE", "the sender identity is not VERIFIED or was revoked"),
-  PRE("WINDOW_INVALID", "validFrom and expiresAt are not a window in the future within the maximum length"),
-  PRE("CHANNEL_POLICY_WITHDRAWN", "the channel policy of the purpose and jurisdiction was withdrawn", "SOMETIMES"),
-]);
-
-/** CMD063 SendAuthorizedOutreach: the draft, its version, the grant and the content binding, judged again at commit. */
-export const SEND_AUTHORIZED_OUTREACH_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  NOT_FOUND("the draft or the authorization"),
-  STALE("draft"),
-  PRE("DRAFT_NOT_SENDABLE", "the draft is not in a state that can be sent", "ALWAYS"),
-  PRE("AUTHORIZATION_NOT_VALID", "the authorization is not ACTIVE for this draft: revoked, expired, exhausted or not yet valid on the database clock", "SOMETIMES"),
-  PRE("CONTENT_HASH_MISMATCH", "contentHash is not the content binding the server recomputes for the draft"),
-  PRE("SENDER_NOT_SENDABLE", "the sender identity was revoked or is not VERIFIED", "SOMETIMES"),
-  PRE("PROSPECT_SUPPRESSED", "the organization key or the contact key is suppressed (KC016)"),
-  PRE("OUTREACH_PAUSED", "the sending person is paused until the owner records a diagnosis"),
-  PRE("OUTSIDE_SENDING_WINDOW", "the instant is outside the permitted business hours of the recipient calendar"),
-]);
-
-/** CMD064 RecordSalesActivity: the prospect, the evidence and the kind's own members. */
-export const RECORD_SALES_ACTIVITY_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  NOT_FOUND("the prospect or the draft"),
-  PRE("ACTIVITY_INVALID", "the kind needs a member the activity lacks, or carries one the kind does not take"),
-  PRE("ACTIVITY_EVIDENCE_INVALID", "evidenceHash is not the caller's own evidence, or the activity is dated after the database clock"),
-  PRE("ACTIVITY_RECONCILER_REQUIRED", "BOUNCED and SUPPRESSED activities are recorded by the owner or the reconciler of the provider outcome"),
-]);
-
-/** PutOutreachContent: the subject and the plain text, content-addressed. */
-export const PUT_OUTREACH_CONTENT_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  PRE("CONTENT_INVALID", "the subject is not one line or the body holds a control character, markup or a forbidden claim"),
-]);
-
-/** PublishSalesResource: the step-up, the family version and the stored content. */
-export const PUBLISH_SALES_RESOURCE_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  ...STEP_UP,
-  NOT_FOUND("the content or a capability"),
-  STALE("resource family"),
-  PRE("CAPABILITY_NOT_ACCEPTED", "a described capability has no independent acceptance: copy never promises it", "SOMETIMES"),
-]);
-
-/** RegisterSenderIdentity: the step-up, the person and the route consent evidence. */
-export const REGISTER_SENDER_IDENTITY_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  ...STEP_UP,
-  NOT_FOUND("the person"),
-  PRE("SENDER_EXISTS", "the person already has a live sender identity for this mailbox"),
-  PRE("CONSENT_EVIDENCE_REQUIRED", "the GMAIL_API route requires the person consent evidence"),
-]);
-
-/** VerifySenderIdentity: the sender and the evidence the person controls the mailbox. */
-export const VERIFY_SENDER_IDENTITY_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  NOT_FOUND("the sender identity"),
-  PRE("SENDER_NOT_VERIFIABLE", "the sender identity is not PENDING", "ALWAYS"),
-]);
-
-/** RecordSenderRevocation: the sender; revoking a revoked sender is a replay, not an error. */
-export const RECORD_SENDER_REVOCATION_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([NOT_FOUND("the sender identity")]);
-
-/** PrepareOutreachReview: the step-up, the sender and the drafts. */
-export const PREPARE_OUTREACH_REVIEW_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  ...STEP_UP,
-  NOT_FOUND("the sender identity or a draft"),
-  PRE("DRAFT_NOT_REVIEWABLE", "a draft is not READY for this sender", "SOMETIMES"),
-]);
-
-/** RecordOutreachDiagnosis: the step-up and the paused person. */
-export const RECORD_OUTREACH_DIAGNOSIS_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  ...STEP_UP,
-  NOT_FOUND("the person"),
-  PRE("PERSON_NOT_PAUSED", "the person is not paused: there is nothing to lift", "ALWAYS"),
-]);
-
-/** RevokeOutreachAuthorization: the grant; revoking a revoked grant is a replay. */
-export const REVOKE_OUTREACH_AUTHORIZATION_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([NOT_FOUND("the authorization")]);
-
-/** WithdrawOutreachChannelPolicy: the step-up, the policy and its version. */
-export const WITHDRAW_OUTREACH_CHANNEL_POLICY_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  ...STEP_UP,
-  NOT_FOUND("the channel policy"),
-  STALE("channel policy"),
-  PRE("POLICY_ALREADY_WITHDRAWN", "the channel policy is already withdrawn", "ALWAYS"),
-]);
-
-/** RecordProspectSource: the caller own prospect and its collection evidence. */
-export const RECORD_PROSPECT_SOURCE_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  NOT_FOUND("the prospect"),
-  PRE("SOURCE_EVIDENCE_INVALID", "the observation is dated after the database clock, or the lawful basis is not one the policy lists"),
-]);
-
-/** RecordProspectContact: the caller own prospect and the contact key. */
-export const RECORD_PROSPECT_CONTACT_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
-  NOT_FOUND("the prospect"),
-  PRE("CONTACT_SUPPRESSED", "the contact key is suppressed (KC016)"),
-]);
-
-/** The reads: a foreign row is unknown. */
-export const GET_OUTREACH_READ_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([NOT_FOUND("the row")]);
 /** CMD061 PrepareOutreachDraft: the prospect, the sender, the stored content, the source evidence, the suppression, the pause, the policy and the resource. */
 export const PREPARE_OUTREACH_DRAFT_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
   NOT_FOUND("the prospect, the sender identity or the content"),

@@ -60,3 +60,5 @@ Totals: 20 cases — 0 DONE, 20 OPEN.
   (TODO-BATCH: the coordinator merges it with batch A's identical census).
 - GAPS left for lanes: the 13 producer operations (L-OWNER) have names in the journal CHECK and the TS union but no route, spec or schema (no designed wire
   shape); GetSellerHome (L-HOME) and the public opt-out routes (L-ACT) are not registered.
+- K2-7 Lists are bounded (minItems, maxItems) but not uniqueItems: the generated web client does not translate that keyword, so a handler refuses a repeated
+  allowedContentHashes, draftIds or capabilityIds entry itself (the lane's DENY cell).

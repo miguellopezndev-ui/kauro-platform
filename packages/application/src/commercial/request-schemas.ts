@@ -104,7 +104,7 @@ export const COMMERCIAL_REQUEST_SCHEMAS = Object.freeze({
   /** AuthorizeOutreach: the sender, the sealed drafts' content bindings, the window, the bound count, the review digest and the owner's step-up proof. */
   CMD062: schema("CMD062", ["senderIdentityRef", "allowedContentHashes", "validFrom", "expiresAt", "maximumSends", "permissionEvidenceHash", "assuranceProofRef"], {
     senderIdentityRef: ID,
-    allowedContentHashes: { type: "array", minItems: 1, maxItems: 100, uniqueItems: true, items: HASH },
+    allowedContentHashes: { type: "array", minItems: 1, maxItems: 100, items: HASH },
     validFrom: UTC_INSTANT,
     expiresAt: UTC_INSTANT,
     maximumSends: { type: "integer", minimum: 1, maximum: 100 },
@@ -142,7 +142,7 @@ export const COMMERCIAL_REQUEST_SCHEMAS = Object.freeze({
     familyId: ID,
     expectedVersion: ACCOUNT_VERSION,
     contentRef: HASH,
-    capabilityIds: { type: "array", minItems: 1, maxItems: 50, uniqueItems: true, items: ID },
+    capabilityIds: { type: "array", minItems: 1, maxItems: 50, items: ID },
     assuranceProofRef: ID,
   }),
   /** RegisterSenderIdentity: the person, the mailbox, the route, the person's consent evidence (required for GMAIL_API) and the owner's step-up proof. */
@@ -160,7 +160,7 @@ export const COMMERCIAL_REQUEST_SCHEMAS = Object.freeze({
   /** PrepareOutreachReview: the sender, the drafts to show the owner and the owner's step-up proof the review is bound to. */
   PrepareOutreachReview: schema("PrepareOutreachReview", ["senderIdentityRef", "draftIds", "assuranceProofRef"], {
     senderIdentityRef: ID,
-    draftIds: { type: "array", minItems: 1, maxItems: 100, uniqueItems: true, items: ID },
+    draftIds: { type: "array", minItems: 1, maxItems: 100, items: ID },
     assuranceProofRef: ID,
   }),
   /** RecordOutreachDiagnosis: the person whose pause the owner lifts, the diagnosis evidence and the owner's step-up proof. */

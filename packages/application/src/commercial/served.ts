@@ -20,7 +20,7 @@ import { HEADERS } from "../api/envelope.js";
 import { PROBLEM_RESPONSE, type DeclaredResponse, type RouteResponses } from "../api/response-contract.js";
 import { ACCEPTED_RESPONSE_SCHEMA_ID } from "../api/response-schemas.js";
 import type { KnownSchemaId } from "../ports/schema-validator.js";
-import { COMMERCIAL_COMMANDS } from "./contracts.js";
+import { COMMERCIAL_COMMANDS, type CommercialCommandId } from "./contracts.js";
 import { B12_SERVED_COMMAND_IDS } from "./outreach/served-ids.js";
 import { COMMERCIAL_COMMAND_OUTCOMES, COMMERCIAL_READ_OUTCOMES } from "./outcomes.js";
 import { COMMERCIAL_COMMAND_RESPONSES, commercialCommandResponseSchemaId, commercialReadResponseSchemaId, type CommercialReadOperationId, type CommercialServedCommandId } from "./response-schemas.js";
@@ -37,7 +37,7 @@ export function isServedCommercialCommand(id: string): id is CommercialServedRou
  * The declared replies of a served B10 command route (its `config.responses`): its COMPLETED status with the command's envelope, and
  * the Problem document of its closed outcome catalogue for every other status. The operationId is the catalogue's name of the command.
  */
-export function commercialCommandRouteResponses(command: CommercialServedRouteCommandId): RouteResponses {
+export function commercialCommandRouteResponses(command: CommercialCommandId): RouteResponses {
   if (!isServedCommercialCommand(command)) throw new TypeError(`${command} is not a served commercial command (COMMERCIAL_SERVED_COMMAND_IDS)`);
   const reply = COMMERCIAL_COMMAND_RESPONSES[command];
   const declared: Record<string, DeclaredResponse> = {
