@@ -156,9 +156,9 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // package B05 IJR: one IC request key is one model task, each IC invocation one request row (ADR-B05-IJR-1; provisional number)
     "0070_b05_model_task_request_key.sql",
     // Payments V1 OWNER-OUTBOX-POLICY: the owner's agency-less outbox policies are SELECT and INSERT only (provisional number)
-    "0071_owner_outbox_policy.sql",
+    "0075_owner_outbox_policy.sql",
     // B10-CMD053-SETTLED-AT: a payout intent's settlement instant is one of its transaction's, read after the cash lock (provisional number)
-    "0072_payout_effect_instant.sql",
+    "0076_payout_effect_instant.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
