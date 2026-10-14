@@ -75,3 +75,6 @@ export { COMMISSION_CUTOFF_DOMAIN, commissionCutoffHash, composeStatement } from
 
 export type { AcquisitionRateFacts, AcquisitionRateDecision, EligibilityFacts, EligibilityDecision, CommissionPeriodDates } from "./time.js";
 export { recurrenceWindowEndsAt, providerTimePlausible, acquisitionRate, eligibleAtOf, holdCoversLine, eligibilityDecision, commissionPeriodOf } from "./time.js";
+
+export type { B12OperationId } from "./b12-operations.js";
+export { B12_OPERATIONS, B12_OUTREACH_OPERATIONS, B12_PRODUCER_OPERATIONS, isB12Operation } from "./b12-operations.js";

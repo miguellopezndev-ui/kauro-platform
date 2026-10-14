@@ -1570,3 +1570,18 @@ REVOKE ALL ON FUNCTION kauro.outreach_event(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION kauro.outreach_event(uuid) TO kauro_app;
 CREATE POLICY outbox_records_outreach_enqueue ON kauro.outbox_records FOR INSERT TO kauro_app
   WITH CHECK (consumer = 'OUTREACH_SENDER' AND kauro.current_agency_id() IS NULL AND kauro.outreach_event(event_id));
+
+-- --- K2: the journal accepts B12's registry-less operations (plan companion §R and §P) --------------------------------------------------
+-- 0006 admitted only the catalogue ids (CMD + three digits). B12 journals stateful routes that have no catalogue id; each is journaled under
+-- its own name. The widening is an EXPLICIT list (domain commercial/b12-operations.ts is its one source; the migration tests compare the
+-- two), never a free pattern: a misspelt or invented operation is still refused by the database.
+ALTER TABLE kauro.command_journal DROP CONSTRAINT command_journal_operation_check;
+ALTER TABLE kauro.command_journal ADD CONSTRAINT command_journal_operation_check CHECK (
+  operation ~ '^CMD[0-9]{3}$' OR operation = ANY (ARRAY[
+    'PutOutreachContent', 'PublishSalesResource', 'RegisterSenderIdentity', 'VerifySenderIdentity', 'RecordSenderRevocation',
+    'PrepareOutreachReview', 'RecordOutreachDiagnosis', 'RevokeOutreachAuthorization', 'WithdrawOutreachChannelPolicy',
+    'RecordProspectSource', 'RecordProspectContact',
+    'RegisterSellerCandidate', 'RecordSellerLegalReview', 'PrepareSellerAgreement', 'RecordAgreementSignature', 'RecordSellerAssessment',
+    'RecordConfidentialityAcceptance', 'RecordSellerTaxDocument', 'ChangePayoutDestination', 'VerifyPayoutDestination',
+    'PrepareServiceAssignment', 'RecordAssistanceAgreement', 'PrepareTerminationTerms', 'PrepareTerminationManifest'
+  ]::text[]));
