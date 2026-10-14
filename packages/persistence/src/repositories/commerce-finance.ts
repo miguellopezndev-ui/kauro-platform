@@ -254,6 +254,8 @@ export class PgTaxDocumentRepository implements TaxDocumentRepository {
     if (change.rejectionCode !== undefined) add("rejection_code", change.rejectionCode);
     if (change.evidenceHash !== undefined) add("evidence_hash", change.evidenceHash);
     if (change.issuedAt !== undefined) add("issued_at", change.issuedAt);
+    if (change.fiscalStatus !== undefined) add("fiscal_status", change.fiscalStatus);
+    if (change.verificationRef !== undefined) add("verification_ref", change.verificationRef);
     const r = await execute<DocumentRow & { previous_state: TaxDocumentState }>(
       this.ctx.db,
       `UPDATE kauro.tax_documents AS t SET ${sets.join(", ")} FROM kauro.tax_documents AS o

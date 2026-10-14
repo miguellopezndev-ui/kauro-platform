@@ -11,6 +11,7 @@ import type { ProjectId } from "@kauro/domain";
 import { clockAt, expireSealedRevision } from "@kauro/persistence/testing";
 import { SimulatedCrash, approveThroughRoute, asProblem, bodyHashOf, call, completed, disclosureItemsOf, disclosuresHashOf, freshKey, ids, outcome, rootCause, routes, sha, waitForApiLockWait, world, type Person, type PlanFixture, type Reply, type World } from "./support.js";
 import { reachedHold, retentionSweeper, tenantWriter, waitForWriterLockWait, type HeldTransaction } from "./writers.js";
+import { confirmedContract, supersede, supersedeIn } from "./b17-target-supersession-support.js";
 
 let w: World;
 let projectId: ProjectId;
@@ -194,8 +195,10 @@ test("DENY: OPERATOR → 403; foreign → 404; stale/missing step-up → 403 ASS
   const expired = await call(w, { url: routes.approvePlan(onExpired.planId), token: w.approver.token, body: approvalBody(onExpired, proof) });
   assert.equal(outcome(w, expired), "422 SOURCE_EXPIRED -");
   const sealedSource = await w.revision(w.A, projectId, "SEALED");
-  const supersededTarget = await w.targetContract(w.A, projectId, { superseded: true });
+  // 0073 (d): a plan is born only on a current target, so the plan comes first and its target is superseded after it
+  const supersededTarget = await w.targetContract(w.A, projectId);
   const onSuperseded = await w.plan(w.A, projectId, { revisionHash: sealedSource.revisionHash, targetContractHash: supersededTarget.targetContractHash, seed: "superseded-target" });
+  await supersede(w.h.oracle, { agencyId: w.A.agencyId, contractId: supersededTarget.contractId }, w.A.ownerMembershipId);
   const superseded = await call(w, { url: routes.approvePlan(onSuperseded.planId), token: w.approver.token, body: approvalBody(onSuperseded, proof) });
   assert.equal(outcome(w, superseded), "422 TARGET_STALE -");
 
@@ -486,7 +489,7 @@ test("RACE: a target-contract supersession racing ApprovePlan — the approval h
     const hold = w.holds.arm("collaborator");
     const request = call(w, { url: routes.approvePlan(first.planId), token: w.approver.token, body: approvalBody(first, proof) });
     await reachedHold(hold, request);
-    const supersession = writerA.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE contract_id = $1", [firstTarget.contract_id]);
+    const supersession = supersedeIn(writerA, { agencyId: w.A.agencyId, contractId: firstTarget.contract_id }, w.A.ownerMembershipId);
     try {
       await waitForWriterLockWait(w, writerA, "UPDATE kauro.target_contracts");
     } finally {
@@ -508,7 +511,7 @@ test("RACE: a target-contract supersession racing ApprovePlan — the approval h
   const key = freshKey("cmd025-race-target-first");
   const writerB = await tenantWriter(w, w.A);
   try {
-    await writerB.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE contract_id = $1", [secondTarget.contract_id]);
+    await supersedeIn(writerB, { agencyId: w.A.agencyId, contractId: secondTarget.contract_id }, w.A.ownerMembershipId);
     const request = call(w, { url: routes.approvePlan(second.planId), token: w.approver.token, key, body: approvalBody(second, proof) });
     try {
       await waitForApiLockWait(w, "await_transition('kauro.target_contracts'");
@@ -564,16 +567,10 @@ test("N4: the target currency is the plan's own project's contract — supersedi
   const plan = await w.approvable(w.A, projectId, "n4-target-scope");
   const proof = await w.stepUp(w.approver);
   const other = await w.project(w.A, w.clientA);
-  await w.asTenant(w.A, (c) =>
-    c.query(
-      `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, superseded_at, created_at)
-       VALUES ($1, $2, $3, 'CLEAN', $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), now(), $8, 'R2-INITIAL', NULL, now())`,
-      [ids.next(), w.A.agencyId, other.projectId, ids.next(), ids.next(), sha("bundle"), plan.targetContractHash, sha("other-authority")],
-    ),
-  );
+  await confirmedContract(w.h.oracle, { agencyId: w.A.agencyId, projectId: other.projectId, mode: "CLEAN", membershipId: w.A.ownerMembershipId, targetContractHash: plan.targetContractHash });
   const own = await w.row<{ contract_id: string }>("target_contracts", "body_hash = $1 AND project_id = $2", [plan.targetContractHash, projectId]);
   assert.ok(own);
-  await w.asTenant(w.A, (c) => c.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE contract_id = $1", [own.contract_id]));
+  await supersede(w.h.oracle, { agencyId: w.A.agencyId, contractId: own.contract_id }, w.A.ownerMembershipId);
   const reply = await call(w, { url: routes.approvePlan(plan.planId), token: w.approver.token, body: approvalBody(plan, proof) });
   assert.equal(outcome(w, reply), "422 TARGET_STALE -");
   assert.equal(await w.count("approvals", "plan_id = $1", [plan.planId]), 0);

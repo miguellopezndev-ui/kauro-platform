@@ -46,6 +46,7 @@ import { DomainFailure, NotFoundFailure, deliveryPhaseOf, toUtcInstant } from "@
 import { ROLES, raceStatementTimeoutMs, activateAgency, checkoutOrder, paidPurchase, recordReviewedFiscalProfile, type AgencyFixture, type CheckoutOrder, type PaidPurchase, type QualifiedRoute, testDatabaseEnvironment } from "@kauro/persistence/testing";
 import { assembleApi, createBearerTokenAuthenticator, createPaymentService, loadContractSchemas, openPaymentPools, storeProviderQuery, type DispatchPass, type PaymentConsumerName, type PaymentHoldCommand, type PaymentHoldPoint, type PaymentPools, type PaymentService } from "../src/index.js";
 import { approveThroughRoute, call, clock, clock as processClock, ids, movableClock, sha, type Call, type MovableClock, type PlanFixture, type Reply, type World, type WorldOptions, world } from "./support.js";
+import { confirmedContract } from "./b17-target-supersession-support.js";
 
 // --- hold points of the payment service ------------------------------------------------------------------------------------------
 
@@ -263,13 +264,8 @@ export async function approvedPlan(pw: PaymentWorld, seed: string, agency: Agenc
   const source = await w.revision(agency, projectId, "SEALED", { recent: true });
   const contractId = ids.next();
   const targetContractHash = sha(`hubspot-target-${contractId}`);
-  await w.asTenant(agency, async (c) => {
-    await c.query(
-      `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, created_at)
-       VALUES ($1, $2, $3, 'HUBSPOT', $4, $5, 'R2-INITIAL', '[]'::jsonb, $6, $7, now(), now(), $8, 'R2-INITIAL', now())`,
-      [contractId, agency.agencyId, projectId, ids.next(), ids.next(), sha("bundle"), targetContractHash, sha(`authority-${contractId}`)],
-    );
-  });
+  // 0073: the confirmed fixture is the oracle's (a request session bears only drafts)
+  await confirmedContract(w.h.oracle, { agencyId: agency.agencyId, projectId, mode: "HUBSPOT", membershipId: agency.ownerMembershipId, targetContractHash, contractId });
   const plan = await w.plan(agency, projectId, { revisionHash: source.revisionHash, targetContractHash, seed, state: "VALIDATED" });
   // a plan of agency A is approved by A's approver; one of agency B by B's owner (the stranger) under B's own selector
   if (agency.agencyId === w.A.agencyId) await approveThroughRoute(w, plan);

@@ -18,6 +18,7 @@ import { CLAIM_NEVER_COMMITTED, CLAIM_WINDOW_SECONDS, createPaymentDispatcher, c
 import { SimulatedCrash, approvedRefund, captureRun, checkout, deliver, dispatch, paid, paymentWorld, postWebhook, reconcile, rows, serviceToken, storeQuery, type PaymentWorld } from "./payment-support.js";
 import { createRevision, projectPointer } from "./source-support.js";
 import { approveThroughRoute, call, clock, completed, freshKey, ids, outcome, rawEvent, rootCause, sha, type Call, type Reply } from "./support.js";
+import { supersedeProject } from "./b17-target-supersession-support.js";
 
 let pw: PaymentWorld;
 let port: number;
@@ -242,7 +243,7 @@ test("D-AUTH-B3: a capture completed after its quote's price expired is honored 
   assert.deepEqual(await rows(pw, "SELECT honored_after_price_expiry FROM kauro.commercial_authorizations WHERE order_id = $1", [honored.order.orderId]), [{ honored_after_price_expiry: true }]);
 
   const lapsed = await lateBy("lapsed-after-expiry");
-  await pw.w.asTenant(pw.w.A, (c) => c.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE agency_id = $1 AND project_id = $2", [pw.w.A.agencyId, lapsed.order.projectId]));
+  await supersedeProject(pw.w.h.oracle, pw.w.A.agencyId, lapsed.order.projectId, pw.w.A.ownerMembershipId);
   pw.paypal.approve(lapsed.order.providerOrderId);
   pw.paypal.captureAtProvider(lapsed.order.providerOrderId, { completedAt: lapsed.afterExpiry });
   const unbound = completed<ReconcilePaymentView>(await reconcile(pw, lapsed.order.orderId, { observationRef: await storeQuery(pw, lapsed.order.providerOrderId) }), 200);

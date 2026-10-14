@@ -179,6 +179,12 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0081_payment_session_fence.sql",
     // CLOCK-SWEEP-B07 L2: the upload acceptance edge and the seal window of the bytes judged at kauro.effect_now() (provisional number)
     "0082_fcg_b07_deadlines.sql",
+    // B17 L0D: import-stage parent edges and the receipt reconciliations of a finalized stage (R2-023, R2-025; provisional number)
+    "0072_b17_stage_receipt_reconciliations.sql",
+    // B17 L0D: target supersession births, re-check plans, the validation refusal reason, vendor qualifications, drift repair (R2-026, S078; provisional number)
+    "0073_b17_target_supersession.sql",
+    // B15 L0D: tax document issuance facts, the widened issuer half, the SUBMITTING backstop, FISCAL subscriptions (CMD035, R2-083/084; provisional number)
+    "0074_b15_tax_document_issuance.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

@@ -27,6 +27,7 @@ import { connectionPid, crashedAt, FaultPoints, INJECTED_STATEMENT_TIMEOUT_MS, L
 import { BANK_PAYEE_DIGEST, bankWorld, type BankWorld } from "./bank-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { agentOf, planOf, quoted, type Agent } from "./integration-support.js";
+import { supersedeIn } from "./b17-target-supersession-support.js";
 import { call, completed, freshKey, outcome, rawEvent, routes, sessionPaths, type BrowserSession, type Reply } from "./support.js";
 
 let bw: BankWorld;
@@ -285,8 +286,11 @@ const disableIdentity = (a: Agent): Withdrawal => ({
 const supersedeTarget = (b: Buyer): Withdrawal => ({
   sql: async (holder) => {
     await holder.query("SELECT set_config('kauro.agency_id', $1, true), set_config('kauro.user_id', $2, true)", [b.a.s.agency.agencyId, b.a.s.agency.ownerUserId]);
-    const moved = await holder.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE agency_id = $1 AND project_id = $2 AND superseded_at IS NULL", [b.a.s.agency.agencyId, projectOf(b)]);
-    assert.ok((moved.rowCount ?? 0) >= 1, "the target contract superseded");
+    const agencyId = b.a.s.agency.agencyId;
+    const current = await holder.query<{ contract_id: string }>("SELECT contract_id FROM kauro.target_contracts WHERE agency_id = $1 AND project_id = $2 AND confirmed_at IS NOT NULL AND superseded_at IS NULL", [agencyId, projectOf(b)]);
+    assert.ok(current.rows.length >= 1, "the target contract superseded");
+    // migration 0073: a contract is superseded only by a later confirmed observation of its instance (CMD019's shape)
+    for (const row of current.rows) await supersedeIn(holder, { agencyId, contractId: row.contract_id }, b.a.s.agency.ownerMembershipId);
   },
 });
 

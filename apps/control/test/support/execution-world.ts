@@ -646,12 +646,11 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     const capabilityVersion = (await oracle.query<{ version: string }>("SELECT version FROM kauro.capabilities WHERE capability_id = $1", [await capabilityOf(mode)])).rows[0]?.version ?? "R2-INITIAL";
     const contractId = ids.next();
     const targetContractHash = sha(`target-${label}-${contractId}`);
-    await asTenant(ag, (c) =>
-      c.query(
+    // 0073: the confirmed fixture is the oracle's (a request session bears only drafts)
+    await oracle.query(
         `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, 'R2-INITIAL', '[]'::jsonb, $7, $8, now(), now(), $9, $10, now())`,
         [contractId, ag.agencyId, projectId, mode, ids.next(), ids.next(), sha("bundle"), targetContractHash, sha(`authority-${contractId}`), capabilityVersion],
-      ),
     );
     return { contractId, targetContractHash };
   }
@@ -902,7 +901,36 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     },
 
     async supersedeTarget(p) {
-      await asTenant(p.agency, (c) => c.query("UPDATE kauro.target_contracts SET superseded_at = now() WHERE contract_id = $1", [p.contractId]));
+      // 0073 (b): CMD019's shape through the oracle — a later observation of the same instance supersedes the contract and is
+      // confirmed in the same transaction
+      await oracle.query("BEGIN");
+      try {
+        const old = (await oracle.query<{ project_id: string; mode: string; instance_id: string; observed_at: Date; capability_version: string }>(
+          "SELECT project_id, mode, instance_id, observed_at, capability_version FROM kauro.target_contracts WHERE contract_id = $1",
+          [p.contractId],
+        )).rows[0]!;
+        const next = ids.next();
+        await oracle.query(
+          `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, 'R2-INITIAL', '[]'::jsonb, $7, $8, $9, NULL, $10, $11, now())`,
+          [next, p.agency.agencyId, old.project_id, old.mode, old.instance_id, ids.next(), sha("bundle"), sha(`superseder-${next}`), new Date(Math.max(Date.now(), old.observed_at.getTime() + 1)), sha(`authority-${next}`), old.capability_version],
+        );
+        await oracle.query("UPDATE kauro.target_contracts SET superseded_at = now(), superseded_by_contract_id = $2, version = version + 1 WHERE contract_id = $1", [p.contractId, next]);
+        const evidenceId = ids.next();
+        await oracle.query(
+          `INSERT INTO kauro.target_artifacts (artifact_id, agency_id, project_id, kind, mode, instance_id, document, content_hash, created_by_membership_id)
+           VALUES ($1, $2, $3, 'CONFIRMATION_EVIDENCE', $4, $5, '{}'::jsonb, $6, $7)`,
+          [evidenceId, p.agency.agencyId, old.project_id, old.mode, old.instance_id, sha(`confirmation-${next}`), p.agency.ownerMembershipId],
+        );
+        await oracle.query(
+          "UPDATE kauro.target_contracts SET confirmed_at = kauro.server_now(), confirmed_by_membership_id = $2, confirmation_evidence_ref = $3, version = version + 1 WHERE contract_id = $1",
+          [next, p.agency.ownerMembershipId, evidenceId],
+        );
+        await oracle.query("COMMIT");
+      } catch (e) {
+        await oracle.query("ROLLBACK");
+        throw e;
+      }
     },
 
     async suspendCapability(id) {
