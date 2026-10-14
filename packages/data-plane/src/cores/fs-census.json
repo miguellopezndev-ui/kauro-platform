@@ -36,6 +36,8 @@
     "writeSync"
   ],
   "childModules": [
+    "closeSync",
+    "openSync",
     "readFileSync",
     "readdirSync",
     "statSync",

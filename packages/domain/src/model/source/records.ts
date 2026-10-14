@@ -17,6 +17,7 @@ import type {
   ObjectHoldId,
   ProjectionId,
   RetentionAnchorId,
+  RetentionExtensionId,
   RetentionId,
   SealAttemptId,
   SelectionManifestId,
@@ -648,6 +649,26 @@ export interface RetentionRecordRow extends Omit<RetentionRecord, "retentionId" 
   readonly version: number;
   /** When the retention sweeper took ACTIVE -> EXPIRED (effective_deadline_reached). */
   readonly expiredAt?: UtcInstant;
+}
+
+/**
+ * The one explicit extension of a project's soft access deadline (CMD060; table kauro.retention_extensions, at most one per project).
+ * The endpoint is exact: `softDeadline = least(previousSoftDeadline + requestedSeconds, hardDeadline)`; the hard deadline never moves.
+ */
+export interface RetentionExtensionRow {
+  readonly extensionId: RetentionExtensionId;
+  readonly agencyId: AgencyId;
+  readonly projectId: ProjectId;
+  readonly retentionId: RetentionId;
+  readonly requestedSeconds: number;
+  /** Whole seconds actually granted (the capped endpoint is exact in `softDeadline`). */
+  readonly grantedSeconds: number;
+  readonly previousSoftDeadline: UtcInstant;
+  readonly softDeadline: UtcInstant;
+  readonly hardDeadline: UtcInstant;
+  readonly cappedAtHardDeadline: boolean;
+  readonly purpose: string;
+  readonly termsVersion: string;
 }
 
 /** A part the preflight expects the scanner to cover, as recorded (re-exported for receipts). */

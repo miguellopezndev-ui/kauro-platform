@@ -15,7 +15,7 @@
   {
    "case": "R2-076",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -23,7 +23,7 @@
   {
    "case": "CMD056-OK",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -31,7 +31,7 @@
   {
    "case": "CMD056-DENY",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -39,7 +39,7 @@
   {
    "case": "CMD056-RACE",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -47,7 +47,7 @@
   {
    "case": "CMD057-OK",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -55,7 +55,7 @@
   {
    "case": "CMD057-DENY",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -63,7 +63,7 @@
   {
    "case": "CMD057-RACE",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null

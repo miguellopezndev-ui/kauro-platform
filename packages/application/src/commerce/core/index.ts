@@ -25,3 +25,4 @@ export type { AttemptSubject, ProviderEffectDependencies, ProviderCommandHooks, 
 export { checkoutPaths, attemptRequest, prepareProviderAttempt, operationOf, providerEffectPhases, runProviderCommand } from "./provider-effects.js";
 export type { CommerceAuthorizerDependencies } from "./authorizer.js";
 export { createCommerceAuthorizer } from "./authorizer.js";
+export { fileRemedyReturns } from "./remedy.js";

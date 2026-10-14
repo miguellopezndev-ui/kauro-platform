@@ -505,6 +505,62 @@ export const APPLICABILITY = {
     "lost response": [["cmd032-approve-refund.test.ts", "RACE: an identical retry replays"]],
     "external uncertainty": "NOT_APPLICABLE: an approval records the immutable refund intent in one transaction and calls no provider; the provider effect and its uncertainty belong to CMD033 ExecuteRefund (the payment service)",
   },
+  // package B16 team commands (docs/design/B16-team-commands.md): each command's own OK / DENY / RACE tests
+  CMD003: {
+    ...common,
+    "legitimate state": [["cmd003-invite-member.test.ts", "OK: the OWNER invites an identity"]],
+    "wrong role": [["cmd003-invite-member.test.ts", "DENY: OPERATOR/APPROVER/VIEWER/BILLING → 403"]],
+    "wrong agency": [["cmd003-invite-member.test.ts", "DENY: OPERATOR/APPROVER/VIEWER/BILLING → 403"]],
+    "stale version": [["cmd003-invite-member.test.ts", "DENY: OPERATOR/APPROVER/VIEWER/BILLING → 403"]],
+    "duplicate request": [...common["duplicate request"], ["cmd003-invite-member.test.ts", "RACE: "]],
+    "changed-body same key": [...common["changed-body same key"], ["cmd003-invite-member.test.ts", "RACE: "]],
+    "lost response": [...common["lost response"], ["cmd003-invite-member.test.ts", "RACE: "]],
+    "invalid schema": common["invalid schema"],
+  },
+  CMD004: {
+    ...common,
+    "legitimate state": [["cmd004-accept-invitation.test.ts", "OK: the invitee accepts with the token"]],
+    "wrong role": [["cmd004-accept-invitation.test.ts", "DENY: wrong token → 403 INVITATION_TOKEN_MISMATCH"]],
+    "wrong agency": [["cmd004-accept-invitation.test.ts", "DENY: wrong token → 403 INVITATION_TOKEN_MISMATCH"]],
+    "stale version": "NOT_APPLICABLE: AcceptInvitation carries no expectedVersion (registry fields: invitationToken); a second accept meets the closed invitation (RACE: two accepts of one invitation)",
+    "duplicate request": [...common["duplicate request"], ["cmd004-accept-invitation.test.ts", "RACE: "]],
+    "changed-body same key": [...common["changed-body same key"], ["cmd004-accept-invitation.test.ts", "RACE: "]],
+    "lost response": [...common["lost response"], ["cmd004-accept-invitation.test.ts", "RACE: "]],
+    "invalid schema": common["invalid schema"],
+  },
+  CMD005: {
+    ...common,
+    "legitimate state": [["cmd005-change-membership.test.ts", "OK: the OWNER changes a role"]],
+    "wrong role": [["cmd005-change-membership.test.ts", "DENY: non-owners → 403"]],
+    "wrong agency": [["cmd005-change-membership.test.ts", "DENY: non-owners → 403"]],
+    "stale version": [["cmd005-change-membership.test.ts", "RACE: two changes with one expectedVersion"]],
+    "duplicate request": [...common["duplicate request"], ["cmd005-change-membership.test.ts", "RACE: "]],
+    "changed-body same key": [...common["changed-body same key"], ["cmd005-change-membership.test.ts", "RACE: "]],
+    "lost response": [...common["lost response"], ["cmd005-change-membership.test.ts", "RACE: "]],
+    "invalid schema": common["invalid schema"],
+  },
+  CMD006: {
+    ...common,
+    "legitimate state": [["cmd006-revoke-membership.test.ts", "OK: the OWNER revokes an active member"]],
+    "wrong role": [["cmd006-revoke-membership.test.ts", "DENY: OPERATOR/APPROVER/VIEWER → 403"]],
+    "wrong agency": [["cmd006-revoke-membership.test.ts", "DENY: OPERATOR/APPROVER/VIEWER → 403"]],
+    "stale version": [["cmd006-revoke-membership.test.ts", "RACE: two revocations of one member"]],
+    "duplicate request": [...common["duplicate request"], ["cmd006-revoke-membership.test.ts", "RACE: "]],
+    "changed-body same key": [...common["changed-body same key"], ["cmd006-revoke-membership.test.ts", "RACE: "]],
+    "lost response": [...common["lost response"], ["cmd006-revoke-membership.test.ts", "RACE: "]],
+    "invalid schema": common["invalid schema"],
+  },
+  CMD007: {
+    ...common,
+    "legitimate state": [["cmd007-transfer-ownership.test.ts", "OK: the OWNER transfers ownership"]],
+    "wrong role": [["cmd007-transfer-ownership.test.ts", "DENY: non-owner → 403"]],
+    "wrong agency": [["cmd007-transfer-ownership.test.ts", "DENY: non-owner → 403"]],
+    "stale version": [["cmd007-transfer-ownership.test.ts", "RACE: two transfers at once"]],
+    "duplicate request": [...common["duplicate request"], ["cmd007-transfer-ownership.test.ts", "RACE: "]],
+    "changed-body same key": [...common["changed-body same key"], ["cmd007-transfer-ownership.test.ts", "RACE: "]],
+    "lost response": [...common["lost response"], ["cmd007-transfer-ownership.test.ts", "RACE: "]],
+    "invalid schema": common["invalid schema"],
+  },
   CMD044: {
     ...common,
     "legitimate state": [["cmd044-create-support-case.test.ts", "OK: a member with access to the project opens a classified case"]],
@@ -515,6 +571,18 @@ export const APPLICABILITY = {
     "changed-body same key": [...common["changed-body same key"], ["cmd044-create-support-case.test.ts", "RACE: an identical retry, the same key with another digest"]],
     "invalid schema": [...common["invalid schema"], ["request-validation.test.ts", "CMD044 closed request"]],
     "lost response": [...common["lost response"], ["cmd044-create-support-case.test.ts", "RACE: an identical retry, the same key with another digest"]],
+  },
+  // B16 lane L2: CMD060 RequestRetentionExtension (docs/design/B16-L2-failure-matrix.md)
+  CMD060: {
+    ...common,
+    "legitimate state": [["cmd060-request-retention-extension.test.ts", "CMD060-OK: one extension of a PAID_ORDINARY soft deadline"]],
+    "wrong role": [["cmd060-request-retention-extension.test.ts", "CMD060-DENY: a VIEWER or BILLING member"], ROLE_MATRIX],
+    "wrong agency": [["cmd060-request-retention-extension.test.ts", "CMD060-DENY: a VIEWER or BILLING member"]],
+    "stale version": [["cmd060-request-retention-extension.test.ts", "CMD060-DENY: a VIEWER or BILLING member"]],
+    "duplicate request": [...common["duplicate request"], ["cmd060-request-retention-extension.test.ts", "RETRY: an identical replay answers 200 byte for byte"]],
+    "changed-body same key": [...common["changed-body same key"], ["cmd060-request-retention-extension.test.ts", "RETRY: an identical replay answers 200 byte for byte"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [...common["lost response"], ["cmd060-request-retention-extension.test.ts", "RACE (crash after COMMIT): the lost answer is recovered by the key"]],
   },
   // package B10's agency lifecycle (mandate B10-AGENCY-LIFECYCLE; docs/design/B10-case-map.md CMD002, CMD043): neither reaches a provider
   CMD002: {
@@ -926,6 +994,11 @@ export async function loadMatrixSources() {
   // the events each served command's handler publishes
   const HANDLER_FILES = {
     CMD001: "commands/handlers/create-agency.ts",
+    CMD003: "commands/handlers/invite-member.ts",
+    CMD004: "commands/handlers/accept-invitation.ts",
+    CMD005: "commands/handlers/change-membership.ts",
+    CMD006: "commands/handlers/revoke-membership.ts",
+    CMD007: "commands/handlers/transfer-ownership.ts",
     CMD009: "commands/handlers/create-client.ts",
     CMD010: "commands/handlers/archive-client.ts",
     CMD011: "commands/handlers/create-project.ts",
@@ -939,6 +1012,7 @@ export async function loadMatrixSources() {
     CMD016: "sources/handlers/select-input-tables.ts",
     CMD017: "sources/handlers/seal-revision.ts",
     CMD044: "commands/handlers/create-support-case.ts",
+    CMD060: "sources/handlers/request-retention-extension.ts",
     CMD022: "audit/handlers/create-plan.ts",
   };
   const published = {};
@@ -987,7 +1061,7 @@ export async function loadMatrixSources() {
   published.CMD040 = [];
   published.CMD041 = [];
   // package B09's served commands (D-REQ-B7): their specs, catalogues and published events from the application's served lists
-  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS };
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS, ...application.TEAM_COMMANDS, ...application.RETENTION_COMMANDS };
   const outcomes = { ...application.COMMAND_OUTCOMES };
   for (const id of application.COMMERCE_SERVED_COMMAND_IDS) {
     const c = application.COMMERCE_COMMANDS[id];
@@ -1242,7 +1316,7 @@ export function generateMatrix(s) {
   line("| Read | Route | Scope | List | Reply view | Action token | Authority |");
   line("| --- | --- | --- | --- | --- | --- | --- |");
   for (const spec of Object.values(s.reads)) {
-    line(`| ${spec.operationId} | GET ${cell(spec.path)} | ${spec.scope} | ${spec.paginated ? "limit, cursor" : "—"} | ${s.readViews[spec.operationId].view} | ${spec.action} | ${cell(spec.authority)} |`);
+    line(`| ${spec.operationId} | GET ${cell(spec.path)} | ${spec.scope} | ${spec.paginated ? (spec.filter !== undefined ? `filter (${spec.filter.values.join(", ")}; default ${spec.filter.default}), limit, cursor` : "limit, cursor") : "—"} | ${s.readViews[spec.operationId].view} | ${spec.action} | ${cell(spec.authority)} |`);
   }
   line();
   for (const spec of Object.values(s.reads)) {

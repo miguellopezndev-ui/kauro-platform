@@ -19,9 +19,10 @@ documents listed in section 1.3 they form the contract between the parties.
 <!-- auth: amendments/A8_PAYMENT_ROUTING.md §1 (Kauro Data S.A.S.); amendments/A4_OPERATING_MODEL.md §Owner acts (domain kaurodata.com); 19 §BusinessProfile and legal facts (real postal address, no fictitious office) -->
 
 1.2. **Customer.** The Customer is (a) an agency that provides CRM, RevOps or data-cleaning services to its own clients
-(each, an "End Client"), or (b) a company whose in-house CRM or data team works on its own company's data ("Internal
-Customer"). Kauro contracts only with the Customer, not with its End Client or with the people who appear in the files.
-<!-- auth: 01_CHARTER.md §Purpose and customer promise (text amended by A3 §4.1); 02 §Buyer, user and job to be done; A3 §3.7 -->
+(each, an "End Client"), or (b) a company that works on its own company's data, with or without a dedicated in-house CRM or
+data team ("Internal Customer"). Kauro contracts only with the Customer, not with its End Client or with the people who appear
+in the files.
+<!-- auth: 01_CHARTER.md §Purpose and customer promise (text amended by A3 §4.1); 02 §Buyer, user and job to be done; A3 §3.7 as superseded in part by D-33 (docs/authority/decisions/2026-10-13-COMMERCIAL-SCOPE.md; wording changed 2026-10-13, pending competent review, D-31) -->
 
 1.3. **Contract documents.** The contract consists of: (i) these Terms; (ii) the Data Processing Agreement for Personal Data
 ("DPA", file DPA.md, the English master); (iii) Kauro's Personal Data Processing Policy; (iv) the list of sub-processors and

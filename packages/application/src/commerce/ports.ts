@@ -35,6 +35,7 @@ import type {
   PaymentAttemptId,
   PaymentEnvironment,
   PaymentOrderId,
+  PaymentOrderRecord,
   ProjectId,
   ProviderExceptionKind,
   PurchaseRebindingId,
@@ -319,6 +320,9 @@ export interface ReconcileResult {
  * cases, excess and remedy refund requests, reversal revocation and lapses), publish. CMD029's settle step, the application of a
  * webhook (CMD030) and CMD034 call it (M3); M2 implements it. It never calls a provider: every observation arrives authenticated.
  */
+/** See CommerceReconciler.applyOrderObservation's afterLocks. */
+export type AfterOrderLocks = (order: PaymentOrderRecord) => Promise<{ readonly now: UtcInstant; readonly authorityBlocker: string | null }>;
+
 export interface CommerceReconciler {
   /** An observation of one order, from a dispatch response (CMD028, CMD029, CMD033) or a stored provider query (CMD034). */
   applyOrderObservation(
@@ -331,6 +335,11 @@ export interface CommerceReconciler {
       readonly artifactRef?: EvidenceArtifactRef;
       readonly causationId: CausationId;
       readonly now: UtcInstant;
+      /**
+       * Locks the caller takes after the order's row lock and the effect instant it reads after the last of them (the database clock;
+       * a bank credit's instruction row, ACH-ROUTE §7.28), with a blocker of the issuance it judged there; the plan runs at that instant.
+       */
+      readonly afterLocks?: AfterOrderLocks;
     },
   ): Promise<ReconcileResult>;
   /**

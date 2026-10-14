@@ -64,27 +64,36 @@ function packageRootOf(file: string): string {
 let cachedCodePaths: readonly string[] | undefined;
 
 /**
- * The read-only code paths the core child needs beyond this package's dist: the Migration Core wrapper, the core it wraps, and the
- * workspace packages the platform scratch store imports at run time (resolved to their real directories, never a link).
+ * The read-only code paths the core child needs beyond this package's dist: the core wrappers (Migration Core, and Intelligence
+ * Core for the effects of a full validation, D5-15), the cores they wrap, and the workspace packages the platform scratch store
+ * imports at run time (resolved to their real directories, never a link).
  */
+const CHILD_WORKSPACE_PACKAGES = ["@kauro/migration-core", "@kauro/intelligence-core", "@kauro/domain", "@kauro/contracts"] as const;
+const CHILD_CORE_WRAPPERS = [
+  ["@kauro/migration-core", "kauro-migration-core"],
+  ["@kauro/intelligence-core", "kauro-intelligence-core"],
+] as const;
+
 export function coreChildCodePaths(): readonly string[] {
   if (cachedCodePaths !== undefined) return cachedCodePaths;
   const roots = new Set<string>();
-  for (const specifier of ["@kauro/migration-core", "@kauro/domain", "@kauro/contracts"]) roots.add(packageRootOf(fileURLToPath(import.meta.resolve(specifier))));
-  const wrapperRoot = packageRootOf(fileURLToPath(import.meta.resolve("@kauro/migration-core")));
-  // the wrapper depends on the raw core through a workspace link; the raw core and its own dependencies sit side by side in its
-  // pnpm virtual-store node_modules directory, each dependency itself a link to another store directory: grant the real roots
-  const rawRoot = realpathSync.native(join(wrapperRoot, "node_modules", "kauro-migration-core"));
-  roots.add(rawRoot);
-  const siblings = dirname(rawRoot);
-  roots.add(siblings);
-  for (const name of readdirSync(siblings)) {
-    const scoped = name.startsWith("@") ? readdirSync(join(siblings, name)).map((n) => join(siblings, name, n)) : [join(siblings, name)];
-    for (const entry of scoped) roots.add(realpathSync.native(entry));
+  for (const specifier of CHILD_WORKSPACE_PACKAGES) roots.add(packageRootOf(fileURLToPath(import.meta.resolve(specifier))));
+  for (const [wrapper, raw] of CHILD_CORE_WRAPPERS) {
+    const wrapperRoot = packageRootOf(fileURLToPath(import.meta.resolve(wrapper)));
+    // the wrapper depends on the raw core through a workspace link; the raw core and its own dependencies sit side by side in its
+    // pnpm virtual-store node_modules directory, each dependency itself a link to another store directory: grant the real roots
+    const rawRoot = realpathSync.native(join(wrapperRoot, "node_modules", raw));
+    roots.add(rawRoot);
+    const siblings = dirname(rawRoot);
+    roots.add(siblings);
+    for (const name of readdirSync(siblings)) {
+      const scoped = name.startsWith("@") ? readdirSync(join(siblings, name)).map((n) => join(siblings, name, n)) : [join(siblings, name)];
+      for (const entry of scoped) roots.add(realpathSync.native(entry));
+    }
   }
   // the permission model checks the path Node opened, which may be the workspace link: grant the link directories too
   const own = packageRootOf(fileURLToPath(import.meta.url));
-  for (const specifier of ["@kauro/migration-core", "@kauro/domain", "@kauro/contracts"]) {
+  for (const specifier of CHILD_WORKSPACE_PACKAGES) {
     const link = join(own, "node_modules", ...specifier.split("/"));
     if (existsSync(link)) roots.add(link);
   }

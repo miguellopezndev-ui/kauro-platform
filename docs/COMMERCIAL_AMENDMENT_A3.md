@@ -1,5 +1,14 @@
 # Amendment A3 — commercial positioning
 
+> **Superseded in part by [2026-10-13-COMMERCIAL-SCOPE](authority/decisions/2026-10-13-COMMERCIAL-SCOPE.md) (owner decision
+> D-33, 2026-10-13):** §3.7 (the capture-channel condition, the ban on prospecting non-agency companies, the single in-house
+> sentence on the site, and the agency-only half of the reading rule); the matching text of §4.1, §4.2, §4.3 (Pricing sentence),
+> §4.5 (channel-conflict rule), §4.6 (§Prospect qualification) and §4.8–§4.9 (D58, in part); §6 (direct-sales row, in part);
+> §7.1 (first sentence of the seller-compensation bullet); §7.3 (the clause letting a complaint stop admissions). Each place is
+> marked below. Every other rule of A3 stays in force. Where this file says "internal rationale held privately; history in git",
+> a block of internal rationale was removed from the current text on 2026-10-13; the adopted text is preserved in the git
+> history of this file and nothing operative was removed with it.
+
 Status: adopted by owner decision on 2026-09-25. It governs every public, application, report, terms and outreach text produced
 in this repository from that date on. It is proposed to the authority as a versioned amendment and binds the construction
 service only once the re-issued authority package contains it (section 1.3). Owner decision (2026-09-25), verbatim: "estoy de
@@ -63,9 +72,9 @@ The fields below are the ones required by 01 §Authority and change control, 28 
 
 | Field | Content |
 |---|---|
-| Observed reason (motive) | On 2026-09-25 the owner proposed a new commercial strategy with four goals: depend less on HubSpot and Salesforce accepting the data, lead with a free diagnosis, sell cleaning as a core service, and add high-ticket and recurring offers. The review found that its most sellable parts already exist in R2: the free audit (02 §5) and CLEAN, which needs no destination CRM (02 §Service modes). Those parts need only presentation. The rest is new product scope, legal exposure or consulting that the company cannot deliver. |
-| Evidence and its limits | R2 manuals and registries; the Migration and Intelligence core repositories; the review of 2026-09-25. Kauro has no customers and no paid conversions (16 §Alternatives and retained price hypothesis). No revenue comparison between the owner's strategy and the current design is possible, and none is claimed. The legal references in section 5 identify applicable regimes for the rejections. They are not a legal opinion, and no source record is added for them. Any later use of them in a deferred item adds verified source records at that time (28 §Evidence rules). |
-| Alternatives considered | (A) Keep the current positioning and record nothing. Rejected: it forgoes zero-cost gains and leaves the owner's decision undocumented. (B) Build the whole strategy before launch. Rejected: roughly 6 to 12 or more months, which would put production in the second half of 2027 or early 2028. It adds serious legal exposure and needs hires, and nothing shows it earns more. (C) Make CLEAN the headline offer. Rejected: CLEAN is 40–54% cheaper at the same band, and its compatibility claim is forbidden (rule 3.3). (D) Adopt the messaging, keep admission agency-only. Considered; the owner chose (E). (E) Adopt the messaging and admit inbound in-house teams with guardrails, reject the unsafe items and defer new product scope. **Chosen.** |
+| Observed reason (motive) | Internal rationale held privately; history in git. |
+| Evidence and its limits | R2 manuals and registries; the Migration and Intelligence core repositories; the review of 2026-09-25. (Internal rationale held privately; history in git.) The legal references in section 5 identify applicable regimes for the rejections. They are not a legal opinion, and no source record is added for them. Any later use of them in a deferred item adds verified source records at that time (28 §Evidence rules). |
+| Alternatives considered | Internal rationale held privately; history in git. The chosen behavior is the next row. |
 | Chosen behavior | Section 3 (adopted rules) and section 4 (amended text). |
 | Rejected | Section 5. |
 | Deferred | Section 6. |
@@ -137,7 +146,7 @@ from the capability publication (02 §Capability publication contract).
      eliminate records". A duplicate candidate is never presented as a confirmed duplicate (02 §5).
    - Say "we clean exported files, not your live CRM" (05 §Operation taxonomy: live CRM merges and deletes are outside the product).
    - The Home page keeps its concrete job, "prepare and verify CRM data from files". CLEAN is never the site's headline offer
-     (section 7.1, cannibalization).
+     (internal rationale held privately; history in git).
 
 3.4 **The prices are shown as a ladder.** The Pricing page presents the existing schedule, unchanged, as steps:
    - Free data health check;
@@ -178,13 +187,16 @@ from the capability publication (02 §Capability publication contract).
    - Any duration shown is an estimate derived from observed capacity (11 §Project dashboard).
 
 3.7 **In-house teams are admitted, with every guardrail.** The in-house CRM, RevOps or data team of a company may buy through the
-   same flow when it arrives on its own.
-   - **Nobody prospects non-agency companies.** Outreach, research, content targeting, seller prospect records and attribution
-     claims stay agency-only, for the owner, sellers, the assistant and any automation alike. A non-agency company or its
-     in-house team is never recorded as a prospect (12 §Prospect record; 18 §Prospect qualification).
-   - **One line on the site.** The site stays agency-first. Exactly one sentence addresses in-house teams: "In-house CRM and data
-     teams can use Kauro too." It appears once, on the Pricing page beside the account-creation action. Home, How it works and For
-     agencies are not rewritten for them.
+   same flow. [Superseded by D-33, 2026-10-13: the condition "when it arrives on its own" is removed. How a company arrives
+   (on its own, by referral, search, campaign or prospecting) does not change admission or eligibility; original wording in git
+   history.]
+   - **[Superseded by D-33, 2026-10-13.]** The former ban on prospecting non-agency companies no longer applies. Kauro, its
+     sellers and its automation may research, contact, prospect and sell to agencies and to companies that need to clean,
+     prepare or migrate their data, under the protections of D-33 and the qualification rules of 18 §Prospect qualification
+     (evidence of need, source and date of observation). Original wording in git history.
+   - **[Superseded by D-33, 2026-10-13.]** The former rule fixing a single in-house sentence on the Pricing page no longer
+     applies. Public copy addressed to companies follows the claim rules of this section and of 02 §Capability publication
+     contract. Original wording in git history.
    - **The fit form records the buyer type.** The fit form (02 §1; Contact, UI07) asks one required closed question: "Who will use
      Kauro?", answered "An agency preparing data for clients" (`agency`) or "An in-house team working on our own company's data"
      (`in-house`).
@@ -214,8 +226,9 @@ from the capability publication (02 §Capability publication contract).
    - **How the tenant is set up.** An in-house tenant uses the `Agency` contract, with its company as the single end-client
      workspace. `EndClient.processingAuthorityRef` records the company's own authority over the data.
    - **Reading rule.** Where R2 names the agency as the customer tenant, it also covers an admitted in-house tenant. This includes
-     the account holder, plan approver, payer, holder of recurrence or founding eligibility, and the `Agency` contract. Where R2
-     names agencies as the outreach, research, content or channel segment, the text stays agency-only.
+     the account holder, plan approver, payer, holder of recurrence or founding eligibility, and the `Agency` contract.
+     [Superseded by D-33, 2026-10-13: where R2 names agencies as the outreach, research, content or channel segment, it also
+     covers companies; original wording in git history.]
 
 ## 4. Amended authority text
 
@@ -231,8 +244,11 @@ decisions and exceptions reviewable."
 New: "Kauro helps professional agencies, and in-house CRM or data teams working on their own company's data, turn authorized CRM
 exports and business spreadsheets into an explainable, verified delivery for data cleaning or an explicitly supported CRM import.
 The agency remains the contracting customer and the authority for its end client's data; an admitted in-house team's company is
-the contracting customer and the controller of its own data. Agencies remain the only segment Kauro prospects. Kauro earns revenue
-by reducing preparation work, preventing avoidable import mistakes, and making decisions and exceptions reviewable."
+the contracting customer and the controller of its own data. Kauro earns revenue by reducing preparation work, preventing avoidable
+import mistakes, and making decisions and exceptions reviewable."
+
+[Superseded by D-33, 2026-10-13: one sentence of the new text, limiting prospecting to agencies, is withdrawn; original wording in
+git history.]
 
 ### 4.2 `02_PRODUCT_AND_CAPABILITIES.md`
 
@@ -240,13 +256,15 @@ by reducing preparation work, preventing avoidable import mistakes, and making d
 appearing in an uploaded table." New: "Kauro contracts with the agency, or with an admitted in-house team's company, not with each
 person appearing in an uploaded table."
 
-Added paragraph after it: "An in-house CRM, RevOps or data team of a company may also buy through the same flow when it arrives on
-its own. It registers as its own customer tenant with its company as the single end-client workspace, confirms that the company
-controls the data, and passes the same fit, data-category, authority and payment checks. Kauro does not prospect in-house teams:
-outreach, research, content and seller prospecting remain agency-only. Where this edition names the agency as the customer tenant,
-account holder, approver, payer or holder of recurrence and founding eligibility, it also covers an admitted in-house tenant; where
-it names agencies as the outreach or channel segment, it does not. The fit form records the buyer type so that conversion can be
-measured by segment (D01, D58)."
+Added paragraph after it: "An in-house CRM, RevOps or data team of a company may also buy through the same flow. It registers as
+its own customer tenant with its company as the single end-client workspace, confirms that the company controls the data, and
+passes the same fit, data-category, authority and payment checks. Where this edition names the agency as the customer tenant,
+account holder, approver, payer or holder of recurrence and founding eligibility, it also covers an admitted in-house tenant. The
+fit form records the buyer type so that conversion can be measured by segment (D01, D58)."
+
+[Superseded by D-33, 2026-10-13: the condition "when it arrives on its own", the sentence excluding in-house teams from
+prospecting and the clause excluding them from the outreach or channel segment are withdrawn from this paragraph; original
+wording in git history.]
 
 §1 Discover and qualify fit. Current: "The fit form collects business contact details, destination, approximate record band and
 desired timing." New: "The fit form collects business contact details, buyer type (agency preparing data for clients, or in-house
@@ -275,8 +293,8 @@ price is an indicative band until the server issues a quote from the sealed scop
 CLEAN beside HUBSPOT and SALESFORCE as the service for buyers without a qualified destination: cleaned, explained standard files
 that the buyer imports with its own tools, with no claim of compatibility with any unqualified CRM. Pricing presents the existing
 schedule as a ladder: free data health check, CLEAN, HubSpot or Salesforce preparation, repeat discounts, and the founding discount
-only while a slot can actually be reserved. Pricing carries the site's single sentence for in-house teams: 'In-house CRM and data
-teams can use Kauro too.'"
+only while a slot can actually be reserved." [Superseded by D-33, 2026-10-13: the final sentence of this addition, fixing a single
+sentence for in-house teams on Pricing, is withdrawn; original wording in git history.]
 
 Current: "Sample delivery uses synthetic data and exposes a representative report, manifest explanation and import guide." Added
 after it: "Sample delivery and a short recorded demonstration form the fifteen-minute demonstration. No page promises a real health
@@ -319,17 +337,18 @@ Channel-conflict rule. Current: "Kauro does not contact the agency's end client 
 data remain within the agency relationship. A future direct-customer offer requires a channel-conflict and product decision." New:
 "Kauro does not contact the agency's end client to sell around the agency. End-client names and data remain within the agency
 relationship and are never used to find, qualify, contact or treat an in-house buyer differently. Decision D58 is the
-channel-conflict and product decision for in-house teams: they are admitted when they arrive on their own, under the same flow,
-prices and discounts, and nobody (owner, seller, assistant or automation) prospects them. Any other direct-customer offer,
-including outbound sales to non-agency companies, requires its own channel-conflict and product decision."
+channel-conflict and product decision for in-house teams: they are admitted under the same flow, prices and discounts."
+
+[Superseded by D-33, 2026-10-13: the clauses admitting in-house teams only when they arrive on their own, barring anyone from
+prospecting them, and requiring a further decision for outbound sales to non-agency companies are withdrawn. D-33 is that
+decision. Original wording in git history.]
 
 §Founding incentive. Current: "The founding incentive is 25% on the first eligible project for each of the first three accepted
 founding agencies." New: "The founding incentive is 25% on the first eligible project for each of the first three accepted
 founding customers, agencies or admitted in-house teams. 'Founding agency' in the registry and cases names that customer tenant."
 
 §Decision rules for experiments. Current: "Do not run more than two simultaneous commercial cells while the sample and staffing are
-small." Added after it: "The first two cells are HubSpot-oriented and Salesforce-oriented agencies. A CLEAN or other-CRM agency cell
-opens only when one of those two cells closes."
+small." Added after it: internal rationale held privately; history in git.
 
 ### 4.6 `18_SALES_MARKETING_AND_SUPPORT.md`
 
@@ -340,10 +359,10 @@ connects to or improves a customer's AI. Messages use only the money arguments o
 amount."
 
 §Prospect qualification. Current: "A qualified account has evidence of relevant service work, target ecosystem, buyer role, likely
-project cadence and a reachable business channel." New: "Prospects are agencies. A non-agency company or its in-house team is
-never researched, recorded as a prospect or contacted for outreach; it can buy only when it arrives on its own (D58). A qualified
-account has evidence of relevant service work, target ecosystem, buyer role, likely project cadence and a reachable business
-channel."
+project cadence and a reachable business channel." [Superseded by D-33, 2026-10-13: the A3 replacement, which limited prospects
+to agencies, is withdrawn; original wording in git history. Prospects are agencies and companies that need to clean, prepare or
+migrate their data. The qualification evidence of the current sentence (relevant need or service work, target ecosystem, buyer
+role, likely project cadence and a reachable business channel, with source and observation date) applies to both.]
 
 Added after "Draft: first contact". These drafts are for use only after commercial activation; before it, the existing draft and
 its "being built" wording stay. When materialized, they name only the modes and destinations that the capability publication lists
@@ -411,34 +430,18 @@ chains, and the lawyer review before activation covers both."
 decision and added primary evidence, so D58 is the next free identifier. It follows D55 under §Material decisions, in the same
 format as the entries there.
 
-> ### D58: Agency-first positioning with zero-build commercial messaging and inbound in-house admission
+> ### D58
 >
-> Owner: 16. Alternative considered: Build the owner's 2026-09-25 strategy before launch (infrastructure migration, scraping
-> enrichment, monitored subscription, ERP tables, direct mid-market sales) or make CLEAN the headline offer.
->
-> The sellable parts of the strategy already exist in the design and need only presentation: a free entry check, cleaning without
-> a destination CRM, true money arguments and periodic cleanup through repeat projects. Admitting inbound in-house teams widens who
-> can buy without code or outreach. By the review's estimate, the expansions would add 6 to 12 or more months, legal exposure and
-> hires, with no evidence of higher contribution. Amendment A3 records the adopted rules, rejections and deferred proposals.
->
-> Review trigger: Paid conversion by buyer type (D01), the ninety-day commercial review, a channel-conflict complaint from an
-> agency customer, CLEAN substituting for qualified-target preparation in the mode mix, or the first qualified paid request in a
-> deferred area.
+> Owner: 16. Adopted 2026-09-25 by this amendment. Its title, alternative, reasoning and review triggers are internal rationale
+> held privately; history in git. Its operative content is the rules of section 3, the rejections of section 5 and the deferrals
+> of section 6. [Superseded in part by D-33, 2026-10-13: the inbound-only admission of in-house teams and the agency-only
+> prospecting limit.]
 
 ### 4.9 `registry/decisions.json` (authority package only; not vendored here) — record appended at re-issue
 
-```json
-{
-  "id": "D58",
-  "owner": "16",
-  "decision": "Agency-first positioning with zero-build commercial messaging and inbound in-house admission",
-  "alternative": "Build the owner's 2026-09-25 strategy before launch or make CLEAN the headline offer",
-  "reason": "The sellable parts already exist in the design and need only presentation; inbound in-house admission widens who can buy without code or outreach; the expansions would add an estimated 6 to 12 or more months, legal exposure and hires with no evidence of higher contribution.",
-  "reviewTrigger": "Paid conversion by buyer type, the ninety-day commercial review, an agency channel-conflict complaint, CLEAN substituting for qualified-target preparation, or the first qualified paid request in a deferred area.",
-  "classification": "DESIGN_DECISION_WITH_BOUNDED_EVIDENCE",
-  "status": "ADOPT_ON_EXPLICIT_R2_TRANSITION"
-}
-```
+The record has `id` "D58", `owner` "16", `classification` "DESIGN_DECISION_WITH_BOUNDED_EVIDENCE" and `status`
+"ADOPT_ON_EXPLICIT_R2_TRANSITION". Its `decision`, `alternative`, `reason` and `reviewTrigger` strings are internal rationale held
+privately; history in git. At re-issue the record also notes its partial supersession by D-33 (2026-10-13).
 
 The record uses the existing classification and status vocabulary. The re-issue is the explicit transition, and the owner decision
 date is carried by this amendment.
@@ -484,7 +487,7 @@ commitments.
 
 | Item | Estimate | Condition to reopen |
 |---|---|---|
-| Direct sales experiment to mid-market companies (construction, distributors, large e-commerce), possibly in Colombia in Spanish | English experiment: no code, but copy, legal review and one of the two commercial cells. Colombian/Spanish version: about 3 to 6 or more weeks plus accountant review, covering UI, report and email localization (a D54 localization release) and a domestic tax and payment route (IVA, domestic e-invoicing, local methods; changes B09/B15). | After the first agency cells have run, and the D01 review shows either inbound in-house conversion comparable to agencies or the agency segment stalled under the 16/26 thresholds. Before any start, the experiment must also include: a consumer-data category review for e-commerce (consumer personal data, possible payment-card fragments that 19 excludes, consumer-contact rules such as Ley 2300 de 2023); Colombian withholding at source (renta, IVA, ICA), which reduces cash received per sale; Kauro as the direct processor for Colombian controllers (a DPA or transmission contract); and a new channel-conflict decision (16). |
+| Colombian/Spanish localization for companies in Colombia. [Superseded in part by D-33, 2026-10-13: selling directly to companies is no longer deferred; only this localization row stays deferred. Original wording in git history.] | About 3 to 6 or more weeks plus accountant review, covering UI, report and email localization (a D54 localization release) and a domestic tax and payment route (IVA, domestic e-invoicing, local methods; changes B09/B15). | Commercial trigger: internal rationale held privately; history in git. Before any start, it must also include: a consumer-data category review for e-commerce (consumer personal data, possible payment-card fragments that 19 excludes, consumer-contact rules such as Ley 2300 de 2023); Colombian withholding at source (renta, IVA, ICA), which reduces cash received per sale; and Kauro as the direct processor for Colombian controllers (a DPA or transmission contract). |
 | ERP and generic tables (products, invoices, inventory, suppliers) | About 3 to 6 weeks: a new object family across Migration, Intelligence, the capability record and reports, with about 20 to 30 new acceptance cases. | D02's trigger, "first unsupported paid request": a qualified paid request for non-CRM tables recorded through the unsupported-scope draft (18). The admitted data categories and prohibited-data checks must first be extended, because ERP tables can hold payroll, bank or health data. |
 | Warehouse-ready export (clean files plus a schema for BigQuery or Snowflake, loaded by the customer, with no credentials) | About 2 to 4 weeks, including qualification against a real warehouse sandbox (small cost). It would be a new file-based target profile. | The first qualified paid request for a warehouse-load profile (D02 trigger). The customer always performs the load in its own account. |
 | Paid periodic re-diagnosis (file-based: the customer uploads a fresh export monthly or quarterly for a flat fee) | About 3 to 5 weeks plus cases: a revision-comparison report, reminders, subscription product and billing (B09/B10/B15) and recurring e-invoicing. Live monitoring inside customer systems would take 2 to 3 or more months with security qualification and is not recommended. | 20 §Recurring service and subscriptions: cohorts show repeated demand, visible as a periodic project cadence in the 90/180/365-day repeat reporting (16 §Agency lifecycle). The service must add a comparison with the previous delivery and included cleaning, or it competes with the free check. It must define entitlements, expiry, refunds, tax and capacity, and treat a prepaid balance as a liability. Longer data keeping conflicts with Kauro's short-retention design (7 to 14 days) and would need new privacy terms. "Permanent guarantee" stays rejected. |
@@ -497,16 +500,14 @@ commitments.
      as they are. Opening founding slots to in-house teams is an eligibility clarification: the discount liability stays at most
      three slots.
    - Seller compensation stays as defined in D32 (10% first, 4% recurring for twelve months) and D33 (the 90-day accepted claim).
-     Non-agency companies may not be prospected, so no seller attribution claim can arise from prospecting an in-house team. An
-     inbound in-house buyer produces seller compensation only as any inbound opportunity does: through an explicit compensation
-     assignment made before the seller performs the agreed closing work (17 §Attribution subject). Otherwise it produces no
-     commission.
-   - **CLEAN cannibalization risk.** At the same band CLEAN costs 40–54% less than HubSpot or Salesforce preparation (USD 695
-     against USD 1,295 or 1,495 in the first band). Presenting it as the headline offer could pull buyers with a qualified
-     destination down to CLEAN. It would also delay 16's evidence milestone of two HubSpot, two Salesforce and one repeat project.
-   - Mitigation: CLEAN stands beside the qualified modes and is never the headline (rule 3.3). The first commercial cells stay
-     HubSpot-oriented and Salesforce-oriented, with at most two cells at once. A CLEAN or other-CRM cell opens only when one of
-     those closes (16 §Decision rules for experiments, as amended).
+     [Superseded by D-33, 2026-10-13: the sentence stating that non-agency companies may not be prospected and so cannot give
+     rise to an attribution claim is withdrawn; original wording in git history. A company opportunity that a seller actively
+     sourced may be attributed to that seller when it meets the attribution rules in force (17 §Attribution subject, §Claim
+     validity and conflicts; D33).] An inbound in-house buyer produces seller compensation only as any inbound opportunity does:
+     through an explicit compensation assignment made before the seller performs the agreed closing work (17 §Attribution
+     subject). Otherwise it produces no commission.
+   - Internal rationale held privately; history in git. The presentation rule it supports is rule 3.3 (CLEAN stands beside the
+     qualified modes and is never the headline).
    - The monthly review reports the mode mix against the destination stated on the fit form.
 
 7.2 **The date: no change.**
@@ -514,16 +515,17 @@ commitments.
      are built anyway.
    - The credible limited-availability date given to the owner stands: not before 2026-12-16, most likely late January to
      mid-March 2027. It is still driven mainly by the owner's legal, tax, payment and cloud identity chain, not by code.
-   - Building the whole strategy before launch would move production to the second half of 2027 or early 2028. That is alternative
-     (B), which was rejected.
+   - Internal rationale held privately; history in git.
 
 7.3 **Review trigger and date.** No calendar review falls before activation. The first scheduled review is the ninety-day
    commercial review after B19 activation (16 §Commercial admission and maturity). A3 and D58 are reviewed earlier when any of
    these occurs:
    - paid conversion by buyer type becomes measurable enough for D01's trigger;
-   - an agency customer complains of channel conflict. This triggers an immediate review of rule 3.7, which can stop new in-house
-     admissions prospectively;
-   - CLEAN is bought in place of HubSpot or Salesforce preparation by buyers whose stated destination is qualified;
+   - an agency customer complains of channel conflict. This triggers an immediate review of the end-client protections of rule
+     3.7. [Superseded by D-33, 2026-10-13: a complaint no longer stops new in-house admissions; admission depends only on the real
+     service requirements, legality, authority over the data and the payment means actually enabled. Original wording in git
+     history.];
+   - a further commercial trigger: internal rationale held privately; history in git;
    - a qualified paid request arrives in a deferred area of section 6;
    - the re-issue finds R2 wording that A3 did not cover. In that case the re-issue records a versioned correction instead of
      adapting silently.

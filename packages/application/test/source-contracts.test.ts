@@ -273,7 +273,11 @@ test("B07-F8: every event routed to AUTHORITY_JOURNAL produces exactly one tombs
   // from it is itself a tombstoned state of that subject), and every terminal state of the machine is tombstoned.
   const subjectMachine: Readonly<Record<string, MachineName>> = { upload_session: "UploadSession", dataset_revision: "DatasetRevision", source_file: "SourceFile" };
   const tombstoned = new Map<MachineName, Set<string>>();
-  const entries = Object.entries(AUTHORITY_TOMBSTONES).map(([eventType, t]) => {
+  // B16 CMD060: the one extension of a retention record is a durable fact outside the machine states (the record stays ACTIVE and may
+  // expire later): its tombstone is proven by the project's extension row, so it is the only one without a machine state (EXTENDED)
+  const extensionEvents = Object.entries(AUTHORITY_TOMBSTONES).filter(([eventType]) => eventType.startsWith("retention_record."));
+  assert.deepEqual(extensionEvents, [["retention_record.extended.v1", { kind: "RETENTION_EXTENDED", state: "EXTENDED" }]]);
+  const entries = Object.entries(AUTHORITY_TOMBSTONES).filter(([eventType]) => !eventType.startsWith("retention_record.")).map(([eventType, t]) => {
     const name = subjectMachine[eventType.slice(0, eventType.indexOf("."))];
     assert.ok(name !== undefined, `${eventType} names a tombstoned subject`);
     tombstoned.set(name, (tombstoned.get(name) ?? new Set<string>()).add(t.state));

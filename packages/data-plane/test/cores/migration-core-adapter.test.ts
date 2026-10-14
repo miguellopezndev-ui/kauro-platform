@@ -20,7 +20,10 @@ import {
   rowCountsOf,
   type CoreAdapterHooks,
 } from "../../src/index.js";
-import { OperationEnded } from "../../src/cores/operation.js";
+import { OperationEnded, coreTimersOf } from "../../src/cores/operation.js";
+
+/** The wall clock of a test (CK3 scans product code only). */
+const WALL_TIMERS = coreTimersOf({ nowMs: () => Date.now() });
 import { attemptFixture, manualChannel, sha } from "../support/attempt.js";
 import { CONTACTS_CSV, ManualTimers, configDocument, gate, hostIoOf, inputRef, memorySource, memoryWriter, resolverOf, settle, tempRoot } from "../support/core-config.js";
 
@@ -34,12 +37,14 @@ interface Built {
   callDir(): string;
 }
 
-function build(options: { n?: number; hooks?: CoreAdapterHooks; document?: Record<string, unknown>; refs?: CoreInputRef[]; root?: ReturnType<typeof tempRoot>; manual?: boolean; hash?: string } = {}): Built {
+function build(options: { n?: number; hooks?: CoreAdapterHooks; document?: Record<string, unknown>; refs?: CoreInputRef[]; root?: ReturnType<typeof tempRoot>; manual?: boolean; hash?: string; clockSkewMs?: number } = {}): Built {
   const t = options.root ?? tempRoot();
   const fixture = attemptFixture(options.n ?? 1);
   mkdirSync(attemptScratchDirectoryOf(t.root, fixture.attemptId), { recursive: true });
   const refs = options.refs ?? [inputRef("contacts.csv", CONTACTS_CSV)];
   const timers = new ManualTimers();
+  // time the manual clock stood still while the real one ran on (a loaded host between this line and the subject below)
+  timers.now -= options.clockSkewMs ?? 0;
   const document = options.document ?? configDocument();
   const adapter = new MigrationCoreAdapter({
     attemptId: fixture.attemptId,
@@ -47,14 +52,15 @@ function build(options: { n?: number; hooks?: CoreAdapterHooks; document?: Recor
     inputs: resolverOf(refs),
     corePackageHash: sha("core"),
     pollIntervalMs: options.manual === true ? 1000 : 50,
-    ...(options.manual === true ? { timers } : {}),
+    timers: options.manual === true ? timers : WALL_TIMERS,
     ...(options.hooks === undefined ? {} : { hooks: options.hooks }),
   });
   const subject: ExecutionSubject = {
     ...fixture.subject,
     configDocument: document,
     configHash: options.hash ?? loadConfig(JSON.stringify(document), "t").configHash,
-    executionDeadlineAt: new Date(Date.now() + 3_600_000).toISOString() as ExecutionSubject["executionDeadlineAt"],
+    // the deadline sits on the clock the adapter reads: the injected one when manual, so advance(3_600_001) always passes it
+    executionDeadlineAt: new Date((options.manual === true ? timers.nowMs() : Date.now()) + 3_600_000).toISOString() as ExecutionSubject["executionDeadlineAt"],
   };
   return { t, adapter, subject, fixture, refs, timers, callDir: () => join(attemptScratchDirectoryOf(t.root, fixture.attemptId), CORE_RUN_DIRECTORY, "execute") };
 }
@@ -375,6 +381,28 @@ test("M08 RACE (expiry): the operation deadline fixed at entry ends a hung open,
   }
 });
 
+test("M08 RACE (ordering): the deadline of a manual-clock operation is on the injected clock however long the real clock ran before the subject was built; one advance(3_600_001) ends a hung source open, bounded by its own watchdog", async () => {
+  const late = gate();
+  const bytes = Buffer.from(CONTACTS_CSV);
+  const reader: SourceReader = { open: () => late.promise.then(() => ({ byteLength: bytes.byteLength, sha256: sha(bytes), read: async function* () { yield bytes; } })) };
+  const b: Built = build({ manual: true, clockSkewMs: 250 });
+  let watchdog: NodeJS.Timeout | undefined;
+  try {
+    const run = b.adapter.execute(b.subject, hostIoOf({ source: reader }));
+    for (let i = 0; i < 40; i += 1) await settle();
+    b.timers.advance(3_600_001);
+    const guard = new Promise<never>((_, reject) => {
+      watchdog = setTimeout(() => reject(new Error("the operation deadline never fired: the subject's deadline is past advance(3_600_001) on the injected clock")), 20_000);
+    });
+    const out = await Promise.race([run, guard]);
+    assert.equal(out.terminalCause, "DEADLINE_EXCEEDED");
+  } finally {
+    clearTimeout(watchdog);
+    late.open();
+    b.t.dispose();
+  }
+});
+
 test("M09 RACE (timeout): a SourceHandle chunk that never arrives is abandoned at the deadline; no child starts", async () => {
   const never = gate();
   const bytes = Buffer.from(CONTACTS_CSV);
@@ -550,7 +578,7 @@ test("M16a RACE (profile bounds): a hung read or child is killed at the deadline
 test("M16b RACE (validate bounds): without controls the adapter rejects; with them a hung read or child is killed at the deadline, cancellation ends it, and a retry uses a new callId directory with equal core hashes", async () => {
   const b = build();
   const documents = { planBinding: () => Promise.resolve({ configDocument: b.subject.configDocument, coreConfigHash: b.subject.configHash }) };
-  const adapter = new MigrationCoreAdapter({ attemptId: b.fixture.attemptId, scratchRoot: b.t.root, inputs: resolverOf(b.refs), documents, corePackageHash: sha("core"), pollIntervalMs: 50 });
+  const adapter = new MigrationCoreAdapter({ attemptId: b.fixture.attemptId, scratchRoot: b.t.root, inputs: resolverOf(b.refs), documents, corePackageHash: sha("core"), timers: WALL_TIMERS, pollIntervalMs: 50 });
   try {
     const io = hostIoOf({ source: source() });
     const base = { revisionHash: sha("revision"), planBody: {} as never, planHash: sha("plan"), targetContractHash: sha("target"), scratch: io.scratch, cancellation: manualChannel() };

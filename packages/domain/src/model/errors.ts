@@ -119,6 +119,17 @@ export const RETRYABLE_FAILURE_CODES: ReadonlySet<FailureCode> = new Set<Failure
  * Safe reason codes: machine tokens that narrow a failure code. They never carry customer values. The list is closed so a
  * frontend and the acceptance harness can enumerate the outcomes a command can produce.
  */
+/** The refusals of CMD060 RequestRetentionExtension (package B16 lane L2; R2-123, R2-124), appended after the recovery reasons. */
+export const RETENTION_EXTENSION_FAILURE_REASONS = [
+  "TERMS_VERSION_MISMATCH",
+  "NO_EXTENDABLE_RECORD",
+  "RETENTION_EXPIRED",
+  "EXTENSION_ALREADY_USED",
+  "NO_SOFT_DEADLINE",
+  "SOFT_DEADLINE_PASSED",
+  "NO_EXTENSION_ROOM",
+] as const;
+
 export const FAILURE_REASONS = [
   // authorization (08 "Identity is not permission")
   "SUBJECT_UNAUTHENTICATED",
@@ -291,6 +302,9 @@ export const FAILURE_REASONS = [
   // the public inquiry (B11 W5b, D-PUB-3): refused by the per-address or per-e-mail limiter; its origin rule reuses ORIGIN_REJECTED
   // (W2) and its detector the support reasons above
   "INQUIRY_RATE_LIMITED",
+  // the agency's buyer type (B11 W6, CMD101 SetBuyerType): answered once; a second answer with the other value is refused, never
+  // overwritten (R2 A3 3.7); placed with B11's reasons before B09's list so that B09, B08 and B10 keep their order (D11-SYNC-1)
+  "BUYER_TYPE_ALREADY_SET",
   // attribution claims (B10 failure matrix CLAIM_DEADLINE, CLAIM_LAPSE_ACCEPT): CMD047 meets a claim whose review deadline is reached on the
   // database clock; placed before B09's list, like B11's, so that B09, B08 and B10's section 12 keep their order (D11-SYNC-1)
   "CLAIM_EXPIRED",
@@ -313,6 +327,8 @@ export const FAILURE_REASONS = [
   ...CAPABILITY_FAILURE_REASONS,
   // operations and recovery (package B16: CMD057)
   ...RECOVERY_FAILURE_REASONS,
+  // the one soft-deadline extension of a project (package B16 lane L2: CMD060 RequestRetentionExtension; R2-123, R2-124)
+  ...RETENTION_EXTENSION_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

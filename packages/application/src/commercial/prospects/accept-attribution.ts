@@ -1,6 +1,6 @@
 /**
  * CMD047 AcceptAttribution — POST /api/v1/sales/claims/{claimId}/accept — KAURO_OWNER — scope CORPORATE — no provider effect (design §5
- * "Attribution", §12; decisions D10-ATTR-1, D58; registry "freeze accepted acquisition attribution and claim window; record any agreed
+ * "Attribution", §12; decisions D10-ATTR-1, D-33; registry "freeze accepted acquisition attribution and claim window; record any agreed
  * split totaling 100%"; "assignment edits or two full-rate sellers cannot duplicate the commission pool").
  *
  * One unit of work of the owner's OPERATOR context, in B06's pipeline order: access (the caller's own ACTIVE KAURO_OWNER grant, read
@@ -8,12 +8,12 @@
  * taken after the writer's half of its prospect's claims lock (NOT_FOUND for an unknown id) → expectedVersion (STALE_VERSION) → its review
  * deadline not reached on the database clock (CLAIM_EXPIRED, under review or lapsed; also for every share's claim) → the claim is SUBMITTED or DISPUTED (CLAIM_NOT_REVIEWABLE) → the owner-prepared allocation shareAllocationRef is on this claim's prospect and
  * unfrozen (NOT_FOUND; ATTRIBUTION_EXISTS) → names a share for this claim and its shares sum to exactly 10 000 bps (SHARES_NOT_WHOLE) →
- * the agency has no frozen allocation (ATTRIBUTION_EXISTS: the pool does not become 10% for each seller) → the agency's buyer type,
- * read through BuyerTypeReader (unset: BUYER_TYPE_UNSET; IN_HOUSE: IN_HOUSE_NOT_ATTRIBUTABLE; D58) → no payment order of the agency
+ * the agency has no frozen allocation (ATTRIBUTION_EXISTS: the pool does not become 10% for each seller) → no payment order of the agency
  * precedes the claim (CLAIM_AFTER_FIRST_ORDER), read in the agency's finance scope. Writes: every beneficiary claim ACCEPTED, running
  * 2160 hours from the server's instant, every other live claim of the prospect REJECTED by the allocation, and the allocation frozen
  * once (its shares sum to 10 000 bps at COMMIT, KC003). The answer names the decision by a server token, never by the owner's ruling text.
- * The corporate machines publish no domain event (D10-EVT-2).
+ * The corporate machines publish no domain event (D10-EVT-2). The tenant's buyer type is no condition (owner decision D-33): a company
+ * buying for its own data is attributable to the seller that sourced it under the same rules as an agency.
  */
 import type { UtcInstant } from "@kauro/contracts";
 import type { AttributionAllocationId, AttributionClaimId, AttributionClaimRecord } from "@kauro/domain";
@@ -84,9 +84,6 @@ export function acceptAttributionHandler(runtime: CommerceRequestRuntime, co: Pr
           if ((await attribution.frozenAllocationOf(allocation.agencyId)) !== null) {
             throw new DomainFailure("PRECONDITION_FAILED", "the agency already has a frozen attribution allocation", { reason: "ATTRIBUTION_EXISTS" });
           }
-          const buyerType = await co.buyerTypes.buyerTypeOf(uow, { agencyId: allocation.agencyId });
-          if (buyerType === null) throw new DomainFailure("PRECONDITION_FAILED", "the agency's buyer type is not recorded", { reason: "BUYER_TYPE_UNSET" });
-          if (buyerType === "IN_HOUSE") throw new DomainFailure("PRECONDITION_FAILED", "an in-house tenant earns no seller attribution", { reason: "IN_HOUSE_NOT_ATTRIBUTABLE" });
           await uow.adoptFinanceScope(allocation.agencyId);
           if (await co.orderPrecedesClaim(uow, allocation.agencyId, claim.claimId)) {
             throw new DomainFailure("PRECONDITION_FAILED", "the claim was submitted after the agency's first payment order", { reason: "CLAIM_AFTER_FIRST_ORDER" });
