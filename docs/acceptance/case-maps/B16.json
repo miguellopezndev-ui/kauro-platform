@@ -8,16 +8,15 @@
  "rows": [
   {
    "case": "S048",
-   "class": "PARTIAL",
+   "class": "EXECUTED_LOCAL",
    "test": [
-    "apps/api/test/b16-tenant-sweep.test.ts :: S048 sweep: every id route answers a foreign and a nonexistent id identically, with Cache-Control no-store"
+    "apps/api/test/b16-tenant-sweep.test.ts :: S048 sweep: every id route answers a foreign and a nonexistent id identically, with Cache-Control no-store",
+    "apps/api/test/cmd038-authorize-download.test.ts :: S048 (download): another agency's package and a package that never existed answer identically, and nothing of either leaks"
    ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [
-    "B16"
-   ],
-   "claimed": "OPEN -> L5 PARTIAL (PLANNED L5; target EXECUTED_LOCAL)"
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "S049",
@@ -130,14 +129,16 @@
   },
   {
    "case": "R2-048",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd038-authorize-download.test.ts :: R2-048: after a role change no new URL; an issued URL keeps its disclosed residual lifetime"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B15"
    ],
-   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L5 PARTIAL (PLANNED L5; target PART(B15) EXECUTED_LOCAL)"
   },
   {
    "case": "R2-049",
@@ -464,36 +465,47 @@
   },
   {
    "case": "CMD038-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038-OK: a reader authorizes two artifacts of an AVAILABLE package: one COMMIT writes the authorization and its artifact rows, download_authorization.issued.v1 and the journal entry; the URLs are signed after COMMIT, bound to the requester, valid for least(900 s, the retention deadline - now) and never journaled",
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038-OK (lifetime): the URL lifetime is least(900 s, the retention deadline - now): a deadline five minutes away bounds the expiry at the deadline"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B15"
    ],
-   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L5 PARTIAL (PLANNED L5; target PART(B15) EXECUTED_LOCAL)"
   },
   {
    "case": "CMD038-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038-DENY: deleted/quarantined artifacts, a package not AVAILABLE, a stale step-up, a suspended member and an unknown artifact deny with nothing written; a shared cache never reuses another user's URL (per-user Cache-Control no-store, URL bound to the requester)",
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038 PARTIAL: one artifact of three deleted or quarantined refuses the whole request; nothing is issued or signed",
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038 EXPIRY: the retention effective deadline crossed during the issuance's wait on the record is refused RETENTION_EXPIRED (judged at effect_now after the lock), nothing written",
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038 DENY (forged): a request session cannot insert an authorization for a package that is not AVAILABLE or longer than 900 s (KA094)"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B15"
    ],
-   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L5 PARTIAL (PLANNED L5; target PART(B15) EXECUTED_LOCAL)"
   },
   {
    "case": "CMD038-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038-RACE: issuance held at the package await against CMD042 and a package revocation, both orders; crash after COMMIT before signing and a lost answer are recovered by the key with the same scope; two keys are two authorizations",
+    "apps/api/test/cmd038-authorize-download.test.ts :: CMD038-RACE (TIMEOUT): the signer times out after COMMIT: the authorization is recorded ISSUE_UNCERTAIN and answered 503 SIGNING_UNCERTAIN; the same key re-signs the same scope at the same expiry, never a broader one"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B15"
    ],
-   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L5 PARTIAL (PLANNED L5; target PART(B15) EXECUTED_LOCAL)"
   },
   {
    "case": "CMD042-OK",

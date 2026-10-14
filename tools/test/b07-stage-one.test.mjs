@@ -20,6 +20,8 @@ const OWNERS = Object.freeze({
   SessionVaultPort: "packages/application/src/testing/contract-fake-session-vault.ts",
   AuthorityJournalPort: "packages/application/src/testing/contract-fake-authority-journal.ts",
   MalwareScannerPort: "packages/data-plane/src/testing/malware-scanner-fake.ts",
+  // B16 lane L5: the read signing of CMD038 AuthorizeDownload (packages/application/src/ports/object-read-signing.ts); the S3 presign is B15
+  ObjectReadSigningPort: "packages/application/src/testing/contract-fake-read-signer.ts",
 });
 
 /** Every TypeScript source of the workspace's packages and apps, production and test, outside build output and dependencies. */
@@ -67,12 +69,13 @@ test("B07 stage 1 is one implementation: each provider port has exactly one labe
     "@kauro/application/testing ContractFakeObjectStorage",
     "@kauro/application/testing ContractFakePayoutEvidence",
     "@kauro/application/testing ContractFakePreparationCompletion",
+    "@kauro/application/testing ContractFakeReadSigner",
     "@kauro/application/testing ContractFakeSessionVault",
     "@kauro/data-plane/testing ContractFakeMalwareScanner",
   ]);
   const fakes = entries["@kauro/application/testing"];
   const scanner = entries["@kauro/data-plane/testing"];
-  for (const token of [fakes.CONTRACT_FAKE_STORAGE_PROVIDER, fakes.CONTRACT_FAKE_VAULT_PROVIDER, fakes.CONTRACT_FAKE_JOURNAL_PROVIDER, scanner.FAKE_SCANNER_ENGINE, scanner.FAKE_SCANNER_ENGINE_VERSION, scanner.FAKE_SCANNER_SIGNATURE_VERSION]) {
+  for (const token of [fakes.CONTRACT_FAKE_STORAGE_PROVIDER, fakes.CONTRACT_FAKE_SIGNER_PROVIDER, fakes.CONTRACT_FAKE_VAULT_PROVIDER, fakes.CONTRACT_FAKE_JOURNAL_PROVIDER, scanner.FAKE_SCANNER_ENGINE, scanner.FAKE_SCANNER_ENGINE_VERSION, scanner.FAKE_SCANNER_SIGNATURE_VERSION]) {
     assert.match(token, /^contract-fake-/, "every token of a fake says it is one");
   }
   assert.equal(scanner.FAKE_SCANNER_EVIDENCE_CLASS, "SIMULATED");

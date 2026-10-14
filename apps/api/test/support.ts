@@ -35,7 +35,7 @@ import type { FastifyInstance, InjectOptions } from "fastify";
 import type { PoolClient } from "pg";
 import { DOMAINS, canonicalize, structuredDigest, type Sha256Hex } from "@kauro/contracts";
 import type { ApprovePlanView, AssuranceVerifier, AuthenticatedSubject, B06Collaborators, B07Collaborators, BuyerTypeReader, LateFailureSink, ProviderCallTimer, CommerceRequestCollaborators, CoreServices, DecisionPatch, DisclosureSet, PatchCompilation, Problem, SchemaValidator, QuoteCollaborators, SessionView } from "@kauro/application";
-import { ContractFakeIdentityIssuer, ContractFakeObjectStorage, ContractFakeSessionVault, contractFakeBankDetailsClassifier } from "@kauro/application/testing";
+import { ContractFakeIdentityIssuer, ContractFakeObjectStorage, ContractFakeReadSigner, ContractFakeSessionVault, contractFakeBankDetailsClassifier } from "@kauro/application/testing";
 import type { BankEvidenceStore } from "@kauro/application";
 import { createAdmissionLimiter } from "@kauro/authorization";
 import type {
@@ -418,6 +418,8 @@ export interface World {
   readonly processClock: MovableClock;
   /** The labelled contract fakes the source lifecycle's provider ports are bound to (SIMULATED; B07-PROVIDER-FAKES). */
   readonly storage: ContractFakeObjectStorage;
+  /** B16 L5: the labelled contract fake of ObjectStoragePort.signRead the api signs CMD038's download URLs with (SIMULATED). */
+  readonly signer: ContractFakeReadSigner;
   readonly vault: ContractFakeSessionVault;
   readonly internalErrors: Array<{ correlationId: string; error: unknown }>;
   /** The bank-transfer route's restricted evidence store, bound after start-up (bank-support.ts bankWorld binds its CONTRACT_FAKE store). */
@@ -639,6 +641,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const tokens = new Map<string, AuthenticatedSubject>();
   const internalErrors: Array<{ correlationId: string; error: unknown }> = [];
   const storage = new ContractFakeObjectStorage();
+  const signer = new ContractFakeReadSigner();
   const vault = new ContractFakeSessionVault();
   const sourceBase: B07Collaborators = { providers: { storage, vault, origin: TEST_ORIGIN }, preview: null, commercialScope: commercialScopeInspector };
   const sources = options.sources ? { ...sourceBase, ...options.sources(sourceBase) } : sourceBase;
@@ -691,6 +694,8 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     clock: apiClock,
     ids,
     onInternalError: (correlationId, error) => internalErrors.push({ correlationId, error }),
+    // B16 L5: CMD038 signs read URLs with the labelled contract fake (SIMULATED; the S3 presign adapter is B15's)
+    readSigner: signer,
     ...(sessionAssembly !== undefined ? { sessions: sessionAssembly } : {}),
     ...(options.logger !== undefined ? { logger: options.logger } : {}),
   });
@@ -766,6 +771,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     storage,
     vault,
     internalErrors,
+    signer,
     bank,
     A,
     owner,

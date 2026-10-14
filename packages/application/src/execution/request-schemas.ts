@@ -13,6 +13,8 @@ const ID = { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}
 /** B06 label: 1..200 characters, no Unicode Cc code point (C0, DEL, C1) — the rule of kauro.is_label (B06 D-LABEL-1, N6). */
 const LABEL = { type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PATTERN } as const;
 const VERSION = { type: "integer", minimum: 1, maximum: 9007199254740991 } as const;
+/** The most artifacts one download authorization grants (a package's delivery copies are far fewer). */
+export const DOWNLOAD_MAX_ARTIFACTS = 100;
 
 function schema(command: string, required: ReadonlyArray<string>, properties: RequestSchema["properties"]): RequestSchema {
   return {
@@ -30,6 +32,8 @@ export const EXECUTION_REQUEST_SCHEMAS = Object.freeze({
   CMD036: schema("CMD036", ["commercialAuthorizationId"], { commercialAuthorizationId: ID }),
   /** CancelJob. */
   CMD037: schema("CMD037", ["expectedVersion", "reasonCode"], { expectedVersion: VERSION, reasonCode: LABEL }),
+  /** AuthorizeDownload (B16 lane L5): 1..100 artifact ids (each once: a repeat is refused by the handler before any write) and a step-up. */
+  CMD038: schema("CMD038", ["artifactIds", "assuranceProofRef"], { artifactIds: { type: "array", minItems: 1, maxItems: DOWNLOAD_MAX_ARTIFACTS, items: ID }, assuranceProofRef: ID }),
 } as const);
 
 export type ExecutionRequestSchemaCommand = keyof typeof EXECUTION_REQUEST_SCHEMAS;

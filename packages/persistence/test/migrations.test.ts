@@ -163,6 +163,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0076_payout_effect_instant.sql",
     // B16 L4 CMD054/CMD055: the breakglass grants, their accesses and the policies a named grant reads under (KA089; provisional number)
     "0071_b16_breakglass.sql",
+    // B16 L5 CMD038: download authorizations, their KA094 guard and the package transition lock (provisional number)
+    "0074_b16_download_authorizations.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

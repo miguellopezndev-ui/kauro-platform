@@ -190,6 +190,8 @@ export type {
   ExecutionUnitOfWork,
   ExecutionUnitOfWorkFactory,
 } from "./execution-store.js";
+// download authorizations of delivered packages (package B16 lane L5, CMD038 AuthorizeDownload)
+export type { DownloadSignState, DownloadPackageRow, DownloadArtifactRow, GoverningRetentionRow, IssueDownloadInput, DownloadAuthorizationRow, DownloadRecheck, DownloadAuthorizationStore } from "./download-store.js";
 // the control plane's discovery of execution work (package B08, mandate B08-CONTROL-EXECUTION)
 export type { ExecutionJobRef, ExecutionAttemptRef, ExecutionFact, ExecutionSourceGeneration, ExecutionInput, ExecutionDiscovery } from "./execution-discovery.js";
 // audit authority (package B08, mandate B08-PERSISTENCE-AUDIT; docs/design/B08-audit-approval-jobs.md §10)

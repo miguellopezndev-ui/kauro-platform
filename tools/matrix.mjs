@@ -908,6 +908,21 @@ APPLICABILITY.CMD037 = {
   "external uncertainty": "NOT_APPLICABLE: CancelJob records the cancellation on the job row and calls no provider; the control plane's EXECUTION_CONTROL terminates the attempt by identity and observes until it is terminal or proved absent (mandate B08-CONTROL-EXECUTION), and a job that was published first answers JOB_ALREADY_READY (S062)",
 };
 
+// B16 lane L5: CMD038 AuthorizeDownload (docs/design/B16-case-map.md CMD038, R2-048, S048): the grant is one COMMIT; the provider signing
+// after it is a port call (the S3 presign half is PARTIAL(B15))
+const AUTHORIZE_DOWNLOAD = "cmd038-authorize-download.test.ts";
+APPLICABILITY.CMD038 = {
+  "legitimate state": [[AUTHORIZE_DOWNLOAD, "CMD038-OK: a reader authorizes two artifacts of an AVAILABLE package"], [AUTHORIZE_DOWNLOAD, "CMD038-OK (lifetime): the URL lifetime is least(900 s, the retention deadline - now)"]],
+  "wrong role": [[AUTHORIZE_DOWNLOAD, "CMD038-DENY: deleted/quarantined artifacts, a package not AVAILABLE, a stale step-up, a suspended member"], [AUTHORIZE_DOWNLOAD, "R2-048: after a role change no new URL"]],
+  "wrong agency": [[AUTHORIZE_DOWNLOAD, "S048 (download): another agency's package and a package that never existed answer identically"]],
+  "stale version": "NOT_APPLICABLE: AuthorizeDownload carries no expectedVersion (registry fields: artifactIds, assuranceProofRef); the project, the package and the governing retention record are read after their transition locks and FOR SHARE, and a fact that changed is refused with its own reason (PROJECT_NOT_OPEN, PACKAGE_NOT_AVAILABLE, ARTIFACT_UNAVAILABLE, RETENTION_EXPIRED, MEMBERSHIP_CHANGED), never with STALE_VERSION",
+  "duplicate request": [[AUTHORIZE_DOWNLOAD, "CMD038-RACE: issuance held at the package await against CMD042 and a package revocation, both orders"]],
+  "changed-body same key": [[AUTHORIZE_DOWNLOAD, "CMD038-RACE (TIMEOUT): the signer times out after COMMIT"]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[AUTHORIZE_DOWNLOAD, "CMD038-RACE: issuance held at the package await against CMD042 and a package revocation, both orders; crash after COMMIT before signing and a lost answer are recovered by the key"]],
+  "external uncertainty": [[AUTHORIZE_DOWNLOAD, "CMD038-RACE (TIMEOUT): the signer times out after COMMIT: the authorization is recorded ISSUE_UNCERTAIN and answered 503 SIGNING_UNCERTAIN"]],
+};
+
 // package B08's audit commands (mandate B08-COMMANDS-AUDIT; docs/design/B08-case-map.md CMD020, CMD021, CMD022, CMD024 and R2-044): each
 // command's own OK / DENY / RACE tests and the role matrix of the four commands, the decision artifact intake and the GetAudit read
 const START_AUDIT = "cmd020-start-audit.test.ts";
@@ -1057,6 +1072,7 @@ export async function loadMatrixSources() {
     CMD044: "commands/handlers/create-support-case.ts",
     CMD042: "sources/handlers/request-deletion.ts",
     CMD060: "sources/handlers/request-retention-extension.ts",
+    CMD038: "execution/handlers/authorize-download.ts",
     CMD022: "audit/handlers/create-plan.ts",
   };
   const published = {};

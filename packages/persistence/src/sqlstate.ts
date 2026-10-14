@@ -91,11 +91,12 @@ export const SQLSTATE = Object.freeze({
   B16_L3_DELETION_EVIDENCE: "KA088",
   // lane L4 (migration kauro.breakglass_grants_birth): the authorization does not justify the breakglass scope now
   B16_L4_BREAKGLASS_SCOPE_UNAUTHORIZED: "KA089",
-  B16_L5_DOWNLOAD_A: "KA090",
+  // L5 (CMD038, migration kauro.download_authorizations) raises KA094 from the top of the range down; L8 keeps one reserve at KA090
+  B16_L8_RESERVE_A: "KA090",
   B16_L6_RESTORE_A: "KA091",
   B16_L6_RESTORE_B: "KA092",
   B16_L7_STAGE_RELEASE_A: "KA093",
-  B16_L8_RESERVE_A: "KA094",
+  B16_L5_DOWNLOAD_AUTHORIZATION: "KA094",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",

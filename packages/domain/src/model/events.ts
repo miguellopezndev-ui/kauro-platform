@@ -103,6 +103,8 @@ export const EVENT_TYPES = [
   "support_case.opened.v1",
   // Agency buyer type (B11 CMD101 SetBuyerType, migration 0062: recorded once, before the first quote; R2 A3 3.7)
   "agency_buyer_type.recorded.v1",
+  // Download authorizations (B16 lane L5 CMD038 AuthorizeDownload; migration 0074, provisional): the audit fact of one grant
+  "download_authorization.issued.v1",
   // Processing authority (package B08, model/execution/events.ts; migrations 0021 and 0022)
   ...EXECUTION_EVENT_TYPES,
   // Audit authority (package B08, model/audit/events.ts; migration 0023)
@@ -124,7 +126,7 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * 0012; B09: the commerce kinds, registered by migrations 0013..0017; B08: processing_job and package_version, registered by
  * migrations 0021 and 0022, and audit and cost_grant, registered by migration 0023; B11: support_case, registered by migration 0026, and agency_buyer_type, registered by migration 0062).
  */
-export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS, "support_case", ...BANK_ROUTE_AGGREGATE_KINDS, "agency_buyer_type", ...BANK_CREDIT_AGGREGATE_KINDS] as const;
+export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS, "support_case", ...BANK_ROUTE_AGGREGATE_KINDS, "agency_buyer_type", ...BANK_CREDIT_AGGREGATE_KINDS, "download_authorization"] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 
 /** Keys each event type may carry (07: references and safe counts only). */
@@ -200,6 +202,8 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   "support_case.opened.v1": ["caseId", "projectId", "category", "severity", "nextReviewAt"],
   // the buyer type and the owner's affirmation travel as the two enumerated facts, with the recording membership's id
   "agency_buyer_type.recorded.v1": ["agencyId", "buyerType", "forEconomicActivity", "recordedByMembershipId"],
+  // the grant travels as ids and counts: never an object name, a URL or a signature (S048; the URLs are bearer secrets, never journaled)
+  "download_authorization.issued.v1": ["authorizationId", "agencyId", "projectId", "packageVersionId", "membershipId", "artifactIds", "lifetimeSeconds"],
   // processing authority (package B08, model/execution/events.ts)
   ...EXECUTION_EVENT_PAYLOAD_ALLOWLIST,
   // audit authority (package B08, model/audit/events.ts)

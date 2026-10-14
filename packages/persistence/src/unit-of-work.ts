@@ -74,6 +74,7 @@ import { PgBuyerTypes, PgProjectDashboard } from "./repositories/agency-app.js";
 import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
 import { PgExecutionDiscovery } from "./execution/discovery.js";
+import { PgDownloadAuthorizationStore } from "./execution/downloads.js";
 import { PgAuditReads, type ResolvedDecisionPatch } from "./audit/reads.js";
 import { PgAuditDiscovery } from "./audit/discovery.js";
 import { PgImportStageStore } from "./repositories/import-stages.js";
@@ -922,11 +923,14 @@ export class PgExecutionUnitOfWork extends PgCommerceUnitOfWork implements Execu
   readonly execution: PgExecutionStore;
   /** The control plane's discovery reads of execution work (mandate B08-CONTROL-EXECUTION, D8-CEX-1). */
   readonly executionDiscovery: PgExecutionDiscovery;
+  /** The download authorizations of delivered packages (package B16 lane L5, CMD038). */
+  readonly downloads: PgDownloadAuthorizationStore;
 
   constructor(client: PoolClient, context: ExecutionContext, ids: TrackingIdGenerator, clock: Clock) {
     super(client, context, ids, clock);
     this.execution = new PgExecutionStore({ db: client, ids, events: this.events, provenance: () => this.provenance() });
     this.executionDiscovery = new PgExecutionDiscovery(client);
+    this.downloads = new PgDownloadAuthorizationStore(client);
   }
 }
 
