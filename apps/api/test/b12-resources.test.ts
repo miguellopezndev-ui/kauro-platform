@@ -123,7 +123,7 @@ cell("GAP-PU-1 RACE: two publishes of one family held at L6: one n+1, one 409 st
     assert.deepEqual(rows.map((x) => [x.version, x.state]), [[1, "SUPERSEDED"], [2, "CURRENT"]], `order ${order}: exactly one n+1, one CURRENT`);
     const won = publishedOf(replyOf(race.first, "first publish"), `order ${order} first publish`);
     assert.deepEqual([won.version, won.state], [2, "CURRENT"], `order ${order}: the first publish is version 2`);
-    const current = (await w.oracle.query<{ ref: string }>("SELECT content_ref AS ref FROM kauro.sales_resources WHERE resource_id = $1", [won.resourceId])).rows[0]!.ref;
+    const current = (await w.oracle.query<{ ref: string }>("SELECT content_id AS ref FROM kauro.sales_resources WHERE resource_id = $1", [won.resourceId])).rows[0]!.ref;
     assert.equal(current, first, `order ${order}: version 2 carries the first publisher's content`);
     assert.equal(statusCode(w, replyOf(race.second, "second publish")), STALE, `order ${order}: the second is 409 stale`);
   }
