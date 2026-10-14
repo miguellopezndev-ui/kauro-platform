@@ -42,8 +42,21 @@ export interface TargetContractView {
   readonly version: number;
   readonly state: TargetContractState;
   readonly objectCount: number;
+  /**
+   * What this confirmation superseded (R2-026, decision D-R3-1): every current contract of the project, each with its instant. Present on a
+   * confirmation that superseded at least one contract, with the re-check plan ids and the paths the agency keeps.
+   */
+  readonly supersedes?: ReadonlyArray<{ readonly contractId: string; readonly supersededAt: UtcInstant }>;
+  /** One re-check plan per APPROVED plan bound to a superseded contract, born VALIDATION_REQUIRED; its approval is never automatic. */
+  readonly recheckPlanIds?: ReadonlyArray<string>;
+  /** The paths a paid scope keeps after a supersession: REPAIR (re-bind through the re-check plan), REQUEST_REFUND, NEW_SCOPE. */
+  readonly includedPaths?: ReadonlyArray<TargetDriftPath>;
   readonly permittedActions: ReadonlyArray<TargetContractAction>;
 }
+
+/** The paths a paid scope keeps after its target was superseded (R2-026): never an automatic survival of the approval. */
+export const TARGET_DRIFT_PATHS = ["REPAIR", "REQUEST_REFUND", "NEW_SCOPE"] as const;
+export type TargetDriftPath = (typeof TARGET_DRIFT_PATHS)[number];
 
 export interface AuditView {
   readonly auditId: string;
@@ -111,5 +124,14 @@ export interface ImportStageView {
   readonly failedRows?: number;
   readonly unresolvedRows?: number;
   readonly continuedAt?: UtcInstant;
+  /** The reconciliation request a differing receipt for the finalized stage opened (R2-025); the stage's identity is unchanged. */
+  readonly reconciliation?: ImportStageReconciliationView;
   readonly permittedActions: ReadonlyArray<ImportStageAction>;
+}
+
+export interface ImportStageReconciliationView {
+  readonly reconciliationId: string;
+  readonly state: "OPEN";
+  readonly contentHash: string;
+  readonly openedAt: UtcInstant;
 }

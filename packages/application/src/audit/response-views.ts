@@ -9,7 +9,7 @@
  * unsupported capabilities by stable finding codes.
  */
 import { RESPONSE_FIELD_VOCABULARY, VIEW_MEMBER_KIT, type ViewDefinition } from "../api/view-kit.js";
-import { AUDIT_GRANT_CLASSES, AUDIT_RESOURCE_ACTIONS, IMPORT_STAGE_ACTIONS, TARGET_CONTRACT_ACTIONS } from "./views.js";
+import { AUDIT_GRANT_CLASSES, AUDIT_RESOURCE_ACTIONS, IMPORT_STAGE_ACTIONS, TARGET_CONTRACT_ACTIONS, TARGET_DRIFT_PATHS } from "./views.js";
 import { COST_GRANT_STATES, DECISION_ARTIFACT_KINDS } from "@kauro/domain";
 
 const { ID, HASH, UTC } = RESPONSE_FIELD_VOCABULARY;
@@ -60,6 +60,25 @@ export const AUDIT_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.free
       version: platform(true, { type: "integer", minimum: 1 }, "The contract's version: 1 as a DRAFT, 2 once confirmed (CMD019's expectedVersion)."),
       state: platform(true, { type: "string", enum: ["DRAFT", "CONFIRMED", "SUPERSEDED"] }, "DRAFT until the agency confirms this exact body, CONFIRMED afterwards, SUPERSEDED once a later contract replaced it."),
       objectCount: platform(true, { type: "integer", minimum: 0 }, "How many target objects the stored body describes."),
+      supersedes: platform(
+        false,
+        {
+          type: "array",
+          maxItems: 64,
+          items: { type: "object", additionalProperties: false, required: ["contractId", "supersededAt"], properties: { contractId: ID, supersededAt: UTC } },
+        },
+        "The project's current contracts this confirmation superseded, each with the database's instant (R2-026: a confirmed newer contract supersedes every current contract of its project, no equivalence branch). Present only on a confirmation that superseded one.",
+      ),
+      recheckPlanIds: platform(
+        false,
+        { type: "array", maxItems: 256, items: ID },
+        "One re-check plan per APPROVED plan bound to a superseded contract, born VALIDATION_REQUIRED with the old body and only the target replaced: a previously approved plan never survives automatically (R2 05:121); validate and approve it again.",
+      ),
+      includedPaths: platform(
+        false,
+        { type: "array", maxItems: TARGET_DRIFT_PATHS.length, items: { type: "string", enum: [...TARGET_DRIFT_PATHS] } },
+        "What a paid scope bound to a superseded contract keeps: REPAIR (re-bind through the re-check plan's validation and approval, no charge), REQUEST_REFUND (the unconsumed cents) and NEW_SCOPE. The paid authorization stays unconsumed.",
+      ),
       permittedActions: platform(true, { type: "array", maxItems: TARGET_CONTRACT_ACTIONS.length, items: { type: "string", enum: [...TARGET_CONTRACT_ACTIONS] } }, "The commands the caller may issue on this contract, derived server-side from the caller's role and the contract's state; informative, never authority (B06 D-PERM-1)."),
     },
   },
@@ -88,6 +107,16 @@ export const AUDIT_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.free
       failedRows: platform(false, { type: "integer", minimum: 0 }, "Source identities the receipt reports as explicitly failed."),
       unresolvedRows: platform(false, { type: "integer", minimum: 0 }, "Source identities missing, named twice or mapped to a target identity another source also claims."),
       continuedAt: platform(false, UTC, "When the approver recorded the continuation (the database's instant); absent before."),
+      reconciliation: platform(
+        false,
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["reconciliationId", "state", "contentHash", "openedAt"],
+          properties: { reconciliationId: ID, state: { type: "string", enum: ["OPEN"] }, contentHash: HASH, openedAt: UTC },
+        },
+        "The reconciliation request a differing receipt for the finalized stage opened (R2-025: a reconciliation, never an overwrite); the stage's identity and receipts are unchanged. Present when the answered receipt bytes are the reconciliation's.",
+      ),
       permittedActions: platform(true, { type: "array", maxItems: IMPORT_STAGE_ACTIONS.length, items: { type: "string", enum: [...IMPORT_STAGE_ACTIONS] } }, "The commands the caller may issue on this stage, derived server-side from the caller's role and the stage's state; informative, never authority (B06 D-PERM-1)."),
     },
   },

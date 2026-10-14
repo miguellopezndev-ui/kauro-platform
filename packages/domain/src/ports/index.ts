@@ -28,6 +28,8 @@ export type {
   LockedSourceRevision,
   TargetContractRepository,
   NewPlanRevision,
+  BoundPlan,
+  NewRecheckPlan,
   PlanRepository,
   ValidationReceiptRepository,
   NewApproval,
