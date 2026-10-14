@@ -2,7 +2,7 @@
  * The closed problem catalogues of the B12 routes (B06 D-OUT-1; plan docs/design/B12-outreach-plan.md §2), composed by commercial/outcomes like the
  * B10 catalogues. The kit (K2) states the access decisions, the step-up refusals and the preconditions the plan lists for each command; a lane
  * that finds a refusal this list lacks adds its entry here with the test that proves it (the send guard refuses any problem not listed).
- * A foreign row answers NOT_FOUND, never a state (the seller reads only its own prospects and drafts; RLS 0072).
+ * A foreign row answers NOT_FOUND, never a state (the seller reads only its own prospects and drafts; RLS 0088).
  */
 import { problemOutcome as outcome, type ProblemOutcome } from "../../api/outcome-kit.js";
 import type { FailureReason } from "@kauro/domain";

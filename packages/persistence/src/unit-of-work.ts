@@ -137,7 +137,7 @@ const COMMISSION_GROUP_SERVICES: ReadonlySet<string> = new Set(["commission-serv
 const OPERATIONS_GROUP_SERVICES: ReadonlySet<string> = new Set(["operations-service"]);
 
 /**
- * The outreach service (package B12, plan A1/A14): the dispatcher units D2..D5 and the public opt-out run under kauro_outreach (0072), a
+ * The outreach service (package B12, plan A1/A14): the dispatcher units D2..D5 and the public opt-out run under kauro_outreach (0088), a
  * group that holds no grant on any agency-scoped table.
  */
 const OUTREACH_GROUP_SERVICES: ReadonlySet<string> = new Set(["outreach-service"]);

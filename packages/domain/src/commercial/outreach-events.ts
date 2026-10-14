@@ -1,7 +1,7 @@
 /**
  * The event vocabulary package B12 adds (docs/design/B12-outreach-plan.md rev 4 §1 CMD063 "One COMMIT: intent QUEUED + draft AUTHORIZED + event
- * outreach.send_intended.v1 + outbox"; migration 0072, lane K1b). Appended to the registered vocabulary of model/events.ts (EVENT_TYPES,
- * EVENT_PAYLOAD_ALLOWLIST, EVENT_SUBSCRIPTIONS, CONSUMERS, AGGREGATE_KINDS) and seeded by migration 0072 (kauro.event_types,
+ * outreach.send_intended.v1 + outbox"; migration 0088, lane K1b). Appended to the registered vocabulary of model/events.ts (EVENT_TYPES,
+ * EVENT_PAYLOAD_ALLOWLIST, EVENT_SUBSCRIPTIONS, CONSUMERS, AGGREGATE_KINDS) and seeded by migration 0088 (kauro.event_types,
  * kauro.aggregate_kinds) in the same commit; the persistence tests prove the database and these lists equal.
  *
  * - outreach_send_intent is an AGENCY-LESS aggregate: its table (outreach_send_intents) carries no agency_id (B12's static gate: the outreach

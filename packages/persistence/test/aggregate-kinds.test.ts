@@ -93,7 +93,7 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   treasury_refund: ["treasury_refunds", "treasury_refund_id"],
   // Payments V1 outbound execution attempt (0080 slice 2, lane L-REFUND; walked by apps/api/test/refund-generic-cells.test.ts)
   outbound_execution_attempt: ["outbound_execution_attempts", "attempt_id"],
-  // package B12 lane K1b (0072): the agency-less send intent
+  // package B12 lane K1b (0088): the agency-less send intent
   outreach_send_intent: ["outreach_send_intents", "intent_id"],
 });
 

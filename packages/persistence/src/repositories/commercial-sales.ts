@@ -601,7 +601,7 @@ export class PgSalesRepository implements SalesRepository {
   /**
    * The writer's half of kauro.attribution_claims for the prospect (claims of one prospect serialize, D10-TX-1), then the prospect as
    * the session reads it. The row itself is not locked FOR UPDATE: a seller's only update policy on prospects is B12's
-   * prospects_seller_suppress (0072, KA098: its own prospect, target state SUPPRESSED only), so a locking read would hide every
+   * prospects_seller_suppress (0088, KA098: its own prospect, target state SUPPRESSED only), so a locking read would hide every
    * prospect that policy does not admit and would queue a claim behind a suppression; nothing a claim writes changes the prospect row.
    */
   async lockProspect(prospectId: ProspectId): Promise<ProspectRecord | null> {

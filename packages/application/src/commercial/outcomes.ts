@@ -130,7 +130,7 @@ export const COMMERCIAL_READ_OUTCOMES: Readonly<Record<CommercialReadOperationId
   GetCommissionStatement: closedCatalogue("GetCommissionStatement", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...GET_COMMISSION_STATEMENT_OUTCOMES]),
   // the breakglass preview (package B16 lane L4): the corporate owner, the two path ids, no query (nothing widens the bounded sample)
   PreviewTableUnderBreakglass: closedCatalogue("PreviewTableUnderBreakglass", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...CORPORATE_OWNER_ACCESS, ...BREAKGLASS_PREVIEW_OUTCOMES]),
-  // package B12 (K2): a seller reads only its own rows (RLS 0072), a foreign id answers NOT_FOUND like an unknown one
+  // package B12 (K2): a seller reads only its own rows (RLS 0088), a foreign id answers NOT_FOUND like an unknown one
   GetOutreachDraft: closedCatalogue("GetOutreachDraft", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.GET_OUTREACH_READ_OUTCOMES]),
   GetOutreachReview: closedCatalogue("GetOutreachReview", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...CORPORATE_OWNER_ACCESS, ...B12.GET_OUTREACH_READ_OUTCOMES]),
   ListSalesActivities: closedCatalogue("ListSalesActivities", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.GET_OUTREACH_READ_OUTCOMES]),

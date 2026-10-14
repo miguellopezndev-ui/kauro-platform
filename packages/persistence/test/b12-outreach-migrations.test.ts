@@ -1,4 +1,4 @@
-// Migration 0072 (package B12 lane K1; docs/design/B12-outreach-plan.md §0 A1..A17, §L, §W; companion B12-outreach-plan-cells.md §K):
+// Migration 0088 (package B12 lane K1; docs/design/B12-outreach-plan.md §0 A1..A17, §L, §W; companion B12-outreach-plan-cells.md §K):
 // every rule-12 forged control of §K is refused by its own guard and only by it (rule 24c). Each control is checked three times:
 //   1. as written, the forged write is refused with its SQLSTATE (and constraint);
 //   2. with its own guard dropped (withoutGuards: the RAISE turned NOTICE, the constraint or index dropped, the policy clause set to true)
@@ -886,7 +886,7 @@ const allGuards = (): Guard[] => {
   return [...seen.values()];
 };
 
-describe("B12 §K forged controls (migration 0072)", () => {
+describe("B12 §K forged controls (migration 0088)", () => {
   for (const c of controls) {
     test(`${c.id}: forged ${c.title} is refused ${c.expect.code}${c.expect.constraint ? ` ${c.expect.constraint}` : ""}; red alone with its own guard dropped, still refused with every other guard dropped (rule 24c)`, async () => {
       const f = await c.forge();
@@ -1020,7 +1020,7 @@ const B12_TABLES = [
   "outreach_diagnoses",
 ];
 
-describe("B12 censuses (migration 0072)", () => {
+describe("B12 censuses (migration 0088)", () => {
   test("B12 TRUNCATE: kauro_app, kauro_outreach, kauro_control hold no TRUNCATE on any B12 table; no runtime role holds DELETE on one", async () => {
     const r = await w.h.oracle.query<{ t: string; role: string; p: string }>(
       `SELECT t, role, p FROM unnest($1::text[]) t, unnest(ARRAY['kauro_app', 'kauro_outreach', 'kauro_control', 'kauro_commission', 'kauro_payment']) role, unnest(ARRAY['TRUNCATE', 'DELETE']) p

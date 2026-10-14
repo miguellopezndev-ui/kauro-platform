@@ -1,4 +1,4 @@
-// B12's send-intent event on real PostgreSQL 17 (migration 0072, lane K1b; plan docs/design/B12-outreach-plan.md rev 4 §1 CMD063: "One
+// B12's send-intent event on real PostgreSQL 17 (migration 0088, lane K1b; plan docs/design/B12-outreach-plan.md rev 4 §1 CMD063: "One
 // COMMIT: intent QUEUED + draft AUTHORIZED + event outreach.send_intended.v1 + outbox"; 07 "one event per committed version").
 //
 // The aggregate kind outreach_send_intent is the first registered with agency_scoped = false: its table (outreach_send_intents) must NOT

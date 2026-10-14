@@ -1,7 +1,7 @@
 /**
  * The journaled operations of package B12 that carry no registry command id (K2). The registry names CMD061..CMD064 only; the plan
  * (docs/design/B12-outreach-plan.md §R and companion §P) adds stateful routes with no catalogue id. Each is journaled under its own name:
- * command_journal.operation (0006) admits `^CMD[0-9]{3}$` OR exactly one of these names (0072 tail: an explicit list, never a pattern), so a
+ * command_journal.operation (0006) admits `^CMD[0-9]{3}$` OR exactly one of these names (0088 tail: an explicit list, never a pattern), so a
  * misspelt operation is refused by the database. The list is hand-maintained beside the generated CommandId (not a registry edit); the
  * migration tests compare it with the constraint, and a new B12 operation is added here and in a migration together.
  */

@@ -1,6 +1,6 @@
 /**
  * The runtime bounds of package B12's outreach (policy outreach v1, plan §W, D-B12O-20). The database stamps and judges every instant
- * (kauro.effect_now(), migration 0072: uncertain_after = submitted_at + startGate + providerCallBound + margin); the only app-side
+ * (kauro.effect_now(), migration 0088: uncertain_after = submitted_at + startGate + providerCallBound + margin); the only app-side
  * time is D3's abort timer, a DURATION started after its gate statement returns, never compared with a stored instant.
  */
 export const OUTREACH_POLICY_VERSION = "outreach-v1";

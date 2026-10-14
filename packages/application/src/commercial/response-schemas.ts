@@ -69,7 +69,7 @@ export const COMMERCIAL_FORBIDDEN_MEMBERS: Readonly<Record<string, string>> = Ob
   taxId: "D10-API-1: a seller's or a buyer's tax identifier stays in the reviewed private record",
 });
 
-/** Content references are the hex SHA-256 of the stored subject and body (0072 outreach_contents.content_id), not a UUID. */
+/** Content references are the hex SHA-256 of the stored subject and body (0088 outreach_contents.content_id), not a UUID. */
 const CONTENT_REF = Object.freeze({ type: "string", pattern: "^[0-9a-f]{64}$" });
 const SALES_ACTIVITY_KINDS = ["REPLIED", "BOUNCED", "SUPPRESSED", "HUMAN_SEND_OBSERVED", "PROVIDER_ACCEPTED", "SEND_UNCERTAIN"] as const;
 

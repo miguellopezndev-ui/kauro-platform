@@ -43,7 +43,7 @@ export const SERVICE_ROLE_TABLE: Readonly<Record<string, ServiceRole>> = Object.
   // beside the commission and finance services (decision B18-OPS-1: that group's pools are the only verified service pools of the api).
   "operations-service": "OPERATIONS_SERVICE",
   // package B12 (plan A1, A14, D-B12O-12): the outreach service runs the dispatcher units D2..D5 and the public opt-out on its own
-  // runtime group kauro_outreach (0072), which acts on no agency; it holds no command of the registry.
+  // runtime group kauro_outreach (0088), which acts on no agency; it holds no command of the registry.
   "outreach-service": "OUTREACH_SERVICE",
 });
 

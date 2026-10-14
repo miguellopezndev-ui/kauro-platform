@@ -9,7 +9,7 @@
  *    observed day of 6103(b)(1) ("Instead of a holiday that occurs on a Saturday, the Friday immediately before is a legal public
  *    holiday") and E.O. 11582 s.3(a) (a Sunday holiday is observed the next Monday). Inauguration Day (6103(c), DC area only) is
  *    excluded.
- * The database judges the calendar (kauro.outreach_calendar_days, seeded by migration 0072 from exactly these lists; the seed test
+ * The database judges the calendar (kauro.outreach_calendar_days, seeded by migration 0088 from exactly these lists; the seed test
  * compares them); this module is the one source of the lists and the read model's rendering. Outside the covered years every
  * answer is null (KC037 OUTREACH_CALENDAR_UNAVAILABLE), never a guess.
  */

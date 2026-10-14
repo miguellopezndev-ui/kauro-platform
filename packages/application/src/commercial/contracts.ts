@@ -535,11 +535,11 @@ export const RESTRICT_CAPABILITY = spec<RestrictCapabilityBody>({
 // --- package B12 (outreach): CMD061..CMD064 and the registry-less operations (K2) ----------------------------------------------------
 // Registered once by the kit so that the lanes replace handler bodies only. CMD061..CMD064 carry the registry fields (gate G-UX_PRIVATE,
 // idempotency REQUIRED; a test proves them against commands.json). The operations without a catalogue id are journaled under their own
-// name (domain B12_OPERATIONS; 0072 widens command_journal.operation by that explicit list) and are specified by plan companion §R.
+// name (domain B12_OPERATIONS; 0088 widens command_journal.operation by that explicit list) and are specified by plan companion §R.
 // Deliberate, recorded differences from the registry field lists (decisions K2-3, K2-4):
 // - CMD062 also carries assuranceProofRef: the plan binds the review to the step-up proof it was issued under and judges the step-up at COMMIT,
 //   and the registry lists no proof field; the proof travels like every other step-up command's, in the body.
-// - contentRef is the hex SHA-256 content address of kauro.outreach_contents (0072), not a UUID.
+// - contentRef is the hex SHA-256 content address of kauro.outreach_contents (0088), not a UUID.
 
 export interface PrepareOutreachDraftBody {
   readonly prospectId: string;

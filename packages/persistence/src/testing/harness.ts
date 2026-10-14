@@ -102,7 +102,7 @@ export interface Harness {
    * commercial unit-of-work factory of the stage-2 lanes; the schema tests use the pool's login directly.
    */
   readonly commissionPool: KauroPool;
-  /** Outreach-service pool (login role in kauro_outreach; package B12, 0072): the dispatcher units D2..D5 and the public opt-out. */
+  /** Outreach-service pool (login role in kauro_outreach; package B12, 0088): the dispatcher units D2..D5 and the public opt-out. */
   readonly outreachPool: KauroPool;
   /**
    * The execution unit-of-work factory of package B08 (ExecutionUnitOfWorkFactory; D8-XPKG-10): the commerce factory's routing with

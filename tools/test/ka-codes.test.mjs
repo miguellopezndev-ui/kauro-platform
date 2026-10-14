@@ -1,5 +1,5 @@
 // SQLSTATE reservations (packages/persistence/src/sqlstate.ts): every KA/KP/KC value of the SQLSTATE object is unique, and KA085..KA094 are
-// reserved for B16 lanes L2..L8 by name, so two lanes never pick one code; KA095..KA098 are package B12's (migration 0072, plan §3).
+// reserved for B16 lanes L2..L8 by name, so two lanes never pick one code; KA095..KA098 are package B12's (migration 0088, plan §3).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

@@ -19,8 +19,8 @@ export const B12_SOURCE_ROOTS = [
   "packages/application/src/commercial/testing/outreach-send.ts",
   "apps/api/src/outreach",
 ];
-/** The B12 migration (provisional number 0072; the plan's 0082, renumbered at merge). */
-export const B12_MIGRATION = "packages/persistence/migrations/0072_b12_outreach.sql";
+/** The B12 migration (0088, renumbered at the batch C merge). */
+export const B12_MIGRATION = "packages/persistence/migrations/0088_b12_outreach.sql";
 
 function walk(path) {
   const abs = join(root, path);

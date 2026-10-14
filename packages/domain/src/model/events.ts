@@ -122,7 +122,7 @@ export const EVENT_TYPES = [
   ...TREASURY_REFUND_EVENT_TYPES,
   // Payments V1 outbound execution attempts (commerce/execution-attempt.ts; migration 0080 slice 2, lane L-REFUND)
   ...OUTBOUND_ATTEMPT_EVENT_TYPES,
-  // Outreach (commercial/outreach-events.ts; migration 0072, package B12)
+  // Outreach (commercial/outreach-events.ts; migration 0088, package B12)
   ...OUTREACH_EVENT_TYPES,
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -139,7 +139,7 @@ export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project",
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 
 /**
- * The kinds whose registry row is agency_scoped = false (migration 0072): the aggregate's table has no agency_id, its events carry no
+ * The kinds whose registry row is agency_scoped = false (migration 0088): the aggregate's table has no agency_id, its events carry no
  * agency and the database refuses an event of the kind that names one. Every other kind is agency scoped (a bank route's NULL agency_id is a
  * value of an agency-scoped kind). The persistence tests prove the registry agrees with this list.
  */

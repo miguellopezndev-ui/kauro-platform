@@ -1,6 +1,6 @@
 /**
- * The SQL writers of package B12's outreach (docs/design/B12-outreach-plan.md §L, §M; migration 0072, provisional 0082; lane K1).
- * Every statement that writes an outreach row lives here, and each writer REQUIRES the advisory subjects the 0072 T2 triggers assert
+ * The SQL writers of package B12's outreach (docs/design/B12-outreach-plan.md §L, §M; migration 0088; lane K1).
+ * Every statement that writes an outreach row lives here, and each writer REQUIRES the advisory subjects the 0088 T2 triggers assert
  * for its edge (KA096 LOCK_NOT_HELD) to be held already on the unit's OutreachLocks, in the global order: the caller (a lane's handler)
  * takes its whole serializer set, judges, and only then calls the writer, whose first statement is the write (plan §L "the first write
  * follows the judgment with no other await"). A writer whose subjects are missing is refused before any SQL (INTEGRITY_FAILURE), so a
@@ -126,7 +126,7 @@ export class PgOutreachWriters {
     return r.rowCount === 1;
   }
 
-  /** A draft edge (L10 X); the 0072 T1 whitelist refuses an edge outside the machine. */
+  /** A draft edge (L10 X); the 0088 T1 whitelist refuses an edge outside the machine. */
   async moveDraft(locks: OutreachLocks, draftId: string, state: string): Promise<void> {
     requireHeld(locks, "draft edge", [["L10", draftId, "X"]]);
     await execute(this.db, "UPDATE kauro.outreach_drafts SET state = $2 WHERE draft_id = $1 AND state IS DISTINCT FROM $2", [draftId, state]);
@@ -193,7 +193,7 @@ export class PgOutreachWriters {
 
   /**
    * A suppression of a key (L8 X of 'KEYKIND:key'), recorded by a person or by the outreach service (the public opt-out; the recorder
-   * XOR of 0072). ON CONFLICT DO NOTHING as every writer of 0029: a second suppression of a live key is a replay, not a new fact. The
+   * XOR of 0088). ON CONFLICT DO NOTHING as every writer of 0029: a second suppression of a live key is a replay, not a new fact. The
    * opt-out records the suppression only: the service never UPDATEs a prospect (A17).
    */
   async recordSuppression(locks: OutreachLocks, s: { readonly suppressionId: string; readonly keyKind: "ORGANIZATION" | "CONTACT"; readonly key: string; readonly reason: string; readonly by: { readonly userId: string } | { readonly service: "outreach-service" } }): Promise<boolean> {

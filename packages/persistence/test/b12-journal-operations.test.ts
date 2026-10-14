@@ -1,4 +1,4 @@
-// K2: command_journal.operation (0006 '^CMD[0-9]{3}$') accepts B12's registry-less operations by an EXPLICIT list (0072 tail), on real PostgreSQL 17.
+// K2: command_journal.operation (0006 '^CMD[0-9]{3}$') accepts B12's registry-less operations by an EXPLICIT list (0088 tail), on real PostgreSQL 17.
 // The list in the migration is the domain's B12_OPERATIONS and nothing else: a name outside it, a lower-cased one, a prefix or a pattern is
 // refused with a check violation on the constraint, and every catalogue id still passes.
 import assert from "node:assert/strict";

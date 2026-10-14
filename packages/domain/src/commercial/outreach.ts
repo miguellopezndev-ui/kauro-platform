@@ -2,7 +2,7 @@
  * The outreach domain of package B12 (docs/design/B12-outreach-plan.md §0 A1..A17; registry OutreachDraft, OutreachAuthorization,
  * SalesActivity; 12 "Outreach workspace", 18 "Outreach cadence and health", "Communication compliance"): the draft and send-intent
  * machines (A2, A2b), the COUNTED states (A2, ADV-43), the bounds of the send (A3, §W), the cap and cadence (A10, A11), the contact key
- * (A14), the lock subjects (§L) and the failure reasons of KA095..KA098 and KC028..KC037. Migration 0072 enforces the same lists; the
+ * (A14), the lock subjects (§L) and the failure reasons of KA095..KA098 and KC028..KC037. Migration 0088 enforces the same lists; the
  * migration tests compare them. This module never reads a segment, a buyer type or a ranking (D-33) and has no CRM write path (A17).
  */
 import { rawDigest, type Sha256Hex } from "@kauro/contracts";
@@ -79,7 +79,7 @@ export const OUTREACH_BOUNDS = Object.freeze({
   startGateMs: 5_000,
   providerCallBoundMs: 30_000,
   marginMs: 2_000,
-  /** uncertain_after = submitted_at + startGate + providerCallBound + margin (0072 outreach_send_intents_columns). */
+  /** uncertain_after = submitted_at + startGate + providerCallBound + margin (0088 outreach_send_intents_columns). */
   uncertainAfterMs: 37_000,
   d4GraceMs: 60_000,
   leaseTtlMs: 120_000,
@@ -125,14 +125,14 @@ export function normalizeContactAddress(text: string): string | null {
 
 const utf8 = (s: string): Uint8Array => new TextEncoder().encode(s);
 
-/** kauro.prospect_contact_key(address) of 0072: sha256 of the domain line and the normalized address. */
+/** kauro.prospect_contact_key(address) of 0088: sha256 of the domain line and the normalized address. */
 export function contactKeyOf(text: string): { readonly address: string; readonly key: Sha256Hex } | null {
   const address = normalizeContactAddress(text);
   if (address === null) return null;
   return { address, key: rawDigest(utf8(`${PROSPECT_CONTACT_DOMAIN}\n${address}`)) as Sha256Hex };
 }
 
-/** kauro.outreach_binding_hash of 0072 (KA095 (d)): the draft's recipient/sender/purpose/content binding (registry contentHash). */
+/** kauro.outreach_binding_hash of 0088 (KA095 (d)): the draft's recipient/sender/purpose/content binding (registry contentHash). */
 export const OUTREACH_BINDING_DOMAIN = "KAURO_OUTREACH_BINDING_V1";
 export function outreachBindingHash(input: {
   readonly prospectId: string;
@@ -144,7 +144,7 @@ export function outreachBindingHash(input: {
   return rawDigest(utf8([OUTREACH_BINDING_DOMAIN, input.prospectId, input.contactKey, input.senderId, input.purpose, input.contentRef].join("\n"))) as Sha256Hex;
 }
 
-/** The content id of 0072's outreach_contents (content-addressed subject and body). */
+/** The content id of 0088's outreach_contents (content-addressed subject and body). */
 export const OUTREACH_CONTENT_DOMAIN = "KAURO_OUTREACH_CONTENT_V1";
 export function outreachContentId(subject: string, body: string): Sha256Hex {
   return rawDigest(utf8(`${OUTREACH_CONTENT_DOMAIN}\n${subject}\n${body}`)) as Sha256Hex;

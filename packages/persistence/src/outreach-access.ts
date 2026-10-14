@@ -5,13 +5,13 @@
  *   DATABASE'S OWN INSTANT kauro.effect_now() (never a caller instant: the B10 helper commission-service-access.ts holdDispatchLease
  *   judges `expires_at > $4`, a value the caller computed before an await, which B12 does not reuse; plan rev 3 own finding, GAP-DI-5).
  *   The share lock holds the row until COMMIT, so a takeover (claim_lease's UPDATE, 0067:20) waits for this unit and never lands between
- *   the guard and the COMMIT. No row answering is LEASE_FENCED. Grants and policies: 0072 leases_outreach_read / leases_outreach_lock.
+ *   the guard and the COMMIT. No row answering is LEASE_FENCED. Grants and policies: 0088 leases_outreach_read / leases_outreach_lock.
  *
  * - OutreachLocks: the advisory subjects of §L (kauro.transition_key(kind, subject)), taken by the WRITERS only, in the one global order
  *   (L1, L2, L3, L4, L4g, L5, L6, L6p, L7, L8, L10, L13, L14). An acquisition that would go backwards in that order is refused before any
  *   SQL runs (INTEGRITY_FAILURE): every actor trace is a subsequence of the order, so no two B12 writers can deadlock. Several keys of one
  *   subject are taken in ascending key order (L10 of a review's drafts). The triggers never acquire (T2 asserts through pg_locks), except
- *   the CMD045 trigger's L8 S (0072, order-safe).
+ *   the CMD045 trigger's L8 S (0088, order-safe).
  */
 import { DomainFailure, OUTREACH_LOCK_KINDS, OUTREACH_LOCK_ORDER, type OutreachLock } from "@kauro/domain";
 import { execute, type Queryable } from "./sql.js";

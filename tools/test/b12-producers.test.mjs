@@ -72,8 +72,8 @@ test(TITLE, () => {
   const fns = functions();
   const sources = readers();
   assert.deepEqual(unwritten(sources, w, fns), [...UNOWNED].sort(), "the unwritten, unowned reads are exactly the reported residual");
-  const created = [...read("packages/persistence/migrations/0072_b12_outreach.sql").matchAll(/CREATE TABLE kauro\.(\w+)/g)].map((m) => m[1]);
-  assert.deepEqual(created.filter((t) => !w.has(t) && !(t in OWNER_LANE)), [], "every 0072 table has a writer or its owner lane");
+  const created = [...read("packages/persistence/migrations/0088_b12_outreach.sql").matchAll(/CREATE TABLE kauro\.(\w+)/g)].map((m) => m[1]);
+  assert.deepEqual(created.filter((t) => !w.has(t) && !(t in OWNER_LANE)), [], "every 0088 table has a writer or its owner lane");
   assert.ok(w.has("outreach_send_intents") && w.has("sales_activities") && w.has("prospect_suppressions"), "the K1 writers are product writers");
   const planted = [...sources, { file: "planted.ts", text: 'await execute(db, "SELECT 1 FROM kauro.nobody_writes_this WHERE id = $1", [id]);' }];
   assert.ok(unwritten(planted, w, fns).includes("nobody_writes_this"), "a planted reader of an unwritten table is refused");

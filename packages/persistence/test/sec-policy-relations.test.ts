@@ -97,7 +97,7 @@ test("B12 K2: no policy the B12 outreach migration creates names another relatio
   try {
     const found = (await su.query<{ entry: string }>(POLICY_CENSUS, ["kauro"])).rows.map((r) => r.entry);
     const b12 = found.filter((e) => created.has(e.split(" NAMES ")[0]!));
-    assert.deepEqual(b12, [], "a B12 policy names another relation: move the lookup into a PL/pgSQL STABLE SECURITY INVOKER function with an early return (0072 kauro.outreach_*)");
+    assert.deepEqual(b12, [], "a B12 policy names another relation: move the lookup into a PL/pgSQL STABLE SECURITY INVOKER function with an early return (0088 kauro.outreach_*)");
     // the lookup functions exist, are INVOKER, STABLE and pin their search_path, and only kauro_app may call them
     const fns = (
       await su.query<{ proname: string; prosecdef: boolean; provolatile: string; cfg: string[] | null; pub: boolean; app: boolean }>(

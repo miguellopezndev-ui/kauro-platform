@@ -1,5 +1,5 @@
 // The B12 SQL writers (repositories/commercial-outreach.ts) and their lock discipline (outreach-access.ts; plan §L, §W; lane K1): each
-// writer commits only with the subjects 0072's T2 asserts already held, in the one global order; a missing subject is refused before any
+// writer commits only with the subjects 0088's T2 asserts already held, in the one global order; a missing subject is refused before any
 // SQL runs; an acquisition out of order is refused; the lease fence is judged at kauro.effect_now() (the TEST CLOCK instant of the unit),
 // never at a caller instant. The world and its fixtures are b12-outreach-support.ts (every write through its runtime role).
 import assert from "node:assert/strict";

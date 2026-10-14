@@ -100,7 +100,7 @@ export const SQLSTATE = Object.freeze({
   B16_L6_RESTORE_RECONCILIATION: "KA092",
   B16_L7_STAGE_RELEASE_A: "KA093",
   B16_L5_DOWNLOAD_AUTHORIZATION: "KA094",
-  // package B12 (migration 0072, plan §3): the outreach bindings, the send fence (edges, claim columns, LOCK_NOT_HELD), the activity
+  // package B12 (migration 0088, plan §3): the outreach bindings, the send fence (edges, claim columns, LOCK_NOT_HELD), the activity
   // facts and the non-owner suppression of a prospect; KC028..KC037 the outreach refusals the database backs (rule 17)
   OUTREACH_BINDING: "KA095",
   SEND_FENCE: "KA096",
@@ -222,7 +222,7 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   // B16 L5 (0075): a download grant a request session wrote around CMD038 (package not AVAILABLE, changed membership, lifetime over 900 s,
   // an artifact that is not a live delivery copy). Only a bypassing writer reaches it: an integrity failure like KA088, never a retry
   KA094: { code: "INTEGRITY_FAILURE" },
-  // package B12 (migration 0072): a binding, an activity fact or a non-owner suppression a handler that follows the domain never breaks;
+  // package B12 (migration 0088): a binding, an activity fact or a non-owner suppression a handler that follows the domain never breaks;
   // a lost send fence (an edge, a claim column or a lock the writer did not hold) is the dispatcher's "lost", as KA080
   KA095: { code: "INTEGRITY_FAILURE", reason: "OUTREACH_BINDING" },
   KA096: { code: "PRECONDITION_FAILED", reason: "SEND_FENCED" },

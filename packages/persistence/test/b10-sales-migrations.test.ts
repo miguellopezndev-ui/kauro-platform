@@ -366,7 +366,7 @@ test("CMD045 at the database: source evidence admits the AGENCY and COMPANY segm
   );
 
   // suppression by organization key and by contact key refuses the registration (KC016); a neighbour with another contact registers
-  // a suppression INSERT holds L8 X of its key (B12 0072 prospect_suppressions_locks, plan §L)
+  // a suppression INSERT holds L8 X of its key (B12 0088 prospect_suppressions_locks, plan §L)
   await within(w.app, ownerOf(w), async (c) => {
     await c.query("SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.prospect_suppressions', $1))", [`ORGANIZATION:${sha("organization:south.example")}`]);
     await c.query("INSERT INTO kauro.prospect_suppressions (suppression_id, key_kind, suppression_key, reason, recorded_by_user_id, recorded_at, created_at) VALUES ($1, 'ORGANIZATION', $2, 'OPTED_OUT', $3, kauro.server_now(), now())", [ids.next(), sha("organization:south.example"), w.kora]);

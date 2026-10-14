@@ -1,4 +1,4 @@
-// Fixtures of the outreach schema (migration 0072; docs/design/B12-outreach-plan.md §0 A1..A17, §L, §W; companion
+// Fixtures of the outreach schema (migration 0088; docs/design/B12-outreach-plan.md §0 A1..A17, §L, §W; companion
 // docs/design/B12-outreach-plan-cells.md §K) for b12-outreach-migrations.test.ts. Like b10-commission-support.ts, every write goes through
 // the runtime role that owns it, under a real context, holding the lock subjects of plan §L T2 that its production writer holds:
 //   - the corporate owner (kauro_app_test, OPERATOR session) records and verifies senders, prepares reviews, grants, revokes, publishes

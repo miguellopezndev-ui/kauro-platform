@@ -1,4 +1,4 @@
--- 0072 — package B12 lane K1 (outreach kit): the sender registry, outreach content, sales resources, channel policies, the outreach
+-- 0088 — package B12 lane K1 (outreach kit): the sender registry, outreach content, sales resources, channel policies, the outreach
 -- calendar, drafts, reviews, authorizations, send intents, sales activities, provider warnings, send evidence and diagnoses; the lock
 -- subjects of plan §L and the triggers that assert them; the guards KA095..KA098 and KC028..KC037.
 -- PROVISIONAL NUMBER: the plan names this file 0082_b12_outreach.sql; main ends at 0071 and batch B adds 0072..0078, and the migration
