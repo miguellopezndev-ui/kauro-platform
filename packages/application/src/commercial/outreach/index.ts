@@ -14,6 +14,7 @@ export {
   outreachBusinessDaysAfter,
 } from "./calendar.js";
 export { OUTREACH_HANDLERS, OutreachNotBuilt, type OutreachHandlerName } from "./handlers.js";
-export { sendHandler, SEND_AUTHORIZED_OUTREACH_OPERATION } from "./send.js";
-export type { OutreachSendStore, OutreachSendCollaborators, OutreachSealer, SendSealFacts, SendActor, QueueSendRequest, QueuedSendRecord, SendAuthorizedOutreachBody, SentIntentView, SendCommandHandler } from "./send-store.js";
 export { B12_SERVED_READ_IDS, createOutreachStubCommandHandlers, createOutreachStubReadHandlers, isB12CommercialCommand, isB12CommercialRead, isB12RegistryLessOperation, type B12CommandId, type B12ReadId } from "./routes.js";
+export { sendHandler, SEND_AUTHORIZED_OUTREACH_OPERATION } from "./send.js";
+export { registerSenderIdentityHandler, verifySenderIdentityHandler, recordSenderRevocationHandler } from "./sender-identity.js";
+export type { OutreachSendStore, OutreachSendCollaborators, OutreachSealer, SendSealFacts, SendActor, QueueSendRequest, QueuedSendRecord, OutreachSenderStore, OutreachSenderCollaborators, SenderRecordView } from "./send-store.js";

@@ -10,13 +10,16 @@
  * agency-less aggregate outreach_send_intent at version 1 and its outbox record for the dispatcher (consumer OUTREACH_SENDER), written by
  * the unit's publisher as kauro_app (K1b). The unit makes no provider call: the dispatcher (D2..D5) claims and submits.
  */
-import type { UtcInstant } from "@kauro/contracts";
+import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { CausationId, CommerceUnitOfWork, IdentityFacts, SellerId, UserId } from "@kauro/domain";
 import { DomainFailure, isUuid } from "@kauro/domain";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { CommerceAccessDenied, operatorContextOf, runCommerceCommand, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
+import { commercialAdmissionSpecOf, type CommercialCommandHandler } from "../agency/runtime.js";
 import type { CommercialAuthorizer } from "../authorizer.js";
-import type { OutreachSendCollaborators, SendActor, SendAuthorizedOutreachBody, SendCommandHandler, SentIntentView } from "./send-store.js";
+import { SEND_AUTHORIZED_OUTREACH, type SendAuthorizedOutreachBody } from "../contracts.js";
+import type { OutreachSendView } from "../views.js";
+import type { OutreachSendCollaborators, SendActor } from "./send-store.js";
 
 export const SEND_AUTHORIZED_OUTREACH_OPERATION = "CMD063";
 
@@ -34,14 +37,16 @@ async function senderPerson(authorizer: CommercialAuthorizer, uow: CommerceUnitO
   return { kind: "OWNER", userId: asOwner.userId as UserId };
 }
 
-export function sendHandler(runtime: CommerceRequestRuntime, co: OutreachSendCollaborators): SendCommandHandler<SendAuthorizedOutreachBody, SentIntentView> {
+export function sendHandler(runtime: CommerceRequestRuntime, co: OutreachSendCollaborators): CommercialCommandHandler<SendAuthorizedOutreachBody, OutreachSendView> {
+  const spec = SEND_AUTHORIZED_OUTREACH;
   return {
-    operation: SEND_AUTHORIZED_OUTREACH_OPERATION,
-    async execute(envelope: CommandEnvelope<SendAuthorizedOutreachBody>): Promise<CommandResult<SentIntentView>> {
+    spec,
+    admission: commercialAdmissionSpecOf(spec),
+    async execute(envelope: CommandEnvelope<SendAuthorizedOutreachBody>): Promise<CommandResult<OutreachSendView>> {
       const context = operatorContextOf(envelope);
       let actor: SendActor | null = null;
-      return runCommerceCommand<SendAuthorizedOutreachBody, SentIntentView>(runtime, {
-        command: { id: SEND_AUTHORIZED_OUTREACH_OPERATION, journalScope: "OPERATOR_IDENTITY" },
+      return runCommerceCommand<SendAuthorizedOutreachBody, OutreachSendView>(runtime, {
+        command: { id: spec.id, journalScope: "OPERATOR_IDENTITY" },
         envelope,
         context,
         replayVersion: () => 1,
@@ -86,7 +91,15 @@ export function sendHandler(runtime: CommerceRequestRuntime, co: OutreachSendCol
           } as never);
           return {
             status: 200,
-            view: { intentId: queued.intentId, draftId: queued.draftId, state: "QUEUED", authorizationId: queued.authorizationId, payloadHash: queued.payloadHash },
+            view: {
+              draftId: queued.draftId,
+              draftState: "AUTHORIZED",
+              intentId: queued.intentId,
+              intentState: "QUEUED",
+              authorizationId: queued.authorizationId,
+              payloadHash: queued.payloadHash as Sha256Hex,
+              queuedAt: queued.queuedAt as UtcInstant,
+            },
             version: 1,
             resourceKind: "outreach_send_intent",
             resourceId: queued.intentId,

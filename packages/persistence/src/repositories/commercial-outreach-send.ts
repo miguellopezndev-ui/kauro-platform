@@ -51,6 +51,7 @@ export interface QueueSendInput {
 export interface QueuedSend {
   readonly intentId: string;
   readonly state: "QUEUED";
+  readonly queuedAt: string;
   readonly draftId: string;
   readonly payloadHash: string;
   readonly purpose: OutreachPurpose;
@@ -293,7 +294,8 @@ export class PgOutreachSend {
       }
       throw e;
     }
-    return { intentId: i.intentId, state: "QUEUED", draftId: i.draftId, payloadHash: payloadHash as string, purpose: d.purpose, route: d.route, senderId: d.sender_id, prospectId: d.prospect_id, authorizationId: i.authorizationId, personUserId: d.sender_user_id };
+    const queuedAt = (await execute<{ at: string }>(this.db, "SELECT to_char(counted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') AS at FROM kauro.outreach_send_intents WHERE intent_id = $1", [i.intentId])).rows[0]!.at;
+    return { intentId: i.intentId, state: "QUEUED", queuedAt, draftId: i.draftId, payloadHash: payloadHash as string, purpose: d.purpose, route: d.route, senderId: d.sender_id, prospectId: d.prospect_id, authorizationId: i.authorizationId, personUserId: d.sender_user_id };
   }
 
   // ---- shared: facts and the L1 set ----------------------------------------------------------------------------------------------------
