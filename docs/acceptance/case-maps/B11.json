@@ -3,7 +3,7 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B11-case-map.md",
-  "sha256": "2540828c8a854eee8b20062dbd3eec638eea364150869ab947a2e2807c7e7cb8"
+  "sha256": "39b23ddc5e2f7cfa11a91a78a73853d5d6f6cb03688cedb10600284655813fe8"
  },
  "rows": [
   {
@@ -125,6 +125,7 @@
    "class": "PARTIAL",
    "test": [
     "packages/ui/test/count-denominators.test.ts :: R2-065: the count panel shows physical rows, billable source units and output rows as three labelled measures with their definitions, never one records figure",
+    "apps/web/test/sources-screens.test.ts :: UI16/R2-065: the seal review shows physical rows, billable source units and association edges as three labelled measures, never one records figure",
     "apps/web/e2e/r2-065-count-denominators.spec.ts :: R2-065: a flat source projected into companies, contacts and relationship files shows the sealed revision's physical rows and billable source units and each output file's rows, each with its definition"
    ],
    "commit": "cf6e9d1, f2ffb86",
@@ -133,7 +134,7 @@
     "B08",
     "B13"
    ],
-   "claimed": "**PARTIAL** — panel half EXECUTED_LOCAL (W1); browser half PLANNED (W7)"
+   "claimed": "**PARTIAL** — panel half EXECUTED_LOCAL (W1); seal-review screen half EXECUTED_LOCAL (S3, markup over scripted fetch); browser half PLANNED (W7)"
   },
   {
    "case": "R2-134",

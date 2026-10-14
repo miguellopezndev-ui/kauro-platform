@@ -6,15 +6,16 @@
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { hostConfig } from "./server/config/hosts.ts";
+import { uploadOrigin } from "./server/config/upload-origin.ts";
 import { decideRoute } from "./server/host-routing.ts";
-import { NONCE_REQUEST_HEADER, contentSecurityPolicy, newNonce } from "./server/security-headers.ts";
+import { NONCE_REQUEST_HEADER, contentSecurityPolicy, newNonce, uploadConnectOrigins } from "./server/security-headers.ts";
 
 /** A path no page owns: rewriting to it makes the application's own not-found document answer, the one every missing path gets. */
 const NOT_FOUND_PATH = "/_kauro/not-found";
 
 export function proxy(request: NextRequest): NextResponse {
   const nonce = newNonce();
-  const policy = contentSecurityPolicy({ nonce, upgradeInsecureRequests: request.nextUrl.protocol === "https:" });
+  const policy = contentSecurityPolicy({ nonce, connectOrigins: uploadConnectOrigins(uploadOrigin()), upgradeInsecureRequests: request.nextUrl.protocol === "https:" });
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(NONCE_REQUEST_HEADER, nonce);
   requestHeaders.set("Content-Security-Policy", policy);
