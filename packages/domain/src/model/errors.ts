@@ -133,7 +133,7 @@ export const RETENTION_EXTENSION_FAILURE_REASONS = [
 
 /** The refusals of CMD042 RequestDeletion and its prevention guards (package B16 lane L3, KA087), appended after the retention-extension reasons. */
 export const DELETION_FAILURE_REASONS = ["PROJECT_DELETION_REQUESTED"] as const;
-/** The refusals of CMD038 AuthorizeDownload (package B16 lane L5; R2-048, S048), appended after the retention-extension reasons. */
+/** The refusals of CMD038 AuthorizeDownload (package B16 lane L5; R2-048, S048), appended after the breakglass reasons. */
 export const DOWNLOAD_FAILURE_REASONS = [
   "ARTIFACT_NOT_FOUND",
   "ARTIFACT_UNAVAILABLE",

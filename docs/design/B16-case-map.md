@@ -11,7 +11,7 @@ Status classes: **DONE EXECUTED_LOCAL** — the cited tests demonstrate the whol
 roles. **OPEN -> L<n>** — the lane that owns the missing cell, with its class; a cited test of an OPEN row demonstrates only the half the
 last column names. **PART(B14|B15|STAGE-RELEASE)** — the provider or later-package half that B16 cannot demonstrate.
 
-Totals: 61 cases — 43 DONE, 18 OPEN. L5 closes CMD038 and R2-048; L6 closes R2-074 and its restore cells locally (S065 PARTIAL). R2-054 and R2-055 closed by L7 (PR #96, main 56d1e15). L4 closes CMD054, CMD055, R2-050 and S071 locally; R2-049 keeps its provider half open (BLOCKED_OWNER), its local SIM half is cited.
+Totals: 61 cases — 43 DONE, 18 OPEN. L5 executes the local half of CMD038 and R2-048 (PARTIAL; the S3 presign is B15); L6 closes R2-074 and its restore cells locally (S065 PARTIAL). R2-054 and R2-055 closed by L7 (PR #96, main 56d1e15). L4 closes CMD054, CMD055, R2-050 and S071 locally; R2-049 keeps its provider half open (BLOCKED_OWNER), its local SIM half is cited.
 
 | case | registry expectation | tests | status | what the check observes |
 |---|---|---|---|---|
