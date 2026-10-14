@@ -511,13 +511,13 @@ test("UI49 (form): one POST form to the api opt-out route carries exactly the RF
   const text = textOf(html);
   assert.equal(count(html, "<form"), 1);
   assert.match(html, /<form[^>]*method="post"/);
-  assert.match(html, new RegExp(`action="/api/v1/public/outreach/opt-out/${TOKEN.replaceAll(".", "\.")}"`));
+  assert.match(html, new RegExp(`action="/api/v1/public/outreach/opt-out/${TOKEN.replaceAll(".", "\\.")}"`));
   assert.match(html, /enctype="application\/x-www-form-urlencoded"/i);
   assert.equal(count(html, "<input"), 1);
   assert.match(html, /<input[^>]*type="hidden"[^>]*name="List-Unsubscribe"[^>]*value="One-Click"/);
   assert.equal(text.includes(TOKEN), false, "the token is never page text");
   assert.match(text, /Stop optional messages/);
-  assert.match(text, /Notices about an account, a payment, your files or a support case are not optional messages./);
+  assert.match(text, /Notices about an account, a payment, your files or a support case are not optional messages\./);
   assert.doesNotMatch(text, /you have been unsubscribed|successfully/i, "no success is claimed before the api answers 200");
 });
 
@@ -538,11 +538,11 @@ test("UI49 (submit): posts exactly the RFC body without credentials and confirms
 });
 
 test("no public route reads a cookie, a header or the environment", () => {
-  const sources = walk(join(webRoot, "src", "app", "(public)")).filter((file) => /.(ts|tsx)$/.test(file));
+  const sources = walk(join(webRoot, "src", "app", "(public)")).filter((file) => /\.(ts|tsx)$/.test(file));
   assert.ok(sources.length >= 12, "the public routes are there");
   for (const file of sources) {
     const source = readFileSync(file, "utf8");
-    assert.equal(/(cookies|headers)(/.test(source) || /process.env/.test(source), false, `${relative(webRoot, file)} reads no request state and no environment`);
+    assert.equal(/\b(cookies|headers)\(/.test(source) || /process\.env/.test(source), false, `${relative(webRoot, file)} reads no request state and no environment`);
   }
 });
 
