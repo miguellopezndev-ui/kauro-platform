@@ -98,6 +98,7 @@ BEGIN
   RETURN NEW;
 END
 $$;
+REVOKE EXECUTE ON FUNCTION kauro.breakglass_grants_birth() FROM PUBLIC;
 CREATE TRIGGER breakglass_grants_birth BEFORE INSERT ON kauro.breakglass_grants
   FOR EACH ROW EXECUTE FUNCTION kauro.breakglass_grants_birth();
 
@@ -128,6 +129,7 @@ BEGIN
   RETURN NEW;
 END
 $$;
+REVOKE EXECUTE ON FUNCTION kauro.breakglass_grants_guard() FROM PUBLIC;
 CREATE TRIGGER breakglass_grants_guard BEFORE UPDATE ON kauro.breakglass_grants
   FOR EACH ROW EXECUTE FUNCTION kauro.breakglass_grants_guard();
 CREATE TRIGGER breakglass_grants_no_delete BEFORE DELETE ON kauro.breakglass_grants
@@ -192,6 +194,7 @@ BEGIN
   RETURN NEW;
 END
 $$;
+REVOKE EXECUTE ON FUNCTION kauro.breakglass_accesses_birth() FROM PUBLIC;
 CREATE TRIGGER breakglass_accesses_birth BEFORE INSERT ON kauro.breakglass_accesses
   FOR EACH ROW EXECUTE FUNCTION kauro.breakglass_accesses_birth();
 CREATE TRIGGER breakglass_accesses_append_only BEFORE UPDATE OR DELETE ON kauro.breakglass_accesses

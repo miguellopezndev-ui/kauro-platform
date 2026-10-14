@@ -297,3 +297,10 @@ CREATE POLICY restore_applied_entries_owner ON kauro.restore_applied_entries FOR
 ALTER TABLE kauro.restore_observations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.restore_observations FORCE ROW LEVEL SECURITY;
 CREATE POLICY restore_observations_owner ON kauro.restore_observations FOR ALL TO kauro_owner USING (true) WITH CHECK (true);
+REVOKE EXECUTE ON FUNCTION kauro.recovery_gate_guard() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.recovery_gate_admits() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.restore_runs_birth() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.restore_runs_guard() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.restore_applied_entries_birth() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.restore_observations_birth() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.restore_observations_guard() FROM PUBLIC;
