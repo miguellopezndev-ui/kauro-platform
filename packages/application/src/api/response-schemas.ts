@@ -1050,6 +1050,130 @@ export const BANK_ROUTE_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Ob
   }),
 ] satisfies ReadonlyArray<OperationalRoute>);
 
+// --- the inbound side of the bank-transfer route (Payments V1, lane PV1-INBOUND; ACH-ROUTE r12 §7.5-§7.12, §7.23) ------------------------------
+const BANK_CENTS = { type: "string", pattern: "^(0|[1-9][0-9]{0,15})$" } as const;
+const BANK_CREDIT_VIEW_SCHEMA: JsonSchema = closedObject(["creditId", "accountRef", "bankTransactionId", "state", "version", "source", "rail", "grossCents", "feeCents", "currency", "reference", "orderId", "captureId"], {
+  creditId: BANK_UUID,
+  accountRef: BANK_REF,
+  bankTransactionId: { type: "string", minLength: 1, maxLength: 128 },
+  state: { type: "string", enum: ["DRAFT_MANUAL", "OBSERVED", "MATCH_REVIEW", "MATCHED", "APPLIED", "RETURN_REVIEW"] },
+  version: { type: "integer", minimum: 1 },
+  source: { type: "string", enum: ["OWNER_MANUAL"] },
+  rail: { type: "string", enum: ["ACH", "DOMESTIC_WIRE", "OTHER", "UNKNOWN"] },
+  grossCents: BANK_CENTS,
+  feeCents: { type: ["string", "null"], pattern: "^(0|[1-9][0-9]{0,15})$" },
+  currency: { type: "string", enum: ["USD"] },
+  reference: { type: ["string", "null"], minLength: 1, maxLength: 256 },
+  orderId: { type: ["string", "null"], pattern: BANK_UUID.pattern },
+  captureId: { type: ["string", "null"], pattern: BANK_UUID.pattern },
+});
+export const BANK_CREDIT_COMMAND_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1 },
+  replayed: { type: "boolean" },
+  data: closedObject(["credit"], { credit: BANK_CREDIT_VIEW_SCHEMA }),
+});
+export const BANK_CREDIT_READ_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], { data: closedObject(["credit"], { credit: BANK_CREDIT_VIEW_SCHEMA }) });
+export const BANK_MATCH_KEYS_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], { data: closedObject(["keys"], { keys: closedObject(["orderId", "reference", "expectedAmountCents", "currency", "acceptedPayerDigest", "transferExpiresAt", "providerTimeToleranceMs", "accountRef"], {
+    orderId: BANK_UUID,
+    reference: { type: "string", minLength: 1, maxLength: 256 },
+    expectedAmountCents: BANK_CENTS,
+    currency: { type: "string", enum: ["USD"] },
+    acceptedPayerDigest: { type: ["string", "null"], pattern: BANK_HASH.pattern },
+    transferExpiresAt: BANK_UTC,
+    providerTimeToleranceMs: { type: "integer", minimum: 0 },
+    accountRef: BANK_REF,
+  }) }) });
+const creditCommand = (operationId: string, path: string, summary: string, status: "200" | "201", request: JsonSchema): OperationalRoute =>
+  Object.freeze({
+    operationId,
+    method: "POST" as const,
+    path,
+    summary,
+    authority: "ACH-ROUTE r12 §7.5-§7.9; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+    request: Object.freeze({ contentType: "application/json" as const, schema: request }),
+    responses: Object.freeze({ [status]: Object.freeze({ description: "The credit after the command (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: BANK_CREDIT_COMMAND_RESPONSE_SCHEMA }) }),
+  });
+export const RECORDED_RETIREMENT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1 },
+  replayed: { type: "boolean" },
+  data: closedObject(["retirement"], { retirement: closedObject(["orderId", "state", "requestedAt"], { orderId: BANK_UUID, state: { type: "string", enum: ["RECORDED"] }, requestedAt: BANK_UTC }) }),
+});
+const STATEMENT_COUNT = { type: "integer", minimum: 0 } as const;
+export const STATEMENT_IMPORT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1 },
+  replayed: { type: "boolean" },
+  data: closedObject(["import"], {
+    import: closedObject(["importId", "coverage", "lines", "newLines", "orphans", "balanced"], {
+      importId: BANK_UUID,
+      coverage: { type: "array", minItems: 2, maxItems: 2, items: closedObject(["stream", "from", "to"], { stream: { type: "string", enum: ["INBOUND", "OUTBOUND"] }, from: BANK_UTC, to: BANK_UTC }) },
+      lines: STATEMENT_COUNT,
+      newLines: STATEMENT_COUNT,
+      orphans: STATEMENT_COUNT,
+      balanced: { type: "boolean" },
+    }),
+  }),
+});
+export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
+  Object.freeze({
+    operationId: "retireBankCheckout",
+    method: "POST" as const,
+    path: "/api/v1/payment-orders/{orderId}/retirements",
+    summary: "Record the retirement of an open bank checkout; the payment service applies it (EXPIRED, cause RETIRED): no further instructions; a later credit is recorded and returned",
+    authority: "ACH-ROUTE r12 §7.12 (E1 retirement), D-ACH-05; the agency's billing member (X-Kauro-Agency); Idempotency-Key (the agency's journal)",
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["reasonCode"], { reasonCode: { type: "string", minLength: 1, maxLength: 200 } }) }),
+    responses: Object.freeze({ "201": Object.freeze({ description: "The retirement as recorded (COMPLETED envelope; an identical replay answers the journaled reply); the payment service's expiry pass applies it.", contentType: JSON_CONTENT_TYPE, schema: RECORDED_RETIREMENT_RESPONSE_SCHEMA }) }),
+  }),
+  creditCommand("enterBankCredit", "/api/v1/operations/bank-accounts/{accountRef}/credits", "Enter a manual bank credit the owner read in the bank's own artifact (DRAFT_MANUAL: grants nothing until confirmed)", "201",
+    closedObject(["bankTransactionId", "rail", "grossCents", "currency", "reference", "bookedAt", "evidence", "authorizationRef"], {
+      bankTransactionId: { type: "string", minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" },
+      rail: { type: "string", enum: ["ACH", "DOMESTIC_WIRE", "OTHER", "UNKNOWN"] },
+      grossCents: { type: "string", pattern: "^[1-9][0-9]{0,15}$" },
+      currency: { type: "string", enum: ["USD"] },
+      reference: { type: ["string", "null"], minLength: 1, maxLength: 256 },
+      bookedAt: BANK_UTC,
+      evidence: closedObject(["artifactRef", "evidenceHash"], { artifactRef: BANK_REF, evidenceHash: BANK_HASH }),
+      authorizationRef: BANK_UUID,
+    })),
+  creditCommand("confirmBankCredit", "/api/v1/operations/bank-credits/{creditId}/confirmations", "Confirm a manual credit: its stored artifact read, verified and compared with the draft (OBSERVED)", "200",
+    closedObject(["expectedVersion", "authorizationRef"], { expectedVersion: BANK_VERSION, authorizationRef: BANK_UUID })),
+  creditCommand("attributeBankCredit", "/api/v1/operations/bank-credits/{creditId}/attributions", "Attribute a credit waiting for review to an order with billing evidence (MATCHED; V1: the order's own payer only)", "200",
+    closedObject(["expectedVersion", "orderId", "billingEvidenceRef", "reasonCode", "authorizationRef"], {
+      expectedVersion: BANK_VERSION,
+      orderId: BANK_UUID,
+      billingEvidenceRef: BANK_REF,
+      reasonCode: { type: "string", minLength: 1, maxLength: 200 },
+      authorizationRef: BANK_UUID,
+    })),
+  Object.freeze({
+    operationId: "importBankStatement",
+    method: "POST" as const,
+    path: "/api/v1/operations/bank-accounts/{accountRef}/statement-imports",
+    summary: "Import a statement the owner stored: its coverage per stream, its lines once by bank line id, debit links and orphan exceptions",
+    authority: "ACH-ROUTE r12 §7.23 (SI1, SI2), §7.28; KAURO_OWNER with a fresh step-up; Idempotency-Key (journal of the owner identity)",
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["artifactRef", "evidenceHash", "authorizationRef"], { artifactRef: BANK_REF, evidenceHash: BANK_HASH, authorizationRef: BANK_UUID }) }),
+    responses: Object.freeze({ "201": Object.freeze({ description: "The import (COMPLETED envelope; an identical replay answers the journaled reply). BALANCED only with zero orphan debits.", contentType: JSON_CONTENT_TYPE, schema: STATEMENT_IMPORT_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "getBankCredit",
+    method: "GET" as const,
+    path: "/api/v1/operations/bank-credits/{creditId}",
+    summary: "A bank credit as the corporate owner sees it",
+    authority: "ACH-ROUTE r12 §7.5; KAURO_OWNER",
+    responses: Object.freeze({ "200": Object.freeze({ description: "The credit.", contentType: JSON_CONTENT_TYPE, schema: BANK_CREDIT_READ_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "getBankOrderMatchKeys",
+    method: "GET" as const,
+    path: "/api/v1/operations/bank-orders/{orderId}/match-keys",
+    summary: "The keys the matching compares a credit with: the order's frozen reference, amount, accepted payer and deadline",
+    authority: "ACH-ROUTE r12 §7.9; KAURO_OWNER",
+    responses: Object.freeze({ "200": Object.freeze({ description: "The match keys.", contentType: JSON_CONTENT_TYPE, schema: BANK_MATCH_KEYS_RESPONSE_SCHEMA }) }),
+  }),
+] satisfies ReadonlyArray<OperationalRoute>);
+
 // --- the agency app's operational command (B11 lane A1; SCREENS-PLAN section 3 rows A1; A3 3.7) -----------------------------------
 // CMD101 SetBuyerType is not a registry command: it runs the shared command pipeline (journal of the owner in the agency) and answers a
 // COMPLETED envelope carrying the recorded buyer type, 201 when recorded and 200 when the same value was already recorded.
@@ -1130,6 +1254,7 @@ export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze
     }),
   }),
   ...BANK_ROUTE_OPERATIONAL_ROUTES,
+  ...BANK_INBOUND_OPERATIONAL_ROUTES,
   ...AGENCY_APP_OPERATIONAL_ROUTES,
 ] satisfies ReadonlyArray<OperationalRoute>);
 

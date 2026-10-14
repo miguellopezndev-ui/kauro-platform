@@ -5,9 +5,9 @@
  * missing or malformed field are REJECTED, never a partial value (no snapshot is ever built from part of a document). Not a provider format.
  */
 import type { BankRouteDetails, EvidenceClassification } from "@kauro/domain";
-import type { BankDetailsClassifier } from "../bank/ports.js";
+import type { BankEvidenceClassifier } from "../bank/inbound-ports.js";
 import type { StoredBankEvidence } from "../ports.js";
-import { BANK_FAKE_FORMAT, BANK_FAKE_NORMALIZER } from "./bank-evidence-fake.js";
+import { BANK_FAKE_FORMAT, BANK_FAKE_NORMALIZER, classifyFakeCredit, classifyFakeStatement } from "./bank-evidence-fake.js";
 import { sha256Hex } from "./labels.js";
 
 type Obj = Readonly<Record<string, unknown>>;
@@ -68,4 +68,4 @@ export function classifyFakeAccountDetails(evidence: StoredBankEvidence): Eviden
 }
 
 /** The CONTRACT_FAKE classifier as the port the route commands read. */
-export const contractFakeBankDetailsClassifier: BankDetailsClassifier = Object.freeze({ classifyAccountDetails: classifyFakeAccountDetails });
+export const contractFakeBankDetailsClassifier: BankEvidenceClassifier = Object.freeze({ classifyAccountDetails: classifyFakeAccountDetails, classifyCredit: classifyFakeCredit, classifyStatement: classifyFakeStatement });
