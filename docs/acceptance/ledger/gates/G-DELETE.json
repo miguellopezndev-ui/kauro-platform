@@ -23,7 +23,7 @@
   {
    "case": "S065",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -103,7 +103,7 @@
   {
    "case": "R2-126",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
