@@ -289,7 +289,7 @@ const supersedeTarget = (b: Buyer): Withdrawal => ({
     const agencyId = b.a.s.agency.agencyId;
     const current = await holder.query<{ contract_id: string }>("SELECT contract_id FROM kauro.target_contracts WHERE agency_id = $1 AND project_id = $2 AND confirmed_at IS NOT NULL AND superseded_at IS NULL", [agencyId, projectOf(b)]);
     assert.ok(current.rows.length >= 1, "the target contract superseded");
-    // migration 0073: a contract is superseded only by a later confirmed observation of its instance (CMD019's shape)
+    // migration 0084: a contract is superseded only by a later confirmed observation of its instance (CMD019's shape)
     for (const row of current.rows) await supersedeIn(holder, { agencyId, contractId: row.contract_id }, b.a.s.agency.ownerMembershipId);
   },
 });

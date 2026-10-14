@@ -24,7 +24,7 @@ const MARK = `snt${randomBytes(6).toString("hex")}`;
 const REASON_MARK = `SNTL_${MARK.toUpperCase()}`;
 
 let w: World;
-/** One current target contract per project (migration 0073 rule (c)): each approvable subject gets a project of its own, so none supersedes another. */
+/** One current target contract per project (migration 0084 rule (c)): each approvable subject gets a project of its own, so none supersedes another. */
 const projectOfItsOwn = async (): Promise<ProjectId> => (await w.project(w.A, w.clientA)).projectId;
 const people: Record<"founder" | "founder2" | "operator" | "admin" | "approver", Person> = {} as never;
 

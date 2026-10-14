@@ -646,7 +646,7 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     const capabilityVersion = (await oracle.query<{ version: string }>("SELECT version FROM kauro.capabilities WHERE capability_id = $1", [await capabilityOf(mode)])).rows[0]?.version ?? "R2-INITIAL";
     const contractId = ids.next();
     const targetContractHash = sha(`target-${label}-${contractId}`);
-    // 0073: the confirmed fixture is the oracle's (a request session bears only drafts)
+    // 0084: the confirmed fixture is the oracle's (a request session bears only drafts)
     await oracle.query(
         `INSERT INTO kauro.target_contracts (contract_id, agency_id, project_id, mode, instance_id, importer_profile_id, importer_version, objects, schema_bundle_digest, body_hash, observed_at, confirmed_at, authority_evidence_hash, capability_version, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, 'R2-INITIAL', '[]'::jsonb, $7, $8, now(), now(), $9, $10, now())`,
@@ -901,7 +901,7 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
     },
 
     async supersedeTarget(p) {
-      // 0073 (b): CMD019's shape through the oracle — a later observation of the same instance supersedes the contract and is
+      // 0084 (b): CMD019's shape through the oracle — a later observation of the same instance supersedes the contract and is
       // confirmed in the same transaction
       await oracle.query("BEGIN");
       try {

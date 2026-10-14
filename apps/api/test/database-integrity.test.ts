@@ -62,7 +62,7 @@ test("R4: a client created through CMD009 journals its label; the control pool r
 
 test("R11: plan X approved through CMD025; plan Y cannot be pointed at X's approval, and CMD025 then approves Y with an approval of its own", async () => {
   const x = await w.approvable(w.A, projectId, "r11-route-x");
-  // one current contract per project (migration 0073 rule (c)): Y has a project of its own, so X's target stays current
+  // one current contract per project (migration 0084 rule (c)): Y has a project of its own, so X's target stays current
   const yProjectId = (await w.project(w.A, w.clientA)).projectId;
   const y = await w.approvable(w.A, yProjectId, "r11-route-y");
   const ax = await approveThroughRoute(w, x);

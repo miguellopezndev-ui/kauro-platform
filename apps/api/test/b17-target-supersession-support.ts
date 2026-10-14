@@ -1,4 +1,4 @@
-// Target-contract fixtures under migration 0073 (docs/design/B15-B17-B18-local-plan.md section 5 M4 births (a)-(c)): a request session
+// Target-contract fixtures under migration 0084 (docs/design/B15-B17-B18-local-plan.md section 5 M4 births (a)-(c)): a request session
 // bears a contract only as a DRAFT, so a confirmed-at-birth fixture is the superuser oracle's insert; a contract is superseded only by a
 // later confirmed observation of the same instance, confirmed in the same transaction (CMD019's shape), and a project holds at most one
 // current contract. `confirmedContract` and `supersede` write exactly that, through the oracle; `supersedeIn` writes it on a caller's

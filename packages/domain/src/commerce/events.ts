@@ -344,7 +344,7 @@ export const COMMERCE_EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: C
   { eventType: "tax_document.validated.v1", consumer: "FISCAL" },
   { eventType: "tax_document.uncertain.v1", consumer: "FISCAL" },
   // CMD035's reconciler watches every submission past its deadline, and an issued invoice validates the credit notes drafted against
-  // it while it was SUBMITTING (B15 M6, M19; migration 0074 inserts the same rows)
+  // it while it was SUBMITTING (B15 M6, M19; migration 0085 inserts the same rows)
   { eventType: "tax_document.submitting.v1", consumer: "FISCAL" },
   { eventType: "tax_document.issued.v1", consumer: "FISCAL" },
   { eventType: "tax_document.issued.v1", consumer: "NOTIFICATIONS" },

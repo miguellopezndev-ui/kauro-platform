@@ -1,4 +1,4 @@
--- Migration 0072: B17 lane L0D KIT-DB, the stage-receipt half of R2-023 and R2-025 (provisional number; the coordinator renumbers on merge).
+-- Migration 0083: B17 lane L0D KIT-DB, the stage-receipt half of R2-023 and R2-025 (provisional number; the coordinator renumbers on merge).
 --
 -- docs/design/B15-B17-B18-local-plan.md section 5 M1 (CMD040) and M2 (CMD041), section 2 R2-023 / R2-025:
 --   1. kauro.import_stages.parent_edges: the explicit parent identity each child source depends on, one edge

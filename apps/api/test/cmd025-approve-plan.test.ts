@@ -195,7 +195,7 @@ test("DENY: OPERATOR → 403; foreign → 404; stale/missing step-up → 403 ASS
   const expired = await call(w, { url: routes.approvePlan(onExpired.planId), token: w.approver.token, body: approvalBody(onExpired, proof) });
   assert.equal(outcome(w, expired), "422 SOURCE_EXPIRED -");
   const sealedSource = await w.revision(w.A, projectId, "SEALED");
-  // 0073 (d): a plan is born only on a current target, so the plan comes first and its target is superseded after it
+  // 0084 (d): a plan is born only on a current target, so the plan comes first and its target is superseded after it
   const supersededTarget = await w.targetContract(w.A, projectId);
   const onSuperseded = await w.plan(w.A, projectId, { revisionHash: sealedSource.revisionHash, targetContractHash: supersededTarget.targetContractHash, seed: "superseded-target" });
   await supersede(w.h.oracle, { agencyId: w.A.agencyId, contractId: supersededTarget.contractId }, w.A.ownerMembershipId);

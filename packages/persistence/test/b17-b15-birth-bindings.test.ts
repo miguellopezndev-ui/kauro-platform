@@ -1,4 +1,4 @@
-// The database births of lane L0D KIT-DB (migrations 0072, 0073, 0074; docs/design/B15-B17-B18-local-plan.md section 5 M1, M4 (a)-(e),
+// The database births of lane L0D KIT-DB (migrations 0083, 0084, 0085; docs/design/B15-B17-B18-local-plan.md section 5 M1, M4 (a)-(e),
 // M5, M6, M17): every refusal is the runtime role that would cross the boundary, with the credentials already emitted to it, beside
 // the legitimate write that still commits (21 "Positive and negative symmetry", FAILURE-MATRIX-TEMPLATE r20, r24b). Each refusal has
 // its red control (r24c, one guard per control input): the same forged statement, as the same role, commits once that one guard is
@@ -123,7 +123,7 @@ async function lockModes(o: Client, kind: string, subject: string): Promise<stri
 
 const appSession = (userId: string = A.ownerUserId) => ({ "kauro.agency_id": A.agencyId, "kauro.user_id": userId });
 
-// --- 0073 target contracts -------------------------------------------------------------------------------------------------------------
+// --- 0084 target contracts -------------------------------------------------------------------------------------------------------------
 
 async function currentInstance(projectId: string): Promise<string | undefined> {
   const r = await h.oracle.query<{ instance_id: string }>(
@@ -161,7 +161,7 @@ async function evidence(c: Client, projectId: string, instanceId: string): Promi
   return evidenceId;
 }
 
-/** A DRAFT contract of the instance, born by the request session (0073 (a)); observed `offsetSeconds` after its transaction's now(). */
+/** A DRAFT contract of the instance, born by the request session (0084 (a)); observed `offsetSeconds` after its transaction's now(). */
 async function draftContract(projectId: string, instanceId: string, offsetSeconds = 0): Promise<ContractRow> {
   const { row, params } = contractParams(projectId, instanceId, { offsetSeconds });
   await tx(app, owner(), (c) => c.query(contractInsert, params));
@@ -171,7 +171,7 @@ async function draftContract(projectId: string, instanceId: string, offsetSecond
 const confirmSql = "UPDATE kauro.target_contracts SET confirmed_at = kauro.server_now(), confirmed_by_membership_id = $2, confirmation_evidence_ref = $3, version = version + 1 WHERE contract_id = $1";
 const supersedeSql = "UPDATE kauro.target_contracts SET superseded_at = now(), superseded_by_contract_id = $2, version = version + 1 WHERE contract_id = $1";
 
-test("0073 (a): the request session bears a target contract only as a DRAFT — never confirmed, never superseded at birth", async () => {
+test("0084 (a): the request session bears a target contract only as a DRAFT — never confirmed, never superseded at birth", async () => {
   const { projectId } = await project(app, A, clientA, clean);
   const instanceId = ids.next();
   const ev = await tx(app, owner(), (c) => evidence(c, projectId, instanceId));
@@ -196,7 +196,7 @@ test("0073 (a): the request session bears a target contract only as a DRAFT — 
   }
 });
 
-test("0073 (b)/(c): supersession is learned once, together, by a later confirmed observation of the same instance, confirmed in the same transaction; one current contract per project", async () => {
+test("0084 (b)/(c): supersession is learned once, together, by a later confirmed observation of the same instance, confirmed in the same transaction; one current contract per project", async () => {
   const { projectId } = await project(app, A, clientA, clean);
   const first = await targetContract(app, A, projectId, "births-b");
   const instanceId = (await currentInstance(projectId))!;
@@ -274,7 +274,7 @@ async function bornPlan(c: Client, p: { planId: string; params: unknown[] }, pro
   await event(c, { aggregateKind: "plan", aggregateId: p.planId, aggregateVersion: 1, agencyId: A.agencyId, eventType: "plan.created.v1", actorUserId: A.ownerUserId, payload: { planId: p.planId, agencyId: A.agencyId, projectId, bodyHash: p.params[7] } });
 }
 
-test("0073 (d)/(e): a plan is born only on a target that is not superseded, after the target's shared half; a re-check plan re-checks its own project's plan of the superseded target with only targetContractHash replaced", async () => {
+test("0084 (d)/(e): a plan is born only on a target that is not superseded, after the target's shared half; a re-check plan re-checks its own project's plan of the superseded target with only targetContractHash replaced", async () => {
   const { projectId } = await project(app, A, clientA, clean);
   const other = await project(app, A, clientA, clean);
   const revision = (await sealedSource(clients(), A, projectId, "births-d")).manifestHash;
@@ -313,9 +313,9 @@ test("0073 (d)/(e): a plan is born only on a target that is not superseded, afte
   );
 });
 
-// --- 0073 plan validation refusal reason; vendor qualifications ---------------------------------------------------------------------------
+// --- 0084 plan validation refusal reason; vendor qualifications ---------------------------------------------------------------------------
 
-test("0073: a refusal reason is learned once, only by the ERROR settlement of its intent, and is never born with the intent", async () => {
+test("0084: a refusal reason is learned once, only by the ERROR settlement of its intent, and is never born with the intent", async () => {
   const { projectId } = await project(app, A, clientA, clean);
   const p = await plan(clients(), A, projectId, "VALIDATION_REQUIRED", "births-refusal");
   const validationId = ids.next();
@@ -358,7 +358,7 @@ test("0073: a refusal reason is learned once, only by the ERROR settlement of it
   );
 });
 
-test("0073: no runtime role inserts a vendor qualification (insert-only evidence, D-12 produces it)", async () => {
+test("0084: no runtime role inserts a vendor qualification (insert-only evidence, D-12 produces it)", async () => {
   const row = [sha(`vq-${ids.next()}`), clean, sha("vq-profile")];
   const insert = "INSERT INTO kauro.vendor_qualifications (evidence_hash, capability_id, tool, profile_hash, envelope, result) VALUES ($1, $2, 'Data Loader', $3, '{}'::jsonb, 'PASS')";
   for (const [role, settings, policy] of [
@@ -374,9 +374,9 @@ test("0073: no runtime role inserts a vendor qualification (insert-only evidence
   }
 });
 
-// --- 0072 stage receipt reconciliations and parent edges ----------------------------------------------------------------------------------
+// --- 0083 stage receipt reconciliations and parent edges ----------------------------------------------------------------------------------
 
-test("0072: a differing receipt of a finalized stage opens one reconciliation naming its own stage-receipt upload; identical content and unfinished stages never do", async () => {
+test("0083: a differing receipt of a finalized stage opens one reconciliation naming its own stage-receipt upload; identical content and unfinished stages never do", async () => {
   const { projectId } = await project(app, A, clientA, clean);
   const p = await plan(clients(), A, projectId, "DRAFT", "births-stage");
   const o = h.oracle;
@@ -451,13 +451,13 @@ test("0072: a differing receipt of a finalized stage opens one reconciliation na
   await assert.rejects(attempt(s, (c) => c.query("UPDATE kauro.import_stages SET parent_edges = '[]'::jsonb, version = version + 1 WHERE stage_id = $1", [child])), refusedWith("42501"));
 });
 
-// --- 0073 M8: the target-drift repair of a paid authorization ---------------------------------------------------------------------------
+// --- 0084 M8: the target-drift repair of a paid authorization ---------------------------------------------------------------------------
 
-/** The agency's one live fiscal profile (a second without `supersedes` would not be the profile the 0074 cells bind). */
+/** The agency's one live fiscal profile (a second without `supersedes` would not be the profile the 0085 cells bind). */
 let profileOfAgencyA: Promise<string> | undefined;
 const profileA = (): Promise<string> => (profileOfAgencyA ??= fiscalProfile(app, kora, A, routes.issuerRef, "EXEMPT_EXPORT"));
 
-test("0073 M8: a drift repair re-binds a paid authorization only from a superseded target, to the re-check plan's quote, naming the KAURO_TARGET_REPAIR_V1 lineage, one ordinal at a time", async () => {
+test("0084 M8: a drift repair re-binds a paid authorization only from a superseded target, to the re-check plan's quote, naming the KAURO_TARGET_REPAIR_V1 lineage, one ordinal at a time", async () => {
   const profileId = await profileA();
   const { projectId } = await project(app, A, clientA, hubspot, "HUBSPOT");
   const s1 = await approvedSubject(clients(), validator, assurance, A, projectId, "m8-paid");
@@ -468,7 +468,7 @@ test("0073 M8: a drift repair re-binds a paid authorization only from a supersed
   const s2 = await approvedSubject(clients(), validator, assurance, A, projectId, "m8-recheck", { revisionId: s1.revisionId, manifestHash: s1.revisionHash });
   const q2 = await issuedQuote(app, A, s2, profileId, routes.issuerRef, { replacesQuoteId: q1.quoteId });
   // Fixture, by the oracle with triggers off (session_replication_role = replica), committed: the re-check link of s2's plan (its birth
-  // guard is the 0073 (e) cell's) and the replacement's terms hash equal to the paid quote's (a drift repair keeps the terms).
+  // guard is the 0084 (e) cell's) and the replacement's terms hash equal to the paid quote's (a drift repair keeps the terms).
   const o = h.oracle;
   await o.query("BEGIN");
   try {
@@ -512,7 +512,7 @@ test("0073 M8: a drift repair re-binds a paid authorization only from a supersed
   );
 });
 
-// --- 0074 tax document issuance ---------------------------------------------------------------------------------------------------------
+// --- 0085 tax document issuance ---------------------------------------------------------------------------------------------------------
 
 async function validatedInvoice(seed: string, profileId: string): Promise<string> {
   const { projectId } = await project(app, A, clientA, hubspot, "HUBSPOT");
@@ -538,7 +538,7 @@ const submittingSql = "UPDATE kauro.tax_documents SET state = 'SUBMITTING', issu
 const issuedSql = (accepted: boolean) =>
   `UPDATE kauro.tax_documents SET state = 'ISSUED', provider_document_id = 'DOC-' || left($1::text, 8), legal_number = 'SETP-' || right(replace($1::text, '-', ''), 6), evidence_hash = $2, issued_at = now()${accepted ? ", fiscal_status = 'ACCEPTED', verification_ref = 'CUFE-' || $1::text" : ""}, version = 4 WHERE document_id = $1`;
 
-test("0074: the issuer's half covers every judged column; the document's state is a transition subject; SUBMITTING is judged after both shared halves at the effect instant", async () => {
+test("0085: the issuer's half covers every judged column; the document's state is a transition subject; SUBMITTING is judged after both shared halves at the effect instant", async () => {
   const profileId = await profileA();
   const doc = await validatedInvoice("births-fiscal", profileId);
   const pay = { role: "kauro_payment_test" as const, settings: { "kauro.agency_id": A.agencyId } };
@@ -599,7 +599,7 @@ test("0074: the issuer's half covers every judged column; the document's state i
   );
 });
 
-test("0074: the FISCAL consumer receives the submitting and issued facts, exactly as @kauro/domain lists them", async () => {
+test("0085: the FISCAL consumer receives the submitting and issued facts, exactly as @kauro/domain lists them", async () => {
   const rows = await h.oracle.query<{ event_type: string; consumer: string }>("SELECT event_type, consumer FROM kauro.commerce_event_subscriptions WHERE consumer = 'FISCAL' ORDER BY event_type");
   const domain = COMMERCE_EVENT_SUBSCRIPTIONS.filter((s) => s.consumer === "FISCAL")
     .map((s) => ({ event_type: String(s.eventType), consumer: String(s.consumer) }))

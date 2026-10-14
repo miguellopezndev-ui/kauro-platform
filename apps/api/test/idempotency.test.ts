@@ -32,7 +32,7 @@ import {
 } from "./support.js";
 
 let w: World;
-/** One current target contract per project (migration 0073 rule (c)): each approvable subject gets a project of its own, so none supersedes another. */
+/** One current target contract per project (migration 0084 rule (c)): each approvable subject gets a project of its own, so none supersedes another. */
 const projectOfItsOwn = async (): Promise<ProjectId> => (await w.project(w.A, w.clientA)).projectId;
 before(async () => {
   w = await world();

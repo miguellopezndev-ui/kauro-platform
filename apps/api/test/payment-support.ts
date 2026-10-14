@@ -264,7 +264,7 @@ export async function approvedPlan(pw: PaymentWorld, seed: string, agency: Agenc
   const source = await w.revision(agency, projectId, "SEALED", { recent: true });
   const contractId = ids.next();
   const targetContractHash = sha(`hubspot-target-${contractId}`);
-  // 0073: the confirmed fixture is the oracle's (a request session bears only drafts)
+  // 0084: the confirmed fixture is the oracle's (a request session bears only drafts)
   await confirmedContract(w.h.oracle, { agencyId: agency.agencyId, projectId, mode: "HUBSPOT", membershipId: agency.ownerMembershipId, targetContractHash, contractId });
   const plan = await w.plan(agency, projectId, { revisionHash: source.revisionHash, targetContractHash, seed, state: "VALIDATED" });
   // a plan of agency A is approved by A's approver; one of agency B by B's owner (the stranger) under B's own selector

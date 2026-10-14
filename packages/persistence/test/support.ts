@@ -290,7 +290,7 @@ export async function sealedSource(clients: SourceClients, ag: AgencyFixture, pr
 
 /**
  * A confirmed, current target contract of the project, as observation and confirmation leave it (plans_target_fk): the request session
- * creates it as a DRAFT (0073 birth (a)) and confirms it with its membership and a confirmation evidence artifact (0050).
+ * creates it as a DRAFT (0084 birth (a)) and confirms it with its membership and a confirmation evidence artifact (0050).
  */
 export async function targetContract(app: Client, ag: AgencyFixture, projectId: string, seed: string): Promise<{ contractId: string; bodyHash: string }> {
   const contractId = ids.next();
@@ -313,7 +313,7 @@ export async function targetContract(app: Client, ag: AgencyFixture, projectId: 
        VALUES ($1, $2, $3, 'CONFIRMATION_EVIDENCE', 'CLEAN', $4, '{}'::jsonb, $5, $6)`,
       [evidenceId, ag.agencyId, projectId, instanceId, sha(`confirmation-${contractId}`), ag.ownerMembershipId],
     );
-    // as CMD019 does: a confirmed newer contract supersedes the project's current one (0073 (b), (c)); a world held at an earlier
+    // as CMD019 does: a confirmed newer contract supersedes the project's current one (0084 (b), (c)); a world held at an earlier
     // migration (b05-dispatch-settlement L22) has no superseder column and no current contract to supersede in a fresh project
     const superseder = await c.query("SELECT 1 FROM pg_attribute WHERE attrelid = 'kauro.target_contracts'::regclass AND attname = 'superseded_by_contract_id' AND NOT attisdropped");
     if (superseder.rowCount === 1) await c.query(

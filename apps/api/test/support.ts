@@ -848,7 +848,7 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     async targetContract(agency, projectId, opts = {}) {
       const contractId = ids.next();
       const targetContractHash = sha(`target-${contractId}`);
-      // 0073: a request session bears only drafts, so the confirmed fixture is the oracle's; a re-observation of the project supersedes
+      // 0084: a request session bears only drafts, so the confirmed fixture is the oracle's; a re-observation of the project supersedes
       // its current contract (one current per project), and `superseded` is superseded at once by a newer confirmed observation
       await confirmedContract(oracle, { agencyId: agency.agencyId, projectId, mode: opts.mode ?? "CLEAN", membershipId: agency.ownerMembershipId, targetContractHash, contractId });
       if (opts.superseded) await supersede(oracle, { agencyId: agency.agencyId, contractId }, agency.ownerMembershipId);

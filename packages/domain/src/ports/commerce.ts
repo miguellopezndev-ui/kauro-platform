@@ -526,7 +526,7 @@ export interface TaxDocumentChange {
   readonly rejectionCode?: string;
   readonly evidenceHash?: Sha256Hex;
   readonly issuedAt?: UtcInstant;
-  /** the fiscal acceptance an ISSUED document carries with its verification reference (0074 tax_documents_issued_accepted; R2 15:139) */
+  /** the fiscal acceptance an ISSUED document carries with its verification reference (0085 tax_documents_issued_accepted; R2 15:139) */
   readonly fiscalStatus?: "ACCEPTED" | "ACCEPTED_WITH_OBSERVATIONS";
   readonly verificationRef?: string;
 }
