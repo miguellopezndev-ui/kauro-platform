@@ -153,7 +153,7 @@ const DESTINATION = (d: string): string =>
   `${d}.destination_id, ${d}.seller_id, ${d}.destination_version, ${d}.version, ${d}.state, ${d}.masked_label, ${d}.currency, ${d}.changed_by_user_id,
    ${d}.change_proof_ref IS NOT NULL AS change_proof_carried, kauro.server_now() >= ${d}.changed_at + interval '172800 seconds' AS cooling_passed,
    EXISTS (SELECT 1 FROM kauro.seller_payout_destinations l WHERE l.seller_id = ${d}.seller_id AND l.destination_version > ${d}.destination_version) AS superseded,
-   ${canonical(`${d}.changed_at`)}, ${canonical(`${d}.changed_at + interval '172800 seconds'`, "verifiable_from")}, ${canonical(`${d}.verified_at`)}, ${canonical(`${d}.rejected_at`)}`;
+   ${canonical(`${d}.changed_at`)}, ${canonical(`(${d}.changed_at + interval '172800 seconds')`, "verifiable_from")}, ${canonical(`${d}.verified_at`)}, ${canonical(`${d}.rejected_at`)}`;
 interface DestinationRow {
   destination_id: string;
   seller_id: string;
