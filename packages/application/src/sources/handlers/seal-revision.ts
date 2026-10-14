@@ -66,7 +66,7 @@ import type {
   StoredObjectId,
   UserId,
 } from "@kauro/domain";
-import { DomainFailure, INPUT_ENVELOPE, RETENTION_POLICY_VERSION, StaleVersionFailure, UPLOAD_LIVE_STATES, projectionHashOf, sealedSubjectHashOf, sourceRevisionManifestHashOf, unpaidSealedDeadlines } from "@kauro/domain";
+import { DomainFailure, INPUT_ENVELOPE, RETENTION_POLICY_VERSION, StaleVersionFailure, UPLOAD_LIVE_STATES, effectNowOf, projectionHashOf, sealedSubjectHashOf, sourceRevisionManifestHashOf, unpaidSealedDeadlines } from "@kauro/domain";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { applied, checkExpectedVersion, requireMembership } from "../../commands/handlers/shared.js";
 import { contextOf, identityOf } from "../../commands/runtime.js";
@@ -246,10 +246,12 @@ export function sealRevisionHandler(runtime: SourceRuntime, collaborators: B07Co
           const subjectHash = sealedSubjectHashOf(subject);
 
           // D-RET-3: the hard cap belongs to the bytes — the first real seal of any included file, else this seal
-          const serverNow = await uow.serverInstant();
           const earlier = await uow.sources.seals.firstSeals(included.map((f) => f.fileId));
           const first = [...earlier].sort((a, b) => (a.sealedAt < b.sealedAt ? -1 : a.sealedAt > b.sealedAt ? 1 : 0))[0];
-          if (first !== undefined && reachedOnServer(unpaidSealedDeadlines(first.sealedAt as UtcInstant).hardDeadline, serverNow)) {
+          // judged at the effect instant, after the unit's last await before it (CLOCK-SWEEP-B07 S4); the deferred COMMIT trigger
+          // re-judges the bytes' cap at kauro.effect_now() (0011:565 as replaced)
+          const effectNow = await effectNowOf(uow);
+          if (first !== undefined && reachedOnServer(unpaidSealedDeadlines(first.sealedAt as UtcInstant).hardDeadline, effectNow)) {
             throw new DomainFailure("PRECONDITION_FAILED", "the reused bytes' window closed before this seal; reuse needs a new upload", { reason: "REUSE_NOT_AVAILABLE", ...current });
           }
 

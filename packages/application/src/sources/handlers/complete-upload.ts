@@ -15,7 +15,7 @@
  */
 import type { Id } from "@kauro/contracts";
 import type { UploadId, UserId } from "@kauro/domain";
-import { COMPLETION_POLL_AFTER_SECONDS, DomainFailure, textDigest } from "@kauro/domain";
+import { COMPLETION_POLL_AFTER_SECONDS, DomainFailure, effectNowOf, textDigest } from "@kauro/domain";
 import { requireMembership } from "../../commands/handlers/shared.js";
 import type { AcceptedOutcome } from "../../commands/runtime.js";
 import { COMPLETE_UPLOAD, type CompleteUploadBody, type CompleteUploadHandler } from "../contracts.js";
@@ -46,7 +46,8 @@ export function completeUploadHandler(runtime: SourceRuntime, collaborators: B07
           if (!upload) throw new DomainFailure("NOT_FOUND", "upload not visible");
           if (upload.requestedByUserId !== (envelope.userId as UserId)) throw new DomainFailure("NOT_AUTHORIZED", "the upload belongs to another requester", { reason: "UPLOAD_NOT_OWNED" });
           const current = { currentVersion: upload.version, currentState: upload.state };
-          const serverNow = await uow.serverInstant();
+          // the deadline is judged at the effect instant, after the unit's last await (the locks above; CLOCK-SWEEP-B07 S1)
+          const effectNow = await effectNowOf(uow);
           switch (upload.state) {
             case "RESERVED":
               throw new DomainFailure("PRECONDITION_FAILED", "no provider session was issued for the upload yet", { reason: "SESSION_NOT_ISSUED", ...current });
@@ -59,8 +60,8 @@ export function completeUploadHandler(runtime: SourceRuntime, collaborators: B07
             case "ADMITTED":
               throw new DomainFailure("PRECONDITION_FAILED", "the upload was already admitted", { reason: "UPLOAD_ADMITTED", ...current });
             case "UPLOADING":
-              // nothing is accepted at or after the deadline on the server clock (D-CLOCK-1; the database refuses it too, KA072)
-              if (reachedOnServer(upload.applicationExpiresAt, serverNow)) {
+              // nothing is accepted at or after the deadline on the database's effect clock (D-CLOCK-1; the database refuses it too, KA072)
+              if (reachedOnServer(upload.applicationExpiresAt, effectNow)) {
                 throw new DomainFailure("PRECONDITION_FAILED", "the application deadline passed", { reason: "RESERVATION_EXPIRED", ...current });
               }
               break;
