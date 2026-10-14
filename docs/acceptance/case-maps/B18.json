@@ -2,9 +2,8 @@
  "package": "B18",
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
-  "file": null,
-  "registry": "packages/contracts/registry/program.json",
-  "note": "no case map yet: no evidence claimed"
+  "file": "docs/design/B18-case-map.md",
+  "sha256": "82b5f748cf1ed36e0253d3cade88a6cad212a3691cf57e7f39868e246f8d9d39"
  },
  "rows": [
   {
@@ -13,7 +12,12 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B17",
+    "B19"
+   ],
+   "claimed": "OPEN -> T5r NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "S080",
@@ -21,7 +25,12 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B17",
+    "B19"
+   ],
+   "claimed": "OPEN -> T5c NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "S088",
@@ -29,7 +38,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B17"
+   ],
+   "claimed": "OPEN -> T5o NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-113",
@@ -37,15 +50,24 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B17"
+   ],
+   "claimed": "OPEN -> T5r NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "R2-114",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "tools/test/audit-kit.test.mjs :: R2-114: DENY a red proof that is not a test-only red on the audited sha failing for the declared reason, then green at the pre-merge fix head with the tests unchanged (E_RED_PROOF)",
+    "tools/test/red-proof.test.mjs :: R2-114: a build failure is not counted as a failing assertion and still cleans up",
+    "tools/test/red-proof.test.mjs :: R2-114: a test whose import only exists at head is INCONCLUSIVE, not red"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD058-OK",
@@ -53,7 +75,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B17"
+   ],
+   "claimed": "OPEN -> T4 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD058-DENY",
@@ -61,7 +87,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B17"
+   ],
+   "claimed": "OPEN -> T4 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD058-RACE",
@@ -69,7 +99,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B17"
+   ],
+   "claimed": "OPEN -> T4 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD059-OK",
@@ -77,7 +111,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B17"
+   ],
+   "claimed": "OPEN -> T4 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD059-DENY",
@@ -85,7 +123,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B17"
+   ],
+   "claimed": "OPEN -> T4 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD059-RACE",
@@ -93,7 +135,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B17"
+   ],
+   "claimed": "OPEN -> T4 NOT_EXECUTED; target SIMULATED"
   }
  ]
 }

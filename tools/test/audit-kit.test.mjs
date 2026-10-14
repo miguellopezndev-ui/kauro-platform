@@ -361,7 +361,7 @@ function junitXml(cases) {
   return `<?xml version="1.0" encoding="utf-8"?>\n<testsuites>\n${body.join("\n")}\n</testsuites>\n`;
 }
 
-test("DENY a red proof that is not a test-only red on the audited sha failing for the declared reason, then green at the pre-merge fix head with the tests unchanged (E_RED_PROOF)", () => {
+test("R2-114: DENY a red proof that is not a test-only red on the audited sha failing for the declared reason, then green at the pre-merge fix head with the tests unchanged (E_RED_PROOF)", () => {
   const fx = makeFixture("kauro-platform");
   try {
     const compiled = `${fx.work.replaceAll("\\", "/")}/packages/x/dist/test/a.test.js`;

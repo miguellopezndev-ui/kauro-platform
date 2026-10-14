@@ -3,7 +3,7 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B09-case-map.md",
-  "sha256": "08a308810855f462f19949cb0d552148329230393110babf905c95262f8c2216"
+  "sha256": "d6b5eea675186943ac97111ef417152910424df33916cdb61ce59a3db7d45f51"
  },
  "rows": [
   {
@@ -184,7 +184,7 @@
    "class": "PARTIAL",
    "test": [
     "packages/domain/test/commerce-critique.test.ts :: B09-F5 (D-CAP-B1): checkout is refused CAPACITY_UNAVAILABLE / DELIVERY_CAPACITY_UNAVAILABLE when the processing admission reports no deliverable capacity or answers nothing",
-    "apps/api/test/cmd028-create-payment-order.test.ts :: DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms, expired price, no deliverable capacity (CAPACITY_UNAVAILABLE), unqualified route, unreviewed treatment — is refused before any intent or provider call",
+    "apps/api/test/cmd028-create-payment-order.test.ts :: R2-082: DENY: a foreign tenant's quote is NOT_FOUND, a wrong role (VIEWER) is NOT_AUTHORIZED, and one missing prerequisite at a time — expired source, stale terms, expired price, no deliverable capacity (CAPACITY_UNAVAILABLE), unqualified route, unreviewed treatment — is refused before any intent or provider call",
     "apps/api/test/cmd028-create-payment-order.test.ts :: DENY (race): a source expiry committed between the intent and the capture leaves the order without authority — the capture is reconciled and no authorization is issued",
     "apps/api/test/cmd028-create-payment-order.test.ts :: DENY (ambiguous): a creation timeout answers 202 and the same key observes by request identity — one provider order, never a second create"
    ],

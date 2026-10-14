@@ -7,7 +7,7 @@
   {
    "case": "R2-082",
    "package": "B15",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null

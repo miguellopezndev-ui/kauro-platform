@@ -127,7 +127,7 @@ test("invalid revision and missing test are usage errors; temporary files are cl
   } finally { rmSync(f.parent, { recursive: true, force: true }); }
 });
 
-test("a build failure is not counted as a failing assertion and still cleans up", () => {
+test("R2-114: a build failure is not counted as a failing assertion and still cleans up", () => {
   const f = fixture();
   try {
     f.put("packages/cell/build.mjs", "throw new Error('broken build');\n");
@@ -144,7 +144,7 @@ test("a build failure is not counted as a failing assertion and still cleans up"
   } finally { rmSync(f.parent, { recursive: true, force: true }); }
 });
 
-test("a test whose import only exists at head is INCONCLUSIVE, not red", () => {
+test("R2-114: a test whose import only exists at head is INCONCLUSIVE, not red", () => {
   const f = fixture();
   try {
     const only = "packages/cell/test/export.test.ts";

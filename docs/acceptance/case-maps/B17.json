@@ -2,9 +2,8 @@
  "package": "B17",
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
-  "file": null,
-  "registry": "packages/contracts/registry/program.json",
-  "note": "no case map yet: no evidence claimed"
+  "file": "docs/design/B17-case-map.md",
+  "sha256": "09c8ed02c07915335987b422e7688915464a618dc966981faf750c2219539f42"
  },
  "rows": [
   {
@@ -13,7 +12,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B17"
+   ],
+   "claimed": "PART(B17 real runs, AWS D-14) NOT_EXECUTED; target class c"
   },
   {
    "case": "S077",
@@ -21,7 +23,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B17"
+   ],
+   "claimed": "PART(B17 real runs, AWS D-14) NOT_EXECUTED; target class c"
   },
   {
    "case": "S078",
@@ -29,7 +34,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T4 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "R2-018",
@@ -37,7 +46,12 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14",
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T2g NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "R2-019",
@@ -45,7 +59,12 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14",
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T2g NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "R2-020",
@@ -53,7 +72,12 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14",
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T2g NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "R2-021",
@@ -61,7 +85,12 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14",
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T2g NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "R2-022",
@@ -69,7 +98,12 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14",
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T2g NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "R2-023",
@@ -77,7 +111,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T1 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "R2-024",
@@ -85,7 +123,12 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B08",
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T1 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "R2-025",
@@ -93,7 +136,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T1 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "R2-026",
@@ -101,7 +148,12 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14",
+    "B15",
+    "B18"
+   ],
+   "claimed": "PART(L7 until L7 is C) NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD018-OK",
@@ -109,7 +161,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T3 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD018-DENY",
@@ -117,7 +173,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T3 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD018-RACE",
@@ -125,7 +185,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T3 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD019-OK",
@@ -133,7 +197,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T3 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD019-DENY",
@@ -141,7 +209,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T3 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD019-RACE",
@@ -149,7 +221,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T3 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD040-OK",
@@ -157,7 +233,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T1 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD040-DENY",
@@ -165,7 +245,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T1 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD040-RACE",
@@ -173,7 +257,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T1 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD041-OK",
@@ -181,7 +269,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T1 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD041-DENY",
@@ -189,7 +281,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T1 NOT_EXECUTED; target SIMULATED"
   },
   {
    "case": "CMD041-RACE",
@@ -197,7 +293,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B18"
+   ],
+   "claimed": "OPEN -> T1 NOT_EXECUTED; target SIMULATED"
   }
  ]
 }
