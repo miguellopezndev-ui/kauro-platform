@@ -313,7 +313,7 @@ test("R2-103 at the database: a payout destination becomes VERIFIED only with th
 
 // --- CMD045 ------------------------------------------------------------------------------------------------------------------------------
 
-test("CMD045 at the database: source evidence admits only the AGENCY segment, one live prospect exists per normalized organization key, and a prospect whose organization or contact key is suppressed is refused KC016", async () => {
+test("CMD045 at the database: source evidence admits the AGENCY and COMPANY segments and no other (D-33), one live prospect exists per normalized organization key, and a prospect whose organization or contact key is suppressed is refused KC016", async () => {
   await assertSeeded(w, machineOf("Prospect"));
   const s = await activeSeller(w, "cmd045-s");
   const t = await activeSeller(w, "cmd045-t");
@@ -324,9 +324,11 @@ test("CMD045 at the database: source evidence admits only the AGENCY segment, on
         [ids.next(), userId, sellerId, sha(`evidence-${segment}-${ids.next()}`), sha("https://directory.example/"), segment],
       ),
     );
-  // A3 3.7, D58: the only segment the table admits is AGENCY
-  for (const segment of ["IN_HOUSE", "END_CLIENT", "CONSUMER"]) await assert.rejects(evidence(s.userId, s.sellerId, segment), refusedWith("23514", "prospect_source_evidence_agency_segment"), segment);
+  // D-33 (supersedes A3 3.7's agency-only prospecting): agencies and companies are prospects; an end client, a consumer or any other
+  // value is refused by the database itself
+  for (const segment of ["IN_HOUSE", "END_CLIENT", "CONSUMER", "company", ""]) await assert.rejects(evidence(s.userId, s.sellerId, segment), refusedWith("23514", "prospect_source_evidence_segment"), segment);
   await evidence(s.userId, s.sellerId, "AGENCY");
+  await evidence(s.userId, s.sellerId, "COMPANY");
 
   // one live prospect per organization key, however the second registrar spells the organization
   const north = await registerProspect(w, s, "north.example");

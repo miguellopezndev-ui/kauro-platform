@@ -113,7 +113,7 @@ export class PgRequestJournal implements RequestJournal {
     const r = await execute<RequestRow>(
       this.db,
       `UPDATE kauro.request_journal SET state = 'DISPATCHING', provider_request_id = coalesce($3, provider_request_id)
-        WHERE request_id = $1 AND fence = $2 AND state = 'RESERVED' RETURNING ${REQUEST_COLUMNS}`,
+        WHERE request_id = $1 AND fence = $2 AND state = 'RESERVED' AND settlement_state IS NULL RETURNING ${REQUEST_COLUMNS}`,
       [requestId, fence, providerRequestId],
     );
     return r.rows[0] ? requestRecord(r.rows[0]) : null;

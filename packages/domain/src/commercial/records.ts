@@ -116,7 +116,7 @@ export type AssessmentOutcome = Token<"assessmentOutcomes">;
 export type DestinationCurrency = Token<"destinationCurrencies">;
 export type PayoutDestinationState = Token<"payoutDestinationStates">;
 export type ProspectState = Token<"prospectStates">;
-/** Prospects are agencies only (18 "Prospect qualification" as amended by A3; D58): the only segment the evidence table admits. */
+/** The segment of a prospect's source evidence: an agency or a company (D-33); the evidence table admits no other value (migration 0063). */
 export type ProspectSegment = Token<"prospectSegments">;
 export type SuppressionKeyKind = Token<"suppressionKeyKinds">;
 export type AttributionClaimState = Token<"attributionClaimStates">;

@@ -7,10 +7,12 @@
 // is the oracle and, for the forged receipts only, the writer that bypasses the receipt's append-only trigger.
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import type { ValidatePort } from "@kauro/application";
+import { AttemptEnvelopeFailure, GenerationSourceReader } from "@kauro/data-plane";
 import type { RowCounts } from "@kauro/contracts";
-import { deliveryManifestHashOf, issuedDeliveryManifestOf, type AuditUnitOfWork, type DeliveryArtifactRecord, type ExecutionAuthorityFacts, type ExecutionContext, type ProcessingJobId, type ProcessingJobRecord, type UnitOfWorkOptions } from "@kauro/domain";
-import type { AuditUnits } from "../src/index.js";
-import { startExecutionWorld, verifiedPrivate, type ExecutionWorld, type Purchase } from "./support/execution-world.js";
+import { deliveryManifestHashOf, issuedDeliveryManifestOf, type AgencyId, type AuditUnitOfWork, type DeliveryArtifactRecord, type ExecutionAuthorityFacts, type ExecutionContext, type ProcessingJobId, type PlanBody, type ProcessingJobRecord, type SystemContext, type UnitOfWorkOptions, type ValidationReceiptId, type ValidationSource } from "@kauro/domain";
+import { PlanValidator, planBodyHashOf, type AuditUnits } from "../src/index.js";
+import { TEST_LIMITS, ids, sha, startExecutionWorld, verifiedPrivate, type ExecutionWorld, type Purchase } from "./support/execution-world.js";
 
 let w: ExecutionWorld;
 
@@ -133,24 +135,28 @@ test("ROWCOUNTS-PRODUCER OK: the published package's KAURO_DELIVERY_MANIFEST_V1 
   await w.quiesce();
 });
 
-test("ROWCOUNTS-PRODUCER OK (populations): a bound receipt naming other populations than the sealed revision's (the core's own view: the validator hands it none) still issues the sealed revision's four populations, never the receipt's, with the receipt's execution counts", async () => {
+test("ROWCOUNTS-PRODUCER DENY (populations): a bound receipt naming other populations than the sealed revision's (one member at a time, higher or lower) fails the job DELIVERY_COUNTS_MISMATCH, revokes the private package and never delivers: the validator handed the core the sealed source and its billable units, so a receipt counting another population is not the revision's", async () => {
   const A = await w.agency("rc-pop");
-  const p = await w.paid(A, "rc-pop");
-  const { jobId } = await verifiedPrivate(w, p);
-  const receiptHash = await receiptHashOf(jobId);
-  const sealed = await oracleCounts(p, receiptHash);
-  const view = { ...sealed, physicalSourceRows: 1, logicalSourceRecords: 1, billableSourceUnits: sealed.billableSourceUnits + 5, associationEdges: sealed.associationEdges + 2 };
-  await forgeReceiptCounts(receiptHash, view);
-  const rec = recordingUnits(w.units);
-  const plane = w.planeWith({ units: rec.units }).execution;
-  assert.ok(plane !== null);
-  assert.deepEqual(await plane.pipeline.publish(jobId as ProcessingJobId), { kind: "APPLIED", what: "PUBLISHED" });
-  const [pub] = rec.published;
-  const pkgId = (await w.packages(jobId))[0]!.package_version_id;
-  const issued = (counts: RowCounts) => deliveryManifestHashOf(issuedDeliveryManifestOf({ packageId: pkgId, subject: pub!.job, copies: pub!.copies, counts, createdAt: pub!.createdAt, captureCompletedAt: pub!.facts.captureCompletedAt! }));
-  assert.equal(pub!.hash, issued(sealed), "the sealed revision's populations are issued");
-  assert.notEqual(pub!.hash, issued(view), "never the receipt's");
-  assert.equal((await w.job(jobId)).state, "READY");
+  const cases: ReadonlyArray<readonly [string, (c: RowCounts) => RowCounts]> = [
+    ["physical higher", (c) => ({ ...c, physicalSourceRows: c.physicalSourceRows + 1 })],
+    ["logical lower", (c) => ({ ...c, logicalSourceRecords: c.logicalSourceRecords - 1 })],
+    ["billable higher", (c) => ({ ...c, billableSourceUnits: c.billableSourceUnits + 5 })],
+    ["edges higher", (c) => ({ ...c, associationEdges: c.associationEdges + 2 })],
+  ];
+  for (const [label, forge] of cases) {
+    const p = await w.paid(A, `rc-pop-${label.replace(/ /g, "-")}`);
+    const { jobId } = await verifiedPrivate(w, p);
+    const receiptHash = await receiptHashOf(jobId);
+    const sealed = await oracleCounts(p, receiptHash);
+    assert.ok(sealed.logicalSourceRecords > 0, "a nonzero sealed population");
+    await forgeReceiptCounts(receiptHash, { ...forge(sealed) });
+    assert.deepEqual(await w.x.pipeline.publish(jobId as ProcessingJobId), { kind: "APPLIED", what: "FAILED" }, label);
+    const job = await w.job(jobId);
+    assert.deepEqual([job.state, job.terminal_reason], ["FAILED", "DELIVERY_COUNTS_MISMATCH"], label);
+    const [pkg] = await w.packages(jobId);
+    assert.deepEqual([pkg?.state, pkg?.delivery_manifest_hash], ["REVOKED", null], label);
+    assert.equal((await w.authorization(p.authorizationId)).state, "CONSUMED", `${label}: never DELIVERED`);
+  }
   await w.quiesce();
 });
 
@@ -174,5 +180,61 @@ test("ROWCOUNTS-PRODUCER DENY: a bound receipt that lacks a RowCounts member or 
     assert.deepEqual([pkg?.state, pkg?.delivery_manifest_hash], ["REVOKED", null], label);
     assert.equal((await w.authorization(p.authorizationId)).state, "CONSUMED", `${label}: never DELIVERED`);
   }
+  await w.quiesce();
+});
+
+test("ROWCOUNTS-PRODUCER OK (validator source): PlanValidator hands the core a reader over exactly the sealed revision's ACCEPTED generations (each read back at its sealed digest and length) and the frozen billable units, read by AuditDiscovery.validationSource in a unit bound to the agency; an unknown hash, another agency's revision or a revision without populations validates nothing (VALIDATION_SOURCE_UNAVAILABLE) and calls no core", async () => {
+  const A = await w.agency("rc-src");
+  const B = await w.agency("rc-src-other");
+  const p = await w.paid(A, "rc-src");
+  const bound = (agencyId: string) => ({ kind: "SYSTEM", serviceId: "plan-validation", correlationId: ids.next(), agencyId }) as unknown as SystemContext;
+  const sourceOf = (agencyId: string, hash: string) => w.units.run(bound(agencyId), (uow) => uow.auditDiscovery.validationSource(agencyId as AgencyId, hash));
+  const sealed = (await w.h.oracle.query("SELECT physical_source_rows::int AS p, logical_source_records::int AS l, billable_source_units::int AS b, association_edges::int AS e FROM kauro.dataset_revisions WHERE revision_id = $1", [p.revisionId])).rows[0];
+  const source = await sourceOf(A.agencyId, p.revisionHash);
+  assert.ok(source !== null);
+  assert.deepEqual([source.revisionId, source.projectId, source.revisionState, source.populations], [p.revisionId, p.projectId, "SEALED", { physicalSourceRows: sealed.p, logicalSourceRecords: sealed.l, billableSourceUnits: sealed.b, associationEdges: sealed.e }]);
+  assert.ok(source.acceptedGenerations.length > 0, "the sealed manifest's generations");
+  assert.equal(await sourceOf(B.agencyId, p.revisionHash), null, "another agency's revision is not visible");
+  assert.equal(await sourceOf(A.agencyId, sha("no-such-revision")), null);
+
+  const plan = (await w.h.oracle.query("SELECT body FROM kauro.plans WHERE plan_id = $1", [p.planId])).rows[0];
+  const body = plan.body as PlanBody;
+  const seen: Array<{ readonly billable: number | undefined; readonly generations: unknown }> = [];
+  let readBytes = false;
+  const validate: ValidatePort = {
+    async validate(request) {
+      const reader = request.controls?.source;
+      assert.ok(reader instanceof GenerationSourceReader, "the core is handed the sealed generations' reader");
+      await assert.rejects(reader.open({ objectName: "outside", generation: "1" }), (e: unknown) => e instanceof AttemptEnvelopeFailure && e.terminalCause === "OUTSIDE_CAPABILITY");
+      seen.push({ billable: request.controls?.billableSourceUnits, generations: reader.capability.acceptedGenerations });
+      if (readBytes) {
+        // the harness seals rows, not bytes: a read of a sealed generation the storage does not hold fails the source's integrity
+        const g = source.acceptedGenerations[0]!;
+        for await (const _chunk of (await reader.open({ objectName: g.objectName, generation: g.generation })).read()) void _chunk;
+      }
+      return { evidenceClass: "SIMULATED", outcome: "ERROR", receipt: null, problems: ["recorded"] };
+    },
+  };
+  const validator = new PlanValidator({ validate, receipts: w.receipts, corePackageHash: sha("rc-src-core"), limits: TEST_LIMITS, storage: w.storage, scratchRoot: w.scratchRoot });
+  const run = (s: ValidationSource | null) =>
+    validator.run({
+      subject: { agencyId: A.agencyId, planId: p.planId, planHash: planBodyHashOf(body), revisionHash: p.revisionHash, targetContractHash: sha("rc-src-target") },
+      body,
+      receiptId: ids.next() as ValidationReceiptId,
+      startedAt: w.now(),
+      cancellation: { check: () => Promise.resolve("CONTINUE" as const) },
+      source: s,
+      completedAt: () => Promise.resolve(w.now()),
+    });
+  const first = await run(source);
+  assert.deepEqual(first, { kind: "CONTRACT_FAILURE", reason: "VALIDATOR_ERROR", evidenceClass: "SIMULATED" }, "the recording core answers ERROR");
+  assert.deepEqual(seen, [{ billable: sealed.b, generations: source.acceptedGenerations.map((g) => ({ objectName: g.objectName, generation: g.generation, sha256: g.sha256, byteLength: g.byteLength })) }], "exactly the sealed generations and the frozen billable units");
+  readBytes = true;
+  assert.deepEqual(await run(source), { kind: "CONTRACT_FAILURE", reason: "SOURCE_INTEGRITY_FAILED", evidenceClass: "EXECUTED_LOCAL" }, "a sealed generation the storage cannot give back");
+  seen.length = 1;
+  for (const bad of [null, { ...source, populations: null }, { ...source, revisionState: "READY_TO_SEAL" }, { ...source, acceptedGenerations: [] }]) {
+    assert.deepEqual(await run(bad), { kind: "CONTRACT_FAILURE", reason: "VALIDATION_SOURCE_UNAVAILABLE", evidenceClass: "EXECUTED_LOCAL" });
+  }
+  assert.equal(seen.length, 1, "no core call without the sealed source");
   await w.quiesce();
 });

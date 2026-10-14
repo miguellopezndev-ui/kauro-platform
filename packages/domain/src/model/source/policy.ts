@@ -116,3 +116,6 @@ export const COMPLETION_REF_MAX_CHARS = 4_096;
 
 /** Decision D-SAPI-3: polling guidance of the ACCEPTED answer of CompleteUpload (10: status URL and allowed polling guidance). */
 export const COMPLETION_POLL_AFTER_SECONDS = 5;
+
+/** The most one explicit soft-deadline extension may ask for (registry CMD060 "at most 259200 seconds within the original hard cap"; 09: seventy-two hours). */
+export const RETENTION_EXTENSION_MAX_SECONDS = 259_200;

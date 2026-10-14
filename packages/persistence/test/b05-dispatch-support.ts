@@ -77,6 +77,9 @@ export interface Run {
   readonly stepFence: number;
   readonly stepId: string;
   readonly candidateManifestHash: string;
+  /** The audited subject's hashes (a system draft's plan body and its receipt name them). */
+  readonly revisionHash: string;
+  readonly targetContractHash: string;
 }
 
 let agencySeq = 0;
@@ -109,7 +112,7 @@ export async function interpretingRun(env: DispatchEnv, tag: string, pool: strin
   const advanced = await h.audit.run(controlOf(ag.agencyId), (uow) => uow.audits.advanceAudit(input.auditId, 2, { to: "INTERPRETING", profileEvidenceHash: sha(`${name}-profile`), candidateManifestHash }));
   assert.equal(advanced.kind, "APPLIED");
   const interpret = await h.audit.run(controlOf(ag.agencyId), (uow) => uow.audits.claimStep(input.auditId, "INTERPRET", ids.next() as AuditStepId));
-  return { ag, auditId: input.auditId, grantId: input.grantId, pool, stepFence: interpret.step.fence, stepId: interpret.step.stepId, candidateManifestHash };
+  return { ag, auditId: input.auditId, grantId: input.grantId, pool, stepFence: interpret.step.fence, stepId: interpret.step.stepId, candidateManifestHash, revisionHash: input.revisionHash, targetContractHash: input.targetContractHash };
 }
 
 /** One model task of the run admitted through beginDispatch with a core admission of `maxChargeMicros`. */
@@ -145,7 +148,8 @@ export async function admitWith(store: PgAuditStore | { createModelTask: PgAudit
     taskKey: sha(`task-${a.core.reservationId}`),
     candidateManifestHash: a.run.candidateManifestHash,
     policyHash: sha("model-policy"),
-    minimizedRequestHash: sha(`minimized-${a.core.reservationId}`),
+    minimizedRequestHash: sha(`request-${a.core.reservationId}`),
+    core: { runId: a.core.runId, requestKey: a.core.requestKey },
     providerProfileId: ids.next() as Id,
     maximumCostCents: 40n,
   });

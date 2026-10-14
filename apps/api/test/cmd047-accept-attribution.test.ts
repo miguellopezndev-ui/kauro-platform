@@ -108,9 +108,8 @@ test("OK: the owner accepts a SUBMITTED claim with a prepared allocation naming 
   const lost = await claimRow(competing.claimId);
   assert.deepEqual([lost?.state, lost?.agency_id, lost?.allocation_id, lost?.rejected], ["REJECTED", agencyId, allocationId, true]);
   assert.equal(await w().count("commission_entitlements", "agency_id = $1", [agencyId]), 0, "an acceptance creates no entitlement: the commission service converts it at the first purchase");
-  // the buyer type was asked of the platform port once, for this agency, in the owner's operator context
-  const asked = buyerTypes.calls.slice(calls);
-  assert.deepEqual(asked.map((c) => [c.operation, c.identity]), [["BUYER_TYPE_OF OPERATOR", agencyId]]);
+  // D-33: the buyer type is no condition of attribution, so the platform port is not asked
+  assert.deepEqual(buyerTypes.calls.slice(calls), [], "AcceptAttribution reads no buyer type");
   const journal = await w().journal(key);
   assert.deepEqual([journal?.state, journal?.status, journal?.resourceKind, journal?.resourceId], ["COMMITTED", 200, "attribution_claim", main.claimId]);
 });
@@ -187,31 +186,19 @@ test("DENY: an agency member's tenant session is a foreign scope and a seller a 
   assert.equal((await claimRow(other.claimId))?.state, "SUBMITTED");
 });
 
-test("DENY (buyer type, D58): with the buyer-type fake answering unset or IN_HOUSE, AcceptAttribution is 409 PRECONDITION_FAILED BUYER_TYPE_UNSET or IN_HOUSE_NOT_ATTRIBUTABLE and writes nothing; answering AGENCY, the same request freezes the allocation", async () => {
-  const unset = await agencyOf("cmd047-buyer-unset", null);
-  const inHouse = await agencyOf("cmd047-buyer-house", "IN_HOUSE");
-  const refusedClaim = await claimed("cmd047-buyer-a");
-  const unsetAllocation = await prepareAllocation(w().h, { ownerUserId: pw.kora.userId, agencyId: unset, prospectId: refusedClaim.prospectId, shares: [{ seller: refusedClaim.seller, claimId: refusedClaim.claimId, shareBps: 10000 }] });
-  const houseAllocation = await prepareAllocation(w().h, { ownerUserId: pw.kora.userId, agencyId: inHouse, prospectId: refusedClaim.prospectId, shares: [{ seller: refusedClaim.seller, claimId: refusedClaim.claimId, shareBps: 10000 }] });
+test("OK (D-33): a company buyer is attributable under the same rules as an agency — with the buyer-type fake answering IN_HOUSE or unset, AcceptAttribution freezes the allocation and accepts the claim exactly as for AGENCY, and the buyer-type port is not asked", async () => {
   const calls = buyerTypes.calls.length;
-  const before = await footprint();
-
-  // the fake answers unset: BUYER_TYPE_UNSET, and nothing is written
-  const unsetReply = await accept(pw.kora, refusedClaim.claimId, bodyOf(unsetAllocation));
-  assert.equal(outcome(w(), unsetReply), "409 PRECONDITION_FAILED BUYER_TYPE_UNSET");
-  // the fake answers IN_HOUSE: IN_HOUSE_NOT_ATTRIBUTABLE, and nothing is written
-  const houseReply = await accept(pw.kora, refusedClaim.claimId, bodyOf(houseAllocation));
-  assert.equal(outcome(w(), houseReply), "409 PRECONDITION_FAILED IN_HOUSE_NOT_ATTRIBUTABLE");
-  assert.deepEqual(await footprint(), before, "no allocation is frozen and no claim is ruled");
-  assert.deepEqual((await claimRow(refusedClaim.claimId))?.state, "SUBMITTED");
-  assert.deepEqual(buyerTypes.calls.slice(calls).map((c) => [c.operation, c.identity]), [["BUYER_TYPE_OF OPERATOR", unset], ["BUYER_TYPE_OF OPERATOR", inHouse]], "the platform port was asked once per request, for the allocation's agency");
-
-  // the fake answers AGENCY: the same request freezes the allocation
-  buyerTypes.set(unset, "AGENCY");
-  const reply = completed<AttributionView>(await accept(pw.kora, refusedClaim.claimId, bodyOf(unsetAllocation)), 200);
-  assert.deepEqual([reply.data.claim.state, reply.data.agencyId], ["ACCEPTED", unset]);
-  assert.deepEqual(await allocationRow(unsetAllocation), { frozen: true, frozen_by_user_id: pw.kora.userId, shares: ["10000"] });
-  assert.equal((await allocationRow(houseAllocation))?.frozen, false, "the in-house allocation stays prepared");
+  for (const [label, buyerType] of [["cmd047-d33-house", "IN_HOUSE"], ["cmd047-d33-unset", null], ["cmd047-d33-agency", "AGENCY"]] as const) {
+    const agencyId = await agencyOf(label, buyerType);
+    const c = await claimed(label);
+    const allocationId = await prepareAllocation(w().h, { ownerUserId: pw.kora.userId, agencyId, prospectId: c.prospectId, shares: [{ seller: c.seller, claimId: c.claimId, shareBps: 10000 }] });
+    const reply = completed<AttributionView>(await accept(pw.kora, c.claimId, bodyOf(allocationId)), 200);
+    assert.deepEqual([reply.data.claim.state, reply.data.agencyId, reply.data.beneficiaryCount, reply.data.decisionReason], ["ACCEPTED", agencyId, 1, "SOLE_CLAIM_ACCEPTED"], String(buyerType));
+    const row = await claimRow(c.claimId);
+    assert.deepEqual([row?.state, row?.agency_id, row?.allocation_id, row?.window_seconds], ["ACCEPTED", agencyId, allocationId, HOURS_2160_S], `${String(buyerType)}: the same 2160-hour window`);
+    assert.deepEqual(await allocationRow(allocationId), { frozen: true, frozen_by_user_id: pw.kora.userId, shares: ["10000"] }, String(buyerType));
+  }
+  assert.deepEqual(buyerTypes.calls.slice(calls), [], "no acceptance asked the buyer-type port");
 });
 
 test("RACE: an identical retry replays the 200, the same key with another shareAllocationRef is 409 IDEMPOTENCY_CONFLICT, two acceptances for one agency racing yield one allocation and one ATTRIBUTION_EXISTS with the wait observed, and a crash before COMMIT leaves the claim SUBMITTED", async () => {

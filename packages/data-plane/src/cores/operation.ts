@@ -11,13 +11,17 @@ export interface CoreTimers {
   after(ms: number, fire: () => void): () => void;
 }
 
-export const SYSTEM_TIMERS: CoreTimers = {
-  nowMs: () => Date.now(),
+/**
+ * The timers of a process clock injected by the composition (B05 D5-2, CK3): the cores read no process clock of their own; the
+ * product's process clocks are its four injection points (apps/control composition.ts controlClock among them).
+ */
+export const coreTimersOf = (clock: { nowMs(): number }): CoreTimers => ({
+  nowMs: () => clock.nowMs(),
   after: (ms, fire) => {
     const handle = setTimeout(fire, Math.max(0, ms));
     return () => clearTimeout(handle);
   },
-};
+});
 
 export type OperationEndReason = "DEADLINE_EXCEEDED" | "CANCELLED" | "FENCED";
 

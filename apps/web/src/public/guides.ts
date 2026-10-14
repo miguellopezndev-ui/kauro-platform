@@ -9,9 +9,9 @@ import { INPUT_LIMITS } from "./limits.ts";
 import { POLICY_SNAPSHOT } from "./policy-snapshot.ts";
 import { formatDays } from "./retention.ts";
 
-export const GUIDES_VERSION = "1.0";
+export const GUIDES_VERSION = "1.1";
 /** The date the guides last changed, in UTC. */
-export const GUIDES_CHANGED = "2026-09-29";
+export const GUIDES_CHANGED = "2026-10-13";
 
 export interface GuideParagraph {
   readonly id: PublicCopyId;
