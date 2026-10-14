@@ -31,7 +31,6 @@ import type { SourceIntakeId, SourceReadId } from "../sources/outcomes.js";
 import { SESSION_URL_MEMBER, SESSION_URL_VIEW, SOURCE_COMMAND_RESPONSES, SOURCE_VIEW_DEFINITIONS } from "../sources/response-views.js";
 import { CURSOR_PATTERN } from "./cursor.js";
 import { LABEL_PATTERN, TEXT_PATTERN } from "./request-schemas.js";
-import { CURSOR_PATTERN } from "./cursor.js";
 import { READINESS_BLOCKERS } from "./views.js";
 import { PROJECT_PHASES, PROJECT_REQUIRED_ACTIONS } from "../agency/dashboard-vocabulary.js";
 import {
