@@ -563,8 +563,12 @@ export class PgUnitOfWorkFactory implements SourceUnitOfWorkFactory {
       }
       throw asFailure(e, context.correlationId);
     } finally {
+      // the backend is ended only when this release DESTROYS the client for its abandoned work. Work given up after the decision (during
+      // COMMIT or ROLLBACK) leaves a finished, clean connection that goes back to the pool: signalling its backend then would terminate a
+      // pooled connection another unit of work may already hold (FLAKY-UOW-TXLIMIT: a pid AND start fence cannot tell a reused backend apart)
+      const endBackend = destroy !== undefined && destroy === unit?.abandonedWork && backend !== null;
       client.release(destroy);
-      if (unit?.abandonedWork != null && backend !== null) await endAbandonedBackend(pool, backend);
+      if (endBackend && backend !== null) await endAbandonedBackend(pool, backend);
     }
   }
 }
