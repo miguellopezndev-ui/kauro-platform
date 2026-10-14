@@ -119,7 +119,7 @@ function assertRefused(label: string, got: Awaited<ReturnType<typeof validated>>
 }
 
 function assertValidated(label: string, got: Awaited<ReturnType<typeof validated>>): void {
-  assert.equal(got.settled.state, "VALIDATED", `${label}: the plan is VALIDATED`);
+  assert.equal(got.settled.state, "VALIDATED", `${label}: the plan is VALIDATED (stored reason ${String(got.settled.reason)})`);
   assert.deepEqual(got.settled.validations.map(([fence, origin, result]) => [fence, origin, result]), [[1, "COMMAND", "VALID"]], label);
   assert.equal(got.settled.reason, null, `${label}: a VALID intent carries no refusal reason`);
   assert.equal(got.coreCalls, 1, `${label}: the core validated it`);
