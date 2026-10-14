@@ -3,12 +3,18 @@
  * (unit of work, repositories, event publisher, journal, authorizer, plan services, inspectors); the persistence adapter and the
  * authorization implementation are wired at the entrypoint.
  */
+import type { RandomBytes } from "@kauro/domain";
 import type { AbuseLimiter } from "../../ports/assurance-and-admission.js";
 import type { ArtifactResolver, DisclosureComposer, PlanPatchCompiler } from "../../ports/plan-services.js";
 import type { ActiveWorkInspector, CommercialConsequenceInspector, ExternalActionInspector } from "../../ports/work-inspectors.js";
 import type {
+  AcceptInvitationHandler,
   ApprovePlanHandler,
   ArchiveClientHandler,
+  ChangeMembershipHandler,
+  InviteMemberHandler,
+  RevokeMembershipHandler,
+  TransferOwnershipHandler,
   CreateAgencyHandler,
   CreateClientHandler,
   CreateProjectHandler,
@@ -17,7 +23,12 @@ import type {
   WithdrawApprovalHandler,
 } from "../contracts.js";
 import type { CommandRuntime } from "../runtime.js";
+import { acceptInvitationHandler } from "./accept-invitation.js";
 import { approvePlanHandler } from "./approve-plan.js";
+import { changeMembershipHandler } from "./change-membership.js";
+import { inviteMemberHandler } from "./invite-member.js";
+import { revokeMembershipHandler } from "./revoke-membership.js";
+import { transferOwnershipHandler } from "./transfer-ownership.js";
 import { archiveClientHandler } from "./archive-client.js";
 import { createAgencyHandler } from "./create-agency.js";
 import { createClientHandler } from "./create-client.js";
@@ -51,6 +62,30 @@ export interface SupportHandlers {
   readonly CMD044: CreateSupportCaseHandler;
 }
 
+/** The team package's commands (B16, G-TENANT): CMD003..CMD007, served beside B06's seven. */
+export interface TeamHandlers {
+  readonly CMD003: InviteMemberHandler;
+  readonly CMD004: AcceptInvitationHandler;
+  readonly CMD005: ChangeMembershipHandler;
+  readonly CMD006: RevokeMembershipHandler;
+  readonly CMD007: TransferOwnershipHandler;
+}
+
+export interface TeamOptions {
+  /** The random source of the invitation token (32 bytes). */
+  readonly random: RandomBytes;
+}
+
+export function createTeamHandlers(runtime: CommandRuntime, options: TeamOptions): TeamHandlers {
+  return Object.freeze({
+    CMD003: inviteMemberHandler(runtime, { random: options.random }),
+    CMD004: acceptInvitationHandler(runtime),
+    CMD005: changeMembershipHandler(runtime),
+    CMD006: revokeMembershipHandler(runtime),
+    CMD007: transferOwnershipHandler(runtime),
+  });
+}
+
 export function createSupportHandlers(runtime: CommandRuntime, options: SupportOptions = {}): SupportHandlers {
   return Object.freeze({ CMD044: createSupportCaseHandler(runtime, options) });
 }
@@ -77,3 +112,8 @@ export { revisePlanHandler } from "./revise-plan.js";
 export { approvePlanHandler, approvalHashOf } from "./approve-plan.js";
 export type { ApprovalPreimage } from "./approve-plan.js";
 export { withdrawApprovalHandler } from "./withdraw-approval.js";
+export { inviteMemberHandler, INVITATION_TTL_MS } from "./invite-member.js";
+export { acceptInvitationHandler } from "./accept-invitation.js";
+export { changeMembershipHandler } from "./change-membership.js";
+export { revokeMembershipHandler } from "./revoke-membership.js";
+export { transferOwnershipHandler } from "./transfer-ownership.js";

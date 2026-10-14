@@ -72,6 +72,7 @@ import {
   type PlanValidationId,
   type SystemContext,
   type ValidationReceiptId,
+  type ValidationSource,
 } from "@kauro/domain";
 import { modelTaskJournalOf } from "@kauro/persistence";
 import { EXECUTION_SERVICES, applied, boundSystem, refused, type ExecutionStep } from "../execution/work.js";
@@ -113,6 +114,8 @@ interface Claim {
   readonly generations: ReadonlyArray<ExecutionSourceGeneration>;
   readonly grant: CostGrantRecord | null;
   readonly draft: DraftValidation | null;
+  /** VALIDATE: the sealed revision the draft binds (B05 L1v). */
+  readonly validationSource: ValidationSource | null;
 }
 
 /** A step's result, recorded once under its fence, and the edges it takes in the same unit. */
@@ -183,6 +186,7 @@ export class AuditOrchestration implements OutboxConsumer {
       let generations: ReadonlyArray<ExecutionSourceGeneration> = [];
       let grant: CostGrantRecord | null = null;
       let draft: DraftValidation | null = null;
+      let validationSource: ValidationSource | null = null;
       if (kind === "PROFILE") {
         // profile_worker_claims: the source SEALED and the grant AUTHORIZED and unexpired (a lost source is EXECUTION_CONTROL's)
         const source = await uow.auditDiscovery.auditSource(audit);
@@ -198,9 +202,10 @@ export class AuditOrchestration implements OutboxConsumer {
         const open = (await uow.auditDiscovery.openDraftValidations(auditId)).filter((d) => d.planState === "VALIDATING");
         draft = open[open.length - 1] ?? null;
         if (draft === null) throw new StepRefused("NO_OPEN_DRAFT");
+        validationSource = await uow.auditDiscovery.validationSource(audit.agencyId, draft.validation.revisionHash);
       }
       const claimed = await uow.audits.claimStep(auditId, kind, this.deps.ids.next() as AuditStepId);
-      return { audit: claimed.audit, step: claimed.step, claimedAt, generations, grant, draft };
+      return { audit: claimed.audit, step: claimed.step, claimedAt, generations, grant, draft, validationSource };
     });
   }
 
@@ -350,6 +355,7 @@ export class AuditOrchestration implements OutboxConsumer {
       receiptId: this.deps.ids.next() as ValidationReceiptId,
       startedAt: claim.claimedAt,
       cancellation: this.channel(claim),
+      source: claim.validationSource,
       completedAt: () => serverNowIn(this.deps, SERVICE, audit.agencyId),
     });
     const settle = async (uow: AuditUnitOfWork, result: "VALID" | "INVALID" | "ERROR", receiptHash: Sha256Hex | null): Promise<void> => {

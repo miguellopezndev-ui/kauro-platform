@@ -92,7 +92,7 @@ test("the suites the tool runs are the packages' own test scripts, one for every
 });
 
 test("B09 (M4): the tool seals the B09 case map beside B06's, read as exactly the 30 cases of B09 (registry program.json) with the later packages each depends on; every cited test on the branch exists under exactly that name, and every other citation is in a row that plans it", () => {
-  assert.deepEqual(CASE_MAPS.map((m) => [m.package, m.file]), [["B06", "docs/design/B06-case-map.md"], ["B09", "docs/design/B09-case-map.md"]]);
+  assert.deepEqual(CASE_MAPS.map((m) => [m.package, m.file]), [["B06", "docs/design/B06-case-map.md"], ["B09", "docs/design/B09-case-map.md"], ["B16", "docs/design/B16-case-map.md"]]);
   const program = JSON.parse(readFileSync(join(root, "packages", "contracts", "registry", "program.json"), "utf8"));
   const b09 = readCaseMap(readFileSync(B09_CASE_MAP_PATH, "utf8"));
   assert.deepEqual(b09.map((r) => r.caseId).sort(), [...program.find((p) => p.id === "B09").caseIds].sort());

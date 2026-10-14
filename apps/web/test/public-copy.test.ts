@@ -9,7 +9,7 @@ import { join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { R2_DOMAIN_ALIASES } from "@kauro/contracts";
-import { HEALTH_CHECK_CTA, HEALTH_CHECK_NAME, IN_HOUSE_SENTENCE, PERMITTED_AI_SENTENCE, lintCatalogue, lintText, withoutComments } from "../src/copy/lint.ts";
+import { HEALTH_CHECK_CTA, HEALTH_CHECK_NAME, PERMITTED_AI_SENTENCE, lintCatalogue, lintText, withoutComments } from "../src/copy/lint.ts";
 import { PUBLIC_COPY, copy, placeholdersOf, type PublicCopyId } from "../src/copy/public.ts";
 
 const webRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -30,13 +30,11 @@ test("the catalogue passes the A3 lint: no audit, no AI-ready, no compatibility 
   assert.deepEqual(lintCatalogue(entries, { brands }), []);
 });
 
-test("the names A3 fixes are exact: the free step, its call to action, and the one sentence for in-house teams that stands on Pricing alone", () => {
+test("the names A3 fixes are exact: the free step and its call to action; and (D-33) Pricing says plainly that a company buys on the same terms as an agency", () => {
   assert.equal(PUBLIC_COPY["health-check.title"], HEALTH_CHECK_NAME);
   assert.equal(PUBLIC_COPY["public.cta.request-health-check.cta"], HEALTH_CHECK_CTA);
   assert.equal(HEALTH_CHECK_CTA, "Request a free data health check");
-  assert.equal(PUBLIC_COPY["pricing.in-house.body"], IN_HOUSE_SENTENCE);
-  const inHouse = ids.filter((id) => (entries[id] ?? "").includes(IN_HOUSE_SENTENCE));
-  assert.deepEqual(inHouse, ["pricing.in-house.body"]);
+  assert.equal(PUBLIC_COPY["pricing.in-house.body"], "Companies preparing their own CRM data can buy Kauro directly, at the same prices and discounts as agencies.");
   const withAi = ids.filter((id) => /\bAI\b|artificial intelligence/i.test(entries[id] ?? ""));
   assert.deepEqual(withAi.map((id) => entries[id]), [PERMITTED_AI_SENTENCE], "AI is written in one message only, and it is the permitted sentence");
   assert.match(PUBLIC_COPY["home.title"], /^Prepare and verify CRM data from files\.$/);
@@ -60,17 +58,13 @@ test("the lint refuses what the catalogue must never say: a synthetic entry per 
   for (const [text, what] of refused) assert.notDeepEqual(lintText("synthetic.body", text, { brands }), [], what);
   const surface = lintCatalogue({ ...entries, "synthetic.title": "Clean data for AI" }, { brands });
   assert.ok(surface.some((violation) => violation.id === "synthetic.title"), "AI in a title is refused");
-  const twice = lintCatalogue({ ...entries, "pricing.in-house.again": IN_HOUSE_SENTENCE }, { brands });
-  assert.ok(twice.length > 0, "the in-house sentence twice is refused");
-  const elsewhere = lintCatalogue({ ...entries, "home.in-house": IN_HOUSE_SENTENCE }, { brands });
-  assert.ok(elsewhere.some((violation) => violation.id === "home.in-house"), "the in-house sentence off Pricing is refused");
   const brand = brands[0];
   assert.ok(brand !== undefined, "the contract package names the earlier brand");
   assert.notDeepEqual(lintText("synthetic.body", `Welcome to ${brand}`, { brands }), []);
 });
 
 test("copy() fills every placeholder, refuses a message asked for with a value missing or with a value it has no place for, and leaves nothing unfilled", () => {
-  assert.equal(copy("pricing.in-house.body"), IN_HOUSE_SENTENCE);
+  assert.equal(copy("pricing.in-house.body"), PUBLIC_COPY["pricing.in-house.body"]);
   assert.equal(copy("security.retention.links", { minutes: "15 minutes" }), "A download link works for 15 minutes.");
   assert.throws(() => copy("security.retention.links"), /COPY_PLACEHOLDER_MISSING security\.retention\.links minutes/);
   assert.throws(() => copy("security.retention.links", { minutes: "15 minutes", extra: 1 }), /COPY_VALUE_UNUSED security\.retention\.links extra/);
@@ -148,4 +142,12 @@ test("the sources say what a page shows only through the catalogue: no sentence 
     const prose = [...text.matchAll(/>([^<>{}\n]*[A-Za-z]{3,}\s+[A-Za-z]{3,}[^<>{}\n]*)</g)].map((match) => (match[1] ?? "").trim()).filter((value) => value.length > 0);
     assert.deepEqual(prose, [], `${relative(webRoot, file)} types prose outside the catalogue`);
   }
+});
+
+test("D-33: the lines that state who may buy, who gets a repeat discount, who holds an account and whose data is kept apart name any customer, never an agency alone", () => {
+  for (const id of ["pricing.ladder.repeat.body", "pricing.repeat.body", "pricing.account.body", "security.processed.body", "security.isolation.heading", "security.isolation.body"] as const) {
+    assert.doesNotMatch(PUBLIC_COPY[id], /\bagenc(y|ies)\b/i, id);
+  }
+  assert.equal(PUBLIC_COPY["contact.buyer.in-house"], "A company working on its own data");
+  assert.equal(PUBLIC_COPY["contact.buyer.agency"], "An agency preparing data for clients");
 });

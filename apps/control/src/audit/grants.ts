@@ -77,7 +77,8 @@ export class GrantReconciliation implements ExecutionSweeper {
         // 2. an intent the database can no longer send: CANCELLED at its fence, reconciled with nothing spent
         const cancelled = await uow.requestJournal.markCancelled(usage.requestId, usage.fence, now);
         if (cancelled === null) throw new StepRefused("REQUEST_FENCED");
-        grant = await uow.audits.reconcileRequest(usage.requestId, 0n);
+        // a reservation its core already RELEASED unsent (S09) was reconciled at 0 then: only the state moves
+        if (usage.usageState !== "RECONCILED") grant = await uow.audits.reconcileRequest(usage.requestId, 0n);
         acted = true;
       } else if (usage.nonAccepted) {
         // B05 D5-18 branch (b): a FAILED request the provider or the transport proved never accepted: released at 0 (IC's late RELEASED is a replay)

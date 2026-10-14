@@ -6,8 +6,8 @@
  * One unit of work of the caller's OPERATOR context, in B06's pipeline order: access (the caller's own ACTIVE seller row, else its own
  * ACTIVE KAURO_OWNER grant, each read after its transition lock) → journal reserve (or the replay of the journaled 201) → the body, the
  * first failure answering: the organization label names a business domain (its key is KAURO_PROSPECT_ORGANIZATION_V1 of the normalized
- * domain, so every spelling of one domain has one key) → the caller's own AGENCY-segment source evidence and business contact
- * (SOURCE_EVIDENCE_INVALID; another seller's evidence and another segment are as unknown as a missing one) → no suppression by the
+ * domain, so every spelling of one domain has one key) → the caller's own source evidence, of the AGENCY or COMPANY segment (D-33), and
+ * business contact (SOURCE_EVIDENCE_INVALID; another seller's evidence and any other segment are as unknown as a missing one) → no suppression by the
  * organization key or the contact key (PROSPECT_SUPPRESSED) → no live prospect of the key (PROSPECT_EXISTS; a prospect another seller
  * registered is invisible to the caller, so the live-prospect unique index answers for it after waiting for the other transaction).
  * Writes the prospect born RESEARCHED at version 1, owned by the registering seller; no claim, no attribution, no customer data. The
@@ -15,13 +15,16 @@
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { ProspectContactRef, ProspectId, SellerId, UserId } from "@kauro/domain";
-import { DomainFailure, organizationKeyOf } from "@kauro/domain";
+import { COMMERCIAL_VOCABULARY, DomainFailure, organizationKeyOf } from "@kauro/domain";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { CommerceAccessDenied, operatorContextOf, runCommerceCommand, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
 import { commercialAdmissionSpecOf, type CommercialCommandHandler } from "../agency/runtime.js";
 import { REGISTER_PROSPECT, type RegisterProspectBody } from "../contracts.js";
 import type { ProspectView } from "../views.js";
 import type { ProspectCollaborators } from "./runtime.js";
+
+/** The segments a prospect may be sourced from (D-33: agencies and companies); the database admits no other (migration 0063). */
+const PROSPECT_SEGMENTS: ReadonlySet<string> = new Set(COMMERCIAL_VOCABULARY.prospectSegments);
 
 export function registerProspectHandler(runtime: CommerceRequestRuntime, co: ProspectCollaborators): CommercialCommandHandler<RegisterProspectBody, ProspectView> {
   const spec = REGISTER_PROSPECT;
@@ -55,8 +58,8 @@ export function registerProspectHandler(runtime: CommerceRequestRuntime, co: Pro
             throw new DomainFailure("INVALID_REQUEST", "request refused: SCHEMA_VIOLATION", { reason: "SCHEMA_VIOLATION", fields: [{ field: "organizationLabel", code: "FORMAT" }] });
           }
           const evidence = await sales.sourceEvidence(body.sourceEvidenceHash as Sha256Hex);
-          if (evidence === null || evidence.segment !== "AGENCY" || (sellerId !== null && evidence.recordedBySellerId !== sellerId)) {
-            throw new DomainFailure("PRECONDITION_FAILED", "the source evidence is not the caller's own AGENCY-segment evidence", { reason: "SOURCE_EVIDENCE_INVALID" });
+          if (evidence === null || !PROSPECT_SEGMENTS.has(evidence.segment) || (sellerId !== null && evidence.recordedBySellerId !== sellerId)) {
+            throw new DomainFailure("PRECONDITION_FAILED", "the source evidence is not the caller's own agency or company evidence", { reason: "SOURCE_EVIDENCE_INVALID" });
           }
           const contact = await sales.getContact(body.businessContactRef as ProspectContactRef);
           if (contact === null) throw new DomainFailure("PRECONDITION_FAILED", "the business contact is not the caller's own", { reason: "SOURCE_EVIDENCE_INVALID" });
