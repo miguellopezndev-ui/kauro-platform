@@ -1,4 +1,4 @@
--- Migration 0081 (provisional number; the coordinator renumbers at merge) — SEC defence in depth, lane OWNER-POLICY-FORALL-2: a
+-- Migration 0078 — SEC defence in depth, lane OWNER-POLICY-FORALL-2: a
 -- row-security policy names exactly the commands its role is granted. 102 kauro policies were FOR ALL for a runtime role that holds
 -- no DELETE (and for most no UPDATE either): the privilege system denied the write, but the policy already said yes, so a grant widened
 -- by one mistaken GRANT would have opened the row without any policy review. Each such policy becomes one policy per command the role
@@ -6,7 +6,7 @@
 -- the FOR ALL policy (USING for SELECT, WITH CHECK for INSERT, both for UPDATE; a FOR ALL without WITH CHECK checks with its USING).
 -- Behaviour is unchanged: the policies are permissive and per command the union equals the old one for every granted command.
 -- Not touched: leases_control (kauro_control holds SELECT, INSERT, UPDATE and DELETE on kauro.leases: FOR ALL is exact) and
--- outbox_records_owner_bank / outbox_records_owner_route (lane OWNER-OUTBOX-POLICY, migration 0075). Idempotent.
+-- outbox_records_owner_bank / outbox_records_owner_route (lane OWNER-OUTBOX-POLICY, migration 0072). Idempotent.
 DROP POLICY IF EXISTS agencies_tenant ON kauro.agencies;
 DROP POLICY IF EXISTS agencies_tenant_read ON kauro.agencies;
 DROP POLICY IF EXISTS agencies_tenant_record ON kauro.agencies;

@@ -7,9 +7,6 @@ import { after, before, test } from "node:test";
 import { startTemporaryPostgres, type TemporaryPostgres } from "../src/testing/index.js";
 import { readBoundary } from "./boundary.js";
 
-/** Owned by lane OWNER-OUTBOX-POLICY (migration 0075 splits them); remove this allowance when that migration is merged. */
-const OWNED_BY_OUTBOX_LANE = new Set(["outbox_records/outbox_records_owner_bank", "outbox_records/outbox_records_owner_route"]);
-
 let pg: TemporaryPostgres;
 before(async () => {
   pg = await startTemporaryPostgres();
@@ -22,9 +19,11 @@ test("SEC-OWNER-POLICY-FORALL: no kauro policy is FOR ALL for a role that lacks 
   const b = await readBoundary(pg);
   const offenders: string[] = [];
   for (const [key, policy] of Object.entries(b.policies)) {
-    if (policy.command !== "ALL" || OWNED_BY_OUTBOX_LANE.has(key)) continue;
+    if (policy.command !== "ALL") continue;
     const rel = `kauro.${key.split("/")[0]}`;
     for (const role of policy.roles) {
+      // the schema owner holds every privilege by ownership (its FOR ALL policies keep the FORCEd tables reachable to the owner-run restore)
+      if (role === "kauro_owner") continue;
       const held = new Set<string>([...(b.tables[role]?.[rel] ?? []), ...Object.keys(b.columns[role]?.[rel] ?? {})]);
       const missing = ["SELECT", "INSERT", "UPDATE", "DELETE"].filter((p) => !held.has(p));
       if (missing.length > 0) offenders.push(`${key} ${role} lacks ${missing.join(",")}`);

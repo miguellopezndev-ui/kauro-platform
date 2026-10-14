@@ -183,8 +183,10 @@ GRANT UPDATE (sign_state, signed_at) ON kauro.download_authorizations TO kauro_a
 
 ALTER TABLE kauro.download_authorization_artifacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.download_authorization_artifacts FORCE ROW LEVEL SECURITY;
-CREATE POLICY download_authorization_artifacts_tenant ON kauro.download_authorization_artifacts FOR ALL TO kauro_app
-  USING (agency_id = kauro.current_agency_id()) WITH CHECK (agency_id = kauro.current_agency_id());
+CREATE POLICY download_authorization_artifacts_tenant_read ON kauro.download_authorization_artifacts FOR SELECT TO kauro_app
+  USING (agency_id = kauro.current_agency_id());
+CREATE POLICY download_authorization_artifacts_tenant_insert ON kauro.download_authorization_artifacts FOR INSERT TO kauro_app
+  WITH CHECK (agency_id = kauro.current_agency_id());
 GRANT SELECT, INSERT ON kauro.download_authorization_artifacts TO kauro_app;
 
 -- 5. the request role reads its own agency's delivery copies
