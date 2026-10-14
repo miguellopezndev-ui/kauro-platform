@@ -23,6 +23,7 @@ import { DISPATCH_LEASE_SECONDS, OUTBOX_CLAIM_SECONDS } from "../src/payments/di
 import { BANK_PAYEE_DIGEST } from "./bank-support.js";
 import type { SqlStep } from "./fault-support.js";
 import { agentOf } from "./integration-support.js";
+import { settlementOracleAfterEach } from "./settlement-oracle.js";
 import { approvePayout, bankCash, claimedCents, closeMonth, eligibleLines, intentOf, reconcilePayout, scriptEvidence, seller, statementsOfSeller } from "./statements-support.js";
 import { completed, freshKey, ids, type Reply } from "./support.js";
 import {
@@ -89,6 +90,7 @@ import {
   type Withdrawal,
 } from "./settlement-support.js";
 
+settlementOracleAfterEach();
 before(async () => {
   await startLane();
 });

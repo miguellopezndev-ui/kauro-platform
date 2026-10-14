@@ -9,7 +9,9 @@ import { MAX_DELIVERY_ATTEMPTS } from "../src/payments/dispatcher.js";
 import { L, awaitingOrder, confirmed, creditRow, exactFor, importSI2, latestEvent, q, startLane, statementArtifact, stopLane } from "./inbound-lane-support.js";
 import { advance, deliveryIn, dispatchPayment, drain, inTransit, outboxOf, recorded, requestRow } from "./settlement-support.js";
 import { ids } from "./support.js";
+import { settlementOracleAfterEach } from "./settlement-oracle.js";
 
+settlementOracleAfterEach();
 before(async () => {
   await startLane();
 });
