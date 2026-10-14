@@ -1685,7 +1685,7 @@
       "roles": [
         "kauro_app"
       ],
-      "using": "(kauro.acting_corporate_owner() AND (EXISTS ( SELECT 1\n   FROM kauro.projects p\n  WHERE ((p.agency_id = agencies.agency_id) AND (p.project_id = kauro.breakglass_scope_project())))))"
+      "using": "(kauro.acting_corporate_owner() AND (agency_id = kauro.breakglass_scope_agency()))"
     },
     "agencies/agencies_commission_designation": {
       "check": "(agency_id = kauro.current_agency_id())",
@@ -7212,7 +7212,7 @@
       "roles": [
         "kauro_app"
       ],
-      "using": "(kauro.acting_corporate_owner() AND (EXISTS ( SELECT 1\n   FROM kauro.source_tables t\n  WHERE ((t.table_id = source_table_columns.table_id) AND (t.agency_id = source_table_columns.agency_id)))))"
+      "using": "(kauro.acting_corporate_owner() AND kauro.breakglass_table_visible(table_id, agency_id))"
     },
     "source_table_columns/source_table_columns_control_insert": {
       "check": "(agency_id = kauro.current_agency_id())",
@@ -7244,7 +7244,7 @@
       "roles": [
         "kauro_app"
       ],
-      "using": "(kauro.acting_corporate_owner() AND (EXISTS ( SELECT 1\n   FROM kauro.source_files f\n  WHERE ((f.file_id = source_tables.file_id) AND (f.agency_id = source_tables.agency_id)))))"
+      "using": "(kauro.acting_corporate_owner() AND kauro.breakglass_file_visible(file_id, agency_id))"
     },
     "source_tables/source_tables_control_insert": {
       "check": "(agency_id = kauro.current_agency_id())",
@@ -7492,7 +7492,7 @@
       "roles": [
         "kauro_app"
       ],
-      "using": "(kauro.acting_corporate_owner() AND (EXISTS ( SELECT 1\n   FROM kauro.source_files f\n  WHERE ((f.accepted_object_id = stored_objects.object_id) AND (f.agency_id = stored_objects.agency_id)))))"
+      "using": "(kauro.acting_corporate_owner() AND kauro.breakglass_object_visible(object_id, agency_id))"
     },
     "stored_objects/stored_objects_control_insert": {
       "check": "((agency_id = kauro.current_agency_id()) AND (created_by_kind = 'SERVICE'::text))",
