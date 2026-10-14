@@ -1,4 +1,4 @@
--- Migration 0075: B17 L2 PROFILE, the control plane reads the one column of a target contract that its body digest needs
+-- Migration 0086: B17 L2 PROFILE, the control plane reads the one column of a target contract that its body digest needs
 -- (provisional number; the coordinator renumbers on merge).
 --
 -- docs/design/B15-B17-B18-local-plan.md cell M3: PLAN_VALIDATION recomputes the KAURO_TARGET_BODY_V1 digest of the target body a plan

@@ -186,7 +186,7 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // B15 L0D: tax document issuance facts, the widened issuer half, the SUBMITTING backstop, FISCAL subscriptions (CMD035, R2-083/084; provisional number)
     "0085_b15_tax_document_issuance.sql",
     // B17 L2: the control plane reads authority_evidence_hash for PLAN_VALIDATION's target digest check (M3; provisional number)
-    "0075_b17_plan_validation_target_read.sql",
+    "0086_b17_plan_validation_target_read.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
