@@ -59,6 +59,7 @@ import {
   routed,
   secondRequest,
   sourceReserved,
+  isolatedLane,
   startLane,
   stopLane,
   storeExecution,
@@ -385,10 +386,11 @@ test("DENY database guard KP014, no design cell id (a DECLARED manual-rail refun
 const x1Revocation = (arms: ReadonlyArray<string>): CellBody => async (ctx) => {
   const { iw, bw } = L();
   for (const scope of SCOPES) {
-    const prerequisites: Array<{ readonly what: string; readonly revoke: (o: { person: import("./support.js").Person; grantId: string }, src: Source) => Promise<unknown>; readonly reason: RegExp }> = [
+    const prerequisites: Array<{ readonly what: string; readonly revoke: (o: { person: import("./support.js").Person; grantId: string }, src: Source, session: import("./support.js").BrowserSession | undefined) => Promise<unknown>; readonly reason: RegExp }> = [
       { what: "owner grant", revoke: (o) => iw.h.revokeCorporateGrant(o.grantId), reason: /^403 / },
       { what: "verified identity", revoke: (o) => q("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1", [o.person.userId]), reason: /^403 / },
-      { what: "session", revoke: (o) => q("UPDATE kauro.web_sessions SET revoked_at = now() WHERE user_id = $1", [o.person.userId]).catch(() => q("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1", [o.person.userId])), reason: /^403 / },
+      // the browser session X1 was sent under ends (a logout committed while X1 waits at L1): only the session, the grant and identity stay
+      { what: "session", revoke: (_o, _src, session) => q("UPDATE kauro.web_sessions SET revoked_at = now(), revoke_reason = 'LOGOUT' WHERE secret_sha256 = $1 AND revoked_at IS NULL RETURNING 1", [session!.secretSha256]).then((rows) => assert.equal(rows.length, 1, "the presented session is revoked")), reason: /^401 / },
       { what: "step-up", revoke: (o) => expireProofs("user_id", o.person.userId), reason: /^403 / },
       // the approval stops being current: the refund leaves APPROVED (the reversal's authorization_lapsed of B09, written as its effect)
       { what: "approval current", revoke: (_o, src) => forced(src.scope === "CAPTURE" ? "UPDATE kauro.refunds SET state = 'FAILED', version = version + 1, failure_code = 'CAPTURE_REVERSED' WHERE refund_id = $1" : "UPDATE kauro.treasury_refunds SET state = 'FAILED', version = version + 1 WHERE treasury_refund_id = $1", [src.refundId]), reason: /^409 / },
@@ -399,11 +401,13 @@ const x1Revocation = (arms: ReadonlyArray<string>): CellBody => async (ctx) => {
       const o = await ownOwner(`x1-revoke-${scope}-${p.what.replace(/ /g, "-")}`);
       const src = await approved(scope, `x1-revoke-${scope}-${p.what.replace(/ /g, "-")}`);
       const before = await footprint(src);
+      // the session arm sends X1 under the owner's browser session (a sessions lane): a bearer request has no session row to revoke
+      const session = p.what === "session" ? await iw.w.identity().signIn(o.person) : undefined;
       const held = await bw.holdOutboundStream();
       try {
         const proof = await iw.w.stepUp(o.person);
-        const { waiting } = await bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => declareX1(src, { owner: o.person, proof })), `${scope}: X1 held at L1 while the ${p.what} is withdrawn`);
-        await ctx.revoked(`${scope}: ${p.what} withdrawn`, () => p.revoke(o, src));
+        const { waiting } = await bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => declareX1(src, { owner: o.person, proof, ...(session === undefined ? {} : { session }) })), `${scope}: X1 held at L1 while the ${p.what} is withdrawn`);
+        await ctx.revoked(`${scope}: ${p.what} withdrawn`, () => p.revoke(o, src, session));
         await held.release();
         await ctx.fenced(`${scope}: X1 after the ${p.what} was withdrawn`, () => asRefusal(waiting.pending.then(valueOf)), refusedWith(p.reason));
       } finally {
@@ -415,7 +419,11 @@ const x1Revocation = (arms: ReadonlyArray<string>): CellBody => async (ctx) => {
   }
 };
 cell("DENY RFG-M-X1-REVOCATION (each prerequisite): Declare manual refund execution", "revocation", x1Revocation(["owner grant", "verified identity", "step-up", "approval current", "destination evidence"]));
-cell("DENY RFG-M-X1-REVOCATION-SESSION (the session revoked while X1 waits at L1): Declare manual refund execution", "revocation", x1Revocation(["session"]));
+{
+  const title = "DENY RFG-M-X1-REVOCATION-SESSION (the session revoked while X1 waits at L1): Declare manual refund execution";
+  // a lane of its own with the B11 session boundary: X1 is sent under the owner's cookie session, the credential a logout ends
+  test(title, async () => void (await isolatedLane(() => runCell({ id: title.split(" ")[1]!, step: title, fault: "revocation", expect: title.slice(title.indexOf(": ") + 2) }, x1Revocation(["session"])), { sessions: true })));
+}
 
 cell("RACE RFG-M-X1-PARTIAL (later write fails): Declare manual refund execution", "partial", async (ctx) => {
   for (const scope of SCOPES) {
@@ -1243,7 +1251,11 @@ positiveLegs(
 // --- NOT_EXECUTED predicate controls --------------------------------------------------------------------------------------------------
 
 function nxControl(title: string, refusalText: string, debits: (a: AttemptView) => Promise<Parameters<typeof statementWith>[2]> | Parameters<typeof statementWith>[2], options: { readonly gapDay?: boolean; readonly early?: boolean; readonly recipient?: string } = {}): void {
-  test(title, async () => {
+  // a gap cell judges account-wide coverage: it runs on a bank account of its own (isolatedLane), never on the file's shared one
+  test(title, () => (options.gapDay === true ? isolatedLane(() => nxCell(title, refusalText, debits, options)) : nxCell(title, refusalText, debits, options)));
+}
+async function nxCell(title: string, refusalText: string, debits: (a: AttemptView) => Promise<Parameters<typeof statementWith>[2]> | Parameters<typeof statementWith>[2], options: { readonly gapDay?: boolean; readonly early?: boolean; readonly recipient?: string }): Promise<void> {
+  {
     await runCell({ id: title.split(" ")[1]!, step: title, fault: "expiry", expect: refusalText }, async (ctx) => {
       // a control: a clean attempt with clean coverage is NOT_EXECUTED (RETURN: FAILED, share released)
       const control = async (scope: Scope, kind: Kind, c: { readonly src: Source; readonly attempt: AttemptView }): Promise<void> => {
@@ -1321,7 +1333,7 @@ function nxControl(title: string, refusalText: string, debits: (a: AttemptView) 
           await control(scope, kind, await lapsed(ctx, scope, kind, `nx-control-${scope}-${kind}`));
         }
     });
-  });
+  }
 }
 nxControl("DENY RFG-P-NX-LAG (one ms before declaredAt + window + coverageLag): Resolve uncertain execution", "409 NOT_EXECUTED_TOO_EARLY", () => [], { early: true });
 nxControl("DENY RFG-P-NX-COVERAGE (a one-day gap in imported coverage): Resolve uncertain execution", "409 COVERAGE_INCOMPLETE", () => [], { gapDay: true });

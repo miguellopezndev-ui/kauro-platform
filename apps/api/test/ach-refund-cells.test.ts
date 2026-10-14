@@ -10,7 +10,7 @@ import { after, before } from "node:test";
 import { laneTest as test } from "./refund-lane-support.js";
 import { LOCK_WAIT_OBSERVATION_MS, runCell, type FaultContext, type FaultKind } from "@kauro/persistence/testing";
 import type { StoredBankArtifact } from "./bank-support.js";
-import { dispatch, reconcile, storeQuery } from "./payment-support.js";
+import { dispatch } from "./payment-support.js";
 import { freshKey, type Reply } from "./support.js";
 import {
   DEST,
@@ -81,16 +81,13 @@ const asRefusal = async (p: Promise<Reply>): Promise<Reply> => {
   return r;
 };
 
-/** The G6 entry point: an authenticated reversal of the source (CAPTURE: the provider's REVERSED capture reconciled by CMD034; BANK_CREDIT: seam S5). */
+/** The G6 entry point: an authenticated reversal of the credit that funded the source (seam S5, both scopes). */
 async function reverseSource(src: Source, cents: bigint = src.totalCents): Promise<Reply> {
-  if (src.scope === "BANK_CREDIT") {
-    const s5 = (L().bw as unknown as { reverseCredit?: (id: string, cents: bigint) => Promise<Reply> }).reverseCredit;
-    if (s5 === undefined) throw new SeamMissing("S5", SEAMS.S5);
-    return s5(src.sourceId, cents);
-  }
-  const { iw } = L();
-  iw.pw.paypal.updateCapture(src.purchase!.providerCaptureId, { status: "REVERSED" });
-  return reconcile(iw.pw, src.purchase!.orderId, { observationRef: await storeQuery(iw.pw, src.purchase!.providerOrderId) });
+  // both scopes reverse the bank credit through S5 (an authenticated reversal version to the inbound consumer): a CAPTURE source of the
+  // manual rail was paid by an applied credit (S1), found by its capture id; PayPal is DEFERRED (Payments V1) and never on the ACH path
+  const s5 = (L().bw as unknown as { reverseCredit?: (id: string, cents: bigint) => Promise<Reply> }).reverseCredit;
+  if (s5 === undefined) throw new SeamMissing("S5", SEAMS.S5);
+  return s5(src.sourceId, cents);
 }
 /** P3: one FINANCE pass; the deliveries it made. */
 async function finance(): Promise<ReadonlyArray<{ readonly eventType: string; readonly outcome: string }>> {

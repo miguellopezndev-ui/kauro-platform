@@ -19,7 +19,7 @@ import type { SqlStep } from "./fault-support.js";
 import { agentOf, bought, integrationWorld, type Agent, type IntegrationWorld } from "./integration-support.js";
 import { execute } from "./payment-support.js";
 import { executionWindowPass } from "../src/payments/index.js";
-import { asProblem, call, freshKey, ids, type Person, type Reply } from "./support.js";
+import { asProblem, call, freshKey, ids, type BrowserSession, type Person, type Reply } from "./support.js";
 import type { Purchase } from "./commission-support.js";
 
 // --- vocabulary ---------------------------------------------------------------------------------------------------------------------
@@ -143,6 +143,27 @@ export async function startLane(): Promise<Lane> {
   bound = { iw, bw, owner: iw.owner };
   return bound;
 }
+/**
+ * Runs `body` in a lane world of its own (its own database, so its own bank account and statement coverage), then restores the file's
+ * lane. Coverage is account-wide (SI2 imports cover the account, not an attempt): a cell whose verdict depends on a coverage GAP must not
+ * share an account with cells whose imports (made on controlled clocks ahead of real instants) would fill that gap. A cell that passes only
+ * alone is a defect; this isolation makes its verdict independent of file order.
+ */
+export async function isolatedLane<T>(body: () => Promise<T>, options: { readonly sessions?: boolean } = {}): Promise<T> {
+  const outer = bound;
+  // sessions: the B11 session boundary (cookie sessions, the browser's credential), for the cells whose prerequisite is the session itself
+  const iw = await integrationWorld(options.sessions === true ? { sessions: true } : {});
+  let bw: BankWorld | undefined;
+  try {
+    bw = await bankWorld({ world: iw });
+    bound = { iw, bw, owner: iw.owner };
+    return await body();
+  } finally {
+    bound = outer;
+    if (bw !== undefined) await bw.stop();
+    await iw.stop();
+  }
+}
 export async function stopLane(): Promise<void> {
   if (bound === undefined) return;
   await bound.bw.stop();
@@ -240,11 +261,16 @@ export interface OwnerCall {
   /** A proof recorded by the cell (iw.h.recordStepUp with a chosen issuedAt): its expiry is issuedAt + the policy validity. */
   readonly proof?: string;
   readonly key?: string;
+  /** A browser call under this cookie session (the app Origin and its CSRF token, no bearer) instead of the owner's bearer token: a sessions lane only. */
+  readonly session?: BrowserSession;
 }
 async function ownerCall(url: string, body: Record<string, unknown>, o: OwnerCall, label: string): Promise<Reply> {
   const { iw } = L();
   const owner = o.owner ?? L().owner;
-  return call(iw.w, { url, token: owner.token, agency: null, key: o.key ?? freshKey(label), body: { ...body, authorizationRef: o.proof ?? (await proofFor(owner, o.stepUp ?? "FRESH")) } });
+  const sent = { ...body, authorizationRef: o.proof ?? (await proofFor(owner, o.stepUp ?? "FRESH")) };
+  if (o.session === undefined) return call(iw.w, { url, token: owner.token, agency: null, key: o.key ?? freshKey(label), body: sent });
+  const headers = { cookie: o.session.cookie, origin: iw.w.identity().origin, "x-kauro-csrf": o.session.view.csrfToken };
+  return call(iw.w, { url, token: null, agency: null, key: o.key ?? freshKey(label), body: sent, headers });
 }
 /**
  * The owner's step-up proof for a call. Under a cell's step clock the command judges the proof's freshness at its repositioned effect
@@ -635,10 +661,8 @@ const RED_FIRST: ReadonlyArray<readonly [RegExp, string]> = [
   [/ ACH-M-FC-G5 /, "todo: red-first, slice 3 (X4 resend) + seam SI2 (statement import)"],
   [/^ACH-16 /, "todo: red-first, slice 3 (X4 resend, P3 booking) + seam S5 (credit reversal)"],
   [/ ACH-M-P3-/, "todo: red-first, slice 3 (the FINANCE return-booking queue); its REVOCATION also seam S7"],
-  [/^GAP PRODUCTION-BANK-BINDING /, "todo: GAP slice 4 (startApi binds no destination fingerprinter nor credit classifier: a deploy answers 503 EVIDENCE_UNAVAILABLE to every owner refund approval)"],
-  [/ RFG-M-X1-REVOCATION-SESSION /, "todo: GAP session fence: the owner commands run in SERVICE units of kauro_payment, which take no lock on the caller's web session (rule 16); a session revoked while X1 waits at L1 is not refused"],
+  [/^GAP PRODUCTION-BANK-BINDING /, "todo: GAP slice 4 (the deploy path bootstrap -> startApi binds no bank collaborator at all: no restricted evidence store, no details/credit/recipient classifier, no destination fingerprinter; startApi forwards StartOptions.bank, but no production implementation of any of the four exists yet (the OWNER_MANUAL evidence store and the Wise artifact classifiers are unbuilt), so a deploy answers 503 EVIDENCE_UNAVAILABLE to every bank route command and every owner refund approval)"],
   [/ RFG-M-(X1-RACE|LOCK-L3) /, "todo: seam S5 (bankWorld.reverseCredit, the G6 Kreversal racing the declaration)"],
-  [/ RFG-P-NX-COVERAGE /, "todo: GAP harness: coverage is account-wide and the file shares one bank account; ordering the legs makes the cell green alone (ddfd3196) but in the file run the imports of earlier cells, made on controlled clocks ahead of the real declaration instants, fill the one-day gap (200 instead of 409 COVERAGE_INCOMPLETE): needs a per-leg bank account (multi-route world)"],
   [/ RFG-P-NX-CORR-DF /, "todo: GAP product (DV1-10 CORR-DF): statement_lines keep only account and routing digests, not the keyed DF with the holder, so X3 cannot compare a debit destination to the attempt fingerprint (needs a DF column computed at SI2)"],
   [/\[RFG-M-X2-RACE\]/, "todo: red-first, slice 4 (the RETURN leg asserts the one refund.completed.v1)"],
   [/\[RFG-M-X2-REVOCATION\]/,"todo: red-first, slice 3 (the revoked owner's X3 NOT_EXECUTED)"],
