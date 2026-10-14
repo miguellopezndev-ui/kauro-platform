@@ -19,6 +19,7 @@ import { createOutreachDispatcher, outreachLeaseResource, type OutreachDispatche
 import { outreachSealerOf } from "../src/outreach/routes.js";
 import type { OptOutKey, OutreachCompliance } from "../src/outreach/mime.js";
 import type { SqlStep } from "./fault-support.js";
+import { prepareManifest, prepareTerminationTerms } from "./sellers-support.js";
 import { statementsWorld } from "./statements-support.js";
 import { call as callApi, clock, completed, freshKey, ids, outcome as outcomeOf, type Reply } from "./support.js";
 import {
@@ -487,8 +488,27 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
     },
     routes: {
       revokeGrant: () => notBuilt("routes.revokeGrant", "RevokeOutreachAuthorization is an L-AUTH route: not merged"),
-      terminate: () => notBuilt("routes.terminate", "the seller termination body needs the integration world's handover manifest (terminationBody): wire at batch"),
-      suspendCapability: () => notBuilt("routes.suspendCapability", "CMD059 route wiring of the capability lifecycle: wire at batch"),
+      async terminate(seller, key) {
+        // CMD050 TerminateSeller by the corporate owner (the shape of integration-support terminationBody with nothing handed over)
+        const row = await h.oracle.query<{ version: string }>("SELECT version::text FROM kauro.sellers WHERE seller_id = $1", [seller.sellerId]);
+        if (row.rows[0] === undefined) throw new Error(`no seller ${seller.sellerId}`);
+        return api({
+          url: `/api/v1/sales/sellers/${seller.sellerId}/terminate`,
+          token: owner.token,
+          ...(key !== undefined ? { key } : {}),
+          body: {
+            expectedVersion: Number(row.rows[0].version),
+            terminationTermsRef: await prepareTerminationTerms(h, owner.userId as UserId, seller.sellerId),
+            activeOpportunityManifestRef: await prepareManifest(h, owner.userId as UserId, seller.sellerId, []),
+          },
+        });
+      },
+      async suspendCapability(capabilityId, key) {
+        // CMD059 RestrictCapability by the corporate owner
+        const row = await h.oracle.query<{ revision: number }>("SELECT revision FROM kauro.capabilities WHERE capability_id = $1", [capabilityId]);
+        if (row.rows[0] === undefined) throw new Error(`no capability ${capabilityId}`);
+        return api({ url: `/api/v1/operations/capabilities/${capabilityId}/restrict`, token: owner.token, ...(key !== undefined ? { key } : {}), body: { expectedVersion: row.rows[0].revision, incidentRef: ids.next() } });
+      },
       publishResource: () => notBuilt("routes.publishResource", "PublishSalesResource is an L-OWNER route: not merged"),
       withdrawPolicy: () => notBuilt("routes.withdrawPolicy", "WithdrawOutreachPolicy is an L-OWNER route: not merged"),
       registerSender,
@@ -498,7 +518,18 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       optOut: () => notBuilt("routes.optOut", "the public opt-out route is L-ACT's (apps/api/src/outreach/opt-out-route.ts is the kit's stub): not merged"),
       diagnose: () => notBuilt("routes.diagnose", "RecordOutreachDiagnosis is an L-ACT route: not merged"),
       review: () => notBuilt("routes.review", "PrepareOutreachReview is an L-AUTH route: not merged"),
-      suppress: () => notBuilt("routes.suppress", "the suppression writer (L8 X) is L-ACT's: not merged"),
+      async suppress(target) {
+        // the registry row of the 0029 writer under L8 X of its key (the L-ACT route writes the same row; ON CONFLICT DO NOTHING as every writer)
+        const keyKind = "contactKey" in target ? "CONTACT" : "ORGANIZATION";
+        const key = "contactKey" in target ? target.contactKey : sha(`organization:${target.domain}`);
+        await within(owner.userId, state.standing ?? FIXTURE_AT, async (c) => {
+          await lock(c, "kauro.prospect_suppressions", `${keyKind}:${key}`);
+          await c.query(
+            "INSERT INTO kauro.prospect_suppressions (suppression_id, key_kind, suppression_key, reason, recorded_by_user_id, recorded_by_service, recorded_at, created_at) VALUES ($1, $2, $3, 'OPT_OUT', $4, NULL, kauro.server_now(), now()) ON CONFLICT DO NOTHING",
+            [ids.next(), keyKind, key, owner.userId],
+          );
+        });
+      },
       reinstatePolicy: () => notBuilt("routes.reinstatePolicy", "ReinstateOutreachPolicy is an L-OWNER route: not merged"),
     },
   };
