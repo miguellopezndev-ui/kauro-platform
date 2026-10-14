@@ -227,6 +227,12 @@ export class PgOwnerToolStore {
     return r.rows[0] ? sellerOf(r.rows[0]) : null;
   }
 
+  /** The seller row, read without a lock (the termination manifest locks claims, never the seller: CMD050 takes the seller before the claims). */
+  async sellerFacts(sellerId: string): Promise<OwnerToolSeller | null> {
+    const r = await execute<SellerRow>(this.db, `SELECT ${SELLER} FROM kauro.sellers WHERE seller_id = $1`, [sellerId]);
+    return r.rows[0] ? sellerOf(r.rows[0]) : null;
+  }
+
   /** The writer's half of each prospect's claims subject, in ascending prospect order (no deadlock between two multi-prospect writers). */
   async lockProspectClaims(prospectIds: ReadonlyArray<string>): Promise<void> {
     for (const prospectId of [...new Set(prospectIds)].sort()) await holdSalesTransition(this.db, "kauro.attribution_claims", prospectId);
