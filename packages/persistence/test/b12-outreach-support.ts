@@ -227,6 +227,8 @@ export interface QueueOptions {
   readonly senderId?: string;
   readonly route?: string;
   readonly moveDraft?: boolean;
+  /** Queue the intent WITHOUT its outreach.send_intended.v1 event (the cells that prove the database refuses that commit). */
+  readonly noEvent?: true;
 }
 
 /** CMD063's statements (no transaction): L3 X, L4 X, L4g S, L10 X, the intent, the draft DRAFT -> AUTHORIZED. */
@@ -242,7 +244,54 @@ export async function queueIn(c: Client, d: Draft, authorizationId: string, opti
     [intentId, d.draftId, authorizationId, options.senderId ?? d.senderId, d.personUserId, d.prospectId, d.purpose, options.route ?? d.route, d.contactKey, sha(`payload-${intentId}`), options.sequenceFirstIntentId ?? null, options.replyActivityId ?? null],
   );
   if (options.moveDraft !== false) await c.query("UPDATE kauro.outreach_drafts SET state = 'AUTHORIZED' WHERE draft_id = $1", [d.draftId]);
-  return { intentId, draft: d, authorizationId };
+  const intent = { intentId, draft: d, authorizationId };
+  if (options.noEvent !== true) await sendIntendedIn(c, intent, { senderId: options.senderId ?? d.senderId, route: options.route ?? d.route });
+  return intent;
+}
+
+/**
+ * CMD063's event and outbox record (no transaction; plan A2, 07 "one event per committed version"): outreach.send_intended.v1 of the
+ * agency-less aggregate outreach_send_intent at version 1, and the record addressed to OUTREACH_SENDER. Returns the event id.
+ * `override` forges one column of the event or record for the refusal cells.
+ */
+export async function sendIntendedIn(
+  c: Client,
+  i: Intent,
+  override: {
+    readonly agencyId?: string | null;
+    readonly version?: number;
+    readonly aggregateId?: string;
+    readonly eventType?: string;
+    readonly kind?: string;
+    readonly consumer?: string;
+    readonly noOutbox?: true;
+    readonly senderId?: string;
+    readonly route?: string;
+  } = {},
+): Promise<string> {
+  const eventId = ids.next();
+  const payload = {
+    intentId: i.intentId,
+    draftId: i.draft.draftId,
+    authorizationId: i.authorizationId,
+    senderId: override.senderId ?? i.draft.senderId,
+    prospectId: i.draft.prospectId,
+    purpose: i.draft.purpose,
+    route: override.route ?? i.draft.route,
+    payloadHash: sha(`payload-${i.intentId}`),
+  };
+  await c.query(
+    `INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, 'USER', $7, $8, $9, $10, $11, '1', kauro.server_now())`,
+    [eventId, override.kind ?? "outreach_send_intent", override.aggregateId ?? i.intentId, override.version ?? 1, override.agencyId ?? null, override.eventType ?? "outreach.send_intended.v1", i.draft.personUserId, ids.next(), ids.next(), JSON.stringify(payload), sha(JSON.stringify(payload))],
+  );
+  if (override.noOutbox !== true) {
+    await c.query(
+      "INSERT INTO kauro.outbox_records (outbox_id, event_id, consumer, state, attempts, next_attempt_at, created_at, updated_at) VALUES ($1, $2, $3, 'PENDING', 0, kauro.server_now(), kauro.server_now(), kauro.server_now())",
+      [ids.next(), eventId, override.consumer ?? "OUTREACH_SENDER"],
+    );
+  }
+  return eventId;
 }
 
 export const personCtx = (w: B12World, userId: string): CommerceContext => (userId === w.kora ? ownerOf(w) : personOf(userId));
