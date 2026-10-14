@@ -2121,6 +2121,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | CAPTURE_NOT_REFUNDABLE | — | — | COMMAND | the capture was reversed: the authorization lapsed and no refund is dispatched |
 | 409 | PAYMENT_PENDING | REFUND_IN_PROGRESS | — | — | COMMAND | a submission of this refund is in flight under another key |
 | 409 | PAYMENT_UNCERTAIN | REFUND_UNCERTAIN | — | — | COMMAND | a prior submission may have refunded: reconcile it (CMD034) before any new dispatch |
+| 409 | PRECONDITION_FAILED | MANUAL_RAIL_NO_AUTOMATED_OUTBOUND | — | — | COMMAND | the refund is on the manual rail: only the owner's declared execution and its recorded evidence move its money |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 422 | INTEGRITY_FAILURE | PROVIDER_SERVICES_UNAVAILABLE | — | — | COMMAND | no payment provider adapter is bound in this edition (a deployment before B15 answers this inside the unit of work; nothing is written) |

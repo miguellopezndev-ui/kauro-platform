@@ -183,6 +183,12 @@ test("R23: the validator compiles the COMPLETED envelope of every served command
     ["POST", "/api/v1/operations/bank-routes/{routeId}/details", "replaceBankRouteDetails", ["200"]],
     ["GET", "/api/v1/operations/bank-routes/{routeId}", "getBankRoute", ["200"]],
     ["GET", "/api/v1/payment-orders/{orderId}/transfer-instructions", "getTransferInstructions", ["200"]],
+    // PV1 (lane L-REFUND): the owner refund commands CMD220-CMD223 and the owner queue
+    ["POST", "/api/v1/operations/treasury-refunds/{treasuryRefundId}/approve", "approveTreasuryRefund", ["200"]],
+    ["POST", "/api/v1/operations/refunds/{refundId}/execution-declarations", "declareRefundExecution", ["201"]],
+    ["POST", "/api/v1/operations/execution-attempts/{attemptId}/records", "recordRefundExecution", ["200"]],
+    ["POST", "/api/v1/operations/execution-attempts/{attemptId}/resolutions", "resolveUncertainExecution", ["200"]],
+    ["GET", "/api/v1/operations/execution-attempts", "listExecutionAttempts", ["200"]],
     // PV1 (lane PV1-INBOUND): the retirement, the owner's manual credit commands, the statement import and the two owner reads
     ["POST", "/api/v1/payment-orders/{orderId}/retirements", "retireBankCheckout", ["201"]],
     ["POST", "/api/v1/operations/bank-accounts/{accountRef}/credits", "enterBankCredit", ["201"]],

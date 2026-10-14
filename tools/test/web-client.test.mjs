@@ -26,7 +26,7 @@ test("the committed generated module is the generated one, byte for byte, and ge
 // the operational commands carry no registry command id on the route but are journaled all the same (OPERATIONAL_WIRE, Idempotency-Key
 // REQUIRED): the five bank-route commands and the agency owner's setBuyerType (B11 A1, CMD101). Named here by hand on purpose: this list is
 // the oracle the generated descriptors are checked against, not a copy of OPERATIONAL_WIRE
-const JOURNALED_OPERATIONAL_COMMANDS = ["configureBankRoute", "verifyBankRoute", "enableBankRoute", "disableBankRoute", "replaceBankRouteDetails", "enterBankCredit", "confirmBankCredit", "attributeBankCredit", "importBankStatement", "retireBankCheckout", "setBuyerType"];
+const JOURNALED_OPERATIONAL_COMMANDS = ["configureBankRoute", "verifyBankRoute", "enableBankRoute", "disableBankRoute", "replaceBankRouteDetails", "enterBankCredit", "confirmBankCredit", "attributeBankCredit", "importBankStatement", "retireBankCheckout", "approveTreasuryRefund", "declareRefundExecution", "recordRefundExecution", "resolveUncertainExecution", "setBuyerType"];
 
 test("every served operation of the document is a descriptor with its method, path, idempotency and reply schemas", () => {
   const { text } = generate();

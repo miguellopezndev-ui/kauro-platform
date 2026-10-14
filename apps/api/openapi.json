@@ -11855,6 +11855,8 @@
             "$ref": "#/components/parameters/CorrelationId"
           }
         ],
+        "x-kauro-idempotency": "NONE",
+        "x-kauro-role": "KAURO_OWNER",
         "responses": {
           "200": {
             "description": "The DECLARED attempts (at most 500).",
@@ -11913,9 +11915,17 @@
             }
           },
           {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "KAURO_OWNER",
         "requestBody": {
           "required": true,
           "content": {
@@ -11984,9 +11994,17 @@
             }
           },
           {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "KAURO_OWNER",
         "requestBody": {
           "required": true,
           "content": {
@@ -13139,9 +13157,17 @@
             }
           },
           {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "KAURO_OWNER",
         "requestBody": {
           "required": true,
           "content": {
@@ -13210,9 +13236,17 @@
             }
           },
           {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
             "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
           }
         ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "KAURO_OWNER",
         "requestBody": {
           "required": true,
           "content": {
