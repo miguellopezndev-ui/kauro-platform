@@ -410,11 +410,17 @@ export async function bounced(scope: Scope, label: string, approval: ApproveOpti
   return { src: r.src, attempt: r.attempt, payableCents: BigInt(r.attempt.amountCents) };
 }
 
-/** An open attempt of `kind`: a declared RETURN, or a declared RESEND of a bounced RETURN (X4 for the whole payable). */
-export async function openAttempt(scope: Scope, kind: Kind, label: string, approval: ApproveOptions = {}): Promise<{ readonly src: Source; readonly attempt: AttemptView }> {
-  if (kind === "RETURN") return declared(scope, label, {}, approval);
+/** DP-RECIPIENT (seam S4): a stored recipient-record artifact (default full details DEST) bound at X1/X4 under its id and version. */
+export async function recipientBinding(recipientRef: string, recipientVersion: string, full: Destination = DEST): Promise<NonNullable<DeclareOptions["recipient"]>> {
+  const artifact = await L().bw.storeRecipientRecord({ recipientRef, recipientVersion, full });
+  return { recipientRef, recipientVersion, artifact };
+}
+
+/** An open attempt of `kind`: a declared RETURN, or a declared RESEND of a bounced RETURN (X4 for the whole payable); `declare` is the X1/X4 option. */
+export async function openAttempt(scope: Scope, kind: Kind, label: string, approval: ApproveOptions = {}, declare: DeclareOptions = {}): Promise<{ readonly src: Source; readonly attempt: AttemptView }> {
+  if (kind === "RETURN") return declared(scope, label, declare, approval);
   const b = await bounced(scope, label, approval);
-  const view = dataOf<DeclareView>(await declareX4(b.attempt, b.payableCents), 201, `X4 declares the resend of ${scope} ${label}`);
+  const view = dataOf<DeclareView>(await declareX4(b.attempt, b.payableCents, declare), 201, `X4 declares the resend of ${scope} ${label}`);
   return { src: b.src, attempt: view.attempt };
 }
 
@@ -426,8 +432,8 @@ export function routeTiming(): { readonly manualExecutionWindowMs: number; reado
 }
 
 /** An attempt lapsed to UNCERTAIN by X2: the sweep runs with the payment service's transaction standing past declaredAt + window (DB clock). */
-export async function lapsed(ctx: FaultContext, scope: Scope, kind: Kind, label: string, approval: ApproveOptions = {}): Promise<{ readonly src: Source; readonly attempt: AttemptView }> {
-  const { src, attempt } = await openAttempt(scope, kind, label, approval);
+export async function lapsed(ctx: FaultContext, scope: Scope, kind: Kind, label: string, approval: ApproveOptions = {}, declare: DeclareOptions = {}): Promise<{ readonly src: Source; readonly attempt: AttemptView }> {
+  const { src, attempt } = await openAttempt(scope, kind, label, approval, declare);
   const { manualExecutionWindowMs } = routeTiming();
   const boundary = plusMs(attempt.declaredAt, manualExecutionWindowMs);
   ctx.deadline(boundary, `the manual execution window of ${label}`);
@@ -632,11 +638,8 @@ const RED_FIRST: ReadonlyArray<readonly [RegExp, string]> = [
   [/^GAP PRODUCTION-BANK-BINDING /, "todo: GAP slice 4 (startApi binds no destination fingerprinter nor credit classifier: a deploy answers 503 EVIDENCE_UNAVAILABLE to every owner refund approval)"],
   [/ RFG-M-X1-REVOCATION-SESSION /, "todo: GAP session fence: the owner commands run in SERVICE units of kauro_payment, which take no lock on the caller's web session (rule 16); a session revoked while X1 waits at L1 is not refused"],
   [/ RFG-M-(X1-RACE|LOCK-L3) /, "todo: seam S5 (bankWorld.reverseCredit, the G6 Kreversal racing the declaration)"],
-  [/RFG-P-DEST-RECIPIENT|RFG-M-DEST-RECIPIENT /, "todo: GAP seam S4 (bankWorld.storeRecipientRecord, the DP-RECIPIENT proof is not offered)"],
   [/ RFG-P-NX-COVERAGE /, "todo: GAP harness: coverage is account-wide, so the neighbouring legs of the shared bank account fill the one-day gap; needs a per-leg bank account (multi-route world)"],
-  [/ RFG-P-NX-CORR-RECIPIENT /, "todo: GAP product (DV1-10 CORR-RECIPIENT): an attempt binds no recipient_ref until the DP-RECIPIENT seam S4 is built, so X3 cannot correlate a debit by recipient id"],
   [/ RFG-P-NX-CORR-DF /, "todo: GAP product (DV1-10 CORR-DF): statement_lines keep only account and routing digests, not the keyed DF with the holder, so X3 cannot compare a debit destination to the attempt fingerprint (needs a DF column computed at SI2)"],
-  [/ RFG-P-DF-(EQUIV|FULLWIDTH|HYPHEN|UNICODE-DIGITS-EVIDENCE)/, "todo: GAP seam S4 (bankWorld.storeRecipientRecord): these cells bind a recipient record (DP-RECIPIENT) at X1 and X4"],
   [/\[RFG-M-X2-RACE\]/, "todo: red-first, slice 4 (the RETURN leg asserts the one refund.completed.v1)"],
   [/\[RFG-M-X2-REVOCATION\]/,"todo: red-first, slice 3 (the revoked owner's X3 NOT_EXECUTED)"],
   [/ RFG-M-G2D-RACE /, "todo: seam SI2 (the statement import links the same debit G2 records)"],

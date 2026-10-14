@@ -1079,6 +1079,9 @@ export const BANK_REFUND_DESTINATION_SCHEMA: JsonSchema = closedObject(["routing
   holderName: { type: "string", maxLength: 512 },
 });
 export const BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA: JsonSchema = closedObject(["artifactRef", "evidenceHash"], { artifactRef: BANK_UUID, evidenceHash: BANK_HASH });
+/** DP-RECIPIENT at X1/X4 (DV1-10): the provider recipient record (id and version, both required) and its stored recipient-record artifact. */
+const BANK_PROVIDER_REF = { type: "string", minLength: 1, maxLength: 256, pattern: "^[A-Za-z0-9._:-]+$" } as const;
+export const BANK_RECIPIENT_BINDING_SCHEMA: JsonSchema = closedObject(["recipientRef", "recipientVersion", "artifactRef", "evidenceHash"], { recipientRef: BANK_PROVIDER_REF, recipientVersion: BANK_PROVIDER_REF, artifactRef: BANK_UUID, evidenceHash: BANK_HASH });
 /** The COMPLETED envelope of CMD220: the treasury refund after its approval (the destination only by its last four). */
 export const TREASURY_REFUND_COMMAND_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
   kind: { type: "string", enum: ["COMPLETED"] },
@@ -1167,7 +1170,7 @@ export const BANK_REFUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = O
     path: "/api/v1/operations/refunds/{refundId}/execution-declarations",
     summary: "Declare the manual transfer of an approved refund (CAPTURE refund or BANK_CREDIT treasury refund): the refund SUBMITTING, one DECLARED attempt with its reference (NEVER-RESEND)",
     authority: "ACH-ROUTE r12 §7.21 (X1), DV1-08, D-24 A; " + OWNER_REFUND_AUTHORITY,
-    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["expectedVersion", "amountCents", "authorizationRef"], { expectedVersion: BANK_VERSION, amountCents: BANK_MONEY, authorizationRef: BANK_UUID }) }),
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["expectedVersion", "amountCents", "authorizationRef"], { expectedVersion: BANK_VERSION, amountCents: BANK_MONEY, recipient: BANK_RECIPIENT_BINDING_SCHEMA, authorizationRef: BANK_UUID }) }),
     responses: Object.freeze({ "201": Object.freeze({ description: "The DECLARED attempt and the refund after the declaration (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: DECLARE_EXECUTION_RESPONSE_SCHEMA }) }),
   }),
   Object.freeze({
@@ -1203,7 +1206,7 @@ export const BANK_REFUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = O
     path: "/api/v1/operations/execution-attempts/{attemptId}/resend-declarations",
     summary: "Declare the re-send of a bounced transfer's open payable: one DECLARED RESEND attempt with its reference (NEVER-RESEND: refused while an attempt of the source is DECLARED or UNCERTAIN); the refund stays COMPLETED",
     authority: "ACH-ROUTE r12 §7.21 (X4), DV1-08, D-24 A; " + OWNER_REFUND_AUTHORITY,
-    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["amountCents", "authorizationRef"], { amountCents: BANK_MONEY, authorizationRef: BANK_UUID }) }),
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["amountCents", "authorizationRef"], { amountCents: BANK_MONEY, recipient: BANK_RECIPIENT_BINDING_SCHEMA, authorizationRef: BANK_UUID }) }),
     responses: Object.freeze({ "201": Object.freeze({ description: "The DECLARED RESEND attempt and the refund as it stands (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: DECLARE_EXECUTION_RESPONSE_SCHEMA }) }),
   }),
   Object.freeze({

@@ -26,8 +26,10 @@
  *       UNCERTAIN_EFFECT case resolved, the ALLOW fact and the journal's answer. Nothing is ever re-sent (NEVER-RESEND).
  *   The queue: the DECLARED attempts with what to send (last four and holder only), for the corporate owner (kauro_app, OPERATOR).
  *
- * GAP (reported): the cookie-session fence of rule 16 is not taken in these SERVICE units (see approve-destination.ts); the recipient-record
- * proof DP-RECIPIENT (seam S4) is not offered: a receipt without full destination details is DESTINATION_UNPROVEN.
+ * GAP (reported): the cookie-session fence of rule 16 is not taken in these SERVICE units (see approve-destination.ts).
+ * DP-RECIPIENT (DV1-10, DV1-11): X1/X4 may bind a provider recipient record (id + version) with its recipient-record artifact, read outside any
+ * unit and re-verified by hash under the locks; its full details must give exactly the captured fingerprint, else RECIPIENT_ALIAS. G2/G4/X3
+ * then accept, without full details, a receipt carrying the same recipient id AND version; anything weaker stays DESTINATION_UNPROVEN.
  */
 import type { CommandId, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { rawDigest } from "@kauro/contracts";
@@ -63,9 +65,17 @@ import { evidenceUnavailable, type BankRouteRequest } from "./route-config.js";
 
 // --- requests and views ---------------------------------------------------------------------------------------------------------------
 
+/** DP-RECIPIENT at X1/X4: the provider recipient record the owner binds, and the stored recipient-record artifact that proves it. */
+export interface RecipientBindingBody {
+  readonly recipientRef: string;
+  readonly recipientVersion: string;
+  readonly artifactRef: string;
+  readonly evidenceHash: string;
+}
 export interface DeclareRefundExecutionBody {
   readonly expectedVersion: number;
   readonly amountCents: string;
+  readonly recipient?: RecipientBindingBody;
   readonly authorizationRef: string;
 }
 export interface ResolveExecutionBody {
@@ -86,6 +96,7 @@ export interface RecordBounceBody {
 }
 export interface DeclareResendBody {
   readonly amountCents: string;
+  readonly recipient?: RecipientBindingBody;
   readonly authorizationRef: string;
 }
 /** G3's answer: the bounced attempt (still RECORDED), the bounce's cents and the open REFUND_PAYABLE it leaves. */
@@ -340,6 +351,57 @@ interface DeclaredSource {
   readonly agencyId: string | null;
 }
 
+// --- DP-RECIPIENT binding (X1, X4) ------------------------------------------------------------------------------------------------------
+
+interface RecipientRead {
+  readonly binding: RecipientBindingBody;
+  readonly read: StoredBankEvidence | null;
+  readonly expired: boolean;
+  readonly classifier: BankCreditClassifier;
+  readonly fingerprinter: DestinationFingerprinter;
+}
+const recipientAlias = (message: string): DomainFailure => precondition("RECIPIENT_ALIAS", message);
+
+/** The recipient-record artifact read outside any unit under the provider-call bound (a failed or late read is unknown, never permission). */
+async function readRecipient(bank: BankRouteCollaborators, binding: RecipientBindingBody | undefined): Promise<RecipientRead | null> {
+  if (binding === undefined) return null;
+  const store = bank.evidence();
+  const fingerprinter = bank.fingerprinter?.() ?? null;
+  const classifier = bank.creditClassifier?.() ?? null;
+  if (store === null || fingerprinter === null || classifier === null) throw evidenceUnavailable();
+  const bound = bank.timer.start(PROVIDER_CALL_TIMEOUT_MS);
+  let read: StoredBankEvidence | null = null;
+  try {
+    const got = await Promise.race([store.get(binding.artifactRef).then((evidence) => ({ evidence }), () => null), bound.elapsed.then(() => null)]);
+    read = got?.evidence ?? null;
+  } finally {
+    bound.cancel();
+  }
+  return { binding, read, expired: bound.expired?.() === true, classifier, fingerprinter };
+}
+
+/**
+ * Under the declaration's locks: the bytes actually read are the named ones of this account, classify as a recipient record of the bound
+ * id and version, and their full details normalize and give exactly the captured fingerprint under its own key id, key version and
+ * normalizer version (DV1-11 canonical encoding). Anything else binds nothing: RECIPIENT_ALIAS (the concatenation-collision twin included).
+ */
+async function judgeRecipient(r: RecipientRead, account: { readonly environment: string; readonly accountRef: string }, destination: CapturedDestination): Promise<{ readonly recipientRef: string; readonly recipientVersion: string }> {
+  const ev = r.read;
+  if (r.expired || ev === null) throw evidenceUnavailable();
+  if (ev.sha256 !== r.binding.evidenceHash || rawDigest(ev.bytes) !== ev.sha256) throw precondition("HASH_MISMATCH", "the recipient record is not the bytes the owner named");
+  if (ev.accountRef !== account.accountRef || ev.environment !== account.environment) throw precondition("UNKNOWN_EVIDENCE", "the recipient record is of another account");
+  const classified = r.classifier.classifyRecipient(ev);
+  if (classified.kind !== "CLASSIFIED") throw refusalOf(classified.code);
+  const x = classified.value;
+  if (x.accountRef !== account.accountRef || x.recipientRef !== r.binding.recipientRef || x.recipientVersion !== r.binding.recipientVersion) throw recipientAlias("the artifact is not the recipient record and version being bound");
+  const n = normalizeDestination(x.full);
+  if (n.kind !== "OK") throw recipientAlias("the details of the recipient record do not normalize to a destination");
+  const under = { keyId: destination.keyId, keyVersion: destination.keyVersion, normVersion: destination.normVersion };
+  const fp = await r.fingerprinter.fingerprint({ routingNumber: n.routing, accountNumber: n.account, holderName: n.holder }, under);
+  if (fp.fingerprint !== destination.fingerprint || fp.keyId !== destination.keyId || fp.keyVersion !== destination.keyVersion || fp.normVersion !== destination.normVersion) throw recipientAlias("the recipient record is another destination than the approved one");
+  return { recipientRef: x.recipientRef, recipientVersion: x.recipientVersion };
+}
+
 function declareExecution(d: OwnerRefundDependencies, request: BankRouteRequest<DeclareRefundExecutionBody>): Promise<CommandResult<DeclareExecutionView>> {
   const operation = BANK_REFUND_COMMAND_IDS.declareExecution;
   const refundId = request.path["refundId"]!;
@@ -350,6 +412,7 @@ function declareExecution(d: OwnerRefundDependencies, request: BankRouteRequest<
     const amount = BigInt(body.amountCents);
     const journal = journalOf(operation, request);
     const proofId = isUuid(body.authorizationRef) ? body.authorizationRef : null;
+    const recipient = await readRecipient(bank, body.recipient);
     const out = await payment.run(context, async (uow): Promise<{ readonly view: DeclareExecutionView } | Replayed> => {
       const repo = refunds(uow);
       const c = uow.commerce;
@@ -391,6 +454,7 @@ function declareExecution(d: OwnerRefundDependencies, request: BankRouteRequest<
       if (current.version !== body.expectedVersion) throw new StaleVersionFailure(current.version, current.state);
       if (current.state !== "APPROVED") throw precondition("REFUND_NOT_APPROVED", "the refund is not APPROVED");
       if (current.total === null || current.total !== amount) throw precondition("EXECUTION_AMOUNT_MISMATCH", "the declared amount is not the approved amount");
+      const bound = recipient === null ? null : await judgeRecipient(recipient, source, destination);
       const attemptNumber = await repo.nextAttemptNumber(source.scope, source.sourceId);
       const at = await bank.effectNow(uow);
       // no await between this instant and its judgment
@@ -429,6 +493,8 @@ function declareExecution(d: OwnerRefundDependencies, request: BankRouteRequest<
         keyId: destination.keyId,
         keyVersion: destination.keyVersion,
         normVersion: destination.normVersion,
+        recipientRef: bound?.recipientRef ?? null,
+        recipientVersion: bound?.recipientVersion ?? null,
       });
       if (treasuryMoved !== null) await publishTreasury(uow, context, causationId, treasuryMoved, "treasury_refund.submitting.v1", { attemptId: attempt.attemptId, previousState: treasuryMoved.previousState });
       await publishAttempt(uow, context, causationId, attempt, "outbound.declared.v1", { attemptNumber: attempt.attemptNumber, amountCents: Number(attempt.amountCents), declaredAt: attempt.declaredAt, destinationFingerprint: attempt.destinationFingerprint });
@@ -535,6 +601,7 @@ function declareResend(d: OwnerRefundDependencies, request: BankRouteRequest<Dec
     const amount = BigInt(body.amountCents);
     const journal = journalOf(operation, request);
     const proofId = isUuid(body.authorizationRef) ? body.authorizationRef : null;
+    const recipient = await readRecipient(bank, body.recipient);
     const out = await payment.run(context, async (uow): Promise<{ readonly view: DeclareExecutionView } | Replayed> => {
       const repo = refunds(uow);
       const c = uow.commerce;
@@ -565,6 +632,7 @@ function declareResend(d: OwnerRefundDependencies, request: BankRouteRequest<Dec
       const refundId = refundIdOf(attempt);
       const destination = await repo.destinationOf(attempt.sourceKind, refundId);
       if (destination === null) throw precondition("DESTINATION_NOT_CAPTURED", "the refund was approved without its destination captured");
+      const bound = recipient === null ? null : await judgeRecipient(recipient, attempt, destination);
       const attemptNumber = await repo.nextAttemptNumber(attempt.sourceKind, attempt.sourceId);
       const at = await bank.effectNow(uow);
       // no await between this instant and its judgment
@@ -592,6 +660,8 @@ function declareResend(d: OwnerRefundDependencies, request: BankRouteRequest<Dec
         keyId: destination.keyId,
         keyVersion: destination.keyVersion,
         normVersion: destination.normVersion,
+        recipientRef: bound?.recipientRef ?? null,
+        recipientVersion: bound?.recipientVersion ?? null,
       });
       await publishAttempt(uow, context, causationId, resend, "outbound.declared.v1", { attemptNumber: resend.attemptNumber, amountCents: Number(resend.amountCents), declaredAt: resend.declaredAt, destinationFingerprint: resend.destinationFingerprint });
       await allowFact(uow, context, operation, at);
@@ -614,7 +684,7 @@ function declareResend(d: OwnerRefundDependencies, request: BankRouteRequest<Dec
 // --- G2 / G4 CMD222 RecordExecution ---------------------------------------------------------------------------------------------------
 
 type Judgment =
-  | { readonly kind: "RECORD"; readonly evidence: OutboundEvidence; readonly proof: "DP_FULL" }
+  | { readonly kind: "RECORD"; readonly evidence: OutboundEvidence; readonly proof: "DP_FULL" | "DP_RECIPIENT" }
   | { readonly kind: "REVIEW"; readonly gate: ExecutionGateOutcomeName; readonly code: string; readonly caseKind: string; readonly executionId: string | null };
 
 const PROVIDER_REF = /^[A-Za-z0-9._:-]{1,256}$/;
@@ -659,6 +729,8 @@ async function judgeExecution(
     return review("CLASSIFIED", "DESTINATION_CONFLICT", "MATCH_REVIEW", id);
   }
   if (dest.accountLast4 !== null && captured !== null && dest.accountLast4 !== captured.accountLast4) return review("CLASSIFIED", "DESTINATION_CONFLICT", "MATCH_REVIEW", id);
+  // DP-RECIPIENT: the recipient record bound at declaration, the same id AND the same version (a changed or unversioned record proves nothing)
+  if (attempt.recipientRef !== null && attempt.recipientVersion !== null && dest.recipientRef === attempt.recipientRef && dest.recipientVersion === attempt.recipientVersion) return { kind: "RECORD", evidence: x, proof: "DP_RECIPIENT" };
   return review("CLASSIFIED", "DESTINATION_UNPROVEN", "DESTINATION_UNPROVEN", id);
 }
 

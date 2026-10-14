@@ -93,6 +93,9 @@ export interface ExecutionAttemptRow {
   readonly keyId: string;
   readonly keyVersion: number;
   readonly normVersion: string;
+  /** The DP-RECIPIENT binding frozen at declaration (both null: none). */
+  readonly recipientRef: string | null;
+  readonly recipientVersion: string | null;
   readonly bankExecutionId: string | null;
   readonly destinationProof: "DP_FULL" | "DP_RECIPIENT" | null;
   readonly evidenceHash: string | null;
@@ -120,6 +123,8 @@ export interface NewExecutionAttempt {
   readonly keyId: string;
   readonly keyVersion: number;
   readonly normVersion: string;
+  readonly recipientRef?: string | null;
+  readonly recipientVersion?: string | null;
 }
 
 /** The bounce of a RECORDED transfer (G3): once per transfer; its cents are the REFUND_PAYABLE its resends settle. */
@@ -202,13 +207,15 @@ interface AttemptDbRow {
   fingerprint_key_id: string;
   fingerprint_key_version: number;
   fingerprint_norm_version: string;
+  recipient_ref: string | null;
+  recipient_version: string | null;
   bank_execution_id: string | null;
   destination_proof: "DP_FULL" | "DP_RECIPIENT" | null;
   evidence_hash: string | null;
   recorded_at: Date | null;
 }
 const ATTEMPT_COLUMNS =
-  "attempt_id, environment, account_ref, kind, state, version, source_kind, agency_id, capture_id, refund_id, bank_credit_id, treasury_refund_id, source_id, parent_bounce_id, attempt_number, reference, amount_cents::text AS amount_cents, currency, declared_at, declared_by, destination_fingerprint, fingerprint_key_id, fingerprint_key_version, fingerprint_norm_version, bank_execution_id, destination_proof, evidence_hash, recorded_at";
+  "attempt_id, environment, account_ref, kind, state, version, source_kind, agency_id, capture_id, refund_id, bank_credit_id, treasury_refund_id, source_id, parent_bounce_id, attempt_number, reference, amount_cents::text AS amount_cents, currency, declared_at, declared_by, destination_fingerprint, fingerprint_key_id, fingerprint_key_version, fingerprint_norm_version, recipient_ref, recipient_version, bank_execution_id, destination_proof, evidence_hash, recorded_at";
 
 function attemptOf(r: AttemptDbRow): ExecutionAttemptRow {
   return {
@@ -236,6 +243,8 @@ function attemptOf(r: AttemptDbRow): ExecutionAttemptRow {
     keyId: r.fingerprint_key_id,
     keyVersion: int(r.fingerprint_key_version),
     normVersion: r.fingerprint_norm_version,
+    recipientRef: r.recipient_ref,
+    recipientVersion: r.recipient_version,
     bankExecutionId: r.bank_execution_id,
     destinationProof: r.destination_proof,
     evidenceHash: r.evidence_hash,
@@ -408,10 +417,10 @@ export class PgBankRefunds {
     const r = await execute<AttemptDbRow>(
       this.db,
       `INSERT INTO kauro.outbound_execution_attempts (attempt_id, environment, account_ref, kind, source_kind, agency_id, capture_id, refund_id, bank_credit_id, treasury_refund_id,
-         attempt_number, reference, amount_cents, currency, declared_at, declared_by, destination_fingerprint, fingerprint_key_id, fingerprint_key_version, fingerprint_norm_version, parent_bounce_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'USD', $14, $15, $16, $17, $18, $19, $20)
+         attempt_number, reference, amount_cents, currency, declared_at, declared_by, destination_fingerprint, fingerprint_key_id, fingerprint_key_version, fingerprint_norm_version, parent_bounce_id, recipient_ref, recipient_version)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'USD', $14, $15, $16, $17, $18, $19, $20, $21, $22)
        RETURNING ${ATTEMPT_COLUMNS}`,
-      [a.attemptId, a.environment, a.accountRef, a.kind, a.sourceKind, a.agencyId, a.captureId, a.refundId, a.bankCreditId, a.treasuryRefundId, a.attemptNumber, a.reference, a.amountCents, a.declaredAt, a.declaredBy, a.destinationFingerprint, a.keyId, a.keyVersion, a.normVersion, a.parentBounceId ?? null],
+      [a.attemptId, a.environment, a.accountRef, a.kind, a.sourceKind, a.agencyId, a.captureId, a.refundId, a.bankCreditId, a.treasuryRefundId, a.attemptNumber, a.reference, a.amountCents, a.declaredAt, a.declaredBy, a.destinationFingerprint, a.keyId, a.keyVersion, a.normVersion, a.parentBounceId ?? null, a.recipientRef ?? null, a.recipientVersion ?? null],
     );
     return attemptOf(r.rows[0]!);
   }

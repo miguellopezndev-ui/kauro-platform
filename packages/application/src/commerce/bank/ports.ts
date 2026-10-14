@@ -158,6 +158,9 @@ export interface ExecutionAttemptRecord {
   readonly keyId: string;
   readonly keyVersion: number;
   readonly normVersion: string;
+  /** The DP-RECIPIENT binding X1/X4 froze (DV1-10): the provider's recipient record and its version, or both null. */
+  readonly recipientRef: string | null;
+  readonly recipientVersion: string | null;
   readonly bankExecutionId: string | null;
   readonly destinationProof: "DP_FULL" | "DP_RECIPIENT" | null;
   readonly evidenceHash: string | null;
@@ -185,6 +188,9 @@ export interface NewExecutionAttemptInput {
   readonly keyId: string;
   readonly keyVersion: number;
   readonly normVersion: string;
+  /** The DP-RECIPIENT binding, only after its recipient-record artifact gave exactly this fingerprint (DV1-11); absent: none bound. */
+  readonly recipientRef?: string | null;
+  readonly recipientVersion?: string | null;
 }
 
 /** The bounce of a RECORDED transfer (G3): once per transfer; its cents are the REFUND_PAYABLE its resends settle. */
@@ -298,6 +304,16 @@ export interface BankCreditClassifier {
   classifyCredit(evidence: StoredBankEvidence): EvidenceClassification<IncomingCredit>;
   /** A manual execution artifact (a send receipt) the owner records (G2, G4, X3-EXECUTED). */
   classifyOutbound(evidence: StoredBankEvidence): EvidenceClassification<OutboundEvidence>;
+  /** A provider recipient-record artifact the owner binds at X1/X4 (DP-RECIPIENT, DV1-10). */
+  classifyRecipient(evidence: StoredBankEvidence): EvidenceClassification<RecipientRecordEvidence>;
+}
+
+/** A classified recipient-record artifact: its full details are restricted (fingerprinted in memory, never stored, logged or shown). */
+export interface RecipientRecordEvidence {
+  readonly accountRef: string;
+  readonly recipientRef: string;
+  readonly recipientVersion: string;
+  readonly full: { readonly routingNumber: string; readonly accountNumber: string; readonly holderName: string };
 }
 
 export interface BankRouteCollaborators {

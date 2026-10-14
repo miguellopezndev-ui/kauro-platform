@@ -48,6 +48,7 @@ import {
   plusMs,
   q,
   recordG2,
+  recipientBinding,
   recorded,
   refundOf,
   refusal,
@@ -1062,6 +1063,40 @@ interface Forge {
   readonly approval?: Destination;
   /** Undoes a forge that changed the attempt itself (not its evidence), so the unforged control judges the attempt as declared. */
   restore?(src: Source): Promise<unknown>;
+  /** DP-RECIPIENT (S4): the recipient record bound at X1/X4 (version v1); the unforged control then proves through that record. */
+  readonly recipient?: string;
+  /** DP-RECIPIENT (S4): a recipient-record artifact with these full details is refused at X1 and X4 (RECIPIENT_ALIAS) before the legs run. */
+  readonly alias?: Destination;
+}
+
+/**
+ * X1 (RETURN) or X4 (RESEND) refuses to bind a recipient record whose full details do not give the captured fingerprint: RECIPIENT_ALIAS,
+ * nothing declared; the control on the same source binds a record with the approved details and declares (the attempt carries the binding).
+ */
+async function aliasRefused(scope: Scope, kind: Kind, label: string, approval: Destination | undefined, alias: Destination): Promise<void> {
+  const ref = `recipient-${label}`.replace(/[^A-Za-z0-9._:-]/g, "-");
+  const forged = await recipientBinding(ref, "v1", alias);
+  const good = await recipientBinding(ref, "v1", approval ?? DEST);
+  const approved_ = approval === undefined ? {} : { destination: approval };
+  if (kind === "RETURN") {
+    const src = await approved(scope, label, approved_);
+    assertRefused(await declareX1(src, { recipient: forged }), "409 RECIPIENT_ALIAS", `${scope} X1`);
+    assert.deepEqual([(await attemptsOf(src)).length, (await refundOf(src))?.state], [0, "APPROVED"], `${scope} X1: nothing declared`);
+    const ok = dataOf<DeclareView>(await declareX1(src, { recipient: good }), 201, `${scope} X1 control`);
+    assert.deepEqual(await boundRecipient(ok.attempt.attemptId), [ref, "v1"], `${scope} X1 control: the recipient is bound`);
+    return;
+  }
+  const b = await bounced(scope, label, approved_);
+  const before = (await attemptsOf(b.src)).length;
+  assertRefused(await declareX4(b.attempt, b.payableCents, { recipient: forged }), "409 RECIPIENT_ALIAS", `${scope} X4`);
+  assert.equal((await attemptsOf(b.src)).length, before, `${scope} X4: nothing declared`);
+  const ok = dataOf<DeclareView>(await declareX4(b.attempt, b.payableCents, { recipient: good }), 201, `${scope} X4 control`);
+  assert.deepEqual(await boundRecipient(ok.attempt.attemptId), [ref, "v1"], `${scope} X4 control: the recipient is bound`);
+}
+/** The recipient record and version an attempt froze at its declaration ([null, null]: none). */
+async function boundRecipient(attemptId: string): Promise<[string | null, string | null]> {
+  const row = (await q<{ recipient_ref: string | null; recipient_version: string | null }>("SELECT recipient_ref, recipient_version FROM kauro.outbound_execution_attempts WHERE attempt_id = $1", [attemptId]))[0]!;
+  return [row.recipient_ref, row.recipient_version];
 }
 
 /** The legs a slice built so far runs as its own cell ([id] RETURN x RECORD, both scopes); the full cell keeps every leg (slice 3). */
@@ -1082,10 +1117,14 @@ function predicateLegs(f: Forge, title: string, legs: ReadonlyArray<readonly [Ki
     // the RECORD-only legs declare no deadline: each forged request is retried with unforged evidence (two counted requests per leg)
     const fault: FaultKind = legs.some(([, c]) => c === "RESOLVE_EXECUTED") ? "expiry" : "retry";
     await runCell({ id: f.title.split(" ")[1]!, step: title, fault, expect: f.refusal }, async (ctx) => {
+      if (f.alias !== undefined)
+        for (const scope of SCOPES) for (const kind of new Set(legs.map(([k]) => k))) await aliasRefused(scope, kind, `alias-${scope}-${kind}`, f.approval, f.alias);
       for (const scope of SCOPES)
         for (const [kind, command] of legs) {
             const approval = f.approval === undefined ? {} : { destination: f.approval };
-            const a = command === "RECORD" ? await openAttempt(scope, kind, `pred-${scope}-${kind}`, approval) : await lapsed(ctx, scope, kind, `pred-x3-${scope}-${kind}`, approval);
+            const declare = f.recipient === undefined ? {} : { recipient: await recipientBinding(f.recipient, "v1", f.approval ?? DEST) };
+            const a = command === "RECORD" ? await openAttempt(scope, kind, `pred-${scope}-${kind}`, approval, declare) : await lapsed(ctx, scope, kind, `pred-x3-${scope}-${kind}`, approval, declare);
+            if (f.recipient !== undefined) assert.deepEqual(await boundRecipient(a.attempt.attemptId), [f.recipient, "v1"], `${scope} ${kind}: the recipient record is bound at declaration`);
             const reserved = await sourceReserved(a.src);
             const before = await footprint(a.src);
             const forged = await storeExecution(a.attempt, await f.forge(a.attempt, a.src));
@@ -1100,7 +1139,7 @@ function predicateLegs(f: Forge, title: string, legs: ReadonlyArray<readonly [Ki
             assert.equal(completions(after.events), completions(before.events), `${scope} ${kind} ${command}: no new completion (a RESEND source already completed with its RETURN)`);
             // the control: unforged evidence records the same attempt
             await f.restore?.(a.src);
-            const ok = await storeExecution(a.attempt, { bankExecutionId: nextExecutionId("control"), ...(f.approval === undefined ? {} : { full: f.approval }) });
+            const ok = await storeExecution(a.attempt, { bankExecutionId: nextExecutionId("control"), ...(f.recipient !== undefined ? { full: null, accountLast4: null, recipientRef: f.recipient, recipientVersion: "v1" } : f.approval === undefined ? {} : { full: f.approval }) });
             const good = command === "RECORD" ? await ctx.attempt(() => recordG2(a.attempt, ok)) : await resolveX3(a.attempt, "EXECUTED", ok);
             assert.equal(dataOf<RecordView>(good, 200, `${scope} ${kind} ${command}: the unforged control`).attempt.state, "RECORDED");
           }
@@ -1118,8 +1157,8 @@ predicateControl({ title: "DENY RFG-P-E-REF-CONFLICT (a present reference differ
 predicateControl({ title: "DENY RFG-P-DEST-SAME-LAST4 (a different full account sharing routing and last four): Record a declared execution", refusal: "409 DESTINATION_CONFLICT", forge: () => ({ full: { ...DEST, accountNumber: `9${DEST.accountNumber}` } }) });
 predicateControl({ title: "DENY RFG-P-DEST-ROUTING (same account number, different routing number): Record a declared execution", refusal: "409 DESTINATION_CONFLICT", forge: () => ({ full: { ...DEST, routingNumber: "011000015" } }) });
 predicateControl({ title: "DENY RFG-P-DEST-NAME (same routing and account, different normalized holder name): Record a declared execution", refusal: "409 DESTINATION_CONFLICT", forge: () => ({ full: { ...DEST, holderName: "Alice Smyth" } }) });
-predicateControl({ title: "DENY RFG-P-DEST-RECIPIENT-CHANGED (recipient record bound at declaration, execution evidence carries another recipient version): Record a declared execution", refusal: "409 DESTINATION_UNPROVEN", caseKind: "DESTINATION_UNPROVEN", forge: () => ({ full: null, recipientRef: "recipient-1", recipientVersion: "v2" }) });
-predicateControl({ title: "DENY RFG-P-DEST-RECIPIENT-UNVERSIONED (recipient id without a version): Record a declared execution", refusal: "409 DESTINATION_UNPROVEN", caseKind: "DESTINATION_UNPROVEN", forge: () => ({ full: null, recipientRef: "recipient-1", recipientVersion: null }) });
+predicateControl({ title: "DENY RFG-P-DEST-RECIPIENT-CHANGED (recipient record bound at declaration, execution evidence carries another recipient version): Record a declared execution", refusal: "409 DESTINATION_UNPROVEN", caseKind: "DESTINATION_UNPROVEN", recipient: "recipient-1", forge: () => ({ full: null, accountLast4: null, recipientRef: "recipient-1", recipientVersion: "v2" }) });
+predicateControl({ title: "DENY RFG-P-DEST-RECIPIENT-UNVERSIONED (recipient id without a version): Record a declared execution", refusal: "409 DESTINATION_UNPROVEN", caseKind: "DESTINATION_UNPROVEN", recipient: "recipient-1", forge: () => ({ full: null, accountLast4: null, recipientRef: "recipient-1", recipientVersion: null }) });
 predicateControl({ title: "DENY RFG-P-DEST-ABSENT (send receipt with no destination fields): Record a declared execution — attempt stays DECLARED or UNCERTAIN, DESTINATION_UNPROVEN case, share held", refusal: "409 DESTINATION_UNPROVEN", caseKind: "DESTINATION_UNPROVEN", forge: () => ({ full: null, accountLast4: null }) });
 predicateControl({ title: "DENY RFG-P-DEST-PARTIAL-ONLY (last four and routing only, both equal): Record a declared execution", refusal: "409 DESTINATION_UNPROVEN", caseKind: "DESTINATION_UNPROVEN", forge: () => ({ full: null, accountLast4: DEST_LAST4_OF(), routingDigest: "a".repeat(64) }) });
 predicateControl({
@@ -1133,28 +1172,36 @@ predicateControl({
   restore: (src) => q("UPDATE kauro.outbound_execution_attempts SET fingerprint_key_version = fingerprint_key_version - 1 WHERE source_id = $1 AND state IN ('DECLARED','UNCERTAIN')", [src.sourceId]),
 });
 predicateControl({ title: "DENY RFG-P-DF-INVALID-EVIDENCE (DP-FULL evidence or a recipient artifact whose holder normalizes to 141 code points or whose routing fails the ABA check): Record a declared execution — DESTINATION_UNPROVEN", refusal: "409 DESTINATION_UNPROVEN", forge: () => ({ full: { ...DEST, holderName: "A".repeat(141) } }) });
-predicateControl({ title: "DENY RFG-P-DF-UNICODE-DIGITS-EVIDENCE (DP-FULL evidence or a recipient artifact whose routing or account uses Arabic-Indic or full-width digits): Record a declared execution — DESTINATION_UNPROVEN, and X1 and X4 refuse the binding", refusal: "409 DESTINATION_UNPROVEN", forge: () => ({ full: { ...DEST, routingNumber: "٠٢١٠٠٠٠٢١" } }) });
+predicateControl({ title: "DENY RFG-P-DF-UNICODE-DIGITS-EVIDENCE (DP-FULL evidence or a recipient artifact whose routing or account uses Arabic-Indic or full-width digits): Record a declared execution — DESTINATION_UNPROVEN, and X1 and X4 refuse the binding", refusal: "409 DESTINATION_UNPROVEN", alias: { ...DEST, routingNumber: "٠٢١٠٠٠٠٢١" }, forge: () => ({ full: { ...DEST, routingNumber: "٠٢١٠٠٠٠٢١" } }) });
 predicateControl({ title: "DENY RFG-P-DF-CONCAT-COLLISION (routing 021000021, account 12341234, holder 1234M versus account 123412341234, holder M): distinct destinations give distinct fingerprints", refusal: "409 DESTINATION_CONFLICT", approval: COLLISION_A, forge: () => ({ full: COLLISION_B }) });
-predicateControl({ title: "DENY RFG-P-DF-HYPHEN (holder A-B captured at F2 versus AB in DP-FULL evidence and in a recipient artifact): one outcome — distinct fingerprints, DP-FULL E-DEST-CONFLICT, X1 and X4 RECIPIENT_ALIAS", refusal: "409 DESTINATION_CONFLICT", approval: { ...DEST, holderName: "A-B" }, forge: () => ({ full: { ...DEST, holderName: "AB" } }) });
-predicateControl({ title: "DENY RFG-P-DF-FULLWIDTH (holder in full-width letters versus ASCII letters): one outcome — distinct fingerprints under NFC, DP-FULL E-DEST-CONFLICT, X1 and X4 RECIPIENT_ALIAS", refusal: "409 DESTINATION_CONFLICT", forge: () => ({ full: { ...DEST, holderName: "Ａlice Smith" } }) });
+predicateControl({ title: "DENY RFG-P-DF-HYPHEN (holder A-B captured at F2 versus AB in DP-FULL evidence and in a recipient artifact): one outcome — distinct fingerprints, DP-FULL E-DEST-CONFLICT, X1 and X4 RECIPIENT_ALIAS", refusal: "409 DESTINATION_CONFLICT", approval: { ...DEST, holderName: "A-B" }, alias: { ...DEST, holderName: "AB" }, forge: () => ({ full: { ...DEST, holderName: "AB" } }) });
+predicateControl({ title: "DENY RFG-P-DF-FULLWIDTH (holder in full-width letters versus ASCII letters): one outcome — distinct fingerprints under NFC, DP-FULL E-DEST-CONFLICT, X1 and X4 RECIPIENT_ALIAS", refusal: "409 DESTINATION_CONFLICT", alias: { ...DEST, holderName: "Ａlice Smith" }, forge: () => ({ full: { ...DEST, holderName: "Ａlice Smith" } }) });
 function DEST_LAST4_OF(): string {
   return DEST.accountNumber.slice(-4);
 }
 
 /** The positive controls: the evidence satisfies every predicate (rule 12's OK side), G2/G4 both scopes and X3 EXECUTED both kinds. */
-function positiveControl(title: string, evidence: (a: AttemptView) => ExecutionOverrides, approval?: Destination): void {
-  const all: ReadonlyArray<readonly [Kind, "RECORD" | "RESOLVE_EXECUTED"]> = KINDS.flatMap((k) => [[k, "RECORD"] as const, [k, "RESOLVE_EXECUTED"] as const]);
-  positiveLegs(title, title, evidence, all, approval);
-  positiveLegs(title, titleOfLegs(title), evidence, RETURN_RECORD_LEGS, approval);
+/** A recipient record bound at X1/X4 (DP-RECIPIENT, S4): its id (version v1) and the full details of its artifact. */
+interface BoundRecipient {
+  readonly ref: string;
+  readonly full: Destination;
 }
-function positiveLegs(id: string, title: string, evidence: (a: AttemptView) => ExecutionOverrides, legs: ReadonlyArray<readonly [Kind, "RECORD" | "RESOLVE_EXECUTED"]>, approval?: Destination): void {
+const ALL_LEGS: ReadonlyArray<readonly [Kind, "RECORD" | "RESOLVE_EXECUTED"]> = KINDS.flatMap((k) => [[k, "RECORD"] as const, [k, "RESOLVE_EXECUTED"] as const]);
+function positiveControl(title: string, evidence: (a: AttemptView) => ExecutionOverrides, approval?: Destination, recipient?: BoundRecipient): void {
+  positiveLegs(title, title, evidence, ALL_LEGS, approval, recipient);
+  positiveLegs(title, titleOfLegs(title), evidence, RETURN_RECORD_LEGS, approval, recipient);
+}
+function positiveLegs(id: string, title: string, evidence: (a: AttemptView) => ExecutionOverrides, legs: ReadonlyArray<readonly [Kind, "RECORD" | "RESOLVE_EXECUTED"]>, approval?: Destination, recipient?: BoundRecipient): void {
   test(title, async () => {
     const fault: FaultKind = legs.some(([, c]) => c === "RESOLVE_EXECUTED") ? "expiry" : "retry";
     await runCell({ id: id.split(" ")[1]!, step: title, fault, expect: "RECORDED" }, async (ctx) => {
       for (const scope of SCOPES)
         for (const [kind, command] of legs) {
             const approved_ = approval === undefined ? {} : { destination: approval };
-            const a = command === "RECORD" ? await openAttempt(scope, kind, `ok-${scope}-${kind}`, approved_) : await lapsed(ctx, scope, kind, `ok-x3-${scope}-${kind}`, approved_);
+            const declare = recipient === undefined ? {} : { recipient: await recipientBinding(recipient.ref, "v1", recipient.full) };
+            const a = command === "RECORD" ? await openAttempt(scope, kind, `ok-${scope}-${kind}`, approved_, declare) : await lapsed(ctx, scope, kind, `ok-x3-${scope}-${kind}`, approved_, declare);
+            // X1 and X4 bind the recipient record (its details give the captured fingerprint)
+            if (recipient !== undefined) assert.deepEqual(await boundRecipient(a.attempt.attemptId), [recipient.ref, "v1"], `${scope} ${kind}: the recipient record is bound`);
             const stored = await storeExecution(a.attempt, evidence(a.attempt));
             const key = freshKey("ok");
             const r = command === "RECORD" ? await ctx.attempt(() => recordG2(a.attempt, stored, { key })) : await resolveX3(a.attempt, "EXECUTED", stored);
@@ -1166,33 +1213,31 @@ function positiveLegs(id: string, title: string, evidence: (a: AttemptView) => E
             }
             assert.equal(view.attempt.state, "RECORDED");
             if (kind === "RETURN") assert.equal(view.refund?.state, "COMPLETED", `${scope}: COMPLETED with ${a.attempt.amountCents} cents`);
+            const proof = (await q<{ destination_proof: string }>("SELECT destination_proof FROM kauro.outbound_execution_attempts WHERE attempt_id = $1", [a.attempt.attemptId]))[0]!.destination_proof;
+            assert.equal(proof, evidence(a.attempt).full === null ? "DP_RECIPIENT" : "DP_FULL", `${scope} ${kind} ${command}: the proof recorded`);
           }
     });
   });
 }
 positiveControl("OK RFG-P-E-ALL (every predicate holds; reference null): Record a declared execution", () => ({ reference: null }));
 positiveControl("OK RFG-P-DEST-FULL (full recipient details whose keyed fingerprint equals the approved one): Record a declared execution", () => ({}));
-positiveControl("OK RFG-P-DF-EQUIV-CASE (holder ALICE SMITH at approval, alice smith in DP-FULL evidence and in a recipient record): same fingerprint — recording succeeds and X1 and X4 bind the recipient", () => ({ full: { ...DEST, holderName: "alice smith" } }), { ...DEST, holderName: "ALICE SMITH" });
-positiveControl("OK RFG-P-DF-EQUIV-NFC (holder with precomposed U+00E9 at approval, e followed by U+0301 in DP-FULL evidence and in a recipient record): same fingerprint — recording succeeds and X1 and X4 bind the recipient", () => ({ full: { ...DEST, holderName: "Renée Smith" } }), { ...DEST, holderName: "Renée Smith" });
-positiveControl("OK RFG-P-DF-EQUIV-WHITESPACE (holder with leading, trailing and inner White_Space runs including a tab and U+00A0 at approval, single spaces in DP-FULL evidence and in a recipient record): same fingerprint — recording succeeds and X1 and X4 bind the recipient", () => ({ full: { ...DEST, holderName: "Alice Smith" } }), { ...DEST, holderName: " Alice	  Smith " });
+positiveControl("OK RFG-P-DF-EQUIV-CASE (holder ALICE SMITH at approval, alice smith in DP-FULL evidence and in a recipient record): same fingerprint — recording succeeds and X1 and X4 bind the recipient", () => ({ full: { ...DEST, holderName: "alice smith" } }), { ...DEST, holderName: "ALICE SMITH" }, { ref: "recipient-equiv-case", full: { ...DEST, holderName: "alice smith" } });
+positiveControl("OK RFG-P-DF-EQUIV-NFC (holder with precomposed U+00E9 at approval, e followed by U+0301 in DP-FULL evidence and in a recipient record): same fingerprint — recording succeeds and X1 and X4 bind the recipient", () => ({ full: { ...DEST, holderName: "Renée Smith" } }), { ...DEST, holderName: "Renée Smith" }, { ref: "recipient-equiv-nfc", full: { ...DEST, holderName: "Renée Smith" } });
+positiveControl("OK RFG-P-DF-EQUIV-WHITESPACE (holder with leading, trailing and inner White_Space runs including a tab and U+00A0 at approval, single spaces in DP-FULL evidence and in a recipient record): same fingerprint — recording succeeds and X1 and X4 bind the recipient", () => ({ full: { ...DEST, holderName: "Alice Smith" } }), { ...DEST, holderName: " Alice	  Smith " }, { ref: "recipient-equiv-ws", full: { ...DEST, holderName: "Alice Smith" } });
 
-test("OK RFG-P-DEST-RECIPIENT (bound recipient record, same version at execution): Record a declared execution", async () => {
-  const s4 = (L().bw as unknown as { storeRecipientRecord?: unknown }).storeRecipientRecord;
-  for (const scope of SCOPES) {
-    const src = await approved(scope, `dp-recipient-${scope}`);
-    if (s4 === undefined) {
-      // without the recipient artifact seam the DP-FULL path must at least exist (the declaration succeeds) before the seam is needed
-      dataOf<DeclareView>(await declareX1(src), 201, `${scope}: X1`);
-      throw new SeamMissing("S4", SEAMS.S4);
-    }
-    // S4 is bound (KIT-2): the DP-RECIPIENT positive control is written with X1/G2, never a vacuous pass
-    throw new Error(`${scope}: the DP-RECIPIENT body is not written yet (slice 2)`);
-  }
-});
+// DP-RECIPIENT: the receipt carries no destination field but the bound recipient id and version (G2/G4 both scopes, X3 EXECUTED both kinds)
+positiveLegs(
+  "OK RFG-P-DEST-RECIPIENT (bound recipient record, same version at execution): Record a declared execution",
+  "OK RFG-P-DEST-RECIPIENT (bound recipient record, same version at execution): Record a declared execution",
+  () => ({ full: null, accountLast4: null, recipientRef: "recipient-ok", recipientVersion: "v1" }),
+  ALL_LEGS,
+  undefined,
+  { ref: "recipient-ok", full: DEST },
+);
 
 // --- NOT_EXECUTED predicate controls --------------------------------------------------------------------------------------------------
 
-function nxControl(title: string, refusalText: string, debits: (a: AttemptView) => Promise<Parameters<typeof statementWith>[2]> | Parameters<typeof statementWith>[2], options: { readonly gapDay?: boolean; readonly early?: boolean } = {}): void {
+function nxControl(title: string, refusalText: string, debits: (a: AttemptView) => Promise<Parameters<typeof statementWith>[2]> | Parameters<typeof statementWith>[2], options: { readonly gapDay?: boolean; readonly early?: boolean; readonly recipient?: string } = {}): void {
   test(title, async () => {
     await runCell({ id: title.split(" ")[1]!, step: title, fault: "expiry", expect: refusalText }, async (ctx) => {
       // a control: a clean attempt with clean coverage is NOT_EXECUTED (RETURN: FAILED, share released)
@@ -1224,7 +1269,9 @@ function nxControl(title: string, refusalText: string, debits: (a: AttemptView) 
       }
       for (const scope of SCOPES)
         for (const kind of KINDS) {
-          const a = await lapsed(ctx, scope, kind, `nx-${scope}-${kind}`);
+          const declare = options.recipient === undefined ? {} : { recipient: await recipientBinding(options.recipient, "v1") };
+          const a = await lapsed(ctx, scope, kind, `nx-${scope}-${kind}`, {}, declare);
+          if (options.recipient !== undefined) assert.deepEqual(await boundRecipient(a.attempt.attemptId), [options.recipient, "v1"], `${scope} ${kind}: the attempt binds the recipient`);
           const { manualExecutionWindowMs, coverageLagMs } = routeTiming();
           const nx = plusMs(a.attempt.declaredAt, manualExecutionWindowMs + coverageLagMs);
           ctx.clock.set(new Date(Math.max(Date.parse(nx), ctx.clock.nowMs())));
@@ -1264,7 +1311,7 @@ nxControl("DENY RFG-P-NX-CORR-OFFERED (a debit whose execution id was offered fo
   assert.ok((await recordG2(a, await storeExecution(a, { bankExecutionId: id, full: null, accountLast4: null }))).status >= 400, "the offer is refused on destination proof");
   return [{ amountCents: BigInt(a.amountCents), bankExecutionId: id }];
 });
-nxControl("DENY RFG-P-NX-CORR-RECIPIENT (a debit carrying the bound recipient id with no reference and no destination fields): Resolve uncertain execution", "409 CONTRADICTORY_EVIDENCE", () => [{ amountCents: 5n, recipientRef: "recipient-bound" }]);
+nxControl("DENY RFG-P-NX-CORR-RECIPIENT (a debit carrying the bound recipient id with no reference and no destination fields): Resolve uncertain execution", "409 CONTRADICTORY_EVIDENCE", () => [{ amountCents: 5n, recipientRef: "recipient-bound" }], { recipient: "recipient-bound" });
 nxControl("DENY RFG-P-NX-CORR-DF (a debit whose full destination gives the attempt's fingerprint, other amount, no reference): Resolve uncertain execution", "409 CONTRADICTORY_EVIDENCE", () => [{ amountCents: 7n, full: DEST }]);
 nxControl("DENY RFG-P-NX-OTHER-CURRENCY (an unexplained debit in another currency): Resolve uncertain execution", "409 UNEXPLAINED_DEBIT", (a) => [{ amountCents: BigInt(a.amountCents), currency: "EUR" }]);
 nxControl("DENY RFG-P-NX-UNEXPLAINED (an unexplained debit of another amount with a conflicting destination): Resolve uncertain execution", "409 UNEXPLAINED_DEBIT", () => [{ amountCents: 11n, full: COLLISION_B }]);
@@ -1435,10 +1482,31 @@ for (const [title, full, expectRecorded] of [
 }
 
 cell("RACE RFG-M-DEST-RECIPIENT (both orders): a recipient-record artifact with a new version imported against G2 recording through DP-RECIPIENT — G2 first records only on the declared version carried by the execution evidence; artifact first changes no bound version and G2 still requires the declared version", "race", async (ctx) => {
-  const src = await approved("CAPTURE", "dest-recipient-wait");
-  const r = await hw(ctx, "X1 vs X1 (the race plumbing of this cell)", bank(() => declareX1(src)), bank(() => declareX1(src)));
-  assert.equal(valueOf(r.held).status, 201);
-  throw new SeamMissing("S4", SEAMS.S4);
+  // the new version is bound by another declaration of the same account (X1 of a second refund binding v2 under L1), against G2 of the
+  // attempt bound to v1 with a receipt carrying v1: in both orders the attempt records DP-RECIPIENT on v1, its bound version never moves,
+  // and a receipt carrying v2 proves nothing for it; the second attempt holds v2 and a v1 receipt proves nothing for it either
+  for (const scope of SCOPES)
+    for (const order of ["G2 first", "new version first"] as const) {
+      const ref = `recipient-race-${scope}-${order === "G2 first" ? "g" : "v"}`;
+      const a = await openAttempt(scope, "RETURN", `dest-rcp-a-${scope}-${order}`, {}, { recipient: await recipientBinding(ref, "v1") });
+      const other = await approved(scope, `dest-rcp-b-${scope}-${order}`);
+      const v2 = await recipientBinding(ref, "v2");
+      const storedV1 = await storeExecution(a.attempt, { full: null, accountLast4: null, recipientRef: ref, recipientVersion: "v1" });
+      const g2 = bank(() => recordG2(a.attempt, storedV1));
+      const x1 = bank(() => declareX1(other, { recipient: v2 }));
+      const r = order === "G2 first" ? await hw(ctx, `${scope} ${order}`, g2, x1) : await hw(ctx, `${scope} ${order}`, x1, g2);
+      const g2Reply = valueOf(order === "G2 first" ? r.held : r.waited) as Reply;
+      const x1Reply = valueOf(order === "G2 first" ? r.waited : r.held) as Reply;
+      assert.equal(dataOf<RecordView>(g2Reply, 200, `${scope} ${order}: G2 on v1`).attempt.state, "RECORDED");
+      const b = dataOf<DeclareView>(x1Reply, 201, `${scope} ${order}: X1 binds v2`).attempt;
+      assert.deepEqual(await boundRecipient(a.attempt.attemptId), [ref, "v1"], `${scope} ${order}: the bound version never moves`);
+      assert.deepEqual(await boundRecipient(b.attemptId), [ref, "v2"], `${scope} ${order}: the second attempt holds v2`);
+      assert.equal((await q<{ destination_proof: string }>("SELECT destination_proof FROM kauro.outbound_execution_attempts WHERE attempt_id = $1", [a.attempt.attemptId]))[0]!.destination_proof, "DP_RECIPIENT");
+      // G2 still requires the declared version: a v1 receipt for the v2-bound attempt proves nothing (its share stays held)
+      assertRefused(await recordG2(b, await storeExecution(b, { full: null, accountLast4: null, recipientRef: ref, recipientVersion: "v1" })), "409 DESTINATION_UNPROVEN", `${scope} ${order}: v1 for the v2 attempt`);
+      assert.equal(await attemptState(b.attemptId), "DECLARED");
+      assert.equal(await sourceReserved(other), other.totalCents);
+    }
 });
 
 cell("RACE RFG-M-NX-SI2-CORR (both orders): X3 NOT_EXECUTED against a statement import of a correlated debit with a conflicting destination — import first: NOT_EXECUTED refused CONTRADICTORY_EVIDENCE; X3 first: NOT_EXECUTED commits, the import opens REFUND_TERMINAL_CONTRADICTED and freezes every open refund of the source (no further share is released)", "race", async (ctx) => {
