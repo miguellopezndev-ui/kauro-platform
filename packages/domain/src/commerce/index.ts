@@ -79,8 +79,8 @@ export { PROVIDER_EXCEPTION_KINDS, providerRequestHash, providerRequestIdOf, pro
 export type { CaptureMismatch, CaptureMatch, CaptureEdge, CaptureStatusStep } from "./capture.js";
 export { CAPTURE_MISMATCHES, matchCapture, captureStatusStep, splitObligation, allocateCapture, authorizesObligation, isFullyPaid } from "./capture.js";
 
-export type { CheckoutBlocker, SubjectFacts, CheckoutFacts, QuoteReleaseFacts, QuoteRelease, ReplacementFacts, ReplacementBlocker } from "./authority.js";
-export { CHECKOUT_BLOCKERS, checkoutBlockers, authorizationBlockers, honoredAfterPriceExpiry, blockerFailure, revocationPhaseOf, deliveryPhaseOf, quoteRelease, replacementBlockers } from "./authority.js";
+export type { CheckoutBlocker, SubjectFacts, CheckoutFacts, QuoteReleaseFacts, QuoteRelease, ReplacementFacts, ReplacementBlocker, RebindingReason } from "./authority.js";
+export { CHECKOUT_BLOCKERS, checkoutBlockers, authorizationBlockers, honoredAfterPriceExpiry, blockerFailure, revocationPhaseOf, deliveryPhaseOf, quoteRelease, replacementBlockers, rebindingRevocationCode, targetRepairLineageHash } from "./authority.js";
 
 export type { RefundAmountCheck, RefundTaxCheck, RefundEffects, RefundAuthorizationPreimage } from "./refunds.js";
 export {

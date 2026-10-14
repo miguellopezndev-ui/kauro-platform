@@ -106,13 +106,26 @@ export async function issueReplacement(
   // the same project, mode, target and band (equal base): any other scope is charged only after a refund and a new accepted quote
   const policy = registryPricePolicy();
   const base = baseServiceCents(policy, subject.project.mode, subject.units);
-  if (subject.project.mode !== live.mode || subject.plan.targetContractHash !== live.targetContractHash || base === null || base !== live.baseServiceCents) {
-    const mismatch = subject.plan.targetContractHash !== live.targetContractHash ? ["targetContractHash"] : subject.project.mode !== live.mode ? ["mode"] : ["baseServiceCents", `paid${live.baseServiceCents}`, `replacement${base ?? 0n}`];
+  // R2-026 REPAIR (M8): a target change is no scope change only as the drift repair, the quote of the re-check plan CMD019 bore for the
+  // paid plan when it superseded the paid target, over the same revision (the re-check body replaces targetContractHash only). It spends
+  // no included source replacement; the payment service re-binds it TARGET_DRIFT_REPAIR and the 0084 guard re-checks all of it.
+  const targetDrift = subject.plan.targetContractHash !== live.targetContractHash;
+  const repair =
+    targetDrift && subject.plan.revisionHash === live.revisionHash
+      ? await c.rebindings.driftOf({ projectId, paidPlanId: live.planId, paidTargetContractHash: live.targetContractHash, replacementPlanId: subject.plan.planId })
+      : null;
+  const isRepair = repair !== null && repair.replacedTargetSuperseded && repair.rechecksPaidPlan;
+  if (subject.project.mode !== live.mode || (targetDrift && !isRepair) || base === null || base !== live.baseServiceCents) {
+    const mismatch = targetDrift && !isRepair ? ["targetContractHash"] : subject.project.mode !== live.mode ? ["mode"] : ["baseServiceCents", `paid${live.baseServiceCents}`, `replacement${base ?? 0n}`];
     throw refuse("REPLACEMENT_SCOPE_CHANGED", "the replacement is not of the paid mode, target and band", { currentVersion: live.version, currentState: live.state, mismatch });
   }
-  const allowance = (await c.pricePolicies.get(live.pricePolicyVersion))?.preExecutionReplacementsIncluded ?? 0;
-  if ((await c.rebindings.listForCapture(authorization.captureId)).length >= allowance) {
-    throw refuse("REPLACEMENT_ALLOWANCE_SPENT", "the one included pre-execution source replacement is spent", { currentVersion: live.version, currentState: live.state });
+  if (!isRepair) {
+    // the included allowance counts only source replacements (0084): a drift repair before it leaves it free
+    const allowance = (await c.pricePolicies.get(live.pricePolicyVersion))?.preExecutionReplacementsIncluded ?? 0;
+    const sourceReplacements = (await c.rebindings.listForCapture(authorization.captureId)).filter((r) => r.reasonCode === "PRE_EXECUTION_SOURCE_REPLACEMENT").length;
+    if (sourceReplacements >= allowance) {
+      throw refuse("REPLACEMENT_ALLOWANCE_SPENT", "the one included pre-execution source replacement is spent", { currentVersion: live.version, currentState: live.state });
+    }
   }
   // retryable: the pending replacement settles or is withdrawn, and the retry then reads the allowance spent or free
   if ((await reads.pendingReplacementOf(agencyId, live.quoteId)) !== null) {

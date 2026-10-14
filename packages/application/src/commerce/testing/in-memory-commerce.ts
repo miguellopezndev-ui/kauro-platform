@@ -736,6 +736,12 @@ function commerceUnitOfWork(b06: UnitOfWork, s: InMemoryCommerceStore, clock: Cl
       async findTo(quoteId) {
         return [...s.rebindings.values()].find((r) => see(r) !== null && r.toQuoteId === quoteId) ?? null;
       },
+      // the in-memory store births no re-check plan (TargetContractRepository.insertRecheckPlan is not in memory): never a re-check
+      async driftOf(input) {
+        const base = s.base;
+        const superseded = [...base.targetContracts.values()].some((t) => t.projectId === input.projectId && t.bodyHash === input.paidTargetContractHash && t.supersededAt !== undefined);
+        return { replacedTargetSuperseded: superseded, rechecksPaidPlan: false };
+      },
     },
     refunds: {
       async get(refundId) {

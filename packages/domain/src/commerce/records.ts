@@ -420,7 +420,7 @@ export interface CommercialAuthorizationRecord {
   readonly deliveredAt?: UtcInstant;
   readonly revokedAt?: UtcInstant;
   readonly revocationPhase?: RevocationPhase;
-  /** A server token (CAPTURE_REVERSED, SERVICE_FULLY_REFUNDED, SOURCE_REPLACED); never customer text. */
+  /** A server token (CAPTURE_REVERSED, SERVICE_FULLY_REFUNDED, SOURCE_REPLACED, TARGET_REPAIRED); never customer text. */
   readonly revocationCode?: string;
   readonly createdAt: UtcInstant;
 }
@@ -438,10 +438,17 @@ export interface PurchaseRebindingRecord {
   readonly fromQuoteId: QuoteId;
   readonly fromAuthorizationId: CommercialAuthorizationId;
   readonly toQuoteId: QuoteId;
-  /** 1 for the first included replacement of the capture; bounded by the price policy's included replacements. */
+  /**
+   * The capture's ordinal within its reason (migration 0084 purchase_rebindings_allowance_once): 1 for its first included source
+   * replacement, bounded by the price policy's included replacements; a drift repair counts its own ordinals and spends no allowance.
+   */
   readonly allowanceOrdinal: number;
-  readonly reasonCode: "PRE_EXECUTION_SOURCE_REPLACEMENT";
-  /** The source lifecycle's lineage evidence (SourceLineageReader, provided by the upload package B07). */
+  /** PRE_EXECUTION_SOURCE_REPLACEMENT (the included source replacement) or TARGET_DRIFT_REPAIR (R2-026 REPAIR, no charge, migration 0084). */
+  readonly reasonCode: "PRE_EXECUTION_SOURCE_REPLACEMENT" | "TARGET_DRIFT_REPAIR";
+  /**
+   * The source lifecycle's lineage evidence (SourceLineageReader, provided by the upload package B07) for a source replacement;
+   * KAURO_TARGET_REPAIR_V1 of the replaced and the replacing target body hashes (targetRepairLineageHash) for a drift repair.
+   */
   readonly lineageEvidenceHash: Sha256Hex;
   readonly requestedByMembershipId: MembershipId;
   readonly createdAt: UtcInstant;

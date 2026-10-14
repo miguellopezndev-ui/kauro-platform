@@ -21,8 +21,8 @@
  */
 import type { PurchaseRebinder, SourceLineageReader } from "@kauro/application";
 import { publishVersionEvent, versionEvent } from "@kauro/application";
-import type { CommercialAuthorizationId, CommercialAuthorizationRecord, PurchaseRebindingId, QuoteRecord, ReplacementBlocker } from "@kauro/domain";
-import { COMMITTING_REFUND_STATES, DomainFailure, NotFoundFailure, authorizesObligation, replacementBlockers } from "@kauro/domain";
+import type { CommercialAuthorizationId, CommercialAuthorizationRecord, PurchaseRebindingId, QuoteRecord, RebindingReason, ReplacementBlocker } from "@kauro/domain";
+import { COMMITTING_REFUND_STATES, DomainFailure, NotFoundFailure, authorizesObligation, rebindingRevocationCode, replacementBlockers, targetRepairLineageHash } from "@kauro/domain";
 import { purchasedSubjectReader } from "../edition.js";
 
 function applied<T>(write: { readonly kind: "APPLIED"; readonly record: T } | { readonly kind: "STALE"; readonly currentVersion: number; readonly currentState: string }, what: string): T {
@@ -45,8 +45,27 @@ export function createPurchaseRebinder(deps: { readonly lineage?: SourceLineageR
       const replaced = await c.authorizations.findLiveByCapture(capture.captureId);
       const refunds = await c.refunds.listForCapture(capture.captureId);
       const policy = await c.pricePolicies.get(from.pricePolicyVersion);
-      const lineage = deps.lineage === undefined ? null : await deps.lineage.replacementOf(uow, { agencyId: from.agencyId, projectId: from.projectId, replacedRevisionHash: from.revisionHash, replacementRevisionHash: to.revisionHash });
-      const used = (await c.rebindings.listForCapture(capture.captureId)).length;
+      // R2-026 REPAIR (M8): a replacement of another target is the drift repair (TARGET_DRIFT_REPAIR, no allowance, the target's lineage);
+      // the same target is the included source replacement (the source lifecycle's lineage, B07)
+      const reason: RebindingReason = to.targetContractHash !== from.targetContractHash ? "TARGET_DRIFT_REPAIR" : "PRE_EXECUTION_SOURCE_REPLACEMENT";
+      const drift =
+        reason === "TARGET_DRIFT_REPAIR"
+          ? {
+              ...(await c.rebindings.driftOf({ projectId: from.projectId, paidPlanId: from.planId, paidTargetContractHash: from.targetContractHash, replacementPlanId: to.planId })),
+              keepsPaidScope: to.revisionHash === from.revisionHash && to.mode === from.mode && to.baseServiceCents === from.baseServiceCents && to.termsVersion === from.termsVersion,
+            }
+          : undefined;
+      const lineage =
+        reason === "TARGET_DRIFT_REPAIR"
+          ? { replacementSealed: true, evidenceHash: targetRepairLineageHash(from.targetContractHash, to.targetContractHash) }
+          : deps.lineage === undefined
+            ? null
+            : await deps.lineage.replacementOf(uow, { agencyId: from.agencyId, projectId: from.projectId, replacedRevisionHash: from.revisionHash, replacementRevisionHash: to.revisionHash });
+      // the ordinal and the allowance are per reason (0084 purchase_rebindings_allowance_once): a repair spends no source replacement
+      const used = (await c.rebindings.listForCapture(capture.captureId)).filter((r) => r.reasonCode === reason).length;
+      // the purchased subject's chain (CSJ: agency, capability, approval, revision, target shared halves): a CMD019 supersession of the
+      // replacement's target that commits while this waits is read here, and refuses TARGET_NOT_CURRENT before anything is recorded (M3)
+      const subject = await purchasedSubjectReader.subjectOf(uow, to);
       const blockers: ReplacementBlocker[] = [
         ...replacementBlockers({
           authorizationState: replaced?.state ?? "REVOKED",
@@ -57,10 +76,12 @@ export function createPurchaseRebinder(deps: { readonly lineage?: SourceLineageR
           replacementsUsed: used,
           replacementsIncluded: policy?.preExecutionReplacementsIncluded ?? 0,
           lineageReachesReplaced: lineage !== null && lineage.replacementSealed,
+          reason,
+          replacementTargetCurrent: subject !== null && subject.target !== null && subject.target.confirmed && !subject.target.superseded,
+          ...(drift !== undefined ? { drift } : {}),
         }),
       ];
       if (replaced === null || replaced.quoteId !== from.quoteId) blockers.push("PURCHASE_NOT_INTACT");
-      const subject = await purchasedSubjectReader.subjectOf(uow, to);
       if (subject === null || subject.approval === null || subject.capability === null) blockers.push("NOT_A_REPLACEMENT");
       if (blockers.length > 0 || replaced === null || lineage === null || subject === null || subject.approval === null || subject.capability === null) {
         return { kind: "REFUSED", blockers: [...new Set(blockers)] };
@@ -78,12 +99,12 @@ export function createPurchaseRebinder(deps: { readonly lineage?: SourceLineageR
         fromAuthorizationId: replaced.authorizationId,
         toQuoteId: to.quoteId,
         allowanceOrdinal: used + 1,
-        reasonCode: "PRE_EXECUTION_SOURCE_REPLACEMENT",
+        reasonCode: reason,
         lineageEvidenceHash: lineage.evidenceHash,
         requestedByMembershipId: input.requestedByMembershipId,
         createdAt: now,
       });
-      await revoke(uow, replaced, input.causationId, now);
+      await revoke(uow, replaced, rebindingRevocationCode(reason), input.causationId, now);
       const superseded = applied(await c.quotes.transition(from.quoteId, from.version, { state: "SUPERSEDED", supersededByQuoteId: to.quoteId }, now), "the replaced quote");
       await publishVersionEvent(uow, versionEvent("quote", from.quoteId, superseded.version, from.agencyId, { previousState: from.state, state: "SUPERSEDED" }, { quoteId: from.quoteId, agencyId: from.agencyId, successorQuoteId: to.quoteId, previousState: from.state }), input.causationId);
       const accepted = applied(await c.quotes.transition(to.quoteId, to.version, { state: "ACCEPTED_FOR_CHECKOUT" }, now), "the replacement quote");
@@ -94,11 +115,11 @@ export function createPurchaseRebinder(deps: { readonly lineage?: SourceLineageR
   };
 }
 
-async function revoke(uow: Parameters<PurchaseRebinder["rebind"]>[0], a: CommercialAuthorizationRecord, causationId: Parameters<PurchaseRebinder["rebind"]>[1]["causationId"], now: Parameters<PurchaseRebinder["rebind"]>[1]["now"]): Promise<void> {
-  const revoked = applied(await uow.commerce.authorizations.transition(a.authorizationId, a.version, { state: "REVOKED", revocation: { at: now, phase: "PRE_EXECUTION", code: "SOURCE_REPLACED" } }, now), "the replaced entitlement");
+async function revoke(uow: Parameters<PurchaseRebinder["rebind"]>[0], a: CommercialAuthorizationRecord, code: "SOURCE_REPLACED" | "TARGET_REPAIRED", causationId: Parameters<PurchaseRebinder["rebind"]>[1]["causationId"], now: Parameters<PurchaseRebinder["rebind"]>[1]["now"]): Promise<void> {
+  const revoked = applied(await uow.commerce.authorizations.transition(a.authorizationId, a.version, { state: "REVOKED", revocation: { at: now, phase: "PRE_EXECUTION", code } }, now), "the replaced entitlement");
   await publishVersionEvent(
     uow,
-    versionEvent("commercial_authorization", a.authorizationId, revoked.version, a.agencyId, { previousState: a.state, state: "REVOKED" }, { authorizationId: a.authorizationId, agencyId: a.agencyId, projectId: a.projectId, captureId: a.captureId, phase: "PRE_EXECUTION", revocationCode: "SOURCE_REPLACED", previousState: a.state }),
+    versionEvent("commercial_authorization", a.authorizationId, revoked.version, a.agencyId, { previousState: a.state, state: "REVOKED" }, { authorizationId: a.authorizationId, agencyId: a.agencyId, projectId: a.projectId, captureId: a.captureId, phase: "PRE_EXECUTION", revocationCode: code, previousState: a.state }),
     causationId,
   );
 }
