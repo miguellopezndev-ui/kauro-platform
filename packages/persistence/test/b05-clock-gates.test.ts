@@ -44,6 +44,7 @@ function ownerOfFile(tag: string): string {
   if (n === 60) return "SEC-DEPTH";
   if (n === 69 || n === 71 || (n >= 74 && n <= 76)) return "B16";
   if (n === 77) return "SEC-HARDENING-2";
+  if (n === 78) return "SEC-OWNER-POLICY-FORALL";
   return "UNKNOWN";
 }
 const fileTag = (at: string): string => at.split(":")[0]!;

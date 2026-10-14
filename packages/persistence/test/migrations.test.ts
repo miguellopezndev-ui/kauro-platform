@@ -169,6 +169,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0076_b16_recovery_gate.sql",
     // SEC-HARDENING-2 (SH2-F1/F2, BL2-F1/F2): the registrar owns the bank-route definer, no runtime role in another role (provisional number)
     "0077_sec_hardening_2.sql",
+    // SEC OWNER-POLICY-FORALL-2: every FOR ALL policy wider than its role's grants becomes one policy per granted command (provisional number)
+    "0071_sec_policy_per_command.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
