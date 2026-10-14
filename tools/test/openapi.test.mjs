@@ -32,7 +32,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   // B10 (CMD002 and CMD043, mandate B10-AGENCY-LIFECYCLE; CMD027, mandate B10-COMMANDS-QUOTE; CMD045..CMD047, mandate B10-COMMANDS-PROSPECTS; CMD048..CMD050, mandate B10-COMMANDS-SELLERS),
   // the five routes of the browser session boundary (B11 W2), the two public routes (B11 W5b), and the Payments V1 bank-transfer
   // routes (L-ROUTE: the five operational bank-route commands, getBankRoute, and the KIT read getTransferInstructions; PV1-INBOUND:
-  // the four bank-credit commands, the credit and match-key reads, and the checkout retirement)
+  // the four bank-credit commands, the credit and match-key reads, and the checkout retirement; B12: the owner's evidence upload and
+  // the credit queue)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -44,6 +45,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/agencies/{agencyId}/projects ListProjects",
       "GET /api/v1/audits/{auditId} GetAudit",
       "GET /api/v1/jobs/{jobId} GetJob",
+      "GET /api/v1/operations/bank-credits listBankCredits",
       "GET /api/v1/operations/bank-credits/{creditId} getBankCredit",
       "GET /api/v1/operations/bank-orders/{orderId}/match-keys getBankOrderMatchKeys",
       "GET /api/v1/operations/bank-routes/{routeId} getBankRoute",
@@ -86,6 +88,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/memberships/{membershipId}/capabilities ChangeMembership",
       "POST /api/v1/memberships/{membershipId}/revoke RevokeMembership",
       "POST /api/v1/operations/bank-accounts/{accountRef}/credits enterBankCredit",
+      "POST /api/v1/operations/bank-accounts/{accountRef}/evidence-artifacts uploadBankEvidenceArtifact",
       "POST /api/v1/operations/bank-accounts/{accountRef}/statement-imports importBankStatement",
       "POST /api/v1/operations/bank-credits/{creditId}/attributions attributeBankCredit",
       "POST /api/v1/operations/bank-credits/{creditId}/confirmations confirmBankCredit",
@@ -196,6 +199,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
     "POST /api/v1/operations/bank-accounts/{accountRef}/statement-imports importBankStatement",
     "GET /api/v1/operations/bank-credits/{creditId} getBankCredit",
     "GET /api/v1/operations/bank-orders/{orderId}/match-keys getBankOrderMatchKeys",
+    "POST /api/v1/operations/bank-accounts/{accountRef}/evidence-artifacts uploadBankEvidenceArtifact",
+    "GET /api/v1/operations/bank-credits listBankCredits",
     "POST /api/v1/agencies/{agencyId}/buyer-type setBuyerType",
   ]);
   // the public routes take no credential (an explicit empty security requirement) and the inquiry names the Origin it demands

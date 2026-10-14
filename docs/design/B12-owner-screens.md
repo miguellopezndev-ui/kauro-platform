@@ -66,4 +66,4 @@ Test titles (files under apps/api/test, apps/web/test, tools/test):
 | case | coverage in this lane | remaining |
 |---|---|---|
 | R2-067 | PARTIAL: O2 shows an absent fee as Unknown, the credit view never claims settlement; `owner-finance-screens.test.ts` O2 title | balances, liabilities and settlement are O4 (PV1-SETTLE) |
-| G-UX_PRIVATE (owner projections) | PARTIAL: owner-only reads and upload (L-DENY, U-DENY); no account number in a read | seller projections R2-066, R2-068 are later B12 lanes |
+| G-UX_PRIVATE (owner projections) | PARTIAL (EXECUTED_LOCAL): owner-only reads and upload (`b12-owner-evidence.test.ts` L-DENY, U-DENY); no account number in a read (`response-schemas.test.ts` B12 title; `owner-finance-screens.test.ts` O1, O2); the OPS screens only on the ops host (`host-routing.test.ts` D-SCR-1) | seller projections R2-066, R2-068 are later B12 lanes |

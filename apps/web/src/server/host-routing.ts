@@ -1,5 +1,6 @@
 // Which host serves which group of screens (design D-TOPO-2). One deployment answers on two hosts: the public origin serves the PUBLIC group
-// (UI01-UI08, UI45-UI49) and the app origin serves the APP group (UI09-UI32, UI50-UI52). The proxy asks this module about every path and
+// (UI01-UI08, UI45-UI49) and the app origin serves the APP group (UI09-UI32, UI50-UI52); the ops origin, when the deployment names one
+// (D-SCR-1), serves the OPS group (UI33-UI44, UI53-UI55, under /ops) and its own sign-in (UI50: the session cookie is host-bound). The proxy asks this module about every path and
 // answers 404 for the other group's paths by host. It is presentation, never authorization (08 "Identity is not permission"): the api
 // decides every access, and no private data is rendered by this server anyway.
 //
@@ -37,6 +38,7 @@ export function groupOfHost(policy: HostPolicy, host: string | null): Origin | n
   const value = host.toLowerCase();
   if (value === policy.publicHost) return "PUBLIC";
   if (value === policy.appHost) return "APP";
+  if (policy.opsHost !== undefined && value === policy.opsHost) return "OPS";
   return null;
 }
 
@@ -46,8 +48,11 @@ export function decideRoute(config: HostConfig, host: string | null, pathname: s
   const group = groupOfRoot(pathname.slice(1).split("/")[0] ?? "");
   if (group === "MALFORMED") return "NOT_FOUND";
   if (group === null) return "PASS";
-  if (matchRoute(pathname) === null) return "NOT_FOUND";
+  const match = matchRoute(pathname);
+  if (match === null) return "NOT_FOUND";
   if (!config.ok) return "UNAVAILABLE";
   if (config.policy.kind === "LOCAL") return "PASS";
-  return groupOfHost(config.policy, host) === group ? "PASS" : "NOT_FOUND";
+  const served = groupOfHost(config.policy, host);
+  if (served === "OPS" && match.screen.id === "UI50") return "PASS";
+  return served === group ? "PASS" : "NOT_FOUND";
 }

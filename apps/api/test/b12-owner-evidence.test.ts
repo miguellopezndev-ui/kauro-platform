@@ -144,7 +144,7 @@ const page = async (query: string, owner: Person = L().owner): Promise<QueuePage
 };
 
 test("L-KEYSET: the queue lists one state oldest first in keyset pages; a credit that leaves the state is not repeated and none is skipped", async () => {
-  const route = await routeFor("b12-queue", []);
+  const route = await routeFor("b12-queue", [L().iw.w.A.agencyId]);
   const entered: string[] = [];
   for (let i = 0; i < 3; i++) {
     const facts = { bankTransactionId: nextTxn(`b12q${i}`), rail: "ACH", grossCents: 1000n + BigInt(i), feeCents: null, currency: "USD", reference: null, payerDigest: null, bookedAt: new Date(Date.now() - 60_000).toISOString(), status: "COMPLETED" };

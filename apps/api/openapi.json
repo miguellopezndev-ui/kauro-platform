@@ -10105,10 +10105,10 @@
             "name": "accountRef",
             "in": "path",
             "required": true,
-            "description": "Path id (a UUID).",
+            "description": "Path reference (letters, digits and . _ : -, at most 128).",
             "schema": {
               "type": "string",
-              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
             }
           },
           {
@@ -10173,6 +10173,82 @@
         }
       }
     },
+    "/api/v1/operations/bank-accounts/{accountRef}/evidence-artifacts": {
+      "post": {
+        "operationId": "uploadBankEvidenceArtifact",
+        "summary": "Store a bank artifact the owner holds (account details, a credit, a statement) in the restricted store for the account: its reference and hash, which a command then cites",
+        "description": "Authority: B12 D-B12S-2 (GAP-API-8); ACH-ROUTE r12 §6 (the store assigns the provenance); KAURO_OWNER; content-addressed, no Idempotency-Key",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "name": "accountRef",
+            "in": "path",
+            "required": true,
+            "description": "Path reference (letters, digits and . _ : -, at most 128).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "x-kauro-idempotency": "NONE",
+        "x-kauro-role": "KAURO_OWNER",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/uploadBankEvidenceArtifactRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The artifact is stored (the same bytes answer the same reference). It grants nothing: a command that cites it re-reads it by hash and judges it.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/uploadBankEvidenceArtifactResponse201"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/operations/bank-accounts/{accountRef}/statement-imports": {
       "post": {
         "operationId": "importBankStatement",
@@ -10184,10 +10260,10 @@
             "name": "accountRef",
             "in": "path",
             "required": true,
-            "description": "Path id (a UUID).",
+            "description": "Path reference (letters, digits and . _ : -, at most 128).",
             "schema": {
               "type": "string",
-              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
             }
           },
           {
@@ -10227,6 +10303,83 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/importBankStatementResponse201"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/bank-credits": {
+      "get": {
+        "operationId": "listBankCredits",
+        "summary": "The bank credits in one state, oldest first, in keyset pages: the owner's queue of drafts to confirm and credits to review",
+        "description": "Authority: B12 D-B12S-3 (GAP-API-9); ACH-ROUTE r12 §7.5-§7.9; KAURO_OWNER",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "The list's filter; a value not listed is SCHEMA_VIOLATION (ENUM). The cursor is bound to it.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT_MANUAL",
+                "OBSERVED",
+                "MATCH_REVIEW",
+                "MATCHED",
+                "APPLIED",
+                "RETURN_REVIEW"
+              ],
+              "default": "MATCH_REVIEW"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/PageLimit"
+          },
+          {
+            "$ref": "#/components/parameters/PageCursor"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          }
+        ],
+        "x-kauro-idempotency": "NONE",
+        "x-kauro-role": "KAURO_OWNER",
+        "responses": {
+          "200": {
+            "description": "One page of the queue; nextCursor continues it (null on the last page).",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/listBankCreditsResponse200"
                 }
               }
             }
@@ -42021,6 +42174,8 @@
               "STATEMENT_ALREADY_IMPORTED",
               "PROVIDER_INCONSISTENCY",
               "ATTRIBUTION_NOT_OVERRIDABLE",
+              "ARTIFACT_SIZE_INVALID",
+              "ARTIFACT_TYPE_MISMATCH",
               "EXECUTION_FENCED",
               "EXECUTION_AUTHORITY_LOST",
               "CAPACITY_LEDGER",
@@ -49017,6 +49172,143 @@
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:response:op:importBankStatement:201"
       },
+      "listBankCreditsResponse200": {
+        "title": "listBankCredits 200",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "credits",
+              "nextCursor"
+            ],
+            "properties": {
+              "credits": {
+                "type": "array",
+                "maxItems": 100,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "creditId",
+                    "accountRef",
+                    "bankTransactionId",
+                    "state",
+                    "version",
+                    "source",
+                    "rail",
+                    "grossCents",
+                    "feeCents",
+                    "currency",
+                    "reference",
+                    "orderId",
+                    "captureId"
+                  ],
+                  "properties": {
+                    "creditId": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "accountRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9._:-]+$"
+                    },
+                    "bankTransactionId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "DRAFT_MANUAL",
+                        "OBSERVED",
+                        "MATCH_REVIEW",
+                        "MATCHED",
+                        "APPLIED",
+                        "RETURN_REVIEW"
+                      ]
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "OWNER_MANUAL"
+                      ]
+                    },
+                    "rail": {
+                      "type": "string",
+                      "enum": [
+                        "ACH",
+                        "DOMESTIC_WIRE",
+                        "OTHER",
+                        "UNKNOWN"
+                      ]
+                    },
+                    "grossCents": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,15})$"
+                    },
+                    "feeCents": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "pattern": "^(0|[1-9][0-9]{0,15})$"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "enum": [
+                        "USD"
+                      ]
+                    },
+                    "reference": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "minLength": 1,
+                      "maxLength": 256
+                    },
+                    "orderId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    },
+                    "captureId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    }
+                  }
+                }
+              },
+              "nextCursor": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[A-Za-z0-9_-]{8,512}\\.[A-Za-z0-9_-]{43}$"
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:listBankCredits:200"
+      },
       "openSessionRequest": {
         "title": "openSession request",
         "type": "object",
@@ -49461,6 +49753,89 @@
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:response:op:setBuyerType:201"
+      },
+      "uploadBankEvidenceArtifactRequest": {
+        "title": "uploadBankEvidenceArtifact request",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mediaType",
+          "contentBase64",
+          "evidenceHash"
+        ],
+        "properties": {
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "application/json",
+              "application/pdf",
+              "text/csv"
+            ]
+          },
+          "contentBase64": {
+            "type": "string",
+            "maxLength": 699052,
+            "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+          },
+          "evidenceHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:op:uploadBankEvidenceArtifact"
+      },
+      "uploadBankEvidenceArtifactResponse201": {
+        "title": "uploadBankEvidenceArtifact 201",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifact"
+        ],
+        "properties": {
+          "artifact": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifactRef",
+              "evidenceHash",
+              "sizeBytes",
+              "mediaType",
+              "accountRef"
+            ],
+            "properties": {
+              "artifactRef": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9._:-]+$"
+              },
+              "evidenceHash": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "sizeBytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 524288
+              },
+              "mediaType": {
+                "type": "string",
+                "enum": [
+                  "application/json",
+                  "application/pdf",
+                  "text/csv"
+                ]
+              },
+              "accountRef": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9._:-]+$"
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:uploadBankEvidenceArtifact:201"
       },
       "verifyBankRouteRequest": {
         "title": "verifyBankRoute request",

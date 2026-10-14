@@ -84,6 +84,8 @@ export type StatementLineWriteResult = { readonly kind: "NEW" | "SAME"; readonly
 export interface BankCreditRepository {
   lockStream(environment: string, accountRef: string, stream: BankStreamName): Promise<void>;
   credit(creditId: string): Promise<BankCreditRecord | null>;
+  /** B12 GAP-API-9: the credits in one state, oldest first, keyset (created_at, bank_credit_id) after `after`, at most `limit`. */
+  listCredits(state: string, after: { readonly createdAt: string; readonly id: string } | null, limit: number): Promise<ReadonlyArray<{ readonly credit: BankCreditRecord; readonly position: { readonly createdAt: string; readonly id: string } }>>;
   lockCredit(creditId: string): Promise<BankCreditRecord | null>;
   creditByTransaction(environment: string, accountRef: string, bankTransactionId: string, lock?: boolean): Promise<BankCreditRecord | null>;
   insertCredit(c: NewBankCreditInput): Promise<BankCreditRecord | null>;
@@ -128,6 +130,8 @@ export interface BankInboundCollaborators extends BankRouteCollaborators {
   readonly classifier: () => BankEvidenceClassifier | null;
   /** The product's registered hold (a test pauses, crashes or fails here; production: a no-op). */
   readonly hold: (point: string) => Promise<void>;
+  /** The list cursors' HMAC key (the api's configured cursor key; absent: a per-process random key, cursors die with the process). */
+  readonly cursorKey?: Uint8Array;
 }
 
 export const BANK_HOLD_GATE_READ = "bank:gate-read";

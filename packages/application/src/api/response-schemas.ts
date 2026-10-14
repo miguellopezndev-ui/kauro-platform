@@ -29,6 +29,7 @@ import { SOURCE_ROUTES } from "../sources/contracts.js";
 import type { B07CommandId } from "../sources/contracts.js";
 import type { SourceIntakeId, SourceReadId } from "../sources/outcomes.js";
 import { SESSION_URL_MEMBER, SESSION_URL_VIEW, SOURCE_COMMAND_RESPONSES, SOURCE_VIEW_DEFINITIONS } from "../sources/response-views.js";
+import { CURSOR_PATTERN } from "./cursor.js";
 import { LABEL_PATTERN, TEXT_PATTERN } from "./request-schemas.js";
 import { READINESS_BLOCKERS } from "./views.js";
 import { PROJECT_PHASES, PROJECT_REQUIRED_ACTIONS } from "../agency/dashboard-vocabulary.js";
@@ -717,6 +718,20 @@ export interface OperationalRoute {
   readonly responses: Readonly<Record<string, OperationalResponse>>;
   /** The body the route admits, when it takes one (strict JSON, closed schema, admitted like a command's body). */
   readonly request?: OperationalRequest;
+  /**
+   * The closed query of a paginated operational read (B12 D-B12S-3): limit (1..api.pageMaximum, default api.pageDefault), cursor, and its one
+   * filter member by name, its values and the one an absent member means. A route without it takes no query parameter.
+   */
+  readonly query?: OperationalQuery;
+  /**
+   * The body parser's string bound for this route when it is not api.maxStringLength (B12 D-B12S-2: the upload's base64 content, exactly
+   * its schema's maxLength). The body's byte bound (api.jsonBytes) is never raised.
+   */
+  readonly maxStringLength?: number;
+}
+
+export interface OperationalQuery {
+  readonly filter: { readonly name: string; readonly values: ReadonlyArray<string>; readonly default: string };
 }
 
 /** The reply of GET /livez: the process is live; nothing else is checked (14 "Monitoring and service health"). */
@@ -1104,6 +1119,33 @@ export const BANK_MATCH_KEYS_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"]
     providerTimeToleranceMs: { type: "integer", minimum: 0 },
     accountRef: BANK_REF,
   }) }) });
+/** The credit states the owner's queue lists (kauro.bank_credits.state). */
+export const BANK_CREDIT_STATES = ["DRAFT_MANUAL", "OBSERVED", "MATCH_REVIEW", "MATCHED", "APPLIED", "RETURN_REVIEW"] as const;
+/** The decoded size bound of an owner upload (B12 D-B12S-2) and the base64 text that encodes it. */
+export const BANK_EVIDENCE_MAX_BYTES = 524_288;
+export const BANK_EVIDENCE_MEDIA_TYPES = ["application/json", "application/pdf", "text/csv"] as const;
+/** The base64 length of BANK_EVIDENCE_MAX_BYTES + 1 bytes' upper bound: an oversized artifact reaches the handler's size refusal. */
+const BANK_EVIDENCE_BASE64_MAX_LENGTH = Math.ceil(BANK_EVIDENCE_MAX_BYTES / 3) * 4;
+const BANK_EVIDENCE_UPLOAD_REQUEST_SCHEMA: JsonSchema = closedObject(["mediaType", "contentBase64", "evidenceHash"], {
+  mediaType: { type: "string", enum: [...BANK_EVIDENCE_MEDIA_TYPES] },
+  contentBase64: { type: "string", maxLength: BANK_EVIDENCE_BASE64_MAX_LENGTH, pattern: "^[A-Za-z0-9+/]*={0,2}$" },
+  evidenceHash: BANK_HASH,
+});
+const BANK_EVIDENCE_UPLOAD_RESPONSE_SCHEMA: JsonSchema = closedObject(["artifact"], {
+  artifact: closedObject(["artifactRef", "evidenceHash", "sizeBytes", "mediaType", "accountRef"], {
+    artifactRef: BANK_REF,
+    evidenceHash: BANK_HASH,
+    sizeBytes: { type: "integer", minimum: 1, maximum: BANK_EVIDENCE_MAX_BYTES },
+    mediaType: { type: "string", enum: [...BANK_EVIDENCE_MEDIA_TYPES] },
+    accountRef: BANK_REF,
+  }),
+});
+const BANK_CREDIT_PAGE_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], {
+  data: closedObject(["credits", "nextCursor"], {
+    credits: { type: "array", maxItems: 100, items: BANK_CREDIT_VIEW_SCHEMA },
+    nextCursor: { type: ["string", "null"], pattern: CURSOR_PATTERN },
+  }),
+});
 const creditCommand = (operationId: string, path: string, summary: string, status: "200" | "201", request: JsonSchema): OperationalRoute =>
   Object.freeze({
     operationId,
@@ -1191,6 +1233,26 @@ export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = 
     summary: "The keys the matching compares a credit with: the order's frozen reference, amount, accepted payer and deadline",
     authority: "ACH-ROUTE r12 §7.9; KAURO_OWNER",
     responses: Object.freeze({ "200": Object.freeze({ description: "The match keys.", contentType: JSON_CONTENT_TYPE, schema: BANK_MATCH_KEYS_RESPONSE_SCHEMA }) }),
+  }),
+  // B12 owner screens lane 1 (docs/design/B12-owner-screens.md D-B12S-2, D-B12S-3; GAP-API-8, GAP-API-9)
+  Object.freeze({
+    operationId: "uploadBankEvidenceArtifact",
+    method: "POST" as const,
+    path: "/api/v1/operations/bank-accounts/{accountRef}/evidence-artifacts",
+    summary: "Store a bank artifact the owner holds (account details, a credit, a statement) in the restricted store for the account: its reference and hash, which a command then cites",
+    authority: "B12 D-B12S-2 (GAP-API-8); ACH-ROUTE r12 §6 (the store assigns the provenance); KAURO_OWNER; content-addressed, no Idempotency-Key",
+    request: Object.freeze({ contentType: JSON_CONTENT_TYPE, schema: BANK_EVIDENCE_UPLOAD_REQUEST_SCHEMA }),
+    maxStringLength: BANK_EVIDENCE_BASE64_MAX_LENGTH,
+    responses: Object.freeze({ "201": Object.freeze({ description: "The artifact is stored (the same bytes answer the same reference). It grants nothing: a command that cites it re-reads it by hash and judges it.", contentType: JSON_CONTENT_TYPE, schema: BANK_EVIDENCE_UPLOAD_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "listBankCredits",
+    method: "GET" as const,
+    path: "/api/v1/operations/bank-credits",
+    summary: "The bank credits in one state, oldest first, in keyset pages: the owner's queue of drafts to confirm and credits to review",
+    authority: "B12 D-B12S-3 (GAP-API-9); ACH-ROUTE r12 §7.5-§7.9; KAURO_OWNER",
+    query: Object.freeze({ filter: Object.freeze({ name: "state", values: Object.freeze([...BANK_CREDIT_STATES]), default: "MATCH_REVIEW" }) }),
+    responses: Object.freeze({ "200": Object.freeze({ description: "One page of the queue; nextCursor continues it (null on the last page).", contentType: JSON_CONTENT_TYPE, schema: BANK_CREDIT_PAGE_RESPONSE_SCHEMA }) }),
   }),
 ] satisfies ReadonlyArray<OperationalRoute>);
 

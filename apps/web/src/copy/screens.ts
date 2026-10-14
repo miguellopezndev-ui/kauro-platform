@@ -7,6 +7,7 @@
 import { ACCOUNT_COPY } from "./screens/account.ts";
 import { APPROVAL_COPY } from "./screens/approval.ts";
 import { BILLING_COPY } from "./screens/billing.ts";
+import { FINANCE_COPY } from "./screens/finance.ts";
 import { HEALTH_CHECK_COPY } from "./screens/health-check.ts";
 import { KIT_COPY } from "./screens/kit.ts";
 import { PAYMENT_COPY } from "./screens/payment.ts";
@@ -17,7 +18,7 @@ import { SOURCES_COPY } from "./screens/sources.ts";
 import { SUPPORT_COPY } from "./screens/support.ts";
 import { WORKSPACE_COPY } from "./screens/workspace.ts";
 
-const AREAS = [ACCOUNT_COPY, APPROVAL_COPY, BILLING_COPY, HEALTH_CHECK_COPY, KIT_COPY, PAYMENT_COPY, PROCESSING_COPY, QUOTE_COPY, SETTINGS_COPY, SOURCES_COPY, SUPPORT_COPY, WORKSPACE_COPY] as const;
+const AREAS = [ACCOUNT_COPY, APPROVAL_COPY, BILLING_COPY, FINANCE_COPY, HEALTH_CHECK_COPY, KIT_COPY, PAYMENT_COPY, PROCESSING_COPY, QUOTE_COPY, SETTINGS_COPY, SOURCES_COPY, SUPPORT_COPY, WORKSPACE_COPY] as const;
 
 const seen = new Set<string>();
 for (const area of AREAS) {
@@ -31,6 +32,7 @@ export const SCREEN_COPY = {
   ...ACCOUNT_COPY,
   ...APPROVAL_COPY,
   ...BILLING_COPY,
+  ...FINANCE_COPY,
   ...HEALTH_CHECK_COPY,
   ...KIT_COPY,
   ...PAYMENT_COPY,
