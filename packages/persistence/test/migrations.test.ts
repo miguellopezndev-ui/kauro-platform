@@ -139,6 +139,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0061_b05_dispatch_settlement.sql",
     // package B11 lane A1: the agency's buyer type, recorded once by SetBuyerType (provisional number)
     "0062_agency_buyer_types.sql",
+    // Payments V1 PV1-INBOUND: credit and statement-import aggregates, guards, the owner pipeline on the payment pool (provisional number)
+    "0063_bank_inbound.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

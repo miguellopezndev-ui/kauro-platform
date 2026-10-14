@@ -28,6 +28,15 @@ export const OPERATIONAL_WIRE: Readonly<Record<string, OperationalWire>> = Objec
   getBankRoute: entry("NONE", false, "KAURO_OWNER"),
   // the buyer's bank details: an agency member under the active agency
   getTransferInstructions: entry("NONE", false, null, true),
+  // Payments V1 inbound credits (CMD210-CMD213): the owner's journaled, cookie-authenticated commands and the owner-only reads;
+  // the buyer's checkout retirement (CMD214) is journaled under the active agency by a billing member (bank-route-routes.ts)
+  enterBankCredit: entry("REQUIRED", true, "KAURO_OWNER"),
+  confirmBankCredit: entry("REQUIRED", true, "KAURO_OWNER"),
+  attributeBankCredit: entry("REQUIRED", true, "KAURO_OWNER"),
+  importBankStatement: entry("REQUIRED", true, "KAURO_OWNER"),
+  getBankCredit: entry("NONE", false, "KAURO_OWNER"),
+  getBankOrderMatchKeys: entry("NONE", false, "KAURO_OWNER"),
+  retireBankCheckout: entry("REQUIRED", true, "AGENCY_BILLING", true),
   // B11 A1: the agency owner records the buyer type once (CMD101), journaled and cookie-authenticated; the agency is the path id
   setBuyerType: entry("REQUIRED", true, "AGENCY_OWNER"),
 });

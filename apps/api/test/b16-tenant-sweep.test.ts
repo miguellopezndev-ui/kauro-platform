@@ -33,13 +33,15 @@ function idRoutes(): string[] {
 }
 
 /**
- * Id routes whose foreign resource this world cannot create (a job, an audit, an upload session, a bank route, a seller statement and
+ * Id routes whose foreign resource this world cannot create (a job, an audit, an upload session, a bank route, a bank credit or a bank order's match keys (corporate-owner operations, PV1 L-INBOUND), a seller statement and
  * the operator's views need the execution, intake, bank or commission worlds). Each is still asked for a nonexistent id below (a refusal that names nothing); the foreign half of each is
  * gap R2-B16-S048-UNSWEPT (reported to the coordinator), and the set is fixed so that a new route cannot hide in it.
  */
 const UNSWEPT: ReadonlySet<string> = new Set([
   "/api/v1/audits/{auditId}",
   "/api/v1/jobs/{jobId}",
+  "/api/v1/operations/bank-credits/{creditId}",
+  "/api/v1/operations/bank-orders/{orderId}/match-keys",
   "/api/v1/operations/bank-routes/{routeId}",
   "/api/v1/operations/refunds/{refundId}",
   "/api/v1/payment-orders/{orderId}/transfer-instructions",
