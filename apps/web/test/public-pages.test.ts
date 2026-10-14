@@ -512,7 +512,7 @@ test("UI49 (form): one POST form to the api opt-out route carries exactly the RF
   assert.equal(count(html, "<form"), 1);
   assert.match(html, /<form[^>]*method="post"/);
   assert.match(html, new RegExp(`action="/api/v1/public/outreach/opt-out/${TOKEN.replaceAll(".", "\.")}"`));
-  assert.match(html, /enctype="application/x-www-form-urlencoded"/i);
+  assert.match(html, /enctype="application\/x-www-form-urlencoded"/i);
   assert.equal(count(html, "<input"), 1);
   assert.match(html, /<input[^>]*type="hidden"[^>]*name="List-Unsubscribe"[^>]*value="One-Click"/);
   assert.equal(text.includes(TOKEN), false, "the token is never page text");
