@@ -49,7 +49,7 @@ test("CMD063-OK: the assigned seller sends a sealed draft under a live grant: 20
   assert.equal(await draftState(w, s.draft), "DRAFT", "the sealed draft is DRAFT before the send");
   const reply = await send(w, s.seller, s.draft, s.grant);
   const intentId = intentIdOf(reply);
-  assert.equal(reply.json<{ state: string }>().state, "QUEUED", "the answer names the intent QUEUED");
+  assert.equal(reply.json<{ data: { intentState: string } }>().data.intentState, "QUEUED", "the answer names the intent QUEUED");
   const i = await onlyIntent(w, s.draft);
   assert.deepEqual([i.intentId, i.state, i.authorizationId, i.personUserId, i.prospectId, i.purpose, i.route], [intentId, "QUEUED", s.grant.authorizationId, s.seller.userId, s.prospect.prospectId, "INDIVIDUAL_PROSPECT_CONTACT", "GMAIL_API"]);
   assert.match(i.payloadHash, /^[0-9a-f]{64}$/, "the payload hash is a sha256");

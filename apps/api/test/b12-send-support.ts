@@ -662,8 +662,8 @@ export function send(w: SendWorld, actor: Person, d: DraftP, g: GrantP, options:
 /** The intent id a 200 CMD063 answered (ids only from API answers, rule 24b). */
 export function intentIdOf(reply: Reply): string {
   assert.equal(reply.status, 200, `CMD063 answered ${reply.status}: ${reply.text}`);
-  const body = reply.json<{ intentId?: string; intent?: { intentId?: string } }>();
-  const id = body.intentId ?? body.intent?.intentId;
+  const body = reply.json<{ data?: { intentId?: string }; intentId?: string; intent?: { intentId?: string } }>();
+  const id = body.data?.intentId ?? body.intentId ?? body.intent?.intentId;
   assert.ok(typeof id === "string", `CMD063 answer names its intent: ${reply.text}`);
   return id;
 }

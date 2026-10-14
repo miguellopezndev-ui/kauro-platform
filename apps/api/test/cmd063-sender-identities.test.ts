@@ -55,7 +55,7 @@ test("GAP-RS-2 EXPIRY (consent): consent evidence older than its stated validity
   const ok = await register(seller.userId, fresh, { consentValidUntil: plusUs(T0, 1) });
   assert.equal(ok.status, 201, `consent valid 1 us after effect_now is admitted: ${ok.text}`);
   assert.equal(await sendersAt(w, fresh), 1);
-  const id = ok.json<{ senderId: string }>().senderId;
+  const id = ok.json<{ data: { senderId: string } }>().data.senderId;
   assert.equal(await senderState(w, id), "PENDING", "admitted PENDING (verification is a separate step)");
 });
 
