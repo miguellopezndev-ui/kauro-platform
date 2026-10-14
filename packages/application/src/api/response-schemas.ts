@@ -1188,7 +1188,7 @@ export const BANK_SETTLEMENT_REQUEST_READ_RESPONSE_SCHEMA: JsonSchema = closedOb
     }),
   }),
 });
-/** listBankSettlementsInTransit: the account's unapplied intents and its unresolved refusals, in record order (plan §3.5). */
+/** listBankSettlementsInTransit: the account's unapplied intents and its unresolved refusals and its applied intents without a receipt (the money still in BANK_IN_TRANSIT), in record order (plan §3.5). */
 export const BANK_SETTLEMENTS_IN_TRANSIT_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], {
   data: closedObject(["items", "nextCursor"], {
     items: {
@@ -1197,7 +1197,7 @@ export const BANK_SETTLEMENTS_IN_TRANSIT_RESPONSE_SCHEMA: JsonSchema = closedObj
       items: closedObject(["requestId", "withdrawalId", "state", "reason", "withdrawnCents", "receivedCents", "feeCents", "requestedAt", "ageSeconds", "delivery", "reviewCaseId"], {
         requestId: BANK_UUID,
         withdrawalId: BANK_REF,
-        state: { type: "string", enum: ["RECORDED", "REFUSED"] },
+        state: { type: "string", enum: ["RECORDED", "REFUSED", "APPLIED"] },
         reason: SETTLEMENT_REFUSAL_REASON,
         withdrawnCents: BANK_CENTS,
         receivedCents: BANK_CENTS_OR_NULL,

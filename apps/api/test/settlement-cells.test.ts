@@ -965,9 +965,34 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
     assert.ok(!lines.some(([a]) => a === "BANK_CASH"), "no receipt: BANK_IN_TRANSIT only, never bank cash");
     const t2 = await outcomeOf(transit.w.accountRef, transit.requestId);
     assert.deepEqual([t2.settlement?.receivedCents, t2.settlement?.bankEvidence], [null, false]);
+    // ADV-8: its withdrawal is in BANK_IN_TRANSIT and no later intent can clear it (one live intent per withdrawal): the owner page shows it
+    assert.deepEqual(
+      (await inTransit(transit.w.accountRef)).items.map((i) => [i.requestId, i.state, i.withdrawnCents, i.receivedCents]),
+      [[transit.requestId, "APPLIED", transit.w.withdrawnCents.toString(), null]],
+      "an applied receipt-less settlement stays on the in-transit page",
+    );
+    assert.deepEqual((await inTransit(w.accountRef)).items, [], "an applied settlement with its receipt is not in transit");
+    // ADV-9: the event payloads carry the cents as exact integer counts (the event envelope admits no string amounts), equal to the row's
+    const eventPayload = async (type: string, aggregateId: string): Promise<unknown> => (await q<{ p: unknown }>("SELECT payload AS p FROM kauro.domain_events WHERE event_type = $1 AND aggregate_id::text = $2", [type, aggregateId]))[0]?.p;
+    const settled = await settlementOf(w);
+    assert.ok(settled !== undefined);
+    assert.deepEqual(await eventPayload("settlement.recorded.v1", settled.id), { settlementId: settled.id, withdrawnCents: Number(w.withdrawnCents), feeCents: Number(w.feeCents), receivedCents: Number(w.receivedCents!), bankEvidence: true }, "settlement.recorded.v1: exact numbers");
     const a = await agentOf(L().iw, "st3-ok-billing");
     assert.equal(code(await getRequest(w.accountRef, requestId, a.billing)), "403 NOT_AUTHORIZED CORPORATE_ROLE_MISSING", "a non-owner reads nothing");
     assert.equal((await ownerGet(requestRoute(transit.w.accountRef, requestId))).status, 404, "another account's intent is not found");
+  });
+
+  test("OK SET-M-ST3-OK (cents at the largest evidence amounts): Apply settlement request", async () => {
+    // ADV-9: the largest amounts the evidence port admits (15 digits, the fake cap; the DB envelope itself reaches 2^53-1) stay exact in the settlement and in both events (safe integers, never a rounded double)
+    const w = await recorded("st3-top", { withdrawnCents: 999_999_999_999_000n, feeCents: 900n, receivedCents: 999_999_999_999_000n, bankAvailableCents: 999_999_999_999_000n });
+    assert.equal(await deliver(w.requestId), "APPLIED");
+    const s = await settlementOf(w.w);
+    assert.ok(s !== undefined, "applied");
+    const [row] = await q<{ w: string; f: string; r: string }>("SELECT withdrawn_cents::text AS w, fee_cents::text AS f, received_cents::text AS r FROM kauro.settlements WHERE settlement_id = $1", [s.id]);
+    assert.deepEqual([row?.w, row?.f, row?.r], ["999999999999000", "900", "999999999999000"]);
+    const [e] = await q<{ p: Record<string, unknown> }>("SELECT payload AS p FROM kauro.domain_events WHERE event_type = 'settlement.recorded.v1' AND aggregate_id::text = $1", [s.id]);
+    assert.deepEqual([e?.p["withdrawnCents"], e?.p["feeCents"], e?.p["receivedCents"]], [Number(row?.w), Number(row?.f), Number(row?.r)], "the event states the row's exact figures");
+    assert.deepEqual((await footprint(w.w)).ledger, postingsOf(w.w));
   });
 
   test("DENY SET-M-ST3-EVIDENCE (re-verified at the apply): Apply settlement request", async () => {
@@ -987,6 +1012,12 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
       assert.deepEqual(await casesOf(w), [["SETTLEMENT_REFUSED", "OPEN", "EVIDENCE_MISMATCH"]], `${what}: a review case`);
       const fp = await footprint(w);
       assert.deepEqual([fp.settlements, fp.ledger], [[], []], `${what}: no settlement, no posting`);
+      // ADV-7: a correct re-record of the same withdrawal applies, but it does not supersede the tamper finding: the EVIDENCE_MISMATCH case stays
+      // OPEN for a human (the apply resolves FUNDS_UNAVAILABLE-type refusals only, cell 21)
+      const again = recordOf(await w.run(), w, `${what}: the correct re-record`).requestId;
+      assert.equal(await deliver(again), "APPLIED");
+      assert.equal((await requestRow(again)).state, "APPLIED", `${what}: the correct intent applies`);
+      assert.deepEqual(await casesOf(w), [["SETTLEMENT_REFUSED", "OPEN", "EVIDENCE_MISMATCH"]], `${what}: the mismatch case is not auto-resolved`);
     }
     // 20(c): the store not bound: CAPACITY_UNAVAILABLE, retried, never refused
     await drain();
@@ -1009,6 +1040,9 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
     const [c] = await q<{ id: string; k: string; s: string; sk: string; si: string; d: string; e: string | null }>("SELECT case_id::text AS id, kind AS k, state AS s, source_kind AS sk, source_id::text AS si, detail_code AS d, evidence_hash AS e FROM kauro.bank_review_cases WHERE account_ref = $1", [no.w.accountRef]);
     assert.deepEqual([c?.k, c?.s, c?.sk, c?.si, c?.d, c?.e], ["SETTLEMENT_REFUSED", "OPEN", "SETTLEMENT_REQUEST", no.requestId, "FUNDS_UNAVAILABLE", no.w.settlement.evidenceHash], "the case names the intent, its reason and its evidence");
     assert.equal(refused.reviewCaseId, c?.id, "the intent cites its case");
+    // ADV-9: the refusal event's cents are exact integers
+    const [refusedEvent] = await q<{ p: unknown }>("SELECT payload AS p FROM kauro.domain_events WHERE event_type = 'settlement_request.refused.v1' AND aggregate_id::text = $1", [no.requestId]);
+    assert.deepEqual(refusedEvent?.p, { requestId: no.requestId, reason: "FUNDS_UNAVAILABLE", reviewCaseId: c?.id, withdrawnCents: Number(no.w.withdrawnCents), receivedCents: Number(no.w.receivedCents!), feeCents: Number(no.w.feeCents) }, "settlement_request.refused.v1: exact numbers");
     const page = await inTransit(no.w.accountRef);
     const [dbAge] = await q<{ a: string }>("SELECT extract(epoch FROM clock_timestamp() - requested_at)::text AS a FROM kauro.settlement_requests WHERE request_id = $1", [pending.requestId]);
     assert.deepEqual(
@@ -1028,6 +1062,12 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
     assert.equal(await deliver(again), "APPLIED");
     assert.equal(await deliver(pending.requestId), "APPLIED");
     assert.deepEqual(await casesOf(no.w), [["SETTLEMENT_REFUSED", "RESOLVED", "FUNDS_UNAVAILABLE"]], "the apply of the same withdrawal resolved the case");
-    assert.deepEqual((await inTransit(no.w.accountRef)).items, [], "nothing in transit once applied and resolved");
+    // ADV-8: the receipt-less intent, applied, still has its withdrawal in BANK_IN_TRANSIT: the page keeps it (APPLIED, no receipt); the
+    // intent with a receipt, applied and its case resolved, is gone
+    assert.deepEqual(
+      (await inTransit(no.w.accountRef)).items.map((i) => [i.requestId, i.state, i.reason, i.withdrawnCents, i.receivedCents, i.reviewCaseId]),
+      [[pending.requestId, "APPLIED", null, pending.w.withdrawnCents.toString(), null, null]],
+      "only the money that is still in transit remains on the page",
+    );
   });
 }

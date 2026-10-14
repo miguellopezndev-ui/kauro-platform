@@ -175,7 +175,7 @@ export interface SettlementRequestOutcomeRecord {
 export interface SettlementInTransitRecord {
   readonly requestId: string;
   readonly withdrawalId: string;
-  readonly state: "RECORDED" | "REFUSED";
+  readonly state: "RECORDED" | "REFUSED" | "APPLIED";
   readonly reason: SettlementRefusalReason | null;
   readonly withdrawnCents: bigint;
   readonly receivedCents: bigint | null;
@@ -274,7 +274,7 @@ export interface SettlementRequestView {
 export interface SettlementInTransitItemView {
   readonly requestId: string;
   readonly withdrawalId: string;
-  readonly state: "RECORDED" | "REFUSED";
+  readonly state: "RECORDED" | "REFUSED" | "APPLIED";
   readonly reason: SettlementRefusalReason | null;
   readonly withdrawnCents: string;
   readonly receivedCents: string | null;
@@ -297,7 +297,7 @@ export interface BankSettlementHandlers {
   record(request: BankRouteRequest<RecordSettlementBody>): Promise<CommandResult<SettlementRequestCommandView>>;
   /** getBankSettlementRequest: one intent of the account and its outcome. */
   get(request: SettlementReadRequest & { readonly requestId: string }): Promise<InboundReadAnswer<{ readonly settlementRequest: SettlementRequestView }>>;
-  /** listBankSettlementsInTransit: the account's intents not yet applied or whose refusal is not resolved. */
+  /** listBankSettlementsInTransit: the account's intents not yet applied, whose refusal is not resolved, or applied without a receipt (money still in BANK_IN_TRANSIT). */
   list(request: SettlementReadRequest & { readonly cursor: string | null }): Promise<InboundReadAnswer<SettlementInTransitView>>;
 }
 
@@ -567,6 +567,13 @@ function factsMatch(r: SettlementRequestRecord, v: VerifiedSettlement): boolean 
  * instant; A7 the refusals in order; A8 the settlement, its event, its posting set, the intent APPLIED and the earlier refusals' cases
  * resolved. A refusal writes its review case, the intent REFUSED and refused.v1, and is the delivery's applied outcome.
  */
+/** ADV-9: a cents figure into an event payload (a count: safe integers only); a bigint that Number() would round throws instead of publishing a wrong amount. */
+function exactCents(v: bigint): number {
+  const n = Number(v);
+  if (!Number.isSafeInteger(n) || BigInt(n) !== v) throw new DomainFailure("INTEGRITY_FAILURE", "a settlement figure does not fit an exact event count");
+  return n;
+}
+
 export async function applySettlementRequest(uow: CommerceUnitOfWork, ports: SettlementApplyPorts, delivery: { readonly eventId: string; readonly requestId: string }): Promise<SettlementApplyOutcome> {
   const repo = ports.settlements;
   const seen = await repo.requestOf(delivery.requestId);
@@ -613,7 +620,7 @@ export async function applySettlementRequest(uow: CommerceUnitOfWork, ports: Set
       actor: actorOf(context),
       causationId,
       correlationId: context.correlationId,
-      payload: { requestId: request.requestId, reason, reviewCaseId: caseId, withdrawnCents: Number(request.withdrawnCents), receivedCents: Number(receipt?.receivedCents ?? 0n), feeCents: Number(request.feeCents) },
+      payload: { requestId: request.requestId, reason, reviewCaseId: caseId, withdrawnCents: exactCents(request.withdrawnCents), receivedCents: exactCents(receipt?.receivedCents ?? 0n), feeCents: exactCents(request.feeCents) },
     });
     return "APPLIED";
   }
@@ -656,7 +663,7 @@ export async function applySettlementRequest(uow: CommerceUnitOfWork, ports: Set
     actor: actorOf(context),
     causationId,
     correlationId: context.correlationId,
-    payload: { settlementId, withdrawnCents: Number(request.withdrawnCents), feeCents: Number(request.feeCents), receivedCents: Number(receivedCents ?? 0n), bankEvidence: receipt !== null },
+    payload: { settlementId, withdrawnCents: exactCents(request.withdrawnCents), feeCents: exactCents(request.feeCents), receivedCents: exactCents(receivedCents ?? 0n), bankEvidence: receipt !== null },
   });
   await uow.commerce.ledger.post(
     {

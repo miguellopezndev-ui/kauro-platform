@@ -49471,7 +49471,8 @@
                       "type": "string",
                       "enum": [
                         "RECORDED",
-                        "REFUSED"
+                        "REFUSED",
+                        "APPLIED"
                       ]
                     },
                     "reason": {

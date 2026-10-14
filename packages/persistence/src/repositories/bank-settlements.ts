@@ -122,7 +122,7 @@ export interface SettlementRequestOutcomeRead {
 export interface SettlementRequestPageItem {
   readonly requestId: string;
   readonly withdrawalId: string;
-  readonly state: "RECORDED" | "REFUSED";
+  readonly state: "RECORDED" | "REFUSED" | "APPLIED";
   readonly reason: SettlementRefusalReason | null;
   readonly withdrawnCents: bigint;
   readonly receivedCents: bigint | null;
@@ -336,12 +336,17 @@ export class PgBankSettlements {
     if ((r.rowCount ?? 0) !== 1) throw new DomainFailure("STALE_VERSION", "the intent was consumed by another apply");
   }
 
-  /** Resolves the open SETTLEMENT_REFUSED cases of the earlier refused intents of the same withdrawal (the apply decided them). */
+  /**
+   * Resolves the open SETTLEMENT_REFUSED cases of the earlier refused intents of the same withdrawal (the apply decided them), except
+   * EVIDENCE_MISMATCH (ADV-7): artifacts that did not match their frozen facts may be tampering, a later correct apply does not supersede
+   * that finding, so the case stays OPEN for a human.
+   */
   async resolveRefusedCases(environment: string, accountRef: string, withdrawalId: string): Promise<number> {
     const r = await execute(
       this.db,
       `UPDATE kauro.bank_review_cases c SET state = 'RESOLVED', resolved_at = kauro.server_now()
         WHERE c.kind = 'SETTLEMENT_REFUSED' AND c.state = 'OPEN' AND c.source_kind = 'SETTLEMENT_REQUEST'
+          AND c.detail_code IS DISTINCT FROM 'EVIDENCE_MISMATCH'
           AND c.source_id IN (SELECT r.request_id FROM kauro.settlement_requests r WHERE r.environment = $1 AND r.account_ref = $2 AND r.withdrawal_id = $3 AND r.outcome = 'REFUSED')`,
       [environment, accountRef, withdrawalId],
     );
@@ -433,7 +438,8 @@ export class PgBankSettlements {
 
   /**
    * The account's intents in transit (plan §3.5, coordinator ruling 2026-10-14): every unconsumed intent, whatever its delivery state (a
-   * dead letter stays visible), and every REFUSED intent whose review case is not RESOLVED; in record order after the cursor, at most
+   * dead letter stays visible), every REFUSED intent whose review case is not RESOLVED, and every APPLIED intent without a receipt (ADV-8: its
+   * withdrawal sits in BANK_IN_TRANSIT and no later intent can clear it, one live intent per withdrawal); in record order after the cursor, at most
    * `limit`. The age is the database clock minus the record instant (one clock).
    */
   async inTransit(environment: string, accountRef: string, after: { readonly requestedAt: string; readonly requestId: string } | null, limit: number): Promise<ReadonlyArray<SettlementRequestPageItem>> {
@@ -445,7 +451,7 @@ export class PgBankSettlements {
          FROM kauro.settlement_requests r
          LEFT JOIN kauro.bank_review_cases c ON c.case_id = r.review_case_id
         WHERE r.environment = $1 AND r.account_ref = $2
-          AND (r.outcome IS NULL OR (r.outcome = 'REFUSED' AND c.state IS DISTINCT FROM 'RESOLVED'))
+          AND (r.outcome IS NULL OR (r.outcome = 'REFUSED' AND c.state IS DISTINCT FROM 'RESOLVED') OR (r.outcome = 'APPLIED' AND r.received_cents IS NULL))
           AND ($3::timestamptz IS NULL OR (r.requested_at, r.request_id) > ($3::timestamptz, $4::uuid))
         ORDER BY r.requested_at, r.request_id
         LIMIT $5`,
@@ -454,7 +460,7 @@ export class PgBankSettlements {
     return r.rows.map((x) => ({
       requestId: x.request_id,
       withdrawalId: x.withdrawal_id,
-      state: x.outcome === "REFUSED" ? "REFUSED" : "RECORDED",
+      state: x.outcome === "REFUSED" || x.outcome === "APPLIED" ? x.outcome : "RECORDED",
       reason: x.refusal_reason as SettlementRefusalReason | null,
       withdrawnCents: BigInt(x.withdrawn_cents),
       receivedCents: x.received_cents === null ? null : BigInt(x.received_cents),
