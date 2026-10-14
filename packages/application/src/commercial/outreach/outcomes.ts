@@ -75,7 +75,9 @@ export const SEND_AUTHORIZED_OUTREACH_OUTCOMES: ReadonlyArray<ProblemOutcome> = 
 export const RECORD_SALES_ACTIVITY_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
   NOT_FOUND("the prospect or the draft"),
   PRE("SOURCE_EVIDENCE_INVALID", "evidenceHash is not the caller own evidence for this prospect, or the activity is dated after the database clock"),
-  PRE("DRAFT_CLOSED", "the draft cannot take the activity: it is closed", "SOMETIMES"),
+  PRE("DRAFT_CLOSED", "the draft cannot take the activity: it is closed, or an activity of the same identity (inbound reference, intent, suppression) is already recorded", "SOMETIMES"),
+  PRE("OUTREACH_ALREADY_SENT", "a not-sent observation of an intent the provider accepted (KC036): the accepted answer stands"),
+  PRE("SEND_UNCERTAIN_UNRESOLVED", "a not-sent observation before the intent's uncertain_after instant: the send may still be answered"),
 ]);
 
 /** PutOutreachContent: the closed schema decides; no precondition. */
