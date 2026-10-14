@@ -43,6 +43,8 @@ function ownerOfFile(tag: string): string {
   if (n === 51 || n === 59) return "B18";
   if (n === 60) return "SEC-DEPTH";
   if (n === 69 || n === 71) return "B16";
+  // B12 0072 is provisional (plan: 0082): the merge renumbering moves this entry with the file
+  if (n === 72) return "B12";
   return "UNKNOWN";
 }
 const fileTag = (at: string): string => at.split(":")[0]!;
