@@ -80,7 +80,7 @@ export class PgOutreachWriters {
   }
 
   /** D2 refusals: QUEUED -> NOT_SENT | CANCELLED (L3 S, L4 S|X, L4g S, L10 X), and the draft to the state its lane decides (CANCELLED, DRAFT, SUPPRESSED). */
-  async refuseQueued(locks: OutreachLocks, i: OutreachIntentKeys, state: "NOT_SENT" | "CANCELLED", outcomeReason: string, draftState: "CANCELLED" | "DRAFT" | "SUPPRESSED"): Promise<boolean> {
+  async refuseQueued(locks: OutreachLocks, i: OutreachIntentKeys, state: "NOT_SENT" | "CANCELLED", outcomeReason: string, draftState: "CANCELLED" | "DRAFT" | "SUPPRESSED" | "PROVIDER_ACCEPTED"): Promise<boolean> {
     requireHeld(locks, "D2 refusal", [["L3", i.prospectId, "S"], ["L4", i.personUserId, "S"], ["L4g", i.authorizationId, "S"], ["L10", i.draftId, "X"]]);
     const r = await execute(this.db, "UPDATE kauro.outreach_send_intents SET state = $2, outcome_reason = $3 WHERE intent_id = $1 AND state = 'QUEUED'", [i.intentId, state, outcomeReason]);
     if (r.rowCount !== 1) return false;

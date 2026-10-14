@@ -20,3 +20,6 @@ export { createOutreachAuthCommandHandlers, createOutreachAuthReadHandlers, type
 export type { OutreachAuthStore, OutreachAuthCollaborators } from "./auth-store.js";
 export { outreachReviewDigest, OUTREACH_REVIEW_DOMAIN } from "./prepare-review.js";
 export { createOutreachDraftCommandHandlers, createOutreachDraftReadHandlers, type OutreachDraftCollaborators, type OutreachDraftStore } from "./draft-handlers.js";
+export { sendHandler, SEND_AUTHORIZED_OUTREACH_OPERATION } from "./send.js";
+export { registerSenderIdentityHandler, verifySenderIdentityHandler, recordSenderRevocationHandler } from "./sender-identity.js";
+export type { OutreachSendStore, OutreachSendCollaborators, OutreachSealer, SendSealFacts, SendActor, QueueSendRequest, QueuedSendRecord, OutreachSenderStore, OutreachSenderCollaborators, SenderRecordView } from "./send-store.js";
