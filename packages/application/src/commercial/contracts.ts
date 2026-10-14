@@ -547,6 +547,8 @@ export interface PrepareOutreachDraftBody {
   readonly purpose: "REQUESTED_REPLY" | "INDIVIDUAL_PROSPECT_CONTACT" | "FOLLOW_UP";
   readonly contentRef: string;
   readonly provenanceEvidenceHash: string;
+  /** The CURRENT sales resources the draft cites (A8, R2-135; amendment of L-DRAFT to K2's body: optional, outreach_draft_resources). */
+  readonly resourceIds?: ReadonlyArray<string>;
 }
 export const PREPARE_OUTREACH_DRAFT = spec<PrepareOutreachDraftBody>({
   id: "CMD061",

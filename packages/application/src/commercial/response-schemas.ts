@@ -174,6 +174,7 @@ export const B12_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze
       familyId: platform(true, ID, "The resource family."),
       version: platform(true, VERSION, "The version inside the family."),
       state: platform(true, enumOf(["CURRENT", "SUPERSEDED"]), "CURRENT is the one version drafts may cite."),
+      currentResourceId: platform(true, ID, "The CURRENT resource of the family (this one while it is CURRENT)."),
       contentRef: platform(true, CONTENT_REF, "The stored content of this version."),
       capabilityIds: platform(true, { type: "array", maxItems: 50, items: ID }, "The capabilities the resource describes."),
       createdAt: platform(true, UTC, "The instant the version was published."),

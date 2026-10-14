@@ -19,10 +19,10 @@ import { DomainFailure, type OutreachLock, type OutreachPurpose, type SenderRout
 import type { OutreachLockMode, OutreachLocks } from "../outreach-access.js";
 import { execute, type Queryable } from "../sql.js";
 
-type Need = readonly [OutreachLock, string, OutreachLockMode];
+export type Need = readonly [OutreachLock, string, OutreachLockMode];
 
 /** Refuses a write whose subjects are not all held (an S need is met by S or X; an X need only by X). */
-function requireHeld(locks: OutreachLocks, what: string, needs: ReadonlyArray<Need>): void {
+export function requireHeld(locks: OutreachLocks, what: string, needs: ReadonlyArray<Need>): void {
   for (const [lock, subject, mode] of needs) {
     const held = locks.taken.some((t) => t.lock === lock && t.subject === subject && (mode === "S" || t.mode === "X"));
     if (!held) throw new DomainFailure("INTEGRITY_FAILURE", `${what} needs ${lock} ${mode} of ${subject} held before it writes (plan §L T2)`);

@@ -19,3 +19,4 @@ export { B12_SERVED_READ_IDS, createOutreachStubCommandHandlers, createOutreachS
 export { createOutreachAuthCommandHandlers, createOutreachAuthReadHandlers, type OutreachAuthCommandHandlers } from "./auth-handlers.js";
 export type { OutreachAuthStore, OutreachAuthCollaborators } from "./auth-store.js";
 export { outreachReviewDigest, OUTREACH_REVIEW_DOMAIN } from "./prepare-review.js";
+export { createOutreachDraftCommandHandlers, createOutreachDraftReadHandlers, type OutreachDraftCollaborators, type OutreachDraftStore } from "./draft-handlers.js";

@@ -164,6 +164,10 @@ export type { ConnectionSecurityInput, DatabaseTls, VerifiedSslOptions } from ".
 export { PgOutreachWriters } from "./repositories/commercial-outreach.js";
 export type { OutreachIntentKeys, NewOutreachIntent, IntentAnswer } from "./repositories/commercial-outreach.js";
 export { OutreachLocks, holdOutreachLease } from "./outreach-access.js";
+// package B12 (lane L-DRAFT): drafts, contents and sales resources (CMD061, PutOutreachContent, PublishSalesResource and the reads)
+export { PgOutreachDrafts } from "./repositories/commercial-outreach-drafts.js";
+export type { PrepareDraftInput, PublishResourceInput } from "./repositories/commercial-outreach-drafts.js";
+export { outreachDraftsOf } from "./outreach-drafts-access.js";
 export type { OutreachLockMode } from "./outreach-access.js";
 // package B12 (lane L-AUTH): the review, grant, revocation and policy-withdrawal SQL with its accessor
 export { PgOutreachAuth } from "./repositories/commercial-outreach-auth.js";
