@@ -43,7 +43,7 @@ async function start(environment: Readonly<Record<string, string>>): Promise<Run
   assert.ok(existsSync(server), `no standalone server at ${server}: run pnpm run build first`);
   const port = await freePort();
   const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: "production", NEXT_TELEMETRY_DISABLED: "1", PORT: String(port), HOSTNAME: "127.0.0.1" };
-  for (const name of ["KAURO_ENV", "KAURO_PUBLIC_ORIGIN", "KAURO_APP_ORIGIN"]) delete env[name];
+  for (const name of ["KAURO_ENV", "KAURO_PUBLIC_ORIGIN", "KAURO_APP_ORIGIN", "KAURO_UPLOAD_ORIGIN"]) delete env[name];
   const child: ChildProcess = spawn(process.execPath, [server], { env: { ...env, ...environment }, stdio: ["ignore", "pipe", "pipe"] });
   let output = "";
   const ready = new Promise<void>((resolve, reject) => {
@@ -169,5 +169,24 @@ test("D-TOPO-2: the local stack names no host and any host reaches every group",
     assert.doesNotMatch(running.output(), /KAURO_HOST_CONFIG_INVALID/);
   } finally {
     await running.stop();
+  }
+});
+
+test("D-SCR-3: the running server's connect-src gains exactly the configured upload origin, and a missing or malformed value gains nothing", async () => {
+  const connect = (answer: Answer): string => (header(answer, "content-security-policy").split("; ").find((part) => part.startsWith("connect-src ")) ?? "");
+  const hosts = { KAURO_ENV: "PRODUCTION", KAURO_PUBLIC_ORIGIN: `https://${PUBLIC_HOST}`, KAURO_APP_ORIGIN: `https://${APP_HOST}` };
+  const configured = await start({ ...hosts, KAURO_UPLOAD_ORIGIN: "https://uploads.example.test" });
+  try {
+    assert.equal(connect(await get(configured, "/livez", APP_HOST)), "connect-src 'self' https://uploads.example.test");
+  } finally {
+    await configured.stop();
+  }
+  for (const value of [undefined, "https://*.example.test", "https://uploads.example.test/path"]) {
+    const running = await start({ ...hosts, ...(value === undefined ? {} : { KAURO_UPLOAD_ORIGIN: value }) });
+    try {
+      assert.equal(connect(await get(running, "/livez", APP_HOST)), "connect-src 'self'", String(value));
+    } finally {
+      await running.stop();
+    }
   }
 });
