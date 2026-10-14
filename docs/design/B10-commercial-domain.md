@@ -187,8 +187,9 @@ prospect linked to an agency with an order or purchase is the owner's to judge a
 claim) freezes an owner-prepared `attribution_allocations` row: the agency the prospect is (identity evidence), the claims it rules
 on and the reason (never timestamps alone, 17), shares summing exactly 10 000 bps (deferred KC003), pool terms equal to each
 beneficiary's signed agreement. One frozen allocation per agency (ATTRIBUTION_EXISTS: "the pool does not become 10% for each
-seller"); an IN_HOUSE agency is IN_HOUSE_NOT_ATTRIBUTABLE and an agency whose buyer type is unset BUYER_TYPE_UNSET (A3 7.1, D58:
-the type is set once, so an acceptance before it could bind an in-house tenant) [superseded by D-33 (2026-10-13): an actively sourced company opportunity may be attributed under 17's rules; this refusal describes the implementation on ba93a62 until the D-33 implementation lands]; a claim submitted after the agency's first payment
+seller"); [retired by D-33 (2026-10-13), docs/design/D33-ATTRIBUTION-MATRIX.md D33-ATTR-1: AcceptAttribution no longer reads the buyer type,
+so an in-house tenant and a tenant whose type is not yet recorded are attributable under 17's rules like an agency; the former
+IN_HOUSE_NOT_ATTRIBUTABLE and CMD047 BUYER_TYPE_UNSET refusals (A3 7.1, D58) are gone]; a claim submitted after the agency's first payment
 order is CLAIM_AFTER_FIRST_ORDER. Claims ACCEPTED with `expires_at` = acceptance + 2160 h, competing ones REJECTED. The commission service
 converts: at the agency's first qualifying purchase confirmed before the claim's end (or its termination tail's end) it creates one
 `commission_entitlements` row per beneficiary (ACQUISITION; `first_capture_id`, `window_starts_at` = the first purchase's
@@ -495,7 +496,7 @@ by name: `quotes_one_live_per_project` → STALE_VERSION with the live quote; `p
 BILLING_PROFILE_MISMATCH, AGREEMENT_VERSION_NOT_PUBLISHED, AGENCY_NOT_DRAFT, CLOSURE_OBLIGATIONS_UNRECONCILED, CLOSURE_RESIDUALS_OPEN,
 REPLACEMENT_SCOPE_CHANGED, REPLACEMENT_ALLOWANCE_SPENT, EXECUTION_STARTED, SELLER_NOT_ACTIVE, SELLER_NOT_ACTIVATABLE,
 AGREEMENT_VERSION_MISMATCH, PROSPECT_EXISTS, PROSPECT_SUPPRESSED, SOURCE_EVIDENCE_INVALID, CLAIM_EVIDENCE_INSUFFICIENT, CLAIM_EXISTS,
-CLAIM_NOT_REVIEWABLE, CLAIM_AFTER_FIRST_ORDER, ATTRIBUTION_EXISTS, SHARES_NOT_WHOLE, IN_HOUSE_NOT_ATTRIBUTABLE,
+CLAIM_NOT_REVIEWABLE, CLAIM_AFTER_FIRST_ORDER, ATTRIBUTION_EXISTS, SHARES_NOT_WHOLE, [IN_HOUSE_NOT_ATTRIBUTABLE retired by D-33],
 SERVICE_ASSIGNMENT_UNPREPARED, TAIL_NOT_ENUMERATED, TERMINATION_TERMS_UNPREPARED, INPUTS_UNRECONCILED, LEDGER_CHANGED, PERIOD_NOT_DUE,
 PAYEE_UNVERIFIED, NOTHING_PAYABLE, FUNDS_UNAVAILABLE, PAYOUT_EVIDENCE_MISMATCH, PAYOUT_NOT_SETTLED, OFFSET_NOT_AUTHORIZED,
 CALENDAR_UNAVAILABLE, PAYOUT_EVIDENCE_UNAVAILABLE, then the KC names the list does not repeat: DESIGNATION_REWRITE,
