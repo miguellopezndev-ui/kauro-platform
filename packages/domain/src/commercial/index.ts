@@ -36,6 +36,9 @@ export {
   OUTREACH_FAILURE_REASONS,
 } from "./outreach.js";
 
+export type { OutreachEventType } from "./outreach-events.js";
+export { OUTREACH_AGGREGATE_KINDS, OUTREACH_CONSUMERS, OUTREACH_EVENT_TYPES, OUTREACH_EVENT_PAYLOAD_ALLOWLIST, OUTREACH_EVENT_SUBSCRIPTIONS } from "./outreach-events.js";
+
 export type { CommercialVocabulary } from "./vocabulary.js";
 export { COMMERCIAL_VOCABULARY } from "./vocabulary.js";
 

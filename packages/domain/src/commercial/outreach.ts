@@ -179,5 +179,8 @@ export const OUTREACH_FAILURE_REASONS = [
   "SEND_FENCED",
   "ACTIVITY_EVIDENCE",
   "OUTREACH_SUPPRESSION_SCOPE",
+  // the sender identity was revoked (L-DRAFT refuses a draft on it, L-SEND refuses a send and D2 cancels a queued intent): appended last so
+  // the order of every earlier reason stays (lane K1b)
+  "SENDER_REVOKED",
 ] as const;
 export type OutreachFailureReason = (typeof OUTREACH_FAILURE_REASONS)[number];
