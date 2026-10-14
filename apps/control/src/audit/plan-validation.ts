@@ -46,7 +46,8 @@ export class PlanValidation implements OutboxConsumer {
         // a system draft's intent is its audit's VALIDATE step's (AUDIT_ORCHESTRATION), never validated twice
         if (intent.origin !== "COMMAND") throw new StepRefused("SYSTEM_DRAFT_INTENT");
         if (subject.planState !== "VALIDATING") throw new StepRefused("PLAN_NOT_VALIDATING");
-        return { subject, intent, startedAt: await uow.executionDiscovery.serverNow() };
+        const source = await uow.auditDiscovery.validationSource(agencyId, intent.revisionHash);
+        return { subject, intent, source, startedAt: await uow.executionDiscovery.serverNow() };
       });
       const judged = await this.deps.validator.run({
         subject: { agencyId, planId, planHash: seen.intent.planHash, revisionHash: seen.intent.revisionHash, targetContractHash: seen.intent.targetContractHash },
@@ -54,6 +55,7 @@ export class PlanValidation implements OutboxConsumer {
         receiptId: this.deps.ids.next() as ValidationReceiptId,
         startedAt: seen.startedAt,
         cancellation: this.channel(seen.subject, seen.intent),
+        source: seen.source,
         completedAt: () => serverNowIn(this.deps, SERVICE, agencyId),
       });
       const settlement = judged.kind === "RECEIPT" ? { result: judged.receipt.result, receiptHash: judged.receipt.receiptHash } : { result: "ERROR" as const, receiptHash: null };

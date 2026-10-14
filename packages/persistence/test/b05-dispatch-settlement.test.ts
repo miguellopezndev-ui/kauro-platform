@@ -292,6 +292,17 @@ test("L08 RACE (reconciliation): GRANT_RECONCILIATION evidence in micros above m
   await env.h.audit.run(controlOf(run3.ag.agencyId), (uow) => uow.audits.reconcileRequestMicros(c3.requestId, 245_000n));
   assert.deepEqual(await liabilities(env, pool3), []);
   assert.deepEqual(await money(env, run3.grantId), { reserved: 0, spent: 25, state: "AUTHORIZED" });
+  // after IC's estimate (D5-18 row 2: usage null -> COMMITTED at the maximum, usageKnown false; no excess, no liability) provider
+  // evidence above the maximum opens the request's one liability by the same rule: evidence - max
+  const pool4 = await freshPool(env);
+  const run4 = await interpretingRun(env, "l08-estimate", pool4);
+  const d = await admit(env, run4, 245_000n);
+  await answered(d, "25");
+  await settle(d, "COMMITTED", 245_000n, false);
+  assert.deepEqual(await liabilities(env, pool4), [], "the estimate at the maximum owes nothing over it");
+  await env.h.audit.run(controlOf(run4.ag.agencyId), (uow) => uow.audits.reconcileRequestMicros(d.requestId, 260_000n));
+  assert.deepEqual(await liabilities(env, pool4), [{ request_id: d.requestId, excess: "15000", state: "OPEN" }], "judged on the evidence");
+  assert.deepEqual(await money(env, run4.grantId), { reserved: 0, spent: 25, state: "AUTHORIZED" }, "spend capped at the 25 reserved cents");
 });
 
 test("S08 DENY send edge: markDispatching on a DISPATCHING, UNCERTAIN, RESPONSE_STORED, FAILED or CANCELLED request returns null, a direct UPDATE into DISPATCHING from any state but RESERVED is refused KA007, and an edge retried after its first COMMIT and an audit cancellation sends nothing", async () => {
@@ -300,8 +311,10 @@ test("S08 DENY send edge: markDispatching on a DISPATCHING, UNCERTAIN, RESPONSE_
   const at = async (state: string): Promise<Admission> => {
     const a = await admit(env, run, 50_000n);
     if (state === "RESERVED") return a;
-    if (state === "CANCELLED") {
+    if (state === "RELEASED" || state === "CANCELLED") {
+      // IC's RELEASED leaves the row RESERVED (S09); GRANT_RECONCILIATION's cancel at its fence then makes it CANCELLED
       await settle(a, "RELEASED", 0n);
+      if (state === "CANCELLED") await journal(a, (j) => j.markCancelled(a.requestId, 1, clock.now()));
       return a;
     }
     await dispatch(env, a);
@@ -310,12 +323,14 @@ test("S08 DENY send edge: markDispatching on a DISPATCHING, UNCERTAIN, RESPONSE_
     if (state === "FAILED") await journal(a, (j) => j.markFailed(a.requestId, 1, clock.now()));
     return a;
   };
+  // and a RESERVED request its core already RELEASED (S09: it stays RESERVED, settled): no edge either
   const rows = new Map<string, Admission>();
-  for (const s of ["DISPATCHING", "UNCERTAIN", "RESPONSE_STORED", "FAILED", "CANCELLED"]) rows.set(s, await at(s));
+  for (const s of ["DISPATCHING", "UNCERTAIN", "RESPONSE_STORED", "FAILED", "CANCELLED", "RELEASED"]) rows.set(s, await at(s));
   for (const [s, a] of rows) {
-    assert.equal((await requestRow(env, a.requestId)).state, s);
+    const state = s === "RELEASED" ? "RESERVED" : s;
+    assert.equal((await requestRow(env, a.requestId)).state, state);
     assert.equal(await journal(a, (j) => j.markDispatching(a.requestId, 1, "provider-again", clock.now())), null, `markDispatching on ${s} returns null`);
-    assert.equal((await requestRow(env, a.requestId)).state, s, `${s} unchanged`);
+    assert.equal((await requestRow(env, a.requestId)).state, state, `${s} unchanged`);
     assert.deepEqual(await refusal(run.ag.agencyId, "UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = $1", [a.requestId]), ["KA007", undefined], `a direct UPDATE from ${s} into DISPATCHING`);
   }
   // the edge retried after its first COMMIT sends nothing (the DISPATCHING row above answered null); after the audit's cancellation a
@@ -391,6 +406,7 @@ test("S15 DENY response edge (B06 contract kept): storeResponse at the request's
   await journal(failed, (j) => j.markFailed(failed.requestId, 1, clock.now()));
   const cancelled = await admit(env, run, 50_000n);
   await settle(cancelled, "RELEASED", 0n);
+  await journal(cancelled, (j) => j.markCancelled(cancelled.requestId, 1, clock.now()));
   const reserved = await admit(env, run, 50_000n);
   for (const [name, a] of [["CONSUMED", consumed], ["FAILED", failed], ["CANCELLED", cancelled], ["RESERVED", reserved]] as const) {
     const before = await requestRow(env, a.requestId);
@@ -785,7 +801,7 @@ test("L13 RACE (four-party ring): an admission holding its audit share and waiti
     // the second task of the audit, planned (its admission is the ring's beginDispatch)
     const t2 = admissionOf(run, 50_000n);
     await env.h.audit.run(controlOf(run.ag.agencyId), (uow) =>
-      uow.audits.createModelTask({ modelTaskId: t2.taskId, auditId: run.auditId as never, stepFence: run.stepFence, taskKey: sha(`task-${t2.core.reservationId}`), candidateManifestHash: run.candidateManifestHash, policyHash: sha("model-policy"), minimizedRequestHash: sha(`minimized-${t2.core.reservationId}`), providerProfileId: t2.requestId as never, maximumCostCents: 40n }),
+      uow.audits.createModelTask({ modelTaskId: t2.taskId, auditId: run.auditId as never, stepFence: run.stepFence, taskKey: sha(`task-${t2.core.reservationId}`), candidateManifestHash: run.candidateManifestHash, policyHash: sha("model-policy"), minimizedRequestHash: sha(`request-${t2.core.reservationId}`), core: { runId: t2.core.runId, requestKey: t2.core.requestKey }, providerProfileId: t2.requestId as never, maximumCostCents: 40n }),
     );
     return { pool, run, q, t2 };
   };
@@ -1302,6 +1318,18 @@ test("L21 DENY commit order (sabotage): request_journal carries exactly two defe
     assert.ok(live.includes(`CONSTRAINT = '${name}'`), `${name} raised by the live schema`);
     assert.equal(sqlstateSource.split(`  ${name}: {`).length - 1, 1, `${name} mapped once in sqlstate.ts`);
   }
+  // ADR-B05-IJR-1's claimed names (0070): each index or constraint declared once, each prefix raised by its one function only
+  const relations = (await env.h.oracle.query("SELECT relname FROM pg_class WHERE relnamespace = 'kauro'::regnamespace UNION ALL SELECT conname FROM pg_constraint WHERE connamespace = 'kauro'::regnamespace")).rows.map((r) => r.relname as string);
+  for (const name of ["request_journal_one_attempt_per_fence", "request_journal_one_live_core_attempt", "model_tasks_one_per_core_request"]) {
+    assert.ok(relations.filter((n) => n === name).length >= 1, `${name} declared`);
+  }
+  assert.deepEqual(relations.filter((n) => n === "request_journal_task_id_fence_key"), [], "0006's UNIQUE (task_id, fence) is the partial index now");
+  const raisers = async (needle: string) =>
+    (await env.h.oracle.query("SELECT proname FROM pg_proc WHERE pronamespace = 'kauro'::regnamespace AND prosrc LIKE '%' || $1 || '%' ORDER BY proname", [needle])).rows.map((r) => r.proname as string);
+  assert.deepEqual(await raisers("'MODEL_TASK_BINDING:"), ["request_journal_core_attempt"]);
+  assert.deepEqual(await raisers("'ATTEMPT_CEILING:"), ["request_journal_core_attempt"]);
+  assert.deepEqual(await raisers("'STORED_RESPONSE_EXISTS:"), ["request_journal_model_task_send"]);
+  assert.equal(live.split("CONSTRAINT = 'model_task_attempt_ceiling'").length - 1, 1, "model_task_attempt_ceiling raised once");
   // sabotage: a test-only body that reads the clock before the gate
   const owner = await env.h.pg.connect("kauro_owner");
   const shipped = (await env.h.oracle.query("SELECT pg_get_functiondef('kauro.request_journal_commit_gate()'::regprocedure) AS def")).rows[0].def as string;
@@ -1342,10 +1370,13 @@ test("L22 OK migration on a live pool: 00NN applied by the migration runner as t
   const all = listMigrations(MIGRATIONS_DIR);
   const target = all.find((m) => m.name === "b05_dispatch_settlement");
   assert.ok(target, "00NN is the dispatch-settlement migration");
-  assert.equal(all[all.length - 1], target, "00NN is the last migration");
+  // the cluster stops just before 00NN, wherever later migrations put it (incident MIGRATION-POSITION-ASSUMED 2026-10-13: "00NN is
+  // the last migration" broke every branch that adds a migration)
+  const at = all.indexOf(target);
+  assert.ok(at > 0, "00NN has a predecessor");
   const dir = mkdtempSync(join(tmpdir(), "kauro-l22-"));
   try {
-    for (const m of all.slice(0, -1)) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
+    for (const m of all.slice(0, at)) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
     const at58 = await openDispatchEnv({ migrationsDir: dir });
     try {
       const e2 = at58;
@@ -1377,7 +1408,16 @@ test("L22 OK migration on a live pool: 00NN applied by the migration runner as t
           { relname: "pool_liability_gates", forced: true },
         ],
       );
+      // the migrations after 00NN applied in turn (the product admission writes their columns, 0070's model_tasks.core_run_id), then
       // the pool's next admission and DISPATCHING edge commit
+      const laterMigrations = all.filter((m) => m.version > target.version);
+      for (const m of laterMigrations) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
+      const owner2 = await e2.h.pg.connect("kauro_owner");
+      try {
+        assert.deepEqual((await applyMigrations(owner2, { dir })).applied.map((m) => m.file), laterMigrations.map((m) => m.file));
+      } finally {
+        await owner2.end();
+      }
       const a = await admit(e2, run, 50_000n);
       await dispatch(e2, a);
       assert.equal((await e2.h.audit.run(controlOf(run.ag.agencyId), (uow) => uow.requestJournal.markDispatching(requestId as RequestId, 1, null, clock.now())))?.state, "DISPATCHING");
@@ -1430,7 +1470,11 @@ test("L17 RACE (deadline at COMMIT, every session on one test-clock offset): a r
       }),
       (c, run) => admitWith(rawStore(c), admissionOf(run, 50_000n)),
     );
-    assert.ok(refusedBy("KA081")(rejection(outcome)), "the deadline judged after the audit share");
+    // the admission's MODEL_TASK lease carries the interpretation deadline as its own (audit/store.ts claimTaskLease), and claim_lease
+    // judges it after the wait at the judged instant (0067, FCG-B06-LEASE-1b): the claim refuses first, before the reservation's KA081
+    const refused = rejection(outcome);
+    assert.ok(refusedBy("KA005")(refused), "the deadline judged after the audit share, by the task lease's claim");
+    assert.match(String((refused as { cause?: { message?: unknown } }).cause?.message), /^LEASE: deadline of .* has passed$/, "refused for its deadline, not a fence");
     assert.deepEqual(await money(env, run.grantId), { reserved: 5, spent: 0, state: "AUTHORIZED" }, "nothing reserved beyond the first admission");
     assert.equal((await env.h.oracle.query("SELECT state FROM kauro.audits WHERE audit_id = $1", [run.auditId])).rows[0].state, "INTERPRETING", "the crashed cancellation changed nothing");
   }
@@ -1570,4 +1614,238 @@ test("S19b DENY pool clause alone (forged, rule 12): in the temporary cluster th
   } finally {
     await owner.end();
   }
+});
+
+// --- ADR-B05-IJR-1 (lane IJR; migration 0070 provisional): one IC request key is one model task, each IC invocation one request row ---
+
+/** The server's message of a refusal, through the product's translation (its cause). */
+function pgMessage(e: unknown): string {
+  const x = e as { code?: unknown; message?: unknown; cause?: unknown } | null;
+  if (x !== null && typeof x === "object" && typeof x.code === "string" && /^[0-9A-Z]{5}$/.test(x.code)) return String(x.message);
+  return x !== null && typeof x === "object" && x.cause !== undefined ? pgMessage(x.cause) : "";
+}
+const refusedWith = (code: string, prefix: string, constraint?: string) => (e: unknown): boolean => refusedBy(code, constraint)(e) && pgMessage(e).startsWith(prefix);
+
+let invocationSeq = 0;
+/** IC's next invocation of the request key of `a`: the same model task, run, key and request hash, a new reservation and request id. */
+function invocationOf(a: Admission, owner = a.owner): Admission {
+  invocationSeq += 1;
+  return { ...a, owner, requestId: ids.next() as RequestId, core: { ...a.core, reservationId: `${a.core.reservationId}-invocation-${invocationSeq}` } };
+}
+/** The request hash every admission of `base`'s task names (its model task's minimized request hash, b05-dispatch-support admitWith). */
+const taskHashOf = (base: Admission): string => sha(`request-${base.core.reservationId}`);
+type Override = { readonly requestHash?: string; readonly core?: Partial<Admission["core"]> };
+/** beginDispatch of invocation `x` of `base`'s task on any audit store. */
+const beginOn = (store: Pick<PgAuditStoreLike, "beginDispatch">, base: Admission, x: Admission, over: Override = {}) =>
+  store.beginDispatch(base.taskId, { requestId: x.requestId, ownerId: x.owner, requestHash: (over.requestHash ?? taskHashOf(base)) as never, reservedCents: x.reservedCents, stepFence: x.run.stepFence, core: { ...x.core, ...over.core } });
+type PgAuditStoreLike = ReturnType<typeof rawStore>;
+type Begun = Awaited<ReturnType<PgAuditStoreLike["beginDispatch"]>>;
+const invoke = (base: Admission, x: Admission, over: Override = {}): Promise<Begun> =>
+  env.h.audit.run(controlOf(base.run.ag.agencyId), (uow) => beginOn(uow.audits as never, base, x, over));
+const outcomeOf = (o: Begun): unknown[] =>
+  o.kind === "HELD" ? [o.kind] : o.kind === "IN_FLIGHT" || o.kind === "RESERVED" ? [o.kind, o.request.requestId, o.request.fence, o.lease.fence] : [o.kind, o.request.requestId];
+const taskRows = async (taskId: string): Promise<Array<{ request_id: string; state: string; fence: number }>> =>
+  (await env.h.oracle.query("SELECT request_id, state, fence::int AS fence FROM kauro.request_journal WHERE task_id = $1 ORDER BY reserved_at, request_id", [taskId])).rows;
+const CORE_INSERT = `INSERT INTO kauro.request_journal (request_id, task_id, agency_id, request_hash, fence, reserved_cents, cost_grant_id, upstream_request_ids, reserved_at, updated_at, step_fence, core_run_id, core_reservation_id, core_request_key, max_charge_micros)
+     VALUES ($1, $2, $3, $4, 1, 5, $5, '{}', kauro.server_now(), kauro.server_now(), $6, $7, $8, $9, 50000)`;
+const THROTTLED = "PROVIDER_DOCUMENTED_NON_ACCEPTANCE:ThrottlingException" as const;
+
+/** An admitted invocation sent and refused by a documented throttling: FAILED with evidence, IC's RELEASED recorded (its cents back). */
+async function throttled(a: Admission): Promise<void> {
+  await dispatch(env, a);
+  assert.equal((await journal(a, (j) => j.markFailed(a.requestId, 1, clock.now(), THROTTLED)))?.state, "FAILED");
+  assert.equal((await settle(a, "RELEASED", 0n)).kind, "RECORDED");
+}
+
+test("K1 RETRY (next invocation): a core admission of one request key by the same owner at the same fence reserves a new row once the earlier one is FAILED with evidence or CANCELLED, answers IN_FLIGHT while it is RESERVED or DISPATCHING, and the same (run, reservation) replays REPLAYED; a 4th core row of the task is refused KA083 ATTEMPT_CEILING", async () => {
+  const pool = await freshPool(env);
+  const run = await interpretingRun(env, "k1", pool);
+  const a = await admit(env, run, 50_000n);
+  const second = invocationOf(a);
+  // while the first invocation is RESERVED, then DISPATCHING: IN_FLIGHT at the owner's fence, nothing reserved
+  assert.deepEqual(outcomeOf(await invoke(a, second)), ["IN_FLIGHT", a.requestId, 1, 1], "RESERVED");
+  await dispatch(env, a);
+  assert.deepEqual(outcomeOf(await invoke(a, second)), ["IN_FLIGHT", a.requestId, 1, 1], "DISPATCHING");
+  assert.equal(await requestCount(second.requestId), 0);
+  assert.deepEqual(await money(env, run.grantId), { reserved: 5, spent: 0, state: "AUTHORIZED" }, "one reservation");
+  // a documented throttling: FAILED with evidence, IC's RELEASED returns its cents; the next invocation reserves at the same fence
+  assert.equal((await journal(a, (j) => j.markFailed(a.requestId, 1, clock.now(), THROTTLED)))?.state, "FAILED");
+  assert.equal((await settle(a, "RELEASED", 0n)).kind, "RECORDED");
+  assert.deepEqual(outcomeOf(await invoke(a, second)), ["RESERVED", second.requestId, 1, 1], "after FAILED with evidence");
+  assert.deepEqual(outcomeOf(await invoke(a, { ...second, requestId: ids.next() as RequestId })), ["REPLAYED", second.requestId], "the same (run, reservation)");
+  assert.deepEqual(await money(env, run.grantId), { reserved: 5, spent: 0, state: "AUTHORIZED" }, "the first returned, the second held");
+  // CANCELLED (GRANT_RECONCILIATION's edge for an unsendable intent) leaves room too
+  assert.equal((await journal(a, (j) => j.markCancelled(second.requestId, 1, clock.now())))?.state, "CANCELLED");
+  const third = invocationOf(a);
+  assert.deepEqual(outcomeOf(await invoke(a, third)), ["RESERVED", third.requestId, 1, 1], "after CANCELLED");
+  assert.equal((await journal(a, (j) => j.markCancelled(third.requestId, 1, clock.now())))?.state, "CANCELLED");
+  // two semantic attempts at most, three invocations each (06 l.168): a 4th core row of one task is refused, nothing reserved
+  const fourth = invocationOf(a);
+  const before = await money(env, run.grantId);
+  await assert.rejects(invoke(a, fourth), refusedWith("KA083", "ATTEMPT_CEILING:", "model_task_attempt_ceiling"));
+  assert.equal(await requestCount(fourth.requestId), 0);
+  assert.deepEqual(await money(env, run.grantId), before);
+  assert.deepEqual((await taskRows(a.taskId)).map((r) => [r.request_id, r.state, r.fence]), [
+    [a.requestId, "FAILED", 1],
+    [second.requestId, "CANCELLED", 1],
+    [third.requestId, "CANCELLED", 1],
+  ]);
+});
+
+test("K2 RACE (stored response vs the next invocation's edge, both orders): storeResponse committed first makes markDispatching refuse KA007 STORED_RESPONSE_EXISTS with zero sends and IC's RELEASED returns the cents; an edge holding its sibling share first makes storeResponse wait (observed lock wait) and then land, one send each", async () => {
+  /** The first invocation sent and its answer late (UNCERTAIN), the next invocation of the same key RESERVED at the same fence. */
+  const lateAndNext = async (tag: string) => {
+    const pool = await freshPool(env);
+    const run = await interpretingRun(env, tag, pool);
+    const a = await admit(env, run, 50_000n);
+    await dispatch(env, a);
+    assert.equal((await journal(a, (j) => j.markUncertain(a.requestId, 1, clock.now())))?.state, "UNCERTAIN");
+    const next = invocationOf(a);
+    assert.deepEqual(outcomeOf(await invoke(a, next)), ["RESERVED", next.requestId, 1, 1]);
+    assert.deepEqual(await money(env, run.grantId), { reserved: 10, spent: 0, state: "AUTHORIZED" });
+    return { run, a, next };
+  };
+  const store = (c: Client, a: Admission) => rawJournal(c).storeResponse(a.requestId, 1, sha(`response-${a.core.reservationId}`), { usageState: "KNOWN", actualCents: "3" as never }, clock.now());
+  // order 1: the response stored first; the edge's sibling share re-reads it and refuses the send
+  {
+    const { run, a, next } = await lateAndNext("k2-stored-first");
+    assert.equal((await withConnections(env, 1, ([c]) => unit(c!, run.ag.agencyId, (x) => store(x, a))))?.state, "RESPONSE_STORED");
+    await assert.rejects(journal(next, (j) => j.markDispatching(next.requestId, 1, "provider-k2", clock.now())), refusedWith("KA007", "STORED_RESPONSE_EXISTS:"));
+    assert.equal((await requestRow(env, next.requestId)).state, "RESERVED", "nothing sent");
+    assert.equal((await settle(next, "RELEASED", 0n)).kind, "RECORDED");
+    assert.deepEqual(await money(env, run.grantId), { reserved: 5, spent: 0, state: "AUTHORIZED" }, "the next invocation's cents back once; the stored answer's held for its settlement");
+  }
+  // order 2: the edge holds its sibling share first; the response waits on the late row, then lands
+  {
+    const { run, a, next } = await lateAndNext("k2-edge-first");
+    await withConnections(env, 2, async ([edge, w]) => {
+      await edge!.query("BEGIN");
+      await bindCommerce(edge!, service(run.ag.agencyId));
+      assert.equal((await rawJournal(edge!).markDispatching(next.requestId, 1, "provider-k2", clock.now()))?.state, "DISPATCHING");
+      const waiting = await mustWait(env.h.oracle, { waiter: w!, holder: connectionPid(edge!) }, (c) => unit(c, run.ag.agencyId, (x) => store(x, a)), "storeResponse on the late row behind the edge's sibling share");
+      assert.equal((await edge!.query("COMMIT")).command, "COMMIT");
+      const stored = await waiting.pending;
+      assert.equal(stored.status, "fulfilled", stored.status === "rejected" ? String((stored as PromiseRejectedResult).reason) : "");
+    });
+    assert.deepEqual([(await requestRow(env, a.requestId)).state, (await requestRow(env, next.requestId)).state], ["RESPONSE_STORED", "DISPATCHING"], "one send each");
+  }
+});
+
+test("K3 RACE (two admissions of one request key): two concurrent core admissions serialize on the MODEL_TASK lease row: one RESERVED, the other IN_FLIGHT with nothing reserved; a direct second live insert of the task is refused 23505", async () => {
+  const pool = await freshPool(env);
+  const run = await interpretingRun(env, "k3", pool);
+  // the task planned and its lease taken by a first invocation refused by a documented throttling, so both admissions find room
+  const a = await admit(env, run, 50_000n);
+  await throttled(a);
+  const first = invocationOf(a);
+  const second = invocationOf(a);
+  const [one, other] = await withConnections(env, 2, async ([x, y]) => {
+    await x!.query("BEGIN");
+    await bindCommerce(x!, service(run.ag.agencyId));
+    const one = await beginOn(rawStore(x!), a, first);
+    const waiting = await mustWait(env.h.oracle, { waiter: y!, holder: connectionPid(x!) }, (c) => unit(c, run.ag.agencyId, (cc) => beginOn(rawStore(cc), a, second)), "the second admission on the MODEL_TASK lease row (claim_lease FOR UPDATE)");
+    assert.equal((await x!.query("COMMIT")).command, "COMMIT");
+    return [one, valueOf<Begun>(await waiting.pending)] as const;
+  });
+  assert.deepEqual(outcomeOf(one), ["RESERVED", first.requestId, 1, 1]);
+  assert.deepEqual(outcomeOf(other), ["IN_FLIGHT", first.requestId, 1, 1], "after the wait, the first admission's live row");
+  assert.equal(await requestCount(second.requestId), 0, "nothing reserved by the second");
+  assert.deepEqual(await money(env, run.grantId), { reserved: 5, spent: 0, state: "AUTHORIZED" });
+  // a direct second live core row of the task (bound to it, at the lease's fence): the unique index refuses it
+  const direct = ids.next();
+  assert.deepEqual(await refusal(run.ag.agencyId, CORE_INSERT, [direct, a.taskId, run.ag.agencyId, taskHashOf(a), run.grantId, run.stepFence, a.core.runId, "k3-direct", a.core.requestKey]), ["23505", "request_journal_one_live_core_attempt"]);
+  assert.equal(await requestCount(direct), 0);
+});
+
+test("K4 CRASH-AFTER (admission COMMIT acknowledgement lost): the admission's replay on (run, reservation) answers REPLAYED with one row; a reopened run's RELEASED and GRANT_RECONCILIATION's cancel of the unsent row return the cents once, and the next invocation reserves a new row", async () => {
+  const pool = await freshPool(env);
+  const run = await interpretingRun(env, "k4", pool);
+  const a = await admit(env, run, 50_000n);
+  await throttled(a);
+  // the second invocation's admission commits and its answer is lost
+  const lost = invocationOf(a);
+  const points = new FaultPoints();
+  points.crash("k4.after-commit");
+  await assert.rejects(crashableFactory(env.h.audit, points, "k4").run(controlOf(run.ag.agencyId), (uow) => beginOn(uow.audits as never, a, lost)), crashedAt("k4.after-commit"));
+  assert.deepEqual(outcomeOf(await invoke(a, { ...lost, requestId: ids.next() as RequestId })), ["REPLAYED", lost.requestId]);
+  assert.equal((await taskRows(a.taskId)).filter((r) => r.request_id === lost.requestId).length, 1, "one row");
+  assert.equal((await taskRows(a.taskId)).length, 2);
+  assert.deepEqual(await money(env, run.grantId), { reserved: 5, spent: 0, state: "AUTHORIZED" });
+  // the reopened run releases it unsent (cents back once; RESERVED and never sendable) and GRANT_RECONCILIATION cancels it (no cent)
+  assert.equal((await settle(lost, "RELEASED", 0n)).kind, "RECORDED");
+  assert.deepEqual(await money(env, run.grantId), { reserved: 0, spent: 0, state: "AUTHORIZED" });
+  assert.equal((await journal(a, (j) => j.markCancelled(lost.requestId, 1, clock.now())))?.state, "CANCELLED");
+  assert.deepEqual(await money(env, run.grantId), { reserved: 0, spent: 0, state: "AUTHORIZED" }, "no cent moves twice");
+  const next = invocationOf(a);
+  assert.deepEqual(outcomeOf(await invoke(a, next)), ["RESERVED", next.requestId, 1, 1], "a CANCELLED row is not live");
+  assert.deepEqual(await money(env, run.grantId), { reserved: 5, spent: 0, state: "AUTHORIZED" });
+});
+
+test("K4b RACE (stored while the admission waits on the lease, rule 16): an admission of the request key that read no stored response and then waited on the MODEL_TASK lease row answers STORED_RESPONSE when the earlier invocation's response committed during the wait, with no new row and no cent reserved", async () => {
+  const pool = await freshPool(env);
+  const run = await interpretingRun(env, "k4b", pool);
+  const a = await admit(env, run, 50_000n);
+  await dispatch(env, a);
+  assert.equal((await journal(a, (j) => j.markUncertain(a.requestId, 1, clock.now())))?.state, "UNCERTAIN");
+  const next = invocationOf(a);
+  const out = await withConnections(env, 3, async ([holder, w, sto]) => {
+    // SIMULATED holder: a raw harness session holds the task's lease row FOR UPDATE (a claim or a heartbeat of it in flight)
+    await holder!.query("BEGIN");
+    await bindCommerce(holder!, service(run.ag.agencyId));
+    await holder!.query("SELECT 1 FROM kauro.leases WHERE resource_kind = 'MODEL_TASK' AND resource_id = $1 FOR UPDATE", [a.taskId]);
+    const waiting = await mustWait(env.h.oracle, { waiter: w!, holder: connectionPid(holder!) }, (c) => unit(c, run.ag.agencyId, (cc) => beginOn(rawStore(cc), a, next)), "the admission on the MODEL_TASK lease row after its first stored-response read");
+    assert.equal((await unit(sto!, run.ag.agencyId, (x) => rawJournal(x).storeResponse(a.requestId, 1, sha("response-k4b"), { usageState: "KNOWN", actualCents: "2" as never }, clock.now())))?.state, "RESPONSE_STORED");
+    await holder!.query("ROLLBACK");
+    return valueOf<Begun>(await waiting.pending);
+  });
+  assert.deepEqual(outcomeOf(out), ["STORED_RESPONSE", a.requestId]);
+  assert.equal(await requestCount(next.requestId), 0);
+  assert.deepEqual(await money(env, run.grantId), { reserved: 5, spent: 0, state: "AUTHORIZED" }, "only the stored answer's reservation");
+});
+
+test("K5 DENY (binding): a core row whose run, request key or request hash differs from its model task's is refused KA004 MODEL_TASK_BINDING, and createModelTask with another minimized request hash is INTEGRITY_FAILURE", async () => {
+  const pool = await freshPool(env);
+  const run = await interpretingRun(env, "k5", pool);
+  const a = await admit(env, run, 50_000n);
+  await throttled(a);
+  const cases: Array<[string, Override]> = [
+    ["another run", { core: { runId: ids.next() as never } }],
+    ["another request key", { core: { requestKey: sha("k5-other-key") } }],
+    ["another request hash", { requestHash: sha("k5-other-hash") }],
+  ];
+  for (const [what, over] of cases) {
+    const x = invocationOf(a);
+    await assert.rejects(invoke(a, x, over), refusedWith("KA004", "MODEL_TASK_BINDING:"), what);
+    assert.equal(await requestCount(x.requestId), 0, what);
+  }
+  assert.deepEqual(await money(env, run.grantId), { reserved: 0, spent: 0, state: "AUTHORIZED" }, "nothing reserved");
+  // a core row of a task with no MODEL_TASK lease
+  const unleased = admissionOf(run, 50_000n);
+  const plan = (x: Admission) => ({
+    modelTaskId: x.taskId,
+    auditId: run.auditId as never,
+    stepFence: run.stepFence,
+    taskKey: sha(`task-${x.core.reservationId}`) as never,
+    candidateManifestHash: run.candidateManifestHash as never,
+    policyHash: sha("model-policy") as never,
+    minimizedRequestHash: taskHashOf(x) as never,
+    providerProfileId: ids.next() as never,
+    maximumCostCents: 40n,
+    core: { runId: x.core.runId, requestKey: x.core.requestKey },
+  });
+  await env.h.audit.run(controlOf(run.ag.agencyId), (uow) => uow.audits.createModelTask(plan(unleased)));
+  const [code] = await refusal(run.ag.agencyId, CORE_INSERT, [ids.next(), unleased.taskId, run.ag.agencyId, taskHashOf(unleased), run.grantId, run.stepFence, unleased.core.runId, unleased.core.reservationId, unleased.core.requestKey]);
+  assert.equal(code, "KA004", "no lease, no core attempt");
+  // planned again with another minimized request, another run or another request key: INTEGRITY_FAILURE, nothing planned
+  const planned = { ...plan(a), modelTaskId: ids.next() as never };
+  const replans: Array<[string, typeof planned]> = [
+    ["another minimized request", { ...planned, minimizedRequestHash: sha("k5-other-minimized") as never }],
+    ["another run", { ...planned, core: { ...planned.core, runId: ids.next() as never } }],
+    ["another request key", { ...planned, core: { ...planned.core, requestKey: sha("k5-other-key") } }],
+  ];
+  for (const [what, task] of replans) {
+    await assert.rejects(env.h.audit.run(controlOf(run.ag.agencyId), (uow) => uow.audits.createModelTask(task)), (e: unknown) => failureOf(e)[0] === "INTEGRITY_FAILURE", what);
+  }
+  assert.equal((await env.h.audit.run(controlOf(run.ag.agencyId), (uow) => uow.audits.createModelTask(planned))).modelTaskId, a.taskId, "the same plan is the same task");
+  assert.equal((await env.h.oracle.query("SELECT count(*)::int AS n FROM kauro.model_tasks WHERE audit_id = $1", [run.auditId])).rows[0].n, 2, "the two planned tasks only");
 });

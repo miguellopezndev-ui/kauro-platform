@@ -25,6 +25,8 @@ export type EvaluationId = Branded<Id, "EvaluationId">;
 export type InspectionReceiptId = Branded<Id, "InspectionReceiptId">;
 /** RetentionRecord.retentionId. */
 export type RetentionId = Branded<Id, "RetentionId">;
+/** One explicit soft-deadline extension of a project's retention (CMD060; at most one per project). */
+export type RetentionExtensionId = Branded<Id, "RetentionExtensionId">;
 /** One immutable retention anchor fact. */
 export type RetentionAnchorId = Branded<Id, "RetentionAnchorId">;
 /** One provider hold record: one included file's accepted generation, held by one seal attempt (B07-R1, D-HOLD-1). */

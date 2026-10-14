@@ -11,7 +11,7 @@ import { R2_DOMAIN_ALIASES } from "@kauro/contracts";
 import { APPLICATION_COPY, EN, message, nextStepLabel, placeholdersOf, stateCopy } from "../src/copy/en.ts";
 import { PUBLIC_COPY } from "../src/copy/public.ts";
 import { SCREEN_COPY } from "../src/copy/screens.ts";
-import { HEALTH_CHECK_CTA, HEALTH_CHECK_NAME, IN_HOUSE_SENTENCE, lintCatalogue, lintText, PERMITTED_AI_SENTENCE, withoutComments } from "../src/copy/lint.ts";
+import { HEALTH_CHECK_CTA, HEALTH_CHECK_NAME, lintCatalogue, lintText, PERMITTED_AI_SENTENCE, withoutComments } from "../src/copy/lint.ts";
 import { SHARED_STATES, type NextStep } from "../src/client/states.ts";
 
 const brands = [...new Set(Object.keys(R2_DOMAIN_ALIASES).map((name) => name.split("_")[0] ?? ""))].filter((name) => name.length > 0);
@@ -19,7 +19,7 @@ const options = { brands };
 const webRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 /** A catalogue that passes, to which a negative control adds one entry. */
-const good: Readonly<Record<string, string>> = { "health-check.title": HEALTH_CHECK_NAME, "public.cta.request-health-check.cta": HEALTH_CHECK_CTA, "pricing.in-house.body": IN_HOUSE_SENTENCE };
+const good: Readonly<Record<string, string>> = { "health-check.title": HEALTH_CHECK_NAME, "public.cta.request-health-check.cta": HEALTH_CHECK_CTA };
 const rulesOf = (entries: Readonly<Record<string, string>>): readonly string[] => lintCatalogue(entries, options).map((violation) => violation.rule);
 const withEntry = (id: string, text: string): Readonly<Record<string, string>> => ({ ...good, [id]: text });
 
@@ -35,29 +35,28 @@ test("B11 INT-1 seam, one copy catalogue (D-COPY-1, D-W5a-2): EN is the applicat
   assert.deepEqual(Object.keys(EN).sort(), [...application, ...site, ...Object.keys(SCREEN_COPY)].sort());
   assert.deepEqual(Object.keys(SCREEN_COPY).filter((id) => Object.hasOwn(PUBLIC_COPY, id) || Object.hasOwn(APPLICATION_COPY, id)), [], "the screens' ids are their own");
   for (const [id, text] of Object.entries(PUBLIC_COPY)) assert.equal((EN as Readonly<Record<string, string>>)[id], text, id);
-  // the names and sentences A3 fixes word for word are the public site's, and each stands once over both catalogues
-  for (const sentence of [HEALTH_CHECK_CTA, IN_HOUSE_SENTENCE]) {
+  // the call to action A3 fixes word for word is the public site's, and it stands once over both catalogues
+  for (const sentence of [HEALTH_CHECK_CTA]) {
     assert.equal([...Object.values(APPLICATION_COPY), ...Object.values(PUBLIC_COPY)].filter((text) => text === sentence).length, 1, sentence);
   }
 });
 
-test("D-COPY-1: the required names are exact — the free step is the Free data health check, its call to action, and the in-house sentence once on Pricing", () => {
+test("D-COPY-1: the required names are exact — the free step is the Free data health check and its call to action", () => {
   assert.equal(EN["health-check.title"], "Free data health check");
   assert.equal(EN["public.cta.request-health-check.cta"], "Request a free data health check");
-  assert.equal(EN["pricing.in-house.body"], "In-house CRM and data teams can use Kauro too.");
-  assert.equal(Object.values(EN).filter((text) => text.includes(IN_HOUSE_SENTENCE)).length, 1);
   const wrongName = { ...good, "health-check.title": "Data audit" };
   assert.ok(rulesOf(wrongName).some((rule) => rule.includes("is named")), "a renamed check is refused");
   const noCta = { ...good, "public.cta.request-health-check.cta": "Start now" };
   assert.ok(rulesOf(noCta).some((rule) => rule.includes("call to action")));
-  const twice = withEntry("pricing.again.body", IN_HOUSE_SENTENCE);
-  assert.ok(rulesOf(twice).includes("A3-3.7 the in-house sentence appears exactly once"));
-  const home = withEntry("home.extra.body", IN_HOUSE_SENTENCE);
-  assert.ok(rulesOf(home).includes("A3-3.7 the in-house sentence appears exactly once"));
-  const notOnPricing = { "health-check.title": HEALTH_CHECK_NAME, "public.cta.request-health-check.cta": HEALTH_CHECK_CTA, "home.in-house.body": IN_HOUSE_SENTENCE };
-  assert.deepEqual(rulesOf(notOnPricing), ["A3-3.7 the in-house sentence appears on Pricing only"]);
-  const none = { "health-check.title": HEALTH_CHECK_NAME, "public.cta.request-health-check.cta": HEALTH_CHECK_CTA };
-  assert.deepEqual(rulesOf(none), ["A3-3.7 the in-house sentence appears exactly once"]);
+  assert.deepEqual(rulesOf(good), [], "the two required names are the whole required set");
+});
+
+test("D-33: company buyers may be addressed on any page, any number of times — the retired A3 3.7 once-on-Pricing rule refuses nothing", () => {
+  const sentence = "Companies preparing their own CRM data can buy Kauro directly.";
+  assert.deepEqual(rulesOf(withEntry("home.company.body", sentence)), [], "on Home");
+  assert.deepEqual(rulesOf({ ...good, "pricing.company.body": sentence, "how.company.body": sentence }), [], "twice");
+  assert.deepEqual(rulesOf({ ...good, "home.extra.body": "In-house CRM and data teams can use Kauro too." }), [], "the former sentence off Pricing");
+  assert.equal(rulesOf(good).some((rule) => rule.startsWith("A3-3.7")), false, "no A3-3.7 rule stands");
 });
 
 test("D-COPY-1: every forbidden phrase of A3 is refused, in any case, and its repaired wording passes", () => {

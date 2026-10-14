@@ -45,7 +45,7 @@ test("the synthetic sample reconciles: the report's shares are its counts over i
 
 // The recorded digest of the guides' rendered text. A change to any guide, or to a number a guide states from the policy, changes the digest:
 // this test then fails until the version and the date are raised and the digest below is recorded, which is what "versioned" means.
-const RECORDED_GUIDES = { version: "1.0", changed: "2026-09-29", sha256: "d610f5acc13ef1111a436349329541f018e0b86f76f259b909f2f159521ef589" } as const;
+const RECORDED_GUIDES = { version: "1.1", changed: "2026-10-13", sha256: "609a73c89f3b45a90a716d25beeae6bb3c856496a16253972f07a405176648c3" } as const;
 
 test("the guides are versioned: their text has a recorded digest under a version and a date, and it is kept in step", () => {
   assert.equal(GUIDES_VERSION, RECORDED_GUIDES.version);

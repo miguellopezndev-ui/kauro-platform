@@ -78,6 +78,7 @@ export { SOURCE_SWEEPERS } from "./pipeline-contracts.js";
 export { SOURCE_READ_ROUTES } from "./read-specs.js";
 export type {
   B07Collaborators,
+  RetentionHandlers,
   SourcePreview,
   SourceProviders,
   SourceRuntime,
@@ -91,6 +92,7 @@ export type {
 } from "./handlers/index.js";
 export {
   createB07Handlers,
+  createRetentionHandlers,
   createSourceReadHandlers,
   createSourceIntakeHandlers,
   SOURCE_INTAKE_ROUTES,

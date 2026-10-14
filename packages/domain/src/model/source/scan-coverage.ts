@@ -80,6 +80,7 @@ export type ScanCoverageReason =
   | "TIMEOUT"
   | "UNEXPECTED_PART"
   | "CONFIG_NOT_PINNED"
+  | "SIGNATURES_UNAVAILABLE"
   | "STALE_SIGNATURES"
   | "SIGNATURES_FROM_THE_FUTURE"
   | "PART_MISSING"
@@ -118,6 +119,7 @@ const REASON_ORDER: ReadonlyArray<ScanCoverageReason> = [
   "TIMEOUT",
   "UNEXPECTED_PART",
   "CONFIG_NOT_PINNED",
+  "SIGNATURES_UNAVAILABLE",
   "SIGNATURES_FROM_THE_FUTURE",
   "STALE_SIGNATURES",
   "PART_MISSING",
@@ -125,6 +127,14 @@ const REASON_ORDER: ReadonlyArray<ScanCoverageReason> = [
   "PART_ENCRYPTED",
   "BYTES_SHORT",
 ];
+
+/** The signature database's publication instant, or null when the report names no feed (an empty version, an absent or non-instant time). */
+function signatureInstantMs(report: ScannerReport): number | null {
+  if (typeof report.signatureVersion !== "string" || report.signatureVersion.length === 0) return null;
+  if (typeof report.signaturesPublishedAt !== "string") return null;
+  const ms = Date.parse(report.signaturesPublishedAt);
+  return Number.isFinite(ms) ? ms : null;
+}
 
 function isCount(n: unknown): n is number {
   return typeof n === "number" && Number.isSafeInteger(n) && n >= 0;
@@ -206,9 +216,12 @@ export function evaluateScanCoverage(expected: ReadonlyArray<ExpectedScanPart>, 
     }
   }
   if (report.configHash !== policy.pinnedConfigHash) reasons.add("CONFIG_NOT_PINNED");
-  const published = instantMs(report.signaturesPublishedAt);
+  // a scanner with no signature feed (no version, or no publication instant that is an instant) has no freshness to judge: that is
+  // never coverage (S076 "No PASS from missing results") and never an exception that skips the verdict — it is NOT_SCANNED
+  const published = signatureInstantMs(report);
   const scannedAt = instantMs(report.scannedAt);
-  if (published > scannedAt) reasons.add("SIGNATURES_FROM_THE_FUTURE");
+  if (published === null) reasons.add("SIGNATURES_UNAVAILABLE");
+  else if (published > scannedAt) reasons.add("SIGNATURES_FROM_THE_FUTURE");
   else if (scannedAt - published > SIGNATURE_MAX_AGE_SECONDS * 1000) reasons.add("STALE_SIGNATURES");
 
   let scanState: ScanCoverage["scanState"];

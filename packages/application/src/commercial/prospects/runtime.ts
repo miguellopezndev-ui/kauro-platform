@@ -6,7 +6,6 @@
  */
 import type { AgencyId, AttributionClaimId, AttributionRepository, CommerceUnitOfWork, SalesRepository, UnitOfWork } from "@kauro/domain";
 import type { CommercialAuthorizer } from "../authorizer.js";
-import type { BuyerTypeReader } from "../ports.js";
 
 export interface ProspectCollaborators {
   /** The seller and corporate-owner access decisions (createCommercialAuthorizer over the principals the persistence package reads). */
@@ -15,8 +14,6 @@ export interface ProspectCollaborators {
   readonly sales: (uow: UnitOfWork) => SalesRepository;
   /** The attribution records of a unit of work (@kauro/persistence attributionOf). */
   readonly attribution: (uow: UnitOfWork) => AttributionRepository;
-  /** The agency's recorded buyer type (D58): the shipped edition records none, so CMD047 refuses every attribution until B11 binds it. */
-  readonly buyerTypes: BuyerTypeReader;
   /**
    * Whether a payment order of the agency was created before the claim was submitted, read in the owner's unit of work after its finance
    * scope was adopted (@kauro/persistence agencyOrderPrecedesClaim).

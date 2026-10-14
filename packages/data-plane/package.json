@@ -30,12 +30,13 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test --test-reporter=spec \"dist/test/**/*.test.js\""
+    "test": "node --test --test-timeout=300000 --test-reporter=spec \"dist/test/**/*.test.js\""
   },
   "dependencies": {
     "@kauro/application": "workspace:*",
     "@kauro/contracts": "workspace:*",
     "@kauro/domain": "workspace:*",
+    "@kauro/intelligence-core": "workspace:*",
     "@kauro/migration-core": "workspace:*"
   },
   "devDependencies": {

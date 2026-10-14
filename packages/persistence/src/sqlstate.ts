@@ -82,6 +82,19 @@ export const SQLSTATE = Object.freeze({
   CAPACITY_LEDGER: "KA082",
   GRANT_UNFUNDED: "KA083",
   PUBLICATION_EVIDENCE: "KA084",
+  // package B16 (tenant isolation, retention, deletion, breakglass, download, restore): KA085..KA094 are RESERVED for lanes L2..L8, named by
+  // lane so two lanes never pick the same code (tools/test/ka-codes.test.mjs). A lane that raises one renames its constant to the
+  // refusal it names, adds its MAP entry and its migration, and keeps the value.
+  B16_L2_RETENTION_A: "KA085",
+  B16_L2_RETENTION_B: "KA086",
+  B16_L3_DELETION_A: "KA087",
+  B16_L3_DELETION_B: "KA088",
+  B16_L4_BREAKGLASS_A: "KA089",
+  B16_L5_DOWNLOAD_A: "KA090",
+  B16_L6_RESTORE_A: "KA091",
+  B16_L6_RESTORE_B: "KA092",
+  B16_L7_STAGE_RELEASE_A: "KA093",
+  B16_L8_RESERVE_A: "KA094",
   // PostgreSQL classes the adapters also translate
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",
