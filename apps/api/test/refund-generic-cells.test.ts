@@ -855,7 +855,12 @@ cell("RACE RFG-M-X3-TIMEOUT (lock and COMMIT timeout): Resolve uncertain executi
 
 cell("DENY RFG-M-X3-EXPIRY (coverage lag and step-up): Resolve uncertain execution", "expiry", async (ctx) => {
   // the controlled clock never moves backwards and an attempt is declared on the real clock: every leg is declared and lapsed first, then the
-  // boundaries are judged in the order of their instants (declaredAt + window + coverageLag), each one harness margin before (the effect clock runs on with the transaction, so an exact -1 ms is not observable) and then at 0 ms
+  // boundaries are judged in the order of their instants (declaredAt + window + coverageLag), each one harness margin before (the effect clock runs on with the transaction, so an exact -1 ms is not observable) and then at 0 ms.
+  // GAP (reported): `<` vs `<=` is NOT pinned here. X3 reads kauro.effect_now() (0038: server_now() + clock_timestamp() - transaction_timestamp())
+  // under L1, rounded UP to the millisecond (UnitOfWork.effectNow); the TEST CLOCK offsets only server_now(), so the instant read is the placed
+  // one plus the wall time the transaction ran up to that statement (> 0, load-dependent): a leg placed at nx - 1 ms may read >= nx (an
+  // intermittent cell) and a leg at nx reads > nx, which both operators admit. Pinning needs a frozen test effect clock (a TEST CLOCK variant of
+  // kauro.effect_now() reading an absolute transaction-local instant), a shared fault-harness change outside this lane.
   const { manualExecutionWindowMs, coverageLagMs } = routeTiming();
   const legs: Array<{ readonly scope: Scope; readonly kind: Kind; readonly a: Awaited<ReturnType<typeof lapsed>> }> = [];
   for (const scope of SCOPES)
