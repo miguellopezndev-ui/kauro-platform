@@ -1235,7 +1235,8 @@ Files `apps/api/test/settlement-cells.test.ts` (ST1-ST3) and `apps/api/test/ach-
 Product decisions:
 - `settlement_requests_event_per_version` fires AFTER INSERT OR UPDATE, not UPDATE OF version. Reason: the BEFORE guard sets `version`, and an `UPDATE OF version` trigger does not fire for a column that only a BEFORE trigger changed.
 - The 0071 vocabulary rows are inserted under NO FORCE ROW LEVEL SECURITY, as event_types is.
-- The in-transit page follows the coordinator rule of PV1-SETTLE §3.5.
+- The in-transit page follows the coordinator rule of PV1-SETTLE §3.5, plus (adversary ADV-8) an APPLIED settlement without a bank receipt: its money is still in BANK_IN_TRANSIT. An apply never auto-resolves an EVIDENCE_MISMATCH case (ADV-7: it stays OPEN for the operator). Event cents are exact safe integers (ADV-9).
+- Every DB cell of both files runs the B10 kit oracle and the settlement oracle INV-SET-1..7 (`apps/api/test/settlement-oracle.ts`) after it (ADV-2).
 
 ### 7.26 Rail parity and buyer reach (cases ACH-07, K-9)
 - `apps/api/test/b10-commission-service.test.ts` :: "OK rail parity: an exact bank-transfer capture accrues, holds and adjusts
