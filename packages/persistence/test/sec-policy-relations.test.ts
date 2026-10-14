@@ -19,7 +19,42 @@ const CENSUS = `SELECT DISTINCT c.relname || ' NAMES ' || r.relname AS entry
 
 // The (table, named relation) pairs main had before batch B (reviewed when they landed): a policy may be renamed or split on one of
 // them, since the lock footprint is the pair's, but no new pair may be added.
-const FROZEN: readonly string[] = [];
+const FROZEN: readonly string[] = [
+  "agencies NAMES memberships",
+  "approvals NAMES memberships",
+  "attribution_allocations NAMES allocation_shares",
+  "attribution_claims NAMES prospects",
+  "audits NAMES memberships",
+  "bank_route_versions NAMES bank_routes",
+  "banking_calendars NAMES commission_statements",
+  "decision_artifacts NAMES memberships",
+  "domain_events NAMES commerce_event_bindings",
+  "identities NAMES sellers",
+  "import_stages NAMES memberships",
+  "inbox_body_conflicts NAMES inbox_records",
+  "inbox_body_conflicts NAMES payment_routes",
+  "inbox_records NAMES payment_routes",
+  "membership_invitations NAMES memberships",
+  "outbox_records NAMES commerce_event_bindings",
+  "outbox_records NAMES commerce_event_subscriptions",
+  "outbox_records NAMES domain_events",
+  "payment_orders NAMES quotes",
+  "plan_validations NAMES memberships",
+  "plans NAMES audits",
+  "processing_jobs NAMES memberships",
+  "quotes NAMES purchase_rebindings",
+  "retention_extensions NAMES retention_records",
+  "retention_records NAMES capture_facts",
+  "retention_records NAMES dataset_revisions",
+  "retention_records NAMES processing_jobs",
+  "retention_records NAMES retention_anchors",
+  "security_events NAMES memberships",
+  "selection_manifests NAMES memberships",
+  "stage_receipts NAMES memberships",
+  "target_artifacts NAMES memberships",
+  "upload_session_secrets NAMES upload_sessions",
+  "upload_sessions NAMES memberships",
+];
 
 let pg: TemporaryPostgres;
 before(async () => {
