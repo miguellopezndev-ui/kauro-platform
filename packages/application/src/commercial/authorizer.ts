@@ -8,6 +8,9 @@
  *                           by the token and by the stored row → the caller's own seller row, read after its transition lock in this
  *                           unit of work, in state ACTIVE. A missing row, another person's row and any other state (CANDIDATE, SUSPENDED,
  *                           TERMINATED) are refused with the same reason, so a refusal reveals nothing about a seller's state.
+ *  authorizeSellerSelf      the same identity checks → the caller's own seller row, read after its transition lock, in ANY state (B12 L-OWNER:
+ *                           the payout destination change is the seller's own fact before activation and after termination, 0029
+ *                           seller_payout_destinations_seller_change). A missing row or another person's row is CORPORATE_ROLE_MISSING.
  *  authorizeCorporateOwner  the same identity checks → the caller's own ACTIVE KAURO_OWNER grant, read after its transition lock.
  *  authorizeCommercialService the verified service identity holds the command's role in the code-owned SERVICE_ROLE_TABLE
  *                           (COMMISSION_SERVICE, FINANCE_SERVICE or, since package B18, OPERATIONS_SERVICE) and was issued for this deployment's environment.
@@ -31,6 +34,7 @@ export type SellerDecision = { readonly kind: "ALLOW"; readonly userId: string; 
 
 export interface CommercialAuthorizer {
   authorizeSeller(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts }): Promise<SellerDecision>;
+  authorizeSellerSelf(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts }): Promise<SellerDecision>;
   authorizeCorporateOwner(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts }): Promise<OperatorDecision>;
   authorizeCommercialService(request: {
     readonly identity: ServiceIdentity;
@@ -69,6 +73,15 @@ export function createCommercialAuthorizer(deps: CommercialAuthorizerDependencie
       if (refused !== null) return refused;
       const seller = await deps.principals.sellerOf(uow, identity.userId);
       if (seller === null || seller.state !== "ACTIVE" || seller.userId !== identity.userId) return deny("NOT_AUTHORIZED", "CORPORATE_ROLE_MISSING");
+      return { kind: "ALLOW", userId: identity.userId, sellerId: seller.sellerId, policyVersion: COMMERCE_POLICY_VERSION };
+    },
+
+    async authorizeSellerSelf(uow, request) {
+      const identity = request.identity;
+      const refused = await refuseUnadmittedPerson(uow, identity);
+      if (refused !== null) return refused;
+      const seller = await deps.principals.sellerOf(uow, identity.userId);
+      if (seller === null || seller.userId !== identity.userId) return deny("NOT_AUTHORIZED", "CORPORATE_ROLE_MISSING");
       return { kind: "ALLOW", userId: identity.userId, sellerId: seller.sellerId, policyVersion: COMMERCE_POLICY_VERSION };
     },
 

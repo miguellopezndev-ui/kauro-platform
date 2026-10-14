@@ -25,21 +25,12 @@ const OWNER_LANE = Object.freeze({
   prospect_contact_addresses: "L-SOURCE",
   prospect_source_evidence: "L-SOURCE",
   prospect_contacts: "L-SOURCE",
-  // companion §P (L-OWNER)
-  sellers: "L-OWNER",
-  seller_legal_reviews: "L-OWNER",
-  seller_agreements: "L-OWNER",
-  seller_assessments: "L-OWNER",
-  seller_confidentiality_acceptances: "L-OWNER",
-  seller_tax_documents: "L-OWNER",
-  seller_payout_destinations: "L-OWNER",
-  service_assignments: "L-OWNER",
-  assistance_agreements: "L-OWNER",
-  seller_terminations: "L-OWNER",
-  termination_manifests: "L-OWNER",
 });
-/** Read by a B10 command, written by no product code and named by no B12 lane: an open producer gap reported to the coordinator. */
-const UNOWNED = Object.freeze(["allocation_shares", "attribution_allocations", "claim_evidence", "corporate_roles", "service_agreement_versions"]);
+/**
+ * Read by a B10 command, written by no product code and named by no B12 lane: none since L-OWNER (companion §P), whose writers
+ * (persistence commercial-owner-tools.ts) cover the seller records and the five formerly unowned tables; a new unwritten read fails.
+ */
+const UNOWNED = Object.freeze([]);
 
 function written() {
   const out = new Set();
