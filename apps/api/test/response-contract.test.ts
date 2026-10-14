@@ -249,6 +249,27 @@ test("R23: every served route declares its replies (the route inventory the Open
       // package B10's statement and payout operations (mandate B10-STATEMENTS-PAYOUTS): the owner's approval and the statement read
       ["POST", "/api/v1/sales/statements/:statementId/approve-payout", "ApproveCommissionPayout", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD052" } }],
       ["GET", "/api/v1/sales/statements/:statementId", "GetCommissionStatement", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetCommissionStatement" } }],
+      // package B12's outreach routes (kit K2): every command and read is registered with a NOT_BUILT stub until its lane lands
+      ["POST", "/api/v1/ops/outreach/drafts", "PrepareOutreachDraft", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD061" } }],
+      ["POST", "/api/v1/ops/outreach/authorizations", "AuthorizeOutreach", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD062" } }],
+      ["POST", "/api/v1/ops/outreach/:draftId/send", "SendAuthorizedOutreach", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD063" } }],
+      ["POST", "/api/v1/ops/sales/activities", "RecordSalesActivity", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD064" } }],
+      ["POST", "/api/v1/ops/outreach/contents", "PutOutreachContent", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:PutOutreachContent" } }],
+      ["POST", "/api/v1/ops/sales/resources", "PublishSalesResource", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:PublishSalesResource" } }],
+      ["POST", "/api/v1/ops/outreach/senders", "RegisterSenderIdentity", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RegisterSenderIdentity" } }],
+      ["POST", "/api/v1/ops/outreach/senders/:senderId/verify", "VerifySenderIdentity", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:VerifySenderIdentity" } }],
+      ["POST", "/api/v1/ops/outreach/senders/:senderId/revoke", "RecordSenderRevocation", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordSenderRevocation" } }],
+      ["POST", "/api/v1/ops/outreach/reviews", "PrepareOutreachReview", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:PrepareOutreachReview" } }],
+      ["POST", "/api/v1/ops/outreach/diagnoses", "RecordOutreachDiagnosis", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordOutreachDiagnosis" } }],
+      ["POST", "/api/v1/ops/outreach/authorizations/:authorizationId/revoke", "RevokeOutreachAuthorization", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RevokeOutreachAuthorization" } }],
+      ["POST", "/api/v1/ops/outreach/policy-withdrawals", "WithdrawOutreachChannelPolicy", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:WithdrawOutreachChannelPolicy" } }],
+      ["POST", "/api/v1/ops/prospects/:prospectId/sources", "RecordProspectSource", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordProspectSource" } }],
+      ["POST", "/api/v1/ops/prospects/:prospectId/contacts", "RecordProspectContact", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:RecordProspectContact" } }],
+      ["GET", "/api/v1/ops/outreach/drafts/:draftId", "GetOutreachDraft", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetOutreachDraft" } }],
+      ["GET", "/api/v1/ops/outreach/reviews/:reviewId", "GetOutreachReview", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetOutreachReview" } }],
+      ["GET", "/api/v1/ops/sales/prospects/:prospectId/activities", "ListSalesActivities", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListSalesActivities" } }],
+      ["GET", "/api/v1/ops/outreach/metrics", "GetOutreachMetrics", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetOutreachMetrics" } }],
+      ["GET", "/api/v1/ops/sales/resources/:resourceId", "GetSalesResource", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetSalesResource" } }],
       // the payment service's routes of package B09 (stage-2 mandate M3), served in every edition: the ACCEPTED envelope only
       // where a provider effect may stay unknown (CMD033)
       ["POST", "/api/v1/payments/webhooks/:provider", "ReceivePaymentWebhook", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD030" } }],

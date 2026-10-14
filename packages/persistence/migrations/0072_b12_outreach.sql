@@ -55,6 +55,69 @@ GRANT USAGE ON SCHEMA kauro_meta TO kauro_outreach;
 GRANT SELECT ON kauro_meta.schema_migrations TO kauro_outreach;
 GRANT EXECUTE ON FUNCTION kauro.await_transition(text, text) TO kauro_outreach;
 
+-- --- policy lookups (incident RLS-POLICY-NAMES-RELATION, template rule 21a) ------------------------------------------------------------
+-- A policy expression that names another relation takes that relation's lock whenever any query on the policy's table is planned, for every
+-- session the policy applies to (FLAKY-UOW-TXLIMIT, batch B 0074 kauro.breakglass_scope_agency). The lookups of this migration's policies sit
+-- in these functions instead: PL/pgSQL plans a statement at its first execution, after the early return a session the policy cannot admit
+-- takes, so such a session never touches the other relation. SECURITY INVOKER: each reads through the caller's own policies, exactly as the
+-- inline subquery did. The census test (sec-policy-relations.test.ts) proves no kauro policy depends on another relation.
+-- p_unbound: the policy admits an agency-less session only (the same condition the policy states, repeated here so the early return does not
+-- depend on the planner's order of two conjuncts).
+CREATE OR REPLACE FUNCTION kauro.outreach_draft_authored(p_draft uuid, p_unbound boolean) RETURNS boolean
+  LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = pg_catalog, pg_temp AS
+$$
+BEGIN
+  IF kauro.current_user_id() IS NULL OR (p_unbound AND kauro.current_agency_id() IS NOT NULL) THEN
+    RETURN false;
+  END IF;
+  RETURN EXISTS (SELECT 1 FROM kauro.outreach_drafts d WHERE d.draft_id = p_draft AND d.author_user_id = kauro.current_user_id());
+END
+$$;
+CREATE OR REPLACE FUNCTION kauro.outreach_sender_owned(p_sender uuid) RETURNS boolean
+  LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = pg_catalog, pg_temp AS
+$$
+BEGIN
+  IF kauro.current_user_id() IS NULL OR kauro.current_agency_id() IS NOT NULL THEN
+    RETURN false;
+  END IF;
+  RETURN EXISTS (SELECT 1 FROM kauro.sender_identities s WHERE s.sender_id = p_sender AND s.user_id = kauro.current_user_id());
+END
+$$;
+CREATE OR REPLACE FUNCTION kauro.outreach_prospect_visible(p_prospect uuid) RETURNS boolean
+  LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = pg_catalog, pg_temp AS
+$$
+BEGIN
+  IF kauro.current_agency_id() IS NOT NULL THEN
+    RETURN false;
+  END IF;
+  RETURN EXISTS (SELECT 1 FROM kauro.prospects p WHERE p.prospect_id = p_prospect);
+END
+$$;
+CREATE OR REPLACE FUNCTION kauro.outreach_intent_of_person(p_intent uuid) RETURNS boolean
+  LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = pg_catalog, pg_temp AS
+$$
+BEGIN
+  IF kauro.current_user_id() IS NULL OR kauro.current_agency_id() IS NOT NULL THEN
+    RETURN false;
+  END IF;
+  RETURN EXISTS (SELECT 1 FROM kauro.outreach_send_intents i WHERE i.intent_id = p_intent AND i.person_user_id = kauro.current_user_id());
+END
+$$;
+CREATE OR REPLACE FUNCTION kauro.outreach_intent_visible(p_intent uuid) RETURNS boolean
+  LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path = pg_catalog, pg_temp AS
+$$
+BEGIN
+  IF kauro.current_agency_id() IS NOT NULL THEN
+    RETURN false;
+  END IF;
+  RETURN EXISTS (SELECT 1 FROM kauro.outreach_send_intents i WHERE i.intent_id = p_intent);
+END
+$$;
+REVOKE ALL ON FUNCTION kauro.outreach_draft_authored(uuid, boolean), kauro.outreach_sender_owned(uuid), kauro.outreach_prospect_visible(uuid),
+  kauro.outreach_intent_of_person(uuid), kauro.outreach_intent_visible(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION kauro.outreach_draft_authored(uuid, boolean), kauro.outreach_sender_owned(uuid), kauro.outreach_prospect_visible(uuid),
+  kauro.outreach_intent_of_person(uuid), kauro.outreach_intent_visible(uuid) TO kauro_app;
+
 -- --- lock subjects (plan §L, T2) -----------------------------------------------------------------------------------------------------------
 -- True when this backend holds the advisory transaction lock of the subject in the mode asked: 'X' only the exclusive lock, 'S' the
 -- shared or the exclusive one. A bigint advisory key is (classid = high 32 bits, objid = low 32 bits, objsubid = 1) in pg_locks.
@@ -1306,7 +1369,7 @@ ALTER TABLE kauro.outreach_draft_resources ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.outreach_draft_resources FORCE ROW LEVEL SECURITY;
 CREATE POLICY outreach_draft_resources_read ON kauro.outreach_draft_resources FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner() OR kauro.acting_seller_id() IS NOT NULL);
 CREATE POLICY outreach_draft_resources_record ON kauro.outreach_draft_resources FOR INSERT TO kauro_app
-  WITH CHECK (EXISTS (SELECT 1 FROM kauro.outreach_drafts d WHERE d.draft_id = outreach_draft_resources.draft_id AND d.author_user_id = kauro.current_user_id()));
+  WITH CHECK (kauro.outreach_draft_authored(draft_id, false));
 CREATE POLICY outreach_draft_resources_outreach_read ON kauro.outreach_draft_resources FOR SELECT TO kauro_outreach USING (true);
 GRANT SELECT, INSERT ON kauro.outreach_draft_resources TO kauro_app;
 GRANT SELECT ON kauro.outreach_draft_resources TO kauro_outreach;
@@ -1327,7 +1390,7 @@ ALTER TABLE kauro.outreach_authorizations FORCE ROW LEVEL SECURITY;
 CREATE POLICY outreach_authorizations_owner_read ON kauro.outreach_authorizations FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner());
 -- the sender person reads the grants of its own senders (CMD063)
 CREATE POLICY outreach_authorizations_sender_read ON kauro.outreach_authorizations FOR SELECT TO kauro_app
-  USING (kauro.current_agency_id() IS NULL AND EXISTS (SELECT 1 FROM kauro.sender_identities s WHERE s.sender_id = outreach_authorizations.sender_id AND s.user_id = kauro.current_user_id()));
+  USING (kauro.current_agency_id() IS NULL AND kauro.outreach_sender_owned(sender_id));
 CREATE POLICY outreach_authorizations_grant ON kauro.outreach_authorizations FOR INSERT TO kauro_app WITH CHECK (kauro.acting_corporate_owner() AND granting_user_id = kauro.current_user_id());
 CREATE POLICY outreach_authorizations_revoke ON kauro.outreach_authorizations FOR UPDATE TO kauro_app
   USING (kauro.acting_corporate_owner()) WITH CHECK (kauro.acting_corporate_owner() AND revoked_by_user_id = kauro.current_user_id());
@@ -1339,7 +1402,7 @@ ALTER TABLE kauro.outreach_authorization_hashes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.outreach_authorization_hashes FORCE ROW LEVEL SECURITY;
 CREATE POLICY outreach_authorization_hashes_owner_read ON kauro.outreach_authorization_hashes FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner());
 CREATE POLICY outreach_authorization_hashes_sender_read ON kauro.outreach_authorization_hashes FOR SELECT TO kauro_app
-  USING (kauro.current_agency_id() IS NULL AND EXISTS (SELECT 1 FROM kauro.outreach_drafts d WHERE d.draft_id = outreach_authorization_hashes.draft_id AND d.author_user_id = kauro.current_user_id()));
+  USING (kauro.current_agency_id() IS NULL AND kauro.outreach_draft_authored(draft_id, true));
 CREATE POLICY outreach_authorization_hashes_seal ON kauro.outreach_authorization_hashes FOR INSERT TO kauro_app WITH CHECK (kauro.acting_corporate_owner());
 CREATE POLICY outreach_authorization_hashes_outreach_read ON kauro.outreach_authorization_hashes FOR SELECT TO kauro_outreach USING (true);
 GRANT SELECT, INSERT ON kauro.outreach_authorization_hashes TO kauro_app;
@@ -1357,7 +1420,7 @@ CREATE POLICY outreach_send_intents_observe ON kauro.outreach_send_intents FOR U
   USING (kauro.current_agency_id() IS NULL AND person_user_id = kauro.current_user_id() AND state = 'SEND_UNCERTAIN')
   WITH CHECK (state IN ('OBSERVED_SENT', 'OBSERVED_NOT_SENT'));
 CREATE POLICY outreach_send_intents_prospect_read ON kauro.outreach_send_intents FOR SELECT TO kauro_app
-  USING (kauro.current_agency_id() IS NULL AND EXISTS (SELECT 1 FROM kauro.prospects p WHERE p.prospect_id = outreach_send_intents.prospect_id));
+  USING (kauro.current_agency_id() IS NULL AND kauro.outreach_prospect_visible(prospect_id));
 CREATE POLICY outreach_send_intents_outreach_read ON kauro.outreach_send_intents FOR SELECT TO kauro_outreach USING (true);
 CREATE POLICY outreach_send_intents_outreach_move ON kauro.outreach_send_intents FOR UPDATE TO kauro_outreach USING (true) WITH CHECK (true);
 GRANT SELECT, INSERT ON kauro.outreach_send_intents TO kauro_app;
@@ -1373,9 +1436,9 @@ CREATE POLICY sales_activities_record ON kauro.sales_activities FOR INSERT TO ka
   WITH CHECK (recorded_by_user_id = kauro.current_user_id() AND recorded_by_service IS NULL AND kind IN ('BOUNCED', 'REPLIED', 'SUPPRESSED', 'HUMAN_SEND_OBSERVED')
               AND (kauro.acting_seller_id() IS NOT NULL OR kauro.acting_corporate_owner()));
 CREATE POLICY sales_activities_prospect_read ON kauro.sales_activities FOR SELECT TO kauro_app
-  USING (kauro.current_agency_id() IS NULL AND EXISTS (SELECT 1 FROM kauro.prospects p WHERE p.prospect_id = sales_activities.prospect_id));
+  USING (kauro.current_agency_id() IS NULL AND kauro.outreach_prospect_visible(prospect_id));
 CREATE POLICY sales_activities_person_read ON kauro.sales_activities FOR SELECT TO kauro_app
-  USING (kauro.current_agency_id() IS NULL AND EXISTS (SELECT 1 FROM kauro.outreach_send_intents i WHERE i.intent_id = sales_activities.intent_id AND i.person_user_id = kauro.current_user_id()));
+  USING (kauro.current_agency_id() IS NULL AND kauro.outreach_intent_of_person(intent_id));
 CREATE POLICY sales_activities_outreach_read ON kauro.sales_activities FOR SELECT TO kauro_outreach USING (true);
 -- the service records PROVIDER_ACCEPTED / SEND_UNCERTAIN (D4, D5) and the opt-out's SUPPRESSED (OPT_OUT, contact key)
 CREATE POLICY sales_activities_outreach_record ON kauro.sales_activities FOR INSERT TO kauro_outreach
@@ -1396,9 +1459,9 @@ ALTER TABLE kauro.outreach_send_evidence ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.outreach_send_evidence FORCE ROW LEVEL SECURITY;
 CREATE POLICY outreach_send_evidence_owner_read ON kauro.outreach_send_evidence FOR SELECT TO kauro_app USING (kauro.acting_corporate_owner());
 CREATE POLICY outreach_send_evidence_person_read ON kauro.outreach_send_evidence FOR SELECT TO kauro_app
-  USING (kauro.current_agency_id() IS NULL AND EXISTS (SELECT 1 FROM kauro.outreach_send_intents i WHERE i.intent_id = outreach_send_evidence.intent_id AND i.person_user_id = kauro.current_user_id()));
+  USING (kauro.current_agency_id() IS NULL AND kauro.outreach_intent_of_person(intent_id));
 CREATE POLICY outreach_send_evidence_prospect_read ON kauro.outreach_send_evidence FOR SELECT TO kauro_app
-  USING (kauro.current_agency_id() IS NULL AND EXISTS (SELECT 1 FROM kauro.outreach_send_intents i WHERE i.intent_id = outreach_send_evidence.intent_id));
+  USING (kauro.current_agency_id() IS NULL AND kauro.outreach_intent_visible(intent_id));
 CREATE POLICY outreach_send_evidence_outreach ON kauro.outreach_send_evidence FOR SELECT TO kauro_outreach USING (true);
 CREATE POLICY outreach_send_evidence_outreach_record ON kauro.outreach_send_evidence FOR INSERT TO kauro_outreach WITH CHECK (recorded_by_service = 'outreach-service');
 GRANT SELECT ON kauro.outreach_send_evidence TO kauro_app;
@@ -1442,3 +1505,146 @@ BEGIN
   END LOOP;
 END
 $$;
+
+-- --- K1b: the send intent's event, an agency-less aggregate (lane K1b; plan §1 CMD063 "One COMMIT: intent QUEUED + draft AUTHORIZED + event
+-- outreach.send_intended.v1 + outbox"; 07 "event per committed version") -----------------------------------------------------------------
+-- kauro.outreach_send_intents carries no agency_id and must not gain one (A17: kauro_outreach holds no grant on an agency_id table), yet the
+-- registry (0008), the event binding (0046) and the event-per-version rule were written for aggregates of an agency. A registry column says
+-- which: agency_scoped (default true, so every registered kind keeps its rule: a bank route's NULL agency_id is a VALUE of a scoped kind).
+-- An unscoped kind's table has no agency_id column, its events name no agency and the binding refuses one (KA006, as an unknown aggregate);
+-- require_event_for_version (0046) already reads a row without agency_id as agency NULL (to_jsonb ->> 'agency_id' is NULL; IS NOT DISTINCT FROM).
+ALTER TABLE kauro.aggregate_kinds ADD COLUMN agency_scoped boolean NOT NULL DEFAULT true;
+
+CREATE OR REPLACE FUNCTION kauro.aggregate_kinds_bind_catalog() RETURNS trigger
+  LANGUAGE plpgsql SECURITY INVOKER SET search_path = pg_catalog, pg_temp AS
+$$
+DECLARE
+  rel oid;
+  key_column name;
+  key_type regtype;
+BEGIN
+  SELECT c.oid INTO rel
+    FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'kauro' AND c.relname = NEW.table_name AND c.relkind IN ('r', 'p');
+  IF rel IS NULL THEN
+    RAISE EXCEPTION 'AGGREGATE_KIND_BINDING: kind % names %, which is not a table of schema kauro', NEW.aggregate_kind, NEW.table_name
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'aggregate_kinds_bind_catalog', SCHEMA = 'kauro', TABLE = 'aggregate_kinds';
+  END IF;
+  SELECT a.attname, a.atttypid::pg_catalog.regtype INTO key_column, key_type
+    FROM pg_catalog.pg_constraint k
+    JOIN pg_catalog.pg_attribute a ON a.attrelid = k.conrelid AND a.attnum = k.conkey[1]
+   WHERE k.conrelid = rel AND k.contype = 'p' AND pg_catalog.cardinality(k.conkey) = 1;
+  IF key_column IS DISTINCT FROM NEW.id_column::name OR key_type IS DISTINCT FROM 'pg_catalog.uuid'::pg_catalog.regtype THEN
+    RAISE EXCEPTION 'AGGREGATE_KIND_BINDING: kind % names %.%, which is not the single uuid primary-key column of that table', NEW.aggregate_kind, NEW.table_name, NEW.id_column
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'aggregate_kinds_bind_catalog', SCHEMA = 'kauro', TABLE = 'aggregate_kinds';
+  END IF;
+  -- the version column the binding reads, always; the agency_id column exactly when the kind is agency scoped (and no agency_id of any type
+  -- on an unscoped kind's table: the table would be both)
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_attribute a
+     WHERE a.attrelid = rel AND a.attname = 'version' AND a.attnum > 0 AND NOT a.attisdropped
+       AND a.atttypid = 'pg_catalog.int8'::pg_catalog.regtype
+  ) THEN
+    RAISE EXCEPTION 'AGGREGATE_KIND_BINDING: kind % names %, which lacks the version bigint column the event binding reads', NEW.aggregate_kind, NEW.table_name
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'aggregate_kinds_bind_catalog', SCHEMA = 'kauro', TABLE = 'aggregate_kinds';
+  END IF;
+  IF NEW.agency_scoped AND NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_attribute a
+     WHERE a.attrelid = rel AND a.attname = 'agency_id' AND a.attnum > 0 AND NOT a.attisdropped
+       AND a.atttypid = 'pg_catalog.uuid'::pg_catalog.regtype
+  ) THEN
+    RAISE EXCEPTION 'AGGREGATE_KIND_BINDING: kind % names %, which lacks the agency_id uuid or version bigint column the event binding reads', NEW.aggregate_kind, NEW.table_name
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'aggregate_kinds_bind_catalog', SCHEMA = 'kauro', TABLE = 'aggregate_kinds';
+  END IF;
+  IF NOT NEW.agency_scoped AND EXISTS (
+    SELECT 1 FROM pg_catalog.pg_attribute a
+     WHERE a.attrelid = rel AND a.attname = 'agency_id' AND a.attnum > 0 AND NOT a.attisdropped
+  ) THEN
+    RAISE EXCEPTION 'AGGREGATE_KIND_BINDING: kind % is registered agency-less but % carries an agency_id column', NEW.aggregate_kind, NEW.table_name
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'aggregate_kinds_bind_catalog', SCHEMA = 'kauro', TABLE = 'aggregate_kinds';
+  END IF;
+  RETURN NEW;
+END
+$$;
+
+-- the binding of 0046, with the agency-less arm: an unscoped kind is looked up by its id alone and its event must name no agency
+CREATE OR REPLACE FUNCTION kauro.domain_events_bind_aggregate() RETURNS trigger
+  LANGUAGE plpgsql SECURITY INVOKER SET search_path = pg_catalog, pg_temp AS
+$$
+DECLARE
+  binding record;
+  current_version bigint;
+BEGIN
+  SELECT k.table_name, k.id_column, k.agency_scoped INTO binding FROM kauro.aggregate_kinds k WHERE k.aggregate_kind = NEW.aggregate_kind;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'CONTEXT: aggregate kind % has no binding', NEW.aggregate_kind USING ERRCODE = 'KA006';
+  END IF;
+  IF binding.agency_scoped THEN
+    EXECUTE pg_catalog.format('SELECT a.version FROM kauro.%I a WHERE a.%I = $1 AND a.agency_id IS NOT DISTINCT FROM $2', binding.table_name, binding.id_column)
+      INTO current_version USING NEW.aggregate_id, NEW.agency_id;
+  ELSE
+    IF NEW.agency_id IS NOT NULL THEN
+      RAISE EXCEPTION 'CONTEXT: % % is an agency-less aggregate and is not an aggregate of agency %', NEW.aggregate_kind, NEW.aggregate_id, NEW.agency_id USING ERRCODE = 'KA006';
+    END IF;
+    EXECUTE pg_catalog.format('SELECT a.version FROM kauro.%I a WHERE a.%I = $1', binding.table_name, binding.id_column)
+      INTO current_version USING NEW.aggregate_id;
+  END IF;
+  IF current_version IS NULL THEN
+    RAISE EXCEPTION 'CONTEXT: % % is not an aggregate of agency % visible in this transaction', NEW.aggregate_kind, NEW.aggregate_id, NEW.agency_id USING ERRCODE = 'KA006';
+  END IF;
+  IF NEW.aggregate_version > current_version THEN
+    RAISE EXCEPTION 'VERSION_DISCIPLINE: an event of % % records version % ahead of the aggregate (version %)', NEW.aggregate_kind, NEW.aggregate_id, NEW.aggregate_version, current_version USING ERRCODE = 'KA002';
+  END IF;
+  RETURN NEW;
+END
+$$;
+
+-- the intent is born at version 1 and its later states are rows of the intent, not aggregate versions: exactly one event, at birth. The
+-- column is in no role's UPDATE grant; the CHECK keeps an INSERT from naming another version.
+ALTER TABLE kauro.outreach_send_intents ADD COLUMN version bigint NOT NULL DEFAULT 1 CONSTRAINT outreach_send_intents_version_one CHECK (version = 1);
+INSERT INTO kauro.aggregate_kinds (aggregate_kind, table_name, id_column, owner_package, agency_scoped) VALUES
+  ('outreach_send_intent', 'outreach_send_intents', 'intent_id', 'B12', false);
+-- the vocabulary is extended by lifting FORCE for this migration's own transaction, as 0013, 0028 and 0046 do, and restoring it before COMMIT
+ALTER TABLE kauro.event_types NO FORCE ROW LEVEL SECURITY;
+INSERT INTO kauro.event_types (event_type) VALUES ('outreach.send_intended.v1');
+ALTER TABLE kauro.event_types FORCE ROW LEVEL SECURITY;
+-- AFTER INSERT only (statement_imports, 0063): an intent cannot commit without its event
+CREATE CONSTRAINT TRIGGER outreach_send_intents_event_per_version AFTER INSERT ON kauro.outreach_send_intents
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('outreach_send_intent', 'intent_id');
+
+-- Who writes and reads it. The writer is CMD063's session, kauro_app: the intent's own person acting as an ACTIVE seller or as the corporate
+-- owner, no agency bound (the policy that lets it queue the intent). kauro_outreach appends and reads NO event and NO outbox record: both
+-- tables are granted by table (domain_events has an agency_id column, A17), the dispatcher's records are claimed by the control plane
+-- (kauro_control, D1) and the service's units D2..D5 write intents, evidence and activities, never events. The author reads its own event
+-- (the event-per-version check reads it at COMMIT as the writer) and no other.
+CREATE POLICY domain_events_outreach_author_read ON kauro.domain_events FOR SELECT TO kauro_app
+  USING (agency_id IS NULL AND aggregate_kind = 'outreach_send_intent' AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text AND kauro.current_agency_id() IS NULL);
+CREATE POLICY domain_events_outreach_publish ON kauro.domain_events FOR INSERT TO kauro_app
+  WITH CHECK (agency_id IS NULL AND aggregate_kind = 'outreach_send_intent' AND event_type = 'outreach.send_intended.v1'
+    AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text AND kauro.current_agency_id() IS NULL
+    AND (kauro.acting_seller_id() IS NOT NULL OR kauro.acting_corporate_owner()));
+-- A policy expression names no other relation (an expression that does takes that relation's lock at plan time): the lookup of the event's
+-- kind is this STABLE function, whose body is locked when it runs. SECURITY INVOKER: it reads through the caller's own policies, so a
+-- writer can address a record only to an event it authored (domain_events_outreach_author_read).
+CREATE OR REPLACE FUNCTION kauro.outreach_event(p_event_id uuid) RETURNS boolean
+  LANGUAGE sql STABLE SECURITY INVOKER SET search_path = pg_catalog, pg_temp AS
+$$ SELECT EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = p_event_id AND e.agency_id IS NULL AND e.aggregate_kind = 'outreach_send_intent') $$;
+REVOKE ALL ON FUNCTION kauro.outreach_event(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION kauro.outreach_event(uuid) TO kauro_app;
+CREATE POLICY outbox_records_outreach_enqueue ON kauro.outbox_records FOR INSERT TO kauro_app
+  WITH CHECK (consumer = 'OUTREACH_SENDER' AND kauro.current_agency_id() IS NULL AND kauro.outreach_event(event_id));
+
+-- --- K2: the journal accepts B12's registry-less operations (plan companion §R and §P) --------------------------------------------------
+-- 0006 admitted only the catalogue ids (CMD + three digits). B12 journals stateful routes that have no catalogue id; each is journaled under
+-- its own name. The widening is an EXPLICIT list (domain commercial/b12-operations.ts is its one source; the migration tests compare the
+-- two), never a free pattern: a misspelt or invented operation is still refused by the database.
+ALTER TABLE kauro.command_journal DROP CONSTRAINT command_journal_operation_check;
+ALTER TABLE kauro.command_journal ADD CONSTRAINT command_journal_operation_check CHECK (
+  operation ~ '^CMD[0-9]{3}$' OR operation = ANY (ARRAY[
+    'PutOutreachContent', 'PublishSalesResource', 'RegisterSenderIdentity', 'VerifySenderIdentity', 'RecordSenderRevocation',
+    'PrepareOutreachReview', 'RecordOutreachDiagnosis', 'RevokeOutreachAuthorization', 'WithdrawOutreachChannelPolicy',
+    'RecordProspectSource', 'RecordProspectContact',
+    'RegisterSellerCandidate', 'RecordSellerLegalReview', 'PrepareSellerAgreement', 'RecordAgreementSignature', 'RecordSellerAssessment',
+    'RecordConfidentialityAcceptance', 'RecordSellerTaxDocument', 'ChangePayoutDestination', 'VerifyPayoutDestination',
+    'PrepareServiceAssignment', 'RecordAssistanceAgreement', 'PrepareTerminationTerms', 'PrepareTerminationManifest'
+  ]::text[]));

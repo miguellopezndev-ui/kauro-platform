@@ -14,7 +14,7 @@
  * reference AgencyView and QuoteView without redeclaring them, and refuses a name that collides with a registry definition or with
  * an earlier package's, a name defined twice, a reference nothing defines, a forbidden member and an open object.
  */
-import { DomainFailure, SERVICE_MODES } from "@kauro/domain";
+import { DRAFT_STATES, DomainFailure, INTENT_STATES, OUTREACH_PURPOSES, SENDER_ROUTES, SENDER_STATES, SERVICE_MODES } from "@kauro/domain";
 import {
   FORBIDDEN_RESPONSE_FIELDS,
   RESPONSE_FIELD_VOCABULARY,
@@ -31,7 +31,7 @@ import { MONEY_PATTERN } from "../commerce/response-schemas.js";
 import { COMMERCIAL_VIEW_VOCABULARY as V } from "./vocabulary.js";
 
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
-const { ID, VERSION, HASH, UTC, COUNT, UUID_PATTERN } = RESPONSE_FIELD_VOCABULARY;
+const { ID, VERSION, HASH, UTC, COUNT, LABEL, UUID_PATTERN } = RESPONSE_FIELD_VOCABULARY;
 const { registry, platform, ref, NARROW_ID, NARROW_LABEL } = VIEW_MEMBER_KIT;
 const MONEY = Object.freeze({ type: "string", pattern: MONEY_PATTERN });
 const TOKEN = Object.freeze({ type: "string", pattern: "^[A-Z][A-Z0-9_]{2,63}$" });
@@ -68,6 +68,221 @@ export const COMMERCIAL_FORBIDDEN_MEMBERS: Readonly<Record<string, string>> = Ob
   taxIdentifier: "D10-API-1: a seller's or a buyer's tax identifier stays in the reviewed private record",
   taxId: "D10-API-1: a seller's or a buyer's tax identifier stays in the reviewed private record",
 });
+
+/** Content references are the hex SHA-256 of the stored subject and body (0072 outreach_contents.content_id), not a UUID. */
+const CONTENT_REF = Object.freeze({ type: "string", pattern: "^[0-9a-f]{64}$" });
+const SALES_ACTIVITY_KINDS = ["REPLIED", "BOUNCED", "SUPPRESSED", "HUMAN_SEND_OBSERVED", "PROVIDER_ACCEPTED", "SEND_UNCERTAIN"] as const;
+
+/**
+ * Package B12 (outreach) views, registered once by the kit (K2) so that the lanes replace handler bodies and never edit this table. No view
+ * carries a recipient address, a subject, a body, a preview or a token: the draft and the review answer ids, hashes, states and counts
+ * (plan A17; the contact label of a review item is the seller's own label for the contact, never the address).
+ */
+export const B12_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
+  {
+    name: "OutreachDraftView",
+    description: "CMD061 and GetOutreachDraft: a versioned outreach draft and its content binding (registry OutreachDraft). Editing a draft never sends it and implies no recipient permission.",
+    contract: null,
+    withheld: {},
+    members: {
+      draftId: platform(true, ID, "Stable draft identity."),
+      prospectId: platform(true, ID, "The prospect the draft is addressed to."),
+      senderIdentityRef: platform(true, ID, "The registered human sender."),
+      purpose: platform(true, enumOf(OUTREACH_PURPOSES), "The reviewed contact purpose."),
+      contentHash: platform(true, HASH, "The exact binding of recipient, sender, purpose and content."),
+      contentRef: platform(true, CONTENT_REF, "The stored outreach content (subject and body), never raw customer CRM."),
+      provenanceEvidenceHash: platform(true, HASH, "The prospect source evidence the draft rests on."),
+      version: platform(true, VERSION, "Optimistic concurrency boundary."),
+      state: platform(true, enumOf(DRAFT_STATES), "The observed send state of the draft."),
+      createdAt: platform(true, UTC, "The instant the database recorded the draft."),
+    },
+  },
+  {
+    name: "OutreachAuthorizationView",
+    description: "CMD062 and RevokeOutreachAuthorization: the owner's bounded, revocable grant over sealed drafts (registry OutreachAuthorization).",
+    contract: null,
+    withheld: {},
+    members: {
+      authorizationId: platform(true, ID, "Immutable grant identity."),
+      grantingActorId: platform(true, ID, "The authenticated owner who granted it."),
+      senderIdentityRef: platform(true, ID, "The permitted sender."),
+      allowedContentHashes: platform(true, { type: "array", minItems: 1, maxItems: 100, items: HASH }, "The sealed recipient and content bindings."),
+      validFrom: platform(true, UTC, "Inclusive beginning (clamped to the database instant when earlier)."),
+      expiresAt: platform(true, UTC, "Exclusive deadline."),
+      maximumSends: platform(true, COUNT, "Bounded positive maximum, no greater than the sealed drafts."),
+      permissionEvidenceHash: platform(true, HASH, "The digest of the server-issued review the owner confirmed."),
+      policyVersion: platform(true, { type: "string", minLength: 1, maxLength: 64 }, "The applicable provider, suppression and contact policy."),
+      revoked: platform(true, BOOLEAN, "Current server-observed revocation, checked at dispatch."),
+    },
+  },
+  {
+    name: "OutreachSendView",
+    description: "CMD063: the fenced send intent queued for a sealed draft. Delivery is never inferred: the draft moves to AUTHORIZED here and to its provider states later.",
+    contract: null,
+    withheld: {},
+    members: {
+      draftId: platform(true, ID, "The draft."),
+      draftState: platform(true, enumOf(DRAFT_STATES), "The draft state after the command."),
+      intentId: platform(true, ID, "The queued send intent."),
+      intentState: platform(true, enumOf(INTENT_STATES), "The intent state after the command (QUEUED)."),
+      authorizationId: platform(true, ID, "The grant the intent is counted against."),
+      payloadHash: platform(true, HASH, "The hash of the exact message the dispatcher submits."),
+      queuedAt: platform(true, UTC, "The instant the database queued the intent."),
+    },
+  },
+  {
+    name: "SalesActivityView",
+    description: "CMD064 and ListSalesActivities: one deduplicated, evidence-backed commercial activity (registry SalesActivity). Submission, receipt and customer response are different facts.",
+    contract: null,
+    withheld: {},
+    members: {
+      activityId: platform(true, ID, "Unique activity event."),
+      prospectId: platform(true, ID, "The scoped prospect."),
+      draftId: platform(false, ID, "The bound draft, when the activity belongs to one."),
+      authorizationId: platform(false, ID, "The grant applied to the event, when one was."),
+      kind: platform(true, enumOf(SALES_ACTIVITY_KINDS), "The exact evidence class."),
+      occurredAt: platform(true, UTC, "The observed event time."),
+      evidenceHash: platform(true, HASH, "The minimal safe supporting record."),
+      providerMessageRef: platform(true, { type: "string", minLength: 1, maxLength: 200 }, "The opaque external identity, or NONE for a local suppression."),
+      recordedAt: platform(true, UTC, "The instant the database recorded the activity."),
+    },
+  },
+  {
+    name: "SalesActivityListView",
+    description: "ListSalesActivities: the newest activities of one prospect the caller may see, at most 200.",
+    contract: null,
+    withheld: {},
+    members: { items: platform(true, { type: "array", maxItems: 200, items: ref("SalesActivityView") }, "The activities, newest first.") },
+  },
+  {
+    name: "OutreachContentView",
+    description: "PutOutreachContent: the stored outreach content, addressed by the hash of its subject and body. The same body stored twice is the same record.",
+    contract: null,
+    withheld: {},
+    members: {
+      contentRef: platform(true, CONTENT_REF, "The content-addressed reference."),
+      createdAt: platform(true, UTC, "The instant the content was first stored."),
+    },
+  },
+  {
+    name: "SalesResourceView",
+    description: "PublishSalesResource and GetSalesResource: one version of an approved sales resource. Superseded copy cannot be used in a new draft (R2-135).",
+    contract: null,
+    withheld: {},
+    members: {
+      resourceId: platform(true, ID, "This version of the resource."),
+      familyId: platform(true, ID, "The resource family."),
+      version: platform(true, VERSION, "The version inside the family."),
+      state: platform(true, enumOf(["CURRENT", "SUPERSEDED"]), "CURRENT is the one version drafts may cite."),
+      contentRef: platform(true, CONTENT_REF, "The stored content of this version."),
+      capabilityIds: platform(true, { type: "array", maxItems: 50, items: ID }, "The capabilities the resource describes."),
+      createdAt: platform(true, UTC, "The instant the version was published."),
+    },
+  },
+  {
+    name: "SenderIdentityView",
+    description: "RegisterSenderIdentity, VerifySenderIdentity and RecordSenderRevocation: a registered human sender. The mailbox address is never answered.",
+    contract: null,
+    withheld: {},
+    members: {
+      senderId: platform(true, ID, "The sender identity."),
+      userId: platform(true, ID, "The person the mailbox belongs to."),
+      route: platform(true, enumOf(SENDER_ROUTES), "The send route: only GMAIL_API carries outreach (R2-131)."),
+      state: platform(true, enumOf(SENDER_STATES), "PENDING_VERIFICATION, VERIFIED or REVOKED."),
+      createdAt: platform(true, UTC, "The instant the sender was registered."),
+      updatedAt: platform(true, UTC, "The instant of its last state change."),
+    },
+  },
+  {
+    name: "OutreachReviewItemView",
+    description: "One draft line of an outreach review: the exact draft version and content binding the owner is shown.",
+    contract: null,
+    withheld: {},
+    members: {
+      draftId: platform(true, ID, "The draft."),
+      draftVersion: platform(true, VERSION, "The draft version shown."),
+      contentHash: platform(true, HASH, "The binding shown."),
+      contactLabel: platform(true, LABEL, "The seller's own label for the recipient contact."),
+    },
+  },
+  {
+    name: "OutreachReviewView",
+    description: "PrepareOutreachReview and GetOutreachReview: the server-issued review the owner confirms; its digest is the permission evidence of CMD062. Single use, short lived.",
+    contract: null,
+    withheld: {},
+    members: {
+      reviewId: platform(true, ID, "The review."),
+      senderIdentityRef: platform(true, ID, "The sender every item belongs to."),
+      digest: platform(true, HASH, "The digest of the exact items shown: the permissionEvidenceHash CMD062 carries."),
+      issuedAt: platform(true, UTC, "The instant the database issued it."),
+      expiresAt: platform(true, UTC, "The instant it stops being usable."),
+      items: platform(true, { type: "array", minItems: 1, maxItems: 100, items: ref("OutreachReviewItemView") }, "The drafts shown."),
+    },
+  },
+  {
+    name: "OutreachChannelPolicyView",
+    description: "WithdrawOutreachChannelPolicy: the policy of one jurisdiction and purpose after the owner withdrew it. Withdrawn means no new outreach intent for that recipient.",
+    contract: null,
+    withheld: {},
+    members: {
+      jurisdiction: platform(true, LABEL, "The jurisdiction of the policy."),
+      purpose: platform(true, enumOf(OUTREACH_PURPOSES), "The purpose of the policy."),
+      version: platform(true, VERSION, "The policy version."),
+      state: platform(true, enumOf(["IN_FORCE", "WITHDRAWN"]), "The policy state after the command."),
+    },
+  },
+  {
+    name: "OutreachDiagnosisView",
+    description: "RecordOutreachDiagnosis: the owner's recorded diagnosis that lifts a person's health pause.",
+    contract: null,
+    withheld: {},
+    members: {
+      diagnosisId: platform(true, ID, "The diagnosis record."),
+      personUserId: platform(true, ID, "The person whose pause it lifts."),
+      recordedAt: platform(true, UTC, "The instant the database recorded it."),
+    },
+  },
+  {
+    name: "OutreachMetricsView",
+    description: "GetOutreachMetrics: counts of what was observed. None names delivered: delivery is never known.",
+    contract: null,
+    withheld: {},
+    members: {
+      accepted: platform(true, COUNT, "Sends the provider accepted."),
+      uncertain: platform(true, COUNT, "Sends whose provider answer is unknown."),
+      observedSent: platform(true, COUNT, "Sends a person observed as sent."),
+      bounced: platform(true, COUNT, "Bounces recorded."),
+      replied: platform(true, COUNT, "Customer replies recorded."),
+      acceptedLessKnownBounces: platform(true, COUNT, "Accepted sends less the bounces known."),
+      pauseNumerator: platform(true, COUNT, "Bounces in the person's latest sends."),
+      pauseDenominator: platform(true, COUNT, "The sends the pause rule looks at."),
+    },
+  },
+  {
+    name: "ProspectSourceView",
+    description: "RecordProspectSource: the source evidence recorded for a prospect (observation date, segment and lawful basis; never the source URL).",
+    contract: null,
+    withheld: {},
+    members: {
+      evidenceId: platform(true, ID, "The evidence record."),
+      evidenceHash: platform(true, HASH, "The evidence hash CMD045 and CMD061 cite."),
+      observedOn: platform(true, DATE, "The day the source was observed."),
+      segment: platform(true, enumOf(["AGENCY", "COMPANY"]), "The buyer segment of the source."),
+      createdAt: platform(true, UTC, "The instant the evidence was recorded."),
+    },
+  },
+  {
+    name: "ProspectContactView",
+    description: "RecordProspectContact: the restricted contact record created for a prospect. Its address and key never leave the restricted record.",
+    contract: null,
+    withheld: {},
+    members: {
+      contactId: platform(true, ID, "The contact record."),
+      channel: platform(true, TOKEN, "The channel of the contact."),
+      createdAt: platform(true, UTC, "The instant the contact was recorded."),
+    },
+  },
+] satisfies ReadonlyArray<ViewDefinition>);
 
 /** Every B10 DTO definition, in OpenAPI component order. Each is closed; a member not listed never reaches the wire. */
 export const COMMERCIAL_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
@@ -431,6 +646,7 @@ export const COMMERCIAL_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object
       newAdmissionBlocked: platform(true, BOOLEAN, "New admission of the capability is closed."),
     },
   },
+  ...B12_VIEW_DEFINITIONS,
 ] satisfies ReadonlyArray<ViewDefinition>);
 
 /** The success reply of each B10 command: status and the view its COMPLETED envelope carries. B10 answers synchronously, except CMD027's replacement whose re-binding timed out (ACCEPTED). */
@@ -452,6 +668,22 @@ export const COMMERCIAL_COMMAND_RESPONSES = Object.freeze({
   CMD057: { status: 200, view: "RecoveryAuthorizationView", accepted: false },
   CMD058: { status: 200, view: "CapabilityVersionView", accepted: false },
   CMD059: { status: 200, view: "CapabilityRestrictionView", accepted: false },
+  // package B12 (outreach; K2): CMD061..CMD064 and the registry-less operations of plan companion §R, all synchronous
+  CMD061: { status: 201, view: "OutreachDraftView", accepted: false },
+  CMD062: { status: 201, view: "OutreachAuthorizationView", accepted: false },
+  CMD063: { status: 200, view: "OutreachSendView", accepted: false },
+  CMD064: { status: 201, view: "SalesActivityView", accepted: false },
+  PutOutreachContent: { status: 201, view: "OutreachContentView", accepted: false },
+  PublishSalesResource: { status: 201, view: "SalesResourceView", accepted: false },
+  RegisterSenderIdentity: { status: 201, view: "SenderIdentityView", accepted: false },
+  VerifySenderIdentity: { status: 200, view: "SenderIdentityView", accepted: false },
+  RecordSenderRevocation: { status: 200, view: "SenderIdentityView", accepted: false },
+  PrepareOutreachReview: { status: 201, view: "OutreachReviewView", accepted: false },
+  RecordOutreachDiagnosis: { status: 201, view: "OutreachDiagnosisView", accepted: false },
+  RevokeOutreachAuthorization: { status: 200, view: "OutreachAuthorizationView", accepted: false },
+  WithdrawOutreachChannelPolicy: { status: 200, view: "OutreachChannelPolicyView", accepted: false },
+  RecordProspectSource: { status: 201, view: "ProspectSourceView", accepted: false },
+  RecordProspectContact: { status: 201, view: "ProspectContactView", accepted: false },
 } as const);
 export type CommercialServedCommandId = keyof typeof COMMERCIAL_COMMAND_RESPONSES;
 
@@ -465,6 +697,52 @@ export const COMMERCIAL_READ_ROUTES = Object.freeze({
     action: "READ_COMMISSION_STATEMENT",
     summary: "A commission statement with each project and adjustment; a seller reads only their own, the corporate owner reads any",
     authority: 'owner manual 17 "Statements reveal each project and adjustment without exposing customer CRM data"; design §13, D10-API-1',
+  },
+  // package B12 (outreach; K2): plan §2 "Reads" (DENY wrong role 403, foreign 404 = unknown)
+  GetOutreachDraft: {
+    path: "/api/v1/ops/outreach/drafts/{draftId}",
+    scope: "CORPORATE",
+    role: "ASSIGNED_SELLER_OR_KAURO_OWNER",
+    view: "OutreachDraftView",
+    action: "READ_OUTREACH_DRAFT",
+    summary: "An outreach draft with its state; the assigned seller reads its own, the corporate owner reads any",
+    authority: "owner manual 12 \"Outreach workspace\"; registry OutreachDraft; B12 plan §2 Reads",
+  },
+  GetOutreachReview: {
+    path: "/api/v1/ops/outreach/reviews/{reviewId}",
+    scope: "CORPORATE",
+    role: "KAURO_OWNER",
+    view: "OutreachReviewView",
+    action: "READ_OUTREACH_REVIEW",
+    summary: "The server-issued review the owner confirms before authorizing outreach",
+    authority: "owner manual 18 \"Communication compliance\"; B12 plan A16, §2 Reads",
+  },
+  ListSalesActivities: {
+    path: "/api/v1/ops/sales/prospects/{prospectId}/activities",
+    scope: "CORPORATE",
+    role: "ASSIGNED_SELLER_OR_KAURO_OWNER",
+    view: "SalesActivityListView",
+    action: "READ_SALES_ACTIVITIES",
+    summary: "The newest commercial activities of one prospect (at most 200); a seller reads its own prospect's, the corporate owner any",
+    authority: "owner manual 12 \"Outreach workspace\"; registry SalesActivity; B12 plan §2 Reads",
+  },
+  GetOutreachMetrics: {
+    path: "/api/v1/ops/outreach/metrics",
+    scope: "CORPORATE",
+    role: "ASSIGNED_SELLER_OR_KAURO_OWNER",
+    view: "OutreachMetricsView",
+    action: "READ_OUTREACH_METRICS",
+    summary: "Counts of what was observed (accepted, uncertain, observed sent, bounced, replied); none names delivered",
+    authority: "owner manual 18 \"Outreach cadence and health\"; B12 plan §2 Reads",
+  },
+  GetSalesResource: {
+    path: "/api/v1/ops/sales/resources/{resourceId}",
+    scope: "CORPORATE",
+    role: "SELLER_OR_KAURO_OWNER",
+    view: "SalesResourceView",
+    action: "READ_SALES_RESOURCE",
+    summary: "One version of an approved sales resource and whether it is still current",
+    authority: "owner manual 12 \"Resources and training\"; R2-135; B12 plan §2 Reads",
   },
 } as const);
 export type CommercialReadOperationId = keyof typeof COMMERCIAL_READ_ROUTES;

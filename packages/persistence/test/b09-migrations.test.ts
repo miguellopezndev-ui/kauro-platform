@@ -128,7 +128,7 @@ test("B09 seeds: the machines, edges and initial states equal the registry (Paym
   assert.deepEqual(kinds.rows.map((k) => k.aggregate_kind), [...AGGREGATE_KINDS].sort());
   for (const k of kinds.rows) {
     const col = await su.query("SELECT 1 FROM information_schema.columns WHERE table_schema = 'kauro' AND table_name = $1 AND column_name IN ($2, 'version', 'agency_id')", [k.table_name, k.id_column]);
-    assert.equal(col.rowCount, k.id_column === "agency_id" ? 2 : 3, `${k.aggregate_kind}: ${k.table_name}.${k.id_column}, version and agency_id exist`);
+    assert.equal(col.rowCount, k.id_column === "agency_id" || k.aggregate_kind === "outreach_send_intent" ? 2 : 3, `${k.aggregate_kind}: ${k.table_name}.${k.id_column}, version and agency_id exist`);
   }
   // the R2-INITIAL bands and tiers of the database are the vendored registry policy's, band by band and at every boundary
   const pricing = (policy() as { pricing: { bands: Array<Record<string, number>>; repeatTiers: Array<{ minimum: number; bps: number }>; foundingDiscountBps: number } }).pricing;

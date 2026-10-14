@@ -36,6 +36,9 @@ export {
   OUTREACH_FAILURE_REASONS,
 } from "./outreach.js";
 
+export type { OutreachEventType } from "./outreach-events.js";
+export { OUTREACH_AGGREGATE_KINDS, OUTREACH_CONSUMERS, OUTREACH_EVENT_TYPES, OUTREACH_EVENT_PAYLOAD_ALLOWLIST, OUTREACH_EVENT_SUBSCRIPTIONS } from "./outreach-events.js";
+
 export type { CommercialVocabulary } from "./vocabulary.js";
 export { COMMERCIAL_VOCABULARY } from "./vocabulary.js";
 
@@ -72,3 +75,6 @@ export { COMMISSION_CUTOFF_DOMAIN, commissionCutoffHash, composeStatement } from
 
 export type { AcquisitionRateFacts, AcquisitionRateDecision, EligibilityFacts, EligibilityDecision, CommissionPeriodDates } from "./time.js";
 export { recurrenceWindowEndsAt, providerTimePlausible, acquisitionRate, eligibleAtOf, holdCoversLine, eligibilityDecision, commissionPeriodOf } from "./time.js";
+
+export type { B12OperationId } from "./b12-operations.js";
+export { B12_OPERATIONS, B12_OUTREACH_OPERATIONS, B12_PRODUCER_OPERATIONS, isB12Operation } from "./b12-operations.js";

@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { DomainFailure } from "@kauro/domain";
 import { OutreachLocks, PgOutreachWriters, holdOutreachLease, type OutreachIntentKeys } from "../src/index.js";
-import { at, closeB12, draft, freshDomain, grant, ids, nextSlot, openB12, personOf, plus, prospectIn, sender, sha, type B12World, type Sender } from "./b12-outreach-support.js";
+import { at, closeB12, draft, sendIntendedIn, type Draft, freshDomain, grant, ids, nextSlot, openB12, personOf, plus, prospectIn, sender, sha, type B12World, type Sender } from "./b12-outreach-support.js";
 
 let w: B12World;
 let snd: Sender;
@@ -26,15 +26,15 @@ const failure = (code: string, reason?: string) => (e: unknown): boolean => {
   return true;
 };
 
-async function granted(): Promise<{ keys: OutreachIntentKeys; contactKey: string; slot: string }> {
+async function granted(): Promise<{ keys: OutreachIntentKeys; contactKey: string; slot: string; d: Draft }> {
   const slot = await nextSlot(w);
   const p = await prospectIn(w, w.s, freshDomain("writers"));
   const d = await draft(w, snd, p);
   const g = await grant(w, snd, [d], slot);
-  return { keys: { intentId: ids.next(), draftId: d.draftId, authorizationId: g.authorizationId, prospectId: p.prospectId, personUserId: snd.userId, purpose: d.purpose }, contactKey: p.contactKey, slot };
+  return { d, keys: { intentId: ids.next(), draftId: d.draftId, authorizationId: g.authorizationId, prospectId: p.prospectId, personUserId: snd.userId, purpose: d.purpose }, contactKey: p.contactKey, slot };
 }
 
-async function queueAt(k: OutreachIntentKeys, contactKey: string, instant: string): Promise<void> {
+async function queueAt(k: OutreachIntentKeys, contactKey: string, instant: string, d: Draft): Promise<void> {
   await at(w.app, personOf(k.personUserId), instant, async (c) => {
     const locks = new OutreachLocks(c);
     await locks.take("L3", k.prospectId);
@@ -42,6 +42,7 @@ async function queueAt(k: OutreachIntentKeys, contactKey: string, instant: strin
     await locks.take("L4g", k.authorizationId, "S");
     await locks.take("L10", k.draftId);
     await new PgOutreachWriters(c).queueIntent(locks, { ...k, senderId: snd.senderId, route: "GMAIL_API", contactKey, payloadHash: sha(`payload-${k.intentId}`), sequenceFirstIntentId: null, replyActivityId: null });
+    await sendIntendedIn(c, { intentId: k.intentId, draft: d, authorizationId: k.authorizationId });
   });
 }
 
@@ -57,8 +58,8 @@ async function stateOf(intentId: string): Promise<{ intent: string; draft: strin
 
 describe("B12 K1 outreach writers (plan §L T2)", () => {
   test("CMD063 queue, D2 claim under the live lease, D4 acceptance and its activity commit through the writers with exactly their T2 subjects", async () => {
-    const { keys, contactKey, slot } = await granted();
-    await queueAt(keys, contactKey, plus(slot, 2));
+    const { keys, contactKey, slot, d } = await granted();
+    await queueAt(keys, contactKey, plus(slot, 2), d);
     assert.deepEqual(await stateOf(keys.intentId), { intent: "QUEUED", draft: "AUTHORIZED" });
     const owner = ids.next();
     const fence = await lease(keys.intentId, owner, plus(slot, 5));
@@ -103,8 +104,8 @@ describe("B12 K1 outreach writers (plan §L T2)", () => {
   });
 
   test("an S subject never meets an X need: D2's first-contact claim needs L4 X", async () => {
-    const { keys, contactKey, slot } = await granted();
-    await queueAt(keys, contactKey, plus(slot, 2));
+    const { keys, contactKey, slot, d } = await granted();
+    await queueAt(keys, contactKey, plus(slot, 2), d);
     await at(w.outreach, {}, plus(slot, 10), async (c) => {
       const locks = new OutreachLocks(c);
       await locks.take("L3", keys.prospectId, "S");
