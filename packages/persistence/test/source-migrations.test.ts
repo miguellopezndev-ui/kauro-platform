@@ -480,9 +480,13 @@ test("B07 tables force row-level security, belong to the migrator, grant no DELE
     assert.equal((await oracleRow<{ ok: boolean }>("SELECT has_table_privilege('kauro_app', $1, 'INSERT') AS ok", [`kauro.${table}`])).ok, false, table);
   }
   // still no SECURITY DEFINER function anywhere, but the one migration 0046 registers (coordinator decision #2 of lane L-ROUTE; the same exact
-  // allowlist as migrations.test.ts): the registration of a bank route's payment route, with a pinned search_path
-  const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef");
-  assert.deepEqual(definers.rows, [{ proname: "register_bank_payment_route", proconfig: ["search_path=pg_catalog, pg_temp"] }]);
+  // allowlist as migrations.test.ts): the registration of a bank route's payment route, and the read-only provider-available balance of a
+  // payment route (migration 0070, PV1-SETTLE D-SET-5), each with a pinned search_path
+  const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef ORDER BY p.proname");
+  assert.deepEqual(definers.rows, [
+    { proname: "register_bank_payment_route", proconfig: ["search_path=pg_catalog, pg_temp"] },
+    { proname: "route_provider_available_cents", proconfig: ["search_path=pg_catalog, pg_temp"] },
+  ]);
 });
 
 test("the state and enum CHECKs of the B07 tables carry exactly the registry vocabularies", async () => {
