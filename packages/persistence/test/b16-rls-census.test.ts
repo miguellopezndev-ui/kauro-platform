@@ -58,7 +58,12 @@ test("R2-047 census: every kauro table with agency_id has ENABLE+FORCE RLS and e
        ORDER BY 1, 2`,
     );
     assert.ok(owned.rows.length > 20, "the census saw the schema's objects");
-    const foreign = owned.rows.filter((o) => o.owner !== "kauro_owner").map((o) => `${o.kind} ${o.name} owned by ${o.owner}`);
+    // SEC-HARDENING-2 (SH2-F1, 0077): the one SECURITY DEFINER routine is owned by the NOLOGIN kauro_route_registrar (INSERT of ten columns of
+    // payment_routes only), pinned by exact name and owner here and by sec-depth-provenance (definers) and sec-hardening-2; any other foreign owner fails.
+    const REGISTRAR_ROUTINE = "function register_bank_payment_route owned by kauro_route_registrar";
+    const foreign = owned.rows.filter((o) => o.owner !== "kauro_owner").map((o) => `${o.kind} ${o.name} owned by ${o.owner}`).filter((o) => o !== REGISTRAR_ROUTINE);
+    const registrar = await su.query<{ rolcanlogin: boolean }>("SELECT rolcanlogin FROM pg_roles WHERE rolname = 'kauro_route_registrar'");
+    assert.deepEqual(registrar.rows, [{ rolcanlogin: false }], "the route registrar cannot log in");
     assert.deepEqual(foreign, [], "no kauro object is owned by a runtime role (an owner bypasses RLS unless forced, and may alter its policies)");
     const members = await su.query<{ member: string; role: string }>(
       `SELECT m.rolname AS member, r.rolname AS role FROM pg_auth_members am JOIN pg_roles m ON m.oid = am.member JOIN pg_roles r ON r.oid = am.roleid
