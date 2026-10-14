@@ -188,7 +188,7 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // B17 L2: the control plane reads authority_evidence_hash for PLAN_VALIDATION's target digest check (M3; provisional number)
     "0086_b17_plan_validation_target_read.sql",
     // B17 L4: the importer tool a capability claims, compared with the tool a vendor qualification tested (S078; provisional number)
-    "0075_b17_capability_importer_tool.sql",
+    "0087_b17_capability_importer_tool.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

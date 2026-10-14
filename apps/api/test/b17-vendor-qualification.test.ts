@@ -3,7 +3,7 @@
 // acceptance covers the exact object/operation/importer/resource envelope"). Five independent predicates, one reason each (r12): the ref
 // resolves; the qualification is of this capability's tool; its profileHash equals the body's; its result is PASS; it has an export-back
 // hash. They apply unless the capability is a CLEAN mode (kind MODE, mode CLEAN: no importer, no export-back). The rows are seeded
-// through the oracle: no runtime role may insert one (0073; the producer is D-12).
+// through the oracle: no runtime role may insert one (0084; the producer is D-12).
 import { invariantsAfterEach } from "@kauro/persistence/testing";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
@@ -25,7 +25,7 @@ const change = (capabilityId: string, body: Record<string, unknown>): Promise<Re
 
 /** A capability of `kind` (a TOOL, or a MODE with its mode) walked to QUALIFIED_INTERNAL (a versionable state). */
 async function capability(label: string, kind: "TOOL" | "MODE" = "TOOL", mode: string | null = null, claim: string | null = kind === "TOOL" ? CLAIMED_TOOL : null): Promise<string> {
-  // the importer tool the capability claims (0075): the catalogue tool id; a version of it must be backed by a qualification that tested exactly it
+  // the importer tool the capability claims (0087): the catalogue tool id; a version of it must be backed by a qualification that tested exactly it
   const id = ids.next();
   await pw.w.h.oracle.query(
     `INSERT INTO kauro.capabilities (capability_id, version, kind, mode, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at, importer_tool)
@@ -104,7 +104,7 @@ test("S078: DENY a capability that claims no importer tool alone (QUALIFICATION_
   assert.deepEqual(await state(id), before);
 });
 
-test("S078: DENY the claimed importer tool changing once learned (0075, 23514)", async () => {
+test("S078: DENY the claimed importer tool changing once learned (0087, 23514)", async () => {
   const id = await capability("claim-once");
   await assert.rejects(pw.w.h.oracle.query("UPDATE kauro.capabilities SET importer_tool = 'REST' WHERE capability_id = $1", [id]), (e: { code?: string }) => e.code === "23514");
 });

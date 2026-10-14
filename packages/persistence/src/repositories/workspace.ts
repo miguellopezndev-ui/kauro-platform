@@ -506,7 +506,7 @@ export class PgTargetContractRepository implements TargetContractRepository {
     return { kind: "STALE", currentVersion: now.version, currentState: now.state };
   }
 
-  // --- B17 L1: CMD019's supersession (R2-026, D-R3-1; migration 0073 (b)-(e)) ----------------------------------------------------
+  // --- B17 L1: CMD019's supersession (R2-026, D-R3-1; migration 0084 (b)-(e)) ----------------------------------------------------
 
   async lockCurrentOfProject(agencyId: AgencyId, projectId: ProjectId, except: TargetContractId): Promise<ReadonlyArray<TargetContractRecord>> {
     const r = await execute<ContractRow>(
@@ -550,7 +550,7 @@ export class PgTargetContractRepository implements TargetContractRepository {
   }
 
   async supersede(contractId: TargetContractId, by: TargetContractId): Promise<TargetContractRecord> {
-    // superseded_at is the database's instant (the 0073 trigger stamps it); the superseder is confirmed in this same transaction (deferred)
+    // superseded_at is the database's instant (the 0084 trigger stamps it); the superseder is confirmed in this same transaction (deferred)
     const r = await execute<ContractRow>(
       this.db,
       `UPDATE kauro.target_contracts SET superseded_at = kauro.server_now(), superseded_by_contract_id = $2

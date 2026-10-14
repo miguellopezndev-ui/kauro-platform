@@ -68,7 +68,7 @@ export class PgCapabilityGovernanceRepository implements CapabilityGovernanceRep
     return row ? { capabilityId: row.capability_id as CapabilityId, revision: Number(row.revision), state: row.state, profileHash: row.profile_hash as Sha256Hex, kind: row.kind, mode: row.mode, importerTool: row.importer_tool } : null;
   }
 
-  /** The vendor_qualifications rows (insert-only, immutable: no lock) carrying these evidence hashes; the owner session reads them (0073 policy). */
+  /** The vendor_qualifications rows (insert-only, immutable: no lock) carrying these evidence hashes; the owner session reads them (0084 policy). */
   async qualificationsOf(evidenceHashes: ReadonlyArray<Sha256Hex>): Promise<ReadonlyArray<VendorQualificationRecord>> {
     if (evidenceHashes.length === 0) return [];
     const r = await execute<QualificationRow>(

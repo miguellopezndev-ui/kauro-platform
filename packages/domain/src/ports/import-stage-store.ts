@@ -1,5 +1,5 @@
 /**
- * The import stage store (package B17; CMD040 SubmitStageReceipt, CMD041 ContinueStage): the port over migrations 0052 and 0072 through
+ * The import stage store (package B17; CMD040 SubmitStageReceipt, CMD041 ContinueStage): the port over migrations 0052 and 0083 through
  * which the request handlers read a stage, serialize on it, read its parents under a shared lock, append a validated receipt revision or
  * open a receipt reconciliation, and advance the stage under its version fence. Every instant is the database's (kauro.server_now()); the
  * database refuses an edge the state machine does not list, a second continuation and a reconciliation of an unfinalized stage. The pg

@@ -44,7 +44,7 @@ export interface CapabilityGovernanceRecord {
   /** The capability kind and (MODE only) its mode: the scope of the S078 qualification predicates. */
   readonly kind: "MODE" | "OBJECT" | "OPERATION" | "TOOL" | "ENVELOPE";
   readonly mode: "CLEAN" | "HUBSPOT" | "SALESFORCE" | null;
-  /** The importer tool the capability claims (0075; an importer-profile catalogue tool id), null when it claims none. */
+  /** The importer tool the capability claims (0087; an importer-profile catalogue tool id), null when it claims none. */
   readonly importerTool: string | null;
 }
 

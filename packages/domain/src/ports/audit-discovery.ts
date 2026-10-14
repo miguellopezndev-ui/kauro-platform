@@ -119,7 +119,7 @@ export interface AuditDiscovery {
   validationSubject(planId: PlanId): Promise<ValidationSubject | null>;
   /**
    * The body of the target contract the plan binds (its project's contract with the plan's targetContractHash), in a unit bound to the
-   * plan's agency; null when the control plane cannot see one. Read without a lock: the currency of the target is the database's (0073).
+   * plan's agency; null when the control plane cannot see one. Read without a lock: the currency of the target is the database's (0084).
    */
   validationTarget(planId: PlanId): Promise<TargetBody | null>;
   /**

@@ -315,7 +315,7 @@ export function applyReceiptOutcome(result: ReceiptResult): ImportStageState {
 
 /**
  * A receipt reconciliation (R2-025, 05:115 "A different receipt for a finalized stage becomes a reconciliation request, not an overwrite"):
- * one per (stage, content hash), born OPEN, append-only; the stage's identity and receipts stay as they were (migration 0072).
+ * one per (stage, content hash), born OPEN, append-only; the stage's identity and receipts stay as they were (migration 0083).
  */
 export interface StageReceiptReconciliationRecord {
   readonly reconciliationId: string;

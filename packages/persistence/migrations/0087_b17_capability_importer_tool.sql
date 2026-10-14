@@ -1,4 +1,4 @@
--- Migration 0075: B17 lane L4 VENDOR, the importer tool a capability claims (S078; provisional number, the coordinator renumbers on merge).
+-- Migration 0087: B17 lane L4 VENDOR, the importer tool a capability claims (S078; provisional number, the coordinator renumbers on merge).
 --
 -- R2 S078 "REST was tested but Data Loader compatibility is claimed. Required outcome: Reject tool mismatch; require actual selected
 -- importer and export-back evidence". CMD058 compares the tool a vendor qualification actually tested (vendor_qualifications.tool, 0073)
