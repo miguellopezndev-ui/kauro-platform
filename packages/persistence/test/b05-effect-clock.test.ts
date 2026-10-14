@@ -1,4 +1,4 @@
-// B05 lane L3t (docs/design/B05-cores.md D5-20; migration 0062 provisional): every authority deadline 0023 judges against the
+// B05 lane L3t (docs/design/B05-cores.md D5-20; migration 0066 provisional): every authority deadline 0023 judges against the
 // transaction's start (kauro.server_now()) is judged again at COMMIT against kauro.effect_now() by a DEFERRABLE INITIALLY DEFERRED
 // constraint trigger. Each scenario runs its work at a test-clock offset that puts the database clock 1.5 s before the instant, so the
 // BEFORE checks pass, then holds the transaction open (or holds the last lock wait, L18) until the shifted clock is past the instant,

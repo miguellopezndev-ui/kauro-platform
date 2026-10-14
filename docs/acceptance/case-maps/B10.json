@@ -3,7 +3,7 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B10-case-map.md",
-  "sha256": "04bf0a87c8c48cb48ebbd5b92e740671bd053af17779f6b40659c39c8053ed52"
+  "sha256": "679f10b0028fbe50602f0a2e20796bcc444affc87d6e6ed7db41cd9285bf87cb"
  },
  "rows": [
   {
@@ -503,7 +503,7 @@
    "class": "EXECUTED_LOCAL",
    "test": [
     "apps/api/test/cmd045-register-prospect.test.ts :: DENY: an agency member's tenant session is a foreign scope and a CANDIDATE or TERMINATED seller a wrong role (403); then one missing prerequisite at a time — source evidence of another seller or segment SOURCE_EVIDENCE_INVALID, an organization spelled differently but suppressed by organization or contact key PROSPECT_SUPPRESSED, a live duplicate PROSPECT_EXISTS — nothing is written",
-    "packages/persistence/test/b10-sales-migrations.test.ts :: CMD045 at the database: source evidence admits only the AGENCY segment, one live prospect exists per normalized organization key, and a prospect whose organization or contact key is suppressed is refused KC016",
+    "packages/persistence/test/b10-sales-migrations.test.ts :: CMD045 at the database: source evidence admits the AGENCY and COMPANY segments and no other (D-33), one live prospect exists per normalized organization key, and a prospect whose organization or contact key is suppressed is refused KC016",
     "packages/domain/test/commercial-rules.test.ts :: CMD045: the organization key KAURO_PROSPECT_ORGANIZATION_V1 normalizes case, IDNA, a leading www. and a trailing dot, so every spelling of one business domain has one key and a re-imported list maps to the same keys"
    ],
    "commit": null,
@@ -574,7 +574,7 @@
    "class": "PARTIAL",
    "test": [
     "apps/api/test/cmd047-accept-attribution.test.ts :: DENY: an agency member's tenant session is a foreign scope and a seller a wrong role (403); then one missing prerequisite at a time — shares summing to 9999 SHARES_NOT_WHOLE, a claim submitted after the agency's first payment order CLAIM_AFTER_FIRST_ORDER, a second full-rate seller's allocation for the agency ATTRIBUTION_EXISTS, a stale version — nothing is written and no pool can double",
-    "apps/api/test/cmd047-accept-attribution.test.ts :: DENY (buyer type, D58): with the buyer-type fake answering unset or IN_HOUSE, AcceptAttribution is 409 PRECONDITION_FAILED BUYER_TYPE_UNSET or IN_HOUSE_NOT_ATTRIBUTABLE and writes nothing; answering AGENCY, the same request freezes the allocation",
+    "apps/api/test/cmd047-accept-attribution.test.ts :: OK (D-33): a company buyer is attributable under the same rules as an agency — with the buyer-type fake answering IN_HOUSE or unset, AcceptAttribution freezes the allocation and accepts the claim exactly as for AGENCY, and the buyer-type port is not asked",
     "packages/persistence/test/b10-sales-migrations.test.ts :: CMD047 at the database: one frozen allocation exists per agency, its shares sum to 10000 bps at COMMIT (KC003) with each beneficiary's pool terms equal to its signed agreement, and no assignment row can reference or alter it"
    ],
    "commit": null,

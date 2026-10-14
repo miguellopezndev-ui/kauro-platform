@@ -37,12 +37,14 @@ interface Built {
   callDir(): string;
 }
 
-function build(options: { n?: number; hooks?: CoreAdapterHooks; document?: Record<string, unknown>; refs?: CoreInputRef[]; root?: ReturnType<typeof tempRoot>; manual?: boolean; hash?: string } = {}): Built {
+function build(options: { n?: number; hooks?: CoreAdapterHooks; document?: Record<string, unknown>; refs?: CoreInputRef[]; root?: ReturnType<typeof tempRoot>; manual?: boolean; hash?: string; clockSkewMs?: number } = {}): Built {
   const t = options.root ?? tempRoot();
   const fixture = attemptFixture(options.n ?? 1);
   mkdirSync(attemptScratchDirectoryOf(t.root, fixture.attemptId), { recursive: true });
   const refs = options.refs ?? [inputRef("contacts.csv", CONTACTS_CSV)];
   const timers = new ManualTimers();
+  // time the manual clock stood still while the real one ran on (a loaded host between this line and the subject below)
+  timers.now -= options.clockSkewMs ?? 0;
   const document = options.document ?? configDocument();
   const adapter = new MigrationCoreAdapter({
     attemptId: fixture.attemptId,
@@ -57,7 +59,8 @@ function build(options: { n?: number; hooks?: CoreAdapterHooks; document?: Recor
     ...fixture.subject,
     configDocument: document,
     configHash: options.hash ?? loadConfig(JSON.stringify(document), "t").configHash,
-    executionDeadlineAt: new Date(Date.now() + 3_600_000).toISOString() as ExecutionSubject["executionDeadlineAt"],
+    // the deadline sits on the clock the adapter reads: the injected one when manual, so advance(3_600_001) always passes it
+    executionDeadlineAt: new Date((options.manual === true ? timers.nowMs() : Date.now()) + 3_600_000).toISOString() as ExecutionSubject["executionDeadlineAt"],
   };
   return { t, adapter, subject, fixture, refs, timers, callDir: () => join(attemptScratchDirectoryOf(t.root, fixture.attemptId), CORE_RUN_DIRECTORY, "execute") };
 }
@@ -375,6 +378,28 @@ test("M08 RACE (expiry): the operation deadline fixed at entry ends a hung open,
     } finally {
       b3.t.dispose();
     }
+  }
+});
+
+test("M08 RACE (ordering): the deadline of a manual-clock operation is on the injected clock however long the real clock ran before the subject was built; one advance(3_600_001) ends a hung source open, bounded by its own watchdog", async () => {
+  const late = gate();
+  const bytes = Buffer.from(CONTACTS_CSV);
+  const reader: SourceReader = { open: () => late.promise.then(() => ({ byteLength: bytes.byteLength, sha256: sha(bytes), read: async function* () { yield bytes; } })) };
+  const b: Built = build({ manual: true, clockSkewMs: 250 });
+  let watchdog: NodeJS.Timeout | undefined;
+  try {
+    const run = b.adapter.execute(b.subject, hostIoOf({ source: reader }));
+    for (let i = 0; i < 40; i += 1) await settle();
+    b.timers.advance(3_600_001);
+    const guard = new Promise<never>((_, reject) => {
+      watchdog = setTimeout(() => reject(new Error("the operation deadline never fired: the subject's deadline is past advance(3_600_001) on the injected clock")), 20_000);
+    });
+    const out = await Promise.race([run, guard]);
+    assert.equal(out.terminalCause, "DEADLINE_EXCEEDED");
+  } finally {
+    clearTimeout(watchdog);
+    late.open();
+    b.t.dispose();
   }
 });
 

@@ -1,4 +1,4 @@
--- 0063 — FCG-B06-LEASE-1b (tier 1; TIME-AFTER-AWAIT, the B05 L3t clock census): claim_lease judged its caller's deadline at p_now
+-- 0067 — FCG-B06-LEASE-1b (tier 1; TIME-AFTER-AWAIT, the B05 L3t clock census): claim_lease judged its caller's deadline at p_now
 -- (kauro.server_now(), the transaction's start) BEFORE its FOR UPDATE, while 0054 had moved only the expiry after the row lock: a claim
 -- whose wait on the lease row crossed the deadline still took the lease over (fence + 1) or renewed it, for a subject whose deadline had
 -- passed. The deadline is now judged at the same instant as the expiry, GREATEST(p_now, kauro.effect_now()) read after the row lock,

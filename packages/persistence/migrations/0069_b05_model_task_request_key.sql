@@ -1,4 +1,4 @@
--- Migration 0064 (provisional number; the coordinator renumbers at merge): what one platform model task stands for when the
+-- Migration 0069 (provisional number; the coordinator renumbers at merge): what one platform model task stands for when the
 -- Intelligence Core admits its dispatches (package B05 lane IJR; ADR-B05-IJR-1 K-1..K-4; tier 1, money idempotency).
 --
 -- R2 (contracts ModelTask/RequestJournal; 06 l.102-106, l.168, l.182; 07 l.45): a model task binds ONE outbound content (one minimized

@@ -188,6 +188,8 @@ export interface InvitationRepository {
   get(invitationId: InvitationId): Promise<InvitationRecord | null>;
   /** The invitation whose stored digest is `tokenHash`, visible to its agency or to the invited identity itself. */
   findByTokenHash(tokenHash: Sha256Hex): Promise<InvitationRecord | null>;
+  /** The invitation issued for a membership (a membership carries at most one: reissuing creates a new membership), null when none is visible. */
+  findByMembership(membershipId: MembershipId): Promise<InvitationRecord | null>;
   consume(invitationId: InvitationId, now: UtcInstant): Promise<InvitationClose>;
   revoke(invitationId: InvitationId, now: UtcInstant): Promise<InvitationClose>;
 }

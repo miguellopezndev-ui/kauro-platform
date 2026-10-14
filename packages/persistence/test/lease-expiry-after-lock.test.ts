@@ -138,7 +138,7 @@ test("FCG-B06-LEASE-1 control: a live lease is still renewed by its holder under
   assert.equal(hb.rows[0].fence, "1");
 });
 
-// FCG-B06-LEASE-1b (0063): the lease's absolute deadline (claimed with 1.5 s to its deadline, immutable) is
+// FCG-B06-LEASE-1b (0067): the lease's absolute deadline (claimed with 1.5 s to its deadline, immutable) is
 // judged at the same instant as the expiry, after the row lock. The caller read its instant (early) before the deadline; while it
 // waited on the lease row the database clock passed both the expiry and the deadline.
 test("FCG-B06-LEASE-1b: a claim whose wait on the lease row crossed its deadline is refused (KA005 deadline has passed): no takeover at fence + 1, the lease row is unchanged", async () => {

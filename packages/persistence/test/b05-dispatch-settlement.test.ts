@@ -1318,7 +1318,7 @@ test("L21 DENY commit order (sabotage): request_journal carries exactly two defe
     assert.ok(live.includes(`CONSTRAINT = '${name}'`), `${name} raised by the live schema`);
     assert.equal(sqlstateSource.split(`  ${name}: {`).length - 1, 1, `${name} mapped once in sqlstate.ts`);
   }
-  // ADR-B05-IJR-1's claimed names (0064): each index or constraint declared once, each prefix raised by its one function only
+  // ADR-B05-IJR-1's claimed names (0069): each index or constraint declared once, each prefix raised by its one function only
   const relations = (await env.h.oracle.query("SELECT relname FROM pg_class WHERE relnamespace = 'kauro'::regnamespace UNION ALL SELECT conname FROM pg_constraint WHERE connamespace = 'kauro'::regnamespace")).rows.map((r) => r.relname as string);
   for (const name of ["request_journal_one_attempt_per_fence", "request_journal_one_live_core_attempt", "model_tasks_one_per_core_request"]) {
     assert.ok(relations.filter((n) => n === name).length >= 1, `${name} declared`);
@@ -1370,12 +1370,13 @@ test("L22 OK migration on a live pool: 00NN applied by the migration runner as t
   const all = listMigrations(MIGRATIONS_DIR);
   const target = all.find((m) => m.name === "b05_dispatch_settlement");
   assert.ok(target, "00NN is the dispatch-settlement migration");
-  // the cluster at 00NN-1 holds every migration before it (later lanes add migrations after 00NN; the runner applies them in order)
-  const earlier = all.filter((m) => m.version < target.version);
-  assert.equal(earlier.length, target.version - 1, "00NN-1 is every migration before it");
+  // the cluster stops just before 00NN, wherever later migrations put it (incident MIGRATION-POSITION-ASSUMED 2026-10-13: "00NN is
+  // the last migration" broke every branch that adds a migration)
+  const at = all.indexOf(target);
+  assert.ok(at > 0, "00NN has a predecessor");
   const dir = mkdtempSync(join(tmpdir(), "kauro-l22-"));
   try {
-    for (const m of earlier) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
+    for (const m of all.slice(0, at)) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
     const at58 = await openDispatchEnv({ migrationsDir: dir });
     try {
       const e2 = at58;
@@ -1407,7 +1408,7 @@ test("L22 OK migration on a live pool: 00NN applied by the migration runner as t
           { relname: "pool_liability_gates", forced: true },
         ],
       );
-      // the migrations after 00NN applied in turn (the product admission writes their columns, 0064's model_tasks.core_run_id), then
+      // the migrations after 00NN applied in turn (the product admission writes their columns, 0069's model_tasks.core_run_id), then
       // the pool's next admission and DISPATCHING edge commit
       const laterMigrations = all.filter((m) => m.version > target.version);
       for (const m of laterMigrations) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
@@ -1470,7 +1471,7 @@ test("L17 RACE (deadline at COMMIT, every session on one test-clock offset): a r
       (c, run) => admitWith(rawStore(c), admissionOf(run, 50_000n)),
     );
     // the admission's MODEL_TASK lease carries the interpretation deadline as its own (audit/store.ts claimTaskLease), and claim_lease
-    // judges it after the wait at the judged instant (0063, FCG-B06-LEASE-1b): the claim refuses first, before the reservation's KA081
+    // judges it after the wait at the judged instant (0067, FCG-B06-LEASE-1b): the claim refuses first, before the reservation's KA081
     const refused = rejection(outcome);
     assert.ok(refusedBy("KA005")(refused), "the deadline judged after the audit share, by the task lease's claim");
     assert.match(String((refused as { cause?: { message?: unknown } }).cause?.message), /^LEASE: deadline of .* has passed$/, "refused for its deadline, not a fence");
@@ -1615,7 +1616,7 @@ test("S19b DENY pool clause alone (forged, rule 12): in the temporary cluster th
   }
 });
 
-// --- ADR-B05-IJR-1 (lane IJR; migration 0064 provisional): one IC request key is one model task, each IC invocation one request row ---
+// --- ADR-B05-IJR-1 (lane IJR; migration 0069 provisional): one IC request key is one model task, each IC invocation one request row ---
 
 /** The server's message of a refusal, through the product's translation (its cause). */
 function pgMessage(e: unknown): string {

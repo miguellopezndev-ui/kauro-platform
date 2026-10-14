@@ -166,6 +166,8 @@ export function operatorContextOf(envelope: Pick<CommandEnvelope<unknown>, "user
 export interface RunnableCommand {
   readonly id: string;
   readonly journalScope: "TENANT" | "OPERATOR_IDENTITY" | "NONE";
+  /** Body fields that are the request's credential, not its content: left out of the request digest (a retry with a fresh step-up proof is the same request). */
+  readonly digestOmits?: ReadonlyArray<string>;
 }
 
 /** The idempotency identity of a command: the agency's row, or — for an operator — the operator's own identity-owned row (D-IDEM-B2). */
@@ -179,8 +181,10 @@ export function commerceIdentityOf<Body>(spec: RunnableCommand, envelope: Comman
   };
 }
 
-export function commerceDigestOf<Body>(spec: Pick<RunnableCommand, "id">, envelope: CommandEnvelope<Body>): Sha256Hex {
-  return commandRequestDigest({ operation: spec.id as CommandId, aggregate: envelope.path, body: envelope.body });
+export function commerceDigestOf<Body>(spec: Pick<RunnableCommand, "id" | "digestOmits">, envelope: CommandEnvelope<Body>): Sha256Hex {
+  const omits = spec.digestOmits ?? [];
+  const body = omits.length === 0 || typeof envelope.body !== "object" || envelope.body === null ? envelope.body : Object.fromEntries(Object.entries(envelope.body as Record<string, unknown>).filter(([k]) => !omits.includes(k)));
+  return commandRequestDigest({ operation: spec.id as CommandId, aggregate: envelope.path, body: body as Body });
 }
 
 /**

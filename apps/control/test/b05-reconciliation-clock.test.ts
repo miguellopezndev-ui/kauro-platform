@@ -1,6 +1,6 @@
-// B05 lane L3t, L19b (RCK; docs/design/B05-cores.md D5-20, J15; migration 0062 provisional): GRANT_RECONCILIATION reads its instant
+// B05 lane L3t, L19b (RCK; docs/design/B05-cores.md D5-20, J15; migration 0066 provisional): GRANT_RECONCILIATION reads its instant
 // at the start of its transaction (grants.ts serverNow), so an EXHAUSTED grant with room whose pass waited on a request row across the
-// grant's expiry is re-AUTHORIZED on that early instant; 0062's commit-time judgement of 0023:178 refuses the pass at COMMIT (KA083),
+// grant's expiry is re-AUTHORIZED on that early instant; 0066's commit-time judgement of 0023:178 refuses the pass at COMMIT (KA083),
 // the whole pass rolls back, SweepRun records the failure, and the next pass moves the grant EXPIRED. Every interleaving is fixed by a
 // FaultPoint and the reconciler's lock wait observed in pg_stat_activity (waitForLockWait), never by a sleep; time is the labelled TEST
 // CLOCK of the control plane's units, one offset for every unit.

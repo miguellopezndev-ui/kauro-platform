@@ -421,7 +421,7 @@ export interface World {
   readonly vault: ContractFakeSessionVault;
   readonly internalErrors: Array<{ correlationId: string; error: unknown }>;
   /** The bank-transfer route's restricted evidence store, bound after start-up (bank-support.ts bankWorld binds its CONTRACT_FAKE store). */
-  readonly bank: { evidence: BankEvidenceStore | null };
+  readonly bank: { evidence: BankEvidenceStore | null; hold: ((point: string) => Promise<void>) | null };
   /** Agency A (DRAFT) and its people. */
   readonly A: AgencyFixture;
   readonly owner: Person;
@@ -669,10 +669,13 @@ export async function world(options: WorldOptions = {}): Promise<World> {
   const { artifacts: _artifacts, patchCompiler: _patchCompiler, disclosures: _disclosures, ...withoutPlanServices } = configured;
   const collaborators: Partial<B06Collaborators> = options.realPlanServices === true ? withoutPlanServices : configured;
 
-  const bank: { evidence: BankEvidenceStore | null } = { evidence: null };
+  const bank: { evidence: BankEvidenceStore | null; hold: ((point: string) => Promise<void>) | null } = { evidence: null, hold: null };
   const app = assembleApi({
     environment: "LOCAL",
-    bank: { evidence: () => bank.evidence, classifier: () => contractFakeBankDetailsClassifier },
+    oneTimeDelivery: ({ command, view, secrets }) => {
+      if (command === "CMD003") deliveredInvitations.set((view as { invitationId: string }).invitationId, secrets["invitationToken"] ?? "");
+    },
+    bank: { evidence: () => bank.evidence, classifier: () => contractFakeBankDetailsClassifier, hold: (point) => (bank.hold === null ? Promise.resolve() : bank.hold(point)) },
     unitOfWork: (options.wrapUnitOfWork ?? ((f) => f))(instrumentedFactory(db.unitOfWork, holds, stats)),
     database: db,
     authenticator: createBearerTokenAuthenticator(tokens),
@@ -1205,6 +1208,9 @@ export async function approveThroughRoute(w: World, plan: PlanFixture, approver:
 }
 
 /** The routes of the seven commands, and of the support cases (CMD044 and its two reads). */
+/** The raw invitation tokens the world's delivery channel received after each CMD003 commit, by invitation id (a CONTRACT_FAKE of the e-mail channel). */
+export const deliveredInvitations = new Map<string, string>();
+
 export const routes = {
   createAgency: () => "/api/v1/agencies",
   createClient: (agencyId: string) => `/api/v1/agencies/${agencyId}/clients`,
@@ -1216,4 +1222,9 @@ export const routes = {
   createSupportCase: (projectId: string) => `/api/v1/projects/${projectId}/support-cases`,
   listSupportCases: (projectId: string) => `/api/v1/projects/${projectId}/support-cases`,
   getSupportCase: (caseId: string) => `/api/v1/support-cases/${caseId}`,
+  inviteMember: (agencyId: string) => `/api/v1/agencies/${agencyId}/invitations`,
+  acceptInvitation: (invitationId: string) => `/api/v1/invitations/${invitationId}/accept`,
+  changeMembership: (membershipId: string) => `/api/v1/memberships/${membershipId}/capabilities`,
+  revokeMembership: (membershipId: string) => `/api/v1/memberships/${membershipId}/revoke`,
+  transferOwnership: (agencyId: string) => `/api/v1/agencies/${agencyId}/ownership-transfers`,
 };

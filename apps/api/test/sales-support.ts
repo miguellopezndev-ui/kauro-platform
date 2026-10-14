@@ -74,15 +74,15 @@ export interface RecordedEvidence {
 export async function recordSourceEvidence(
   h: Harness,
   by: { readonly userId: string; readonly sellerId?: string },
-  options: { readonly domain: string; readonly segment?: "AGENCY"; readonly contactKey?: string },
+  options: { readonly domain: string; readonly segment?: "AGENCY" | "COMPANY"; readonly contactKey?: string },
 ): Promise<RecordedEvidence> {
   const contactRef = ids.next();
   const contactKey = options.contactKey ?? sha(`contact:${options.domain}:${contactRef}`);
   const sourceEvidenceHash = sha(`source-evidence-${options.domain}-${contactRef}`);
   await asOperator(h, by.userId, async (c) => {
     await c.query(
-      "INSERT INTO kauro.prospect_source_evidence (evidence_id, recorded_by_user_id, seller_id, evidence_hash, source_url_digest, observed_on, lawful_basis, segment, created_at) VALUES ($1, $2, $3, $4, $5, current_date, 'LEGITIMATE_INTEREST', 'AGENCY', now())",
-      [ids.next(), by.userId, by.sellerId ?? null, sourceEvidenceHash, sha(`https://${options.domain}/`)],
+      "INSERT INTO kauro.prospect_source_evidence (evidence_id, recorded_by_user_id, seller_id, evidence_hash, source_url_digest, observed_on, lawful_basis, segment, created_at) VALUES ($1, $2, $3, $4, $5, current_date, 'LEGITIMATE_INTEREST', $6, now())",
+      [ids.next(), by.userId, by.sellerId ?? null, sourceEvidenceHash, sha(`https://${options.domain}/`), options.segment ?? "AGENCY"],
     );
     await c.query("INSERT INTO kauro.prospect_contacts (contact_id, recorded_by_user_id, contact_key, contact_label, role_label, channel, created_at) VALUES ($1, $2, $3, 'Operations lead', 'Head of operations', 'EMAIL', now())", [contactRef, by.userId, contactKey]);
   });
