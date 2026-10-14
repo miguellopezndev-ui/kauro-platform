@@ -1,244 +1,247 @@
-# B12 outreach plan: CMD061..CMD064, R2-066..068, R2-129..132, R2-135 (planner 2026-10-14)
-Base origin/main 8354d7be, branch b12/outreach. Registry B12 = 20 ids (program.json B12.caseIds = gates.json G-UX_PRIVATE.caseIds); census
-2026-10-14: none has a test on main. Sources read by slice only: R2 12 "Role-specific home", "Seller onboarding and access lifecycle", "Prospect
-record", "Outreach workspace", "Commission statement", "Owner commercial dashboard", "Finance and cost controls", "Resources and training",
-"Acceptance"; 18 "Initial channel decision", "Prospect qualification", "Outreach cadence and health", "Communication compliance", "Acceptance";
-reference/MESSAGING_AND_SENDER_OPERATIONS.md (all six sections; R2 12/18 "Messaging adapter and sender boundary" make it binding: "They apply to
-this manual and its implementation packages"); 17 "Assignment changes", "Termination and tail", "Business-day calendar"; 08 "Role and capability
-model"; 10 "Idempotency contract", "Support and operations routes", "Provider adapter contract", "Notifications and event consumers"; 24 OA16,
-OA17; reference/COMMAND_CATALOGUE.md CMD061..064; registry contracts OutreachDraft/OutreachAuthorization/SalesActivity/Prospect, policy.messaging,
-screens UI33/34/49/53/54. Classes: EL = EXECUTED_LOCAL (real PostgreSQL + contract fakes), SIM = SIMULATED (labelled contract fake),
-PART(x) = local half here, live half in package x. Template: docs/design/FAILURE-MATRIX-TEMPLATE.md columns + rules 1-23.
-
-## 0. Authority first (rulings, each: R2 text -> input-only predicate -> census measured 2026-10-14 on 8354d7be)
-- A1 draft is not send. Ref "Draft, authority and send intent": "`OutreachDraft` ... The draft is a proposal."; 12 "Outreach workspace": "Draft
-  generation is not a send authorization."; OA16 "Drafting does not authorize tool-based external sending." Predicate: a provider call exists only
-  for an intent row born by CMD063 under a live grant. Census: provider send ports on main = 0 (git grep "gmail|Resend" src = 0 hits).
-- A2 states. Ref: "`DRAFT`, `AUTHORIZED`, `SUBMITTING`, `PROVIDER_ACCEPTED`, `SEND_UNCERTAIN`, `BOUNCED`, `REPLIED`, `SUPPRESSED` and `CANCELLED` have
-  different meanings" = registry OutreachDraft.state. 12 lists "DRAFT, APPROVED_TO_SEND, SENT, DELIVERED, ...". Conflict decided D-B12O-1: the
-  reference + registry enum govern (12's own boundary section delegates "draft/send, uncertainty" to the reference); DELIVERED is never produced
-  (ref "Measurement": "Do not label this count delivered").
-- A3 uncertain = reconcile. Ref: "If submission may have succeeded but its response was lost, retain `SEND_UNCERTAIN`; do not automatically send
-  again."; policy.messaging.uncertainSubmission = "RECONCILE_BEFORE_REPEAT"; 10 "An ambiguous external effect requires reconciliation, not blind
-  retry." Predicate: an intent leaves SUBMITTING only to PROVIDER_ACCEPTED | SEND_UNCERTAIN | NOT_SENT(no-effect proof); never back to QUEUED.
-- A4 suppression wins. Ref "Notification reliability": "Honor a marketing opt-out ... immediately after validation, before queued sends are
-  claimed. Do not require login"; ref "Draft, authority": "Before dispatch recheck the suppression registry, sender grant, current recipient,
-  expiry ... remaining campaign count."; 18 "A contact's opt-out survives reassignment, list reimport and provider change." Census of suppression
-  writers on main: 0 product writers (only apps/api/test/sales-support.ts:93); readers: commercial-sales.ts:558, trigger 0029:991-1000.
-- A5 no cold outreach via Resend. Ref "Selected routes": "Kauro must therefore never route cold prospects, purchased lists or scraped contacts
-  through this adapter."; policy.messaging.coldOutreachViaResend = false. Predicate: route(sender) = RESEND_TRANSACTIONAL => no intent for ANY
-  OutreachDraft purpose (all three purposes are sales correspondence; Resend is "customer-requested transactional notifications" only).
-- A6 sender. Ref "Account and DNS": "A sender identity cannot be selected from arbitrary browser input. All `From` identities are registry entries
-  bound to the authorized person"; 12 "The owner mailbox is never shared as a shortcut." Predicate: sender.user_id = actor (seller) or owner-bound
-  (owner); intent.sender = draft.sender = grant.sender (DB binding, KA095).
-- A7 former seller. 12 "Suspension ... preserving the seller's permitted historical statement and dispute path. Termination revokes operational
-  access"; 12 "An inactive seller retains access to an appropriate statement"; ref "Measurement": "surviving commission rights do not grant
-  perpetual access to prospect correspondence." MEASURED DEFECTS on main: (a) get-statement.ts:101 admits a seller only through authorizeSeller,
-  which refuses any non-ACTIVE row (authorizer.ts:70) -> a TERMINATED seller cannot read its own statement; (b) policies on prospect data use
-  kauro.current_seller_id() (any state, 0029:164-166): prospects_seller_read 0029:1352, prospect_suppressions_read 0029:1365; contacts and source
-  evidence self-read by recorded_by_user_id 0029:1341-1342, 1346-1347 -> a TERMINATED seller still SELECTs its prospects and contacts. Census of
-  seller-state-blind policies: 24 (git grep "current_seller_id()" migrations); financial ones (statements, lines, adjustments, holds, offsets,
-  payouts, credit, agreements, destinations, entitlements, claims, tail) stay; prospect-data ones (prospects, contacts, source evidence,
-  suppressions read, every new outreach table) become ACTIVE-only.
-- A8 resources. 12 "Resources and training": "Each has version, effective date and owner. Retired copy cannot be used to promise an old feature.";
-  UI53 "Obsolete claims cannot be silently reused in a new campaign." Predicate: a draft/grant/intent cites resource versions all CURRENT and every
-  capability they claim in AVAILABLE|AVAILABLE_LIMITED (0003:17 states), judged under FOR SHARE locks.
-- A9 scope (D-33, owner 2026-10-13, .kauro/decisions/2026-10-13-COMMERCIAL-SCOPE.md item 1) supersedes 18 "Prospect qualification" ("Prospects are
-  agencies. A non-agency company ... is never researched ... or contacted") and A3 3.7, as 0064_d33_company_prospects already does. Predicate: no
-  B12 rule, cap, copy, fixture or ordering reads `segment` (prospect_source_evidence.segment). Census: B12 files reading segment = 0 (new files).
-  The internal channel priority is category C: never coded, never in copy/fixtures/tests.
-- A10 cadence. Ref: "ten newly contacted recipients per authorized sender per business day, one active sequence per prospect, no more than three
-  total messages over fourteen calendar days, and no follow-up after a reply, refusal, bounce or opt-out"; 18: "at most two follow-ups, at five and
-  twelve business days, then stop for ninety days". Conflict decided D-B12O-6 (conservative intersection, never looser than either): new-recipient
-  cap 10 per sender per ROLLING 24 h (no calendar exists for outreach; a rolling window is never looser than a business day); per prospect at most
-  2 sends (first + one follow-up: 12 business days > 14 calendar days makes the second follow-up unreachable under both), the follow-up >= 10
-  calendar days after the first (>= 5 US business days with <= 3 holidays) and < 14 calendar days; then 90 days with no new sequence.
-- A11 jurisdiction. 18 "Other markets require a separate channel/legal review before equivalent outreach. A US policy is not assumed sufficient";
-  "a real postal contact and a working opt-out". D-B12O-7: kauro.outreach_channel_policies seeded ('US', each purpose, policy v1, cite 18); any
-  other jurisdiction refused OUTREACH_JURISDICTION_UNREVIEWED; CMD063 refuses OUTREACH_COMPLIANCE_UNCONFIGURED unless the deployment binds a postal
-  address and the opt-out origin (owner fact D-16: address not given -> BLOCKED_OWNER for live, §6).
-Not decided by R2 (conservative choice recorded): grant max window 14 days (= policy.sequenceCalendarDays); validFrom earlier than the birth
-instant is clamped to it (rule 23: the DB clock opens the window); step-up required for CMD062 (08 "authorize supported high-impact decisions
-after step-up"; OA16 is an owner act).
-
-## 1. Case table (exact titles; file :: "title"; one title per file, unique)
+# B12 outreach plan rev 2: CMD061..CMD064, R2-066..068, R2-129..132, R2-135 (planner 2026-10-14; closes adversary 91c82e89 ADV-1..21)
+Base origin/main 8354d7be, branch b12/outreach. Registry B12 = 20 ids (program.json B12.caseIds = gates.json G-UX_PRIVATE.caseIds); none has a test on main. R2 read by slice only: 12 "Role-specific
+home", "Seller onboarding and access lifecycle", "Prospect record", "Outreach workspace", "Resources and training"; 18 "Initial channel decision", "Outreach cadence and health", "Communication
+compliance"; reference/MESSAGING_AND_SENDER_ OPERATIONS.md (binding through 12/18 "Messaging adapter and sender boundary"); 17 "Business-day calendar", "Termination and tail"; 08, 10, 24 OA16/17;
+COMMAND_CATALOGUE CMD061..064; registry contracts OutreachDraft/OutreachAuthorization/SalesActivity, policy.messaging. Classes: EL = EXECUTED_LOCAL (real PostgreSQL + contract fakes), SIM = labelled
+contract fake, PART(x) = live half in package x. Template: FAILURE-MATRIX-TEMPLATE.md rules 1-23. Companion: docs/design/B12-outreach-plan-cells.md (rule-22 table matrix, rule-12 controls,
+non-registry route matrices, producer matrix). §8 = closure.
+## 0. Authority first (R2 text -> input-only predicate -> census on 8354d7be)
+-  A1 draft is not send. Ref "Draft, authority and send intent": "The draft is a proposal."; 12: "Draft generation is not a send authorization."; OA16 "Drafting does not authorize tool-based external
+  sending." Predicate: a provider call exists only for an intent born by CMD063 under a live grant. Census: provider send ports on main 0 (git grep "gmail|Resend" src). Assistant path (R2-068
+  "Assistant creates an outreach draft"): CMD061 role is ASSIGNED_SELLER_OR_OWNER; the kit's OUTREACH_SERVICE (SERVICE_ROLE_TABLE, packages/domain/src/commerce/principals.ts:35) is admitted by D1-D5,
+  the opt-out and CMD064 service kinds only, never by CMD061/062/063; an assistant proposal reaches a draft only through CMD061 under a human session.
+-  A2 states. Ref: "`DRAFT`, `AUTHORIZED`, `SUBMITTING`, `PROVIDER_ACCEPTED`, `SEND_UNCERTAIN`, `BOUNCED`, `REPLIED`, `SUPPRESSED` and `CANCELLED` have different meanings" = OutreachDraft.state.
+  D-B12O-1: reference + registry enum govern; DELIVERED never produced (ref "Measurement": "Do not label this count delivered"). Intent states (ours): QUEUED, SUBMITTING, PROVIDER_ACCEPTED,
+  SEND_UNCERTAIN, OBSERVED_SENT, OBSERVED_NOT_SENT, NOT_SENT, CANCELLED. COUNTED = {QUEUED, SUBMITTING, PROVIDER_ACCEPTED, SEND_UNCERTAIN, OBSERVED_SENT}: these count as sent for grant, person cap and
+  cadence.
+-  A3 uncertainty. Ref: "If submission may have succeeded but its response was lost, retain `SEND_UNCERTAIN`; do not automatically send again. Reconcile through the sender's actual Sent view or
+  independently accessible provider evidence ... A human-assisted observation may close the uncertainty with a safe evidence reference."; policy uncertainSubmission "RECONCILE_BEFORE_REPEAT"; CMD063
+  failure "uncertain provider acceptance requires reconciliation before any repeat". Port classification (D-B12O-11, conservative): ACCEPTED{providerMessageRef} -> PROVIDER_ACCEPTED; AUTH_REVOKED (401
+  invalid_grant) -> NOT_SENT(AUTH_REVOKED) + sender REVOKED; REJECTED_DEFINITIVE (400, 403, 413, 429 answered before acceptance) -> NOT_SENT(PROVIDER_REJECTED:<code>); NOT_ATTEMPTED (adapter failed
+  before any byte left: MIME build, no token) -> NOT_SENT(LOCAL_FAILURE); every other answer (500, 502, 503, 504, reset, timeout, malformed or lost answer, UNKNOWN, exception after the write) ->
+  SEND_UNCERTAIN. No NOT_SENT is ever retried automatically; a repeat is a new CMD063 by a human. Reconciliation (CMD064 HUMAN_SEND_OBSERVED, attribute observation SENT|NOT_SENT bound into
+  evidenceHash): SENT -> intent OBSERVED_SENT (counted; the draft is never sent again: KC036 OUTREACH_ALREADY_SENT); NOT_SENT -> intent OBSERVED_NOT_SENT (not counted; the only path to a repeat),
+  admitted only at effect_now >= submitted_at + providerCallBound. A late provider answer after D5 is evidence: SEND_UNCERTAIN -> PROVIDER_ACCEPTED with its ref (no submission).
+-  A4 suppression wins. Ref "Notification reliability": "Honor a marketing opt-out ... immediately after validation, before queued sends are claimed. Do not require login"; ref: "Before dispatch
+  recheck the suppression registry, sender grant, current recipient, expiry, consent/legal-policy evidence, per-person activity cap and remaining campaign count." (full list: every item is a D2
+  recheck, §2 D2). Census of suppression writers on main: 0 product (fixtures apps/api/test/sales-support.ts:97); readers commercial-sales.ts:558-575, register-prospect.ts:66, trigger 0029:991-1004.
+-  A5 Resend. Ref "Selected routes": "Kauro must therefore never route cold prospects, purchased lists or scraped contacts through this adapter."; coldOutreachViaResend false. Predicate: route
+  RESEND_TRANSACTIONAL => no intent for any OutreachDraft purpose. CMD061 admits a RESEND sender (the draft is a proposal); CMD063 and the DB refuse it (KC028).
+-  A6 sender. Ref: "All `From` identities are registry entries bound to the authorized person"; 12 "The owner mailbox is never shared as a shortcut." Predicate: sender.user_id = actor; intent.sender =
+  draft.sender = grant.sender (KA095).
+-  A7 former seller. 12: "An inactive seller retains access to an appropriate statement"; ref "Measurement": "surviving commission rights do not grant perpetual access to prospect correspondence."
+  Defects on main: get-statement.ts:101 admits only via authorizeSeller, which refuses non-ACTIVE (authorizer.ts:70); prospects_seller_read 0029:1351-1352 and prospect_suppressions_read 0029:1364-1365
+  use kauro.current_seller_id() (any state, 0029:164-166); prospect_source_evidence_self_read 0029:1333-1334 and prospect_contacts_self_read 0029:1341-1342 admit by recorded_by_user_id. Census
+  current_seller_id() in migrations = 28 lines: definition 0029:164, comment 0029:1282, 26 policy lines: 0029:1298, 1324, 1328, 1352, 1365, 1372, 1386, 1394, 1406, 1414, 1422, 1430, 1437, 1458, 1464,
+  1471; 0030:604, 610, 619, 630; 0031:610, 616, 624; 0056:167, 457; 0057:139. Prospect data (become ACTIVE-only in 0083): 1352, 1365 + the two recorded_by policies. Stay: financial ones, 1328 (payout
+  destination change in the tail, 17 "Termination and tail"), 1471 (trigger-level history insert).
+-  A8 resources. 12: "Retired copy cannot be used to promise an old feature."; UI53 "Obsolete claims cannot be silently reused". Predicate: every resource cited CURRENT and every capability claimed in
+  AVAILABLE|AVAILABLE_LIMITED (0003:17), judged under L5/L6 at CMD061, CMD062, CMD063 and D2.
+-  A9 scope D-33 (owner 2026-10-13) supersedes 18 "Prospects are agencies" (0064_d33_company_prospects). Predicate: no B12 rule, cap, copy, fixture, query or ordering reads segment/buyer type or ranks
+  prospects. No commercial prioritisation is coded.
+-  A10 new-recipient cap. 18: "ten new messages per mailbox per business day in week one" and "A seller cannot evade limits by adding another unapproved mailbox."; ref: "ten newly contacted recipients
+  per authorized sender per business day" and "per-person activity cap"; policy initialNewProspectsPerSenderBusinessDay 10. D-B12O-6a (never looser than any reading): the cap subject is the PERSON
+  (sender_identities.user_id), summed over all of its identities; a first contact is admitted only (i) on an outreach business day and (ii) when fewer than 10 first contacts of the person have
+  counted_at > effect_now - 24 h. (ii) bounds every calendar day of every zone at 10, so the weekend 10+10+10 reading is impossible. Outreach calendar: R2 names none for outreach (17's calendar
+  governs commission dates); conservative choice: a date is an outreach business day iff it is a weekday and not a holiday in the US federal calendar (5 U.S.C. 6103) nor in the Colombian calendar
+  (COLOMBIA_HOLIDAYS, application support/ holidays.ts:142), judged in BOTH America/New_York and America/Bogota; seeded in 0082 as kauro.outreach_calendar_days (version OUTREACH-CAL-2026.10, years
+  2026-2028); an uncovered date refuses KC037 OUTREACH_CALENDAR_UNAVAILABLE (17: "Do not substitute ... an unverified weekday-only approximation"). "increasing to twenty" is not coded (a policy
+  version change).
+-  A11 cadence. 18: "Use at most two follow-ups, at five and twelve business days, then stop for ninety days ... Reply, opt-out, complaint or disqualification stops the sequence immediately."; ref:
+  "one active sequence per prospect, no more than three total messages over fourteen calendar days, and no follow-up after a reply, refusal, bounce or opt-out ... A new mailbox is not a reason to copy
+  the same prospect into another sequence." D-B12O-6b (intersection): a sequence = INDIVIDUAL_PROSPECT_CONTACT first message + at most ONE FOLLOW_UP (12 business days > 14 calendar days makes a second
+  unreachable under both); the follow-up is admitted in [first + 5 outreach business days at the same wall time, the later of the two zones; first + interval '14 days'); a new sequence only at >= last
+  message + 90 days; after any stop trigger (REPLIED, BOUNCED, SUPPRESSED of any reason) no new sequence ever for that prospect; REQUESTED_REPLY only answering a REPLIED activity, one per reply,
+  outside the counts. All judged at effect_now after L3/L4. Case: first 2026-12-24T15:00Z (Thu) -> follow-up window [2027-01-04T15:00Z, 2027-01-07T15:00Z) (Dec 25 and Jan 1 holidays in both).
+-  A12 health pause. 18: "A hard-bounce rate of at least 2% in the latest fifty-message batch or any complaint/provider warning pauses new outreach pending diagnosis. With a smaller sample, show the
+  numerator and denominator". Predicate: among the person's latest min(n, 50) counted intents after its latest diagnosis record, any BOUNCED (every bounce counted hard: 1/50 = 2%) or any SUPPRESSED
+  reason COMPLAINT pauses the person (KC034 OUTREACH_PAUSED) until RecordOutreachDiagnosis (owner, step-up). Provider warnings: no ingestion source exists in V1 (send-only scope, A3): N/A.
+-  A13 compliance content. 18: "truthful sender and subject identification, required commercial identification, a real postal contact and a working opt-out"; policy trackingPixels false. Predicate on
+  the submitted MIME: From = bound identity, Subject = draft subject, text/plain only (no image, no remote resource), commercial identification line, deployment postal address, opt-out URL with the
+  intent token, List-Unsubscribe + List-Unsubscribe-Post: List-Unsubscribe=One-Click (RFC 8058); sha256(MIME) = intent.payload_hash.
+-  A14 opt-out survival and principal. 18: "A contact's opt-out survives reassignment, list reimport and provider change."; 12 "Reassignment cannot evade an opt-out". Predicate: contact_key =
+  KAURO_PROSPECT_CONTACT_V1(case-folded NFC address), independent of recorder, seller, prospect and sender route (census: no product key derivation on main; the fixture sales-support.ts:80 invents
+  one). Writers and principals: seller/owner CMD064 via prospect_suppressions_record 0029:1366-1367 + new prospects_seller_suppress; public opt-out as OUTREACH_SERVICE in kauro_outreach (D-B12O-12).
+-  A15 jurisdiction. 18: "Other markets require a separate channel/legal review ... A US policy is not assumed sufficient". outreach_channel_policies seeded ('US', each purpose, v1); other
+  jurisdictions OUTREACH_JURISDICTION_UNREVIEWED; missing postal address/opt-out origin OUTREACH_COMPLIANCE_UNCONFIGURED (live address: BLOCKED_OWNER D-16, §6).
+-  A16 permission evidence. CMD062 precondition: "Explicit owner permission binds reviewed recipients/content"; contract permissionEvidenceHash "Actual explicit authorization". Predicate: the hash is
+  the digest of a server-issued outreach_reviews row (PrepareOutreachReview, owner, step-up): exact draft ids, versions, content hashes, recipients' contact labels and previews shown, issued_at =
+  effect_now, expires issued_at + 15 min (R2 silent: conservative), bound to the step-up proof it was issued under (assurance_proofs 0002:43 are per person, not per session), single use (UNIQUE
+  outreach_authorizations.review_id). Client-computed digests, other proofs, stale versions, reuse: KC035 OUTREACH_REVIEW_INVALID.
+-  A17 no CRM data. Ref: "No source CRM data enters a sales email."; contract contentRef "never raw customer CRM". Predicate: contentRef resolves only in kauro.outreach_contents and provenance only in
+  prospect_source_evidence (any other id = 404 like unknown); B12 modules import no tenant data-plane, staging, target adapter or CRM write port; role kauro_outreach has no grant on any agency_id
+  table. Not decided by R2 (conservative, recorded): grant window <= 14 days; validFrom before birth clamped to effect_now (rule 23); step-up for CMD062.
+## 1. Case table (file :: "exact title"; titles unique repo-wide)
 | Case | Class | Lane | Test |
 |---|---|---|---|
-| CMD061-OK | EL | L-DRAFT | apps/api/test/cmd061-prepare-outreach-draft.test.ts :: "CMD061-OK: an assigned ACTIVE seller prepares a DRAFT for its US prospect from stored content and a CURRENT resource, sender its own GMAIL_API identity, provenance its prospect's source evidence: 201 version 1, content hash bound to recipient/sender/purpose/body, no intent, outbox record, activity or provider call" |
-| CMD061-DENY | EL | L-DRAFT | same :: "CMD061-DENY: an agency tenant session and a TERMINATED seller are 403, another seller's prospect is 404 like an unknown id (no contact label in the problem); then one missing prerequisite at a time: other sender, REVOKED sender, provenance not the prospect's, unreviewed jurisdiction, suppressed prospect, superseded resource, savings amount, AI in subject, CR/LF in subject; no row, no event" |
-| CMD061-RACE | EL | L-DRAFT | same :: "CMD061-RACE: identical retry replays the 201, same key other content is 409 IDEMPOTENCY_CONFLICT, the seller's termination held at the seller lock in both orders (draft then TERMINATED, or 403), a resource superseded held at its row lock in both orders, crash before COMMIT leaves nothing and crash after COMMIT replays one draft" |
-| CMD062-OK | EL | L-AUTH | apps/api/test/cmd062-authorize-outreach.test.ts :: "CMD062-OK: the owner with a fresh step-up seals two DRAFT hashes of one sender for 14 days, maximumSends 2, evidence equal to the server's review digest: 201 one grant, revoked false, policyVersion recorded, validFrom clamped to the database instant, no draft state changed and no send queued" |
-| CMD062-DENY | EL | L-AUTH | same :: "CMD062-DENY: a seller and an agency member are 403, a stale step-up is ASSURANCE_REQUIRED; then expired, empty, duplicate or non-DRAFT hash, another sender's draft, maximumSends 0 or above the sealed drafts, window over 14 days, evidence not the review digest, superseded resource: each 409 with nothing written" |
-| CMD062-RACE | EL | L-AUTH | same :: "CMD062-RACE: identical retry replays one grant, same key other hashes is 409, a draft re-bound or a resource superseded held at its lock in both orders, the owner grant revoked held at its transition lock in both orders, crash before COMMIT nothing and after COMMIT one grant replayed" |
-| CMD063-OK | EL+SIM | L-SEND | apps/api/test/cmd063-send-authorized-outreach.test.ts :: "CMD063-OK: the assigned seller sends a sealed draft under a live grant: 200 one QUEUED intent (draft AUTHORIZED) with payload hash and grant reference, one outbox record; the dispatcher submits once through the Gmail contract fake and records PROVIDER_ACCEPTED with the provider id, never DELIVERED" |
-| CMD063-DENY | EL+SIM | L-SEND | same :: "CMD063-DENY: foreign and TERMINATED callers 403; then stale version, changed content hash, revoked, expired, exhausted or uncovering grant, suppressed contact, RESEND sender, unresolved SEND_UNCERTAIN of the prospect, cadence cap and missing compliance configuration: 409, no intent, no outbox, zero provider calls" |
-| CMD063-RACE | EL+SIM | L-SEND | same :: "CMD063-RACE: identical retry replays one intent, same key other hash is 409, two drafts on a one-send grant held at the grant lock give one 200 and one 409 OUTREACH_GRANT_INVALID, grant revocation held at the grant lock in both orders, crash before COMMIT no intent and after COMMIT one intent replayed" |
-| CMD064-OK | EL | L-ACT | apps/api/test/cmd064-record-sales-activity.test.ts :: "CMD064-OK: the reconciler records PROVIDER_ACCEPTED then BOUNCED, the seller records REPLIED with the inbound message ref and the owner records SUPPRESSED with opt-out evidence: one activity each, queued follow-ups of the prospect NOT_SENT, the contact suppressed, prospect SUPPRESSED, metrics accepted 1 less known bounces 1" |
-| CMD064-DENY | EL | L-ACT | same :: "CMD064-DENY: a seller of another prospect is 404, a TERMINATED seller 403, REPLIED on a DRAFT, REPLIED whose ref is the outbound provider id, PROVIDER_ACCEPTED by a person, a duplicate external identity and an activity dated after the database instant are refused; nothing counts twice" |
-| CMD064-RACE | EL | L-ACT | same :: "CMD064-RACE: identical retry replays one activity, same key other kind is 409, two reconcilers with one provider ref held at the prospect lock give one row, SUPPRESSED against a dispatcher claim held at the suppression key in both orders, crash before COMMIT nothing and after COMMIT one activity" |
-| R2-066 | EL (web half PART(B12-WEB)) | L-HOME | apps/api/test/b12-seller-home.test.ts :: "R2-066: a TERMINATED seller reads its home (statements and the support route only) and its own statement, while every prospect, contact, source, draft, activity and resource read and CMD045/046/061/063/064 refuse it, and its session sees zero prospect-data rows" |
-| R2-067 | PARTIAL(b12/owner-screens O2 + DEFERRED O4 after PV1-SETTLE) | - | no title here: §7 Deferred (binding requirements) |
-| R2-068 | EL | L-DRAFT | apps/api/test/cmd061-prepare-outreach-draft.test.ts :: "R2-068: a draft prepared without a grant stays DRAFT through reads, the dispatcher pass and a forged activity: no intent, no activity, metrics zero, and no projection has a delivered member" |
-| R2-129 | EL+SIM (live PART(B15/B19)) | L-SEND | apps/api/test/b12-dispatch-cells.test.ts :: "R2-129: the Gmail fake accepts but the answer is lost (timeout, reset, crash after SUBMITTING, lease taken over during the call): SEND_UNCERTAIN, exactly one provider submission, redelivery and recovery never submit again, CMD063 refuses a repeat until CMD064 HUMAN_SEND_OBSERVED closes it" |
-| R2-130 | EL | L-SEND | same :: "R2-130: an opt-out recorded after the grant and before the claim blocks the send — the public opt-out and CMD064 SUPPRESSED each held at the suppression key against the claim in both orders; the sealed grant never overrides the later refusal" |
-| R2-131 | EL+SIM | L-SEND | same :: "R2-131: a sales draft on a RESEND_TRANSACTIONAL sender is refused at send despite valid fake credentials and spare quota: zero Resend calls, the draft stays DRAFT at its version, the grant unconsumed; the database refuses a forged intent on that route" |
-| R2-132 | EL+SIM | L-SEND | same :: "R2-132: the sender's OAuth grant revoked with three queued drafts: the first claim observes AUTH_REVOKED (no effect), the sender becomes REVOKED, the other two are CANCELLED unsubmitted, past PROVIDER_ACCEPTED and SEND_UNCERTAIN activity is kept, and no intent is ever sent from the owner's identity" |
-| R2-135 | EL | L-DRAFT | apps/api/test/b12-resources.test.ts :: "R2-135: a seller opening a superseded offer sheet sees SUPERSEDED and the current resource; a new draft citing it, a grant over a draft citing it and a send are refused, a capability suspended by CMD059 makes its resource unusable too, and the historical draft, intent and activity rows stay readable" |
-Kit/DB cells (K): packages/persistence/test/b12-outreach-migrations.test.ts :: "B12 at the database: forged births refused (draft, grant, intent, activity, suppression) — KA095/KA096/KA097/KC028..KC033 each fired alone with its OK sibling through the production writer"; tools/test/ka-codes.test.mjs :: "KA codes: every raised KA code has one prefix, one sqlstate.ts entry and no other lane's claim"; packages/application/test/outreach-content.test.ts :: "safe claim and header checks: savings amounts, guarantees, AI in subject or more than one AI sentence, CR/LF/NUL, non-NFC text, over-long fields refused; plain permitted text admitted"; tools/test/b12-d33.test.mjs :: "D-33: no outreach rule, cap, copy or fixture reads or ranks the prospect segment".
-
-## 2. Failure-mode matrices (C = test above or new title; GAP code = written first; N/A reason)
-Global lock order B12 (rules 13/21; every actor in this order, every pair a RACE cell): [1] journal reserve (commerce/request/runtime.ts:306) ->
-[2] principal: owner grant shared transition 'kauro.corporate_roles' (commercial-sales.ts:857) | seller shared 'kauro.sellers' (commercial-sales.ts:339;
-CMD050 holds the exclusive half :372 after the row FOR NO KEY UPDATE :369) -> [3] prospect exclusive 'kauro.outreach_prospects' (NEW transition
-subject; readers shared) -> [4] capabilities FOR SHARE ascending (CMD059 takes FOR NO KEY UPDATE capability-governance.ts:54 then UPDATE :117) ->
-[5] resource versions FOR SHARE (publisher UPDATE) -> [6] sender identity FOR SHARE (commands) / FOR NO KEY UPDATE (dispatcher claim, revoker) ->
-[7] suppression keys 'kauro.prospect_suppressions' ORGANIZATION then CONTACT key (readers shared, writers exclusive; NEW; also taken shared by
-the 0029:991 registration trigger, GAP-SUP-1) -> [8] grant FOR SHARE (CMD061 none, CMD062 none) / FOR NO KEY UPDATE (CMD063, revoke) -> [9] draft
-FOR NO KEY UPDATE -> [10] intent FOR NO KEY UPDATE -> [11] dispatcher lease row FOR SHARE as LAST statement (0048 pattern,
-commission-service-access.ts:174) -> COMMIT. Clock: every judgment = kauro.effect_now() (0038:12) in a statement AFTER the last lock (rule 15/16);
-birth stamps kauro.server_now() (0009:42); app `now` (commerce/request/runtime.ts:318) is passed but never judged; the dispatcher's lease instant is
-judged GREATEST(p_now, effect_now()) exactly as 0054/0067 claim_lease. Clock-source census: CK1 (b05-clock-gates.test.ts:337) covers 0082/0083
-automatically (regenerate the gates file at rebase); kit adds the B12 src paths to CK3_PATHS (:407).
-### CMD061 PrepareOutreachDraft (L-DRAFT). One COMMIT: draft row + content binding + journal. Lock trace: [1] -> [2] seller shared (or owner) ->
-[3] prospect shared -> [4] capabilities of the resource FOR SHARE -> [5] resource FOR SHARE -> [6] sender FOR SHARE -> [7] suppression keys shared
--> SELECT effect_now() -> judge (assignment = prospects.owner_seller_id, sender state/binding, provenance = prospect source_evidence_hash,
-channel policy, content checks) -> INSERT draft. Actors: B=CMD050 (seller exclusive :372, unassignProspects :617), C=PublishSalesResource
-(UPDATE old version SUPERSEDED), D=CMD059 (capability), E=suppression writer, F=second CMD061.
-| RACE | C CMD061-RACE (B both orders; C both orders); GAP-DR-1 "RACE (capability): CMD059 restricting the resource's capability held at the capability lock in both orders — draft then SUSPENDED, or 409 RESOURCE_NOT_CURRENT" (fix: FOR SHARE [4]; red without it); E: GAP-DR-2 "RACE (suppression): a suppression of the prospect's contact held at the key lock in both orders — draft refused PROSPECT_SUPPRESSED or born before it (dispatch then refuses, R2-130)" |
-| TIMEOUT | C runtime lock/statement timeout -> retryable CAPACITY_UNAVAILABLE, nothing (adapters-unit-of-work "statement_timeout is transaction-local"); GAP-DR-3 "RACE (timeout): CMD061 waiting at the resource lock past the statement timeout answers 503 retryable and writes nothing" |
-| EXPIRY | N/A: a draft has no deadline; the resource/capability state is judged after [4]/[5] (rule 15) and the grant window belongs to CMD062/063 |
-| CRASH-BEFORE | C CMD061-RACE (crash after INSERT draft, before COMMIT: no draft, no journal entry) |
-| CRASH-AFTER | C CMD061-RACE (lost answer replayed by the key; one draft) |
-| RETRY | C CMD061-RACE (replay 201 identical; same key other body 409) |
-| REVOCATION | C CMD061-RACE (seller terminated); GAP-DR-4 "RACE (revocation): the sender REVOKED by the revoker held at the sender row in both orders" (rule 8: sender, assignment, resource, owner grant each a prerequisite) |
-| PARTIAL | GAP-DR-5 "RACE (partial): a failure injected at the content-binding INSERT after the draft INSERT rolls back the draft and the journal reservation" |
-### CMD062 AuthorizeOutreach (L-AUTH). One COMMIT: grant + sealed hash rows + journal + allow fact. Trace: [1] -> [2] owner shared -> step-up
-proof read -> [5] resources of every draft FOR SHARE -> [6] sender FOR SHARE -> [9] drafts FOR SHARE ascending (NOT NO KEY: the grant's FK
-inserts take KEY SHARE; drafts are not written) -> effect_now() -> judge (each hash = a DRAFT of this sender, max <= distinct drafts, window <= 14 d,
-expiresAt > effect_now, evidence = review digest, step-up at COMMIT per 0040). Actors: B=revoke owner grant, C=publisher, D=sender revoker,
-E=second CMD062 with an overlapping hash (allowed: two grants may seal one draft; consumption is per intent).
-| RACE | C CMD062-RACE (B, C, D both orders) | TIMEOUT | C runtime 503 (GAP-AU-1 "RACE (timeout): ... at the draft lock") | EXPIRY | GAP-AU-2 "RACE (expiry): the step-up and expiresAt crossed while waiting at the draft lock are judged at effect_now after it: ASSURANCE_REQUIRED / OUTREACH_GRANT_INVALID, nothing written" | CRASH-BEFORE | C CMD062-RACE | CRASH-AFTER | C CMD062-RACE | RETRY | C CMD062-RACE | REVOCATION | C CMD062-RACE (owner grant) + GAP-AU-3 "DENY: a sender REVOKED after the drafts were prepared" | PARTIAL | GAP-AU-4 "RACE (partial): failure at the second sealed-hash INSERT rolls back grant, first hash, fact and journal" |
-RevokeOutreachAuthorization (L-AUTH, owner route, GAP-API-B12-5): [1] -> [2] owner -> [8] grant FOR NO KEY UPDATE -> UPDATE revoked; queued intents
-of the grant -> NOT_SENT(GRANT_REVOKED) under [10] ascending. Cells: RACE vs dispatcher claim both orders (in R2-130 file: "RACE (revocation):
-grant revoked against a claim held at the grant row in both orders — claim refused, or SUBMITTING completes and the revoke leaves it"), RETRY replay,
-PARTIAL failure at the second intent update rolls back the revoke; TIMEOUT/CRASH C by the runtime shape; EXPIRY N/A (revocation has no deadline).
-### CMD063 SendAuthorizedOutreach (L-SEND). One COMMIT: intent QUEUED + draft AUTHORIZED + domain event outreach.send_intended.v1 + outbox
-record (consumer OUTREACH) + journal. Trace: [1] -> [2] seller/owner shared -> [3] prospect exclusive (cadence + uncertain) -> [4][5] FOR SHARE ->
-[6] sender FOR SHARE -> [7] keys shared -> [8] grant FOR NO KEY UPDATE (guarded aggregate: sends reserved = intents not NOT_SENT; rule 17 writers:
-CMD063 birth +1, NOT_SENT -1, revoke) -> [9] draft FOR NO KEY UPDATE -> effect_now() -> judge -> INSERTs.
-| RACE | C CMD063-RACE (two drafts one grant; revoke both orders); GAP-SE-1 "RACE (cadence): two sends to one prospect held at the prospect lock: one 200, one 409 OUTREACH_CAP_REACHED"; GAP-SE-2 "RACE (rolling cap): the 11th new recipient of one sender in 24 h refused, held at the sender lock" (rule 11 writer pair: CMD063 x CMD063) |
-| TIMEOUT | C runtime 503; GAP-SE-3 at the grant lock |
-| EXPIRY | GAP-SE-4 "RACE (expiry): the grant's expiresAt crossed while CMD063 waits at the grant lock: OUTREACH_GRANT_INVALID at effect_now after the lock, nothing written" (fix: clock after [8]; red with server_now) |
-| CRASH-BEFORE | C CMD063-RACE (after the outbox INSERT, before COMMIT: no intent, no outbox, draft DRAFT) |
-| CRASH-AFTER | C CMD063-RACE (replay; one intent; the outbox record dispatches once) |
-| RETRY | C CMD063-RACE |
-| REVOCATION | C CMD063-RACE (grant); GAP-SE-5 "RACE (revocation): seller TERMINATED held at the seller lock in both orders" ; GAP-SE-6 sender REVOKED both orders |
-| PARTIAL | GAP-SE-7 "RACE (partial): failure at the outbox INSERT (third write) rolls back intent, draft AUTHORIZED, event and journal" |
-### Dispatcher (L-SEND; apps/api/src/outreach/dispatcher.ts, commissions/dispatcher.ts shape; lease OUTBOX_DISPATCH, v5 UUID "b12-outreach-dispatcher").
-Rows: D1 claim outbox (kauro_control, 0067 claim_lease); D2 SUBMITTING COMMIT (kauro_outreach SERVICE unit: [2] seller shared -> [3] prospect shared
--> [6] sender NO KEY UPDATE -> [7] keys shared -> [8] grant FOR SHARE -> [9] draft -> [10] intent NO KEY UPDATE -> recheck all of A4 at effect_now ->
-QUEUED->SUBMITTING with claim_fence -> [11] lease FOR SHARE -> COMMIT); D3 provider call OUTSIDE any transaction, bounded (provider-call bound <
-lease TTL); D4 outcome COMMIT (intent + draft + activity PROVIDER_ACCEPTED|SEND_UNCERTAIN + [11] lease FOR SHARE); D5 recovery: SUBMITTING whose
-claim_fence < current fence -> SEND_UNCERTAIN, no call (KA096 refuses SUBMITTING->SUBMITTING, SUBMITTING->QUEUED, SEND_UNCERTAIN->SUBMITTING);
-D6 outbox settle (DELIVERED/RETRYABLE only for a QUEUED intent; never RETRYABLE once SUBMITTING committed).
-| D2 RACE | C R2-130 (opt-out writers x claim both orders); C R2-132; GAP-DI-1 "RACE (termination): CMD050 against the claim held at the seller lock in both orders — NOT_SENT(SELLER_NOT_ACTIVE) or SUBMITTING then terminated" | D2 TIMEOUT | GAP-DI-2 claim lock wait timeout: intent stays QUEUED, outbox RETRYABLE, zero calls | D2 EXPIRY | GAP-DI-3 "RACE (expiry): grant expiry crossed while the claim waits at the grant row: NOT_SENT(GRANT_EXPIRED), zero calls" | D2 CRASH-BEFORE | GAP-DI-4 crash after the SUBMITTING UPDATE, before COMMIT: QUEUED, redelivery submits once | D2 CRASH-AFTER | C R2-129 (crash after SUBMITTING COMMIT: D5 -> SEND_UNCERTAIN, zero further calls) | D2 RETRY | C R2-129 (redelivery) | D2 REVOCATION | C R2-132; GAP-DI-5 lease taken over before [11]: unit rolls back, intent QUEUED | D2 PARTIAL | GAP-DI-6 failure at the draft UPDATE after the intent UPDATE rolls both back |
-| D3 port | RACE N/A (no lock held; D4 is fenced) | TIMEOUT C R2-129 | EXPIRY C R2-129 (lease taken over during the call: old outcome fenced, SEND_UNCERTAIN) | CRASH C R2-129 | RETRY C R2-129 (one submission; fake counts calls by payload hash) | REVOCATION C R2-132 (AUTH_REVOKED = NO_EFFECT -> NOT_SENT + sender REVOKED) | PARTIAL N/A single call |
-| D4 outcome | RACE GAP-DI-7 "RACE (fence): D4 of the old owner against D5 of the new owner held at the lease row, both orders: exactly one outcome" | TIMEOUT GAP-DI-8 outcome COMMIT timeout -> D5 later SEND_UNCERTAIN | EXPIRY C (GAP-DI-7) | CRASH-BEFORE C R2-129 | CRASH-AFTER C R2-129 (settle lost: redelivery sees PROVIDER_ACCEPTED, no call) | RETRY C | REVOCATION N/A (effect already happened; recorded as observed) | PARTIAL GAP-DI-9 failure at activity INSERT rolls back intent/draft outcome; D5 then SEND_UNCERTAIN |
-### CMD064 RecordSalesActivity (L-ACT). One COMMIT: activity + draft/intent edge + (SUPPRESSED) suppression row + prospect SUPPRESSED + queued
-intents of the prospect NOT_SENT + journal. Trace: [1] -> [2] actor -> [3] prospect exclusive -> [7] keys EXCLUSIVE (SUPPRESSED only) -> [9] draft
--> [10] intent -> effect_now() (occurredAt <= it) -> INSERTs. Writers of the dedup identity: CMD064 x CMD064, dispatcher D4 x CMD064 (both insert
-activities with a provider ref; UNIQUE (provider_message_ref, kind) WHERE ref <> 'NONE' + [3]).
-| RACE | C CMD064-RACE; GAP-AC-1 "RACE (dispatcher): D4 PROVIDER_ACCEPTED and a reconciler's PROVIDER_ACCEPTED of one ref held at the prospect lock: one row"; GAP-SUP-1 "RACE: RegisterProspect against a suppression of its organization key held at the key lock in both orders — 409 PROSPECT_SUPPRESSED or the new prospect SUPPRESSED by the writer" (0029:991 trigger takes the shared key lock: whole-lane sweep, rule 17) | TIMEOUT | C runtime | EXPIRY | N/A no deadline; occurredAt judged <= effect_now after locks (DENY) | CRASH-BEFORE | C CMD064-RACE | CRASH-AFTER | C CMD064-RACE | RETRY | C CMD064-RACE | REVOCATION | GAP-AC-2 seller TERMINATED both orders | PARTIAL | GAP-AC-3 "RACE (partial): failure at the queued-intent NOT_SENT update rolls back suppression, prospect state and activity" |
-Public opt-out POST /api/v1/public/outreach/opt-out/{token} (L-ACT, GAP-API-B12-3; UI49 backend): token = HMAC(secret version, intent id), stored
-sha256 on the intent; anonymous, rate-limited, answers the same 200 for unknown tokens (no disclosure). Trace: lookup -> [7] keys exclusive -> INSERT
-suppression (CONTACT, purpose MARKETING) -> prospect SUPPRESSED -> queued intents NOT_SENT. Cells: RACE C R2-130; RETRY "RACE: the same token twice
-and concurrently: one suppression"; PARTIAL GAP-OO-1; TIMEOUT C runtime; EXPIRY N/A (tokens do not expire: an opt-out must keep working);
-CRASH-AFTER replay = same 200 (idempotent by key); REVOCATION N/A (anonymous).
-### Reads and owner routes (EL; N/A columns: read-only single unit unless stated)
-GetOutreachDraft, ListSalesActivities, GetOutreachMetrics (L-ACT), GetSalesResource + PublishSalesResource (L-DRAFT; publish RACE vs CMD061/062/063
-in R2-135), PutOutreachContent (L-DRAFT; content-addressed, not journaled, D-B12S-2 shape), RegisterSenderIdentity + RecordSenderRevocation (L-SEND;
-owner, step-up; GMAIL_API needs consentEvidenceRef), GetSellerHome (L-HOME). Each read: DENY cell (wrong role 403, foreign 404 identical to
-unknown) + REVOCATION cell (judged under the principal's shared lock, rule 16, same transaction).
-L-HOME migration 0083: prospects_seller_read, prospect_contacts_self_read, prospect_source_evidence_self_read, prospect_suppressions_read and every
-B12 table use kauro.acting_seller_id() (0029:169, ACTIVE only); GetCommissionStatement admits ACTIVE|SUSPENDED|TERMINATED own seller via new
-authorizer.authorizeStatementSeller (shared seller lock, state read after it). Cells: R2-066 title; GAP-HO-1 "RACE (revocation): CMD050 against a
-seller's prospect read held at the seller lock in both orders — rows then 0, never rows after TERMINATED"; impact inventory (run on base first):
-apps/api/test/{b10-failure-cells-sales,b10-scenarios,cmd045-register-prospect,cmd049-activate-seller,cmd050-terminate-seller}.test.ts,
-sellers-support.ts, packages/persistence/test/{b10-ledger-migrations,b10-sales-migrations}.test.ts.
-
-## 3. Lanes (file ownership; no two lanes edit one file; API-REG = commercial/{contracts,request-schemas,response-schemas,views,outcomes,served,
-vocabulary}.ts + apps/api/src/composition.ts + openapi/web generated: KIT only, once; regenerated files are regenerated by the coordinator at merge)
-| Lane | Branch | Owns | Cells | Est. (tokens, min, model) |
+| CMD061-OK | EL | L-DRAFT | apps/api/test/cmd061-prepare-outreach-draft.test.ts :: "CMD061-OK: an assigned ACTIVE seller prepares a DRAFT for its US prospect from stored content and a CURRENT resource, sender its own verified GMAIL_API identity, provenance its prospect's source evidence: 201 version 1, content hash bound to recipient/sender/purpose/body, no intent, outbox record, activity or provider call" |
+| CMD061-DENY | EL | L-DRAFT | same :: "CMD061-DENY: an agency tenant session and a TERMINATED seller are 403, another seller's prospect is 404 like an unknown id; then one missing prerequisite at a time: other person's sender, REVOKED sender, not-yet-verified sender (KC031), provenance not the prospect's, contentRef naming a tenant upload or staged record (404 like unknown), unreviewed jurisdiction, suppressed contact, superseded resource, savings amount, AI in subject, CR/LF in subject; no row, no event" + "CMD061-OK (route): a RESEND_TRANSACTIONAL sender is admitted at draft time and refused only at send (R2-131)" |
+| CMD061-RACE | EL | L-DRAFT | same :: "CMD061-RACE: identical retry replays the 201, same key other content is 409, CMD050 held at the seller lock L1 in both orders (draft then TERMINATED, or 403), PublishSalesResource held at the resource row L6 in both orders, crash before COMMIT leaves nothing and crash after COMMIT replays one draft" |
+| CMD062-OK | EL | L-AUTH | apps/api/test/cmd062-authorize-outreach.test.ts :: "CMD062-OK: the owner with a fresh step-up consumes the server-issued review of two DRAFT hashes of one sender and seals them for 14 days, maximumSends 2: 201 one grant bound to the review, revoked false, policyVersion recorded, validFrom clamped to the database instant, no draft changed, no send queued" |
+| CMD062-DENY | EL | L-AUTH | same :: "CMD062-DENY: a seller and an agency member are 403, a stale step-up is ASSURANCE_REQUIRED; then a client-computed digest of the same fields, a review issued under another step-up proof, a review of an earlier draft version, a consumed review, an expired review, expired/empty/duplicate/non-DRAFT hash, another sender's draft, maximumSends 0 or above the sealed drafts, window over 14 days, superseded resource, capability SUSPENDED by CMD059 after drafting: each 409 with nothing written" |
+| CMD062-RACE | EL | L-AUTH | same :: "CMD062-RACE: identical retry replays one grant, same key other hashes is 409, two CMD062 consuming one review give one grant (UNIQUE review_id), CMD063 authorizing a sealed draft held at the draft row L10 in both orders (grant then AUTHORIZED, or 409 non-DRAFT), CMD059 held at the capability row L5 in both orders, owner grant revoked held at L1 in both orders, crash before COMMIT nothing and after COMMIT one grant" |
+| CMD063-OK | EL+SIM | L-SEND | apps/api/test/cmd063-send-authorized-outreach.test.ts :: "CMD063-OK: the assigned seller sends a sealed draft under a live grant: 200 one QUEUED intent (draft AUTHORIZED) with payload hash and grant reference, one outbox record; the dispatcher submits once through the Gmail contract fake and records PROVIDER_ACCEPTED with the provider id, never DELIVERED" + "CMD063-OK (payload): the submitted MIME is text/plain with the bound From, the draft subject, the commercial identification line, the deployment postal address, List-Unsubscribe and List-Unsubscribe-Post headers and an opt-out URL that suppresses this contact when posted, no image or remote resource, and sha256 equal to the intent's payload hash" |
+| CMD063-DENY | EL+SIM | L-SEND | same :: "CMD063-DENY: foreign and TERMINATED callers 403; then stale version, changed content hash, revoked, exhausted or uncovering grant, suppressed contact, RESEND sender (KC028), open SEND_UNCERTAIN of the prospect (KC029), draft already OBSERVED_SENT or PROVIDER_ACCEPTED (KC036), follow-up after REPLIED or after BOUNCED, person paused by one bounce in its latest 50 (KC034), missing compliance configuration, uncovered calendar year (KC037): 409/503, no intent, no outbox, zero provider calls" + EXPIRY/CAP/CADENCE titles of §2 CMD063 |
+| CMD063-RACE | EL+SIM | L-SEND | same :: "CMD063-RACE: identical retry replays one intent, same key other hash is 409, two drafts on a one-send grant held at the grant row L9 give one 200 and one 409 OUTREACH_GRANT_INVALID, grant revocation held at L9 in both orders, crash before COMMIT no intent and after COMMIT one intent replayed" + GAP-SE-* |
+| CMD064-OK | EL | L-ACT | apps/api/test/cmd064-record-sales-activity.test.ts, one title per trigger: "CMD064-OK (REPLIED alone): the seller records REPLIED with an inbound ref on an accepted intent: one activity, the queued follow-up NOT_SENT, a new FOLLOW_UP CMD063 409, metrics accepted 1 replied 1 bounced 0 acceptedLessKnownBounces 1"; "CMD064-OK (BOUNCED alone): ... queued follow-up NOT_SENT, new FOLLOW_UP 409, the person paused (KC034), metrics accepted 1 bounced 1 acceptedLessKnownBounces 0"; "CMD064-OK (SUPPRESSED opt-out alone): ... contact suppressed, prospect SUPPRESSED, queued follow-up NOT_SENT, CMD061 and CMD063 409 PROSPECT_SUPPRESSED"; "CMD064-OK (complaint alone): SUPPRESSED reason COMPLAINT suppresses the contact and pauses the person"; "CMD064-OK (disqualification alone): SUPPRESSED reason DISQUALIFIED stops the sequence and refuses a new sequence after 90 days" |
+| CMD064-DENY | EL | L-ACT | same :: "CMD064-DENY: a seller of another prospect is 404, a TERMINATED seller 403, REPLIED on a DRAFT, REPLIED whose ref is an outbound provider id, a DELIVERED kind, PROVIDER_ACCEPTED or SEND_UNCERTAIN by a person, a second activity of one dedup identity under another key (per kind, §2 CMD064), HUMAN_SEND_OBSERVED NOT_SENT before submitted_at + call bound, an activity dated after the database instant; nothing counts twice" |
+| CMD064-RACE | EL | L-ACT | same :: "CMD064-RACE: identical retry replays one activity, same key other kind is 409, CMD064 REPLIED against the dispatcher claim held at the prospect lock L3 in both orders (claim NOT_SENT, or SUBMITTING then REPLIED), two HUMAN_SEND_OBSERVED of one intent held at L3 give one row, crash before COMMIT nothing and after COMMIT one activity" |
+| R2-066 | EL (web PART(B12-WEB)) | L-HOME | apps/api/test/b12-seller-home.test.ts :: "R2-066: a TERMINATED seller reads its home (statements and the support route, configured and then null shown as not configured) and its own statement, while every prospect, contact, source, draft, activity and resource read and CMD045/046/061/063/064 refuse it, and its session sees zero prospect-data rows" |
+| R2-067 | PARTIAL(B12-OWNER-SCREENS-2) | - | §7 (lane, date, required fixtures) |
+| R2-068 | EL | L-DRAFT | cmd061 file :: "R2-068: a draft prepared without a grant stays DRAFT through reads, a dispatcher pass and a forged activity: no intent, no activity, metrics zero, no delivered member — while the same pass submits a granted sibling draft exactly once" |
+| R2-129 | EL+SIM (live PART(B15/B19)) | L-SEND | apps/api/test/b12-dispatch-cells.test.ts :: "R2-129: the Gmail fake accepts but the answer is lost (timeout, reset, crash after SUBMITTING, lease taken over during the call): SEND_UNCERTAIN, exactly one submission, redelivery and recovery never submit again, CMD063 409 KC029 while it is open" + "R2-129 (5xx): a Gmail 503 after the body was sent is SEND_UNCERTAIN, never NOT_SENT; zero further submissions" + "R2-129 (observed sent): after HUMAN_SEND_OBSERVED SENT a CMD063 of the draft is 409 KC036 and the message counts in the 14-day cadence and the person cap" + "R2-129 (observed not sent): only after HUMAN_SEND_OBSERVED NOT_SENT is a repeat CMD063 admitted, once" |
+| R2-130 | EL | L-SEND | same :: "R2-130 (cross-seller): an opt-out of a contact recorded after the grant and before the claim of another seller's prospect with the same contact key, held at the suppression key L8 in both orders: NOT_SENT(SUPPRESSED), zero calls, that prospect shown suppressed" + "R2-130 (same prospect): the public opt-out against the claim of its own intent held at L3 in both orders: claim NOT_SENT, or SUBMITTING then the opt-out leaves it; the sealed grant never overrides the refusal" |
+| R2-131 | EL+SIM | L-SEND | same :: "R2-131: a sales draft on a RESEND_TRANSACTIONAL sender is refused at send despite valid fake credentials and spare quota: zero Resend calls, the draft stays DRAFT, the grant unconsumed, a forged intent on that route refused (KC028); the same contentRef drafted on the seller's GMAIL_API sender is granted and submitted once" |
+| R2-132 | EL+SIM | L-SEND | same :: "R2-132: the sender's OAuth grant revoked with three queued drafts: the first claim observes AUTH_REVOKED (no effect), the sender becomes REVOKED, the other two are CANCELLED at their claims unsubmitted, past PROVIDER_ACCEPTED and SEND_UNCERTAIN activity is kept, and no intent is ever sent from the owner's identity" |
+| R2-135 | EL | L-DRAFT | apps/api/test/b12-resources.test.ts :: "R2-135: a seller opening a superseded offer sheet sees SUPERSEDED and the current resource; a new draft citing it, a grant over a draft citing it and a send are refused, a capability suspended by CMD059 after drafting refuses the grant and the claim (NOT_SENT CAPABILITY_RESTRICTED), and the historical draft, intent and activity rows stay readable" |
+Kit, static and producer cells: companion §K (one title per predicate), §S (tools/test/b12-d33.test.mjs, b12-imports.test.mjs, b12-case-map.test.mjs).
+## 2. Failure-mode matrices (C = title above or below; GAP = written first; N/A with reason)
+GLOBAL LOCK ORDER (rules 13/21; corrected per ADV-4f: access runs before the journal, runtime.ts:300 then :306): L1 principal shared, inside run.access (runtime.ts:300): seller 'kauro.sellers'
+(commercial-sales.ts:339; CMD050 exclusive :372 after the row FOR NO KEY UPDATE :369) | owner 'kauro.corporate_roles' (:857). Service units (D2-D5) take the shared seller half of the intent's sender
+person here. L2 journal reserve (runtime.ts:306; commands and the opt-out). L3 prospect subject 'kauro.outreach_prospects' (NEW, keyed prospect_id): exclusive for every writer of the prospect's
+sequence, state or activities (CMD063, CMD064, D2, D4, D5, opt-out), shared for CMD061 and reads. L4 person cap subject 'kauro.outreach_person_caps' (NEW, keyed user_id) exclusive, by every writer
+moving an intent into or out of COUNTED (§2 G). L5 capabilities FOR SHARE ascending (CMD059 FOR NO KEY UPDATE capability-governance.ts:54, UPDATE :117). L6 resource rows FOR SHARE (publisher FOR NO
+KEY UPDATE). L7 sender FOR SHARE (CMD061/062/063, D2) | FOR NO KEY UPDATE (RecordSenderRevocation, D4 on AUTH_REVOKED). L8 suppression key subject 'kauro.prospect_suppressions' (NEW, keyed kind+key):
+exclusive by suppression writers; shared by CMD061, CMD063, D2 (recipient contact key and organization key) and by the CMD045 trigger 0029:991 (0082 adds the lock there; a new prospect has no L3). L9
+grant row FOR NO KEY UPDATE (CMD063, D2, revoke, every COUNTED mover); CMD062 inserts it. L10 drafts FOR SHARE (CMD062) | FOR NO KEY UPDATE (CMD063, D2, D4, D5, CMD064). L11 review row (CMD062;
+serializer = UNIQUE review_id). L12 intents FOR NO KEY UPDATE ascending. L13 lease row FOR SHARE as last statement (D2/D4/D5; 0048, packages/persistence/src/commission-service-access.ts:166-180). A
+multi-subject writer reads its set first, locks ascending, re-reads after its last lock and reruns (retryable CAPACITY_UNAVAILABLE after 3) if the set grew (rule 17). No actor takes a lower L after a
+higher one. Clock: every judgment = kauro.effect_now() (0038:12) in a statement after the last lock; births stamp kauro.server_now() (0009:42); app now (runtime.ts:318) never judged; leases
+GREATEST(p_now, effect_now()) (0054/0067). Census by source: CK1 (b05-clock-gates.test.ts:337) regenerated; K adds B12 src paths to CK3_PATHS (:164) and
+apps/api/src/outreach/dispatcher.ts#claim1/#heartbeat1 to LEASE_CALLERS (:185).
+### G. Guarded aggregates (rules 11/17; every writer, lock, DB guard, counted states, RACE pairs)
+| Aggregate | Lock | Writers (+1 / -1) | DB guard | Pair cells (both orders, held at the lock, mustWait proves the wait) |
 |---|---|---|---|---|
-| K kit (first) | b12/kit | migration 0082_b12_outreach.sql (tables sender_identities, outreach_contents, sales_resources(+capability claims), outreach_channel_policies seed, outreach_drafts, outreach_authorizations(+sealed hashes), outreach_send_intents, sales_activities, prospect_contact_addresses; machine rows in kauro.aggregate machine registry; RLS ACTIVE-only; role kauro_outreach + 0048-style lease FOR SHARE grant; narrow lock-only grants for FOR SHARE on capabilities/resources; 0029:991 trigger takes the key lock; guards KA095-097, KC028-033); packages/domain/src/commercial/outreach.ts + machines.ts + principals.ts (OUTREACH_SERVICE); persistence repositories/commercial-outreach.ts, outreach-access.ts, pool.ts/testing harness login kauro_outreach_test, sqlstate.ts, index.ts; application commercial/outreach/{ports,runtime,index}.ts + ContractFakeGmailSend/ContractFakeResend (testing, SIMULATED); every handler file as a stub answering INTEGRITY_FAILURE NOT_BUILT; API-REG for all 4 commands + 11 routes; docs/design/KC-CODES.md rows (PLANNED); tools/test/ka-codes.test.mjs; b05-clock-gates CK3_PATHS; apps/api/test/outreach-support.ts | K cells (§1), GAP-SUP-1 | TD 150k/60 Opus; B 450k/150 Sonnet |
-| L-DRAFT | b12/draft | application commercial/outreach/{prepare-draft,put-content,content-checks,resources,get-draft}.ts; tests cmd061-*, b12-resources, packages/application/test/outreach-content.test.ts | CMD061 x3, R2-068, R2-135, GAP-DR-1..5 | TD 120k/45; B 250k/90 |
-| L-AUTH | b12/auth | commercial/outreach/{authorize,revoke-authorization}.ts; test cmd062-* | CMD062 x3, GAP-AU-1..4, revoke cells | TD 80k/30; B 150k/60 |
-| L-SEND (tier 1 authority) | b12/send | commercial/outreach/{send,sender-identity}.ts; apps/api/src/outreach/{dispatcher,recovery,mime}.ts; tests cmd063-*, b12-dispatch-cells | CMD063 x3, R2-129..132, GAP-SE-*, GAP-DI-* | TD 180k/75 Opus; B 400k/150 Sonnet |
-| L-ACT | b12/activity | commercial/outreach/{record-activity,opt-out,metrics,list-activities}.ts; apps/api/src/outreach/opt-out-route.ts; test cmd064-* | CMD064 x3, GAP-AC-*, GAP-OO-1 | TD 120k/45; B 250k/90 |
-| L-HOME | b12/home | migration 0083_b12_seller_scope.sql; commercial/authorizer.ts; statements/get-statement.ts; sellers/seller-home.ts; test b12-seller-home | R2-066, GAP-HO-1 | TD 60k/25; B 120k/45 |
-| L-SOURCE (rule 1b) | b12/source | commercial/prospects/{record-source,record-contact}.ts (the owner/seller producers commercial-sales.ts:14 says B12 owns; contact address bound sha256 -> contact_key); test b12-prospect-sources | DENY/OK/RACE of the two routes | TD 50k/20; B 100k/40 |
-Order: K -> {L-DRAFT, L-AUTH, L-SEND, L-ACT, L-HOME, L-SOURCE} in parallel (5 max per quota-pace) -> one batch branch batch/<date>-b12 (all
-lanes together: the stubs never reach main alone) -> adversary per lane (L-SEND tier 1: Codex lane review) -> red-proof per new test -> one PR.
-Done per lane: every title of its cells exists and is red on the kit head with the lane's product files reverted (red-proof.mjs), green after;
-ci-local green on the merge with origin/main; matrix cells rewritten GAP -> C in the same commit. Total ~2.9M agent tokens; wall ~3.5 h kit + ~3 h lanes.
-Codes claimed (census main + 167 worktrees 2026-10-14: KA max KA094 (B16 reserved KA085-094), KC max KC027, gaps KC004/008/012/013 never reused):
-KA095 OUTREACH_BINDING, KA096 SEND_FENCE, KA097 ACTIVITY_EVIDENCE; KC028 OUTREACH_ROUTE_FORBIDDEN, KC029 SEND_UNCERTAIN_UNRESOLVED, KC030
-OUTREACH_GRANT_INVALID, KC031 SENDER_NOT_VERIFIED, KC032 OUTREACH_CAP_REACHED, KC033 RESOURCE_NOT_CURRENT; dispatch suppression reuses KC016
-PROSPECT_SUPPRESSED (same prefix, kc-codes allows one prefix raised by many functions). Migrations provisional 0082 (K), 0083 (L-HOME).
-
-## 4. Context packets (coordinator copies; each <= 3k tokens)
-TD-K: goal: failing kit DB tests + ka-codes test. Files: 0029:321-372 (contacts, prospects, suppressions), 0029:988-1000, 0029:1338-1370 (RLS),
-0048 whole (21 lines), 0005:108-140 (outbox), 0006:162-215 (leases), 0054/0067 claim_lease, sqlstate.ts:1-130, tools/test/kc-codes.test.mjs, docs/
-design/KC-CODES.md. Harness: @kauro/persistence/testing faults (bothOrders, mustWait, crashableFactory, controlledClock, runCell), sales-fixtures
-recordActiveSeller. Cells: K titles + GAP-SUP-1. Done: each forged control red alone on 8354d7be+schema-without-guard. Budget 150k/60.
-B-K: goal: §3 K files. Contracts: registry contracts OutreachDraft/OutreachAuthorization/SalesActivity (fields verbatim), policy.messaging, §0 A2-A11,
-lock order §2, codes §3. Patterns: operations-recovery.ts + 0059 (service principal), commissions/dispatcher.ts:1-130, commission-service-access.ts:
-166-180 (lease fence, but judge GREATEST(p_now, effect_now()) like 0054), D-B12S-2 (content-addressed upload). Stubs answer INTEGRITY_FAILURE NOT_BUILT.
-Done: kit tests green, existing suite green, CK1 gates regenerated, openapi regenerated. Budget 450k/150.
-TD-DRAFT / B-DRAFT: files: kit outreach-support.ts, commercial/prospects/register-prospect.ts (handler shape), authorizer.ts:66-80, commercial-sales.ts:
-330-372, 596-610, capability-governance.ts:54,117. Rules: 12 "Outreach workspace" + 18 "Initial channel decision" quotes (§0 A1, A8, A9). Content
-checks: subject <= 200 chars, no CR/LF/NUL/control, NFC; body text <= 20,000; refuse any currency/percentage amount within 8 words of "save"/"savings";
-"guarantee"; "AI"/"artificial intelligence" in subject; more than one sentence naming AI; every resourceRef CURRENT. Cells §1/§2 CMD061, R2-068, R2-135.
-Done: §3. Budget TD 120k/45, B 250k/90.
-TD-AUTH / B-AUTH: files: authorize-recovery.ts (step-up pattern), 0040 step-up at COMMIT, kit repository grant methods. Review digest =
-sha256(canonical JSON {senderIdentityRef, sorted allowedContentHashes, validFrom, expiresAt, maximumSends}). Cells CMD062 + revoke. Budget 80k/30, 150k/60.
-TD-SEND / B-SEND: files: commissions/dispatcher.ts whole, payments/dispatcher.ts:1-30, lease-store.ts, 0048, 0054:1-40, kit ports (GmailSendPort:
-submit(mime, sender) -> ACCEPTED{providerMessageRef} | REJECTED{code} | AUTH_REVOKED | TIMEOUT | RESET | UNKNOWN; fake counts submissions by payload
-hash, can lose the answer after accepting). Rules: §0 A3-A6, A10, A11; D5 recovery; KA096. Every RACE cell: actor lock trace of §2 in the test
-comment with file:line, held via mustWait at the named lock, both orders; the fix whose removal turns it red named in the title comment.
-Cells: CMD063 x3, R2-129..132, GAP-SE-*, GAP-DI-*. Budget TD 180k/75 (Opus), B 400k/150.
-TD-ACT / B-ACT: files: kit repository activity/suppression methods, 0029:988-1000, register-prospect.ts:60-72, policy.messaging. Kinds and their
-admitted actors: PROVIDER_ACCEPTED/SEND_UNCERTAIN service only; BOUNCED service or person with evidence on an accepted intent; REPLIED person with an
-inbound ref distinct from every outbound ref of the draft; SUPPRESSED any; HUMAN_SEND_OBSERVED person, closes SEND_UNCERTAIN. Metrics: accepted,
-uncertain, bounced, replied and "accepted less known bounces"; no member named delivered. Budget TD 120k/45, B 250k/90.
-TD-HOME / B-HOME: files: authorizer.ts whole, get-statement.ts:85-122, 0029:164-177, 1338-1366, 0031:610-624; impact inventory list §2. Home view:
-{sellerState, permittedActions (closed set), statements [{statementId, periodStart, periodEnd, state}], supportRoute (deployment KAURO_SELLER_SUPPORT_ROUTE
-or null, labelled "not configured")}; never cash, CRM or other sellers. Budget TD 60k/25, B 120k/45.
-
-## 5. Conflicts decided (authority quoted in §0)
-D-B12O-1 states (A2). D-B12O-2 dispatch = outbox intent + OUTBOX_DISPATCH lease + fenced outcome, NOT the D-TEAM-1 oneTimeDelivery seam: that seam
-drops a failed delivery after COMMIT (server.ts:772-779 "a failing channel is an internal error") and has no uncertain state, which violates A3.
-D-B12O-3 a separate kauro_outreach group: contact addresses are personal data and the ref "Measurement" keeps the sales store "separate ... from
-private personal finance"; reusing kauro_commission (B18-OPS-1) would let the commission pool read them; policies cannot scope by service id (0059:28).
-D-B12O-4 manual route: MANUAL_MAILBOX senders (ref "Selected routes": "sent by its authorized human in the native mailbox and recorded with evidence;
-it remains an explicit manual delivery route") get the same claim rechecks; D3 releases the payload to the human (no provider call); CMD064
-HUMAN_SEND_OBSERVED closes it. This is the V1 operable route while Gmail consent is BLOCKED_OWNER. D-B12O-5 cancellation: no cancel command exists in
-the registry; CANCELLED is reached only by the dispatcher (sender REVOKED, seller not ACTIVE, grant revoked/expired) — recorded, not invented.
-D-B12O-6 cadence, D-B12O-7 jurisdiction/compliance (§0). D-B12O-8 grant consumption = reserved intents under the grant row lock; NOT_SENT returns it.
-D-B12O-9 R2-066 support route = deployment value (no seller support command exists in the registry; 12 "Seller dispute flow" has none either):
-null is shown as not configured, never a fabricated address. D-B12O-10 an opt-out is contact-level MARKETING suppression; essential notices are not
-outreach and are out of this boundary (10 "Marketing opt-out does not suppress legally necessary payment or security notices").
-Caveats turned into cells: post-claim opt-out cannot recall an in-flight submission (ref: "before queued sends are claimed") -> R2-130 asserts the
-order; a provider-accepted message whose answer was lost stays SEND_UNCERTAIN even if the fake later shows it sent (never inferred) -> R2-129.
-
-## 6. BLOCKED_OWNER parts (build continues on fakes; live halves PART)
-Gmail API OAuth app verification and per-seller consent (ref "Selected routes"; OA06/OA16) -> live R2-129/131/132/CMD063 PART(B15/B19); Workspace
-seats per seller (OA17, "licence ... separately provisioned and budgeted"); domain + SPF/DKIM/DMARC read-back (OA03, B14); Resend account (B15);
-postal address for the CAN-SPAM footer (D-16: address not given); opt-out HMAC secret and support alias are B14 provisioning (not owner).
-
-## 7. Deferred (rule 7: moving interfaces)
-R2-067 owner finance unknowns: O2 part is lane b12/owner-screens (open); O4 needs PV1-SETTLE (pv1/settle 5134439a, open). Binding requirements for the
-O4 lane: captured, provider-held, provider-available, bank-available, refundable, tax, commission-payable each a separate member with observedAt and
-source; absent observation = UNKNOWN (never 0, 12 "Unknown balances are labelled unknown, never zero"); no spendable-cash member exists unless a
-verified bank settlement row backs it; seller sessions 403. Web screens UI33/UI53/UI54 (browser halves of R2-066/068/135) follow the API lanes'
-merge (SCREENS-PLAN: OPS screens DEFERRED): copy word for word from registry primaryCopy; "A draft is not sent; provider acceptance is not delivery".
+| grant reserved = COUNTED intents <= maximumSends | L9 | +1 CMD063 INSERT; -1 D2 NOT_SENT/CANCELLED, CMD064 stop sweep, opt-out sweep, HUMAN NOT_SENT, revoke sweep at D2 | BEFORE INSERT/UPDATE OF state on intents takes L9 then counts (KC030) | GAP-SE-8 "RACE (grant, CMD063 x CMD063 on two prospects)"; GAP-SE-9 "RACE (grant, CMD064 REPLIED sweep holding L9 x CMD063 on the one-send grant: CMD063 waits, then 200; exactly maximumSends)"; GAP-SE-10 opt-out sweep x CMD063; GAP-SE-11 D2 NOT_SENT x CMD063; K "forged intent INSERT over maximumSends refused at L9" |
+| person first contacts in 24 h < 10 | L4 | +1 CMD063 (counted_at), D2 re-stamps counted_at at claim; -1 every NOT_SENT/CANCELLED/OBSERVED_NOT_SENT | same trigger takes L4 (KC032) | GAP-SE-2 "RACE (person cap): two CMD063 of one person on two prospects and two grants at 9 of 10, one held after its count at L4: one 200, one 409 OUTREACH_CAP_REACHED; both orders; red with L4 downgraded to shared"; GAP-SE-12 "DENY (person cap): a second sender identity of the same seller does not reset the cap"; GAP-SE-13 CMD064 sweep x CMD063 at L4; GAP-DI-10 D2 re-stamp x CMD063 at L4 |
+| prospect sequence (one active, <= 2, windows, stops, 90 d) | L3 | CMD063 +1; D2, D4, D5, CMD064, opt-out | trigger takes L3 (KC032) | GAP-SE-1 "RACE (cadence): two sends to one prospect held at L3: one 200, one 409"; CMD064-RACE (REPLIED x claim); GAP-SE-14 "RACE: CMD064 REPLIED holding L3 x CMD063 follow-up: no QUEUED intent survives the reply" |
+| health pause | none needed | BOUNCED, COMPLAINT, diagnosis | — | N/A: a monotone gate; a send serialized before the bounce is not after the pause (no lock can turn a test red); sequential cells GAP-SE-15 and D2 DENY (paused) |
+### CMD061 PrepareOutreachDraft (L-DRAFT). One COMMIT: draft + content binding + journal. Trace: L1 seller shared (or owner) -> L2 -> L3 shared ->
+L5 -> L6 -> L7 shared -> L8 shared (contact + org key) -> effect_now -> judge -> INSERT. Actors: CMD050 (L1), publisher (L6), CMD059 (L5), opt-out (L8 via L3 of another prospect), CMD061.
+| RACE | C CMD061-RACE; GAP-DR-1 "RACE (capability): CMD059 held at the capability row L5 in both orders: draft then SUSPENDED, or 409 RESOURCE_NOT_CURRENT"; GAP-DR-2 "RACE (suppression): the public opt-out of the contact through another prospect held at L8 in both orders: 409 PROSPECT_SUPPRESSED or the draft born before it (send then refused)" | TIMEOUT | GAP-DR-3 "TIMEOUT: CMD061 waiting at L6 past statement_timeout answers 503 retryable, writes nothing" | EXPIRY | N/A: no deadline; states judged after L5/L6 | CRASH-BEFORE/AFTER, RETRY | C CMD061-RACE | REVOCATION | C CMD061-RACE (seller); GAP-DR-4 "RACE (revocation): RecordSenderRevocation held at the sender row L7 in both orders" | PARTIAL | GAP-DR-5 "PARTIAL: failure at the content-binding INSERT rolls back the draft and the journal reservation" |
+### PrepareOutreachReview (L-AUTH, owner, step-up; GAP-API-B12-6) and CMD062 AuthorizeOutreach (L-AUTH). Review: L1 owner -> L2 -> L10 drafts FOR
+SHARE -> effect_now -> INSERT review (versions, hashes, previews, proof id, expires). CMD062: L1 owner -> L2 -> proof read -> L5 -> L6 -> L7 -> L10 drafts FOR SHARE ascending -> L11 review read ->
+effect_now -> judge -> INSERT grant(review_id UNIQUE) + hashes + fact; step-up fresh at COMMIT (0040).
+| RACE | C CMD062-RACE | TIMEOUT | GAP-AU-1 "TIMEOUT: at the draft row L10" | EXPIRY | GAP-AU-2 "EXPIRY: step-up, review expiry and expiresAt crossed while waiting at L10 judged after it"; GAP-AU-5 "EXPIRY (review boundary): consumed 1 us before issued_at + 15 min admitted, at it refused" | CRASH, RETRY | C CMD062-RACE | REVOCATION | C (owner grant L1, CMD059 L5); GAP-AU-3 "DENY: a sender REVOKED after the review" | PARTIAL | GAP-AU-4 "PARTIAL: failure at the second sealed-hash INSERT rolls back grant, first hash, fact, journal and leaves the review unconsumed" |
+Review route rows: companion §R. RevokeOutreachAuthorization (L-AUTH, GAP-API-B12-5): L1 owner -> L2 -> L9 FOR NO KEY UPDATE -> revoked = true; queued intents are NOT_SENT(GRANT_REVOKED) by D2 at
+their claim (no sweep: keeps L3 < L9). Cells: GAP-AU-6 "RACE (revocation): revoke against a claim held at L9 in both orders: claim NOT_SENT, or SUBMITTING completes and revoke leaves it"; RETRY
+replay; TIMEOUT/CRASH runtime shape; EXPIRY N/A; PARTIAL N/A (one row).
+### CMD063 SendAuthorizedOutreach (L-SEND). One COMMIT: intent QUEUED (counted_at = effect_now) + draft AUTHORIZED + event outreach.send_intended.v1 +
+outbox + journal. Trace: L1 -> L2 -> L3 excl -> L4 excl -> L5 -> L6 -> L7 shared -> L8 shared -> L9 -> L10 -> effect_now -> judge (A4-A15) -> INSERTs.
+| RACE | C CMD063-RACE; §G pairs | TIMEOUT | GAP-SE-3 "TIMEOUT: at the grant row L9" | EXPIRY | GAP-SE-4 "EXPIRY (wait): expiresAt crossed while waiting at L9: refused at effect_now after it (red with server_now)"; GAP-SE-16 "EXPIRY (boundaries): at validFrom admitted and 1 us before refused; 1 us before expiresAt admitted and at expiresAt refused"; GAP-SE-17 "CAP (24 h edge): a first contact counted at T keeps the 11th refused at T + 24 h - 1 us and admits it at T + 24 h"; GAP-SE-18 "CADENCE (business days): first send 2026-12-24T15:00Z: follow-up refused on 2027-01-03 (10 calendar days, 4 business days) and at 2027-01-04T14:59:59.999999Z, admitted at 2027-01-04T15:00:00Z, admitted 1 us before 2027-01-07T15:00:00Z and refused at it"; GAP-SE-19 "CADENCE (90 days): a new sequence refused 1 us before last message + 90 days, admitted at it"; GAP-SE-20 "DENY (calendar): a Saturday first contact is refused, a Saturday follow-up inside its window too" | CRASH-BEFORE | C CMD063-RACE (after the outbox INSERT) | CRASH-AFTER, RETRY | C CMD063-RACE | REVOCATION | C (grant); GAP-SE-5 "RACE (revocation): CMD050 held at L1 in both orders"; GAP-SE-6 sender REVOKED held at L7 both orders | PARTIAL | GAP-SE-7 "PARTIAL: failure at the outbox INSERT rolls back intent, draft, event, journal" |
+GAP-SE-15 "DENY (health): one BOUNCED among the person's latest 50 counted intents refuses a new first contact and a follow-up of another prospect (KC034) until the owner's diagnosis; with 3 sends
+shown as 1/3".
+### Dispatcher (L-SEND; apps/api/src/outreach/dispatcher.ts; lease OUTBOX_DISPATCH, v5 UUID "b12-outreach-dispatcher")
+D1 claim outbox (kauro_control, claim_lease 0067). D2 claim COMMIT (kauro_outreach SERVICE unit): L1 seller shared -> L3 excl -> L4 excl -> L5 -> L6 -> L7 shared -> L8 shared -> L9 -> L10 -> L12 ->
+effect_now -> rechecks (each refusal NOT_SENT or CANCELLED with reason, grant/cap released, zero calls; titles "D2 DENY (<prerequisite>): withdrawn after CMD063 and before the claim:
+<state>(<REASON>), zero provider calls, grant and cap released"): suppression registry -> SUPPRESSED (and prospect SUPPRESSED); grant revoked -> GRANT_REVOKED; expiresAt <= effect_now +
+providerCallBound -> GRANT_EXPIRED (ADV-20; boundary "D2 EXPIRY (boundaries): claimed when expiresAt - callBound is 1 us after effect_now, refused at equality"); validFrom > effect_now ->
+GRANT_NOT_YET_VALID; assignment moved (CMD050 unassignProspects, commercial-sales.ts:617) -> CANCELLED(RECIPIENT_CHANGED); channel policy withdrawn or compliance configuration absent ->
+POLICY_WITHDRAWN / COMPLIANCE_UNCONFIGURED; person cap -> CAP_REACHED; not a business day for a first contact -> OUTSIDE_BUSINESS_DAY; cadence window closed or stop trigger -> CADENCE_CLOSED; health
+pause -> PAUSED; seller not ACTIVE -> CANCELLED(SELLER_NOT_ACTIVE); sender REVOKED/unverified -> CANCELLED(SENDER_REVOKED); resource not CURRENT -> RESOURCE_NOT_CURRENT; capability restricted ->
+CAPABILITY_RESTRICTED; another open SEND_UNCERTAIN of the prospect -> UNCERTAIN_OPEN. Admitted: QUEUED -> SUBMITTING, counted_at = effect_now, claim_fence = lease fence -> L13 -> COMMIT. D3 provider
+call outside any transaction, bounded (callBound < lease TTL), classified by A3. D4 outcome COMMIT: L3 -> L7 (AUTH_REVOKED only) -> L10 -> L12 -> if an activity of this intent and kind exists: no-op
+-> intent/draft outcome + activity (through the CMD064 writer, service key = intent id + kind) -> L13. D5 recovery: SUBMITTING with claim_fence < current fence or submitted_at + callBound < effect_now
+-> SEND_UNCERTAIN, no call (L3, L10, L12, L13). KA096 refuses SUBMITTING->SUBMITTING|QUEUED, SEND_UNCERTAIN->SUBMITTING|QUEUED, NOT_SENT|CANCELLED|OBSERVED_*->any. D6 outbox settle: RETRYABLE only
+while the intent is QUEUED.
+| D2 | RACE: C R2-130 x2, R2-132; GAP-DI-1 "RACE (termination): CMD050 against the claim held at L1 in both orders: CANCELLED(SELLER_NOT_ACTIVE) or SUBMITTING then terminated"; GAP-DI-11 "RACE (capability): CMD059 held at L5 in both orders"; GAP-DI-12 "RACE (resource): publisher held at L6 in both orders" | TIMEOUT: GAP-DI-2 "TIMEOUT: claim lock wait: QUEUED, outbox RETRYABLE, zero calls" | EXPIRY: GAP-DI-3 "EXPIRY (wait): grant expiry crossed while waiting at L9: NOT_SENT(GRANT_EXPIRED)" + boundary above | CRASH-BEFORE: GAP-DI-4 "CRASH: after the SUBMITTING UPDATE, before COMMIT: QUEUED, redelivery submits once" | CRASH-AFTER: C R2-129 | RETRY: C R2-129 | REVOCATION: C R2-132, GAP-AU-6; GAP-DI-5 "lease taken over before L13: unit rolls back, intent QUEUED" | PARTIAL: GAP-DI-6 "failure at the draft UPDATE after the intent UPDATE rolls both back" |
+| D3 | RACE N/A (no lock held; D4 fenced) | TIMEOUT/EXPIRY/CRASH/RETRY C R2-129 (+5xx) | REVOCATION C R2-132 | PARTIAL N/A (one call) |
+| D4 | RACE: GAP-DI-7 "RACE (fence): D4 of the old owner and D5 of the new owner held at L3 in both orders: one SEND_UNCERTAIN at most, the late answer then closes it PROVIDER_ACCEPTED with its ref, never two PROVIDER_ACCEPTED activities" | TIMEOUT: GAP-DI-8 "outcome COMMIT timeout: D5 later SEND_UNCERTAIN" | EXPIRY: C GAP-DI-7 | CRASH-BEFORE/AFTER C R2-129 | RETRY: GAP-DI-13 "RETRY: a redelivered D4 with its activity already recorded is a no-op" | REVOCATION N/A (effect happened; recorded) | PARTIAL: GAP-DI-9 "failure at the activity INSERT rolls back the outcome; D5 then SEND_UNCERTAIN" |
+| D5 | RACE C GAP-DI-7 | TIMEOUT N/A (no wait beyond L3) | EXPIRY: GAP-DI-14 "D5 boundary: SUBMITTING at submitted_at + callBound - 1 us untouched, at it SEND_UNCERTAIN" | CRASH C R2-129 | RETRY: rerun is idempotent (state guard) GAP-DI-15 | REVOCATION N/A | PARTIAL N/A (one UPDATE per intent unit) |
+### CMD064 RecordSalesActivity (L-ACT). One COMMIT: activity + intent/draft edge + (SUPPRESSED) suppression row + own prospect SUPPRESSED + queued
+intents of the prospect NOT_SENT + journal. Trace: L1 -> L2 -> L3 excl -> L4 persons of the moved intents ascending -> L8 excl (SUPPRESSED) -> L9 grants ascending -> L10 -> L12 -> effect_now
+(occurredAt <= it) -> writes. Dedup identities (DB, KA097; ADV-21): PROVIDER_ACCEPTED, SEND_UNCERTAIN, BOUNCED, HUMAN_SEND_OBSERVED: one per intent; REPLIED: one per inbound provider ref (NONE refused
+for REPLIED and BOUNCED); SUPPRESSED: one per (prospect, key kind, key); NONE admitted only for SUPPRESSED and HUMAN_SEND_OBSERVED. Actors and kinds: PROVIDER_ACCEPTED/SEND_UNCERTAIN service only;
+BOUNCED service or person with DSN evidence on an accepted intent; REPLIED person, inbound ref distinct from every outbound ref; SUPPRESSED seller (CONTACT) or owner (CONTACT|ORGANIZATION), reasons
+OPT_OUT|COMPLAINT|DISQUALIFIED|REFUSAL; HUMAN_SEND_OBSERVED person (SENT|NOT_SENT).
+| RACE | C CMD064-RACE; GAP-SUP-1 "RACE: CMD045 registering the organization against the owner's ORGANIZATION SUPPRESSED of its suppressed-to-be prospect held at L8 in both orders: 409 PROSPECT_SUPPRESSED or PROSPECT_EXISTS, never a live prospect of a suppressed organization (red without the trigger's L8)" | TIMEOUT | runtime 503 GAP-AC-4 at L3 | EXPIRY | N/A no deadline; occurredAt <= effect_now (DENY); observed-not-sent bound DENY | CRASH, RETRY | C CMD064-RACE | REVOCATION | GAP-AC-2 "RACE: CMD050 held at L1 in both orders" | PARTIAL | GAP-AC-3 "PARTIAL: failure at the queued-intent NOT_SENT update rolls back suppression, prospect state and activity" |
+### Public opt-out (L-ACT; GET/POST /api/v1/public/outreach/opt-out/{token}; GAP-API-B12-3). Token = HMAC(secret v, intent id), sha256 stored. POST:
+OUTREACH_SERVICE in kauro_outreach: lookup -> L2 (key = token hash) -> L3 of the intent's prospect -> L4 -> L8 CONTACT excl -> L9 -> L10 -> L12 -> INSERT suppression (recorded_by_service, reason
+OPT_OUT) + that prospect SUPPRESSED + its queued intents NOT_SENT; other prospects reached by the key are refused at L8 by CMD061/063/D2 and shown suppressed (views read the registry). D-B12O-13: no
+cookie or session is read; Origin/Sec-Fetch-Site not required (RFC 8058 one-click carries none; the token is the only capability; the only effect reduces sending): the explicit exception to D-AUTH-5
+(public-routes.ts:9-10). GET renders a confirmation form and writes nothing. Cells (b12-opt-out.test.ts): "OPT-OUT OK: one-click POST without Origin suppresses the token's contact; an unknown token
+answers the same 200 and writes nothing"; "OPT-OUT DENY (ambient): a POST with an owner cookie and a foreign Origin acts only on the token, never as the session"; "OPT-OUT DENY (GET): a link-scanner
+GET writes nothing"; "OPT-OUT DENY (rate): the 21st POST in 60 s from one client network is ADMISSION_LIMITED and writes nothing (receiveInquiry pattern, public/inquiries.ts:99-115)"; RETRY "OPT-OUT
+RACE: the same token twice concurrently: one suppression"; PARTIAL GAP-OO-1 "failure at the prospect UPDATE rolls back the suppression"; GAP-OO-2 "RACE (set): the opt-out reruns when its L3/L4 set
+grew while it waited at L8"; TIMEOUT runtime; EXPIRY N/A (an opt-out never expires); REVOCATION N/A (anonymous).
+### Reads (DENY wrong role 403, foreign 404 = unknown; REVOCATION under the principal's shared lock, rule 16): GetOutreachDraft, GetOutreachReview,
+ListSalesActivities, GetOutreachMetrics (L-ACT; members accepted, uncertain, observedSent, bounced, replied, acceptedLessKnownBounces, pause numerator/ denominator; none named delivered),
+GetSalesResource (L-DRAFT), GetSellerHome (L-HOME). Stateful non-registry routes: companion §R. L-HOME 0083: the four prospect-data policies + every B12 table use kauro.acting_seller_id() (0029:169);
+GetCommissionStatement admits ACTIVE|SUSPENDED| TERMINATED own seller via new authorizer.authorizeStatementSeller (L1, state read after it). GAP-HO-1 "RACE (revocation): CMD050 against a seller's
+prospect read held at L1 in both orders: rows then 0". Impact inventory (run on base first): apps/api/test/{b10-failure-cells-sales,b10-scenarios,
+cmd045-register-prospect,cmd049-activate-seller,cmd050-terminate-seller}.test.ts, sellers-support.ts, sales-support.ts, packages/persistence/test/ {b10-ledger-migrations,b10-sales-migrations}.test.ts;
+commercial-sales.ts:603-606 comment ("a seller holds no update policy on prospects") becomes stale with prospects_seller_suppress (K edits it).
+## 3. Lanes (file ownership; within B12 no two lanes edit one file)
+Shared sets, measured 2026-10-14 over every worktree: API-REG token (.kauro/mandates/B16-REST-PLAN.md:115-118 + commercial/{contracts,outcomes, request-schemas,response-schemas,served,views}.ts, which
+b16/breakglass 05dea52d also edits) = apps/api/src/{server.ts,composition.ts}, packages/application/src/index.ts, apps/api/openapi.json, apps/web/src/api/generated.ts, tools/openapi.mjs,
+tools/test/openapi.test.mjs, packages/application/test/json-schema.test.ts (b12/owner-screens 6d5b0079 edits composition.ts, application index.ts, openapi.json, generated.ts, tools/openapi.mjs,
+openapi.test.mjs, json-schema.test.ts). Append registries merged at batch (other open lanes edit them): persistence/src/ {sqlstate.ts,index.ts,pool.ts}, b05-clock-gates.test.ts, clock-gates.json
+(regenerated), KC-CODES.md, ka/kc-codes tests, tools/evidence.mjs.
+| Lane | Branch | Owns | Cells | Est. TD / B (tokens, min), model |
+|---|---|---|---|---|
+| K1 kit, starts now | b12/kit | 0082_b12_outreach.sql (companion §K tables, ALTER prospect_suppressions recorder XOR, policies, kauro_outreach group, calendar seed, L3/L4/L8 subjects, 0029:991 trigger L8, guards KA095-098, KC028-037); domain/src/commercial/{outreach.ts,failure-reasons.ts,index.ts}, domain/src/commerce/principals.ts (OUTREACH_SERVICE); persistence repositories/commercial-outreach.ts (every SQL writer with its locks), commercial-sales.ts:603-606 comment, outreach-access.ts, testing login kauro_outreach_test; append registries above; application commercial/outreach/{ports,runtime,calendar,index}.ts + testing ContractFakeGmailSend/ContractFakeResend (SIM); every handler file of every lane as a NOT_BUILT stub; apps/api/test/outreach-support.ts; docs/design/B12-case-map.md, tools/test/b12-case-map.test.mjs | companion §K, §S | 220k/80 Opus; 520k/180 claude-sonnet-5-5 |
+| K2 registration | b12/kit (2nd commit) | the API-REG token set; registers all 35 B12 routes (4 commands, the §2 routes, companion §R and §P) as stubs | openapi/json-schema tests | -; 90k/35 Sonnet 5.5 (DEFERRED: §7) |
+| L-DRAFT | b12/draft | commercial/outreach/{prepare-draft,put-content,content-checks,resources,get-draft,publish-resource}.ts; tests cmd061-*, b12-resources, packages/application/test/outreach-content.test.ts | CMD061 x3, R2-068, R2-135, GAP-DR-*, §R publish/put | 140k/50; 280k/100 |
+| L-AUTH | b12/auth | commercial/outreach/{authorize,prepare-review,get-review,revoke-authorization}.ts; test cmd062-* | CMD062 x3, GAP-AU-*, §R review | 110k/40; 200k/75 |
+| L-SEND (tier 1) | b12/send | commercial/outreach/{send,sender-identity}.ts; apps/api/src/outreach/{dispatcher,recovery,mime}.ts; tests cmd063-*, b12-dispatch-cells | CMD063 x3, R2-129..132, GAP-SE-*, GAP-DI-*, §R sender routes | 240k/90 Opus; 480k/170 |
+| L-ACT | b12/activity | commercial/outreach/{record-activity,opt-out,metrics,list-activities,diagnosis}.ts; apps/api/src/outreach/opt-out-route.ts; tests cmd064-*, b12-opt-out | CMD064 x3 (5 OK titles), GAP-AC-*, GAP-OO-*, opt-out titles, §R diagnosis | 170k/60; 330k/120 |
+| L-HOME | b12/home | 0083_b12_seller_scope.sql; commercial/authorizer.ts; commercial/statements/get-statement.ts; sellers/seller-home.ts; test b12-seller-home (DEFERRED: §7) | R2-066, GAP-HO-1 | 60k/25; 120k/45 |
+| L-SOURCE | b12/source | commercial/prospects/{record-source,record-contact,contact-key}.ts; test b12-prospect-sources | §R source/contact incl. reimport | 80k/30; 160k/60 |
+| L-OWNER | b12/owner-tools | commercial/sellers/owner-tools/*.ts; persistence repositories/commercial-owner-tools.ts; test b12-owner-tools | companion §P (11 tables, 13 routes; payout destination tier 1) | 150k/60; 350k/130 |
+Order: K1 now (TD of every lane may write its new test files meanwhile) -> K2 when the coordinator releases API-REG after batch-b (B16-L4/L5, b12/ owner-screens) merges -> {L-DRAFT, L-AUTH, L-SEND,
+L-ACT, L-SOURCE, L-OWNER, L-HOME} at most 5 at once (quota-pace) -> one batch branch -> adversary per lane (Codex lane review: L-SEND and the payout-destination producer, tier 1) -> red-proof per new
+test -> one PR. Done per lane: each title exists, is red with the lane's product files reverted (red-proof.mjs) and for each lock cell red with that lock removed, green after; ci-local green on the
+merge with origin/main; GAP -> C in the same commit. Total ~3.75M agent tokens (TD 1.17M, B 2.53M); wall ~4.3 h K1 + 0.6 h K2 + ~4.5 h lanes (L-SEND). Codes (census main + every worktree HEAD +
+worktree sqlstate/docs + .kauro/mandates, 2026-10-14: KA max KA094, KC max KC027; KA098 named free and unclaimed by plan/b15-b17-b18 5ef94d6f :131): KA095 OUTREACH_BINDING, KA096 SEND_FENCE, KA097
+ACTIVITY_EVIDENCE, KA098 OUTREACH_SUPPRESSION_SCOPE; KC028 OUTREACH_ROUTE_FORBIDDEN, KC029 SEND_UNCERTAIN_UNRESOLVED, KC030 OUTREACH_GRANT_INVALID, KC031 SENDER_NOT_VERIFIED, KC032
+OUTREACH_CAP_REACHED, KC033 RESOURCE_NOT_CURRENT, KC034 OUTREACH_PAUSED, KC035 OUTREACH_REVIEW_INVALID, KC036 OUTREACH_ALREADY_SENT, KC037 OUTREACH_CALENDAR_UNAVAILABLE; KC016 reused.
+ka-codes/kc-codes tests extended (uniqueness + one prefix each). Migrations provisional 0082 (K1), 0083 (L-HOME).
+## 4. Context packets: companion §T (TD/B packets per lane, harness API, files with line ranges; each <= 3k tokens).
+## 5. Conflicts decided
+D-B12O-1 states (A2). D-B12O-2 dispatch = outbox intent + lease + fenced outcome, not the oneTimeDelivery seam (server.ts:771-779 sinks a failed delivery after COMMIT; no uncertain state). D-B12O-3 a
+separate kauro_outreach group (contact addresses are personal data; ref "Measurement" keeps the sales store separate; 0059's one-group argument is for three statements, B12 needs a data boundary; new
+DB login = B14 provisioning). D-B12O-4 MANUAL_MAILBOX route: D3 releases the payload to the human, intent SEND_UNCERTAIN (counted) until HUMAN_SEND_OBSERVED SENT|NOT_SENT. D-B12O-5 CANCELLED only by
+the dispatcher (no cancel command in the registry). D-B12O-6a/6b cap and cadence (A10/A11). D-B12O-7 jurisdiction (A15). D-B12O-8 grant consumption = COUNTED intents under L9. D-B12O-9 support route =
+deployment value. D-B12O-10 an opt-out is contact-level marketing suppression; every outreach purpose is marketing; transactional notices are outside B12. D-B12O-11 port classification (A3). D-B12O-12
+suppression principals (A14): 0082 makes prospect_suppressions.recorded_by_user_id nullable with recorded_by_service and CHECK num_nonnulls = 1; policies prospect_suppressions_outreach_record
+(kauro_outreach, CONTACT, OPT_OUT) and prospects_seller_suppress / prospects_outreach_suppress (WITH CHECK state = 'SUPPRESSED'), KA098 guard: a non-owner prospect UPDATE changes only
+state/suppressed/version/updated_at, to SUPPRESSED, with a matching suppression row; no SECURITY DEFINER (0048:13, 0059:25). D-B12O-13 opt-out route authentication (§2). D-B12O-14 ORGANIZATION
+suppression is owner-only. Caveats turned into cells: post-claim opt-out cannot recall an in-flight call (ref "before queued sends are claimed": R2-130 asserts the order); authority changes between D2
+COMMIT and the call (grant revoke/expiry, sender revoke, seller termination) cannot stop the bounded in-flight call: decision = D2 refuses unless expiresAt > effect_now + callBound (D2 EXPIRY
+boundary), the provider refuses a revoked OAuth token itself (R2-132), and the rest is the accepted residual of a callBound-long window, listed in the Codex prompt; a lost answer stays SEND_UNCERTAIN
+even if the fake later shows it sent (R2-129); provider quota share (policy ordinaryDailyQuotaShareBps 8000): N/A, 10 first contacts + their follow-ups per person per day are far below 80% of any
+documented Workspace limit, no quota read exists in send-only scope.
+## 6. BLOCKED_OWNER (build continues on fakes; live halves PART)
+Gmail OAuth app verification and per-seller consent (OA06/OA16) -> live R2-129/131/132/CMD063 PART(B15/B19); Workspace seats (OA17); domain + SPF/ DKIM/DMARC (OA03, B14); Resend account (B15); postal
+address for the footer (D-16). B14 provisioning (not owner): opt-out HMAC secret, kauro_outreach login, support alias.
+## 7. Deferred (rule 7)
+K2 and L-HOME: their files (API-REG set; commercial/*.ts and statements/get-statement.ts) are edited by b16/breakglass 05dea52d (B16-L4, BATCH_READY, batch-b) and b12/owner-screens 6d5b0079
+(VERIFYING): they start on main after batch-b merges; binding requirement: K2 registers exactly the 35 routes of §3, L-HOME keeps CommercialReadHandler's operationId type as main has it then. R2-067:
+O2 = b12/owner-screens (open); O4 = board B12-OWNER-SCREENS-2 (WAITING_DEP) on pv1/settle 5134439a (0071_bank_settlement), starting the day pv1/settle merges, target 2026-10-16. O4 requirements:
+captured, provider-held, provider-available, bank-available, refundable, tax and commission-payable each a member with observedAt and source; absent observation UNKNOWN, never 0 (12); fixtures
+"captures present, no settlement row: bank-available UNKNOWN" and positive control "a verified settlement row: its amount shown with source"; no spendable-cash member without a verified settlement;
+seller sessions 403. Web UI33/53/54 follow the API merge.
+## 8. Adversary closure (91c82e89)
+| ADV | Plan change | Closing titles |
+|---|---|---|
+| 1 | A10 per person over all identities; L4 exclusive subject in CMD063/D2/every COUNTED mover + trigger | GAP-SE-2, GAP-SE-12, GAP-SE-13, GAP-DI-10, K "forged intent over the person cap" |
+| 2 | A3 classification table, OBSERVED_SENT/OBSERVED_NOT_SENT, KC036, COUNTED set | R2-129 (5xx), (observed sent), (observed not sent); CMD064-DENY bound |
+| 3 | D2 rechecks every ref item + seller, assignment, resource, capability, cadence, policy; CMD062 takes L5 | 16 "D2 DENY (<prerequisite>)" titles; CMD062-DENY capability; GAP-DI-11/12; R2-135 |
+| 4 | Order L1 access before L2 journal; L3/L8 meeting points; D4 takes L3 and is a no-op on a recorded activity; GAP-SUP-1 with the owner ORGANIZATION writer; CMD062-RACE uses CMD063 (real writer); opt-out trace | R2-130 x2, CMD064-RACE, GAP-DI-7, GAP-DI-13, GAP-SUP-1, CMD062-RACE |
+| 5 | §G table: every writer, DB trigger guard, COUNTED states, pair cells | GAP-SE-8..11, 13, 14, GAP-DI-10, K forged intent |
+| 6 | µs boundary cells; business-day calendar both zones; 2026-12-24 case; 24 h and 90 d edges | GAP-SE-16..20, D2 EXPIRY, GAP-AU-5, GAP-DI-14 |
+| 7 | CMD064-OK split per trigger; health pause A12; exact metrics | five CMD064-OK titles, GAP-SE-15, CMD063-DENY follow-up after REPLIED/BOUNCED |
+| 8 | A14 key + principals D-B12O-12; opt-out auth D-B12O-13; rate limit | §R reimport titles, OPT-OUT titles, "CMD064-OK (SUPPRESSED opt-out alone)" |
+| 9 | A13 MIME predicate | "CMD063-OK (payload)" |
+| 10 | A16 server-issued review, single use, proof-bound | CMD062-OK/DENY/RACE, GAP-AU-5, §R review |
+| 11 | companion §K (rule 22 per table, rule 12 per predicate) and §R (8 columns per route) | companion titles |
+| 12 | §3 shared sets measured, K1/K2 split, K2 registers all 35 routes, deferral §7 | coordinator check (board files) |
+| 13 | L-OWNER lane, companion §P census of 11 tables with 0 product writers | §P titles, §S "every table a B10/B12 command reads has a non-fixture writer" |
+| 14 | A17; contentRef/provenance stores only; import census | CMD061-DENY, §S b12-imports, §R source DENY |
+| 15 | citations fixed (0029:1333-1334, 1341-1342; census 28 listed; CK paths :164/:185/:337/:407; commission-service-access.ts path) | n/a |
+| 16 | R2-068 sibling control; assistant path A1 | R2-068 |
+| 17 | R2-131 permitted channel, R2-066 configured + null, CMD061 unverified sender | those titles |
+| 18 | A9 sentence; D-33 scan widened with a planted control | §S b12-d33 |
+| 19 | §7 O4 lane, date, fixtures | n/a until O4 |
+| 20 | caveat with decision; D2 refuses inside callBound | D2 EXPIRY (boundaries) |
+| 21 | dedup identity per kind in the DB (KA097) | CMD064-DENY, CMD064-RACE |
