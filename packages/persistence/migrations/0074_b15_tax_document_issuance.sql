@@ -11,8 +11,9 @@
 --      acceptance and its verification reference (R2 15:139 "A provider PDF existing does not prove DIAN acceptance").
 --   4. The SUBMITTING backstop (VALIDATED -> SUBMITTING), after the profile and issuer shared halves, judged at kauro.effect_now():
 --      the route gate of R2-083 (a PROVIDER_API issuer QUALIFIED with entitlement evidence, or a MANUAL_BRIDGE issuer) and the validity
---      of section 2 (issuer valid_from known and reached, valid_until not reached; profile valid_from reached, valid_until not reached,
---      not superseded). 23514.
+--      of section 2 (issuer valid_from known and reached, valid_until not reached). 23514. The profile is the sale's version, bound at
+--      VALIDATED by 0017 tax_documents_validation_guard at the tax point (saleProfileAt, B09-N5: a version recorded later never
+--      unbinds it), so the backstop takes the profile half as the serializer and does not re-judge the version at the effect instant.
 --   5. The FISCAL consumer receives tax_document.submitting.v1 and tax_document.issued.v1 (the reconciler and the credit-note
 --      validation of M6; tax_document.uncertain.v1 is 0013's); @kauro/domain COMMERCE_EVENT_SUBSCRIPTIONS carries the same rows.
 
@@ -55,15 +56,12 @@ CREATE OR REPLACE FUNCTION kauro.tax_documents_submitting_guard() RETURNS trigge
 $$
 DECLARE
   i record;
-  p record;
   t timestamptz;
 BEGIN
   PERFORM kauro.await_transition('kauro.fiscal_profiles', NEW.agency_id::text);
   PERFORM kauro.await_transition('kauro.fiscal_issuers', NEW.issuer_ref::text);
   SELECT x.route_kind, x.route_state, x.entitlement_evidence_hash, x.valid_from, x.valid_until INTO i
     FROM kauro.fiscal_issuers x WHERE x.issuer_ref = NEW.issuer_ref;
-  SELECT x.valid_from, x.valid_until, x.superseded_at INTO p
-    FROM kauro.fiscal_profiles x WHERE x.agency_id = NEW.agency_id AND x.profile_id = NEW.fiscal_profile_id;
   t := kauro.effect_now();
   IF i.route_kind IS NULL
      OR NOT ((i.route_kind = 'PROVIDER_API' AND i.route_state = 'QUALIFIED' AND i.entitlement_evidence_hash IS NOT NULL) OR i.route_kind = 'MANUAL_BRIDGE') THEN
@@ -71,9 +69,6 @@ BEGIN
   END IF;
   IF i.valid_from IS NULL OR i.valid_from > t OR (i.valid_until IS NOT NULL AND t >= i.valid_until) THEN
     RAISE EXCEPTION 'FISCAL_ISSUER_NOT_IN_FORCE: issuer % is not in force', NEW.issuer_ref USING ERRCODE = '23514';
-  END IF;
-  IF p.valid_from IS NULL OR t < p.valid_from OR (p.valid_until IS NOT NULL AND t >= p.valid_until) OR p.superseded_at IS NOT NULL THEN
-    RAISE EXCEPTION 'FISCAL_PROFILE_NOT_IN_FORCE: profile % is not in force', NEW.fiscal_profile_id USING ERRCODE = '23514';
   END IF;
   RETURN NEW;
 END
@@ -88,3 +83,4 @@ INSERT INTO kauro.commerce_event_subscriptions (event_type, consumer) VALUES
   ('tax_document.submitting.v1', 'FISCAL'),
   ('tax_document.issued.v1', 'FISCAL');
 ALTER TABLE kauro.commerce_event_subscriptions FORCE ROW LEVEL SECURITY;
+REVOKE EXECUTE ON FUNCTION kauro.tax_documents_submitting_guard() FROM PUBLIC;

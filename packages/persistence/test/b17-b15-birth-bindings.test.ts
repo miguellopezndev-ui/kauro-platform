@@ -510,15 +510,8 @@ test("0074: the issuer's half covers every judged column; the document's state i
   // the issuer's validity: ended, or not yet begun
   await deniedByGuard({ ...pay, drop: guard, setup: (o) => o.query("UPDATE kauro.fiscal_issuers SET valid_until = now() - interval '1 second', valid_from = now() - interval '2 days' WHERE issuer_ref = $1", [routes.issuerRef]) }, submit, "23514", /FISCAL_ISSUER_NOT_IN_FORCE/);
   await deniedByGuard({ ...pay, drop: guard, setup: (o) => o.query("UPDATE kauro.fiscal_issuers SET valid_from = now() + interval '1 hour', valid_until = NULL WHERE issuer_ref = $1", [routes.issuerRef]) }, submit, "23514", /FISCAL_ISSUER_NOT_IN_FORCE/);
-  // the profile's validity: not yet in force, ended, or superseded
-  for (const set of ["valid_from = now() + interval '1 hour'", "valid_until = now() - interval '1 second'", "superseded_at = now()"]) {
-    await deniedByGuard(
-      { ...pay, drop: guard, setup: (o) => o.query(`SET LOCAL session_replication_role = replica; UPDATE kauro.fiscal_profiles SET ${set} WHERE profile_id = '${profileId}'; SET LOCAL session_replication_role = origin`) },
-      submit,
-      "23514",
-      /FISCAL_PROFILE_NOT_IN_FORCE/,
-    );
-  }
+  // the profile is the sale's version bound at VALIDATED (0017, B09-N5): a version recorded later does not unbind it at submission
+  assert.equal(await attempt({ ...pay, setup: (o) => o.query(`SET LOCAL session_replication_role = replica; UPDATE kauro.fiscal_profiles SET superseded_at = now() WHERE profile_id = '${profileId}'; SET LOCAL session_replication_role = origin`) }, submit), undefined);
   // OK: the qualified issuer in force and the current profile
   await within(payment, service(A.agencyId), async (c) => {
     await submit(c);

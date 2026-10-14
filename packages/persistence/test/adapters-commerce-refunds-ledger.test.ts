@@ -355,7 +355,7 @@ test("fiscal documents: the drafter reads the sale's profile version at the capt
     const redraft = await uow.commerce.taxDocuments.redraft(invoiceId, 1, { fiscalProfileId: e1 as FiscalProfileId, issuerRef: env.routes.issuerRef as FiscalIssuerRef, taxTreatment: "EXEMPT_EXPORT", taxCents: 0n, blockedReason: null }, clock.now());
     const valid = await uow.commerce.taxDocuments.transition(invoiceId, 2, { state: "VALIDATED" }, clock.now());
     const submitting = await uow.commerce.taxDocuments.transition(invoiceId, 3, { state: "SUBMITTING", issueRequestHash: sha(`issue-${invoiceId}`) }, clock.now());
-    const issued = await uow.commerce.taxDocuments.transition(invoiceId, 4, { state: "ISSUED", providerDocumentId: `DOC-${invoiceId.slice(-12)}`, legalNumber: "SETP-990101", evidenceHash: sha(`issued-${invoiceId}`), issuedAt: clock.now() }, clock.now());
+    const issued = await uow.commerce.taxDocuments.transition(invoiceId, 4, { state: "ISSUED", providerDocumentId: `DOC-${invoiceId.slice(-12)}`, legalNumber: "SETP-990101", evidenceHash: sha(`issued-${invoiceId}`), issuedAt: clock.now(), fiscalStatus: "ACCEPTED", verificationRef: `CUFE-${invoiceId}` }, clock.now());
     return { redraft, valid, submitting, issued, events: [...uow.events.appended], live: await uow.commerce.taxDocuments.findLiveInvoice(captureId as CaptureId), blocked: await uow.commerce.taxDocuments.listBlockedDrafts(10) };
   });
   assert.deepEqual([validated.redraft.kind, validated.valid.kind, validated.submitting.kind, validated.issued.kind], ["APPLIED", "APPLIED", "APPLIED", "APPLIED"]);

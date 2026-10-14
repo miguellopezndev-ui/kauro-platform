@@ -359,3 +359,11 @@ BEGIN
   RETURN NULL;
 END
 $$;
+
+-- trigger functions are executed by their triggers only (SEC-DEPTH R17)
+REVOKE EXECUTE ON FUNCTION kauro.target_contracts_supersession() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.target_contracts_superseder_confirmed() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.plans_target_not_superseded() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.plans_recheck_birth() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.plan_validations_refusal_once() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.vendor_qualifications_stamp() FROM PUBLIC;

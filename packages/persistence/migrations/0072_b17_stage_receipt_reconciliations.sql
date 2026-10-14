@@ -105,3 +105,4 @@ CREATE POLICY stage_receipt_reconciliations_tenant_open ON kauro.stage_receipt_r
 GRANT SELECT ON kauro.stage_receipt_reconciliations TO kauro_app;
 GRANT INSERT (reconciliation_id, agency_id, project_id, stage_id, content_hash, receipt_upload_ref, opened_by_membership_id)
   ON kauro.stage_receipt_reconciliations TO kauro_app;
+REVOKE EXECUTE ON FUNCTION kauro.stage_receipt_reconciliations_birth() FROM PUBLIC;

@@ -313,8 +313,10 @@ export async function targetContract(app: Client, ag: AgencyFixture, projectId: 
        VALUES ($1, $2, $3, 'CONFIRMATION_EVIDENCE', 'CLEAN', $4, '{}'::jsonb, $5, $6)`,
       [evidenceId, ag.agencyId, projectId, instanceId, sha(`confirmation-${contractId}`), ag.ownerMembershipId],
     );
-    // as CMD019 does: a confirmed newer contract supersedes the project's current one (0073 (b), (c))
-    await c.query(
+    // as CMD019 does: a confirmed newer contract supersedes the project's current one (0073 (b), (c)); a world held at an earlier
+    // migration (b05-dispatch-settlement L22) has no superseder column and no current contract to supersede in a fresh project
+    const superseder = await c.query("SELECT 1 FROM pg_attribute WHERE attrelid = 'kauro.target_contracts'::regclass AND attname = 'superseded_by_contract_id' AND NOT attisdropped");
+    if (superseder.rowCount === 1) await c.query(
       `UPDATE kauro.target_contracts SET superseded_at = now(), superseded_by_contract_id = $2, version = version + 1
         WHERE agency_id = $1 AND project_id = $3 AND confirmed_at IS NOT NULL AND superseded_at IS NULL`,
       [ag.agencyId, contractId, projectId],
