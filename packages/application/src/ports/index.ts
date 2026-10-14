@@ -119,6 +119,11 @@ export type {
   AuthorityTombstoneState,
   AuthorityTombstone,
   AuthorityJournalPort,
+  RecoveryJournalKind,
+  RecoveryJournalEntry,
+  RecoveryJournalPort,
+  NotificationSenderPort,
+  PaymentObservationPort,
   CommercialScopeInspector,
 } from "./source-providers.js";
 export { AUTHORITY_TOMBSTONES } from "./source-providers.js";

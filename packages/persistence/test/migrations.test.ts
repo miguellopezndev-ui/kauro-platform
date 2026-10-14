@@ -155,6 +155,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0069_b16_retention_extensions.sql",
     // package B05 IJR: one IC request key is one model task, each IC invocation one request row (ADR-B05-IJR-1; provisional number)
     "0070_b05_model_task_request_key.sql",
+    // B16 L6: the recovery gate every claim reads FOR SHARE, the restore run, its applied journal entries and observations (provisional number)
+    "0071_b16_recovery_gate.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

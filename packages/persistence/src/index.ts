@@ -140,6 +140,11 @@ export { PgCapabilityGovernanceRepository } from "./repositories/capability-gove
 export { capabilityGovernanceOf } from "./capability-governance-access.js";
 export { operationsOf } from "./operations-recovery-access.js";
 export { PgOperationsRepository } from "./repositories/operations-recovery.js";
+// package B16 L6: the authority journal outside the restore boundary and the restore run's database side (migration 0071)
+export { PgAuthorityJournal, provisionAuthorityJournal, AUTHORITY_JOURNAL_SCHEMA, RECOVERY_JOURNAL_KINDS, RecoveryJournalConflict } from "./journal/pg-authority-journal.js";
+export type { RecoveryJournalKind, RecoveryJournalRecord, RecoveryJournalEntry, JournalTombstone } from "./journal/pg-authority-journal.js";
+export { PgRestoreOwnerStore, PgRestoreControl, PgRecoveryAuthority, PgJournalTail, restoreControlOf, recoveryAuthorityOf, journalTailOf } from "./journal/restore-store.js";
+export type { RestoreRunRow, RestoreRunState, AppliedOutcome, ObservationRow, ReleaseHold, TombstonedSubjectKind, CandidateRow, RecoveryRow, TailedEvent } from "./journal/restore-store.js";
 // CMD027's reads (mandate B10-COMMANDS-QUOTE; design §3.4, §3.5): the sealed revision's billable population, the project's live quote
 export { PgQuoteReads, quoteReadsOf } from "./commercial-quote-access.js";
 // the commission service's work lists (mandate B10-COMMISSION-SERVICE; docs/design/B10-commercial-domain.md §14; D10-SVC-1, D10-SVC-2):

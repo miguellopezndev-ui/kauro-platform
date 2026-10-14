@@ -452,6 +452,54 @@ export interface AuthorityJournalPort {
   list(agencyId: AgencyId, afterSequence: number): Promise<ReadonlyArray<AuthorityTombstone>>;
 }
 
+// --- B16 L6: the recovery journal, the notification dispatch identity and the provider payment observation --------------------------
+
+/**
+ * What else the journal outside the restore boundary holds (R2 14 "External-effect recovery journal"): revocations, extensions,
+ * provider payment states and dispatched notification identities, each under its subject's own identity (idempotent), numbered densely
+ * in commit order. A restore applies entries 1..n in that order; a candidate names the journal by hashThrough(n).
+ */
+export type RecoveryJournalKind = "TOMBSTONE" | "REVOCATION" | "EXTENSION" | "PAYMENT" | "NOTIFICATION";
+
+export interface RecoveryJournalEntry {
+  readonly journalSeq: number;
+  readonly entryId: string;
+  readonly kind: RecoveryJournalKind;
+  readonly agencyId: string | null;
+  readonly body: Readonly<Record<string, unknown>>;
+  readonly bodyHash: Sha256Hex;
+}
+
+export interface RecoveryJournalPort extends AuthorityJournalPort {
+  record(entry: { readonly entryId: string; readonly kind: Exclude<RecoveryJournalKind, "TOMBSTONE">; readonly agencyId: string | null; readonly body: Readonly<Record<string, unknown>> }): Promise<"APPENDED" | "ALREADY_PRESENT">;
+  has(entryId: string): Promise<boolean>;
+  entries(after: number, through: number): Promise<ReadonlyArray<RecoveryJournalEntry>>;
+  head(): Promise<number>;
+  maxEventSequence(): Promise<number>;
+  hashThrough(through: number): Promise<Sha256Hex>;
+  cursor(source: string): Promise<string | null>;
+  advanceCursor(source: string, from: string | null, to: string): Promise<boolean>;
+  rebaseCursor(source: string, to: string): Promise<void>;
+}
+
+/**
+ * The notification provider (package B15 binds the live one; PART). A dispatch carries its identity — derived from the event, never
+ * random — as the provider's idempotency key, so a repeated dispatch of one identity is one message (R2-074).
+ */
+export interface NotificationSenderPort {
+  readonly evidenceClass: ProviderEvidenceClass;
+  send(notification: { readonly identity: Sha256Hex; readonly eventId: string; readonly eventType: string; readonly agencyId: string | null }): Promise<void>;
+}
+
+/**
+ * The provider's own answer for a payment a restore could not reconcile (S6; the live provider halves are BLOCKED_OWNER D-14 / B15).
+ * UNKNOWN keeps the observation open until its deadline; nothing here resolves a conflict automatically.
+ */
+export interface PaymentObservationPort {
+  readonly evidenceClass: ProviderEvidenceClass;
+  observe(subject: { readonly kind: "CAPTURE" | "REFUND"; readonly subjectId: string; readonly agencyId: string | null }): Promise<{ readonly kind: "UNKNOWN" } | { readonly kind: "TIMEOUT" }>;
+}
+
 // --- commercial scope (CMD012 impact map; B09 binds the real inspector) -----------------------------------------------------------
 
 export interface CommercialScopeInspector {

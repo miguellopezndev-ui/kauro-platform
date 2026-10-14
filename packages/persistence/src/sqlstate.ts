@@ -91,8 +91,9 @@ export const SQLSTATE = Object.freeze({
   B16_L3_DELETION_B: "KA088",
   B16_L4_BREAKGLASS_A: "KA089",
   B16_L5_DOWNLOAD_A: "KA090",
-  B16_L6_RESTORE_A: "KA091",
-  B16_L6_RESTORE_B: "KA092",
+  // L6 (0071): a claim while a restore holds the recovery gate closed; a restore step out of its journal order or unreconciled
+  B16_L6_RECOVERY_GATE: "KA091",
+  B16_L6_RESTORE_RECONCILIATION: "KA092",
   B16_L7_STAGE_RELEASE_A: "KA093",
   B16_L8_RESERVE_A: "KA094",
   // PostgreSQL classes the adapters also translate
@@ -184,6 +185,10 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KA082: { code: "INTEGRITY_FAILURE", reason: "CAPACITY_LEDGER" },
   KA083: { code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
   KA084: { code: "INTEGRITY_FAILURE", reason: "PUBLICATION_EVIDENCE_MISSING" },
+  // package B16 L6 (0071): a claim refused while a restore holds the recovery gate closed is retried once the gate opens; a restore
+  // step the database refuses (out of journal order, a payment conflict, a release without its run) is unreconciled consequences
+  KA091: { code: "CAPACITY_UNAVAILABLE", retryable: true },
+  KA092: { code: "PRECONDITION_FAILED", reason: "CONSEQUENCES_UNRECONCILED" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },
