@@ -587,6 +587,11 @@ function createUnitOfWork(s: InMemoryStore, initialContext: ExecutionContext, cl
       getBody: () => notInMemory("TargetContractRepository.getBody"),
       createDraft: () => notInMemory("TargetContractRepository.createDraft"),
       confirm: () => notInMemory("TargetContractRepository.confirm"),
+      lockCurrentOfProject: () => notInMemory("TargetContractRepository.lockCurrentOfProject"),
+      holdTransitions: () => notInMemory("TargetContractRepository.holdTransitions"),
+      approvedPlansBoundTo: () => notInMemory("TargetContractRepository.approvedPlansBoundTo"),
+      supersede: () => notInMemory("TargetContractRepository.supersede"),
+      insertRecheckPlan: () => notInMemory("TargetContractRepository.insertRecheckPlan"),
     },
     plans: {
       async get(planId: PlanId) {

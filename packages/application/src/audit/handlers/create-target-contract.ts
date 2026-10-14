@@ -14,7 +14,7 @@
  * evidence are the artifact's and the project's, so no request can assert a fact about the target.
  */
 import type { ArtifactRef, ProjectId, TargetContractId } from "@kauro/domain";
-import { DomainFailure, isUtcInstant, parseTargetMetadata } from "@kauro/domain";
+import { DomainFailure, effectNowOf, isUtcInstant, parseTargetMetadata } from "@kauro/domain";
 import { requireMembership } from "../../commands/handlers/shared.js";
 import { CREATE_TARGET_CONTRACT, type CreateTargetContractBody, type CreateTargetContractHandler } from "../contracts.js";
 import type { TargetContractView } from "../views.js";
@@ -57,7 +57,8 @@ export function createTargetContractHandler(runtime: AuditRuntime): CreateTarget
           // the metadata is data: the closed shape or nothing
           const metadata = parseTargetMetadata(artifact.document);
           if (metadata === null) throw new DomainFailure("INVALID_REQUEST", "the metadata is not the closed target metadata shape", { reason: "TARGET_METADATA_INVALID" });
-          const now = await uow.serverInstant();
+          // r15/r25: the clock is read after the last await (findLatestForProject), and nothing is awaited before the draft is created
+          const now = await effectNowOf(uow);
           if (!isUtcInstant(metadata.observedAt) || Date.parse(metadata.observedAt) > Date.parse(now)) {
             throw new DomainFailure("PRECONDITION_FAILED", "the observation is dated after the database clock", { reason: "OBSERVATION_IN_FUTURE" });
           }
