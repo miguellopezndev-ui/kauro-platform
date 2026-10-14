@@ -15,7 +15,7 @@
 | B12 Seller and owner application | 20: 20 NOT_EXECUTED | NOT_STARTED | — | — | — |
 | B13 Reports and package experience | 9: 9 NOT_EXECUTED | NOT_STARTED | — | — | — |
 | B14 Cloud foundation and actual worker host | 6: 6 NOT_EXECUTED | NOT_STARTED | — | — | — |
-| B15 Real external integration | 9: 1 EXECUTED_LOCAL, 8 NOT_EXECUTED | IN_PROGRESS | — | — | — |
+| B15 Real external integration | 9: 1 EXECUTED_LOCAL, 2 PARTIAL, 3 SIMULATED, 3 NOT_EXECUTED | IN_PROGRESS | — | — | — |
 | B16 Security and restoration qualification | 61: 30 EXECUTED_LOCAL, 3 PARTIAL, 28 NOT_EXECUTED | IN_PROGRESS | — | — | — |
 | B17 Integrated capacity and target qualification | 24: 24 NOT_EXECUTED | NOT_STARTED | — | — | — |
 | B18 Final candidate and independent release audit | 11: 1 EXECUTED_LOCAL, 10 NOT_EXECUTED | IN_PROGRESS | — | — | — |
