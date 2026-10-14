@@ -10,6 +10,13 @@
  *   GET  /api/v1/operations/bank-routes/{routeId}               getBankRoute             (KAURO_OWNER)  200
  *   POST /api/v1/operations/bank-accounts/{accountRef}/evidence-artifacts uploadBankEvidenceArtifact (KAURO_OWNER) 201, no key (B12)
  *   GET  /api/v1/operations/bank-credits?state=&limit=&cursor=  listBankCredits          (KAURO_OWNER)  200 (B12 GAP-API-9)
+ *   POST /api/v1/operations/treasury-refunds/{treasuryRefundId}/approve  approveTreasuryRefund  (KAURO_OWNER)  200 (lane L-REFUND)
+ *   POST /api/v1/operations/refunds/{refundId}/execution-declarations   declareRefundExecution (KAURO_OWNER)  201 (lane L-REFUND, X1)
+ *   POST /api/v1/operations/execution-attempts/{attemptId}/records      recordRefundExecution  (KAURO_OWNER)  200 (lane L-REFUND, G2/G4)
+ *   POST /api/v1/operations/execution-attempts/{attemptId}/resolutions  resolveUncertainExecution (KAURO_OWNER) 200 (lane L-REFUND, X3)
+ *   POST /api/v1/operations/execution-attempts/{attemptId}/bounces      recordReturnBounce (KAURO_OWNER)  200 (lane L-REFUND, G3)
+ *   POST /api/v1/operations/execution-attempts/{attemptId}/resend-declarations  declareResendExecution (KAURO_OWNER) 201 (lane L-REFUND, X4)
+ *   GET  /api/v1/operations/execution-attempts                           listExecutionAttempts  (KAURO_OWNER)  200 (lane L-REFUND, the queue)
  *   GET  /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions  (agency member, X-Kauro-Agency) 200
  *   POST /api/v1/payment-orders/{orderId}/retirements          retireBankCheckout       (billing member, X-Kauro-Agency) 201
  *
@@ -18,7 +25,7 @@
  * Sec-Fetch-Site and CSRF rule; typed credential refusals; none: the anonymous denial, AUTHENTICATION_REQUIRED). Every reply carries Cache-Control: no-store (the server's hook);
  * the instructions never carry an ETag.
  */
-import type { BankEvidenceArtifactView, BankInboundHandlers, BankSettlementHandlers, InboundReadAnswer, UploadBankEvidenceBody, UploadBankEvidenceRequest, BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest } from "@kauro/application";
+import type { BankEvidenceArtifactView, BankInboundHandlers, BankSettlementHandlers, InboundReadAnswer, UploadBankEvidenceBody, UploadBankEvidenceRequest, BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest, BankRefundHandlers } from "@kauro/application";
 import { CURSOR_PATTERN, HEADERS, OPERATIONAL_ROUTES, admitEmptyRequest, admitReadQuery, admitHeaders, admitOperationalBody, operationalRouteResponses, problemOf, readTransferInstructions, repeatedHeaderNames, type CommerceRequestRuntime } from "@kauro/application";
 import type { AgencyId, Clock, CorrelationId, Environment } from "@kauro/domain";
 import { DomainFailure, IDEMPOTENCY_KEY, isUuid } from "@kauro/domain";
@@ -27,6 +34,8 @@ import type { RouteKit } from "../server.js";
 
 export interface BankRouteRouteDependencies {
   readonly handlers: BankRouteHandlers;
+  /** Lane L-REFUND: the owner refund commands of the route (CMD220 ApproveTreasuryRefund); absent, their routes are not served. */
+  readonly refunds?: BankRefundHandlers;
   /** The owner's inbound credit commands (lane PV1-INBOUND). */
   readonly inbound?: BankInboundHandlers;
   /** B12 GAP-API-8: the owner's evidence upload (createBankEvidenceUpload of @kauro/application). */
@@ -131,6 +140,15 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
   command("enableBankRoute", "CMD203", (req) => deps.handlers.enable(req as never));
   command("disableBankRoute", "CMD204", (req) => deps.handlers.disable(req as never));
   command("replaceBankRouteDetails", "CMD205", (req) => deps.handlers.replaceDetails(req as never));
+  const refunds = deps.refunds;
+  if (refunds !== undefined) {
+    command("approveTreasuryRefund", "CMD220", (req) => refunds.approveTreasury(req as never));
+    command("declareRefundExecution", "CMD221", (req) => refunds.declareExecution(req as never));
+    command("recordRefundExecution", "CMD222", (req) => refunds.recordExecution(req as never));
+    command("resolveUncertainExecution", "CMD223", (req) => refunds.resolveExecution(req as never));
+    command("recordReturnBounce", "CMD224", (req) => refunds.recordBounce(req as never));
+    command("declareResendExecution", "CMD225", (req) => refunds.declareResend(req as never));
+  }
 
   const inbound = deps.inbound;
   if (inbound !== undefined) {
@@ -227,6 +245,14 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     return await deps.handlers.get({ correlationId, subject: authenticated.subject, routeId: path["routeId"]!, authority });
   });
 
+  if (refunds !== undefined) {
+    read("listExecutionAttempts", async (request, correlationId, _path, headers) => {
+      const authenticated = await kit.subjectOrRefusal(request, headers, "READ_EXECUTION_ATTEMPTS", { correlationId, agencyId: null });
+      if (authenticated.kind === "PROBLEM") return authenticated;
+      const authority = kit.requestAuthority(request, headers, authenticated.subject.identity.userId);
+      return await refunds.executionQueue({ correlationId, subject: authenticated.subject, authority });
+    });
+  }
   if (inbound !== undefined) {
     const ownerRead = async <View>(headers: Readonly<Record<string, string | undefined>>, request: FastifyRequest<{ Params: Record<string, string> }>, action: string, correlationId: CorrelationId, run: (r: { correlationId: CorrelationId; subject: never; authority: never }) => Promise<FastifyReplyAnswer>): Promise<FastifyReplyAnswer> => {
       const authenticated = await kit.subjectOrRefusal(request, headers, action, { correlationId, agencyId: null });

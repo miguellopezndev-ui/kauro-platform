@@ -45,6 +45,14 @@ export const OPERATIONAL_WIRE: Readonly<Record<string, OperationalWire>> = Objec
   // unsafe cookie request; the credit queue is an owner-only read
   uploadBankEvidenceArtifact: entry("NONE", true, "KAURO_OWNER"),
   listBankCredits: entry("NONE", false, "KAURO_OWNER"),
+  // Payments V1 owner refunds (lane L-REFUND, CMD220-CMD223): the owner's journaled, cookie-authenticated commands and the owner-only queue
+  approveTreasuryRefund: entry("REQUIRED", true, "KAURO_OWNER"),
+  declareRefundExecution: entry("REQUIRED", true, "KAURO_OWNER"),
+  recordRefundExecution: entry("REQUIRED", true, "KAURO_OWNER"),
+  resolveUncertainExecution: entry("REQUIRED", true, "KAURO_OWNER"),
+  recordReturnBounce: entry("REQUIRED", true, "KAURO_OWNER"),
+  declareResendExecution: entry("REQUIRED", true, "KAURO_OWNER"),
+  listExecutionAttempts: entry("NONE", false, "KAURO_OWNER"),
   // B11 A1: the agency owner records the buyer type once (CMD101), journaled and cookie-authenticated; the agency is the path id
   setBuyerType: entry("REQUIRED", true, "AGENCY_OWNER"),
 });

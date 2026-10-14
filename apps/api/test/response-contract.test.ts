@@ -268,6 +268,13 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/operations/bank-routes/:routeId/disable", "disableBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:disableBankRoute:200" } }],
       ["POST", "/api/v1/operations/bank-routes/:routeId/details", "replaceBankRouteDetails", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:replaceBankRouteDetails:200" } }],
       // the inbound side (Payments V1, lane PV1-INBOUND): the owner's manual credit commands, the statement import and the retirement
+      // the owner refund commands (Payments V1, lane L-REFUND): the treasury approval, the declaration and the record of a manual execution
+      ["POST", "/api/v1/operations/treasury-refunds/:treasuryRefundId/approve", "approveTreasuryRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:approveTreasuryRefund:200" } }],
+      ["POST", "/api/v1/operations/refunds/:refundId/execution-declarations", "declareRefundExecution", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:declareRefundExecution:201" } }],
+      ["POST", "/api/v1/operations/execution-attempts/:attemptId/records", "recordRefundExecution", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:recordRefundExecution:200" } }],
+      ["POST", "/api/v1/operations/execution-attempts/:attemptId/resolutions", "resolveUncertainExecution", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:resolveUncertainExecution:200" } }],
+      ["POST", "/api/v1/operations/execution-attempts/:attemptId/bounces", "recordReturnBounce", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:recordReturnBounce:200" } }],
+      ["POST", "/api/v1/operations/execution-attempts/:attemptId/resend-declarations", "declareResendExecution", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:declareResendExecution:201" } }],
       ["POST", "/api/v1/operations/bank-accounts/:accountRef/credits", "enterBankCredit", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:enterBankCredit:201" } }],
       ["POST", "/api/v1/operations/bank-credits/:creditId/confirmations", "confirmBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:confirmBankCredit:200" } }],
       ["POST", "/api/v1/operations/bank-credits/:creditId/attributions", "attributeBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:attributeBankCredit:200" } }],
@@ -277,6 +284,7 @@ test("R23: every served route declares its replies (the route inventory the Open
       // lane B12-OWNER-SCREENS-1 (GAP-API-8): the owner's evidence-artifact upload, 201 stored and judged
       ["POST", "/api/v1/operations/bank-accounts/:accountRef/evidence-artifacts", "uploadBankEvidenceArtifact", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:uploadBankEvidenceArtifact:201" } }],
       ["GET", "/api/v1/operations/bank-routes/:routeId", "getBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankRoute:200" } }],
+      ["GET", "/api/v1/operations/execution-attempts", "listExecutionAttempts", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:listExecutionAttempts:200" } }],
       ["GET", "/api/v1/operations/bank-credits/:creditId", "getBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankCredit:200" } }],
       // lane B12-OWNER-SCREENS-1 (GAP-API-9): the owner's inbound-credit queue, filtered by state and paginated
       ["GET", "/api/v1/operations/bank-credits", "listBankCredits", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:listBankCredits:200" } }],

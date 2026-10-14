@@ -185,6 +185,7 @@ test("SQLSTATE translation of the commerce constraints: a second open checkout i
     ["KP011", "INTEGRITY_FAILURE", "FISCAL_VALIDATION_REFUSED"],
     ["KP012", "PRECONDITION_FAILED", "REFUND_TAX_INCONSISTENT"],
     ["KP013", "PRECONDITION_FAILED", "REPLACEMENT_NOT_ALLOWED"],
+    ["KP014", "INTEGRITY_FAILURE", "EXECUTION_EVIDENCE_MISSING"],
   ];
   for (const [code, failureCode, reason] of expected) {
     const f = failureOfSqlState(code);

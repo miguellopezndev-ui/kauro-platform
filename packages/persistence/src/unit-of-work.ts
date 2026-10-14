@@ -68,6 +68,7 @@ import {
 import type { PoolClient } from "pg";
 import { serverInstantOf } from "./source/rows.js";
 import { PgBankRoutes } from "./repositories/bank-routes.js";
+import { PgBankRefunds } from "./repositories/bank-refunds.js";
 import { PgBankCredits } from "./repositories/bank-credits.js";
 import { PgBankSettlements } from "./repositories/bank-settlements.js";
 import { PgSessionFence } from "./session-fence.js";
@@ -226,7 +227,8 @@ export class PgUnitOfWork implements UnitOfWork {
   ) {
     this.context = context;
     this.ids = ids;
-    this.sessionFence = new PgSessionFence(client);
+    // a SERVICE unit of the payment service binds no person: its fence is the definer of migration 0072 (rule 16 for the bank owner commands)
+    this.sessionFence = new PgSessionFence(client, roleFor(context) === "kauro_payment" ? "SERVICE" : "REQUEST");
     this.buyerTypes = new PgBuyerTypes(client);
     this.projectDashboard = new PgProjectDashboard(client);
     this.agencies = new PgAgencyRepository(client);
@@ -700,6 +702,12 @@ export function bankRoutesOf(uow: UnitOfWork): PgBankRoutes {
   return uow.bankRoutes;
 }
 
+/** The manual-assisted refund tables in a commerce unit of work of this package (lane L-REFUND). */
+export function bankRefundsOf(uow: UnitOfWork): PgBankRefunds {
+  if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the bank refunds are read in a commerce unit of work of @kauro/persistence");
+  return uow.bankRefunds;
+}
+
 /** The effect instant of a commerce unit of work of this package (read after its locks). */
 export function effectInstantOf(uow: UnitOfWork): Promise<UtcInstant> {
   if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the effect instant is read in a commerce unit of work of @kauro/persistence");
@@ -743,6 +751,8 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   readonly requestReads: PgCommerceRequestReads;
   /** The bank-transfer route's tables (migration 0046, lane L-ROUTE), read through bankRoutesOf(uow). */
   readonly bankRoutes: PgBankRoutes;
+  /** The manual-assisted refund tables of the bank-transfer route (migration 0071, lane L-REFUND), read through bankRefundsOf(uow). */
+  readonly bankRefunds: PgBankRefunds;
   /** The inbound credit, statement and order-state tables (migration 0063, lane PV1-INBOUND), read through bankCreditsOf(uow). */
   readonly bankCredits: PgBankCredits;
   /** The settlement observations of the bank route (migration 0062, lane PV1-SETTLE), read through bankSettlementsOf(uow). */
@@ -761,6 +771,7 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
     this.paymentSweeps = new PgPaymentSweeps(client);
     this.requestReads = new PgCommerceRequestReads(client);
     this.bankRoutes = new PgBankRoutes(client);
+    this.bankRefunds = new PgBankRefunds(client);
     this.bankCredits = new PgBankCredits(client);
     this.bankSettlements = new PgBankSettlements(client);
   }

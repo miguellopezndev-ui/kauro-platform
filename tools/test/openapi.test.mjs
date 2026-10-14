@@ -33,7 +33,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
   // the five routes of the browser session boundary (B11 W2), the two public routes (B11 W5b), and the Payments V1 bank-transfer
   // routes (L-ROUTE: the five operational bank-route commands, getBankRoute, and the KIT read getTransferInstructions; PV1-INBOUND:
   // the four bank-credit commands, the credit and match-key reads, and the checkout retirement; B12: the owner's evidence upload and
-  // the credit queue)
+  // the credit queue; L-REFUND: the six owner refund commands CMD220-CMD225 and the owner queue)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -52,6 +52,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/operations/bank-orders/{orderId}/match-keys getBankOrderMatchKeys",
       "GET /api/v1/operations/bank-routes/{routeId} getBankRoute",
       "GET /api/v1/operations/breakglass-grants/{grantId}/tables/{tableId}/preview PreviewTableUnderBreakglass",
+      "GET /api/v1/operations/execution-attempts listExecutionAttempts",
       "GET /api/v1/operations/refunds/{refundId} GetRefundReview",
       "GET /api/v1/payment-orders/{orderId} GetPaymentOrder",
       "GET /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions",
@@ -105,8 +106,14 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/operations/breakglass-grants/{grantId}/revoke RevokeBreakglass",
       "POST /api/v1/operations/capabilities/{capabilityId}/restrict RestrictCapability",
       "POST /api/v1/operations/capabilities/{capabilityId}/versions ChangeCapability",
+      "POST /api/v1/operations/execution-attempts/{attemptId}/bounces recordReturnBounce",
+      "POST /api/v1/operations/execution-attempts/{attemptId}/records recordRefundExecution",
+      "POST /api/v1/operations/execution-attempts/{attemptId}/resend-declarations declareResendExecution",
+      "POST /api/v1/operations/execution-attempts/{attemptId}/resolutions resolveUncertainExecution",
       "POST /api/v1/operations/incidents RecordIncident",
       "POST /api/v1/operations/recoveries AuthorizeRecovery",
+      "POST /api/v1/operations/refunds/{refundId}/execution-declarations declareRefundExecution",
+      "POST /api/v1/operations/treasury-refunds/{treasuryRefundId}/approve approveTreasuryRefund",
       "POST /api/v1/packages/{packageId}/download-authorizations AuthorizeDownload",
       "POST /api/v1/payment-orders/{orderId}/capture CapturePayment",
       "POST /api/v1/payment-orders/{orderId}/reconcile ReconcilePayment",
@@ -200,6 +207,13 @@ test("the committed document is the generated one, byte for byte, and matches ev
     "POST /api/v1/operations/bank-routes/{routeId}/details replaceBankRouteDetails",
     "GET /api/v1/operations/bank-routes/{routeId} getBankRoute",
     "GET /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions",
+    "POST /api/v1/operations/treasury-refunds/{treasuryRefundId}/approve approveTreasuryRefund",
+    "POST /api/v1/operations/refunds/{refundId}/execution-declarations declareRefundExecution",
+    "POST /api/v1/operations/execution-attempts/{attemptId}/records recordRefundExecution",
+    "POST /api/v1/operations/execution-attempts/{attemptId}/resolutions resolveUncertainExecution",
+    "POST /api/v1/operations/execution-attempts/{attemptId}/bounces recordReturnBounce",
+    "POST /api/v1/operations/execution-attempts/{attemptId}/resend-declarations declareResendExecution",
+    "GET /api/v1/operations/execution-attempts listExecutionAttempts",
     "POST /api/v1/payment-orders/{orderId}/retirements retireBankCheckout",
     "POST /api/v1/operations/bank-accounts/{accountRef}/credits enterBankCredit",
     "POST /api/v1/operations/bank-credits/{creditId}/confirmations confirmBankCredit",

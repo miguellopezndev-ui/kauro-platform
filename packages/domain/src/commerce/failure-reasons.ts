@@ -73,6 +73,8 @@ export const COMMERCE_FAILURE_REASONS = [
   "NO_DECLARED_ATTEMPT",
   "EXECUTION_PRECEDES_DECLARATION",
   "NO_RECORDED_BOUNCE",
+  "ATTEMPT_NOT_RECORDED",
+  "BOUNCE_ALREADY_RECORDED",
   "RESEND_EXCEEDS_PAYABLE",
   "REFUND_NOT_UNCERTAIN",
   "NOT_EXECUTED_TOO_EARLY",
@@ -125,6 +127,10 @@ export const COMMERCE_FAILURE_REASONS = [
   // the two-step apply of a recorded settlement intent (lane PV1-SETTLE; docs/design/PV1-SETTLE-two-step.md §3.3 A7)
   "REQUEST_STALE",
   "EVIDENCE_MISMATCH",
+  // an idempotency key of a bank owner command reused with another request body (lane L-REFUND; the journal conflict named, never a new effect)
+  "BODY_CONFLICT",
+  // a manual-rail refund or treasury refund COMPLETED without the RECORDED attempt that is its execution evidence (lane L-REFUND; SQLSTATE KP014)
+  "EXECUTION_EVIDENCE_MISSING",
 ] as const;
 
 export type CommerceFailureReason = (typeof COMMERCE_FAILURE_REASONS)[number];

@@ -38,7 +38,7 @@ function ownerOfFile(tag: string): string {
   if (n === 23 || n === 58 || n === 61 || n === 66 || n === 68 || n === 70) return "B05";
   if (n >= 25 && n <= 27) return "B11";
   if ((n >= 28 && n <= 43) || n === 48 || n === 49 || n === 56 || n === 57 || n === 73) return "B10";
-  if (n === 45 || n === 46 || n === 47 || n === 55 || n === 72 || n === 79) return "PV1";
+  if (n === 45 || n === 46 || n === 47 || n === 55 || n === 72 || n === 79 || n === 80 || n === 81) return "PV1";
   if (n === 50 || n === 52) return "B17";
   if (n === 51 || n === 59) return "B18";
   if (n === 60) return "SEC-DEPTH";

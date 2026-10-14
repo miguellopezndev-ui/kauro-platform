@@ -173,6 +173,10 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0078_sec_policy_per_command.sql",
     // Payments V1 PV1-SETTLE: the bank-route settlement observation (CMD215), its event and the route's provider-available read (provisional number)
     "0079_bank_settlement.sql",
+    // Payments V1 L-REFUND: the corporate owner's step-up approval of a manual-rail refund applied by the payment service (bank_owner_authority, owner acts, treasury refund approval; provisional number)
+    "0071_refund_owner_authority.sql",
+    // Payments V1 L-REFUND: the session fence of the bank owner commands, a definer kauro_payment executes (rule 16; provisional number)
+    "0072_payment_session_fence.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
@@ -233,11 +237,16 @@ test("runtime roles are neither owners nor superusers and have no BYPASSRLS; the
     }
     // SECURITY DEFINER requires specific justification (08): the one function is the registration of a bank route's payment route
     // (migration 0046, coordinator decision #2 of lane L-ROUTE: payment_routes stays closed to every runtime role; the function checks the
-    // caller's ACTIVE KAURO_OWNER grant and writes CONFIGURED rows only), and the read-only provider-available balance of a payment route
+    // caller's ACTIVE KAURO_OWNER grant and writes CONFIGURED rows only), the read-only provider-available balance of a payment route
     // (migration 0079, PV1-SETTLE D-SET-5: the payment service cannot read another agency's postings, the funds guard needs the route's
-    // whole PSP_AVAILABLE; executable by kauro_payment only), each with a pinned search_path
+    // whole PSP_AVAILABLE; executable by kauro_payment only), the owner authority of a manual-rail refund (migration 0080, lane L-REFUND:
+    // the payment service never reads identities, grants or proofs; the function judges them and records the act), and the session fence of
+    // the bank owner commands (migration 0081: kauro_payment holds no privilege on web_sessions; the function locks FOR SHARE and returns the
+    // liveness of the one presented session), each with a pinned search_path
     const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef ORDER BY p.proname");
     assert.deepEqual(definers.rows, [
+      { proname: "bank_owner_authority", proconfig: ["search_path=pg_catalog, pg_temp"] },
+      { proname: "payment_session_fence", proconfig: ["search_path=pg_catalog, pg_temp"] },
       { proname: "register_bank_payment_route", proconfig: ["search_path=pg_catalog, pg_temp"] },
       { proname: "route_provider_available_cents", proconfig: ["search_path=pg_catalog, pg_temp"] },
     ]);
@@ -391,7 +400,7 @@ test("R20: the initial-state seed equals the registry machines (and the platform
     const births = machineOf(["enforce_initial_state", "enforce_initial_state_of", "enforce_observed_birth"]);
     for (const d of defs.rows) if (/EXECUTE FUNCTION kauro\.enforce_membership_initial_state\(\)/.test(d.def)) births.set(d.relname, "Membership");
     assert.deepEqual([...births.entries()].sort(), [...edges.entries()].sort());
-    assert.equal(edges.size, 40, "every seeded machine guards its table's edges (B06 seven, B07 four, B09 twelve, B08 five, B10 eleven, B11 one)");
+    assert.equal(edges.size, 41, "every seeded machine guards its table's edges (B06 seven, B07 four, B09 twelve, B08 five, B10 eleven, B11 one; Payments V1 the treasury refund of an unassigned credit, machine Refund)");
     for (const d of defs.rows) {
       if (/enforce_initial_state|enforce_membership_initial_state|enforce_observed_birth/.test(d.def)) assert.match(d.def, /BEFORE INSERT ON/, d.def);
     }

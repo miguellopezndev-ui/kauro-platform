@@ -24,17 +24,32 @@ interface FenceRow {
   absolute_expires_at: Date;
 }
 
+/**
+ * Which statement takes the lock: REQUEST, the request handlers' own (kauro_app, migration 0047: its policies over the session the
+ * transaction presents for the person it binds); SERVICE, the payment service's (kauro_payment, migration 0072: a SERVICE unit binds no
+ * person and holds no privilege on the table, so the definer kauro.payment_session_fence locks and returns the same row and columns).
+ */
+export type SessionFenceMode = "REQUEST" | "SERVICE";
+
 export class PgSessionFence {
-  constructor(private readonly client: Queryable) {}
+  constructor(
+    private readonly client: Queryable,
+    private readonly mode: SessionFenceMode = "REQUEST",
+  ) {}
 
   /** Locks FOR SHARE and returns the session `secretSha256` names for `userId` as it stands (latest committed version after any wait), or null. */
   async lockPresented(secretSha256: Sha256Hex, userId: UserId): Promise<LockedSession | null> {
-    await execute(this.client, "SELECT set_config('kauro.session_sha256', $1, true)", [secretSha256]);
-    const r = await execute<FenceRow>(
-      this.client,
-      "SELECT revoked_at, idle_expires_at, absolute_expires_at FROM kauro.web_sessions WHERE secret_sha256 = $1 AND user_id = $2 FOR SHARE",
-      [secretSha256, userId],
-    );
+    let r;
+    if (this.mode === "SERVICE") {
+      r = await execute<FenceRow>(this.client, "SELECT revoked_at, idle_expires_at, absolute_expires_at FROM kauro.payment_session_fence($1, $2)", [secretSha256, userId]);
+    } else {
+      await execute(this.client, "SELECT set_config('kauro.session_sha256', $1, true)", [secretSha256]);
+      r = await execute<FenceRow>(
+        this.client,
+        "SELECT revoked_at, idle_expires_at, absolute_expires_at FROM kauro.web_sessions WHERE secret_sha256 = $1 AND user_id = $2 FOR SHARE",
+        [secretSha256, userId],
+      );
+    }
     const row = r.rows[0];
     if (row === undefined) return null;
     return {

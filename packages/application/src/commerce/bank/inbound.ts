@@ -521,6 +521,8 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
             }
             if (linked !== null) continue;
             orphans++;
+            // late evidence on a terminal fact: the debit carries the reference of an attempt resolved NOT_EXECUTED (the facts do not change)
+            if (d.reference !== null) await repo.contradictTerminalAttempt(uow.ids.next(), uow.ids.next(), { environment, accountRef, lineId: w.lineId, reference: d.reference, evidenceHash: page.evidenceHash });
             // a Kauro refund reference with no declaration at all is an execution before any declaration (§7.28 SI2-UNDECLARED)
             const undeclared = d.reference !== null && REFUND_REFERENCE.test(d.reference) && !(await repo.attemptDeclaredWith(d.reference));
             await repo.openLineCase(uow.ids.next(), undeclared ? "UNDECLARED_OUTBOUND" : "RECORD_REQUIRED", { environment, accountRef, lineId: w.lineId, evidenceHash: page.evidenceHash }, undeclared ? "DEBIT_BEFORE_DECLARATION" : "DEBIT_NOT_RECORDED");

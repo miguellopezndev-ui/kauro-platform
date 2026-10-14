@@ -41,6 +41,8 @@ interface Route {
   readonly invocation?: Invocation;
   /** The unit of work this route serves (its statement log), once the invocation numbered it. */
   readonly unit?: UnitLog;
+  /** Lane L-REFUND: the payment service's commerce units (wrapCommerce) are routed over the same connection too (the bank owner commands run as kauro_payment). */
+  readonly payment?: boolean;
 }
 
 /**
@@ -78,6 +80,8 @@ export interface UnitLog {
 export interface Routing {
   readonly target?: number;
   readonly log?: UnitLog[];
+  /** Route the payment service's commerce units (wrapCommerce) over the connection as well (lane L-REFUND: a bank owner command's SERVICE units). */
+  readonly payment?: boolean;
 }
 
 type AnyFactory = { run(context: ExecutionContext, work: (uow: never) => Promise<unknown>, options?: unknown): Promise<unknown> };
@@ -306,7 +310,7 @@ export class FaultRouting {
    * into `routing.log` (B10-KIT-SUITES section 3).
    */
   on<T>(conn: HarnessConnection, role: RouteRole, points: FaultPoints, steps: ReadonlyArray<SqlStep>, fn: () => Promise<T>, routing: Routing = {}): Promise<T> {
-    return this.#als.run({ conn, role, points, steps, seen: new Map(), invocation: { seq: 0, target: routing.target ?? null, log: routing.log ?? [] } }, fn);
+    return this.#als.run({ conn, role, points, steps, seen: new Map(), invocation: { seq: 0, target: routing.target ?? null, log: routing.log ?? [] }, ...(routing.payment === true ? { payment: true } : {}) }, fn);
   }
 
   /**
@@ -336,10 +340,20 @@ export class FaultRouting {
     return this.#pay.run({ points }, fn);
   }
 
-  /** The payment service's commerce unit-of-work factory (paymentWorld's wrapCommerce): traced and crashable inside `onPayment`. */
+  /**
+   * Passes the named point of the routed invocation running now (a no-op outside one): a bank owner command's hold between its evidence read
+   * and its unit (lane L-REFUND `bank:gate-read`), paused or crashed by the cell that armed it.
+   */
+  async pass(point: string): Promise<void> {
+    const route = this.#als.getStore();
+    if (route !== undefined) await route.points.pass(point);
+  }
+
+  /** The payment service's commerce unit-of-work factory (paymentWorld's wrapCommerce): traced and crashable inside `onPayment`; routed inside `on` with `payment`. */
   wrapCommerce<F extends object>(inner: F): F {
     return new Proxy(inner, {
       get: (target, prop) => {
+        if (prop === "run" && this.#als.getStore()?.payment === true) return Reflect.get(this.wrap(target), "run");
         const value: unknown = Reflect.get(target, prop, target);
         if (typeof value !== "function") return value;
         if (prop !== "run") return (value as (...a: unknown[]) => unknown).bind(target);
