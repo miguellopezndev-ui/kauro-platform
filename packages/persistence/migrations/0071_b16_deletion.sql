@@ -1,4 +1,4 @@
--- Migration 0070: B16 lane L3, CMD042 RequestDeletion and the DELETION_EXECUTOR (provisional number; the coordinator renumbers on merge).
+-- Migration 0071: B16 lane L3, CMD042 RequestDeletion and the DELETION_EXECUTOR (provisional number; the coordinator renumbers on merge).
 --
 -- 09 "Early deletion" and "Deletion receipts", R2-056/R2-057, S062/S064: a project deletion is requested once, by an owner or admin with a
 -- fresh step-up; the request revokes new work at once and the control plane then deletes what the project owns and says, in a receipt,

@@ -88,7 +88,7 @@ export const EVENT_TYPES = [
   "retention_record.expired.v1",
   // the one explicit soft-deadline extension of a project (B16 CMD060; migration 0069, provisional)
   "retention_record.extended.v1",
-  // the managed deletion of a project (B16 CMD042 and DELETION_EXECUTOR; migration 0070, provisional)
+  // the managed deletion of a project (B16 CMD042 and DELETION_EXECUTOR; migration 0071, provisional)
   "project.deletion_requested.v1",
   "project.deleted.v1",
   "retention_record.deleting.v1",

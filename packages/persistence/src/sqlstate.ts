@@ -184,7 +184,7 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KA082: { code: "INTEGRITY_FAILURE", reason: "CAPACITY_LEDGER" },
   KA083: { code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
   KA084: { code: "INTEGRITY_FAILURE", reason: "PUBLICATION_EVIDENCE_MISSING" },
-  // package B16 L3 (migration 0070): nothing new enters a project whose deletion was requested; a deletion's closing facts need their evidence
+  // package B16 L3 (migration 0071): nothing new enters a project whose deletion was requested; a deletion's closing facts need their evidence
   KA087: { code: "PRECONDITION_FAILED", reason: "PROJECT_DELETION_REQUESTED" },
   KA088: { code: "INTEGRITY_FAILURE" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },

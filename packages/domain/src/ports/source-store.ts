@@ -682,7 +682,7 @@ export interface PendingOperationJournal {
 }
 
 /**
- * Managed deletion of a project (package B16 lane L3; table kauro.deletion_requests and kauro.deletion_receipts, migration 0070).
+ * Managed deletion of a project (package B16 lane L3; table kauro.deletion_requests and kauro.deletion_receipts, migration 0071).
  * The request half (CMD042, kauro_app) inserts the one request of the project and moves its retention records to DELETING; the
  * executor half (DELETION_EXECUTOR, kauro_control) advances the request, enumerates and closes what the project owns and appends
  * one receipt per attempt. The database refuses a COMPLETE receipt while a registered object of the project is not DELETED (KA088).

@@ -134,7 +134,7 @@ Notes.
 ## Builder decisions (2026-10-14, coordinator-approved)
 
 - **Files**: the repository is `packages/persistence/src/source/deletion.ts` (`PgDeletionRepository`), the executor
-  `apps/control/src/consumers/deletion-executor.ts`, the migration `0070_b16_deletion.sql` (provisional number).
+  `apps/control/src/consumers/deletion-executor.ts`, the migration `0071_b16_deletion.sql` (provisional number).
 - **END_OF_SERVICE** is in the request schema, the response view, the migration CHECK and the generated clients. The vendored
   authority registry (`packages/contracts/registry/contracts.json`, DeletionRequest.reason) is hash-pinned by its provenance test
   (`registry provenance verifies and every vendored file is hashed`); editing it breaks that evidence, so it is carried as a

@@ -1,5 +1,5 @@
 /**
- * The managed deletion of a project over `pg` (B16 lane L3; migration 0070; docs/design/B16-L3-failure-matrix.md). CMD042's half runs
+ * The managed deletion of a project over `pg` (B16 lane L3; migration 0071; docs/design/B16-L3-failure-matrix.md). CMD042's half runs
  * as the request handlers' role (kauro_app) and the DELETION_EXECUTOR's half as the control plane (kauro_control); the database owns
  * the evidence rules: the step-up re-judged at COMMIT (KC020), a retention record DELETING only with the request of this transaction
  * and closed only with the completed deletion of this one (KA088), a COMPLETE receipt only while every managed object is DELETED
