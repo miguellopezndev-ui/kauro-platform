@@ -66,6 +66,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/revisions/{revisionId}/selection-manifests/{selectionManifestId} GetSelectionManifest",
       "GET /api/v1/revisions/{revisionId}/tables/{tableId}/preview PreviewTable",
       "GET /api/v1/revisions/{revisionId}/uploads ListUploads",
+      "GET /api/v1/sales/home GetSellerHome",
       "GET /api/v1/sales/statements/{statementId} GetCommissionStatement",
       "GET /api/v1/sessions/current getCurrentSession",
       "GET /api/v1/support-cases/{caseId} GetSupportCase",

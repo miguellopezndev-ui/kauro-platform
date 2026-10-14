@@ -8,6 +8,9 @@
  *                           by the token and by the stored row → the caller's own seller row, read after its transition lock in this
  *                           unit of work, in state ACTIVE. A missing row, another person's row and any other state (CANDIDATE, SUSPENDED,
  *                           TERMINATED) are refused with the same reason, so a refusal reveals nothing about a seller's state.
+ *  authorizeStatementSeller the same identity checks → the caller's own seller row in ACTIVE, SUSPENDED or TERMINATED (a terminated seller keeps its
+ *                           home, statements and support route, R2-066; B12 lane L-HOME). A CANDIDATE and a person with no seller row are
+ *                           CORPORATE_ROLE_MISSING. It admits statements and the home only: every prospect-data command keeps authorizeSeller.
  *  authorizeCorporateOwner  the same identity checks → the caller's own ACTIVE KAURO_OWNER grant, read after its transition lock.
  *  authorizeCommercialService the verified service identity holds the command's role in the code-owned SERVICE_ROLE_TABLE
  *                           (COMMISSION_SERVICE, FINANCE_SERVICE or, since package B18, OPERATIONS_SERVICE) and was issued for this deployment's environment.
@@ -29,8 +32,15 @@ export type CommercialServiceRole = "COMMISSION_SERVICE" | "FINANCE_SERVICE" | "
 /** An admitted active seller: the caller's own identity and the seller row the decision was made on. */
 export type SellerDecision = { readonly kind: "ALLOW"; readonly userId: string; readonly sellerId: string; readonly policyVersion: string } | CommerceDenial;
 
+/** An admitted seller of any readable state: the state is the one read after the lock, so a home is judged on it. */
+export type StatementSellerDecision =
+  | { readonly kind: "ALLOW"; readonly userId: string; readonly sellerId: string; readonly sellerState: "ACTIVE" | "SUSPENDED" | "TERMINATED"; readonly policyVersion: string }
+  | CommerceDenial;
+
 export interface CommercialAuthorizer {
   authorizeSeller(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts }): Promise<SellerDecision>;
+  /** The caller's own seller in any state but CANDIDATE, read after its transition lock (L1); carries the state read. */
+  authorizeStatementSeller(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts }): Promise<StatementSellerDecision>;
   authorizeCorporateOwner(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts }): Promise<OperatorDecision>;
   authorizeCommercialService(request: {
     readonly identity: ServiceIdentity;
@@ -70,6 +80,17 @@ export function createCommercialAuthorizer(deps: CommercialAuthorizerDependencie
       const seller = await deps.principals.sellerOf(uow, identity.userId);
       if (seller === null || seller.state !== "ACTIVE" || seller.userId !== identity.userId) return deny("NOT_AUTHORIZED", "CORPORATE_ROLE_MISSING");
       return { kind: "ALLOW", userId: identity.userId, sellerId: seller.sellerId, policyVersion: COMMERCE_POLICY_VERSION };
+    },
+
+    async authorizeStatementSeller(uow, request) {
+      const identity = request.identity;
+      const refused = await refuseUnadmittedPerson(uow, identity);
+      if (refused !== null) return refused;
+      const seller = await deps.principals.sellerOf(uow, identity.userId);
+      if (seller === null || seller.userId !== identity.userId || (seller.state !== "ACTIVE" && seller.state !== "SUSPENDED" && seller.state !== "TERMINATED")) {
+        return deny("NOT_AUTHORIZED", "CORPORATE_ROLE_MISSING");
+      }
+      return { kind: "ALLOW", userId: identity.userId, sellerId: seller.sellerId, sellerState: seller.state, policyVersion: COMMERCE_POLICY_VERSION };
     },
 
     async authorizeCorporateOwner(uow, request) {
