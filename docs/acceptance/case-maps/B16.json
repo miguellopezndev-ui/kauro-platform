@@ -3,7 +3,7 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B16-case-map.md",
-  "sha256": "c0f0b9dc2cf6e0a241a1b86f15ebc6a33a123f2fc237695e01f1082c8d29254c"
+  "sha256": "290f9c03907923967897cbca24847fe489faface8c2fecd86cb0f3c3003767e9"
  },
  "rows": [
   {
@@ -70,14 +70,16 @@
   },
   {
    "case": "S065",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/control/test/b16-restore.test.ts :: S065: a membership revoked and a project deleted after the backup stay revoked and deleted before any request"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B14"
    ],
-   "claimed": "OPEN -> L6 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
+   "claimed": "OPEN -> L3 PARTIAL (PLANNED L3; target PART(B14) EXECUTED_LOCAL)"
   },
   {
    "case": "S071",
@@ -237,27 +239,26 @@
   },
   {
    "case": "R2-074",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/control/test/b16-restore.test.ts :: R2-074: a sent notification identity in the journal is never dispatched again from the restored outbox"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [
-    "B14"
-   ],
-   "claimed": "OPEN -> L6 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-076",
-   "class": "PARTIAL",
+   "class": "EXECUTED_LOCAL",
    "test": [
-    "packages/persistence/test/adapters-leases.test.ts :: B06-R1: an expired JOB_ATTEMPT or MODEL_TASK lease that never stored a checkpoint cannot be resumed — another owner's takeover with no checkpoint or an invented one is REFUSED RESUME_WITHOUT_CHECKPOINT and the lease stays as its first owner left it; an OUTBOX_DISPATCH lease, which spends nothing, is still taken over without one, never with an invented one"
+    "packages/persistence/test/adapters-leases.test.ts :: B06-R1: an expired JOB_ATTEMPT or MODEL_TASK lease that never stored a checkpoint cannot be resumed — another owner's takeover with no checkpoint or an invented one is REFUSED RESUME_WITHOUT_CHECKPOINT and the lease stays as its first owner left it; an OUTBOX_DISPATCH lease, which spends nothing, is still taken over without one, never with an invented one",
+    "apps/control/test/b16-restore.test.ts :: R2-076 (restore): a RUNNING attempt in the backup is fenced and rerun under the same authorization; nothing resumes from scratch"
    ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [
-    "B14"
-   ],
-   "claimed": "OPEN -> L6 PARTIAL (PLANNED L6; target PART(B14) EXECUTED_LOCAL)"
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-123",
@@ -288,14 +289,14 @@
   },
   {
    "case": "R2-126",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/control/test/b16-restore.test.ts :: R2-126: a restored earlier deadline never deletes data promised by a journaled extension; a later tombstone still wins"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [
-    "B14"
-   ],
-   "claimed": "OPEN -> L6 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD003-OK",
@@ -635,16 +636,15 @@
   },
   {
    "case": "CMD057-OK",
-   "class": "PARTIAL",
+   "class": "EXECUTED_LOCAL",
    "test": [
-    "apps/api/test/cmd056-cmd057-operations.test.ts :: CMD057-OK: the owner with a fresh step-up authorizes a PREPARED restore candidate for its own deletion journal hash — 200 AUTHORIZED at the next candidate revision, one recovery row naming the owner, the proof and the hash, the journal and the step-up fact committed with it"
+    "apps/api/test/cmd056-cmd057-operations.test.ts :: CMD057-OK: the owner with a fresh step-up authorizes a PREPARED restore candidate for its own deletion journal hash — 200 AUTHORIZED at the next candidate revision, one recovery row naming the owner, the proof and the hash, the journal and the step-up fact committed with it",
+    "apps/control/test/b16-restore.test.ts :: CMD057-OK (run): the authorized candidate is restored, reconciled and released only after the checks"
    ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [
-    "B14"
-   ],
-   "claimed": "OPEN -> L6 PARTIAL (PLANNED L6; target PART(B14) EXECUTED_LOCAL)"
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD057-DENY",

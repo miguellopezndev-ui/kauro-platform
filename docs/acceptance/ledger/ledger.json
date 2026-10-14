@@ -2938,7 +2938,7 @@
    "case": "S048",
    "package": "B16",
    "gate": "G-TENANT",
-   "claimed": "PARTIAL",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -2992,7 +2992,7 @@
    "case": "S071",
    "package": "B16",
    "gate": "G-TENANT",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3028,7 +3028,7 @@
    "case": "R2-048",
    "package": "B16",
    "gate": "G-TENANT",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3037,7 +3037,7 @@
    "case": "R2-049",
    "package": "B16",
    "gate": "G-SECURITY",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3046,7 +3046,7 @@
    "case": "R2-050",
    "package": "B16",
    "gate": "G-SECURITY",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3298,7 +3298,7 @@
    "case": "CMD038-OK",
    "package": "B16",
    "gate": "G-TENANT",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3307,7 +3307,7 @@
    "case": "CMD038-DENY",
    "package": "B16",
    "gate": "G-TENANT",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3316,7 +3316,7 @@
    "case": "CMD038-RACE",
    "package": "B16",
    "gate": "G-TENANT",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "PARTIAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3352,7 +3352,7 @@
    "case": "CMD054-OK",
    "package": "B16",
    "gate": "G-SECURITY",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3361,7 +3361,7 @@
    "case": "CMD054-DENY",
    "package": "B16",
    "gate": "G-SECURITY",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3370,7 +3370,7 @@
    "case": "CMD054-RACE",
    "package": "B16",
    "gate": "G-SECURITY",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3379,7 +3379,7 @@
    "case": "CMD055-OK",
    "package": "B16",
    "gate": "G-SECURITY",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3388,7 +3388,7 @@
    "case": "CMD055-DENY",
    "package": "B16",
    "gate": "G-SECURITY",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3397,7 +3397,7 @@
    "case": "CMD055-RACE",
    "package": "B16",
    "gate": "G-SECURITY",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -4216,9 +4216,9 @@
    "title": "Security and restoration qualification",
    "cases": 61,
    "counts": {
-    "PARTIAL": 2,
-    "EXECUTED_LOCAL": 34,
-    "NOT_EXECUTED": 25
+    "EXECUTED_LOCAL": 43,
+    "NOT_EXECUTED": 12,
+    "PARTIAL": 6
    },
    "status": "IN_PROGRESS",
    "acceptedSubject": null,
