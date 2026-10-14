@@ -89,7 +89,8 @@ export const SQLSTATE = Object.freeze({
   B16_L2_RETENTION_B: "KA086",
   B16_L3_DELETION_A: "KA087",
   B16_L3_DELETION_B: "KA088",
-  B16_L4_BREAKGLASS_A: "KA089",
+  // lane L4 (migration 0071 kauro.breakglass_grants_birth): the authorization does not justify the breakglass scope now
+  B16_L4_BREAKGLASS_SCOPE_UNAUTHORIZED: "KA089",
   B16_L5_DOWNLOAD_A: "KA090",
   B16_L6_RESTORE_A: "KA091",
   B16_L6_RESTORE_B: "KA092",
@@ -184,6 +185,9 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   KA082: { code: "INTEGRITY_FAILURE", reason: "CAPACITY_LEDGER" },
   KA083: { code: "BUDGET_EXHAUSTED", reason: "NO_FUNDED_GRANT" },
   KA084: { code: "INTEGRITY_FAILURE", reason: "PUBLICATION_EVIDENCE_MISSING" },
+  // B16 lane L4 (CMD054): a grant whose support case or incident does not justify its project now (another project or agency, closed,
+  // resolved, a false positive, an incident not naming the project, a project on its way to deletion, a closed agency)
+  KA089: { code: "PRECONDITION_FAILED", reason: "BREAKGLASS_SCOPE_UNAUTHORIZED" },
   "23503": { code: "INVALID_REQUEST", reason: "UNKNOWN_REFERENCE" },
   "23514": { code: "INVALID_REQUEST" },
   "42501": { code: "NOT_FOUND", reason: "TENANT_CONTEXT_MISSING" },
@@ -286,6 +290,11 @@ export const COMMERCIAL_UNIQUE_FAILURES: Readonly<Record<string, () => DomainFai
   prospects_one_live_per_organization: () => new DomainFailure("PRECONDITION_FAILED", "the organization already has a live prospect", { reason: "PROSPECT_EXISTS" }),
   attribution_claims_one_live_per_seller: () => new DomainFailure("PRECONDITION_FAILED", "the seller already has a live claim on the prospect", { reason: "CLAIM_EXISTS" }),
   attribution_allocations_one_per_agency: () => new DomainFailure("PRECONDITION_FAILED", "the agency already has a frozen attribution allocation", { reason: "ATTRIBUTION_EXISTS" }),
+  // CMD054 (migration 0071): two opens of one project race on its one live grant; a step-up proof opens one grant; one authorization opens
+  // one grant of a project — after its expiry a new justified grant is required (R2-050)
+  breakglass_grants_one_live_per_project: () => new DomainFailure("PRECONDITION_FAILED", "the project already holds a live breakglass grant", { reason: "BREAKGLASS_GRANT_LIVE" }),
+  breakglass_grants_proof_once: () => new DomainFailure("PRECONDITION_FAILED", "the step-up proof already opened a breakglass grant", { reason: "BREAKGLASS_PROOF_REUSED" }),
+  breakglass_grants_one_per_authorization: () => new DomainFailure("PRECONDITION_FAILED", "this authorization already opened a grant of the project: a new justified grant is required", { reason: "BREAKGLASS_RENEWAL_REFUSED" }),
   // CMD048: two first assignments of one agency race to open its sales account; the loser finds it opened at version 1 (D10-ASSIGN-3)
   sales_accounts_pkey: () => new StaleVersionFailure(1, "ASSIGNED"),
 });

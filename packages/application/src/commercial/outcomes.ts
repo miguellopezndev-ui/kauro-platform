@@ -8,7 +8,7 @@
 import { OUTCOME_BLOCKS, closedCatalogue, problemOutcome as outcome, type ProblemOutcome } from "../api/outcome-kit.js";
 import { CREATE_QUOTE_OUTCOMES } from "./quotes/outcomes.js";
 import type { CommercialServedRouteCommandId } from "./served.js";
-import { AUTHORIZE_RECOVERY_OUTCOMES, OPERATIONS_SERVICE_ACCESS, RECORD_INCIDENT_OUTCOMES } from "./operations/outcomes.js";
+import { AUTHORIZE_RECOVERY_OUTCOMES, BREAKGLASS_PREVIEW_OUTCOMES, OPEN_BREAKGLASS_OUTCOMES, OPERATIONS_SERVICE_ACCESS, RECORD_INCIDENT_OUTCOMES, REVOKE_BREAKGLASS_OUTCOMES } from "./operations/outcomes.js";
 import { CHANGE_CAPABILITY_OUTCOMES, RESTRICT_CAPABILITY_OUTCOMES } from "./capabilities/outcomes.js";
 import { ACTIVATE_SELLER_OUTCOMES, ASSIGN_ACCOUNT_OUTCOMES, CORPORATE_OWNER_ACCESS, TERMINATE_SELLER_OUTCOMES } from "./sellers/outcomes.js";
 import type { CommercialReadOperationId } from "./response-schemas.js";
@@ -99,6 +99,9 @@ export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteC
   CMD053: closedCatalogue("CMD053", [...EVERY_SERVICE_ROUTE, ...PATH_IDS, ...COMMISSION_SERVICE_ACCESS, ...RECONCILE_COMMISSION_PAYOUT_OUTCOMES]),
   // the capability commands (package B18): the corporate owner, the path id, the command-layer outcomes of capabilities/outcomes
   // the operations commands (package B16/B18): CMD056 admits the owner or the operations service, CMD057 the owner with a step-up
+  // the breakglass commands (package B16 lane L4): the corporate owner; CMD054 with its step-up, CMD055 with the path grant id
+  CMD054: closedCatalogue("CMD054", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...OPEN_BREAKGLASS_OUTCOMES]),
+  CMD055: closedCatalogue("CMD055", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...REVOKE_BREAKGLASS_OUTCOMES]),
   CMD056: closedCatalogue("CMD056", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...OPERATIONS_SERVICE_ACCESS, ...RECORD_INCIDENT_OUTCOMES]),
   CMD057: closedCatalogue("CMD057", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...AUTHORIZE_RECOVERY_OUTCOMES]),
   CMD058: closedCatalogue("CMD058", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...CORPORATE_OWNER_ACCESS, ...CHANGE_CAPABILITY_OUTCOMES]),
@@ -108,4 +111,6 @@ export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteC
 /** The closed problem catalogue of each served B10 read route (GetCommissionStatement: no query, the path id, the seller's or owner's access). */
 export const COMMERCIAL_READ_OUTCOMES: Readonly<Record<CommercialReadOperationId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   GetCommissionStatement: closedCatalogue("GetCommissionStatement", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...GET_COMMISSION_STATEMENT_OUTCOMES]),
+  // the breakglass preview (package B16 lane L4): the corporate owner, the two path ids, no query (nothing widens the bounded sample)
+  PreviewTableUnderBreakglass: closedCatalogue("PreviewTableUnderBreakglass", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...CORPORATE_OWNER_ACCESS, ...BREAKGLASS_PREVIEW_OUTCOMES]),
 });

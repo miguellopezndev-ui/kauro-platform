@@ -365,14 +365,14 @@ test("CMD055-OK: the corporate owner revokes a live grant — 200 REVOKED with t
   assert.equal((await grantRow(held.grantId))?.revoked_by_user_id, corp2.userId);
 });
 
-test("CMD055-DENY: no credential, an agency OWNER or a seller cannot revoke; an unknown grant is 404; a revoked grant is not revoked again and an expired one is not revoked at all (its record kept); a malformed reason is 400 — and no answer ever claims a zero residual bearer lifetime", async () => {
+test("CMD055-DENY: no credential, an agency OWNER or a seller cannot revoke; an unknown grant is 404; a revoked grant is not revoked again and an expired one is not revoked at all (its record kept); a reason with a control character is 400 — and no answer ever claims a zero residual bearer lifetime", async () => {
   const s = await scope("revoke-deny");
   const grant = await opened(s);
   assert.equal(outcome(w, await revoke(grant.grantId, undefined, { token: null })), "401 AUTHENTICATION_REQUIRED -");
   assert.equal(outcome(w, await revoke(grant.grantId, undefined, { token: w.owner.token })), "403 NOT_AUTHORIZED CORPORATE_ROLE_MISSING");
   assert.equal(outcome(w, await revoke(grant.grantId, undefined, { token: w.stranger.token })), "403 NOT_AUTHORIZED CORPORATE_ROLE_MISSING");
   assert.equal(outcome(w, await revoke(ids.next())), "404 NOT_FOUND -");
-  assert.equal((await revoke(grant.grantId, { reasonCode: "lower case" })).status, 400);
+  assert.equal((await revoke(grant.grantId, { reasonCode: "WORKCOMPLETE" })).status, 400);
   assert.equal((await revoke(grant.grantId, { reasonCode: "WORK_COMPLETE", residualBearerLifetimeSeconds: 0 })).status, 400, "a caller cannot state a residual lifetime");
   assert.equal((await grantRow(grant.grantId))?.state, "ACTIVE", "nothing revoked by a refusal");
 
@@ -522,7 +522,7 @@ test("R2-050: renewal after the 30-min expiry is refused, a new justified grant 
     await waitForApiLockWait(w, "FROM kauro.breakglass_grants");
     await holder.client.query("SET LOCAL session_replication_role = replica");
     const moved = await holder.client.query<{ wait_ms: string }>(
-      "UPDATE kauro.breakglass_grants SET expires_at = clock_timestamp() + interval '300 milliseconds', opened_at = clock_timestamp() + interval '300 milliseconds' - interval '1800 seconds' WHERE grant_id = $1 RETURNING (extract(epoch FROM expires_at - clock_timestamp()) * 1000 + 50)::text AS wait_ms",
+      "UPDATE kauro.breakglass_grants g SET expires_at = c.t + interval '300 milliseconds', opened_at = c.t + interval '300 milliseconds' - interval '1800 seconds' FROM (SELECT clock_timestamp() AS t) c WHERE g.grant_id = $1 RETURNING (extract(epoch FROM g.expires_at - clock_timestamp()) * 1000 + 50)::text AS wait_ms",
       [crossing.grantId],
     );
     await new Promise((resolve) => setTimeout(resolve, Math.max(0, Math.ceil(Number(moved.rows[0]?.wait_ms)))));

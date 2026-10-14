@@ -78,6 +78,10 @@ export const COMMERCIAL_REQUEST_SCHEMAS = Object.freeze({
     affectedScopeRefs: { type: "array", minItems: 1, maxItems: 20, items: { type: "string", pattern: "^(platform|agency|capability|project|provider|route|worker):[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" } },
     summary: { type: "string", minLength: 1, maxLength: 500, pattern: LABEL_PATTERN },
   }),
+  /** OpenBreakglass: ONE project id (no list, no wildcard), the purpose, the owner's fresh step-up proof and the support case or incident. */
+  CMD054: schema("CMD054", ["scopeRef", "purpose", "assuranceProofRef", "authorizationRef"], { scopeRef: ID, purpose: LABEL, assuranceProofRef: ID, authorizationRef: ID }),
+  /** RevokeBreakglass: the reason recorded with the revocation. A caller states no residual lifetime: the platform does. */
+  CMD055: schema("CMD055", ["reasonCode"], { reasonCode: LABEL }),
   /** AuthorizeRecovery: the prepared restore candidate, the deletion journal hash the restore must honour and the owner's step-up proof. */
   CMD057: schema("CMD057", ["restoreCandidateRef", "deletionJournalHash", "authorizationRef"], { restoreCandidateRef: ID, deletionJournalHash: HASH, authorizationRef: ID }),
   /** ChangeCapability: the capability version read, the new profile hash and the qualification evidence hashes it cites (1..50; a repeated hash is recorded once). */

@@ -35,6 +35,7 @@ export type CapabilityId = Branded<Id, "CapabilityId">;
 export type IncidentId = Branded<Id, "IncidentId">;
 export type RestoreCandidateId = Branded<Id, "RestoreCandidateId">;
 export type RecoveryId = Branded<Id, "RecoveryId">;
+export type BreakglassGrantId = Branded<Id, "BreakglassGrantId">;
 export type EventId = Branded<Id, "EventId">;
 export type InquiryId = Branded<Id, "InquiryId">;
 export type OutboxId = Branded<Id, "OutboxId">;
