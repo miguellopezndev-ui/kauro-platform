@@ -178,7 +178,7 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // Payments V1 L-REFUND: the session fence of the bank owner commands, a definer kauro_payment executes (rule 16; provisional number)
     "0081_payment_session_fence.sql",
     // CLOCK-SWEEP-B07 L2: the upload acceptance edge and the seal window of the bytes judged at kauro.effect_now() (provisional number)
-    "0072_fcg_b07_deadlines.sql",
+    "0082_fcg_b07_deadlines.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

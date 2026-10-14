@@ -1,4 +1,4 @@
--- Migration 0072: CLOCK-SWEEP-B07 lane L2, FCG-B07-DEADLINES (provisional number; the coordinator renumbers on merge).
+-- Migration 0082: CLOCK-SWEEP-B07 lane L2, FCG-B07-DEADLINES (provisional number; the coordinator renumbers on merge).
 --
 -- D-CLOCK-1 judged at the effect (docs/design/B07-clock-sweep-plan.md sec. 4): a deadline that refuses an effect is judged against the
 -- server's instant of the effect statement (kauro.effect_now(), 0038), never against the transaction's start (kauro.server_now()), so
