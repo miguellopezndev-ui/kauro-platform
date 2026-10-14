@@ -175,3 +175,8 @@ ALTER TABLE kauro.staged_retention_windows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kauro.staged_retention_windows FORCE ROW LEVEL SECURITY;
 CREATE POLICY staged_retention_windows_tenant_read ON kauro.staged_retention_windows FOR SELECT TO kauro_app USING (agency_id = kauro.current_agency_id());
 GRANT SELECT ON kauro.staged_retention_windows TO kauro_app;
+
+-- SEC-DEPTH R17 (0060): a trigger fires without EXECUTE, and a direct call is not a route, so PUBLIC holds EXECUTE on none of this
+-- migration's trigger functions (a function created after 0060 starts with it)
+REVOKE EXECUTE ON FUNCTION kauro.staged_retention_windows_birth() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.staged_retention_windows_deadlines() FROM PUBLIC;
