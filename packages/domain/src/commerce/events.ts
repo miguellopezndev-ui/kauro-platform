@@ -343,6 +343,10 @@ export const COMMERCE_EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: C
   // the issuance command of the fiscal integration package (CMD035, B15) takes validated documents and uncertain submissions
   { eventType: "tax_document.validated.v1", consumer: "FISCAL" },
   { eventType: "tax_document.uncertain.v1", consumer: "FISCAL" },
+  // CMD035's reconciler watches every submission past its deadline, and an issued invoice validates the credit notes drafted against
+  // it while it was SUBMITTING (B15 M6, M19; migration 0074 inserts the same rows)
+  { eventType: "tax_document.submitting.v1", consumer: "FISCAL" },
+  { eventType: "tax_document.issued.v1", consumer: "FISCAL" },
   { eventType: "tax_document.issued.v1", consumer: "NOTIFICATIONS" },
   { eventType: "reconciliation_case.opened.v1", consumer: "NOTIFICATIONS" },
   // the reviewed resolution of a case sources the correcting ledger postings it decides (D-LEDGER-B4; B09-F15)
