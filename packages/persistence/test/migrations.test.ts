@@ -143,6 +143,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0063_bank_inbound.sql",
     // owner decision D-33: prospect source evidence of the AGENCY or COMPANY segment (provisional number, renumbered at merge)
     "0064_d33_company_prospects.sql",
+    // package B16 lane L7: PAID_STAGED retention windows (first release + 21 d, capture + 30 d, final download + 7 d; provisional number)
+    "0065_b16_staged_retention.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
