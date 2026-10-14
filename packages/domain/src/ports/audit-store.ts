@@ -143,6 +143,12 @@ export interface NewModelTask {
   readonly minimizedRequestHash: Sha256Hex;
   readonly providerProfileId: Id;
   readonly maximumCostCents: bigint;
+  /**
+   * ADR-B05-IJR-1: a task the Intelligence Core dispatches is ONE request key (one prepared envelope, `minimizedRequestHash` its
+   * request hash) of one core run, unique per audit; every core admission of the task names that run, that key and that hash (KA004
+   * MODEL_TASK_BINDING otherwise). Planned again, the same run and key must carry the same identity (INTEGRITY_FAILURE otherwise).
+   */
+  readonly core?: { readonly runId: Id; readonly requestKey: string };
 }
 
 /**
@@ -192,7 +198,9 @@ export type SettlementOutcome =
 /**
  * The answer to a dispatch intent (D8-AUD-3): a response already stored for the task is returned before any new intent
  * (STORED_RESPONSE); an attempt of the lease's current fence is answered as it stands (IN_FLIGHT); another owner's live lease is HELD;
- * otherwise the intent is RESERVED on the audit's grant at the lease's fence.
+ * otherwise the intent is RESERVED on the audit's grant at the lease's fence. For a core admission (ADR-B05-IJR-1 K-5) the stored
+ * response is looked for again after the lease wait, IN_FLIGHT is the task's live (RESERVED or DISPATCHING) attempt at any fence, and a
+ * failed, cancelled or uncertain attempt leaves room for the next invocation at the same fence.
  */
 export type DispatchOutcome =
   | { readonly kind: "STORED_RESPONSE"; readonly request: RequestJournalRecord }

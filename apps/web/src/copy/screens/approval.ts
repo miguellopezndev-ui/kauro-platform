@@ -1,0 +1,26 @@
+// The copy of one area of the stage-2 screens (design D-COPY-1); copy/screens.ts merges every area and refuses a key defined twice.
+export const APPROVAL_COPY = {
+  // UI22 Approval (registry primaryCopy: "Approve these exact preparation decisions.")
+  "screen.approval.title": "Approval",
+  "screen.approval.lead.body": "Approve these exact preparation decisions.",
+  "screen.approval.plan.label": "Plan",
+  "screen.approval.validated.body": "The plan was validated in full for this exact source and destination.",
+  "screen.approval.effects.heading": "What approving will do",
+  "screen.approval.effects.rows.label": "rows are affected",
+  "screen.approval.open.cta": "Review and approve",
+  "screen.approval.return.label": "Return to review",
+  "screen.approval.dialog.title": "Approve this plan",
+  "screen.approval.dialog.summary.body": "You approve exactly the effects listed here, for this version of the plan. A change to the plan needs a new approval.",
+  "screen.approval.dialog.approve.cta": "Approve",
+  "screen.approval.dialog.cancel.label": "Cancel",
+  "screen.approval.dialog.errors.title": "The approval was refused",
+  "screen.approval.acknowledge.body": "I understand and approve this: {effect}",
+  "screen.approval.stepup.body": "Approving needs a fresh identity check. Your choices stay on this page.",
+  "screen.approval.working.body": "Recording your approval. Do not repeat this step.",
+  "screen.approval.done.title": "Plan approved",
+  "screen.approval.done.body": "Your approval is recorded for this exact plan.",
+  "screen.approval.hidden.title": "An effect is not disclosed",
+  "screen.approval.hidden.body": "Approval is blocked until every material effect of the plan is listed here.",
+  "screen.approval.unavailable.title": "The plan details are not available",
+  "screen.approval.unavailable.body": "Approval needs the plan's validated facts and disclosures. They cannot be read yet, so nothing can be approved from this page.",
+} as const satisfies Readonly<Record<string, string>>;
