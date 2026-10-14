@@ -19,6 +19,7 @@ import { AuthorizationDeliveryCompletionSource } from "@kauro/persistence";
 import { DISPATCH_LEASE_SECONDS, PAYMENT_APPLICATION_NAME, commissionLeaseResource, createCommissionService } from "../src/index.js";
 import {
   acceptAttribution,
+  acquisitionInstants,
   adjustmentsOf,
   approvedPlan,
   approvedRefund,
@@ -86,7 +87,7 @@ async function sweep(service: CommissionWorld["service"], name: Parameters<Commi
 
 async function acquired(label: string, options: { readonly acceptedAt?: string; readonly sellers?: number; readonly shares?: ReadonlyArray<number> } = {}) {
   const s = await sellingAgency(cw, label);
-  const a = await claimsOn(cw, label, options.sellers ?? 1);
+  const a = await claimsOn(cw, label, options.sellers ?? 1, options.acceptedAt === undefined ? undefined : acquisitionInstants(options.acceptedAt).submittedAt);
   const allocationId = await acceptAttribution(cw, s.agency.agencyId, a, options.shares ?? [10_000], options.acceptedAt ?? null);
   return { s, a, allocationId };
 }
@@ -130,7 +131,7 @@ async function reversed(p: Purchase): Promise<void> {
 
 test("R2-094: after a first confirmation at 2028-02-29T15:00:00Z, a subsequent capture completed at the provider at 2029-02-28T14:59:59Z accrues a 400-bps line and one completed at 2029-02-28T15:00:00Z accrues no acquisition line", async () => {
   const { s } = await acquired("r094", { acceptedAt: "2028-02-20T12:00:00Z" });
-  const first = await purchase(cw, s, "r094-first", { confirmedAt: "2028-02-29T15:00:00Z", providerCompletedAt: "2028-02-29T14:55:00Z" });
+  const first = await purchase(cw, s, "r094-first", { orderAt: acquisitionInstants("2028-02-20T12:00:00Z").orderAt, confirmedAt: "2028-02-29T15:00:00Z", providerCompletedAt: "2028-02-29T14:55:00Z" });
   const inside = await purchase(cw, s, "r094-inside", { providerCompletedAt: "2029-02-28T14:59:59Z", confirmedAt: "2029-03-01T15:00:00Z" });
   const atEnd = await purchase(cw, s, "r094-end", { providerCompletedAt: "2029-02-28T15:00:00Z", confirmedAt: "2029-03-01T16:00:00Z" });
   await dispatch();
@@ -152,7 +153,7 @@ let example3: { readonly s: Selling; readonly sellers: ReadonlyArray<{ readonly 
 
 test("R2-098 (example 3): a purchase completed at the provider at or after the window end accrues no acquisition line, and no assistance line without a prior agreement, while the seller's earned lines of the window stay on their path to payment", async () => {
   const { s, a } = await acquired("ex3", { acceptedAt: "2027-01-02T12:00:00Z", sellers: 2, shares: [6_000, 4_000] });
-  const first = await purchase(cw, s, "ex3-first", { confirmedAt: "2027-01-10T15:00:00Z", providerCompletedAt: "2027-01-10T14:50:00Z" });
+  const first = await purchase(cw, s, "ex3-first", { orderAt: acquisitionInstants("2027-01-02T12:00:00Z").orderAt, confirmedAt: "2027-01-10T15:00:00Z", providerCompletedAt: "2027-01-10T14:50:00Z" });
   await dispatch();
   const lines = await linesOf(cw, first.authorizationId);
   // the first pool, 9713, split 6000/4000 by largest remainder: 5827.8 → 5828 and 3885.2 → 3885 (worked example 8's rule)
@@ -352,7 +353,7 @@ test("R2-137 (examples 9 and 10): P confirmed first keeps sequence 1 and its 100
 test("R2-138: two subsequent captures completed at the provider one second before and exactly at the local twelve-month endpoint, both notified a day later, accrue 400 bps for the first and no acquisition line for the second", async () => {
   // example 11: the first confirmation at 09:00 in America/Bogota; the window ends at 09:00 twelve calendar months later
   const { s } = await acquired("r138", { acceptedAt: "2027-09-01T12:00:00Z" });
-  await purchase(cw, s, "r138-first", { confirmedAt: "2027-09-12T14:00:00Z", providerCompletedAt: "2027-09-12T13:55:00Z" });
+  await purchase(cw, s, "r138-first", { orderAt: acquisitionInstants("2027-09-01T12:00:00Z").orderAt, confirmedAt: "2027-09-12T14:00:00Z", providerCompletedAt: "2027-09-12T13:55:00Z" });
   const before = await purchase(cw, s, "r138-before", { providerCompletedAt: "2028-09-12T13:59:59Z", confirmedAt: "2028-09-13T13:59:59Z" });
   const atEnd = await purchase(cw, s, "r138-end", { providerCompletedAt: "2028-09-12T14:00:00Z", confirmedAt: "2028-09-13T14:00:00Z" });
   await dispatch();
@@ -617,7 +618,7 @@ function bankRail(): BankRail {
   return rail;
 }
 
-test("OK rail parity: an exact bank-transfer capture accrues, holds and adjusts commission exactly as a provider capture of the same cents", async () => {
+test("OK rail parity: an exact bank-transfer capture accrues, holds and adjusts commission exactly as a provider capture of the same cents", { todo: "DEPENDS ON L-REFUND: KIT seam IN1 (cw.bank over the CONTRACT_FAKE bank store) needs the refund rail F2/X1/G2; the refund lane removes this todo" }, async () => {
   const rail = bankRail();
   const { s: sp } = await acquired("rail-provider");
   const { s: sb } = await acquired("rail-bank");
