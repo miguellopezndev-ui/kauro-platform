@@ -14,3 +14,4 @@ export {
   outreachBusinessDaysAfter,
 } from "./calendar.js";
 export { OUTREACH_HANDLERS, OutreachNotBuilt, type OutreachHandlerName } from "./handlers.js";
+export { B12_SERVED_READ_IDS, createOutreachStubCommandHandlers, createOutreachStubReadHandlers, isB12CommercialCommand, isB12CommercialRead, isB12RegistryLessOperation, type B12CommandId, type B12ReadId } from "./routes.js";

@@ -36,3 +36,27 @@ Totals: 20 cases — 0 DONE, 20 OPEN.
 | CMD064-OK | Append deduplicated evidence-backed commercial activity and stop follow-up after refusal, reply, bounce or suppression. | none yet | OPEN -> L-ACT NOT_EXECUTED; target EXECUTED_LOCAL | K1 database backstop (migration 0072): activities recorded with their locks per kind; a COMPLAINT after an OPT_OUT is a second activity, one registry row |
 | CMD064-DENY | Unsupported delivered/replied claims reject; duplicate external identity cannot count twice. No unauthorized committed state or external effect. | none yet | OPEN -> L-ACT NOT_EXECUTED; target EXECUTED_LOCAL | K1 database backstop (migration 0072): KA097 provider reference, inbound reference, service-only kinds, no future occurredAt; KA098 non-owner suppression scope |
 | CMD064-RACE | Append deduplicated evidence-backed commercial activity and stop follow-up after refusal, reply, bounce or suppression. Preserve one logical operation, a typed conflict or explicit reconciled uncertainty; no duplicate authority. | none yet | OPEN -> L-ACT NOT_EXECUTED; target EXECUTED_LOCAL | K1 database backstop (migration 0072): U2 unique indexes of sales_activities; L8 X of the suppression key asserted |
+
+## Kit K2 notes (shared contracts landed once; decisions K2-1 .. K2-6)
+
+- K2-1 Journal identity. command_journal.operation accepts `^CMD[0-9]{3}$` or exactly one name of the explicit list in migration 0072's tail
+  (domain B12_OPERATIONS: 11 outreach operations and 13 producer operations). No pattern is widened and the registry is not edited.
+- K2-2 Registered routes. CMD061..CMD064 (registry rows, gate G-UX_PRIVATE, idempotency REQUIRED) and the 11 outreach operations of plan companion
+  section R are in contracts, request and response schemas, outcomes, served lists, composition and the generated openapi.json and web client, each bound
+  to a NOT_BUILT stub. Five reads: GetOutreachDraft, GetOutreachReview, ListSalesActivities, GetOutreachMetrics, GetSalesResource.
+  The matrix applicability rows of these commands read PLACEHOLDER-B12-NOT-BUILT in the handler-dependent cells; the serving lane replaces them with its tests.
+- K2-3 CMD062 also carries assuranceProofRef (the registry lists no proof field). The plan binds the review to the owner's step-up and judges it at commit; the
+  proof travels in the body like every other step-up command's.
+- K2-4 contentRef and the content binding are the 64-hex content address of kauro.outreach_contents, not a UUID. RecordProspectSource and RecordProspectContact
+  take the prospect in the path (/api/v1/ops/prospects/{prospectId}/sources and /contacts). ListSalesActivities is a bounded (200), non-paginated read by prospect.
+  The source segment enum is AGENCY or COMPANY (D-33) although the 0029 check allows AGENCY only: L-SOURCE migrates that check.
+- K2-5 Publish step-up. PublishSalesResource is an owner command with a fresh step-up, as plan companion section R states. R2 08 "Authentication and assurance"
+  lists the step-up actions ("ownership transfer, payment destination change, privileged grant, significant refund, seller payout approval, destructive data
+  decision and production control") and does not list resource publication; R2 12 "Resources and training" says only "Each has version, effective date and
+  owner. Retired copy cannot be used to promise an old feature." Decision: keep the plan's step-up. It is stricter than R2 and costs one reauthentication on a
+  rare owner act; publishing the copy sellers quote is an authority act. If the owner wants it relaxed, drop `stepUp` and `assuranceProofRef` for this command only.
+- K2-6 RLS rule 21a (incident RLS-POLICY-NAMES-RELATION). The eight B12 policies that named another relation call kauro.outreach_* PL/pgSQL functions
+  (STABLE, SECURITY INVOKER, search_path = pg_catalog, early return); packages/persistence/test/sec-policy-relations.test.ts is the pg_depend census, FROZEN empty
+  (TODO-BATCH: the coordinator merges it with batch A's identical census).
+- GAPS left for lanes: the 13 producer operations (L-OWNER) have names in the journal CHECK and the TS union but no route, spec or schema (no designed wire
+  shape); GetSellerHome (L-HOME) and the public opt-out routes (L-ACT) are not registered.
