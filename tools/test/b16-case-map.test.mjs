@@ -22,7 +22,7 @@ test("B16 case map: a status is DONE, or OPEN naming its owning lane; a DONE row
     assert.match(r.status, /^(DONE EXECUTED_LOCAL|OPEN -> L[2-8](\+L[2-8])?( \(PR #\d+, not on main\))? (NOT_EXECUTED; target .+|PARTIAL \(PLANNED L[2-8]; target .+\)))$/, r.caseId);
     if (r.status.startsWith("DONE")) assert.ok(r.citations.length > 0, `${r.caseId} is DONE with no cited test`);
   }
-  assert.deepEqual(rows.filter((r) => r.caseId === "R2-054" || r.caseId === "R2-055").map((r) => r.status.startsWith("OPEN -> L7")), [true, true]);
+  assert.deepEqual(rows.filter((r) => r.caseId === "R2-054" || r.caseId === "R2-055").map((r) => r.status === "DONE EXECUTED_LOCAL" && r.citations.every((c) => c.file === "apps/control/test/b16-staged-retention.test.ts")), [true, true]);
 });
 
 test("B16 case map: every cited title occurs verbatim in its cited file, which exists", () => {

@@ -16,7 +16,7 @@
 | B13 Reports and package experience | 9: 9 NOT_EXECUTED | NOT_STARTED | — | — | — |
 | B14 Cloud foundation and actual worker host | 6: 6 NOT_EXECUTED | NOT_STARTED | — | — | — |
 | B15 Real external integration | 9: 9 NOT_EXECUTED | NOT_STARTED | — | — | — |
-| B16 Security and restoration qualification | 61: 28 EXECUTED_LOCAL, 3 PARTIAL, 30 NOT_EXECUTED | IN_PROGRESS | — | — | — |
+| B16 Security and restoration qualification | 61: 30 EXECUTED_LOCAL, 3 PARTIAL, 28 NOT_EXECUTED | IN_PROGRESS | — | — | — |
 | B17 Integrated capacity and target qualification | 24: 24 NOT_EXECUTED | NOT_STARTED | — | — | — |
 | B18 Final candidate and independent release audit | 11: 11 NOT_EXECUTED | NOT_STARTED | — | — | — |
 | B19 Commercial production activation | 11: 11 NOT_EXECUTED | NOT_STARTED | — | — | — |

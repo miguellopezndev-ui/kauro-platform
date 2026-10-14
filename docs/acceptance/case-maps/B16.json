@@ -3,7 +3,7 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B16-case-map.md",
-  "sha256": "1d7d14ba1b5c0002e9cb29c8a7ab0f67a72bdfb1eba344c9c7aafbacd86b0c55"
+  "sha256": "7c3eb63d27e835da0c4893d86e09286ae0db73fffebd320bfb0c8ce5b2d18557"
  },
  "rows": [
   {
@@ -169,21 +169,32 @@
   },
   {
    "case": "R2-054",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054: first release + 21 d governs stage continuation when it is earlier than capture + 30 d; a completion inside it gets the full seven-day final download; at each deadline the window is EXPIRED and one microsecond before it is open",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054: capture + 30 d caps continuation when first release + 21 d is later; a final stage completing one day before the hard cap gets exactly one remaining day (deadline capture + 30 d), never seven",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054 EXPIRY: a final completion at the continuation deadline is refused KA072 and creates no final-delivery allowance; one second before it the allowance is granted and still capped at capture + 30 d; a first release at capture + 30 d is refused",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054 RETRY: an identical release replay, a later stage release, a client-supplied instant, a written deadline, a retried completion and a re-read on a later server clock never move an anchor or a deadline",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054 RACE (both orders): two first-release writers on one window; the second is observed waiting on the row lock and the first committer's server instant stays the anchor",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054 TIMEOUT: a final completion that waits on the window's row lock while its effect clock crosses the continuation deadline is refused at that instant (KA072), its transaction's server instant still before the deadline",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054 CRASH-BEFORE / CRASH-AFTER / PARTIAL: a release whose backend dies before COMMIT leaves the window unreleased and the re-run anchors at its own instant; a committed release survives the crash and its replay keeps it; a unit whose second write fails rolls the release back",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054 REVOCATION (binding): a window is born only on a COMPLETED capture of its own project and plan, once per plan; its capture instant and hard deadline come from the capture fact, never from the writer"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L7 (PR #96, not on main) NOT_EXECUTED; target PART(STAGE-RELEASE) EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-055",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/control/test/b16-staged-retention.test.ts :: R2-055: a parent stage waiting ten days for the agency's receipt holds no job, attempt, lease, heartbeat or capacity slot, the execution watchdog never fires for it, and its continuation deadline keeps running (eleven days left, never paused) until it is due at release + 21 d"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L7 (PR #96, not on main) NOT_EXECUTED; target PART(STAGE-RELEASE) EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-056",

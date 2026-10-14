@@ -3064,7 +3064,7 @@
    "case": "R2-054",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3073,7 +3073,7 @@
    "case": "R2-055",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -4217,8 +4217,8 @@
    "cases": 61,
    "counts": {
     "PARTIAL": 3,
-    "EXECUTED_LOCAL": 28,
-    "NOT_EXECUTED": 30
+    "EXECUTED_LOCAL": 30,
+    "NOT_EXECUTED": 28
    },
    "status": "IN_PROGRESS",
    "acceptedSubject": null,
