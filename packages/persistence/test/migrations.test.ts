@@ -157,6 +157,10 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0070_b05_model_task_request_key.sql",
     // B16 L3 CMD042: the deletion request, its receipts, the DELETING/DELETED guards and the prevention guards KA087/KA088 (provisional number)
     "0071_b16_deletion.sql",
+    // Payments V1 OWNER-OUTBOX-POLICY: the owner's agency-less outbox policies are SELECT and INSERT only (provisional number)
+    "0075_owner_outbox_policy.sql",
+    // B10-CMD053-SETTLED-AT: a payout intent's settlement instant is one of its transaction's, read after the cash lock (provisional number)
+    "0076_payout_effect_instant.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

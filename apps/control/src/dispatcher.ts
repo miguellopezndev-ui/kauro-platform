@@ -10,6 +10,7 @@
  *      it (its claim expires and the record is claimed again: at least once);
  *   3. the consumer handles the event in SYSTEM units of work bound to the event's agency (D-CTRL-1); it is idempotent by its own
  *      fences and the listed transitions;
+ *      (an agency-less event of AGENCY_LESS_NOTIFICATION_EVENT_TYPES runs NOTIFICATIONS unbound; any other agency-less one is dead-lettered);
  *   4. the outcome is settled under the attempt the claim holds: DONE → DELIVERED; RETRY → RETRYABLE at the consumer's instant, or
  *      DEAD_LETTER once the attempts are spent; DEAD_LETTER → DEAD_LETTER with the consumer's reason token. A settlement of a record
  *      claimed again since is FENCED and changes nothing.
@@ -63,6 +64,28 @@ export interface DispatchCounts {
 }
 
 const SERVICE = "outbox-dispatcher";
+
+/**
+ * The agency-less events NOTIFICATIONS is delivered (lane NOTIF-AGENCYLESS-BANK): the platform-scope bank aggregates of Payments V1 — the
+ * credit and the statement import (0063, BANK_CREDIT_EVENT_SUBSCRIPTIONS), the route (0046, BANK_ROUTE_EVENT_SUBSCRIPTIONS) — whose events
+ * carry no agency by design and whose recipient is the corporate owner. A closed list of literal types, for NOTIFICATIONS alone: its consumer
+ * runs under an unbound SYSTEM context (no agency is invented); every other agency-less event, and any agency-less event for another
+ * consumer, stays DEAD_LETTER EVENT_WITHOUT_AGENCY. An agency's bank order or instruction event (bank_transfer_instruction.*) is never here.
+ */
+export const AGENCY_LESS_NOTIFICATION_EVENT_TYPES: ReadonlyArray<string> = Object.freeze([
+  "bank_credit.drafted.v1",
+  "bank_credit.received.v1",
+  "bank_credit.matched.v1",
+  "bank_credit.review_required.v1",
+  "bank_credit.applied.v1",
+  "statement_import.recorded.v1",
+  "bank_route.configured.v1",
+  "bank_route.verified.v1",
+  "bank_route.enabled.v1",
+  "bank_route.disabled.v1",
+  "bank_route.details_replaced.v1",
+]);
+const AGENCY_LESS_NOTIFICATIONS: ReadonlySet<string> = new Set(AGENCY_LESS_NOTIFICATION_EVENT_TYPES);
 
 /** The answer of an attempt that threw: a retryable failure is retried after its hint, anything else after the backoff. */
 function outcomeOfError(e: unknown): ConsumerOutcome {
@@ -138,8 +161,11 @@ export class PgOutboxDispatcher implements OutboxDispatcher {
   }
 
   async #handle(consumer: OutboxConsumer, event: DomainEventRecord): Promise<ConsumerOutcome> {
-    if (event.agencyId === undefined || event.agencyId === null) return { kind: "DEAD_LETTER", reason: "EVENT_WITHOUT_AGENCY" };
-    const context: SystemContext = { kind: "SYSTEM", serviceId: serviceOf(consumer.consumer), correlationId: event.correlationId as CorrelationId, agencyId: event.agencyId as AgencyId };
+    const agencyLess = event.agencyId === undefined || event.agencyId === null;
+    if (agencyLess && !(consumer.consumer === "NOTIFICATIONS" && AGENCY_LESS_NOTIFICATIONS.has(event.eventType))) return { kind: "DEAD_LETTER", reason: "EVENT_WITHOUT_AGENCY" };
+    const context: SystemContext = agencyLess
+      ? { kind: "SYSTEM", serviceId: serviceOf(consumer.consumer), correlationId: event.correlationId as CorrelationId }
+      : { kind: "SYSTEM", serviceId: serviceOf(consumer.consumer), correlationId: event.correlationId as CorrelationId, agencyId: event.agencyId as AgencyId };
     try {
       return await consumer.handle(event, context, this.#units);
     } catch (e) {

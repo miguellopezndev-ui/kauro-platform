@@ -4277,21 +4277,37 @@
       ],
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND kauro.in_finance_scope(e.agency_id))))"
     },
-    "outbox_records/outbox_records_owner_bank": {
-      "check": "((EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text]))))) AND kauro.acting_corporate_owner())",
-      "command": "ALL",
+    "outbox_records/outbox_records_owner_bank_read": {
+      "check": null,
+      "command": "SELECT",
       "roles": [
         "kauro_app"
       ],
       "using": "((EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text]))))) AND kauro.acting_corporate_owner())"
     },
-    "outbox_records/outbox_records_owner_route": {
-      "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'bank_route'::text) AND kauro.acting_corporate_owner())))",
-      "command": "ALL",
+    "outbox_records/outbox_records_owner_bank_record": {
+      "check": "((EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text]))))) AND kauro.acting_corporate_owner())",
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null
+    },
+    "outbox_records/outbox_records_owner_route_read": {
+      "check": null,
+      "command": "SELECT",
       "roles": [
         "kauro_app"
       ],
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'bank_route'::text) AND kauro.acting_corporate_owner())))"
+    },
+    "outbox_records/outbox_records_owner_route_record": {
+      "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'bank_route'::text) AND kauro.acting_corporate_owner())))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null
     },
     "outbox_records/outbox_records_payment": {
       "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id = kauro.current_agency_id()))))",

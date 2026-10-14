@@ -15,7 +15,7 @@
  * (PROFILE, INTERPRET and VALIDATE under the audit's fence) and PLAN_VALIDATION (only the current intent), and the sweepers
  * AUDIT_DEADLINES and GRANT_RECONCILIATION; EXECUTION_CONTROL also cancels the audits of a lost source.
  */
-export { PgOutboxDispatcher, serviceOf } from "./dispatcher.js";
+export { AGENCY_LESS_NOTIFICATION_EVENT_TYPES, PgOutboxDispatcher, serviceOf } from "./dispatcher.js";
 export type { DispatcherOptions, DispatchCounts } from "./dispatcher.js";
 export { UploadInspection, claimConsistentWith, QUARANTINE_AFTER_INSPECTION } from "./consumers/upload-inspection.js";
 export type { UploadInspectionDependencies } from "./consumers/upload-inspection.js";
