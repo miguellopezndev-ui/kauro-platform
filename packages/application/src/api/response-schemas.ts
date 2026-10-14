@@ -71,7 +71,7 @@ const NARROW_SUMMARY = Object.freeze({ minLength: 20, pattern: TEXT_PATTERN });
  * (docs/design/B07-upload-source-lifecycle.md §9.5: served routes move from x-kauro-planned to paths), and CMD044 of the support
  * package (B11 W4).
  */
-export type ServedCommandId = "CMD001" | "CMD003" | "CMD004" | "CMD005" | "CMD006" | "CMD007" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId | ExecutionCommandId | AuditCommandId | "CMD044";
+export type ServedCommandId = "CMD001" | "CMD003" | "CMD004" | "CMD005" | "CMD006" | "CMD007" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId | ExecutionCommandId | AuditCommandId | "CMD044" | "CMD060";
 export type CommandResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}${ServedCommandId}`;
 export type AcceptedResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}accepted`;
 export type OperationalResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}op:${string}`;
@@ -452,6 +452,25 @@ const B06_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
     },
   },
   {
+    name: "RetentionExtensionView",
+    description: "CMD060 RequestRetentionExtension result: the project's one soft-deadline extension and its exact endpoint. The endpoint is capped at the hard deadline when the request would pass it (cappedAtHardDeadline), and the hard deadline is shown unchanged (09 Quotes, reuploads and retention; R2-123).",
+    contract: null,
+    withheld: {},
+    members: {
+      extensionId: platform(true, ID, "The extension (at most one per project)."),
+      projectId: platform(true, ID, "The project."),
+      retentionId: platform(true, ID, "The retention record whose soft deadline moved."),
+      retentionVersion: platform(true, VERSION, "The record's version after the extension."),
+      requestedSeconds: platform(true, { type: "integer", minimum: 1, maximum: 259200 }, "What the request asked for."),
+      grantedSeconds: platform(true, COUNT, "Whole seconds actually granted; the exact endpoint is softDeadline."),
+      previousSoftDeadline: platform(true, UTC, "The soft deadline before the extension."),
+      softDeadline: platform(true, UTC, "The exact endpoint: least(previous soft deadline + requestedSeconds, hardDeadline)."),
+      hardDeadline: platform(true, UTC, "The original hard cap, never moved."),
+      effectiveDeadline: platform(true, UTC, "The record's effective deadline after the extension: least(softDeadline, hardDeadline)."),
+      cappedAtHardDeadline: platform(true, { type: "boolean" }, "Whether the request would have passed the hard cap and the endpoint is the cap."),
+    },
+  },
+  {
     name: "BuyerTypeView",
     description: "The agency's buyer type as its owner recorded it once during onboarding (A3 3.7: agency or in-house; it does not change the price), or every member null and version 0 while it is not recorded (B11 lane A1).",
     contract: null,
@@ -532,6 +551,7 @@ export const COMMAND_RESPONSES: Readonly<Record<ServedCommandId, CommandReply>> 
   CMD026: { status: 200, view: "WithdrawApprovalView" },
   ...SOURCE_COMMAND_RESPONSES,
   CMD044: { status: 201, view: "SupportCaseView" },
+  CMD060: { status: 200, view: "RetentionExtensionView" },
   ...EXECUTION_COMMAND_RESPONSES,
   ...AUDIT_COMMAND_RESPONSES,
 });

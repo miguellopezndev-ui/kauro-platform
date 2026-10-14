@@ -267,7 +267,7 @@ export function generateOpenApi(sources) {
   const paths = {};
   const served = new Set(application.SERVED_COMMAND_IDS);
   // the served commands' specs: B06's seven, B07's six (mandate B07-COMMANDS), B08's two execution commands (mandate B08-COMMANDS-EXECUTION) and its four audit commands (mandate B08-COMMANDS-AUDIT), and B11's CMD044 (mandate W4)
-  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS, ...application.TEAM_COMMANDS };
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS, ...application.TEAM_COMMANDS, ...application.RETENTION_COMMANDS };
   for (const command of registryCommands) {
     if (!served.has(command.id)) continue;
     const spec = specs[command.id];

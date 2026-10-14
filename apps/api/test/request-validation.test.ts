@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { KnownSchemaId, ProjectView } from "@kauro/application";
-import { AGENCY_APP_COMMANDS, AUDIT_COMMANDS, AUDIT_REQUEST_SCHEMA_IDS, B06_COMMANDS, B07_COMMANDS, COMMERCE_COMMANDS, COMMERCE_READ_ROUTES, COMMERCE_SERVED_COMMAND_IDS, COMMERCE_SERVED_READ_IDS, COMMERCIAL_COMMANDS, COMMERCIAL_READ_ROUTES, COMMERCIAL_SERVED_COMMAND_IDS, COMMERCIAL_SERVED_READ_IDS, EXECUTION_COMMANDS, INTAKE_ROUTES, READ_ROUTES, REQUEST_LIMITS, REQUEST_SCHEMA_PREFIX, SOURCE_REQUEST_SCHEMA_IDS, SUPPORT_COMMANDS, TEAM_COMMANDS, requestSchemaId } from "@kauro/application";
+import { AGENCY_APP_COMMANDS, AUDIT_COMMANDS, AUDIT_REQUEST_SCHEMA_IDS, B06_COMMANDS, B07_COMMANDS, RETENTION_COMMANDS, COMMERCE_COMMANDS, COMMERCE_READ_ROUTES, COMMERCE_SERVED_COMMAND_IDS, COMMERCE_SERVED_READ_IDS, COMMERCIAL_COMMANDS, COMMERCIAL_READ_ROUTES, COMMERCIAL_SERVED_COMMAND_IDS, COMMERCIAL_SERVED_READ_IDS, EXECUTION_COMMANDS, INTAKE_ROUTES, READ_ROUTES, REQUEST_LIMITS, REQUEST_SCHEMA_PREFIX, SOURCE_REQUEST_SCHEMA_IDS, SUPPORT_COMMANDS, TEAM_COMMANDS, requestSchemaId } from "@kauro/application";
 import type { ProjectId } from "@kauro/domain";
 import { classifyInternalError, fastifyPath, routeInventoryOf } from "../src/index.js";
 import { approvalBodyOf, asProblem, call, completed, effectCounts, freshKey, ids, outcome, routes, sha, world, type Call, type World } from "./support.js";
@@ -274,7 +274,7 @@ test("exactly the fourteen catalogue routes and the selection manifest intake ar
   // selection manifest and decision artifact intakes (D-SEL-2, D8-CMA-7); beside them every served route of
   // package B09 — the request side (M4) and the payment service's routes (M3), served in every edition (D-REQ-B1, D-M3-B1) — and
   // nothing else of the payment catalogue; and B11 lane A1's SetBuyerType (CMD101)
-  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url) && !commercialPosts.has(r.url) && !bankPosts.has(r.url)).length, 32);
+  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url) && !commercialPosts.has(r.url) && !bankPosts.has(r.url)).length, 33);
   assert.deepEqual(inventory.filter((r) => commercialPosts.has(r.url) && r.method === "POST").map((r) => r.url).sort(), [...commercialPosts].sort());
   // the five manual-10 reads, the two support reads (B11 W4), the seven source reads (B07 design §9.1), GetJob and GetAudit (B08 design §12),
   // GetBuyerType and ListProjects (B11 lane A1)
@@ -282,7 +282,7 @@ test("exactly the fourteen catalogue routes and the selection manifest intake ar
   assert.deepEqual(inventory.filter((r) => commercePosts.has(r.url) && r.method === "POST").map((r) => r.url).sort(), [...commercePosts].sort());
   assert.deepEqual(inventory.filter((r) => commerceGets.has(r.url) && r.method === "GET").map((r) => r.url).sort(), [...commerceGets].sort());
   // each route validates its body against its own closed request schema
-  for (const id of [...Object.keys(B06_COMMANDS), ...Object.keys(SUPPORT_COMMANDS), ...Object.keys(TEAM_COMMANDS)] as Array<keyof typeof B06_COMMANDS | keyof typeof SUPPORT_COMMANDS | keyof typeof TEAM_COMMANDS>) assert.ok(w.validator.knownSchemaIds.includes(requestSchemaId(id)), id);
+  for (const id of [...Object.keys(B06_COMMANDS), ...Object.keys(SUPPORT_COMMANDS), ...Object.keys(TEAM_COMMANDS), ...Object.keys(RETENTION_COMMANDS)] as Array<keyof typeof B06_COMMANDS | keyof typeof SUPPORT_COMMANDS | keyof typeof TEAM_COMMANDS | keyof typeof RETENTION_COMMANDS>) assert.ok(w.validator.knownSchemaIds.includes(requestSchemaId(id)), id);
   for (const id of SOURCE_REQUEST_SCHEMA_IDS) assert.ok(w.validator.knownSchemaIds.includes(id), id);
   for (const id of AUDIT_REQUEST_SCHEMA_IDS) assert.ok(w.validator.knownSchemaIds.includes(id), id);
   for (const route of Object.values(INTAKE_ROUTES)) assert.ok(w.validator.knownSchemaIds.includes(route.schemaId), route.schemaId);

@@ -151,6 +151,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0067_lease_deadline_after_lock.sql",
     // package B05 L1v: a dispatch leaves RESERVED only while it has never been settled (provisional number)
     "0068_dispatch_from_unsettled_reserved.sql",
+    // B16 L2 CMD060: the one retention extension, its guard path B (KA085) and the request role update grant (provisional number)
+    "0069_b16_retention_extensions.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
