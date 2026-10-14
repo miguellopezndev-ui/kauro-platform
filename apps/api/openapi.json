@@ -11897,6 +11897,85 @@
         }
       }
     },
+    "/api/v1/operations/execution-attempts/{attemptId}/bounces": {
+      "post": {
+        "operationId": "recordReturnBounce",
+        "summary": "Record that the money of a RECORDED transfer came back (once per transfer, B at most the transfer): the bounce row, its RETURN_BOUNCED case and the open payable a resend may re-send",
+        "description": "Authority: ACH-ROUTE r12 §7.22 (G3), DV1-08; KAURO_OWNER with a fresh step-up judged at the database clock; Idempotency-Key (journal of the owner identity)",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "name": "attemptId",
+            "in": "path",
+            "required": true,
+            "description": "Path id (a UUID).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "KAURO_OWNER",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/recordReturnBounceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The bounced attempt (still RECORDED) and the bounce with the open payable it leaves (COMPLETED envelope; an identical replay answers the journaled reply).",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/recordReturnBounceResponse200"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/operations/execution-attempts/{attemptId}/records": {
       "post": {
         "operationId": "recordRefundExecution",
@@ -11951,6 +12030,85 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/recordRefundExecutionResponse200"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem document (10 \"Responses and safe errors\"): every status >= 400 the operation does not declare otherwise.",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/execution-attempts/{attemptId}/resend-declarations": {
+      "post": {
+        "operationId": "declareResendExecution",
+        "summary": "Declare the re-send of a bounced transfer's open payable: one DECLARED RESEND attempt with its reference (NEVER-RESEND: refused while an attempt of the source is DECLARED or UNCERTAIN); the refund stays COMPLETED",
+        "description": "Authority: ACH-ROUTE r12 §7.21 (X4), DV1-08, D-24 A; KAURO_OWNER with a fresh step-up judged at the database clock; Idempotency-Key (journal of the owner identity)",
+        "x-kauro-operational": true,
+        "parameters": [
+          {
+            "name": "attemptId",
+            "in": "path",
+            "required": true,
+            "description": "Path id (a UUID).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfToken"
+          }
+        ],
+        "x-kauro-idempotency": "REQUIRED",
+        "x-kauro-role": "KAURO_OWNER",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/declareResendExecutionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The DECLARED RESEND attempt and the refund as it stands (COMPLETED envelope; an identical replay answers the journaled reply).",
+            "headers": {
+              "X-Correlation-Id": {
+                "$ref": "#/components/headers/CorrelationId"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControl"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/declareResendExecutionResponse201"
                 }
               }
             }
@@ -42446,6 +42604,8 @@
               "NO_DECLARED_ATTEMPT",
               "EXECUTION_PRECEDES_DECLARATION",
               "NO_RECORDED_BOUNCE",
+              "ATTEMPT_NOT_RECORDED",
+              "BOUNCE_ALREADY_RECORDED",
               "RESEND_EXCEEDS_PAYABLE",
               "REFUND_NOT_UNCERTAIN",
               "NOT_EXECUTED_TOO_EARLY",
@@ -48513,6 +48673,183 @@
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:response:op:declareRefundExecution:201"
       },
+      "declareResendExecutionRequest": {
+        "title": "declareResendExecution request",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "amountCents",
+          "authorizationRef"
+        ],
+        "properties": {
+          "amountCents": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,15})$"
+          },
+          "authorizationRef": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:op:declareResendExecution"
+      },
+      "declareResendExecutionResponse201": {
+        "title": "declareResendExecution 201",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "version",
+          "replayed",
+          "data"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "COMPLETED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "attempt",
+              "refund"
+            ],
+            "properties": {
+              "attempt": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "attemptId",
+                  "kind",
+                  "state",
+                  "reference",
+                  "amountCents",
+                  "currency",
+                  "declaredAt",
+                  "sourceKind",
+                  "sourceId",
+                  "destination",
+                  "bankExecutionId"
+                ],
+                "properties": {
+                  "attemptId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "RETURN",
+                      "RESEND"
+                    ]
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "DECLARED",
+                      "UNCERTAIN",
+                      "RECORDED",
+                      "NOT_EXECUTED"
+                    ]
+                  },
+                  "reference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  },
+                  "amountCents": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,15})$"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "enum": [
+                      "USD"
+                    ]
+                  },
+                  "declaredAt": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+                  },
+                  "sourceKind": {
+                    "type": "string",
+                    "enum": [
+                      "CAPTURE",
+                      "BANK_CREDIT"
+                    ]
+                  },
+                  "sourceId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "destination": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "accountLast4",
+                      "holderName"
+                    ],
+                    "properties": {
+                      "accountLast4": {
+                        "type": "string",
+                        "pattern": "^[0-9]{1,4}$"
+                      },
+                      "holderName": {
+                        "type": "string",
+                        "maxLength": 512
+                      }
+                    }
+                  },
+                  "bankExecutionId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  }
+                }
+              },
+              "refund": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "required": [
+                  "state",
+                  "version"
+                ],
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:declareResendExecution:201"
+      },
       "disableBankRouteRequest": {
         "title": "disableBankRoute request",
         "type": "object",
@@ -50193,6 +50530,202 @@
           }
         },
         "x-kauro-schema-id": "urn:kauro:api:v1:response:op:recordRefundExecution:200"
+      },
+      "recordReturnBounceRequest": {
+        "title": "recordReturnBounce request",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "bouncedCents",
+          "evidence",
+          "authorizationRef"
+        ],
+        "properties": {
+          "bouncedCents": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,15})$"
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifactRef",
+              "evidenceHash"
+            ],
+            "properties": {
+              "artifactRef": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "evidenceHash": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "authorizationRef": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:request:op:recordReturnBounce"
+      },
+      "recordReturnBounceResponse200": {
+        "title": "recordReturnBounce 200",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "version",
+          "replayed",
+          "data"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "COMPLETED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "attempt",
+              "bounce"
+            ],
+            "properties": {
+              "attempt": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "attemptId",
+                  "kind",
+                  "state",
+                  "reference",
+                  "amountCents",
+                  "currency",
+                  "declaredAt",
+                  "sourceKind",
+                  "sourceId",
+                  "destination",
+                  "bankExecutionId"
+                ],
+                "properties": {
+                  "attemptId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "RETURN",
+                      "RESEND"
+                    ]
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "DECLARED",
+                      "UNCERTAIN",
+                      "RECORDED",
+                      "NOT_EXECUTED"
+                    ]
+                  },
+                  "reference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  },
+                  "amountCents": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,15})$"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "enum": [
+                      "USD"
+                    ]
+                  },
+                  "declaredAt": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+                  },
+                  "sourceKind": {
+                    "type": "string",
+                    "enum": [
+                      "CAPTURE",
+                      "BANK_CREDIT"
+                    ]
+                  },
+                  "sourceId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "destination": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "accountLast4",
+                      "holderName"
+                    ],
+                    "properties": {
+                      "accountLast4": {
+                        "type": "string",
+                        "pattern": "^[0-9]{1,4}$"
+                      },
+                      "holderName": {
+                        "type": "string",
+                        "maxLength": 512
+                      }
+                    }
+                  },
+                  "bankExecutionId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "pattern": "^[A-Za-z0-9._:-]+$"
+                  }
+                }
+              },
+              "bounce": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "bounceId",
+                  "bouncedCents",
+                  "payableCents"
+                ],
+                "properties": {
+                  "bounceId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                  },
+                  "bouncedCents": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,15})$"
+                  },
+                  "payableCents": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,15})$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-kauro-schema-id": "urn:kauro:api:v1:response:op:recordReturnBounce:200"
       },
       "replaceBankRouteDetailsRequest": {
         "title": "replaceBankRouteDetails request",

@@ -32,8 +32,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   // B10 (CMD002 and CMD043, mandate B10-AGENCY-LIFECYCLE; CMD027, mandate B10-COMMANDS-QUOTE; CMD045..CMD047, mandate B10-COMMANDS-PROSPECTS; CMD048..CMD050, mandate B10-COMMANDS-SELLERS),
   // the five routes of the browser session boundary (B11 W2), the two public routes (B11 W5b), and the Payments V1 bank-transfer
   // routes (L-ROUTE: the five operational bank-route commands, getBankRoute, and the KIT read getTransferInstructions; PV1-INBOUND:
-  // the four bank-credit commands, the credit and match-key reads, and the checkout retirement; L-REFUND: the four owner refund
-  // commands CMD220-CMD223 and the owner queue)
+  // the four bank-credit commands, the credit and match-key reads, and the checkout retirement; L-REFUND: the six owner refund
+  // commands CMD220-CMD225 and the owner queue)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -98,7 +98,9 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/operations/bank-routes/{routeId}/verify verifyBankRoute",
       "POST /api/v1/operations/capabilities/{capabilityId}/restrict RestrictCapability",
       "POST /api/v1/operations/capabilities/{capabilityId}/versions ChangeCapability",
+      "POST /api/v1/operations/execution-attempts/{attemptId}/bounces recordReturnBounce",
       "POST /api/v1/operations/execution-attempts/{attemptId}/records recordRefundExecution",
+      "POST /api/v1/operations/execution-attempts/{attemptId}/resend-declarations declareResendExecution",
       "POST /api/v1/operations/execution-attempts/{attemptId}/resolutions resolveUncertainExecution",
       "POST /api/v1/operations/incidents RecordIncident",
       "POST /api/v1/operations/recoveries AuthorizeRecovery",
@@ -199,6 +201,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
     "POST /api/v1/operations/refunds/{refundId}/execution-declarations declareRefundExecution",
     "POST /api/v1/operations/execution-attempts/{attemptId}/records recordRefundExecution",
     "POST /api/v1/operations/execution-attempts/{attemptId}/resolutions resolveUncertainExecution",
+    "POST /api/v1/operations/execution-attempts/{attemptId}/bounces recordReturnBounce",
+    "POST /api/v1/operations/execution-attempts/{attemptId}/resend-declarations declareResendExecution",
     "GET /api/v1/operations/execution-attempts listExecutionAttempts",
     "POST /api/v1/payment-orders/{orderId}/retirements retireBankCheckout",
     "POST /api/v1/operations/bank-accounts/{accountRef}/credits enterBankCredit",
