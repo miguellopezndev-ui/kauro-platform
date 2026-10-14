@@ -479,3 +479,38 @@ test("operational routes: every path parameter, Idempotency-Key and agency selec
   }
   for (const id of Object.keys(wire)) assert.ok(sources.operationalRoutes.some((r) => r.operationId === id), `${id} names an operational route`);
 });
+
+test("B12: a Ref path parameter is documented with the REF pattern, and the credit queue documents its closed query", () => {
+  const UUID = sources.application.RESPONSE_FIELD_VOCABULARY.UUID_PATTERN;
+  const REF = "^[A-Za-z0-9._:-]{1,128}$";
+  const opOf = (id) => {
+    const route = sources.operationalRoutes.find((r) => r.operationId === id);
+    assert.ok(route, id);
+    return expected.paths[route.path][route.method.toLowerCase()];
+  };
+  const refsOf = (op) => (op.parameters ?? []).map((p) => p.$ref ?? `${p.in}:${p.name}`);
+  // what bank-route-routes.ts admits: a *Ref path value of the REF pattern, every other one a UUID
+  for (const r of sources.operationalRoutes) {
+    if (!r.path.startsWith("/api/v1/")) continue;
+    for (const p of opOf(r.operationId).parameters.filter((x) => x.in === "path")) {
+      assert.equal(p.schema.pattern, p.name.endsWith("Ref") ? REF : UUID, `${r.operationId} ${p.name}`);
+    }
+  }
+  const upload = opOf("uploadBankEvidenceArtifact");
+  assert.equal(upload["x-kauro-idempotency"], "NONE");
+  assert.equal(upload["x-kauro-role"], "KAURO_OWNER");
+  assert.ok(refsOf(upload).includes("#/components/parameters/CsrfToken"), "the upload is an unsafe cookie request");
+  assert.ok(!refsOf(upload).includes("#/components/parameters/IdempotencyKey"), "content-addressed: no key");
+  const queue = opOf("listBankCredits");
+  assert.equal(queue["x-kauro-role"], "KAURO_OWNER");
+  const state = queue.parameters.find((p) => p.in === "query" && p.name === "state");
+  assert.deepEqual(state?.schema, { type: "string", enum: ["DRAFT_MANUAL", "OBSERVED", "MATCH_REVIEW", "MATCHED", "APPLIED", "RETURN_REVIEW"], default: "MATCH_REVIEW" });
+  assert.ok(refsOf(queue).includes("#/components/parameters/PageLimit"));
+  assert.ok(refsOf(queue).includes("#/components/parameters/PageCursor"));
+  // only the queue documents a query: no other operational route takes one
+  for (const r of sources.operationalRoutes) {
+    if (r.operationId === "listBankCredits" || !r.path.startsWith("/api/v1/")) continue;
+    const op = opOf(r.operationId);
+    assert.deepEqual((op.parameters ?? []).filter((p) => p.in === "query" || p.$ref === "#/components/parameters/PageLimit"), [], r.operationId);
+  }
+});

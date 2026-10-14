@@ -140,3 +140,42 @@ test("D-TOPO-2, D-SEC-2: the hosts are read from two https origins that differ; 
   ];
   for (const [label, input, expected] of table) assert.deepEqual(parseHostPolicy(input), expected, label);
 });
+
+test("D-SCR-1: the OPS screens answer only on the ops host, a split deployment without it serves none, and sign-in is served on the ops host", () => {
+  const OPS_HOST = "ops.kauro.example";
+  const WITH_OPS: HostConfig = { ok: true, policy: { kind: "SPLIT", publicHost: PUBLIC_HOST, appHost: APP_HOST, opsHost: OPS_HOST } };
+  const ops = registry.filter((row) => row.origin === "OPS");
+  assert.equal(ops.length, 15);
+  assert.deepEqual(rootsOf("OPS"), ["ops"], "one first segment owns the private origin's screens");
+  assert.deepEqual(rootsOf("OPS").filter((root) => rootsOf("APP").includes(root) || rootsOf("PUBLIC").includes(root)), []);
+  for (const row of ops) {
+    const path = concretePath(row.id);
+    assert.ok(path === "/ops" || path.startsWith("/ops/"), `${row.id} ${path}`);
+    assert.equal(decideRoute(WITH_OPS, OPS_HOST, path), "PASS", `${row.id} on the ops host`);
+    for (const host of [PUBLIC_HOST, APP_HOST, "elsewhere.example", null]) assert.equal(decideRoute(WITH_OPS, host, path), "NOT_FOUND", `${row.id} on ${host ?? "no host"}`);
+    // a split deployment that names no ops origin serves the private screens on no host: never on the app host
+    for (const host of [PUBLIC_HOST, APP_HOST]) assert.equal(decideRoute(SPLIT, host, path), "NOT_FOUND", `${row.id} without an ops origin on ${host}`);
+    assert.equal(decideRoute(LOCAL, "localhost:44300", path), "PASS", `${row.id} on the local stack`);
+    assert.equal(decideRoute(BROKEN, OPS_HOST, path), "UNAVAILABLE", row.id);
+  }
+  // the session cookie is host-bound: the ops host serves its own sign-in, and nothing else of the app group
+  assert.equal(decideRoute(WITH_OPS, OPS_HOST, "/login"), "PASS");
+  for (const id of ["UI10", "UI11", "UI51", "UI09"]) assert.equal(decideRoute(WITH_OPS, OPS_HOST, concretePath(id)), "NOT_FOUND", `${id} is not served on the ops host`);
+  for (const id of ["UI01", "UI04"]) assert.equal(decideRoute(WITH_OPS, OPS_HOST, concretePath(id)), "NOT_FOUND", `${id} is not served on the ops host`);
+  assert.equal(decideRoute(WITH_OPS, APP_HOST, "/login"), "PASS", "the app host keeps its sign-in");
+  assert.equal(groupOfHost(WITH_OPS.ok ? WITH_OPS.policy : { kind: "LOCAL" }, OPS_HOST), "OPS");
+  for (const path of ["/ops/", "/ops/finance/", "/ops/ops", "/ops/sales/agencies/a.b", "/%6Fps/finance"]) {
+    assert.equal(decideRoute(WITH_OPS, OPS_HOST, path), "NOT_FOUND", path);
+  }
+  // the third origin: https, distinct from the other two; an invalid one is refused, never ignored
+  const table: Array<[string, HostEnvironment, HostConfig]> = [
+    ["three origins", env({ KAURO_PUBLIC_ORIGIN: "https://www.kauro.example", KAURO_APP_ORIGIN: "https://app.kauro.example", KAURO_OPS_ORIGIN: "https://ops.kauro.example" }), WITH_OPS],
+    ["no ops origin", env({ KAURO_PUBLIC_ORIGIN: "https://www.kauro.example", KAURO_APP_ORIGIN: "https://app.kauro.example", KAURO_OPS_ORIGIN: "" }), SPLIT],
+    ["the ops origin is the app origin", env({ KAURO_PUBLIC_ORIGIN: "https://www.kauro.example", KAURO_APP_ORIGIN: "https://app.kauro.example", KAURO_OPS_ORIGIN: "https://app.kauro.example" }), { ok: false, problem: "ORIGINS_NOT_DISTINCT" }],
+    ["the ops origin is the public origin", env({ KAURO_PUBLIC_ORIGIN: "https://www.kauro.example", KAURO_APP_ORIGIN: "https://app.kauro.example", KAURO_OPS_ORIGIN: "https://www.kauro.example" }), { ok: false, problem: "ORIGINS_NOT_DISTINCT" }],
+    ["plain http ops outside local", env({ KAURO_PUBLIC_ORIGIN: "https://www.kauro.example", KAURO_APP_ORIGIN: "https://app.kauro.example", KAURO_OPS_ORIGIN: "http://ops.kauro.example" }), { ok: false, problem: "ORIGIN_INVALID" }],
+    ["an ops origin with a path", env({ KAURO_PUBLIC_ORIGIN: "https://www.kauro.example", KAURO_APP_ORIGIN: "https://app.kauro.example", KAURO_OPS_ORIGIN: "https://ops.kauro.example/x" }), { ok: false, problem: "ORIGIN_INVALID" }],
+    ["an ops origin alone", env({ KAURO_ENV: "LOCAL", KAURO_OPS_ORIGIN: "https://ops.kauro.example" }), { ok: false, problem: "ONE_ORIGIN_ONLY" }],
+  ];
+  for (const [label, input, expected] of table) assert.deepEqual(parseHostPolicy(input), expected, label);
+});

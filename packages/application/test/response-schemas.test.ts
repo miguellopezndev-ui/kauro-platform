@@ -191,6 +191,9 @@ test("R23: the validator compiles the COMPLETED envelope of every served command
     ["POST", "/api/v1/operations/bank-accounts/{accountRef}/statement-imports", "importBankStatement", ["201"]],
     ["GET", "/api/v1/operations/bank-credits/{creditId}", "getBankCredit", ["200"]],
     ["GET", "/api/v1/operations/bank-orders/{orderId}/match-keys", "getBankOrderMatchKeys", ["200"]],
+    // B12 owner screens lane 1 (D-B12S-2, D-B12S-3): the owner's evidence upload and the credit queue
+    ["POST", "/api/v1/operations/bank-accounts/{accountRef}/evidence-artifacts", "uploadBankEvidenceArtifact", ["201"]],
+    ["GET", "/api/v1/operations/bank-credits", "listBankCredits", ["200"]],
     // B11 lane A1: CMD101 SetBuyerType (201 recorded, 200 the same value again)
     ["POST", "/api/v1/agencies/{agencyId}/buyer-type", "setBuyerType", ["200", "201"]],
   ]);
@@ -308,4 +311,43 @@ test("R23 / R29: the COMPLETED reply of each of the eight handlers satisfies its
   assert.equal(approval["actorId"], w.approver.identity.userId);
   const preimage = Object.fromEntries(APPROVAL_PREIMAGE.map((k) => [k, approval[k]]));
   assert.equal(structuredDigest(DOMAINS.PLAN_APPROVAL, 1, preimage), approval["approvalHash"]);
+});
+
+test("B12: the owner evidence upload and the credit queue are declared operational routes, and no owner credit read carries an account or routing number", () => {
+  const route = (id: string): OperationalRoute => {
+    const r = OPERATIONAL_ROUTES.find((x) => x.operationId === id);
+    assert.ok(r, `${id} is declared`);
+    return r;
+  };
+  const upload = route("uploadBankEvidenceArtifact");
+  assert.equal(upload.method, "POST");
+  const body = upload.request?.schema as { required: string[]; additionalProperties: boolean; properties: Record<string, { enum?: string[]; maxLength?: number; pattern?: string }> };
+  assert.deepEqual([...body.required].sort(), ["contentBase64", "evidenceHash", "mediaType"]);
+  assert.equal(body.additionalProperties, false);
+  assert.deepEqual(body.properties["mediaType"]!.enum, ["application/json", "application/pdf", "text/csv"]);
+  // 524,288 bytes are at most 699,052 base64 characters: the schema bounds the text, the handler the decoded bytes
+  assert.equal(body.properties["contentBase64"]!.maxLength, 699_052);
+  const list = route("listBankCredits");
+  assert.equal(list.method, "GET");
+  assert.equal(list.request, undefined, "a read takes no body");
+  assert.deepEqual(list.query, { filter: { name: "state", values: ["DRAFT_MANUAL", "OBSERVED", "MATCH_REVIEW", "MATCHED", "APPLIED", "RETURN_REVIEW"], default: "MATCH_REVIEW" } });
+  // every owner credit read and the upload reply: no member names an account or routing number, at any depth
+  const NUMBER_MEMBER = /(account|routing)Number/i;
+  const membersOf = (schema: unknown, out: string[] = []): string[] => {
+    if (typeof schema !== "object" || schema === null) return out;
+    for (const [k, v] of Object.entries(schema)) {
+      if (k === "properties" && typeof v === "object" && v !== null) out.push(...Object.keys(v));
+      membersOf(v, out);
+    }
+    return out;
+  };
+  for (const id of ["uploadBankEvidenceArtifact", "listBankCredits", "getBankCredit", "getBankOrderMatchKeys", "confirmBankCredit", "enterBankCredit", "attributeBankCredit"]) {
+    const members = Object.values(route(id).responses).flatMap((r) => membersOf(r.schema));
+    assert.ok(members.length > 0, id);
+    assert.deepEqual(members.filter((m) => NUMBER_MEMBER.test(m)), [], `${id} names no account or routing number`);
+  }
+  // the queue's items are exactly the credit view; an unknown fee is null, never a number in its place
+  const page = (list.responses["200"]!.schema as { properties: { data: { properties: { credits: { items: { properties: Record<string, { type: unknown }> } }; nextCursor: { type: unknown } } } } }).properties.data.properties;
+  assert.deepEqual(page.credits.items.properties["feeCents"]!.type, ["string", "null"]);
+  assert.deepEqual(page.nextCursor.type, ["string", "null"]);
 });

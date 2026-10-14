@@ -253,3 +253,24 @@ test("D-GEN-1: every generated descriptor lists exactly the parameters of its pa
   }
   assert.ok(OPERATIONS.getTransferInstructions.headers.includes("X-Kauro-Agency"));
 });
+
+test("D-B12S-4: a Ref path value admits the server's REF characters and never a dot segment; other parameters keep the UUID-safe pattern", async () => {
+  const { client, sent } = harness(() => respond(500, null, ""));
+  const proof = "0199c1a2-7b3d-7c4e-8a5f-1b2c3d4e5f73";
+  const body = { artifactRef: "art-1", evidenceHash: "a".repeat(64), authorizationRef: proof };
+  // an account reference of the server's REF pattern (bank-route-routes.ts REF_PATH) reaches the wire, encoded
+  await client.call("importBankStatement", { path: { accountRef: "acct.b12:main-1" }, body, idempotencyKey: KEY });
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0]!.url.startsWith("/api/v1/operations/bank-accounts/acct.b12%3Amain-1/statement-imports"), sent[0]!.url);
+  const refused: readonly (readonly [string, () => Promise<unknown>])[] = [
+    ["a dot segment", () => client.call("importBankStatement", { path: { accountRef: "." }, body, idempotencyKey: KEY })],
+    ["a parent segment", () => client.call("importBankStatement", { path: { accountRef: ".." }, body, idempotencyKey: KEY })],
+    ["a slash", () => client.call("importBankStatement", { path: { accountRef: "a/b" }, body, idempotencyKey: KEY })],
+    ["129 characters", () => client.call("importBankStatement", { path: { accountRef: "a".repeat(129) }, body, idempotencyKey: KEY })],
+    // a parameter that is not a Ref keeps the UUID-safe characters: no dot, no colon
+    ["a dot in an id", () => client.call("getBankCredit", { path: { creditId: "acct.b12" } })],
+    ["a colon in an id", () => client.call("getBankCredit", { path: { creditId: "a:b" } })],
+  ];
+  for (const [label, attempt] of refused) await assert.rejects(attempt, RangeError, label);
+  assert.equal(sent.length, 1, "no refused value reached the network");
+});
