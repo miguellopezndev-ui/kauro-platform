@@ -384,6 +384,7 @@ export class PgOutreachSend {
     const judged = v.judged_at.getTime();
     let refusal: { state: "NOT_SENT" | "CANCELLED"; reason: string } | null = null;
     const facts: SealFacts = { intentId, from: f.sender_address, to: f.to_address ?? "", subject: f.subject, body: f.body };
+    // TODO(D2, migration >= 0086 deferred): the dispatcher records this refusal but the kauro_outreach role has no prospects grant, so the prospect row is not moved to SUPPRESSED here; needs a narrowly granted policy or function in a new migration.
     if (v.suppressed) refusal = { state: "NOT_SENT", reason: "SUPPRESSED" };
     else if (v.revoked) refusal = { state: "NOT_SENT", reason: "GRANT_REVOKED" };
     else if (judged < v.valid_from.getTime()) refusal = { state: "NOT_SENT", reason: "GRANT_NOT_YET_VALID" };
