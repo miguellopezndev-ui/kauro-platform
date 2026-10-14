@@ -15,6 +15,8 @@ import { execute, int, type Queryable } from "../sql.js";
 import { one, pageLimit, serverInstantOf, str } from "../source/rows.js";
 
 const LIVE_UNCANCELLED = "j.state IN ('QUEUED', 'ADMITTED', 'RUNNING', 'VERIFYING') AND j.cancel_version = 0";
+/** A project's deletion also finishes the cancellation a job already asked for (CANCEL_REQUESTED): the slot and the private package are its to settle. */
+const LIVE_FOR_PROJECT_DELETION = "j.state IN ('QUEUED', 'ADMITTED', 'RUNNING', 'VERIFYING', 'CANCEL_REQUESTED')";
 
 function jobRefs(rows: ReadonlyArray<{ job_id: unknown; agency_id: unknown }>): ReadonlyArray<ExecutionJobRef> {
   return rows.map((r) => ({ jobId: str<ProcessingJobId>(r.job_id), agencyId: str<AgencyId>(r.agency_id) }));
@@ -87,13 +89,15 @@ export class PgExecutionDiscovery implements ExecutionDiscovery {
           ? ["j.approval_id = $2", fact.approvalId]
           : fact.kind === "PLAN"
             ? ["j.plan_id = $2", fact.planId]
-            : [
-                "EXISTS (SELECT 1 FROM kauro.dataset_revisions r WHERE r.agency_id = j.agency_id AND r.project_id = j.project_id AND r.manifest_hash = j.revision_hash AND r.revision_id = $2)",
-                fact.revisionId,
-              ];
+            : fact.kind === "PROJECT"
+              ? ["j.project_id = $2", fact.projectId]
+              : [
+                  "EXISTS (SELECT 1 FROM kauro.dataset_revisions r WHERE r.agency_id = j.agency_id AND r.project_id = j.project_id AND r.manifest_hash = j.revision_hash AND r.revision_id = $2)",
+                  fact.revisionId,
+                ];
     const r = await execute<{ job_id: string; agency_id: string }>(
       this.db,
-      `SELECT j.job_id, j.agency_id FROM kauro.processing_jobs j WHERE j.agency_id = $1 AND ${condition} AND ${LIVE_UNCANCELLED} ORDER BY j.queued_at, j.job_id`,
+      `SELECT j.job_id, j.agency_id FROM kauro.processing_jobs j WHERE j.agency_id = $1 AND ${condition} AND ${fact.kind === "PROJECT" ? LIVE_FOR_PROJECT_DELETION : LIVE_UNCANCELLED} ORDER BY j.queued_at, j.job_id`,
       [agencyId, key],
     );
     return jobRefs(r.rows);

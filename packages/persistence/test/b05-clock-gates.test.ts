@@ -42,6 +42,9 @@ function ownerOfFile(tag: string): string {
   if (n === 50 || n === 52) return "B17";
   if (n === 51 || n === 59) return "B18";
   if (n === 60) return "SEC-DEPTH";
+  if (n === 69 || n === 71) return "B16";
+  // B12 0072 is provisional (plan: 0082): the merge renumbering moves this entry with the file
+  if (n === 72) return "B12";
   return "UNKNOWN";
 }
 const fileTag = (at: string): string => at.split(":")[0]!;
@@ -173,6 +176,11 @@ const CK3_PATHS = [
   "packages/application/src/audit",
   "packages/data-plane/src/cores",
   "packages/application/src/adapters/cores/intelligence",
+  // package B12 (lane K1, plan §W): the outreach domain, writers, lease fence and application kit (the dispatcher, a LeaseStore caller, is not here)
+  "packages/domain/src/commercial/outreach.ts",
+  "packages/persistence/src/outreach-access.ts",
+  "packages/persistence/src/repositories/commercial-outreach.ts",
+  "packages/application/src/commercial/outreach",
 ];
 /** The product's server code (the process clocks are exactly the four injection points). apps/web is the browser client. */
 const PRODUCT_ROOTS = ["packages/application/src", "packages/authorization/src", "packages/contracts/src", "packages/data-plane/src", "packages/domain/src", "packages/persistence/src", "packages/reports/src", "apps/api/src", "apps/control/src"];

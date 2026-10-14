@@ -2,9 +2,8 @@
  "package": "B12",
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
-  "file": null,
-  "registry": "packages/contracts/registry/program.json",
-  "note": "no case map yet: no evidence claimed"
+  "file": "docs/design/B12-case-map.md",
+  "sha256": "808670a4e8741c4c1162796ce712400ed019527dc4e2fe3195e08a9a33ec6c23"
  },
  "rows": [
   {
@@ -13,7 +12,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B12"
+   ],
+   "claimed": "OPEN -> L-HOME NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-067",
@@ -21,7 +23,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B12"
+   ],
+   "claimed": "OPEN -> B12-OWNER-SCREENS-2 NOT_EXECUTED; target PARTIAL"
   },
   {
    "case": "R2-068",
@@ -29,7 +34,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-DRAFT NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-129",
@@ -37,7 +43,11 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15",
+    "B19"
+   ],
+   "claimed": "OPEN -> L-SEND NOT_EXECUTED; target EXECUTED_LOCAL + SIMULATED; live PART(B15/B19)"
   },
   {
    "case": "R2-130",
@@ -45,7 +55,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-SEND NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-131",
@@ -53,7 +64,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-SEND NOT_EXECUTED; target EXECUTED_LOCAL + SIMULATED"
   },
   {
    "case": "R2-132",
@@ -61,7 +73,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-SEND NOT_EXECUTED; target EXECUTED_LOCAL + SIMULATED"
   },
   {
    "case": "R2-135",
@@ -69,7 +82,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-DRAFT NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD061-OK",
@@ -77,7 +91,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-DRAFT NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD061-DENY",
@@ -85,7 +100,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-DRAFT NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD061-RACE",
@@ -93,7 +109,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-DRAFT NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD062-OK",
@@ -101,7 +118,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-AUTH NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD062-DENY",
@@ -109,7 +127,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-AUTH NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD062-RACE",
@@ -117,7 +136,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-AUTH NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD063-OK",
@@ -125,7 +145,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-SEND NOT_EXECUTED; target EXECUTED_LOCAL + SIMULATED"
   },
   {
    "case": "CMD063-DENY",
@@ -133,7 +154,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-SEND NOT_EXECUTED; target EXECUTED_LOCAL + SIMULATED"
   },
   {
    "case": "CMD063-RACE",
@@ -141,7 +163,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-SEND NOT_EXECUTED; target EXECUTED_LOCAL + SIMULATED"
   },
   {
    "case": "CMD064-OK",
@@ -149,7 +172,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-ACT NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD064-DENY",
@@ -157,7 +181,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-ACT NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD064-RACE",
@@ -165,7 +190,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L-ACT NOT_EXECUTED; target EXECUTED_LOCAL"
   }
  ]
 }

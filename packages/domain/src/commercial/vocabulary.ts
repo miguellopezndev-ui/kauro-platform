@@ -41,6 +41,8 @@ export const COMMERCIAL_VOCABULARY = Object.freeze({
   prospectSegments: ["AGENCY", "COMPANY"],
   /** A suppression matches the organization key or the contact key (KC016). */
   suppressionKeyKinds: ["ORGANIZATION", "CONTACT"],
+  /** The one service recorder of a suppression (package B12 0072 recorder XOR: the public opt-out, plan A17). */
+  suppressionServiceRecorders: ["outreach-service"],
   attributionClaimStates: ["SUBMITTED", "ACCEPTED", "DISPUTED", "REJECTED", "EXPIRED", "CONVERTED"],
   /** Acquisition activity a claim's evidence names; a list import or a tracking link alone is not a claim (17 "Attribution subject"). */
   claimActivityKinds: ["FIRST_MEANINGFUL_CONTACT", "QUALIFIED_NEED", "DISCOVERY_MEETING", "PROPOSAL", "CLOSING_SUPPORT", "LIST_IMPORT", "TRACKING_LINK"],

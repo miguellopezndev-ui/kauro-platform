@@ -93,10 +93,10 @@ function securedSettingsOf(config: ConnectionSecurityConfig & { readonly host: s
   return { ...(security.password === undefined ? {} : { password: security.password }), ...(security.tls === undefined ? {} : { ssl: sslOptionsOf(security.tls) }) };
 }
 
-export type RuntimeRole = "kauro_app" | "kauro_control" | "kauro_assurance" | "kauro_validator" | "kauro_ingress" | "kauro_payment" | "kauro_commission";
+export type RuntimeRole = "kauro_app" | "kauro_control" | "kauro_assurance" | "kauro_validator" | "kauro_ingress" | "kauro_payment" | "kauro_commission" | "kauro_outreach";
 
 /** The runtime groups: B06's five, package B09's payment service (0013) and package B10's commission service (0028; D10-CTX-1). */
-export const RUNTIME_ROLES: ReadonlyArray<RuntimeRole> = Object.freeze(["kauro_app", "kauro_control", "kauro_assurance", "kauro_validator", "kauro_ingress", "kauro_payment", "kauro_commission"]);
+export const RUNTIME_ROLES: ReadonlyArray<RuntimeRole> = Object.freeze(["kauro_app", "kauro_control", "kauro_assurance", "kauro_validator", "kauro_ingress", "kauro_payment", "kauro_commission", "kauro_outreach"]);
 
 export interface PoolConfig extends ConnectionSecurityConfig {
   readonly host: string;
@@ -171,7 +171,8 @@ export class PrivilegedRoleError extends Error {
 const VERIFY_SQL = `
 SELECT current_user AS login_role,
        r.rolsuper, r.rolbypassrls, r.rolcreaterole, r.rolcreatedb,
-       ARRAY(SELECT g FROM unnest($1::text[]) AS g WHERE pg_has_role(current_user, g, 'MEMBER') ORDER BY g) AS groups,
+       -- a runtime group a schema has not created yet (kauro_outreach before 0072) is not a membership: pg_has_role would raise on it
+       ARRAY(SELECT g FROM unnest($1::text[]) AS g WHERE CASE WHEN EXISTS (SELECT 1 FROM pg_catalog.pg_roles x WHERE x.rolname = g) THEN pg_has_role(current_user, g, 'MEMBER') ELSE false END ORDER BY g) AS groups,
        EXISTS (SELECT 1 FROM pg_database d WHERE d.datname = current_database() AND d.datdba = r.oid) AS owns_database,
        has_database_privilege(current_user, current_database(), 'TEMPORARY') AS database_temporary,
        has_database_privilege(current_user, current_database(), 'CREATE') AS database_create,

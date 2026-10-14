@@ -4,7 +4,7 @@
  * docs/design/B06-domain-db-authz.md §7; handlers implementing these contracts belong to the B06 implementation mandate.
  */
 import type { ServiceMode, SupportCategory } from "@kauro/domain";
-import type { AcceptInvitationView, AgencyView, ApprovalView, EndClientView, InviteMemberView, MembershipView, PlanView, ProjectView, RetentionExtensionView, SupportCaseView, TransferOwnershipView } from "../api/views.js";
+import type { AcceptInvitationView, AgencyView, ApprovalView, EndClientView, InviteMemberView, MembershipView, DeletionRequestView, PlanView, ProjectView, RetentionExtensionView, SupportCaseView, TransferOwnershipView } from "../api/views.js";
 import type { CommandHandler, CommandSpec } from "../ports/command-handler.js";
 import type { ActiveWorkSummary, CompletedExternalAction } from "../ports/work-inspectors.js";
 
@@ -242,8 +242,33 @@ export const REQUEST_RETENTION_EXTENSION: CommandSpec<RequestRetentionExtensionB
 });
 export type RequestRetentionExtensionHandler = CommandHandler<RequestRetentionExtensionBody, RetentionExtensionView>;
 
+// --- CMD042 RequestDeletion (B16 lane L3; docs/design/B16-L3-failure-matrix.md) ----------------------------------------------
+
+export interface RequestDeletionBody {
+  readonly expectedVersion: number;
+  /** RETENTION, AGENCY_REQUEST, ACCOUNT_CLOSURE, INCIDENT or END_OF_SERVICE (the customer's return-or-delete choice, A-15). */
+  readonly reasonCode: string;
+  /** The requester's fresh step-up (re-judged at COMMIT, KC020). */
+  readonly assuranceProofRef: string;
+}
+export const REQUEST_DELETION: CommandSpec<RequestDeletionBody> = spec<RequestDeletionBody>({
+  id: "CMD042",
+  name: "RequestDeletion",
+  method: "POST",
+  path: "/api/v1/projects/{projectId}/deletion-requests",
+  role: "AGENCY_OWNER_OR_ADMIN",
+  scope: "AGENCY_HEADER",
+  aggregateParam: "projectId",
+  expectedVersionRequired: true,
+  stepUpRequired: true,
+  authorityHashFields: [],
+  fields: ["expectedVersion", "reasonCode", "assuranceProofRef"],
+});
+export type RequestDeletionHandler = CommandHandler<RequestDeletionBody, DeletionRequestView>;
+
 /** The retention package's commands (B16): served beside the others, which stay closed sets. */
 export const RETENTION_COMMANDS = Object.freeze({
+  CMD042: REQUEST_DELETION,
   CMD060: REQUEST_RETENTION_EXTENSION,
 } as const);
 export type RetentionCommandId = keyof typeof RETENTION_COMMANDS;

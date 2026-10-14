@@ -396,7 +396,9 @@ export type AuthorityTombstoneKind =
   | "REVISION_DELETED"
   | "FILE_ADMISSION_REVOKED"
   /** B16 CMD060: the project used its one soft-deadline extension; a restore must not forget it (14), or a second one could be granted. */
-  | "RETENTION_EXTENDED";
+  | "RETENTION_EXTENDED"
+  /** B16 CMD042: the project's deletion was requested; a restore must not reopen it (09: restoring must not recreate deleted data). */
+  | "PROJECT_DELETION_REQUESTED";
 
 /**
  * The state a tombstoned subject reached, named exactly as the subject's own machine names it (closed: a tombstone never records
@@ -406,7 +408,7 @@ export type AuthorityTombstoneKind =
  * The one exception is EXTENDED (B16 CMD060): an extension is not a state of the RetentionRecord machine (the record stays ACTIVE and may
  * later expire), so the consumer proves it by the project's extension row, which no later transition removes.
  */
-export type AuthorityTombstoneState = "CANCELLED" | "EXPIRED" | "REJECTED" | "SUPERSEDED" | "DELETED" | "ADMISSION_REVOKED" | "EXTENDED";
+export type AuthorityTombstoneState = "CANCELLED" | "EXPIRED" | "REJECTED" | "SUPERSEDED" | "DELETED" | "ADMISSION_REVOKED" | "EXTENDED" | "DELETION_REQUESTED";
 
 /**
  * Which tombstone each event routed to AUTHORITY_JOURNAL produces (EVENT_SUBSCRIPTIONS): the AUTHORITY_JOURNAL consumer appends
@@ -424,6 +426,7 @@ export const AUTHORITY_TOMBSTONES = Object.freeze({
   "dataset_revision.deleted.v1": { kind: "REVISION_DELETED", state: "DELETED" },
   "source_file.admission_revoked.v1": { kind: "FILE_ADMISSION_REVOKED", state: "ADMISSION_REVOKED" },
   "retention_record.extended.v1": { kind: "RETENTION_EXTENDED", state: "EXTENDED" },
+  "project.deletion_requested.v1": { kind: "PROJECT_DELETION_REQUESTED", state: "DELETION_REQUESTED" },
 } as const satisfies Readonly<Record<string, { readonly kind: AuthorityTombstoneKind; readonly state: AuthorityTombstoneState }>>);
 
 /** A minimal durable fact (14: scoped ids, deadlines, sequence and evidence hashes; no CRM payload). */

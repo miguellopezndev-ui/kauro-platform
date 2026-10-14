@@ -7,6 +7,35 @@
 export type { CommercialFailureReason } from "./failure-reasons.js";
 export { COMMERCIAL_FAILURE_REASONS } from "./failure-reasons.js";
 
+export type { OutreachPurpose, SenderRoute, SenderState, DraftState, IntentState, ActivityKind, OutreachSuppressionReason, OutreachFailureReason, OutreachLock } from "./outreach.js";
+export {
+  OUTREACH_PURPOSES,
+  SENDER_ROUTES,
+  OUTREACH_ROUTES,
+  SENDER_STATES,
+  SENDER_EDGES,
+  DRAFT_STATES,
+  DRAFT_EDGES,
+  INTENT_STATES,
+  INTENT_EDGES,
+  COUNTED_INTENT_STATES,
+  intentCounted,
+  ACTIVITY_KINDS,
+  SUPPRESSION_REASONS,
+  OUTREACH_BOUNDS,
+  OUTREACH_CADENCE,
+  OUTREACH_LOCK_KINDS,
+  OUTREACH_LOCK_ORDER,
+  PROSPECT_CONTACT_DOMAIN,
+  normalizeContactAddress,
+  contactKeyOf,
+  OUTREACH_BINDING_DOMAIN,
+  outreachBindingHash,
+  OUTREACH_CONTENT_DOMAIN,
+  outreachContentId,
+  OUTREACH_FAILURE_REASONS,
+} from "./outreach.js";
+
 export type { CommercialVocabulary } from "./vocabulary.js";
 export { COMMERCIAL_VOCABULARY } from "./vocabulary.js";
 

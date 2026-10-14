@@ -274,7 +274,7 @@ test("exactly the fourteen catalogue routes and the selection manifest intake ar
   // selection manifest and decision artifact intakes (D-SEL-2, D8-CMA-7); beside them every served route of
   // package B09 — the request side (M4) and the payment service's routes (M3), served in every edition (D-REQ-B1, D-M3-B1) — and
   // nothing else of the payment catalogue; and B11 lane A1's SetBuyerType (CMD101)
-  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url) && !commercialPosts.has(r.url) && !bankPosts.has(r.url)).length, 33);
+  assert.equal(inventory.filter((r) => r.method === "POST" && !commercePosts.has(r.url) && !commercialPosts.has(r.url) && !bankPosts.has(r.url)).length, 34);
   assert.deepEqual(inventory.filter((r) => commercialPosts.has(r.url) && r.method === "POST").map((r) => r.url).sort(), [...commercialPosts].sort());
   // the five manual-10 reads, the two support reads (B11 W4), the seven source reads (B07 design §9.1), GetJob and GetAudit (B08 design §12),
   // GetBuyerType and ListProjects (B11 lane A1)

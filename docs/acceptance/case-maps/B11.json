@@ -3,7 +3,7 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B11-case-map.md",
-  "sha256": "39b23ddc5e2f7cfa11a91a78a73853d5d6f6cb03688cedb10600284655813fe8"
+  "sha256": "4788aabeab4d8ce72229c99e24ee75e9aa98c9d1903a009728404643131e3787"
  },
  "rows": [
   {
@@ -156,12 +156,15 @@
    "class": "PARTIAL",
    "test": [
     "apps/api/test/cmd044-create-support-case.test.ts :: OK: a member with access to the project opens a classified case — 201 with its category, severity, OPEN state and the covered-hours next review; one case, one support_case.opened.v1 event without the summary, one journal entry",
-    "apps/web/e2e/cmd044-support-case.spec.ts :: CMD044: the support form warns against secrets and CRM rows, shows the server's refusal with the secure-upload route, and shows the created case with its next response time after a lost response"
+    "apps/web/e2e/cmd044-support-case.spec.ts :: CMD044: the support form warns against secrets and CRM rows, shows the server's refusal with the secure-upload route, and shows the created case with its next response time after a lost response",
+    "apps/web/test/processing-support-screens.test.ts :: UI52/CMD044: the form warns against secrets and CRM rows, shows the SECURE_UPLOAD refusal with its route, and a lost answer shows the created case with its next response time"
    ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [],
-   "claimed": "**PARTIAL** — api half EXECUTED_LOCAL (W4); web half PLANNED (W10)"
+   "inheritedTo": [
+    "B11"
+   ],
+   "claimed": "**PARTIAL** — api half EXECUTED_LOCAL (W4); web unit half EXECUTED_LOCAL (B11-S4: screen and command over a scripted api); browser half PLANNED (W10)"
   },
   {
    "case": "CMD044-DENY",

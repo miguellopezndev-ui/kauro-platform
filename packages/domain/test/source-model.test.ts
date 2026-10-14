@@ -298,7 +298,7 @@ test("every B07 event type carries an allowlist without customer-text keys, and 
   assert.deepEqual([...b07].sort(), [
     "dataset_revision.cancelled.v1", "dataset_revision.deleted.v1", "dataset_revision.expired.v1", "dataset_revision.inspecting.v1", "dataset_revision.ready_to_seal.v1",
     "dataset_revision.rejected.v1", "dataset_revision.sealed.v1", "dataset_revision.selection_changed.v1", "dataset_revision.superseded.v1", "dataset_revision.uploading.v1",
-    "project.current_revision_changed.v1", "retention_record.created.v1", "retention_record.expired.v1", "retention_record.extended.v1",
+    "project.current_revision_changed.v1", "retention_record.created.v1", "retention_record.deleted.v1", "retention_record.deleting.v1", "retention_record.expired.v1", "retention_record.extended.v1",
     // package B08 adds the soft-deadline version its publication writes on a PAID_ORDINARY record (migration 0022, D8-RET-1)
     "retention_record.soft_deadline_set.v1",
     "source_file.admission_revoked.v1", "source_file.admitted.v1",

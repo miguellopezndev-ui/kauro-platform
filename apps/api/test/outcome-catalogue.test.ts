@@ -239,6 +239,7 @@ const HANDLER_FILES: Readonly<Record<ServedCommandId, ReadonlyArray<string>>> = 
   CMD022: b08audit("create-plan.ts"),
   CMD024: b08audit("validate-plan.ts"),
   CMD044: b06("create-support-case.ts"),
+  CMD042: b07("request-deletion.ts"),
   CMD060: b07("request-retention-extension.ts"),
   CMD003: b06team("invite-member.ts"),
   CMD004: b06team("accept-invitation.ts"),

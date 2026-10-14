@@ -15,6 +15,7 @@
  */
 import { COMMERCE_FAILURE_REASONS } from "../commerce/failure-reasons.js";
 import { COMMERCIAL_FAILURE_REASONS } from "../commercial/failure-reasons.js";
+import { OUTREACH_FAILURE_REASONS } from "../commercial/outreach.js";
 import { EXECUTION_FAILURE_REASONS } from "./execution/failure-reasons.js";
 import { AUDIT_FAILURE_REASONS } from "./audit/failure-reasons.js";
 import { TARGET_FAILURE_REASONS } from "./target-contract.js";
@@ -129,6 +130,9 @@ export const RETENTION_EXTENSION_FAILURE_REASONS = [
   "SOFT_DEADLINE_PASSED",
   "NO_EXTENSION_ROOM",
 ] as const;
+
+/** The refusals of CMD042 RequestDeletion and its prevention guards (package B16 lane L3, KA087), appended after the retention-extension reasons. */
+export const DELETION_FAILURE_REASONS = ["PROJECT_DELETION_REQUESTED"] as const;
 
 export const FAILURE_REASONS = [
   // authorization (08 "Identity is not permission")
@@ -329,6 +333,10 @@ export const FAILURE_REASONS = [
   ...RECOVERY_FAILURE_REASONS,
   // the one soft-deadline extension of a project (package B16 lane L2: CMD060 RequestRetentionExtension; R2-123, R2-124)
   ...RETENTION_EXTENSION_FAILURE_REASONS,
+  // managed deletion of a project (package B16 lane L3: CMD042 RequestDeletion)
+  ...DELETION_FAILURE_REASONS,
+  // outreach (package B12: CMD061..CMD064, the dispatcher D2..D5; KA095..KA098, KC028..KC037)
+  ...OUTREACH_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

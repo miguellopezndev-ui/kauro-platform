@@ -79,6 +79,7 @@ export type {
   ProjectRevisionPointer,
   RevisionAuthorityInspector,
   RetentionRepository,
+  DeletionRepository,
   PendingOperationJournal,
   NewRetentionAnchor,
   SourceAvailabilityReader,
