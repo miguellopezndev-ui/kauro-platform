@@ -136,4 +136,6 @@ export const COMMERCIAL_READ_OUTCOMES: Readonly<Record<CommercialReadOperationId
   ListSalesActivities: closedCatalogue("ListSalesActivities", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.GET_OUTREACH_READ_OUTCOMES]),
   GetOutreachMetrics: closedCatalogue("GetOutreachMetrics", [...EVERY_READ, NO_QUERY, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS]),
   GetSalesResource: closedCatalogue("GetSalesResource", [...EVERY_READ, ...PATH_IDS, NO_QUERY, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.GET_OUTREACH_READ_OUTCOMES]),
+  // package B12 lane L-HOME: any seller state is admitted; the caller who is no seller at all is CORPORATE_ROLE_MISSING
+  GetSellerHome: closedCatalogue("GetSellerHome", [...EVERY_READ, NO_QUERY, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS]),
 });

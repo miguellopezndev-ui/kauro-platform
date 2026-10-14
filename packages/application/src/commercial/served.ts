@@ -108,7 +108,7 @@ export const COMMERCIAL_COMMAND_EVENTS: Readonly<Record<CommercialServedRouteCom
 });
 
 /** The B10 reads the api serves (design §13): GetCommissionStatement since B10-STATEMENTS-PAYOUTS. */
-export const COMMERCIAL_SERVED_READ_IDS = Object.freeze(["GetCommissionStatement", "PreviewTableUnderBreakglass", "GetOutreachDraft", "GetOutreachReview", "ListSalesActivities", "GetOutreachMetrics", "GetSalesResource"] as const satisfies ReadonlyArray<CommercialReadOperationId>);
+export const COMMERCIAL_SERVED_READ_IDS = Object.freeze(["GetCommissionStatement", "PreviewTableUnderBreakglass", "GetOutreachDraft", "GetOutreachReview", "ListSalesActivities", "GetOutreachMetrics", "GetSalesResource", "GetSellerHome"] as const satisfies ReadonlyArray<CommercialReadOperationId>);
 
 export function isServedCommercialRead(id: string): id is CommercialReadOperationId {
   return (COMMERCIAL_SERVED_READ_IDS as ReadonlyArray<string>).includes(id);

@@ -85,6 +85,7 @@ import type {
   ProspectContactRef,
   ProspectId,
   ProspectRecord,
+  ProspectSegment,
   ProspectSourceEvidenceRecord,
   ProspectSuppressionRecord,
   PurchaseCompletionRecord,
@@ -327,6 +328,30 @@ export interface NewProspect {
   readonly createdAt: UtcInstant;
 }
 
+/** B12 RecordProspectSource: the collection evidence the caller recorded (append-only; one per recorder and hash). */
+export interface NewProspectSourceEvidence {
+  readonly evidenceId: string;
+  readonly evidenceHash: Sha256Hex;
+  readonly sourceUrlDigest: Sha256Hex;
+  /** The observation date, YYYY-MM-DD. */
+  readonly observedOn: string;
+  readonly lawfulBasis: string;
+  readonly segment: ProspectSegment;
+  /** The recording seller; absent when the owner records. */
+  readonly sellerId?: SellerId;
+}
+
+/** B12 RecordProspectContact: the restricted contact and its normalized address (contactKey is KAURO_PROSPECT_CONTACT_V1 of the address). */
+export interface NewProspectContact {
+  readonly contactId: string;
+  readonly contactKey: Sha256Hex;
+  readonly contactLabel: string;
+  readonly roleLabel?: string;
+  readonly channel: string;
+  /** The case-folded NFC address whose digest is contactKey; the database repeats the derivation (KA095). */
+  readonly address: string;
+}
+
 /** An ASSIGNED link appended to the agency's assignment chain (D10-ASSIGN-2): the seller under its prepared service assignment. */
 export interface NewAccountAssignment {
   readonly assignmentId: AccountAssignmentId;
@@ -371,6 +396,10 @@ export interface SalesRepository {
   /** The caller's own evidence by hash (a seller's, or the owner's), or null (CMD045 SOURCE_EVIDENCE_INVALID). */
   sourceEvidence(evidenceHash: Sha256Hex): Promise<ProspectSourceEvidenceRecord | null>;
   getContact(contactRef: ProspectContactRef): Promise<ProspectContactRecord | null>;
+  /** B12 RecordProspectSource: appends the caller's evidence at the server's instant (a repeat of one hash by one recorder is the unique violation). */
+  recordSourceEvidence(evidence: NewProspectSourceEvidence): Promise<ProspectSourceEvidenceRecord>;
+  /** B12 RecordProspectContact: appends the restricted contact and its address; both statements run in the caller's unit of work, so the failure of either leaves neither. */
+  recordContact(contact: NewProspectContact): Promise<ProspectContactRecord>;
   /** A suppression matching the organization key or the contact key, or null (KC016). */
   suppressionOf(organizationKey: Sha256Hex, contactKey: Sha256Hex | null): Promise<ProspectSuppressionRecord | null>;
   /** The live prospect of an organization key (prospects_one_live_per_organization), or null. */

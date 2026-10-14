@@ -436,6 +436,23 @@ export interface SalesResourceView {
   readonly createdAt: UtcInstant;
 }
 
+export interface SellerHomeStatementView {
+  readonly statementId: string;
+  readonly periodStart: CalendarDate;
+  readonly periodEnd: CalendarDate;
+  readonly state: string;
+  readonly payableCents: string;
+  readonly heldCents: string;
+}
+
+/** GetSellerHome (R2-066): a seller in any state; never a prospect, contact, draft or other seller's row. */
+export interface SellerHomeView {
+  readonly sellerState: "ACTIVE" | "SUSPENDED" | "TERMINATED";
+  readonly permittedActions: ReadonlyArray<string>;
+  readonly statements: ReadonlyArray<SellerHomeStatementView>;
+  readonly supportRoute: string | null;
+}
+
 export interface SenderIdentityView {
   readonly senderId: string;
   readonly userId: string;

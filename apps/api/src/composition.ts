@@ -23,7 +23,7 @@ import type { FastifyInstance } from "fastify";
 import type { LateFailureSink, BankEvidenceClassifier, BankEvidenceStore, BankInboundCollaborators, ObjectReadSigningPort, BankCreditClassifier, DestinationFingerprinter } from "@kauro/application";
 import { createBankEvidenceUpload, createBankInboundHandlers, createBankRouteHandlers, createBankSettlementHandlers, realProviderCallTimer, createBankRefundHandlers } from "@kauro/application";
 import type { AssuranceVerifier, AuditReadRuntime, AuditRuntime, B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators, ProviderCallTimer } from "@kauro/application";
-import { RecordedBuyerTypeReader, SESSION_POLICY_VERSION, createAgencyAppHandlers, type AgencyAppStores, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createRetentionHandlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, createTeamHandlers, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createCapabilityCommandHandlers, createOperationsCommandHandlers, createOperationsReadHandlers, createQuoteHandlers, createStatementRequestHandlers, problemOf, recordOperatorDenial, createOutreachStubCommandHandlers, createOutreachStubReadHandlers } from "@kauro/application";
+import { RecordedBuyerTypeReader, SESSION_POLICY_VERSION, createAgencyAppHandlers, type AgencyAppStores, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createRetentionHandlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createProspectIntakeHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, createTeamHandlers, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createCapabilityCommandHandlers, createOperationsCommandHandlers, createOperationsReadHandlers, createQuoteHandlers, createStatementRequestHandlers, getSellerHomeHandler, problemOf, recordOperatorDenial, createOutreachStubCommandHandlers, createOutreachStubReadHandlers } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
 import type { UtcInstant } from "@kauro/contracts";
 import type { AuditUnitOfWorkFactory, Clock, Environment, ExecutionContext, IdGenerator, RandomBytes, SourceUnitOfWork, UnitOfWorkOptions, UserId } from "@kauro/domain";
@@ -313,7 +313,7 @@ export interface ApiAssembly {
    * the statement and payout operations (CMD052 judges the proof at its request and again at its effect); absent, the platform's. The
    * fault cells bind the platform's own verifier through an instrumented proxy, so the instant the product judges a proof at is evidence.
    */
-  readonly commercial?: { readonly buyerTypes?: BuyerTypeReader; readonly assurance?: AssuranceVerifier; /** The bound of the collaborator calls of CMD027 and CMD043 (realProviderCallTimer when absent; fault cells bind a clock-driven one). */ readonly providerTimer?: ProviderCallTimer; /** Where the failure of a collaborator call after its bound elapsed goes (stderr when absent). */ readonly onLateFailure?: LateFailureSink };
+  readonly commercial?: { /** KAURO_SELLER_SUPPORT_ROUTE (B12 GetSellerHome); null or absent shows "not configured". */ readonly sellerSupportRoute?: string | null; readonly buyerTypes?: BuyerTypeReader; readonly assurance?: AssuranceVerifier; /** The bound of the collaborator calls of CMD027 and CMD043 (realProviderCallTimer when absent; fault cells bind a clock-driven one). */ readonly providerTimer?: ProviderCallTimer; /** Where the failure of a collaborator call after its bound elapsed goes (stderr when absent). */ readonly onLateFailure?: LateFailureSink };
   /**
    * CMD027 CreateQuote's collaborators that replace the edition's (package B10, mandate B10-COMMANDS-QUOTE): the recorded buyer type (the
    * edition records none, so a quote is refused BUYER_TYPE_UNSET until B11 binds it), the re-binder of a paid purchase (the payment service's
@@ -445,12 +445,15 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const commercial = createAgencyLifecycleHandlers(commerceRuntime, { lifecycle: agencyLifecycleOf, activeWork: collaborators.activeWork, assurance: createAssuranceVerifier(), ...(assembly.commercial?.providerTimer !== undefined ? { providerTimer: assembly.commercial.providerTimer } : {}), ...(assembly.commercial?.onLateFailure !== undefined ? { onLateFailure: assembly.commercial.onLateFailure } : {}) });
   // package B10: the prospect, claim and attribution commands (CMD045, CMD046, CMD047) in the caller's OPERATOR context, over the sales and
   // attribution adapters, the commercial authorizer's principals (the seller row and the owner grant, read after their transition locks)
-  const prospects = createProspectHandlers(commerceRuntime, {
+  const prospectCollaborators = {
     authorizer: createCommercialAuthorizer({ principals: { binding: "PLATFORM", sellerOf: async (uow, userId) => commercialPrincipalsOf(uow).sellerOf(userId), ownerGrantOf: async (uow, userId) => commercialPrincipalsOf(uow).ownerGrantOf(userId) } }),
     sales: salesOf,
     attribution: attributionOf,
     orderPrecedesClaim: agencyOrderPrecedesClaim,
-  });
+  };
+  const prospects = createProspectHandlers(commerceRuntime, prospectCollaborators);
+  // package B12 lane L-SOURCE: RecordProspectSource and RecordProspectContact replace their NOT_BUILT stubs
+  const outreachCommands = { ...createOutreachStubCommandHandlers(), ...createProspectIntakeHandlers(commerceRuntime, prospectCollaborators) };
   // package B10: the seller commands (CMD048, CMD049, CMD050) on the same runtime, over the sales and attribution adapters, the commercial
   // authorizer (the corporate owner's grant) and the step-up verifier
   const sellers = createSellerCommandHandlers(commerceRuntime, { sales: salesOf, attribution: attributionOf, authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }), assurance: createAssuranceVerifier() });
@@ -488,6 +491,16 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }),
     assurance: assembly.commercial?.assurance ?? createAssuranceVerifier(),
   });
+  // package B12 lane L-HOME (R2-066): the seller's home, served to a seller in any state
+  const sellerHome = getSellerHomeHandler(commerceRuntime, {
+    statements: statementsOf,
+    ledger: ledgerOf,
+    sales: salesOf,
+    serverNow: async (uow) => `${(await (uow as unknown as { serverInstant(): Promise<string> }).serverInstant()).slice(0, 23)}Z` as UtcInstant,
+    authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }),
+    assurance: assembly.commercial?.assurance ?? createAssuranceVerifier(),
+    supportRoute: () => assembly.commercial?.sellerSupportRoute ?? null,
+  });
   return createApiServer({
     ...(assembly.oneTimeDelivery !== undefined ? { oneTimeDelivery: assembly.oneTimeDelivery } : {}),
     environment: assembly.environment,
@@ -495,8 +508,8 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     reads: { ...createReadHandlers(readRuntime), ...createSourceReadHandlers(readRuntime, sources), ...createExecutionReadHandlers(readRuntime), ...createAuditReadHandlers(readRuntime) },
     intakes: { ...createSourceIntakeHandlers(readRuntime), ...createAuditIntakeHandlers(readRuntime) },
     commercial: {
-      commands: [...Object.values(commercial), ...Object.values(quotes), ...Object.values(prospects), ...Object.values(sellers), ...Object.values(capabilities), ...Object.values(operations), statements.CMD052, ...Object.values(createOutreachStubCommandHandlers())] as ReadonlyArray<CommercialCommandHandler<unknown, unknown>>,
-      reads: [statements.GetCommissionStatement, operationsReads.PreviewTableUnderBreakglass, ...Object.values(createOutreachStubReadHandlers())] as ReadonlyArray<CommercialReadHandler<unknown>>,
+      commands: [...Object.values(commercial), ...Object.values(quotes), ...Object.values(prospects), ...Object.values(sellers), ...Object.values(capabilities), ...Object.values(operations), statements.CMD052, ...Object.values(outreachCommands)] as ReadonlyArray<CommercialCommandHandler<unknown, unknown>>,
+      reads: [statements.GetCommissionStatement, operationsReads.PreviewTableUnderBreakglass, sellerHome, ...Object.values(createOutreachStubReadHandlers())] as ReadonlyArray<CommercialReadHandler<unknown>>,
       ...(serviceAuthenticator !== undefined ? { serviceAuthenticator } : {}),
     },
     commerce: { commands: Object.values(commerce.commands) as ReadonlyArray<CommerceCommandHandler<unknown, unknown>>, reads: Object.values(commerce.reads) as ReadonlyArray<CommerceReadHandler<unknown>> },

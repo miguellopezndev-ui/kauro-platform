@@ -194,7 +194,7 @@ test("the commercial contracts: every request schema carries exactly the registr
   assert.deepEqual(Object.keys(COMMERCIAL_COMMAND_RESPONSES), [...ALL_COMMANDS]);
   assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.status), [200, 201, 200, 201, 201, 200, 200, 200, 200, 200, 200, 200, 201, 200, 201, 200, 200, 200, 201, 201, 200, 201, 201, 201, 201, 200, 200, 201, 201, 200, 200, 201, 201]);
   assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.accepted), ALL_COMMANDS.map((c) => c === "CMD027"));
-  assert.deepEqual(Object.keys(roots).sort(), [...ALL_COMMANDS.map((c) => commercialCommandResponseSchemaId(c)), ...(["GetCommissionStatement", "PreviewTableUnderBreakglass", ...B12_READS] as const).map((r) => commercialReadResponseSchemaId(r))].sort());
+  assert.deepEqual(Object.keys(roots).sort(), [...ALL_COMMANDS.map((c) => commercialCommandResponseSchemaId(c)), ...(["GetCommissionStatement", "PreviewTableUnderBreakglass", "GetSellerHome", ...B12_READS] as const).map((r) => commercialReadResponseSchemaId(r))].sort());
   assert.deepEqual(COMMERCIAL_READ_ROUTES.GetCommissionStatement, {
     path: "/api/v1/sales/statements/{statementId}",
     scope: "CORPORATE",

@@ -477,6 +477,7 @@ export interface SellerActivationFacts {
 
 /** Lawful, dated evidence of where and why a prospect was collected (registry Prospect.sourceEvidenceHash; D10-PROS-1). */
 export interface ProspectSourceEvidenceRecord {
+  readonly evidenceId: string;
   readonly evidenceHash: Sha256Hex;
   /** The seller (or null: the owner) who recorded it; CMD045 accepts only the caller's own evidence. */
   readonly recordedBySellerId?: SellerId;
