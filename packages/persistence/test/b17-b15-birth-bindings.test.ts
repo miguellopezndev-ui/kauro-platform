@@ -451,6 +451,67 @@ test("0072: a differing receipt of a finalized stage opens one reconciliation na
   await assert.rejects(attempt(s, (c) => c.query("UPDATE kauro.import_stages SET parent_edges = '[]'::jsonb, version = version + 1 WHERE stage_id = $1", [child])), refusedWith("42501"));
 });
 
+// --- 0073 M8: the target-drift repair of a paid authorization ---------------------------------------------------------------------------
+
+/** The agency's one live fiscal profile (a second without `supersedes` would not be the profile the 0074 cells bind). */
+let profileOfAgencyA: Promise<string> | undefined;
+const profileA = (): Promise<string> => (profileOfAgencyA ??= fiscalProfile(app, kora, A, routes.issuerRef, "EXEMPT_EXPORT"));
+
+test("0073 M8: a drift repair re-binds a paid authorization only from a superseded target, to the re-check plan's quote, naming the KAURO_TARGET_REPAIR_V1 lineage, one ordinal at a time", async () => {
+  const profileId = await profileA();
+  const { projectId } = await project(app, A, clientA, hubspot, "HUBSPOT");
+  const s1 = await approvedSubject(clients(), validator, assurance, A, projectId, "m8-paid");
+  const q1 = await issuedQuote(app, A, s1, profileId, routes.issuerRef);
+  const order = await createdOrder(app, A, q1, routes, { payment });
+  const done = await observedCapture(payment, A, order, routes, { amountCents: q1.totalCents, serviceCents: q1.serviceCents, taxCents: q1.taxCents, excessCents: 0 }, hubspot);
+  // the target drifted: a second subject over the same sealed revision supersedes the paid quote's target (one current contract per project)
+  const s2 = await approvedSubject(clients(), validator, assurance, A, projectId, "m8-recheck", { revisionId: s1.revisionId, manifestHash: s1.revisionHash });
+  const q2 = await issuedQuote(app, A, s2, profileId, routes.issuerRef, { replacesQuoteId: q1.quoteId });
+  // Fixture, by the oracle with triggers off (session_replication_role = replica), committed: the re-check link of s2's plan (its birth
+  // guard is the 0073 (e) cell's) and the replacement's terms hash equal to the paid quote's (a drift repair keeps the terms).
+  const o = h.oracle;
+  await o.query("BEGIN");
+  try {
+    await o.query("SET LOCAL session_replication_role = replica");
+    await o.query("UPDATE kauro.plans SET recheck_of_plan_id = $2 WHERE plan_id = $1", [s2.planId, s1.planId]);
+    await o.query("UPDATE kauro.quotes SET terms_hash = $2 WHERE quote_id = $1", [q2.quoteId, q1.termsHash]);
+    await o.query("COMMIT");
+  } catch (e) {
+    await o.query("ROLLBACK");
+    throw e;
+  }
+  const lineage = (await o.query<{ h: string }>("SELECT kauro.target_repair_lineage_hash($1, $2) AS h", [s1.targetContractHash, s2.targetContractHash])).rows[0]!.h;
+  const pay = { role: "kauro_payment_test" as const, settings: { "kauro.agency_id": A.agencyId } };
+  const guard = "DROP TRIGGER purchase_rebindings_guard ON kauro.purchase_rebindings";
+  const rebinding = (ordinal: number, lineageHash: string) => (c: Client) =>
+    c.query(
+      `INSERT INTO kauro.purchase_rebindings (rebinding_id, agency_id, project_id, order_id, capture_id, from_quote_id, from_authorization_id, to_quote_id, allowance_ordinal, reason_code, lineage_evidence_hash, requested_by_membership_id, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'TARGET_DRIFT_REPAIR', $10, $11, now())`,
+      [ids.next(), A.agencyId, projectId, order.orderId, done.captureId, q1.quoteId, done.authorizationId, q2.quoteId, ordinal, lineageHash, A.ownerMembershipId],
+    );
+  // a rolled-back arrangement of the world by the oracle with triggers off, before the role switch
+  const arranged = (sql: string, params: unknown[]) => async (c: Client) => {
+    await c.query("SET LOCAL session_replication_role = replica");
+    await c.query(sql, params);
+    await c.query("SET LOCAL session_replication_role = origin");
+  };
+  // OK: the repair of the superseded target, to the re-check plan's quote, with the lineage of the two bodies and the first ordinal
+  await assert.doesNotReject(attempt(pay, rebinding(1, lineage)), "OK: the drift repair is admitted");
+  // DENY: a lineage that is not KAURO_TARGET_REPAIR_V1 of the replaced and the replacing target bodies
+  await deniedByGuard({ ...pay, drop: guard }, rebinding(1, sha("another lineage")), "KP013", /lineage of a drift repair/);
+  // DENY: an ordinal that is not the next one
+  await deniedByGuard({ ...pay, drop: guard }, rebinding(2, lineage), "KP013", /takes the next ordinal 1/);
+  // DENY: a replacement quote of a plan that does not re-check the paid plan
+  await deniedByGuard({ ...pay, setup: arranged("UPDATE kauro.plans SET recheck_of_plan_id = NULL WHERE plan_id = $1", [s2.planId]), drop: guard }, rebinding(1, lineage), "KP013", /not a quote of the re-check plan/);
+  // DENY: a paid quote bound to the project's current target (nothing drifted)
+  await deniedByGuard(
+    { ...pay, setup: arranged("UPDATE kauro.quotes SET target_contract_hash = $2 WHERE quote_id = $1", [q1.quoteId, s2.targetContractHash]), drop: guard },
+    rebinding(1, lineage),
+    "KP013",
+    /is not superseded/,
+  );
+});
+
 // --- 0074 tax document issuance ---------------------------------------------------------------------------------------------------------
 
 async function validatedInvoice(seed: string, profileId: string): Promise<string> {
@@ -478,7 +539,7 @@ const issuedSql = (accepted: boolean) =>
   `UPDATE kauro.tax_documents SET state = 'ISSUED', provider_document_id = 'DOC-' || left($1::text, 8), legal_number = 'SETP-' || right(replace($1::text, '-', ''), 6), evidence_hash = $2, issued_at = now()${accepted ? ", fiscal_status = 'ACCEPTED', verification_ref = 'CUFE-' || $1::text" : ""}, version = 4 WHERE document_id = $1`;
 
 test("0074: the issuer's half covers every judged column; the document's state is a transition subject; SUBMITTING is judged after both shared halves at the effect instant", async () => {
-  const profileId = await fiscalProfile(app, kora, A, routes.issuerRef, "EXEMPT_EXPORT");
+  const profileId = await profileA();
   const doc = await validatedInvoice("births-fiscal", profileId);
   const pay = { role: "kauro_payment_test" as const, settings: { "kauro.agency_id": A.agencyId } };
   const ctl = { role: "kauro_control_test" as const, settings: {} };
