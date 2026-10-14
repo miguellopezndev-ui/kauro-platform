@@ -180,6 +180,12 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/projects/:projectId/import-stages/:stageId/continue", "ContinueStage", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD041" } }],
       // the support package (B11 W4)
       ["POST", "/api/v1/projects/:projectId/support-cases", "CreateSupportCase", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD044" } }],
+      // the team package (B16, CMD003..CMD007): an invitation is created (201), the others edit (200)
+      ["POST", "/api/v1/agencies/:agencyId/invitations", "InviteMember", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD003" } }],
+      ["POST", "/api/v1/invitations/:invitationId/accept", "AcceptInvitation", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD004" } }],
+      ["POST", "/api/v1/memberships/:membershipId/capabilities", "ChangeMembership", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD005" } }],
+      ["POST", "/api/v1/memberships/:membershipId/revoke", "RevokeMembership", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD006" } }],
+      ["POST", "/api/v1/agencies/:agencyId/ownership-transfers", "TransferOwnership", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD007" } }],
       // the manual-10 reads (N16)
       ["GET", "/api/v1/agencies", "ListAgencies", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListAgencies" } }],
       ["GET", "/api/v1/agencies/:agencyId", "GetAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetAgency" } }],

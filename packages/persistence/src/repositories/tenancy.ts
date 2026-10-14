@@ -485,6 +485,15 @@ export class PgInvitationRepository implements InvitationRepository {
     return r.rows[0] ? invitationRecord(r.rows[0]) : null;
   }
 
+  async findByMembership(membershipId: MembershipId): Promise<InvitationRecord | null> {
+    const r = await execute<InvitationRow>(
+      this.db,
+      `SELECT ${INVITATION_COLUMNS} FROM kauro.membership_invitations WHERE membership_id = $1 ORDER BY created_at DESC, invitation_id DESC LIMIT 1`,
+      [membershipId],
+    );
+    return r.rows[0] ? invitationRecord(r.rows[0]) : null;
+  }
+
   async consume(invitationId: InvitationId, now: UtcInstant): Promise<InvitationClose> {
     return this.close(invitationId, "consumed_at", now);
   }

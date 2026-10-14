@@ -4,7 +4,7 @@
  * docs/design/B06-domain-db-authz.md §7; handlers implementing these contracts belong to the B06 implementation mandate.
  */
 import type { ServiceMode, SupportCategory } from "@kauro/domain";
-import type { AgencyView, ApprovalView, EndClientView, MembershipView, PlanView, ProjectView, SupportCaseView } from "../api/views.js";
+import type { AcceptInvitationView, AgencyView, ApprovalView, EndClientView, InviteMemberView, MembershipView, PlanView, ProjectView, SupportCaseView, TransferOwnershipView } from "../api/views.js";
 import type { CommandHandler, CommandSpec } from "../ports/command-handler.js";
 import type { ActiveWorkSummary, CompletedExternalAction } from "../ports/work-inspectors.js";
 
@@ -216,6 +216,118 @@ export const SUPPORT_COMMANDS = Object.freeze({
   CMD044: CREATE_SUPPORT_CASE,
 } as const);
 export type SupportCommandId = keyof typeof SUPPORT_COMMANDS;
+
+// --- the team commands of package B16 (G-TENANT): CMD003..CMD007 ------------------------------------------------------------
+// Behaviour: docs/design/B16-team-commands.md (decisions D-TEAM-n and the failure matrix); domain rules are
+// packages/domain/src/model/membership.ts, database rules migration 0002 (enforce_membership_authority, enforce_invitation_rules).
+
+export interface InviteMemberBody {
+  readonly expectedVersion: number;
+  readonly intendedIdentityRef: string;
+  readonly role: string;
+}
+export const INVITE_MEMBER: CommandSpec<InviteMemberBody> = spec<InviteMemberBody>({
+  id: "CMD003",
+  name: "InviteMember",
+  method: "POST",
+  path: "/api/v1/agencies/{agencyId}/invitations",
+  role: "AGENCY_OWNER_OR_ADMIN",
+  scope: "AGENCY_PATH",
+  aggregateParam: "agencyId",
+  expectedVersionRequired: true,
+  stepUpRequired: false,
+  authorityHashFields: [],
+  fields: ["expectedVersion", "intendedIdentityRef", "role"],
+});
+export type InviteMemberHandler = CommandHandler<InviteMemberBody, InviteMemberView>;
+
+export interface AcceptInvitationBody {
+  readonly invitationToken: string;
+}
+/** CMD004 is VERIFIED_USER: the caller holds no membership yet; the agency it runs in is the one its own invitation names. */
+export const ACCEPT_INVITATION: CommandSpec<AcceptInvitationBody> = spec<AcceptInvitationBody>({
+  id: "CMD004",
+  name: "AcceptInvitation",
+  method: "POST",
+  path: "/api/v1/invitations/{invitationId}/accept",
+  role: "VERIFIED_USER",
+  scope: "NONE",
+  aggregateParam: "invitationId",
+  expectedVersionRequired: false,
+  stepUpRequired: false,
+  authorityHashFields: [],
+  fields: ["invitationToken"],
+});
+export type AcceptInvitationHandler = CommandHandler<AcceptInvitationBody, AcceptInvitationView>;
+
+export interface ChangeMembershipBody {
+  readonly expectedVersion: number;
+  readonly role: string;
+  readonly assuranceProofRef: string;
+}
+export const CHANGE_MEMBERSHIP: CommandSpec<ChangeMembershipBody> = spec<ChangeMembershipBody>({
+  id: "CMD005",
+  name: "ChangeMembership",
+  method: "POST",
+  path: "/api/v1/memberships/{membershipId}/capabilities",
+  role: "AGENCY_OWNER",
+  scope: "AGENCY_HEADER",
+  aggregateParam: "membershipId",
+  expectedVersionRequired: true,
+  stepUpRequired: true,
+  authorityHashFields: [],
+  fields: ["expectedVersion", "role", "assuranceProofRef"],
+});
+export type ChangeMembershipHandler = CommandHandler<ChangeMembershipBody, MembershipView>;
+
+export interface RevokeMembershipBody {
+  readonly expectedVersion: number;
+  readonly reasonCode: string;
+}
+export const REVOKE_MEMBERSHIP: CommandSpec<RevokeMembershipBody> = spec<RevokeMembershipBody>({
+  id: "CMD006",
+  name: "RevokeMembership",
+  method: "POST",
+  path: "/api/v1/memberships/{membershipId}/revoke",
+  role: "AGENCY_OWNER_OR_ADMIN",
+  scope: "AGENCY_HEADER",
+  aggregateParam: "membershipId",
+  expectedVersionRequired: true,
+  stepUpRequired: false,
+  authorityHashFields: [],
+  fields: ["expectedVersion", "reasonCode"],
+});
+export type RevokeMembershipHandler = CommandHandler<RevokeMembershipBody, MembershipView>;
+
+export interface TransferOwnershipBody {
+  readonly expectedVersion: number;
+  readonly newOwnerMembershipId: string;
+  readonly assuranceProofRef: string;
+}
+export const TRANSFER_OWNERSHIP: CommandSpec<TransferOwnershipBody> = spec<TransferOwnershipBody>({
+  id: "CMD007",
+  name: "TransferOwnership",
+  method: "POST",
+  path: "/api/v1/agencies/{agencyId}/ownership-transfers",
+  role: "AGENCY_OWNER",
+  scope: "AGENCY_PATH",
+  aggregateParam: "agencyId",
+  expectedVersionRequired: true,
+  stepUpRequired: true,
+  authorityHashFields: [],
+  fields: ["expectedVersion", "newOwnerMembershipId", "assuranceProofRef"],
+});
+export type TransferOwnershipHandler = CommandHandler<TransferOwnershipBody, TransferOwnershipView>;
+
+/** The team package's commands (B16): served beside the seven of B06, which stay a closed set. */
+export const TEAM_COMMANDS = Object.freeze({
+  CMD003: INVITE_MEMBER,
+  CMD004: ACCEPT_INVITATION,
+  CMD005: CHANGE_MEMBERSHIP,
+  CMD006: REVOKE_MEMBERSHIP,
+  CMD007: TRANSFER_OWNERSHIP,
+} as const);
+export type TeamCommandId = keyof typeof TEAM_COMMANDS;
 
 export const B06_COMMANDS = Object.freeze({
   CMD001: CREATE_AGENCY,

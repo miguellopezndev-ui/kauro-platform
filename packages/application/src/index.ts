@@ -13,7 +13,7 @@ export type { CommandEnvelope, CommandResult, AuthenticatedSubject, CompletedRes
 export type { CredentialHold, RequestAuthority } from "./api/authority.js";
 export { credentialEnded, judgedUnderHold } from "./api/authority.js";
 export { HEADERS, PRIVATE_CACHE_POLICY, REQUEST_LIMITS, SINGLE_VALUED_HEADERS, isSuccess } from "./api/envelope.js";
-export type { AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView, ReadinessBlocker, AgencyMembershipView, TeamMemberView, SupportCaseView, Page } from "./api/views.js";
+export type { AgencyView, MembershipView, EndClientView, ProjectView, PlanView, ApprovalView, ReadinessBlocker, AgencyMembershipView, TeamMemberView, SupportCaseView, InviteMemberView, AcceptInvitationView, TransferOwnershipView, Page } from "./api/views.js";
 export { READINESS_BLOCKERS } from "./api/views.js";
 export type { ReadinessFacts } from "./api/projections.js";
 export { agencyView, membershipView, endClientView, projectView, planView, approvalView, readinessBlockersOf, agencyMembershipView, teamMemberView, supportCaseView } from "./api/projections.js";
@@ -135,7 +135,19 @@ export type {
   CreateSupportCaseBody,
   CreateSupportCaseHandler,
   SupportCommandId,
+  InviteMemberBody,
+  InviteMemberHandler,
+  AcceptInvitationBody,
+  AcceptInvitationHandler,
+  ChangeMembershipBody,
+  ChangeMembershipHandler,
+  RevokeMembershipBody,
+  RevokeMembershipHandler,
+  TransferOwnershipBody,
+  TransferOwnershipHandler,
+  TeamCommandId,
 } from "./commands/contracts.js";
+export { INVITE_MEMBER, ACCEPT_INVITATION, CHANGE_MEMBERSHIP, REVOKE_MEMBERSHIP, TRANSFER_OWNERSHIP, TEAM_COMMANDS } from "./commands/contracts.js";
 export { CREATE_AGENCY, CREATE_CLIENT, ARCHIVE_CLIENT, CREATE_PROJECT, REVISE_PLAN, APPROVE_PLAN, WITHDRAW_APPROVAL, B06_COMMANDS, CREATE_SUPPORT_CASE, SUPPORT_COMMANDS } from "./commands/contracts.js";
 export type { CommandRuntime, CommandContext, CommandOutcome, AcceptedOutcome, UnitOfWorkRunner, VersionOfView, UnauthenticatedRequest, IdentityFact } from "./commands/runtime.js";
 export { runCommand, runCommandIn, settleCommandFailure, contextOf, identityOf, refuseUnauthenticated, refuseAnonymously, recordDenialFact, recordIdentityFact, ALLOW_REASONS } from "./commands/runtime.js";
@@ -160,9 +172,11 @@ export {
 } from "./sessions/protocol.js";
 export type { SessionView, StepUpProofView, SessionService, SessionServiceDependencies, SessionOutcome, ResumedSession, HeldSession } from "./sessions/service.js";
 export { createSessionService, SESSION_POLICY_VERSION, SESSION_ACTIONS, SESSION_ALLOW_REASONS, LOGOUT_REASON, REPLACED_REASON } from "./sessions/service.js";
-export type { B06Collaborators, B06Handlers, SupportHandlers, SupportOptions, ApprovalPreimage } from "./commands/handlers/index.js";
+export type { B06Collaborators, B06Handlers, SupportHandlers, SupportOptions, ApprovalPreimage, TeamHandlers, TeamOptions } from "./commands/handlers/index.js";
 export {
   createB06Handlers,
+  createTeamHandlers,
+  INVITATION_TTL_MS,
   createSupportHandlers,
   createSupportCaseHandler,
   createAgencyHandler,

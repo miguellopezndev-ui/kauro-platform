@@ -29,7 +29,7 @@
 import type { CommandId } from "@kauro/contracts";
 import { COMMANDS } from "@kauro/contracts";
 import type { AllowDecision, AuthorizationDecision, AuthorizationRequest, Authorizer, AssuranceVerifier, ReadAuthorizationRequest } from "@kauro/application";
-import { AGENCY_APP_COMMANDS, AUTHORIZATION_POLICY_VERSION, B06_COMMANDS, assureStepUpAtCommit } from "@kauro/application";
+import { AGENCY_APP_COMMANDS, AUTHORIZATION_POLICY_VERSION, B06_COMMANDS, TEAM_COMMANDS, assureStepUpAtCommit } from "@kauro/application";
 import type { AgencyId, Clock, FailureReason, MembershipRecord, UnitOfWork } from "@kauro/domain";
 import { isAgencyCommandRole, isUuidV5, isVerifiedIdentity, roleSatisfies } from "@kauro/domain";
 
@@ -38,8 +38,8 @@ export interface AuthorizerDependencies {
   readonly assurance: AssuranceVerifier;
 }
 
-/** Commands whose spec names a step-up proof in the body (CMD025 in B06); read from the command contracts, never duplicated. */
-const STEP_UP_COMMANDS: ReadonlySet<CommandId> = new Set<CommandId>(Object.values(B06_COMMANDS).filter((c) => c.stepUpRequired).map((c) => c.id));
+/** Commands whose spec names a step-up proof in the body (CMD025 in B06; CMD005 and CMD007 of the team package); read from the command contracts, never duplicated. */
+const STEP_UP_COMMANDS: ReadonlySet<CommandId> = new Set<CommandId>([...Object.values(B06_COMMANDS), ...Object.values(TEAM_COMMANDS)].filter((c) => c.stepUpRequired).map((c) => c.id));
 
 function deny(code: Extract<AuthorizationDecision, { kind: "DENY" }>["code"], reason: FailureReason): AuthorizationDecision {
   return { kind: "DENY", code, reason, policyVersion: AUTHORIZATION_POLICY_VERSION };
