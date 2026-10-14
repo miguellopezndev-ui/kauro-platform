@@ -28935,7 +28935,7 @@
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 10 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 8 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -28996,18 +28996,6 @@
                 "reason": "ATTRIBUTION_EXISTS",
                 "layer": "COMMAND",
                 "meaning": "the agency already has a frozen allocation: the pool does not become 10% for each seller"
-              },
-              {
-                "code": "PRECONDITION_FAILED",
-                "reason": "BUYER_TYPE_UNSET",
-                "layer": "COMMAND",
-                "meaning": "the agency's buyer type is not recorded (D58)"
-              },
-              {
-                "code": "PRECONDITION_FAILED",
-                "reason": "IN_HOUSE_NOT_ATTRIBUTABLE",
-                "layer": "COMMAND",
-                "meaning": "the agency is an in-house tenant: no seller attribution arises from prospecting it"
               },
               {
                 "code": "PRECONDITION_FAILED",
@@ -29798,7 +29786,7 @@
                 "code": "PRECONDITION_FAILED",
                 "reason": "SOURCE_EVIDENCE_INVALID",
                 "layer": "COMMAND",
-                "meaning": "sourceEvidenceHash or businessContactRef is not the caller's own record, or the evidence is not of the AGENCY segment: another seller's record is as unknown as a missing one"
+                "meaning": "sourceEvidenceHash or businessContactRef is not the caller's own record, or the evidence is of neither the AGENCY nor the COMPANY segment: another seller's record is as unknown as a missing one"
               },
               {
                 "code": "PRECONDITION_FAILED",
@@ -41578,7 +41566,6 @@
               "CLAIM_AFTER_FIRST_ORDER",
               "ATTRIBUTION_EXISTS",
               "SHARES_NOT_WHOLE",
-              "IN_HOUSE_NOT_ATTRIBUTABLE",
               "SERVICE_ASSIGNMENT_UNPREPARED",
               "TAIL_NOT_ENUMERATED",
               "TERMINATION_TERMS_UNPREPARED",

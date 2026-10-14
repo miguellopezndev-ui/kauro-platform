@@ -155,6 +155,45 @@ test("DENY: an agency member's tenant session is a foreign scope and a CANDIDATE
   assert.equal((await prospectRow(keyOf("deny-base.example"))).length, 1, "one live prospect per organization key");
 });
 
+test("OK (D-33): an ACTIVE seller registers a company prospect from its own COMPANY-segment source evidence — 201 with one RESEARCHED prospect owned by the seller under the same minimized view, no claim and no attribution; an AGENCY and a COMPANY record of one domain share its organization key, so the second is PROSPECT_EXISTS", async () => {
+  const seller = await sw.seller("cmd045-company");
+  const evidence = await recordSourceEvidence(w().h, { userId: seller.userId, sellerId: seller.sellerId }, { domain: "northwind-company.example", segment: "COMPANY" });
+  const before = await footprint();
+  const reply = completed<ProspectView>(await register(seller.person, { body: bodyOf("northwind-company.example", evidence) }), 201);
+  assert.deepEqual(Object.keys(reply.data).sort(), ["jurisdiction", "organizationLabel", "ownerSellerId", "prospectId", "sourceEvidenceHash", "state", "suppressed"], "the same minimized view as an agency prospect");
+  assert.deepEqual([reply.data.state, reply.data.ownerSellerId, reply.data.sourceEvidenceHash], ["RESEARCHED", seller.sellerId, evidence.sourceEvidenceHash]);
+  const rows = await prospectRow(keyOf("northwind-company.example"));
+  assert.deepEqual(rows.map((r) => [r.state, r.owner_seller_id, r.source_evidence_hash]), [["RESEARCHED", seller.sellerId, evidence.sourceEvidenceHash]]);
+  const after = await footprint();
+  assert.deepEqual([after.prospects - before.prospects, after.claims - before.claims, after.allocations - before.allocations], [1, 0, 0], "one prospect, no claim, no attribution");
+  // the segment is not part of the organization key: an agency record of the same domain cannot open a second live prospect
+  const agencyRecord = await recordSourceEvidence(w().h, { userId: seller.userId, sellerId: seller.sellerId }, { domain: "northwind-company.example", segment: "AGENCY" });
+  assert.equal(outcome(w(), await register(seller.person, { body: bodyOf("www.northwind-company.example", agencyRecord) })), "409 PRECONDITION_FAILED PROSPECT_EXISTS");
+});
+
+test("DENY (D-33): the protections stand for company prospects — another seller's COMPANY-segment evidence is SOURCE_EVIDENCE_INVALID, a suppressed company by organization or contact key is PROSPECT_SUPPRESSED, and nothing is written", async () => {
+  const seller = await sw.seller("cmd045-company-deny");
+  const other = await sw.seller("cmd045-company-deny-other");
+  const mine = await recordSourceEvidence(w().h, { userId: seller.userId, sellerId: seller.sellerId }, { domain: "company-deny.example", segment: "COMPANY" });
+  const theirs = await recordSourceEvidence(w().h, { userId: other.userId, sellerId: other.sellerId }, { domain: "company-deny.example", segment: "COMPANY" });
+  const refused = async (what: string, body: Record<string, unknown>, expected: string) => {
+    const before = await footprint();
+    const key = freshKey("cmd045-company-deny");
+    assert.equal(outcome(w(), await register(seller.person, { key, body })), expected, what);
+    assert.deepEqual(await footprint(), before, `${what}: nothing is written`);
+    assert.equal(await w().journal(key), null, `${what}: no journal entry`);
+  };
+  await refused("another seller's COMPANY evidence", bodyOf("company-deny.example", theirs, { businessContactRef: mine.contactRef }), "409 PRECONDITION_FAILED SOURCE_EVIDENCE_INVALID");
+  await suppress(w().h, sw.owner.userId, { domain: "suppressed-company.example" });
+  const suppressedOrg = await recordSourceEvidence(w().h, { userId: seller.userId, sellerId: seller.sellerId }, { domain: "suppressed-company.example", segment: "COMPANY" });
+  await refused("a suppressed company", bodyOf("Suppressed-Company.example", suppressedOrg), "409 PRECONDITION_FAILED PROSPECT_SUPPRESSED");
+  const contactKey = "d".repeat(64);
+  await suppress(w().h, sw.owner.userId, { contactKey });
+  const suppressedContact = await recordSourceEvidence(w().h, { userId: seller.userId, sellerId: seller.sellerId }, { domain: "company-contact.example", segment: "COMPANY", contactKey });
+  await refused("a company whose contact is suppressed", bodyOf("company-contact.example", suppressedContact), "409 PRECONDITION_FAILED PROSPECT_SUPPRESSED");
+  assert.equal((await prospectRow(keyOf("company-deny.example"))).length, 0);
+});
+
 test("RACE: an identical retry replays the 201, the same key with another organizationLabel is 409 IDEMPOTENCY_CONFLICT, two sellers registering one organization at once yield one prospect and one 409 PROSPECT_EXISTS with the wait observed, and a crash before COMMIT leaves no prospect", async () => {
   const a = await sellerWith("cmd045-race-a", "retry.example");
   const key = freshKey("cmd045-race");

@@ -1,6 +1,6 @@
 // UI04 Pricing (A3 3.4): the ladder is the policy's bands and nothing typed here. Every price is an indicative band until the server quotes
-// from the sealed files; the band above the launch envelope is on the ladder but carries no price; the one in-house sentence is here and on
-// no other page; the founding line is not here. What each service costs is shown beside whether it can be bought now, from the publication.
+// from the sealed files; the band above the launch envelope is on the ladder but carries no price; the company sentence says a company buys on
+// the same terms as an agency (D-33); the founding line is not here. What each service costs is shown beside whether it can be bought now, from the publication.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type PublicCopyId } from "../../copy/public.ts";
 import { BandEstimator } from "../band-estimator.tsx";
