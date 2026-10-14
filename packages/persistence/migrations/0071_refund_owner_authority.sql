@@ -453,3 +453,12 @@ GRANT INSERT (attempt_id, source_kind, source_id) ON kauro.bank_review_cases TO 
 CREATE POLICY bank_source_freezes_owner_contradiction ON kauro.bank_source_freezes FOR INSERT TO kauro_app
   WITH CHECK (kauro.acting_corporate_owner() AND reason = 'REFUND_TERMINAL_CONTRADICTED');
 GRANT INSERT ON kauro.bank_source_freezes TO kauro_app;
+
+-- --- trigger functions: never executable by PUBLIC (0060 runtime hardening; SEC-DEPTH R17) ---------------------------------------------
+REVOKE EXECUTE ON FUNCTION kauro.treasury_refunds_review_authority() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.treasury_refunds_commitment_ceiling() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.enforce_bank_machine_edge() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.refunds_manual_completion_evidence() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.treasury_refunds_completion_evidence() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.outbound_return_bounces_guard() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION kauro.outbound_resend_ceiling() FROM PUBLIC;
