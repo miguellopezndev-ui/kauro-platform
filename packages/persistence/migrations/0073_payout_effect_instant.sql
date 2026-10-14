@@ -1,4 +1,4 @@
--- Migration 0076 (provisional number; the coordinator renumbers at merge) — B10, lane B10-CMD053-SETTLED-AT (template rule 15, the
+-- Migration 0073 (provisional number; the coordinator renumbers at merge) — B10, lane B10-CMD053-SETTLED-AT (template rule 15, the
 -- effective instant after the last lock wait, at the database clock): CMD053 stamped settled_at (and failed_at, returned_at) with
 -- kauro.server_now(), the transaction's start, although it writes them after waiting for the payout-cash basis lock (lockPayoutCash,
 -- D10-GAP-1): a settlement queued behind a concurrent holder recorded an instant earlier than its effect, so the claimed-cash rule

@@ -1,7 +1,7 @@
 /**
  * The accessor of the breakglass adapter over a unit of work of this package (the B10 accessor pattern: operationsOf): breakglassOf(uow)
  * answers the adapter on the unit of work's own connection and transaction, one instance per unit of work. Only the corporate owner's
- * request units (PgCommerceUnitOfWork, OPERATOR context) reach it; the policies of migration 0071 decide what each statement may read.
+ * request units (PgCommerceUnitOfWork, OPERATOR context) reach it; the policies of migration 0074 decide what each statement may read.
  */
 import { DomainFailure, type UnitOfWork } from "@kauro/domain";
 import { PgBreakglassRepository } from "./repositories/breakglass.js";

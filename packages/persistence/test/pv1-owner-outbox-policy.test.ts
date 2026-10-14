@@ -1,4 +1,4 @@
-// Payments V1, lane OWNER-OUTBOX-POLICY (migration 0075, provisional number): the corporate owner's agency-less outbox records (the
+// Payments V1, lane OWNER-OUTBOX-POLICY (migration 0072, provisional number): the corporate owner's agency-less outbox records (the
 // credit and import records of 0063, the route records of 0046) are written by the owner's request handlers with INSERT only and read
 // with SELECT only (event-publisher.ts: one INSERT per subscribed consumer, no RETURNING, no upsert); the dispatch columns move only under
 // kauro_control (inbox-outbox.ts). So the owner's policies on kauro.outbox_records name exactly SELECT and INSERT, never FOR ALL, and the

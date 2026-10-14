@@ -1,6 +1,6 @@
 /**
  * The download authorization store over `pg` (package B16 lane L5, CMD038 AuthorizeDownload; @kauro/domain DownloadAuthorizationStore;
- * migration 0074, provisional). The request session's reads and writes of one grant; the database re-proves every precondition of a
+ * migration 0075, provisional). The request session's reads and writes of one grant; the database re-proves every precondition of a
  * grant (KA094, B16_L5_DOWNLOAD_AUTHORIZATION) and orders a grant against the project's and the package's state changes through their
  * transition locks (`awaitProject`, `awaitPackage`).
  *

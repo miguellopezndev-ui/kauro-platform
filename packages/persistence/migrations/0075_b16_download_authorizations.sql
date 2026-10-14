@@ -1,4 +1,4 @@
--- Migration 0074 (provisional number; the coordinator renumbers at merge): B16 lane L5, CMD038 AuthorizeDownload.
+-- Migration 0075 (provisional number; the coordinator renumbers at merge): B16 lane L5, CMD038 AuthorizeDownload.
 --
 -- 13 "Delivery", R2-048, S048: a member of the package's agency is granted short-lived read URLs over the delivery copies of an
 -- AVAILABLE package. One COMMIT writes the grant (kauro.download_authorizations), its artifact rows, the audit event and the journal

@@ -1,4 +1,4 @@
--- 0071 — B16 lane L6: the recovery gate, the restore run and its journal application (provisional number; the coordinator renumbers).
+-- 0076 — B16 lane L6: the recovery gate, the restore run and its journal application (provisional number; the coordinator renumbers).
 --
 -- R2 14 "External-effect recovery journal": "After restoring a backup, disable dispatch, apply current tombstones and revocations, query
 -- provider payment state, rebuild safe inbox/outbox disposition and invalidate all old leases"; 09 "Deletion receipts and restoration":

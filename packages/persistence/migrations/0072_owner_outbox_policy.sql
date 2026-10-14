@@ -1,4 +1,4 @@
--- Migration 0075 (provisional number; the coordinator renumbers at merge) — Payments V1, lane OWNER-OUTBOX-POLICY: the corporate owner's
+-- Migration 0072 (provisional number; the coordinator renumbers at merge) — Payments V1, lane OWNER-OUTBOX-POLICY: the corporate owner's
 -- agency-less outbox records name exactly the commands the owner's code paths use. 0063:188 (outbox_records_owner_bank, the credit and
 -- statement-import records) and 0046:256 (outbox_records_owner_route, the route records) were FOR ALL: the owner's writer
 -- (event-publisher.ts) INSERTs one PENDING record per subscribed consumer, without RETURNING or an upsert, and the owner's reads SELECT

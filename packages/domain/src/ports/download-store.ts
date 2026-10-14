@@ -1,12 +1,12 @@
 /**
- * The download authorization store (package B16 lane L5, CMD038 AuthorizeDownload; migration 0074, provisional): the request session's
+ * The download authorization store (package B16 lane L5, CMD038 AuthorizeDownload; migration 0075, provisional): the request session's
  * reads and writes of one grant of short-lived read URLs over the delivery copies of an AVAILABLE package.
  *
  * The lock trace of an issuance (the handler calls these in this order, in the one unit of work of the command): the membership's shared
  * transition lock (the authorizer) -> `awaitProject` (the project's shared transition lock, then its state) -> `awaitPackage` (the
  * package's shared transition lock, then its state) -> `lockGoverningRetention` (the governing PAID record FOR SHARE) -> `effectInstant`
  * (kauro.effect_now(), read in a statement after the last lock) -> `issue`. A writer that moves the project's or the package's state
- * takes the exclusive transition lock (the triggers of migrations 0021 and 0074), so a deletion request (CMD042) or a revocation is
+ * takes the exclusive transition lock (the triggers of migrations 0021 and 0075), so a deletion request (CMD042) or a revocation is
  * ordered wholly before or wholly after the issuance.
  *
  * The URLs themselves are never stored: the grant fixes the scope (the exact object generations) and the absolute expiry; signing is a

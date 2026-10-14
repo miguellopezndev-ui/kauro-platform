@@ -8,7 +8,7 @@ import type { AgencyId, AssuranceProofId, BreakglassGrantId, ProjectId, UserId }
 import type { SourceFileId, SourceTableId } from "./source/ids.js";
 import type { DeclaredFormat } from "./source/records.js";
 
-/** policy.json retention.breakglassSeconds: a grant expires this long after the database's instant of its opening (migration 0071 CHECK). */
+/** policy.json retention.breakglassSeconds: a grant expires this long after the database's instant of its opening (migration 0074 CHECK). */
 export const BREAKGLASS_GRANT_SECONDS = 1800;
 /**
  * policy.json retention.signedDownloadSeconds: the longest a bearer capability already issued under the platform's providers lives. A

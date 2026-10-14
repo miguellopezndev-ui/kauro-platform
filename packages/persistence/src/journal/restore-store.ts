@@ -1,5 +1,5 @@
 /**
- * The restore run's database side (package B16 lane L6; migration 0071). Three adapters, each over a connection it is handed (none is a
+ * The restore run's database side (package B16 lane L6; migration 0076). Three adapters, each over a connection it is handed (none is a
  * connection site):
  *
  *   PgRestoreOwnerStore   the migration owner on the RESTORED database: closes the recovery gate as its first statement (S3), keeps the

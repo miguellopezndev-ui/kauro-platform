@@ -2,7 +2,7 @@
  * The restore runner (package B16 lane L6; R2 14 "External-effect recovery journal": "After restoring a backup, disable dispatch, apply
  * current tombstones and revocations, query provider payment state, rebuild safe inbox/outbox disposition and invalidate all old leases";
  * 09 "Deletion receipts and restoration"; CMD057 "Run the authorized isolated restore and release only after integrity/tenant/deletion/
- * financial checks"). The steps, each resumable from what the restored database records (restore_runs, migration 0071):
+ * financial checks"). The steps, each resumable from what the restored database records (restore_runs, migration 0076):
  *
  *   S1 prepare     the control plane names the journal through n by its chained hash and prepares the candidate on the primary;
  *   S2 restore     the backup is restored into an ISOLATED database (RestoreTarget; the local adapter is pg_restore, the provider's

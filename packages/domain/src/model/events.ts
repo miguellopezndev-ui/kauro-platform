@@ -103,7 +103,7 @@ export const EVENT_TYPES = [
   "support_case.opened.v1",
   // Agency buyer type (B11 CMD101 SetBuyerType, migration 0062: recorded once, before the first quote; R2 A3 3.7)
   "agency_buyer_type.recorded.v1",
-  // Download authorizations (B16 lane L5 CMD038 AuthorizeDownload; migration 0074, provisional): the audit fact of one grant
+  // Download authorizations (B16 lane L5 CMD038 AuthorizeDownload; migration 0075, provisional): the audit fact of one grant
   "download_authorization.issued.v1",
   // Processing authority (package B08, model/execution/events.ts; migrations 0021 and 0022)
   ...EXECUTION_EVENT_TYPES,

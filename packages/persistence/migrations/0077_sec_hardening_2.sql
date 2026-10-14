@@ -1,4 +1,4 @@
--- 0061 — SEC-HARDENING-2 (tier 1; provisional number, renumbered on rebase by tools/renumber-migration.mjs) + B-LIFETIME-2 BL2-F1/F2.
+-- 0077 — SEC-HARDENING-2 (tier 1; provisional number, renumbered on rebase by tools/renumber-migration.mjs) + B-LIFETIME-2 BL2-F1/F2.
 -- SH2-F1 (R2 08 "Database isolation": SECURITY DEFINER functions require "minimal owner privileges"): the one justified definer,
 -- kauro.register_bank_payment_route (0046), moves from the migrator (which owns every kauro table) to the NOLOGIN role
 -- kauro_route_registrar, which holds only what the registration reads and writes:

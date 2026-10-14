@@ -158,17 +158,17 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // B16 L3 CMD042: the deletion request, its receipts, the DELETING/DELETED guards and the prevention guards KA087/KA088 (provisional number)
     "0071_b16_deletion.sql",
     // Payments V1 OWNER-OUTBOX-POLICY: the owner's agency-less outbox policies are SELECT and INSERT only (provisional number)
-    "0075_owner_outbox_policy.sql",
+    "0072_owner_outbox_policy.sql",
     // B10-CMD053-SETTLED-AT: a payout intent's settlement instant is one of its transaction's, read after the cash lock (provisional number)
-    "0076_payout_effect_instant.sql",
+    "0073_payout_effect_instant.sql",
     // B16 L4 CMD054/CMD055: the breakglass grants, their accesses and the policies a named grant reads under (KA089; provisional number)
-    "0071_b16_breakglass.sql",
+    "0074_b16_breakglass.sql",
     // B16 L5 CMD038: download authorizations, their KA094 guard and the package transition lock (provisional number)
-    "0074_b16_download_authorizations.sql",
+    "0075_b16_download_authorizations.sql",
     // B16 L6: the recovery gate every claim reads FOR SHARE, the restore run, its applied journal entries and observations (provisional number)
-    "0071_b16_recovery_gate.sql",
+    "0076_b16_recovery_gate.sql",
     // SEC-HARDENING-2 (SH2-F1/F2, BL2-F1/F2): the registrar owns the bank-route definer, no runtime role in another role (provisional number)
-    "0061_sec_hardening_2.sql",
+    "0077_sec_hardening_2.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

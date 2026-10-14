@@ -93,7 +93,7 @@ export const SQLSTATE = Object.freeze({
   B16_L4_BREAKGLASS_SCOPE_UNAUTHORIZED: "KA089",
   // L5 (CMD038, migration kauro.download_authorizations) raises KA094 from the top of the range down; L8 keeps one reserve at KA090
   B16_L8_RESERVE_A: "KA090",
-  // L6 (0071): a claim while a restore holds the recovery gate closed; a restore step out of its journal order or unreconciled
+  // L6 (0076): a claim while a restore holds the recovery gate closed; a restore step out of its journal order or unreconciled
   B16_L6_RECOVERY_GATE: "KA091",
   B16_L6_RESTORE_RECONCILIATION: "KA092",
   B16_L7_STAGE_RELEASE_A: "KA093",
@@ -193,7 +193,7 @@ const MAP: Readonly<Record<string, { code: FailureCode; reason?: FailureReason; 
   // B16 lane L4 (CMD054): a grant whose support case or incident does not justify its project now (another project or agency, closed,
   // resolved, a false positive, an incident not naming the project, a project on its way to deletion, a closed agency)
   KA089: { code: "PRECONDITION_FAILED", reason: "BREAKGLASS_SCOPE_UNAUTHORIZED" },
-  // package B16 L6 (0071): a claim refused while a restore holds the recovery gate closed is retried once the gate opens; a restore
+  // package B16 L6 (0076): a claim refused while a restore holds the recovery gate closed is retried once the gate opens; a restore
   // step the database refuses (out of journal order, a payment conflict, a release without its run) is unreconciled consequences
   KA091: { code: "CAPACITY_UNAVAILABLE", retryable: true },
   KA092: { code: "PRECONDITION_FAILED", reason: "CONSEQUENCES_UNRECONCILED" },
@@ -299,7 +299,7 @@ export const COMMERCIAL_UNIQUE_FAILURES: Readonly<Record<string, () => DomainFai
   prospects_one_live_per_organization: () => new DomainFailure("PRECONDITION_FAILED", "the organization already has a live prospect", { reason: "PROSPECT_EXISTS" }),
   attribution_claims_one_live_per_seller: () => new DomainFailure("PRECONDITION_FAILED", "the seller already has a live claim on the prospect", { reason: "CLAIM_EXISTS" }),
   attribution_allocations_one_per_agency: () => new DomainFailure("PRECONDITION_FAILED", "the agency already has a frozen attribution allocation", { reason: "ATTRIBUTION_EXISTS" }),
-  // CMD054 (migration 0071): two opens of one project race on its one live grant; a step-up proof opens one grant; one authorization opens
+  // CMD054 (migration 0074): two opens of one project race on its one live grant; a step-up proof opens one grant; one authorization opens
   // one grant of a project — after its expiry a new justified grant is required (R2-050)
   breakglass_grants_one_live_per_project: () => new DomainFailure("PRECONDITION_FAILED", "the project already holds a live breakglass grant", { reason: "BREAKGLASS_GRANT_LIVE" }),
   breakglass_grants_proof_once: () => new DomainFailure("PRECONDITION_FAILED", "the step-up proof already opened a breakglass grant", { reason: "BREAKGLASS_PROOF_REUSED" }),

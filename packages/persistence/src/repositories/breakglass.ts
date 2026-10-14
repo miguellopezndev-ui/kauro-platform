@@ -1,7 +1,7 @@
 /**
- * The breakglass records of package B16 lane L4 over `pg` (migration 0071; registry CMD054 OpenBreakglass, CMD055 RevokeBreakglass and the
+ * The breakglass records of package B16 lane L4 over `pg` (migration 0074; registry CMD054 OpenBreakglass, CMD055 RevokeBreakglass and the
  * breakglass preview). Every statement runs under the corporate owner's own request session (kauro_app, OPERATOR context): the policies of
- * 0071 decide what it reads. The scope a session names (kauro.breakglass_project_id, kauro.breakglass_grant_id) is transaction-local and
+ * 0074 decide what it reads. The scope a session names (kauro.breakglass_project_id, kauro.breakglass_grant_id) is transaction-local and
  * grants nothing by itself; every instant is the database's (opened_at, expires_at, revoked_at by trigger, judgments at effect_now()).
  *
  * Lock order (GAP-BG-1): the grant row is the one lock. A revocation takes it FOR NO KEY UPDATE, a read under the grant FOR SHARE in both of

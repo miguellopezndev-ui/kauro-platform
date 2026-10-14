@@ -143,7 +143,7 @@ export { operationsOf } from "./operations-recovery-access.js";
 export { PgOperationsRepository } from "./repositories/operations-recovery.js";
 export { breakglassOf } from "./breakglass-access.js";
 export { PgBreakglassRepository } from "./repositories/breakglass.js";
-// package B16 L6: the authority journal outside the restore boundary and the restore run's database side (migration 0071)
+// package B16 L6: the authority journal outside the restore boundary and the restore run's database side (migration 0076)
 export { PgAuthorityJournal, provisionAuthorityJournal, AUTHORITY_JOURNAL_SCHEMA, RECOVERY_JOURNAL_KINDS, RecoveryJournalConflict } from "./journal/pg-authority-journal.js";
 export type { RecoveryJournalKind, RecoveryJournalRecord, RecoveryJournalEntry, JournalTombstone } from "./journal/pg-authority-journal.js";
 export { PgRestoreOwnerStore, PgRestoreControl, PgRecoveryAuthority, PgJournalTail, restoreControlOf, recoveryAuthorityOf, journalTailOf } from "./journal/restore-store.js";
