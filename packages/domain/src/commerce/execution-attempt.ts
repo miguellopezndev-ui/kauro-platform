@@ -5,7 +5,7 @@
  * of the destination (the destination stays in its own row). Pure: no clock, no I/O.
  */
 export const OUTBOUND_ATTEMPT_AGGREGATE_KINDS = ["outbound_execution_attempt"] as const;
-export const OUTBOUND_ATTEMPT_EVENT_TYPES = ["outbound.declared.v1", "outbound.uncertain.v1", "outbound.recorded.v1", "outbound.not_executed.v1"] as const;
+export const OUTBOUND_ATTEMPT_EVENT_TYPES = ["outbound.declared.v1", "outbound.uncertain.v1", "outbound.recorded.v1", "outbound.not_executed.v1", "outbound.bounced.v1", "outbound.resent.v1"] as const;
 export type OutboundAttemptEventType = (typeof OUTBOUND_ATTEMPT_EVENT_TYPES)[number];
 
 export const OUTBOUND_ATTEMPT_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<OutboundAttemptEventType, ReadonlyArray<string>>> = Object.freeze({
@@ -14,6 +14,10 @@ export const OUTBOUND_ATTEMPT_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<OutboundA
   "outbound.recorded.v1": ["attemptId", "kind", "state", "previousState", "sourceKind", "sourceId", "refundId", "treasuryRefundId", "evidenceHash", "destinationProof"],
   // X3 NOT_EXECUTED: the owner attests no effect under NX-LAG, NX-COVERAGE and NX-NO-POTENTIAL
   "outbound.not_executed.v1": ["attemptId", "kind", "state", "previousState", "sourceKind", "sourceId", "refundId", "treasuryRefundId"],
+  // G3 RecordReturnBounce: the recorded transfer's money came back (B cents); the attempt stays RECORDED, its version moves
+  "outbound.bounced.v1": ["attemptId", "kind", "state", "sourceKind", "sourceId", "refundId", "treasuryRefundId", "bounceId", "bouncedCents", "evidenceHash"],
+  // G4 of a RESEND attempt (instead of outbound.recorded.v1): the resend recorded, the REFUND_PAYABLE of its bounce settled by amountCents
+  "outbound.resent.v1": ["attemptId", "kind", "state", "previousState", "sourceKind", "sourceId", "refundId", "treasuryRefundId", "parentBounceId", "amountCents", "evidenceHash", "destinationProof"],
 });
 
 /** The owner learns of every attempt change (no account data in any of them). */

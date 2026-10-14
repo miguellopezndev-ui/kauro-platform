@@ -81,6 +81,8 @@ export interface ExecutionAttemptRow {
   readonly bankCreditId: string | null;
   readonly treasuryRefundId: string | null;
   readonly sourceId: string;
+  /** RESEND: the bounce whose payable it re-sends; RETURN: null. */
+  readonly parentBounceId: string | null;
   readonly attemptNumber: number;
   readonly reference: string;
   readonly amountCents: bigint;
@@ -108,6 +110,7 @@ export interface NewExecutionAttempt {
   readonly refundId: string | null;
   readonly bankCreditId: string | null;
   readonly treasuryRefundId: string | null;
+  readonly parentBounceId?: string | null;
   readonly attemptNumber: number;
   readonly reference: string;
   readonly amountCents: bigint;
@@ -117,6 +120,14 @@ export interface NewExecutionAttempt {
   readonly keyId: string;
   readonly keyVersion: number;
   readonly normVersion: string;
+}
+
+/** The bounce of a RECORDED transfer (G3): once per transfer; its cents are the REFUND_PAYABLE its resends settle. */
+export interface ReturnBounceRow {
+  readonly bounceId: string;
+  readonly attemptId: string;
+  readonly bouncedCents: bigint;
+  readonly evidenceHash: string;
 }
 
 export interface ExecutionOfferRow {
@@ -180,6 +191,7 @@ interface AttemptDbRow {
   bank_credit_id: string | null;
   treasury_refund_id: string | null;
   source_id: string;
+  parent_bounce_id: string | null;
   attempt_number: number;
   reference: string;
   amount_cents: string;
@@ -196,7 +208,7 @@ interface AttemptDbRow {
   recorded_at: Date | null;
 }
 const ATTEMPT_COLUMNS =
-  "attempt_id, environment, account_ref, kind, state, version, source_kind, agency_id, capture_id, refund_id, bank_credit_id, treasury_refund_id, source_id, attempt_number, reference, amount_cents::text AS amount_cents, currency, declared_at, declared_by, destination_fingerprint, fingerprint_key_id, fingerprint_key_version, fingerprint_norm_version, bank_execution_id, destination_proof, evidence_hash, recorded_at";
+  "attempt_id, environment, account_ref, kind, state, version, source_kind, agency_id, capture_id, refund_id, bank_credit_id, treasury_refund_id, source_id, parent_bounce_id, attempt_number, reference, amount_cents::text AS amount_cents, currency, declared_at, declared_by, destination_fingerprint, fingerprint_key_id, fingerprint_key_version, fingerprint_norm_version, bank_execution_id, destination_proof, evidence_hash, recorded_at";
 
 function attemptOf(r: AttemptDbRow): ExecutionAttemptRow {
   return {
@@ -213,6 +225,7 @@ function attemptOf(r: AttemptDbRow): ExecutionAttemptRow {
     bankCreditId: r.bank_credit_id,
     treasuryRefundId: r.treasury_refund_id,
     sourceId: r.source_id,
+    parentBounceId: r.parent_bounce_id,
     attemptNumber: int(r.attempt_number),
     reference: r.reference,
     amountCents: BigInt(r.amount_cents),
@@ -389,10 +402,10 @@ export class PgBankRefunds {
     const r = await execute<AttemptDbRow>(
       this.db,
       `INSERT INTO kauro.outbound_execution_attempts (attempt_id, environment, account_ref, kind, source_kind, agency_id, capture_id, refund_id, bank_credit_id, treasury_refund_id,
-         attempt_number, reference, amount_cents, currency, declared_at, declared_by, destination_fingerprint, fingerprint_key_id, fingerprint_key_version, fingerprint_norm_version)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'USD', $14, $15, $16, $17, $18, $19)
+         attempt_number, reference, amount_cents, currency, declared_at, declared_by, destination_fingerprint, fingerprint_key_id, fingerprint_key_version, fingerprint_norm_version, parent_bounce_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'USD', $14, $15, $16, $17, $18, $19, $20)
        RETURNING ${ATTEMPT_COLUMNS}`,
-      [a.attemptId, a.environment, a.accountRef, a.kind, a.sourceKind, a.agencyId, a.captureId, a.refundId, a.bankCreditId, a.treasuryRefundId, a.attemptNumber, a.reference, a.amountCents, a.declaredAt, a.declaredBy, a.destinationFingerprint, a.keyId, a.keyVersion, a.normVersion],
+      [a.attemptId, a.environment, a.accountRef, a.kind, a.sourceKind, a.agencyId, a.captureId, a.refundId, a.bankCreditId, a.treasuryRefundId, a.attemptNumber, a.reference, a.amountCents, a.declaredAt, a.declaredBy, a.destinationFingerprint, a.keyId, a.keyVersion, a.normVersion, a.parentBounceId ?? null],
     );
     return attemptOf(r.rows[0]!);
   }
@@ -405,6 +418,56 @@ export class PgBankRefunds {
         WHERE attempt_id = $1 AND version = $2 AND state IN ('DECLARED', 'UNCERTAIN')
         RETURNING ${ATTEMPT_COLUMNS}`,
       [attemptId, expectedVersion, record.bankExecutionId, record.proof, record.evidenceHash, record.recordedAt],
+    );
+    return r.rows[0] ? attemptOf(r.rows[0]) : null;
+  }
+
+  /** The bounce of a RECORDED transfer, if G3 recorded one. */
+  async bounceOf(attemptId: string): Promise<ReturnBounceRow | null> {
+    const r = await execute<{ bounce_id: string; attempt_id: string; bounced_cents: string; evidence_hash: string }>(
+      this.db,
+      "SELECT bounce_id, attempt_id, bounced_cents::text AS bounced_cents, evidence_hash FROM kauro.outbound_return_bounces WHERE attempt_id = $1",
+      [attemptId],
+    );
+    const b = r.rows[0];
+    return b ? { bounceId: b.bounce_id, attemptId: b.attempt_id, bouncedCents: BigInt(b.bounced_cents), evidenceHash: b.evidence_hash } : null;
+  }
+
+  async bounceById(bounceId: string): Promise<ReturnBounceRow | null> {
+    const r = await execute<{ bounce_id: string; attempt_id: string; bounced_cents: string; evidence_hash: string }>(
+      this.db,
+      "SELECT bounce_id, attempt_id, bounced_cents::text AS bounced_cents, evidence_hash FROM kauro.outbound_return_bounces WHERE bounce_id = $1",
+      [bounceId],
+    );
+    const b = r.rows[0];
+    return b ? { bounceId: b.bounce_id, attemptId: b.attempt_id, bouncedCents: BigInt(b.bounced_cents), evidenceHash: b.evidence_hash } : null;
+  }
+
+  async insertBounce(b: { readonly bounceId: string; readonly attempt: ExecutionAttemptRow; readonly bouncedCents: bigint; readonly evidenceHash: string; readonly recordedBy: string }): Promise<void> {
+    await execute(
+      this.db,
+      "INSERT INTO kauro.outbound_return_bounces (bounce_id, attempt_id, environment, account_ref, source_kind, source_id, bounced_cents, evidence_hash, recorded_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+      [b.bounceId, b.attempt.attemptId, b.attempt.environment, b.attempt.accountRef, b.attempt.sourceKind, b.attempt.sourceId, b.bouncedCents, b.evidenceHash, b.recordedBy],
+    );
+  }
+
+  /** The open REFUND_PAYABLE of a bounce: its cents less the RESEND attempts of it that are RECORDED or still open. */
+  async bouncePayable(bounceId: string): Promise<bigint> {
+    const r = await execute<{ o: string }>(
+      this.db,
+      `SELECT (b.bounced_cents - coalesce((SELECT sum(a.amount_cents) FROM kauro.outbound_execution_attempts a WHERE a.parent_bounce_id = b.bounce_id AND a.state IN ('DECLARED', 'UNCERTAIN', 'RECORDED')), 0))::text AS o
+         FROM kauro.outbound_return_bounces b WHERE b.bounce_id = $1`,
+      [bounceId],
+    );
+    return r.rows[0] ? BigInt(r.rows[0].o) : 0n;
+  }
+
+  /** G3: the RECORDED attempt's version moves (its event is the bounce's); null when the row moved meanwhile. */
+  async bounceAttempt(attemptId: string, expectedVersion: number): Promise<ExecutionAttemptRow | null> {
+    const r = await execute<AttemptDbRow>(
+      this.db,
+      `UPDATE kauro.outbound_execution_attempts SET version = version + 1, updated_at = now() WHERE attempt_id = $1 AND version = $2 AND state = 'RECORDED' RETURNING ${ATTEMPT_COLUMNS}`,
+      [attemptId, expectedVersion],
     );
     return r.rows[0] ? attemptOf(r.rows[0]) : null;
   }

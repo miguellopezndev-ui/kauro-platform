@@ -9,5 +9,5 @@ export type { EnterBankCreditBody, ConfirmBankCreditBody, AttributeBankCreditBod
 export { BANK_INBOUND_COMMAND_IDS, bankCreditView, createBankInboundHandlers, publishCreditEvent, publishOrderStateEvent } from "./inbound.js";
 export type { ApproveTreasuryRefundBody, TreasuryRefundView, OwnerRefundDependencies, RefundDestinationFields, RefundDestinationEvidenceFields } from "./approve-destination.js";
 export { BANK_REFUND_COMMAND_IDS, treasuryRefundAuthorizationHash } from "./approve-destination.js";
-export type { BankRefundHandlers, DeclareRefundExecutionBody, RecordExecutionBody, ExecutionAttemptView, DeclareExecutionView, RecordExecutionView, ResolveExecutionBody, ResolveExecutionView, ExecutionQueueItemView, ExecutionQueueView, ExecutionQueueRequest, RefundStateView } from "./execute-refund.js";
+export type { BankRefundHandlers, DeclareRefundExecutionBody, RecordExecutionBody, ExecutionAttemptView, DeclareExecutionView, RecordExecutionView, ResolveExecutionBody, ResolveExecutionView, RecordBounceBody, RecordBounceView, DeclareResendBody, ExecutionQueueItemView, ExecutionQueueView, ExecutionQueueRequest, RefundStateView } from "./execute-refund.js";
 export { createBankRefundHandlers, attemptView, publishAttemptEvent, publishTreasuryRefundEvent, EXECUTION_QUEUE_LIMIT } from "./execute-refund.js";

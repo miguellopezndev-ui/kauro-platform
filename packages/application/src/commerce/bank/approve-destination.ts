@@ -94,7 +94,7 @@ export interface TreasuryRefundView {
 }
 
 /** The lane's operational ids of the command journal (route-scope owner commands; not registry commands). */
-export const BANK_REFUND_COMMAND_IDS = Object.freeze({ approveTreasury: "CMD220", declareExecution: "CMD221", recordExecution: "CMD222", resolveExecution: "CMD223" } as const);
+export const BANK_REFUND_COMMAND_IDS = Object.freeze({ approveTreasury: "CMD220", declareExecution: "CMD221", recordExecution: "CMD222", resolveExecution: "CMD223", recordBounce: "CMD224", declareResend: "CMD225" } as const);
 
 /** What the owner refund commands run on: the request runtime (its clock), the payment service's units and identity, the bank collaborators. */
 export interface OwnerRefundDependencies {

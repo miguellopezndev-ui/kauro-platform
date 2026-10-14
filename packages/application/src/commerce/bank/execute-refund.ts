@@ -79,6 +79,20 @@ export interface ResolveExecutionView {
   readonly refund: RefundStateView | null;
   readonly offerId: string | null;
 }
+export interface RecordBounceBody {
+  readonly bouncedCents: string;
+  readonly evidence: { readonly artifactRef: string; readonly evidenceHash: string };
+  readonly authorizationRef: string;
+}
+export interface DeclareResendBody {
+  readonly amountCents: string;
+  readonly authorizationRef: string;
+}
+/** G3's answer: the bounced attempt (still RECORDED), the bounce's cents and the open REFUND_PAYABLE it leaves. */
+export interface RecordBounceView {
+  readonly attempt: ExecutionAttemptView;
+  readonly bounce: { readonly bounceId: string; readonly bouncedCents: string; readonly payableCents: string };
+}
 export interface RecordExecutionBody {
   readonly evidence: { readonly artifactRef: string; readonly evidenceHash: string };
   readonly authorizationRef: string;
@@ -132,6 +146,8 @@ export interface ExecutionQueueRequest {
 export interface BankRefundHandlers {
   approveTreasury(request: BankRouteRequest<ApproveTreasuryRefundBody>): Promise<CommandResult<TreasuryRefundView>>;
   declareExecution(request: BankRouteRequest<DeclareRefundExecutionBody>): Promise<CommandResult<DeclareExecutionView>>;
+  recordBounce(request: BankRouteRequest<RecordBounceBody>): Promise<CommandResult<RecordBounceView>>;
+  declareResend(request: BankRouteRequest<DeclareResendBody>): Promise<CommandResult<DeclareExecutionView>>;
   recordExecution(request: BankRouteRequest<RecordExecutionBody>): Promise<CommandResult<RecordExecutionView>>;
   resolveExecution(request: BankRouteRequest<ResolveExecutionBody>): Promise<CommandResult<ResolveExecutionView>>;
   executionQueue(request: ExecutionQueueRequest): Promise<{ readonly kind: "READ"; readonly view: ExecutionQueueView } | { readonly kind: "PROBLEM"; readonly problem: Problem }>;
@@ -258,7 +274,7 @@ async function answer<View>(uow: CommerceUnitOfWork, entryId: string, status: 20
 
 const withoutNulls = (payload: Readonly<Record<string, unknown>>): Record<string, unknown> => Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== null && v !== undefined));
 
-async function publishAttempt(uow: CommerceUnitOfWork, context: ServiceContext, causationId: CausationId, attempt: ExecutionAttemptRecord, eventType: "outbound.declared.v1" | "outbound.uncertain.v1" | "outbound.recorded.v1" | "outbound.not_executed.v1", payload: Readonly<Record<string, unknown>>): Promise<void> {
+async function publishAttempt(uow: CommerceUnitOfWork, context: ServiceContext, causationId: CausationId, attempt: ExecutionAttemptRecord, eventType: "outbound.declared.v1" | "outbound.uncertain.v1" | "outbound.recorded.v1" | "outbound.not_executed.v1" | "outbound.bounced.v1" | "outbound.resent.v1", payload: Readonly<Record<string, unknown>>): Promise<void> {
   await uow.events.publish({
     aggregateKind: "outbound_execution_attempt",
     aggregateId: attempt.attemptId as never,
@@ -424,6 +440,172 @@ function declareExecution(d: OwnerRefundDependencies, request: BankRouteRequest<
       return { kind: "COMPLETED", status: out.status, view, version: view.refund?.version ?? 1, replayed: true };
     }
     return { kind: "COMPLETED", status: 201, view: out.view, version: out.view.refund?.version ?? 1, replayed: false };
+  });
+}
+
+// --- G3 CMD224 RecordReturnBounce -----------------------------------------------------------------------------------------------------
+
+function recordBounce(d: OwnerRefundDependencies, request: BankRouteRequest<RecordBounceBody>): Promise<CommandResult<RecordBounceView>> {
+  const operation = BANK_REFUND_COMMAND_IDS.recordBounce;
+  const attemptId = request.path["attemptId"]!;
+  const userId = request.subject.identity.userId as UserId;
+  const body = request.body;
+  return ownerCommand<RecordBounceView>(d, operation, request.correlationId, async (context, adopt) => {
+    const { bank, payment, refunds } = partsOf(d);
+    const store = bank.evidence();
+    const classifier = bank.creditClassifier?.() ?? null;
+    if (store === null || classifier === null) throw evidenceUnavailable();
+    const journal = journalOf(operation, request);
+    const proofId = isUuid(body.authorizationRef) ? body.authorizationRef : null;
+    const bounced = BigInt(body.bouncedCents);
+    // the evidence is read outside any unit under the provider-call bound (a failed or late read is unknown, never permission)
+    const bound = bank.timer.start(PROVIDER_CALL_TIMEOUT_MS);
+    let read: StoredBankEvidence | null = null;
+    try {
+      const got = await Promise.race([store.get(body.evidence.artifactRef).then((evidence) => ({ evidence }), () => null), bound.elapsed.then(() => null)]);
+      read = got?.evidence ?? null;
+    } finally {
+      bound.cancel();
+    }
+    const expired = bound.expired?.() === true;
+    await bank.hold?.("bank:gate-read");
+    const out = await payment.run(context, async (uow): Promise<{ readonly view: RecordBounceView } | Replayed> => {
+      const repo = refunds(uow);
+      // 1. the attempt's scope, L1, the owner's authority, the journal
+      const seen = await repo.attempt(attemptId);
+      if (seen === null) throw new NotFoundFailure("execution attempt");
+      if (seen.sourceKind === "CAPTURE") {
+        if ((await uow.adoptScope("REFUND", seen.refundId as RefundId)) === null) throw new NotFoundFailure("execution attempt");
+        adopt(uow.commerceScope);
+      }
+      await repo.lockOutboundStream(seen.environment, seen.accountRef);
+      const verdict = await ownerAuthority(bank, uow, repo, userId, proofId);
+      const reservation = await reserve(uow, journal);
+      if (reservation instanceof Replayed) return reservation;
+      // 2. L2, then the attempt (L3)
+      await lockSource(repo, seen);
+      const attempt = await repo.lockAttempt(attemptId);
+      if (attempt === null) throw new NotFoundFailure("execution attempt");
+      if (attempt.state !== "RECORDED") throw precondition("ATTEMPT_NOT_RECORDED", "only a RECORDED transfer can bounce");
+      if ((await repo.bounceOf(attemptId)) !== null) throw precondition("BOUNCE_ALREADY_RECORDED", "the bounce of this transfer is already recorded");
+      // 3. the bytes actually read: the evidence of the same transfer coming back, B > 0 and B <= P
+      if (expired || read === null) throw evidenceUnavailable();
+      if (read.sha256 !== body.evidence.evidenceHash || rawDigest(read.bytes) !== read.sha256) throw precondition("HASH_MISMATCH", "the evidence is not the bytes the owner named");
+      if (read.accountRef !== attempt.accountRef || read.environment !== attempt.environment) throw precondition("UNKNOWN_EVIDENCE", "the evidence is of another account");
+      const classified = classifier.classifyOutbound(read);
+      if (classified.kind !== "CLASSIFIED") throw refusalOf(classified.code);
+      const x = classified.value;
+      if (x.accountRef !== attempt.accountRef || x.status !== "BOUNCED") throw precondition("UNKNOWN_EVIDENCE", "the evidence does not show the transfer coming back");
+      if (x.bankExecutionId !== attempt.bankExecutionId) throw precondition("EXECUTION_ID_INVALID", "the evidence is of another transfer");
+      if (bounced <= 0n || bounced > attempt.amountCents || x.returnedCents === null || x.returnedCents !== bounced || x.currency !== attempt.currency) {
+        throw precondition("EXECUTION_AMOUNT_MISMATCH", "the returned cents are not the bounced cents or exceed the transfer");
+      }
+      const destination = await repo.destinationOf(attempt.sourceKind, refundIdOf(attempt));
+      if (destination === null) throw new DomainFailure("INTEGRITY_FAILURE", "a recorded attempt without the destination it was declared to");
+      const at = await bank.effectNow(uow);
+      // no await between this instant and its judgment
+      if (!freshAt(verdict, at)) throw stepUpStale();
+      const causationId = reservation.entryId as string as CausationId;
+      // 4. the bounce row, the attempt's version, the event, the RETURN_BOUNCED case, the ALLOW fact, the journal's response
+      const bounceId = uow.ids.next() as string;
+      await repo.insertBounce({ bounceId, attempt, bouncedCents: bounced, evidenceHash: read.sha256, recordedBy: userId });
+      const moved = await repo.bounceAttempt(attempt.attemptId, attempt.version);
+      if (moved === null) throw new StaleVersionFailure(attempt.version, attempt.state);
+      await publishAttempt(uow, context, causationId, moved, "outbound.bounced.v1", { bounceId, bouncedCents: Number(bounced), evidenceHash: read.sha256 });
+      await repo.openCaseIfNone({ caseId: uow.ids.next() as string, kind: "RETURN_BOUNCED", environment: attempt.environment, accountRef: attempt.accountRef, attemptId: attempt.attemptId, sourceKind: attempt.sourceKind, sourceId: attempt.sourceId, detailCode: "RETURN_BOUNCED", evidenceHash: read.sha256 });
+      await allowFact(uow, context, operation, at);
+      const view: RecordBounceView = { attempt: attemptView(moved, destination), bounce: { bounceId, bouncedCents: formatMoney(bounced), payableCents: formatMoney(await repo.bouncePayable(bounceId)) } };
+      return { view: await answer(uow, reservation.entryId, 200, view, "outbound_execution_attempt", moved.attemptId) };
+    });
+    const view = out.view as RecordBounceView;
+    return out instanceof Replayed ? { kind: "COMPLETED", status: out.status, view, version: 1, replayed: true } : { kind: "COMPLETED", status: 200, view, version: 1, replayed: false };
+  });
+}
+
+// --- X4 CMD225 DeclareResendExecution ---------------------------------------------------------------------------------------------------
+
+function declareResend(d: OwnerRefundDependencies, request: BankRouteRequest<DeclareResendBody>): Promise<CommandResult<DeclareExecutionView>> {
+  const operation = BANK_REFUND_COMMAND_IDS.declareResend;
+  const attemptId = request.path["attemptId"]!;
+  const userId = request.subject.identity.userId as UserId;
+  const body = request.body;
+  return ownerCommand<DeclareExecutionView>(d, operation, request.correlationId, async (context, adopt) => {
+    const { bank, payment, refunds } = partsOf(d);
+    const amount = BigInt(body.amountCents);
+    const journal = journalOf(operation, request);
+    const proofId = isUuid(body.authorizationRef) ? body.authorizationRef : null;
+    const out = await payment.run(context, async (uow): Promise<{ readonly view: DeclareExecutionView } | Replayed> => {
+      const repo = refunds(uow);
+      const c = uow.commerce;
+      // 1. the bounced attempt's scope, L1, the owner's authority, the journal
+      const seen = await repo.attempt(attemptId);
+      if (seen === null) throw new NotFoundFailure("execution attempt");
+      if (seen.sourceKind === "CAPTURE") {
+        if ((await uow.adoptScope("REFUND", seen.refundId as RefundId)) === null) throw new NotFoundFailure("execution attempt");
+        adopt(uow.commerceScope);
+      }
+      await repo.lockOutboundStream(seen.environment, seen.accountRef);
+      const verdict = await ownerAuthority(bank, uow, repo, userId, proofId);
+      const reservation = await reserve(uow, journal);
+      if (reservation instanceof Replayed) return reservation;
+      // 2. L2, then the bounced attempt (L3)
+      await lockSource(repo, seen);
+      const attempt = await repo.lockAttempt(attemptId);
+      if (attempt === null) throw new NotFoundFailure("execution attempt");
+      await bank.hold?.("bank:declare-locked");
+      // 3. NEVER-RESEND first: an open attempt of the source refuses whatever else the request says
+      if ((await repo.openAttemptOf(attempt.sourceKind, attempt.sourceId)) !== null) throw precondition("EXECUTION_ATTEMPT_OPEN", "an execution attempt of this source is DECLARED or UNCERTAIN");
+      // 4. a recorded bounce with an open payable, the amount within it
+      const bounce = attempt.state === "RECORDED" ? await repo.bounceOf(attempt.attemptId) : null;
+      const payable = bounce === null ? 0n : await repo.bouncePayable(bounce.bounceId);
+      if (bounce === null || payable <= 0n) throw precondition("NO_RECORDED_BOUNCE", "no recorded bounce of this transfer has an open payable");
+      if (amount <= 0n || amount > payable) throw precondition("RESEND_EXCEEDS_PAYABLE", "the resend exceeds the open payable of its bounce");
+      const refundId = refundIdOf(attempt);
+      const destination = await repo.destinationOf(attempt.sourceKind, refundId);
+      if (destination === null) throw precondition("DESTINATION_NOT_CAPTURED", "the refund was approved without its destination captured");
+      const attemptNumber = await repo.nextAttemptNumber(attempt.sourceKind, attempt.sourceId);
+      const at = await bank.effectNow(uow);
+      // no await between this instant and its judgment
+      if (!freshAt(verdict, at)) throw stepUpStale();
+      const causationId = reservation.entryId as string as CausationId;
+      // 5. the DECLARED RESEND attempt, its event, the ALLOW fact, the journal's response (the refund stays as it is)
+      const resend = await repo.insertAttempt({
+        attemptId: uow.ids.next() as string,
+        environment: attempt.environment,
+        accountRef: attempt.accountRef,
+        kind: "RESEND",
+        sourceKind: attempt.sourceKind,
+        agencyId: attempt.agencyId,
+        captureId: attempt.captureId,
+        refundId: attempt.refundId,
+        bankCreditId: attempt.bankCreditId,
+        treasuryRefundId: attempt.treasuryRefundId,
+        parentBounceId: bounce.bounceId,
+        attemptNumber,
+        reference: outboundReference(refundId, attemptNumber),
+        amountCents: amount,
+        declaredAt: at,
+        declaredBy: userId,
+        destinationFingerprint: destination.fingerprint,
+        keyId: destination.keyId,
+        keyVersion: destination.keyVersion,
+        normVersion: destination.normVersion,
+      });
+      await publishAttempt(uow, context, causationId, resend, "outbound.declared.v1", { attemptNumber: resend.attemptNumber, amountCents: Number(resend.amountCents), declaredAt: resend.declaredAt, destinationFingerprint: resend.destinationFingerprint });
+      await allowFact(uow, context, operation, at);
+      let refund: RefundStateView | null;
+      if (attempt.sourceKind === "CAPTURE") {
+        const r = await c.refunds.get(attempt.refundId as RefundId);
+        refund = r === null ? null : { state: r.state, version: r.version };
+      } else {
+        const t = await repo.treasuryRefund(attempt.treasuryRefundId!);
+        refund = t === null ? null : { state: t.state, version: t.version };
+      }
+      const view: DeclareExecutionView = { attempt: attemptView(resend, destination), refund };
+      return { view: await answer(uow, reservation.entryId, 201, view, "outbound_execution_attempt", resend.attemptId) };
+    });
+    const view = out.view as DeclareExecutionView;
+    return out instanceof Replayed ? { kind: "COMPLETED", status: out.status, view, version: view.refund?.version ?? 1, replayed: true } : { kind: "COMPLETED", status: 201, view, version: view.refund?.version ?? 1, replayed: false };
   });
 }
 
@@ -621,7 +803,12 @@ function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<R
       await repo.insertOutcome({ outcomeId: uow.ids.next() as string, offerId: theOffer.offerId, gateOutcome: "CLASSIFIED", bankExecutionId: executionId, outcomeCode: "RECORDED", footprint: "RECORDED", reviewCaseKind: null });
       const recorded = await repo.recordAttempt(attempt.attemptId, attempt.version, { bankExecutionId: executionId, proof: judged.proof, evidenceHash, recordedAt: at });
       if (recorded === null) throw new StaleVersionFailure(attempt.version, attempt.state);
-      await publishAttempt(uow, context, causationId, recorded, "outbound.recorded.v1", { previousState: attempt.state, evidenceHash, destinationProof: judged.proof });
+      if (recorded.kind === "RESEND") {
+        // G4: the resend recorded settles the REFUND_PAYABLE of its bounce (its amount was held by the declaration); the case closes with the last cent
+        await publishAttempt(uow, context, causationId, recorded, "outbound.resent.v1", { previousState: attempt.state, parentBounceId: recorded.parentBounceId, amountCents: Number(recorded.amountCents), evidenceHash, destinationProof: judged.proof });
+        const parent = recorded.parentBounceId === null ? null : await repo.bounceById(recorded.parentBounceId);
+        if (parent !== null && (await repo.bouncePayable(parent.bounceId)) === 0n) await repo.resolveOpenCases("RETURN_BOUNCED", parent.attemptId, at);
+      } else await publishAttempt(uow, context, causationId, recorded, "outbound.recorded.v1", { previousState: attempt.state, evidenceHash, destinationProof: judged.proof });
       let refundState: RefundStateView | null;
       if (refundRow !== null && refundRow !== undefined) {
         // CAPTURE RETURN: the refund COMPLETED citing the execution (KP014); a completion that leaves the capture no service basis revokes
@@ -811,6 +998,8 @@ export function createBankRefundHandlers(d: OwnerRefundDependencies): BankRefund
   return {
     approveTreasury: approveTreasuryHandler(d),
     declareExecution: (request) => declareExecution(d, request),
+    recordBounce: (request) => recordBounce(d, request),
+    declareResend: (request) => declareResend(d, request),
     recordExecution: (request) => recordExecution(d, request),
     resolveExecution: (request) => resolveExecution(d, request),
     executionQueue: (request) => executionQueue(d, request),

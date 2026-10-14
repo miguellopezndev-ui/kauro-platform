@@ -315,7 +315,7 @@ CREATE CONSTRAINT TRIGGER outbound_execution_attempts_event_per_version AFTER UP
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('outbound_execution_attempt', 'attempt_id');
 ALTER TABLE kauro.event_types NO FORCE ROW LEVEL SECURITY;
 INSERT INTO kauro.event_types (event_type) VALUES
-  ('outbound.declared.v1'), ('outbound.uncertain.v1'), ('outbound.recorded.v1'), ('outbound.not_executed.v1'),
+  ('outbound.declared.v1'), ('outbound.uncertain.v1'), ('outbound.recorded.v1'), ('outbound.not_executed.v1'), ('outbound.bounced.v1'), ('outbound.resent.v1'),
   ('treasury_refund.submitting.v1'), ('treasury_refund.uncertain.v1'), ('treasury_refund.completed.v1'), ('treasury_refund.failed.v1')
   ON CONFLICT DO NOTHING;
 ALTER TABLE kauro.event_types FORCE ROW LEVEL SECURITY;
@@ -378,3 +378,66 @@ $$;
 DROP TRIGGER IF EXISTS treasury_refunds_completion_evidence ON kauro.treasury_refunds;
 CREATE TRIGGER treasury_refunds_completion_evidence BEFORE UPDATE OF state ON kauro.treasury_refunds
   FOR EACH ROW WHEN (NEW.state = 'COMPLETED' AND OLD.state IS DISTINCT FROM 'COMPLETED') EXECUTE FUNCTION kauro.treasury_refunds_completion_evidence();
+
+-- =====================================================================================================================================
+-- Slice 3: G3 RecordReturnBounce and X4 DeclareResendExecution (docs/design/ACH-ROUTE.md r12 §7.21-§7.22, DV1-08). A recorded transfer whose
+-- money came back has one bounce row (once per transfer); the REFUND_PAYABLE O of a bounce is its cents less the RESEND attempts that are
+-- RECORDED or still open. A RESEND attempt names its bounce (parent_bounce_id) and can never exceed it.
+-- =====================================================================================================================================
+
+-- --- 10. the bounce of a recorded transfer -----------------------------------------------------------------------------------------------
+CREATE TABLE kauro.outbound_return_bounces (
+  bounce_id            uuid PRIMARY KEY CHECK (kauro.is_uuid_v7(bounce_id)),
+  attempt_id           uuid NOT NULL UNIQUE,
+  environment          text NOT NULL CHECK (environment IN ('SANDBOX', 'LIVE')),
+  account_ref          text NOT NULL CHECK (kauro.is_provider_ref(account_ref)),
+  source_kind          text NOT NULL CHECK (source_kind IN ('CAPTURE', 'BANK_CREDIT')),
+  source_id            uuid NOT NULL,
+  bounced_cents        bigint NOT NULL CHECK (kauro.is_money(bounced_cents) AND bounced_cents > 0),
+  evidence_hash        text NOT NULL CHECK (kauro.is_sha256_hex(evidence_hash)),
+  recorded_by          uuid NOT NULL,
+  recorded_at          timestamptz NOT NULL DEFAULT kauro.server_now(),
+  CONSTRAINT outbound_return_bounces_attempt_fk FOREIGN KEY (attempt_id, source_kind, source_id)
+    REFERENCES kauro.outbound_execution_attempts (attempt_id, source_kind, source_id)
+);
+ALTER TABLE kauro.outbound_return_bounces ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kauro.outbound_return_bounces FORCE ROW LEVEL SECURITY;
+CREATE POLICY outbound_return_bounces_service ON kauro.outbound_return_bounces FOR ALL TO kauro_payment USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT ON kauro.outbound_return_bounces TO kauro_payment;
+DROP TRIGGER IF EXISTS outbound_return_bounces_append_only ON kauro.outbound_return_bounces;
+CREATE TRIGGER outbound_return_bounces_append_only BEFORE UPDATE OR DELETE ON kauro.outbound_return_bounces FOR EACH ROW EXECUTE FUNCTION kauro.forbid_change();
+-- a bounce belongs to a RECORDED attempt and never exceeds what that attempt sent (B <= P)
+CREATE OR REPLACE FUNCTION kauro.outbound_return_bounces_guard() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM kauro.outbound_execution_attempts a WHERE a.attempt_id = NEW.attempt_id AND a.state = 'RECORDED' AND NEW.bounced_cents <= a.amount_cents) THEN
+    RAISE EXCEPTION 'a bounce is recorded only for a RECORDED attempt and never above its amount (%)', NEW.attempt_id USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END
+$$;
+DROP TRIGGER IF EXISTS outbound_return_bounces_guard ON kauro.outbound_return_bounces;
+CREATE TRIGGER outbound_return_bounces_guard BEFORE INSERT ON kauro.outbound_return_bounces FOR EACH ROW EXECUTE FUNCTION kauro.outbound_return_bounces_guard();
+
+-- --- 11. a RESEND names its bounce and never exceeds it ------------------------------------------------------------------------------------
+ALTER TABLE kauro.outbound_execution_attempts DROP CONSTRAINT IF EXISTS outbound_attempts_parent_bounce_fk;
+ALTER TABLE kauro.outbound_execution_attempts ADD CONSTRAINT outbound_attempts_parent_bounce_fk FOREIGN KEY (parent_bounce_id) REFERENCES kauro.outbound_return_bounces (bounce_id);
+CREATE INDEX IF NOT EXISTS outbound_execution_attempts_by_bounce ON kauro.outbound_execution_attempts (parent_bounce_id) WHERE parent_bounce_id IS NOT NULL;
+CREATE OR REPLACE FUNCTION kauro.outbound_resend_ceiling() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  ceiling bigint;
+  spent bigint;
+BEGIN
+  SELECT b.bounced_cents INTO ceiling FROM kauro.outbound_return_bounces b WHERE b.bounce_id = NEW.parent_bounce_id;
+  SELECT coalesce(sum(a.amount_cents), 0) INTO spent FROM kauro.outbound_execution_attempts a WHERE a.parent_bounce_id = NEW.parent_bounce_id AND a.state IN ('DECLARED', 'UNCERTAIN', 'RECORDED');
+  IF ceiling IS NULL OR spent + NEW.amount_cents > ceiling THEN
+    RAISE EXCEPTION 'a resend never exceeds the open payable of its bounce (%)', NEW.parent_bounce_id USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END
+$$;
+DROP TRIGGER IF EXISTS outbound_resend_ceiling ON kauro.outbound_execution_attempts;
+CREATE TRIGGER outbound_resend_ceiling BEFORE INSERT ON kauro.outbound_execution_attempts FOR EACH ROW WHEN (NEW.kind = 'RESEND') EXECUTE FUNCTION kauro.outbound_resend_ceiling();

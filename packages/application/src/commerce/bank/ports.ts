@@ -147,6 +147,7 @@ export interface ExecutionAttemptRecord {
   readonly bankCreditId: string | null;
   readonly treasuryRefundId: string | null;
   readonly sourceId: string;
+  readonly parentBounceId: string | null;
   readonly attemptNumber: number;
   readonly reference: string;
   readonly amountCents: bigint;
@@ -174,6 +175,7 @@ export interface NewExecutionAttemptInput {
   readonly refundId: string | null;
   readonly bankCreditId: string | null;
   readonly treasuryRefundId: string | null;
+  readonly parentBounceId?: string | null;
   readonly attemptNumber: number;
   readonly reference: string;
   readonly amountCents: bigint;
@@ -183,6 +185,14 @@ export interface NewExecutionAttemptInput {
   readonly keyId: string;
   readonly keyVersion: number;
   readonly normVersion: string;
+}
+
+/** The bounce of a RECORDED transfer (G3): once per transfer; its cents are the REFUND_PAYABLE its resends settle. */
+export interface ReturnBounceRecord {
+  readonly bounceId: string;
+  readonly attemptId: string;
+  readonly bouncedCents: bigint;
+  readonly evidenceHash: string;
 }
 
 export type ExecutionOfferCommandName = "RECORD_RETURN" | "RECORD_RESEND" | "RESOLVE_EXECUTED";
@@ -265,6 +275,13 @@ export interface BankRefundRepository {
   transitionTreasuryRefund(treasuryRefundId: string, expectedVersion: number, state: "SUBMITTING" | "UNCERTAIN" | "COMPLETED" | "FAILED"): Promise<(TreasuryRefundRecord & { readonly previousState: TreasuryRefundRecord["state"] }) | null>;
   dueAttempts(at: UtcInstant, limit: number): Promise<ReadonlyArray<{ readonly attemptId: string; readonly sourceKind: "CAPTURE" | "BANK_CREDIT"; readonly refundId: string | null }>>;
   executionWindowMs(environment: string, accountRef: string): Promise<number | null>;
+  // slice 3 (G3 RecordReturnBounce, X4 DeclareResendExecution)
+  bounceOf(attemptId: string): Promise<ReturnBounceRecord | null>;
+  bounceById(bounceId: string): Promise<ReturnBounceRecord | null>;
+  insertBounce(b: { readonly bounceId: string; readonly attempt: ExecutionAttemptRecord; readonly bouncedCents: bigint; readonly evidenceHash: string; readonly recordedBy: string }): Promise<void>;
+  /** The open REFUND_PAYABLE of a bounce: its cents less the RESEND attempts of it RECORDED or still open. */
+  bouncePayable(bounceId: string): Promise<bigint>;
+  bounceAttempt(attemptId: string, expectedVersion: number): Promise<ExecutionAttemptRecord | null>;
   // X3 ResolveUncertainExecution (§7.22, DV1-10, DV1-11)
   notExecuteAttempt(attemptId: string, expectedVersion: number): Promise<ExecutionAttemptRecord | null>;
   anyOfferFor(attemptId: string): Promise<boolean>;

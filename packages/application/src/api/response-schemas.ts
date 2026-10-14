@@ -1115,6 +1115,12 @@ const executionEnvelope = (data: JsonSchema): JsonSchema =>
 export const DECLARE_EXECUTION_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(closedObject(["attempt", "refund"], { attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA, refund: REFUND_STATE_VIEW_SCHEMA }));
 export const RECORD_EXECUTION_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(closedObject(["attempt", "refund", "offerId"], { attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA, refund: REFUND_STATE_VIEW_SCHEMA, offerId: BANK_UUID }));
 export const RESOLVE_EXECUTION_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(closedObject(["attempt", "refund", "offerId"], { attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA, refund: REFUND_STATE_VIEW_SCHEMA, offerId: { type: ["string", "null"], pattern: BANK_UUID.pattern } }));
+export const RECORD_BOUNCE_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(
+  closedObject(["attempt", "bounce"], {
+    attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA,
+    bounce: closedObject(["bounceId", "bouncedCents", "payableCents"], { bounceId: BANK_UUID, bouncedCents: BANK_MONEY, payableCents: BANK_MONEY }),
+  }),
+);
 export const EXECUTION_QUEUE_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], {
   data: closedObject(["items"], {
     items: {
@@ -1181,6 +1187,24 @@ export const BANK_REFUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = O
     authority: "ACH-ROUTE r12 §7.22 (X3), D-24 A; " + OWNER_REFUND_AUTHORITY,
     request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["outcome", "authorizationRef"], { outcome: { type: "string", enum: ["EXECUTED", "NOT_EXECUTED"] }, evidence: BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA, authorizationRef: BANK_UUID }) }),
     responses: Object.freeze({ "200": Object.freeze({ description: "The resolved attempt, the refund after it and the offer of this key (null for NOT_EXECUTED) (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: RESOLVE_EXECUTION_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "recordReturnBounce",
+    method: "POST" as const,
+    path: "/api/v1/operations/execution-attempts/{attemptId}/bounces",
+    summary: "Record that the money of a RECORDED transfer came back (once per transfer, B at most the transfer): the bounce row, its RETURN_BOUNCED case and the open payable a resend may re-send",
+    authority: "ACH-ROUTE r12 §7.22 (G3), DV1-08; " + OWNER_REFUND_AUTHORITY,
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["bouncedCents", "evidence", "authorizationRef"], { bouncedCents: BANK_MONEY, evidence: BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA, authorizationRef: BANK_UUID }) }),
+    responses: Object.freeze({ "200": Object.freeze({ description: "The bounced attempt (still RECORDED) and the bounce with the open payable it leaves (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: RECORD_BOUNCE_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "declareResendExecution",
+    method: "POST" as const,
+    path: "/api/v1/operations/execution-attempts/{attemptId}/resend-declarations",
+    summary: "Declare the re-send of a bounced transfer's open payable: one DECLARED RESEND attempt with its reference (NEVER-RESEND: refused while an attempt of the source is DECLARED or UNCERTAIN); the refund stays COMPLETED",
+    authority: "ACH-ROUTE r12 §7.21 (X4), DV1-08, D-24 A; " + OWNER_REFUND_AUTHORITY,
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["amountCents", "authorizationRef"], { amountCents: BANK_MONEY, authorizationRef: BANK_UUID }) }),
+    responses: Object.freeze({ "201": Object.freeze({ description: "The DECLARED RESEND attempt and the refund as it stands (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: DECLARE_EXECUTION_RESPONSE_SCHEMA }) }),
   }),
   Object.freeze({
     operationId: "listExecutionAttempts",
