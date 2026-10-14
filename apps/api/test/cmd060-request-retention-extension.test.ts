@@ -759,3 +759,150 @@ test("DENY (forged): a request session moving soft_deadline without an extension
   assert.ok(controlCode === "KA004" || controlCode === "KA085", `the control path is refused too (${String(controlCode)})`);
   assert.equal(JSON.stringify(await recordOf(g.retentionId)), before);
 });
+
+// --- R2-125: an extension against a deletion (CMD042) of the same project, and against a record already in deletion --------------------
+// The oracle is the specification: R2-125 "One valid transaction wins; a later extension cannot undo committed deletion authority", and the
+// handlers' own orders. CMD042 moves every ACTIVE or EXPIRED record of the project to DELETING under the project's exclusive transition lock;
+// CMD060 takes the project's shared transition lock, then the paid records, and extends only an ACTIVE one (RETENTION_EXPIRED otherwise).
+// CMD042 judges no retention deadline and no extension: a deletion the agency requests is never withheld by retention.
+
+/** CMD042 as the owner with a fresh step-up, at the project's current version. */
+async function requestDeletion(projectId: string, options: { readonly key?: string } = {}): Promise<Reply> {
+  const project = await pw.w.h.oracle.query<{ version: string }>("SELECT version::text AS version FROM kauro.projects WHERE project_id = $1", [projectId]);
+  assert.equal(project.rows.length, 1, "the project exists");
+  return call(pw.w, {
+    url: `/api/v1/projects/${projectId}/deletion-requests`,
+    token: pw.w.owner.token,
+    agency: pw.w.A.agencyId,
+    key: options.key ?? freshKey("cmd042"),
+    body: { expectedVersion: Number(project.rows[0]!.version), reasonCode: "AGENCY_REQUEST", assuranceProofRef: await pw.w.stepUp(pw.w.owner) },
+  });
+}
+
+/** The 200 of a deletion request (an assertion failure naming the reply otherwise). */
+function deletionGranted(reply: Reply): { readonly deletionId: string; readonly state: string; readonly projectState: string } {
+  assert.equal(reply.status, 200, `CMD042 answered ${answer(reply)}`);
+  return reply.json<{ data: { deletionId: string; state: string; projectState: string } }>().data;
+}
+
+async function projectStateOf(projectId: string): Promise<string> {
+  return (await pw.w.h.oracle.query<{ state: string }>("SELECT state FROM kauro.projects WHERE project_id = $1", [projectId])).rows[0]!.state;
+}
+
+async function recordStatesOf(projectId: string): Promise<ReadonlyArray<string>> {
+  return (await pw.w.h.oracle.query<{ class: string; state: string }>("SELECT class, state FROM kauro.retention_records WHERE project_id = $1 ORDER BY class", [projectId])).rows.map((r) => `${r.class}:${r.state}`);
+}
+
+test("R2-125: an extension and a deletion of one project, both orders — the deletion first (held at its COMMIT): the extension waits at the project's transition lock and is refused RETENTION_EXPIRED, nothing written; the extension first (held at its COMMIT): the deletion waits and then completes, the record DELETING with the extended soft deadline kept; a later extension never revives access", async () => {
+  // order 1: the deletion holds its writes (project DELETION_REQUESTED, records DELETING; before its journal commit); the extension, which could
+  // read the project OPEN and the record ACTIVE a moment ago, waits at the project's transition lock; the deletion commits; the extension
+  // re-reads the records after the lock and finds none ACTIVE
+  {
+    const g = await published("r2-125-deletion-first");
+    const soft = usOf(g.record.soft_us);
+    const version = Number(g.record.version);
+    const hold = pw.w.holds.arm("journal.commit");
+    const deletion = requestDeletion(g.projectId);
+    let extension: Promise<Reply> | null = null;
+    try {
+      await reached(hold, deletion, "the deletion request");
+      extension = extend(g.projectId, { expectedVersion: version, requestedSeconds: 3_600 });
+      await waitsOn(extension, "await_transition('kauro.projects'", "the extension");
+    } finally {
+      release(hold, "journal.commit");
+    }
+    const asked = deletionGranted(await deletion);
+    assert.deepEqual([asked.state, asked.projectState], ["REQUESTED", "DELETION_REQUESTED"], "the deletion committed first");
+    assert.equal(answer(await extension!), "409 PRECONDITION_FAILED RETENTION_EXPIRED", "the extension that lost the race is refused: the record is no longer ACTIVE");
+    const row = await recordOf(g.retentionId);
+    assert.deepEqual([row.state, row.version, row.soft_us, row.effective_us], ["DELETING", String(version + 1), String(soft), String(soft)], "the record is DELETING at the deletion's version, its soft deadline untouched");
+    assert.equal(await extensionsOf(g.projectId), 0, "no extension row");
+    assert.equal((await eventsOf(g.retentionId)).filter((e) => e.event_type === "retention_record.extended.v1").length, 0, "no retention_record.extended.v1");
+    assert.equal(await projectStateOf(g.projectId), "DELETION_REQUESTED", "the deletion authority stands");
+    // a later extension, with the record's committed version, is the same refusal: it cannot undo the committed deletion
+    const before = await footprint(g);
+    assert.equal(answer(await extend(g.projectId, { expectedVersion: version + 1, requestedSeconds: 3_600 })), "409 PRECONDITION_FAILED RETENTION_EXPIRED");
+    assert.deepEqual(await footprint(g), before, "a later extension writes nothing");
+  }
+
+  // order 2: the extension holds its writes (record extended, extension row, event; before its journal commit); the deletion waits at the
+  // project's exclusive transition behind the extension's shared one; the extension commits; the deletion then completes and takes the
+  // extended record to DELETING: R2 gives a retention extension no power over the agency's own deletion
+  {
+    const g = await published("r2-125-extension-first");
+    const soft = usOf(g.record.soft_us);
+    const version = Number(g.record.version);
+    const hold = pw.w.holds.arm("journal.commit");
+    const extension = extend(g.projectId, { expectedVersion: version, requestedSeconds: 3_600 });
+    let deletion: Promise<Reply> | null = null;
+    try {
+      await reached(hold, extension, "the extension");
+      deletion = requestDeletion(g.projectId);
+      await waitsOn(deletion, "UPDATE kauro.projects SET state", "the deletion request");
+    } finally {
+      release(hold, "journal.commit");
+    }
+    const ext = granted(await extension).data;
+    assert.equal(Date.parse(ext.softDeadline), msOf(soft + HOUR_US), "the extension committed first, one hour past the soft deadline");
+    const asked = deletionGranted(await deletion!);
+    assert.deepEqual([asked.state, asked.projectState], ["REQUESTED", "DELETION_REQUESTED"], "the deletion waited, then committed");
+    const row = await recordOf(g.retentionId);
+    assert.deepEqual([row.state, row.version, row.soft_us, row.effective_us], ["DELETING", String(version + 2), String(soft + HOUR_US), String(soft + HOUR_US)], "the record is DELETING two versions on, the extended soft deadline kept (not reverted)");
+    assert.equal(await extensionsOf(g.projectId), 1, "the extension stays recorded");
+    assert.deepEqual((await eventsOf(g.retentionId)).map((e) => e.event_type).slice(-2), ["retention_record.extended.v1", "retention_record.deleting.v1"], "the extension, then the deletion");
+    assert.deepEqual(await recordStatesOf(g.projectId), ["PAID_ORDINARY:DELETING", "UNPAID:DELETING"], "every record of the project is DELETING");
+    assert.equal(await projectStateOf(g.projectId), "DELETION_REQUESTED");
+    // the one extension is spent and the record is in deletion: a second one is refused for the record, nothing written
+    const before = await footprint(g);
+    assert.equal(answer(await extend(g.projectId, { expectedVersion: version + 2, requestedSeconds: 3_600 })), "409 PRECONDITION_FAILED RETENTION_EXPIRED");
+    assert.deepEqual(await footprint(g), before, "nothing written");
+  }
+});
+
+test("CMD060-DENY (deletion): an extension against a record already DELETING, DELETED_WITH_RESIDUALS or DELETED is refused RETENTION_EXPIRED with nothing written, and the request role cannot write the extension row of a record in deletion", async () => {
+  const g = await published("cmd060-deny-deletion");
+  const soft = usOf(g.record.soft_us);
+  const version = Number(g.record.version);
+  deletionGranted(await requestDeletion(g.projectId));
+  const states: Array<"DELETING" | "DELETED_WITH_RESIDUALS" | "DELETED"> = ["DELETING", "DELETED_WITH_RESIDUALS", "DELETED"];
+  let at = version + 1;
+  for (const state of states) {
+    if (state !== "DELETING") {
+      // the executor's close (apps/control b16-deletion-executor.test.ts runs the real one): the superuser places the state with triggers off
+      const c = pw.w.h.oracle;
+      try {
+        await c.query("SET session_replication_role = replica");
+        const r = await c.query("UPDATE kauro.retention_records SET state = $2, version = version + 1 WHERE project_id = $1 AND state IN ('DELETING', 'DELETED_WITH_RESIDUALS')", [g.projectId, state]);
+        assert.equal(r.rowCount, 2, "both records of the project close");
+      } finally {
+        await c.query("RESET session_replication_role");
+      }
+      at += 1;
+    }
+    const row = await recordOf(g.retentionId);
+    assert.deepEqual([row.state, row.version, row.soft_us], [state, String(at), String(soft)], `the record is ${state} at version ${at}`);
+    const before = await footprint(g);
+    assert.equal(answer(await extend(g.projectId, { expectedVersion: at, requestedSeconds: 3_600 })), "409 PRECONDITION_FAILED RETENTION_EXPIRED", `an extension against a ${state} record`);
+    assert.deepEqual(await footprint(g), before, `against ${state}: no extension row, no event, no clock change`);
+    assert.equal(await extensionsOf(g.projectId), 0);
+  }
+  // below the handler: the database refuses the request role's extension row for a record that is not ACTIVE (RLS), whatever the route says
+  const forged = await ownerTx();
+  let code: unknown = "NONE";
+  try {
+    await forged.query(
+      `INSERT INTO kauro.retention_extensions (extension_id, agency_id, project_id, retention_id, requested_seconds, granted_seconds, previous_soft_deadline, soft_deadline, hard_deadline, capped_at_hard_deadline, purpose, terms_version, requested_by_membership_id, requested_by_user_id, created_at)
+       SELECT $1, r.agency_id, r.project_id, r.retention_id, 3600, 3600, r.soft_deadline, r.soft_deadline + interval '3600 seconds', r.hard_deadline, false, 'CLIENT_REVIEW', $2, m.membership_id, m.user_id, kauro.server_now()
+         FROM kauro.retention_records r, kauro.memberships m
+        WHERE r.retention_id = $3 AND m.agency_id = r.agency_id AND m.user_id = $4`,
+      [ids.next(), termsVersion, g.retentionId, pw.w.owner.userId],
+    );
+  } catch (e) {
+    code = (e as { code?: unknown }).code;
+  } finally {
+    await end(forged, "ROLLBACK");
+  }
+  assert.equal(code, "42501", "the extension row of a record that is not ACTIVE violates the row-level policy of the request role");
+  assert.equal(await extensionsOf(g.projectId), 0);
+  assert.equal((await recordOf(g.retentionId)).soft_us, String(soft), "the soft deadline never moved");
+});

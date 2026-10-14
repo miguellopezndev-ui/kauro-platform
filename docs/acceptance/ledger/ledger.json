@@ -3145,7 +3145,7 @@
    "case": "R2-125",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -3469,7 +3469,7 @@
    "case": "CMD060-DENY",
    "package": "B16",
    "gate": "G-DELETE",
-   "claimed": "PARTIAL",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -4216,9 +4216,9 @@
    "title": "Security and restoration qualification",
    "cases": 61,
    "counts": {
-    "EXECUTED_LOCAL": 50,
-    "PARTIAL": 8,
-    "NOT_EXECUTED": 3
+    "EXECUTED_LOCAL": 52,
+    "PARTIAL": 7,
+    "NOT_EXECUTED": 2
    },
    "status": "IN_PROGRESS",
    "acceptedSubject": null,

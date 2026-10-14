@@ -3,7 +3,7 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B16-case-map.md",
-  "sha256": "9d5fd9a7f0669b919f3b8ee36b84fab6649c929f7b77ad1f1284ef0094425fb7"
+  "sha256": "7e0ae77aa98cd4cb0dec14e46ec78b882d5b5ac14463cdf5a9306f67cdafaf40"
  },
  "rows": [
   {
@@ -286,12 +286,17 @@
   },
   {
    "case": "R2-125",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: R2-125: an extension and a deletion of one project, both orders — the deletion first (held at its COMMIT): the extension waits at the project's transition lock and is refused RETENTION_EXPIRED, nothing written; the extension first (held at its COMMIT): the deletion waits and then completes, the record DELETING with the extended soft deadline kept; a later extension never revives access",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: CMD060-DENY (deletion): an extension against a record already DELETING, DELETED_WITH_RESIDUALS or DELETED is refused RETENTION_EXPIRED with nothing written, and the request role cannot write the extension row of a record in deletion",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: CMD060-RACE: an extension held at the record lock against RETENTION expiry, both orders — first the sweeper's CAS misses and nothing expires, then the extension refuses RETENTION_EXPIRED; two extensions of one project: one 200, one 409 EXTENSION_ALREADY_USED or STALE_VERSION",
+    "apps/api/test/cmd042-request-deletion.test.ts :: RACE (expiry): RETENTION expiring a record of the project during the request, both orders — the request holding the records first: the sweeper's CAS misses and the record stays DELETING; the sweeper first: the request waits at the record lock and takes the listed EXPIRED -> DELETING edge"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-126",
@@ -710,19 +715,18 @@
   },
   {
    "case": "CMD060-DENY",
-   "class": "PARTIAL",
+   "class": "EXECUTED_LOCAL",
    "test": [
     "apps/api/test/cmd060-request-retention-extension.test.ts :: CMD060-DENY: a VIEWER or BILLING member, another agency, more than 259200 s, a stale version, an UNPAID-only project and no room before the hard cap are refused with nothing written; before the first package there is no soft deadline: NO_SOFT_DEADLINE, and a publication in flight makes the extension wait and answer STALE_VERSION",
     "apps/api/test/cmd060-request-retention-extension.test.ts :: R2-124: a second extension and one after expiry are refused; no clock, access or tombstone changes",
     "apps/api/test/cmd060-request-retention-extension.test.ts :: DENY (forged): a request session moving soft_deadline without an extension row is refused KA085",
-    "apps/api/test/cmd060-request-retention-extension.test.ts :: REVOCATION: a membership suspended before the extension is refused 403 MEMBERSHIP_SUSPENDED; one suspended in flight makes the extension wait on the authorizer and then refuses it, the record unchanged"
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: REVOCATION: a membership suspended before the extension is refused 403 MEMBERSHIP_SUSPENDED; one suspended in flight makes the extension wait on the authorizer and then refuses it, the record unchanged",
+    "apps/api/test/cmd060-request-retention-extension.test.ts :: CMD060-DENY (deletion): an extension against a record already DELETING, DELETED_WITH_RESIDUALS or DELETED is refused RETENTION_EXPIRED with nothing written, and the request role cannot write the extension row of a record in deletion"
    ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": [
-    "B16"
-   ],
-   "claimed": "OPEN -> L2 PARTIAL (PLANNED L2; target EXECUTED_LOCAL)"
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD060-RACE",

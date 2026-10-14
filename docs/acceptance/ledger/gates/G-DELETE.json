@@ -95,7 +95,7 @@
   {
    "case": "R2-125",
    "package": "B16",
-   "claimed": "NOT_EXECUTED",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
@@ -143,7 +143,7 @@
   {
    "case": "CMD060-DENY",
    "package": "B16",
-   "claimed": "PARTIAL",
+   "claimed": "EXECUTED_LOCAL",
    "demonstrated": null,
    "reviewId": null,
    "commit": null
