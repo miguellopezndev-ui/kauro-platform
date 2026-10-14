@@ -67,7 +67,7 @@ $$
        AND l.database = (SELECT d.oid FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database())
        AND l.classid::bigint = ((kauro.transition_key(kind, subject) >> 32) & 4294967295)
        AND l.objid::bigint = (kauro.transition_key(kind, subject) & 4294967295)
-       AND (l.mode = 'ExclusiveLock' OR (mode = 'S' AND l.mode = 'ShareLock'))
+       AND (l.mode = 'ExclusiveLock' OR (outreach_lock_held.mode = 'S' AND l.mode = 'ShareLock'))
   )
 $$;
 
@@ -448,6 +448,7 @@ BEGIN
     RETURN NEW;
   END IF;
   RAISE EXCEPTION 'SEND_FENCE: draft edge % is not listed (plan A2b)', e USING ERRCODE = 'KA096';
+  RETURN NEW;
 END
 $$;
 
@@ -536,7 +537,7 @@ BEGIN
   SELECT * INTO r FROM kauro.outreach_reviews WHERE review_id = NEW.review_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'OUTREACH_REVIEW_INVALID: no review row %', NEW.review_id USING ERRCODE = 'KC035';
-  END IF;
+  ELSE
   IF judged >= r.expires_at THEN
     RAISE EXCEPTION 'OUTREACH_REVIEW_INVALID: review % expired', NEW.review_id USING ERRCODE = 'KC035';
   END IF;
@@ -551,6 +552,7 @@ BEGIN
   END IF;
   IF NEW.sender_id IS DISTINCT FROM r.sender_id THEN
     RAISE EXCEPTION 'OUTREACH_BINDING: grant % names another sender than its review', NEW.authorization_id USING ERRCODE = 'KA095';
+  END IF;
   END IF;
   IF NEW.revoked THEN
     RAISE EXCEPTION 'OUTREACH_BINDING: grant % is born unrevoked', NEW.authorization_id USING ERRCODE = 'KA095';
@@ -651,8 +653,8 @@ CREATE TABLE kauro.outreach_send_intents (
   updated_at               timestamptz NOT NULL DEFAULT kauro.server_now(),
   CONSTRAINT outreach_send_intents_sequence CHECK ((purpose = 'FOLLOW_UP') = (sequence_first_intent_id IS NOT NULL)),
   CONSTRAINT outreach_send_intents_reply CHECK ((purpose = 'REQUESTED_REPLY') = (reply_activity_id IS NOT NULL)),
-  CONSTRAINT outreach_send_intents_claim CHECK ((submitted_at IS NULL) = (claim_fence IS NULL) AND (submitted_at IS NULL) = (uncertain_after IS NULL)),
-  CONSTRAINT outreach_send_intents_accepted_ref CHECK (state <> 'PROVIDER_ACCEPTED' OR provider_message_ref IS NOT NULL)
+  -- the provider reference of PROVIDER_ACCEPTED is T1 (KA096 (h)) alone, one guard per control (rule 24c)
+  CONSTRAINT outreach_send_intents_claim CHECK ((submitted_at IS NULL) = (claim_fence IS NULL) AND (submitted_at IS NULL) = (uncertain_after IS NULL))
 );
 CREATE INDEX outreach_send_intents_by_person ON kauro.outreach_send_intents (person_user_id, counted_at DESC);
 CREATE INDEX outreach_send_intents_by_prospect ON kauro.outreach_send_intents (prospect_id, counted_at DESC);
@@ -878,7 +880,7 @@ BEGIN
   SELECT * INTO g FROM kauro.outreach_authorizations WHERE authorization_id = NEW.authorization_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'OUTREACH_GRANT_INVALID: no grant row' USING ERRCODE = 'KC030';
-  END IF;
+  ELSE
   IF g.revoked THEN
     RAISE EXCEPTION 'OUTREACH_GRANT_INVALID: grant % is revoked', g.authorization_id USING ERRCODE = 'KC030';
   END IF;
@@ -895,6 +897,7 @@ BEGIN
    WHERE i.authorization_id = g.authorization_id AND i.intent_id <> NEW.intent_id AND kauro.outreach_intent_counted(i.intent_id, i.state);
   IF n >= g.maximum_sends THEN
     RAISE EXCEPTION 'OUTREACH_GRANT_INVALID: grant % has reserved % of % sends', g.authorization_id, n, g.maximum_sends USING ERRCODE = 'KC030';
+  END IF;
   END IF;
   -- resources (KC033)
   IF EXISTS (SELECT 1 FROM kauro.outreach_draft_resources dr JOIN kauro.sales_resources r ON r.resource_id = dr.resource_id WHERE dr.draft_id = d.draft_id AND r.state <> 'CURRENT') THEN
@@ -1078,7 +1081,7 @@ BEGIN
     PERFORM kauro.outreach_require_lock('kauro.outreach_drafts', NEW.draft_id::text, 'X', 'a BOUNCED activity');
   ELSE
     PERFORM kauro.outreach_require_lock('kauro.prospect_suppressions', NEW.suppression_key_kind || ':' || NEW.suppression_key, 'X', 'a SUPPRESSED activity');
-    IF NEW.suppression_reason = 'COMPLAINT' THEN
+    IF NEW.suppression_reason = 'COMPLAINT' AND NEW.intent_id IS NOT NULL THEN
       SELECT i.person_user_id INTO person FROM kauro.outreach_send_intents i WHERE i.intent_id = NEW.intent_id;
       PERFORM kauro.outreach_require_lock('kauro.outreach_person_caps', person::text, 'X', 'a COMPLAINT activity');
     END IF;
@@ -1176,8 +1179,12 @@ CREATE OR REPLACE FUNCTION kauro.prospects_suppression_columns() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog AS
 $$
 BEGIN
-  IF NOT kauro.acting_corporate_owner()
-     AND (to_jsonb(NEW) - 'state' - 'suppressed' - 'version' - 'updated_at') IS DISTINCT FROM (to_jsonb(OLD) - 'state' - 'suppressed' - 'version' - 'updated_at') THEN
+  IF kauro.current_user_id() IS NOT NULL THEN
+    IF kauro.acting_corporate_owner() THEN
+      RETURN NEW;
+    END IF;
+  END IF;
+  IF (to_jsonb(NEW) - 'state' - 'suppressed' - 'version' - 'updated_at') IS DISTINCT FROM (to_jsonb(OLD) - 'state' - 'suppressed' - 'version' - 'updated_at') THEN
     RAISE EXCEPTION 'OUTREACH_SUPPRESSION_SCOPE: a non-owner prospect update changes only its state' USING ERRCODE = 'KA098';
   END IF;
   RETURN NEW;
@@ -1408,10 +1415,10 @@ GRANT SELECT ON kauro.outreach_diagnoses TO kauro_outreach;
 
 -- the corporate rows the outreach service reads (its triggers and D2's rechecks): no agency_id table among them (A17)
 CREATE POLICY prospects_outreach_read ON kauro.prospects FOR SELECT TO kauro_outreach USING (true);
--- the public opt-out: a prospect reached by its suppression moves to SUPPRESSED only (KA098 judges the columns and the reach)
-CREATE POLICY prospects_outreach_suppress ON kauro.prospects FOR UPDATE TO kauro_outreach USING (state <> 'SUPPRESSED') WITH CHECK (state = 'SUPPRESSED');
+-- the public opt-out records the CONTACT suppression only (A14: the registry row is what survives reassignment, reimport and route): a
+-- prospect state move writes its history into commercial_transitions, an agency_id table kauro_outreach holds no grant on (A17), so
+-- the service never UPDATEs a prospect; every reader (CMD061, CMD063, D2, the CMD045 trigger) judges the registry key, never the state
 GRANT SELECT ON kauro.prospects TO kauro_outreach;
-GRANT UPDATE (state, suppressed, version, updated_at) ON kauro.prospects TO kauro_outreach;
 CREATE POLICY prospect_contacts_outreach_read ON kauro.prospect_contacts FOR SELECT TO kauro_outreach USING (true);
 GRANT SELECT ON kauro.prospect_contacts TO kauro_outreach;
 CREATE POLICY prospect_suppressions_outreach_read ON kauro.prospect_suppressions FOR SELECT TO kauro_outreach USING (true);
