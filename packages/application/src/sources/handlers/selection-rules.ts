@@ -15,7 +15,7 @@
  */
 import type { UtcInstant } from "@kauro/contracts";
 import type { ParserChoice, ProjectionDeclaration, SelectionManifestDocument, SourceFileId, SourceFileRecord, SourceRevisionRecord, SourceTableRecord, SourceUnitOfWork } from "@kauro/domain";
-import { DomainFailure, INPUT_ENVELOPE, unpaidSealedDeadlines } from "@kauro/domain";
+import { DomainFailure, INPUT_ENVELOPE, effectNowOf, unpaidSealedDeadlines } from "@kauro/domain";
 import { reachedOnServer } from "./shared.js";
 
 /** What CMD016 binds and reports once a manifest passed every rule. */
@@ -82,13 +82,20 @@ export function checkDocument(document: SelectionManifestDocument): void {
   }
 }
 
-/** The fourteen days of reused bytes: the first seal of any of them (D-RET-3) is the start of their hard cap. */
-async function reuseAvailable(uow: SourceUnitOfWork, file: SourceFileRecord, serverNow: string): Promise<boolean> {
+/**
+ * The fourteen days of reused bytes: the first seal of any of them (D-RET-3) is the start of their hard cap. Each window is judged at
+ * the effect instant read after the read it judges (CLOCK-SWEEP-B07 S5); the seal re-judges the cap (S4, the deferred COMMIT trigger).
+ */
+async function reuseAvailable(uow: SourceUnitOfWork, file: SourceFileRecord): Promise<boolean> {
   const [first] = await uow.sources.seals.firstSeals([file.fileId]);
-  if (first !== undefined) return !reachedOnServer(unpaidSealedDeadlines(first.sealedAt as UtcInstant).hardDeadline, serverNow);
+  if (first !== undefined) {
+    const effectNow = await effectNowOf(uow);
+    return !reachedOnServer(unpaidSealedDeadlines(first.sealedAt as UtcInstant).hardDeadline, effectNow);
+  }
   // bytes no seal ever included follow their upload's window (D-RET-1): an expired intake is no longer reusable
   const upload = await uow.sources.uploads.get(file.originUploadId);
-  return upload !== null && !reachedOnServer(upload.applicationExpiresAt, serverNow);
+  const effectNow = await effectNowOf(uow);
+  return upload !== null && !reachedOnServer(upload.applicationExpiresAt, effectNow);
 }
 
 /**
@@ -97,7 +104,6 @@ async function reuseAvailable(uow: SourceUnitOfWork, file: SourceFileRecord, ser
  */
 export async function checkAgainstInventory(uow: SourceUnitOfWork, revision: SourceRevisionRecord, document: SelectionManifestDocument): Promise<SelectionSummary> {
   checkDocument(document);
-  const serverNow = await uow.serverInstant();
   const own = (await uow.sources.files.listForRevision(revision.revisionId)).filter((f) => f.state === "ADMITTED");
   const named = new Map(document.files.map((f) => [f.fileId as string, f]));
   if (named.size !== document.files.length) throw new DomainFailure("INVALID_REQUEST", "the manifest disposes a file twice", { reason: "SELECTION_UNKNOWN_TABLE" });
@@ -119,7 +125,7 @@ export async function checkAgainstInventory(uow: SourceUnitOfWork, revision: Sou
       throw new DomainFailure("INVALID_REQUEST", "an included file is not an admitted file of this project", { reason: "SELECTION_FILE_NOT_ADMITTED" });
     }
     if (entry.origin === "REUSED") {
-      if (file.state !== "ADMITTED" || !(await reuseAvailable(uow, file, serverNow))) {
+      if (file.state !== "ADMITTED" || !(await reuseAvailable(uow, file))) {
         throw new DomainFailure("PRECONDITION_FAILED", "a reused file's bytes are no longer available for a new seal", { reason: "REUSE_NOT_AVAILABLE" });
       }
       reused.push(file.fileId);

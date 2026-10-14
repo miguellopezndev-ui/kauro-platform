@@ -236,8 +236,8 @@ async function siblingInVerification(revisionId: string): Promise<{ readonly upl
  * UPLOAD_INSPECTION's decision unit for the sibling, held open (revision row, then the sibling upload, D-LOCK-2): the production writer
  * a request on another upload of the revision meets on the dataset_revisions row (NO KEY UPDATE x NO KEY UPDATE).
  */
-async function inspectionHolding(revisionId: string): Promise<HeldTransaction> {
-  const sibling = await siblingInVerification(revisionId);
+async function inspectionHolding(revisionId: string, ready?: { readonly uploadId: string; readonly finalized: Finalized }): Promise<HeldTransaction> {
+  const sibling = ready ?? (await siblingInVerification(revisionId));
   return (await heldAdmission(w, w.A, sibling.uploadId, sibling.finalized)).writer;
 }
 
@@ -342,7 +342,7 @@ test("CS-2L EXPIRY: ReserveUpload's issuance unit paused at its last await (the 
 
 test("CS-2P EXPIRY: ReserveUpload's issuance unit waiting on the revision row held by UPLOAD_INSPECTION of a sibling upload, the reservation deadline passing on the effect clock before its judgment -> the attempt is abandoned: upload RESERVED, no session secret, no session_issued event, the provider session cancelled, journal committed, 201 UNAVAILABLE SESSION_PENDING", async () => {
   const { revisionId } = await w.project(w.A, w.clientA);
-  await siblingInVerification(revisionId);
+  const sibling = await siblingInVerification(revisionId);
   const key = freshKey("cs-2p");
   const version = (await revisionFacts(revisionId)).version;
   const sessionsBefore = w.storage.calls("createResumableSession").length;
@@ -351,7 +351,7 @@ test("CS-2P EXPIRY: ReserveUpload's issuance unit waiting on the revision row he
   const replying = reserve(w, revisionId, version, { key });
   await providerHold.reached;
   const cancelsBefore = w.storage.calls("cancelResumableSession").length;
-  const holder = await inspectionHolding(revisionId);
+  const holder = await inspectionHolding(revisionId, sibling);
   const p = arm("uploads", "lock", "PAST", reservedOf(revisionId), recordDeadline);
   try {
     providerHold.release();
@@ -368,7 +368,7 @@ test("CS-2P EXPIRY: ReserveUpload's issuance unit waiting on the revision row he
 
 test("CS-3P EXPIRY: a resumed ReserveUpload (pending past the grace) waiting on the revision row held by UPLOAD_INSPECTION of a sibling, the reservation deadline passing on the effect clock before its judgment -> no new session attempt, no provider session created, journal committed with the RESERVED view", async () => {
   const { revisionId } = await w.project(w.A, w.clientA);
-  await siblingInVerification(revisionId);
+  const sibling = await siblingInVerification(revisionId);
   const key = freshKey("cs-3p");
   const crash = w.holds.arm("after.commit", { fail: new SimulatedCrash("after the intent") });
   const crashed = await reserve(w, revisionId, (await revisionFacts(revisionId)).version, { key });
@@ -377,7 +377,7 @@ test("CS-3P EXPIRY: a resumed ReserveUpload (pending past the grace) waiting on 
   const intentUpload = (await w.journal(key))?.resourceId as string;
   assert.deepEqual([(await uploadFacts(intentUpload)).state, (await uploadFacts(intentUpload)).attempt], ["RESERVED", 1]);
   w.processClock.advance((PENDING_RESUME_GRACE_SECONDS + 1) * 1000);
-  const holder = await inspectionHolding(revisionId);
+  const holder = await inspectionHolding(revisionId, sibling);
   const sessionsBefore = w.storage.calls("createResumableSession").length;
   const p = arm("uploads", "lock", "PAST", (args) => args[0] === intentUpload, recordDeadline);
   let replying: Promise<Reply> | undefined;

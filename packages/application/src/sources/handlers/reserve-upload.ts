@@ -65,6 +65,7 @@ import {
   PROVIDER_CALL_TIMEOUT_MS,
   REVISION_UPLOAD_STATES,
   commandRequestDigest,
+  effectNowOf,
   isOffered,
   quarantineObjectName,
   textDigest,
@@ -195,9 +196,11 @@ async function reserveUpload(runtime: SourceRuntime, collaborators: B07Collabora
       const revision = await uow.sources.revisions.lock(upload.revisionId);
       const current = await uow.sources.uploads.lock(upload.uploadId);
       if (!revision || !current) throw new DomainFailure("INTEGRITY_FAILURE", "the reserved upload of a pending entry is not visible");
-      const serverNow = await uow.serverInstant();
-      if (current.state !== "RESERVED" || current.sessionAttempt !== first.attempt || reachedOnServer(current.applicationExpiresAt, serverNow)) {
-        if (current.state === "RESERVED" && current.sessionAttempt !== first.attempt && !reachedOnServer(current.applicationExpiresAt, serverNow)) {
+      // the deadline is judged at the effect instant, after the unit's last await (the locks above; CLOCK-SWEEP-B07 S2). The one await
+      // before the effect (the session secret's INSERT) takes no lock this unit waits on; the database re-judges at the edge (KA072).
+      const effectNow = await effectNowOf(uow);
+      if (current.state !== "RESERVED" || current.sessionAttempt !== first.attempt || reachedOnServer(current.applicationExpiresAt, effectNow)) {
+        if (current.state === "RESERVED" && current.sessionAttempt !== first.attempt && !reachedOnServer(current.applicationExpiresAt, effectNow)) {
           // a later attempt of the same key resumed the intent and holds the fence: it completes the operation (D-RUN-2)
           throw new DomainFailure("PRECONDITION_FAILED", "a later attempt of this operation holds its fence", { reason: "OPERATION_PENDING" }, true);
         }
@@ -356,8 +359,9 @@ async function reserveUpload(runtime: SourceRuntime, collaborators: B07Collabora
     const revision = await uow.sources.revisions.lock(found.revisionId);
     const upload = await uow.sources.uploads.lock(found.uploadId);
     if (!revision || !upload) throw new DomainFailure("INTEGRITY_FAILURE", "the reserved upload of a pending entry is not visible");
-    const serverNow = await uow.serverInstant();
-    if (upload.state === "RESERVED" && !reachedOnServer(upload.applicationExpiresAt, serverNow)) {
+    // judged at the effect instant, after the resume's last await (the locks above; CLOCK-SWEEP-B07 S3)
+    const effectNow = await effectNowOf(uow);
+    if (upload.state === "RESERVED" && !reachedOnServer(upload.applicationExpiresAt, effectNow)) {
       const attempt = await uow.sources.uploads.claimSessionAttempt(upload.uploadId);
       if (attempt !== null) return { kind: "INTENT", entryId: entry.entryId, upload, attempt, membership };
     }
