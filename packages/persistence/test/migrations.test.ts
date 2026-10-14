@@ -155,6 +155,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0069_b16_retention_extensions.sql",
     // package B05 IJR: one IC request key is one model task, each IC invocation one request row (ADR-B05-IJR-1; provisional number)
     "0070_b05_model_task_request_key.sql",
+    // SEC OWNER-POLICY-FORALL-2: every FOR ALL policy wider than its role's grants becomes one policy per granted command (provisional number)
+    "0071_sec_policy_per_command.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
