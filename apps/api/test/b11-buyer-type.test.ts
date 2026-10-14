@@ -16,7 +16,7 @@ import type { FiscalProfileId, UserId } from "@kauro/domain";
 import { API_APPLICATION_NAME } from "../src/index.js";
 import { apiBusy, disarm, otherApiBackend, otherWaitsExactlyOn, soleApiBackend, track, until } from "./agency-lock-cells.js";
 import { paymentsWorld, type PaymentsWorld } from "./commerce-support.js";
-import { prepareAllocation, recordSeller } from "./sales-support.js";
+import { prepareAllocation, recordSeller, recordSourceEvidence } from "./sales-support.js";
 import { SimulatedCrash, approveThroughRoute, asProblem, call, completed, freshKey, outcome, replayTextOf, type Person, type Reply } from "./support.js";
 
 // --- the world: the payments world with a unit-of-work wrapper for the TIMEOUT and PARTIAL cells --------------------------------------
@@ -503,20 +503,48 @@ test("E2E: CreateQuote is BUYER_TYPE_UNSET until the owner records the buyer typ
   assert.equal(await w.count("quotes", "project_id = $1 AND state = 'ISSUED'", [projectId]), 1);
 });
 
-test("E2E: AcceptAttribution reads the recorded type in the corporate owner's context — in-house is IN_HOUSE_NOT_ATTRIBUTABLE, agency is accepted", async () => {
+test("E2E (D-33, A3 3.7 'the buyer type does not change the price'): an agency buyer and an in-house buyer quoted for the same plan get the same price, the same discount and the same eligibility", async () => {
+  const { w } = pw;
+  const quoteFor = async (label: string, buyerType: "agency" | "in-house"): Promise<CreateQuoteView> => {
+    const s = await sellingAgency(label);
+    answered<BuyerTypeView>(await setBuyerType(s.agency.agencyId, s.owner, buyerType), 201);
+    const { projectId } = await w.project(s.agency, s.clientId as never);
+    const plan = await w.approvable(s.agency, projectId, "a1-e2e-price", "SET", { recent: true });
+    await approveThroughRoute(w, plan, s.owner, s.agency.agencyId);
+    return answered<CreateQuoteView>(await call(w, { url: `/api/v1/projects/${projectId}/quotes`, token: s.billing.token, agency: s.agency.agencyId, key: freshKey(`${label}-quote`), body: { planId: plan.planId, billingProfileRef: s.profileId } }), 201).data;
+  };
+  const priced = (v: CreateQuoteView) => {
+    const q = v.quote;
+    const { lookbackStartsAt: _lookback, ...eligibility } = v.eligibility;
+    return { billableUnits: q.billableUnits, mode: q.mode, pricePolicyVersion: q.pricePolicyVersion, discountPolicyVersion: q.discountPolicyVersion, baseServiceCents: q.baseServiceCents, discountCents: q.discountCents, serviceCents: q.serviceCents, taxCents: q.taxCents, totalCents: q.totalCents, currency: q.currency, discount: q.discount, taxTreatment: q.taxTreatment, eligibility };
+  };
+  const agency = await quoteFor("a1-e2e-price-agency", "agency");
+  const inHouse = await quoteFor("a1-e2e-price-house", "in-house");
+  assert.equal(agency.quote.state, "ISSUED");
+  assert.equal(inHouse.quote.state, "ISSUED");
+  assert.ok(Number(agency.quote.baseServiceCents) > 0, "a priced quote");
+  assert.deepEqual(priced(inHouse), priced(agency), "the buyer type changes neither the price nor any discount");
+});
+
+test("E2E (D-33): a company prospect registered from COMPANY-segment evidence through the api is attributed to its seller — the claim is accepted for a recorded in-house tenant exactly as for an agency, and the kept protections still refuse a second allocation for that tenant", async () => {
   const { w } = pw;
   const house = await onboarding("a1-e2e-house");
-  const agency = await onboarding("a1-e2e-agency");
   answered<BuyerTypeView>(await setBuyerType(house.agency.agencyId, house.owner, "in-house"), 201);
-  answered<BuyerTypeView>(await setBuyerType(agency.agency.agencyId, agency.owner, "agency"), 201);
   const seller = await recordSeller(w, pw.kora.userId, "a1-e2e-seller");
-  const prospect = await recordProspect(w.h, { by: seller, domain: "a1-e2e-seller.example" });
-  const { claimId } = await recordClaim(w.h, { seller, prospectId: prospect.prospectId });
-  const allocationOf = (agencyId: string) => prepareAllocation(w.h, { ownerUserId: pw.kora.userId, agencyId, prospectId: prospect.prospectId, shares: [{ seller, claimId, shareBps: 10000 }] });
-  const accept = async (allocationId: string) => call(w, { url: `/api/v1/sales/claims/${claimId}/accept`, token: pw.kora.token, agency: null, key: freshKey("a1-e2e-accept"), body: { expectedVersion: 1, shareAllocationRef: allocationId } });
-  assert.equal(outcome(w, await accept(await allocationOf(house.agency.agencyId))), "409 PRECONDITION_FAILED IN_HOUSE_NOT_ATTRIBUTABLE");
-  assert.equal(await w.count("attribution_claims", "claim_id = $1 AND state = 'SUBMITTED'", [claimId]), 1, "the claim is not ruled");
-  const accepted = await accept(await allocationOf(agency.agency.agencyId));
+  const evidence = await recordSourceEvidence(w.h, { userId: seller.userId, sellerId: seller.sellerId }, { domain: "a1-e2e-company.example", segment: "COMPANY" });
+  const registered = await call(w, { url: "/api/v1/sales/prospects", token: seller.person.token, agency: null, key: freshKey("a1-e2e-prospect"), body: { organizationLabel: "a1-e2e-company.example", businessContactRef: evidence.contactRef, sourceEvidenceHash: evidence.sourceEvidenceHash, jurisdiction: "United States" } });
+  const prospectId = answered<{ prospectId: string; ownerSellerId?: string }>(registered, 201).data.prospectId;
+  const { claimId } = await recordClaim(w.h, { seller, prospectId: prospectId as never });
+  const allocationOf = (agencyId: string, claim: string) => prepareAllocation(w.h, { ownerUserId: pw.kora.userId, agencyId, prospectId, shares: [{ seller, claimId: claim, shareBps: 10000 }] });
+  const accept = async (claim: string, allocationId: string) => call(w, { url: `/api/v1/sales/claims/${claim}/accept`, token: pw.kora.token, agency: null, key: freshKey("a1-e2e-accept"), body: { expectedVersion: 1, shareAllocationRef: allocationId } });
+  const accepted = await accept(claimId, await allocationOf(house.agency.agencyId, claimId));
   assert.equal(accepted.status, 200, accepted.text);
-  assert.equal(await w.count("attribution_claims", "claim_id = $1 AND state = 'ACCEPTED' AND agency_id = $2", [claimId, agency.agency.agencyId]), 1);
+  assert.equal(await w.count("attribution_claims", "claim_id = $1 AND state = 'ACCEPTED' AND agency_id = $2", [claimId, house.agency.agencyId]), 1, "the seller holds the attribution of the in-house tenant");
+  assert.equal(await w.count("attribution_allocations", "agency_id = $1 AND frozen_at IS NOT NULL", [house.agency.agencyId]), 1);
+  // the pool does not double: a second seller's claim for the same tenant is ATTRIBUTION_EXISTS
+  const rival = await recordSeller(w, pw.kora.userId, "a1-e2e-rival");
+  const rivalProspect = await recordProspect(w.h, { by: rival, domain: "a1-e2e-rival.example" });
+  const rivalClaim = await recordClaim(w.h, { seller: rival, prospectId: rivalProspect.prospectId });
+  const doubled = await prepareAllocation(w.h, { ownerUserId: pw.kora.userId, agencyId: house.agency.agencyId, prospectId: rivalProspect.prospectId, shares: [{ seller: rival, claimId: rivalClaim.claimId, shareBps: 10000 }] });
+  assert.equal(outcome(w, await accept(rivalClaim.claimId, doubled)), "409 PRECONDITION_FAILED ATTRIBUTION_EXISTS");
 });

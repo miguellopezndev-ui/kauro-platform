@@ -5907,6 +5907,14 @@
       ],
       "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))"
     },
+    "staged_retention_windows/staged_retention_windows_tenant_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())"
+    },
     "statement_coverage/statement_coverage_owner": {
       "check": null,
       "command": "SELECT",
@@ -6811,6 +6819,9 @@
         "SELECT"
       ],
       "kauro.stage_receipts": [
+        "SELECT"
+      ],
+      "kauro.staged_retention_windows": [
         "SELECT"
       ],
       "kauro.state_machines": [

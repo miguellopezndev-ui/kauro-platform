@@ -251,7 +251,7 @@ export class PgRetentionRepository implements RetentionRepository {
     readonly termsVersion: string;
     readonly membershipId: MembershipId;
   }): Promise<{ readonly extension: RetentionExtensionRow; readonly record: RetentionRecordRow }> {
-    // the extension row first: the database binds it to the record, to this request session and to the window (migration 0064); the
+    // the extension row first: the database binds it to the record, to this request session and to the window (migration 0066); the
     // endpoint is computed in SQL from the locked record, so it is exact to the microsecond
     const inserted = await execute<Row>(
       this.db,

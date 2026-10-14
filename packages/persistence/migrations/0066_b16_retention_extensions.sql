@@ -1,4 +1,4 @@
--- Migration 0064 (provisional number; the coordinator renumbers at merge): B16 lane L2, CMD060 RequestRetentionExtension.
+-- Migration 0066: B16 lane L2, CMD060 RequestRetentionExtension.
 --
 -- 09 "Quotes, reuploads and retention", R2-123/R2-124, plan conflict C1: a project's soft access deadline may be extended ONCE, by at
 -- most 259200 seconds, never past the original hard cap; the hard deadline never moves.
@@ -99,7 +99,8 @@ BEGIN
   END IF;
   RETURN NEW;
 END
-$$;
+$;
+REVOKE EXECUTE ON FUNCTION kauro.retention_records_soft_deadline() FROM PUBLIC;
 
 ALTER TABLE kauro.event_types NO FORCE ROW LEVEL SECURITY;
 INSERT INTO kauro.event_types (event_type) VALUES ('retention_record.extended.v1');

@@ -2314,7 +2314,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE seller row (or, for the owner commands, no ACTIVE KAURO_OWNER grant), read after its transition lock: an agency member, a CANDIDATE, SUSPENDED or TERMINATED seller and a revoked owner answer alike |
 | 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
 | 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
-| 409 | PRECONDITION_FAILED | SOURCE_EVIDENCE_INVALID | — | — | COMMAND | sourceEvidenceHash or businessContactRef is not the caller's own record, or the evidence is not of the AGENCY segment: another seller's record is as unknown as a missing one |
+| 409 | PRECONDITION_FAILED | SOURCE_EVIDENCE_INVALID | — | — | COMMAND | sourceEvidenceHash or businessContactRef is not the caller's own record, or the evidence is of neither the AGENCY nor the COMPANY segment: another seller's record is as unknown as a missing one |
 | 409 | PRECONDITION_FAILED | PROSPECT_SUPPRESSED | — | — | COMMAND | the organization key or the contact key is suppressed, however the organization is spelled (KC016) |
 | 409 | PRECONDITION_FAILED | PROSPECT_EXISTS | — | — | COMMAND | the organization already has a live prospect (the unique index answers for a prospect the caller cannot read) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
@@ -2389,8 +2389,6 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | CLAIM_EXPIRED | — | sometimes | COMMAND | the claim's (or a share's claim's) review deadline is reached on the database clock, whether or not the CLAIM_WINDOWS sweep lapsed it |
 | 409 | PRECONDITION_FAILED | SHARES_NOT_WHOLE | — | — | COMMAND | the allocation's shares do not sum to exactly 10000 basis points, or name no share for this claim (KC003) |
 | 409 | PRECONDITION_FAILED | ATTRIBUTION_EXISTS | — | — | COMMAND | the agency already has a frozen allocation: the pool does not become 10% for each seller |
-| 409 | PRECONDITION_FAILED | BUYER_TYPE_UNSET | — | — | COMMAND | the agency's buyer type is not recorded (D58) |
-| 409 | PRECONDITION_FAILED | IN_HOUSE_NOT_ATTRIBUTABLE | — | — | COMMAND | the agency is an in-house tenant: no seller attribution arises from prospecting it |
 | 409 | PRECONDITION_FAILED | CLAIM_AFTER_FIRST_ORDER | — | — | COMMAND | the claim was submitted after the agency's first payment order |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |

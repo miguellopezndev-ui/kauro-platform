@@ -41,9 +41,9 @@ const COMMAND_SPECIFIC: Readonly<Record<"CMD002" | "CMD043" | "CMD045" | "CMD046
     outcome("COMMAND", "PRECONDITION_FAILED", "FISCAL_TREATMENT_UNREVIEWED", "the agency's current fiscal profile carries no reviewed treatment (R2-082): activation does not rest on an unknown treatment"),
   ],
   // CMD043: the path agency's OWNER with a fresh step-up; the step-up, then the version, then the state, then the obligations (D10-AGY-2, D10-AGY-4)
-  // CMD045: an ACTIVE seller or the owner; the label, then the caller's own AGENCY-segment evidence and contact, suppression, then a live duplicate (D10-PROS-1)
+  // CMD045: an ACTIVE seller or the owner; the label, then the caller's own AGENCY- or COMPANY-segment evidence and contact (D-33), suppression, then a live duplicate (D10-PROS-1)
   CMD045: [
-    outcome("COMMAND", "PRECONDITION_FAILED", "SOURCE_EVIDENCE_INVALID", "sourceEvidenceHash or businessContactRef is not the caller's own record, or the evidence is not of the AGENCY segment: another seller's record is as unknown as a missing one"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "SOURCE_EVIDENCE_INVALID", "sourceEvidenceHash or businessContactRef is not the caller's own record, or the evidence is of neither the AGENCY nor the COMPANY segment: another seller's record is as unknown as a missing one"),
     outcome("COMMAND", "PRECONDITION_FAILED", "PROSPECT_SUPPRESSED", "the organization key or the contact key is suppressed, however the organization is spelled (KC016)"),
     outcome("COMMAND", "PRECONDITION_FAILED", "PROSPECT_EXISTS", "the organization already has a live prospect (the unique index answers for a prospect the caller cannot read)"),
   ],
@@ -54,7 +54,7 @@ const COMMAND_SPECIFIC: Readonly<Record<"CMD002" | "CMD043" | "CMD045" | "CMD046
     outcome("COMMAND", "PRECONDITION_FAILED", "CLAIM_EVIDENCE_INSUFFICIENT", "evidenceHash is not the seller's own evidence for this prospect, or records only a list import or a tracking link"),
     outcome("COMMAND", "PRECONDITION_FAILED", "CLAIM_EXISTS", "the seller already has a live claim on the prospect"),
   ],
-  // CMD047: the owner; the claim, the version, its state, the prepared allocation, the split, the agency's single allocation, its buyer type and its first order (D10-ATTR-1, D58)
+  // CMD047: the owner; the claim, the version, its state, the prepared allocation, the split, the agency's single allocation and its first order (D10-ATTR-1; D-33: no buyer-type condition)
   CMD047: [
     outcome("COMMAND", "NOT_FOUND", null, "the claim, or the allocation on its prospect, is unknown"),
     STALE("claim"),
@@ -62,8 +62,6 @@ const COMMAND_SPECIFIC: Readonly<Record<"CMD002" | "CMD043" | "CMD045" | "CMD046
     outcome("COMMAND", "PRECONDITION_FAILED", "CLAIM_EXPIRED", "the claim's (or a share's claim's) review deadline is reached on the database clock, whether or not the CLAIM_WINDOWS sweep lapsed it", { current: "SOMETIMES" }),
     outcome("COMMAND", "PRECONDITION_FAILED", "SHARES_NOT_WHOLE", "the allocation's shares do not sum to exactly 10000 basis points, or name no share for this claim (KC003)"),
     outcome("COMMAND", "PRECONDITION_FAILED", "ATTRIBUTION_EXISTS", "the agency already has a frozen allocation: the pool does not become 10% for each seller"),
-    outcome("COMMAND", "PRECONDITION_FAILED", "BUYER_TYPE_UNSET", "the agency's buyer type is not recorded (D58)"),
-    outcome("COMMAND", "PRECONDITION_FAILED", "IN_HOUSE_NOT_ATTRIBUTABLE", "the agency is an in-house tenant: no seller attribution arises from prospecting it"),
     outcome("COMMAND", "PRECONDITION_FAILED", "CLAIM_AFTER_FIRST_ORDER", "the claim was submitted after the agency's first payment order"),
   ],
   CMD043: [
