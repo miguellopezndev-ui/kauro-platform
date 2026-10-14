@@ -2,7 +2,7 @@
  * The public opt-out routes (B12 lane L-ACT; plan "Public opt-out", D-B12O-12/13/21, RFC 8058), the List-Unsubscribe URI of a sales message:
  *
  *   GET  /api/v1/public/outreach/opt-out/{token}   303 to the human page /unsubscribe/{token}; no body, no media type, writes nothing
- *   POST /api/v1/public/outreach/opt-out/{token}   the one-click body; 200 (never a redirect), 415, 400, or 429 for a network's unknown-token flood
+ *   POST /api/v1/public/outreach/opt-out/{token}   the one-click body; 200 (never a redirect), 400 (media type or body), or 429 for a network's unknown-token flood
  *
  * Neither route reads a cookie, Authorization, Origin or Idempotency-Key. This module is the only caller of admitOneClickOptOut.
  */
