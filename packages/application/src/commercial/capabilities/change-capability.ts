@@ -12,7 +12,7 @@
  */
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { CapabilityId, CausationId } from "@kauro/domain";
-import { DomainFailure, NotFoundFailure, VERSIONABLE_CAPABILITY_STATES } from "@kauro/domain";
+import { DomainFailure, NotFoundFailure, requiresVendorQualification, VERSIONABLE_CAPABILITY_STATES, type CapabilityFailureReason } from "@kauro/domain";
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import { CommerceAccessDenied, operatorContextOf, runCommerceCommand, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
 import { applied, checkExpectedVersion } from "../agency/shared.js";
@@ -54,12 +54,27 @@ export function changeCapabilityHandler(runtime: CommerceRequestRuntime, co: Cap
           if (await governance.holdsProfile(capabilityId, profileHash)) {
             throw new DomainFailure("PRECONDITION_FAILED", "the profile hash is already held by the capability or one of its versions", { reason: "CAPABILITY_PROFILE_UNCHANGED" });
           }
+          const evidenceHashes = [...new Set(body.qualificationEvidenceRefs)] as ReadonlyArray<Sha256Hex>;
+          // S078: the evidence resolves to independent acceptance of this tool, profile and export-back (a CLEAN mode has none to cite)
+          if (requiresVendorQualification(capability)) {
+            const found = new Map((await governance.qualificationsOf(evidenceHashes)).map((q) => [q.evidenceHash, q]));
+            const refuse = (reason: CapabilityFailureReason, message: string): never => {
+              throw new DomainFailure("PRECONDITION_FAILED", message, { reason });
+            };
+            const cited = evidenceHashes.map((h) => found.get(h));
+            if (cited.some((q) => q === undefined)) refuse("QUALIFICATION_EVIDENCE_UNKNOWN", "a cited qualification evidence hash is not a recorded vendor qualification");
+            const rows = cited.flatMap((q) => (q === undefined ? [] : [q]));
+            if (rows.some((q) => q.capabilityId !== capabilityId)) refuse("QUALIFICATION_TOOL_MISMATCH", "a cited qualification was recorded for another tool");
+            if (rows.some((q) => q.profileHash !== profileHash)) refuse("QUALIFICATION_PROFILE_MISMATCH", "a cited qualification covers another profile");
+            if (rows.some((q) => q.result !== "PASS")) refuse("QUALIFICATION_FAILED", "a cited qualification did not pass");
+            if (rows.some((q) => q.exportBackEvidenceHash === null)) refuse("QUALIFICATION_EXPORT_BACK_MISSING", "a cited qualification has no export-back evidence");
+          }
           const version = applied(
             await governance.recordVersion({
               capabilityId,
               expectedRevision: capability.revision,
               profileHash,
-              evidenceHashes: [...new Set(body.qualificationEvidenceRefs)] as ReadonlyArray<Sha256Hex>,
+              evidenceHashes,
               by: envelope.userId,
             }),
           );
