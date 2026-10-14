@@ -8,10 +8,13 @@
  * it at the intent's birth and D2/D3 rebuild the same bytes from the same inputs, so a changed configuration or secret is observable as a
  * different hash and refuses the send (the intent never submits bytes it did not seal).
  *
- * The opt-out token is HMAC-SHA-256(secret of version v, intent id): it reveals no address and is derivable only by the platform; the
- * public opt-out (lane L-ACT) looks it up by its sha256.
+ * The opt-out token is lane L-ACT's mintOptOutToken (`<version>.<intent hex>.<HMAC-SHA-256 under that version's secret>`): it reveals no
+ * address, is derivable only by the platform, and the public opt-out verifies it with readOptOutToken over the same key versions.
  */
-import { createHash, createHmac } from "node:crypto";
+import { createHash } from "node:crypto";
+import { mintOptOutToken, type OptOutKey } from "@kauro/application";
+
+export type { OptOutKey };
 
 /** The deployment's compliance configuration (A13): absent until the owner configures it (D-16), which is OUTREACH_COMPLIANCE_UNCONFIGURED. */
 export interface OutreachCompliance {
@@ -19,12 +22,6 @@ export interface OutreachCompliance {
   /** https origin of the public opt-out (no trailing slash). */
   readonly optOutOrigin: string;
   readonly commercialIdentification: string;
-}
-
-/** The HMAC secret of the opt-out tokens and its version. */
-export interface OptOutKey {
-  readonly version: number;
-  readonly secret: string;
 }
 
 export interface OutreachMessage {
@@ -38,9 +35,9 @@ export interface OutreachMessage {
 const CRLF = "\r\n";
 const OPT_OUT_PATH = "/api/v1/public/outreach/opt-out/";
 
-/** The opt-out token of an intent: `v<version>` and the base64url HMAC of the intent id (characters A-Za-z0-9_- only). */
+/** The opt-out token of an intent, minted by L-ACT's mintOptOutToken (characters a-z0-9 . A-Za-z0-9_- only, safe in a URL path). */
 export function optOutTokenOf(key: OptOutKey, intentId: string): string {
-  return `v${key.version}${createHmac("sha256", key.secret).update(intentId, "utf8").digest("base64url")}`;
+  return mintOptOutToken(key, intentId);
 }
 
 export function optOutUrlOf(compliance: OutreachCompliance, token: string): string {

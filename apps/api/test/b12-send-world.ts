@@ -61,7 +61,7 @@ const notBuilt = (what: string, why: string): never => {
 
 const sha = (s: string): string => createHash("sha256").update(s, "utf8").digest("hex");
 const DEFAULT_COMPLIANCE: ComplianceConfig = { postalAddress: "100 Test Street, Suite 1, Wilmington, DE 19801, United States", optOutOrigin: "https://app.kauro.test", commercialIdentification: "Kauro commercial message" };
-const OPT_OUT_KEY: OptOutKey = { version: 1, secret: "b12-send-world-opt-out-secret-not-a-credential" };
+const OPT_OUT_KEY: OptOutKey = { version: "k1", secret: new Uint8Array(32).fill(5) };
 /** Fixtures stand an hour before T0 on the labelled TEST CLOCK, so every row they write precedes the instants the cells judge at. */
 const FIXTURE_AT = plusMs(T0, -3_600_000);
 
