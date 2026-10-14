@@ -511,7 +511,17 @@ export async function startExecutionWorld(tag: string): Promise<ExecutionWorld> 
   const scratchRoot = join(scratch, "workers");
   const hostClock = hostClockOf();
   const storage = new ContractFakeObjectStorage();
-  const core = new ContractFakeMigrationCore();
+  // the fake core reports the sealed revision's own populations (B05 L1v: the fake parses no source, the oracle reads what was sealed)
+  const core = new ContractFakeMigrationCore({
+    populationsOf: async (revisionHash) => {
+      const r = await h.oracle.query<{ p: number | null; l: number | null; b: number | null; e: number | null }>(
+        "SELECT physical_source_rows::int AS p, logical_source_records::int AS l, billable_source_units::int AS b, association_edges::int AS e FROM kauro.dataset_revisions WHERE manifest_hash = $1",
+        [revisionHash],
+      );
+      const x = r.rows.length === 1 ? r.rows[0]! : null;
+      return x === null || x.p === null || x.l === null || x.b === null || x.e === null ? null : { physicalSourceRows: x.p, logicalSourceRecords: x.l, billableSourceUnits: x.b, associationEdges: x.e };
+    },
+  });
   const intelligence = new ContractFakeIntelligenceCore();
   const receipts: ValidationReceipts = new PgValidationReceiptRecorder(h.validatorPool);
   const host = new ContractFakeWorkerHost({ core, storage, uploads: holderOf(storage), scratchRoot, clock: hostClock, creationHorizonSeconds: 300 });

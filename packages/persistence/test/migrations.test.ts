@@ -145,6 +145,12 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0064_d33_company_prospects.sql",
     // package B16 lane L7: PAID_STAGED retention windows (first release + 21 d, capture + 30 d, final download + 7 d; provisional number)
     "0065_b16_staged_retention.sql",
+    // package B05 L3t: the audit's and the grant's authority deadlines judged at COMMIT (provisional number)
+    "0066_audit_clock_at_commit.sql",
+    // FCG-B06-LEASE-1b: claim_lease judges its caller's deadline at the database clock after the row lock (provisional number)
+    "0067_lease_deadline_after_lock.sql",
+    // package B05 L1v: a dispatch leaves RESERVED only while it has never been settled (provisional number)
+    "0068_dispatch_from_unsettled_reserved.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

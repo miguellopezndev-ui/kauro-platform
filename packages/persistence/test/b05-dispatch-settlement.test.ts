@@ -292,6 +292,17 @@ test("L08 RACE (reconciliation): GRANT_RECONCILIATION evidence in micros above m
   await env.h.audit.run(controlOf(run3.ag.agencyId), (uow) => uow.audits.reconcileRequestMicros(c3.requestId, 245_000n));
   assert.deepEqual(await liabilities(env, pool3), []);
   assert.deepEqual(await money(env, run3.grantId), { reserved: 0, spent: 25, state: "AUTHORIZED" });
+  // after IC's estimate (D5-18 row 2: usage null -> COMMITTED at the maximum, usageKnown false; no excess, no liability) provider
+  // evidence above the maximum opens the request's one liability by the same rule: evidence - max
+  const pool4 = await freshPool(env);
+  const run4 = await interpretingRun(env, "l08-estimate", pool4);
+  const d = await admit(env, run4, 245_000n);
+  await answered(d, "25");
+  await settle(d, "COMMITTED", 245_000n, false);
+  assert.deepEqual(await liabilities(env, pool4), [], "the estimate at the maximum owes nothing over it");
+  await env.h.audit.run(controlOf(run4.ag.agencyId), (uow) => uow.audits.reconcileRequestMicros(d.requestId, 260_000n));
+  assert.deepEqual(await liabilities(env, pool4), [{ request_id: d.requestId, excess: "15000", state: "OPEN" }], "judged on the evidence");
+  assert.deepEqual(await money(env, run4.grantId), { reserved: 0, spent: 25, state: "AUTHORIZED" }, "spend capped at the 25 reserved cents");
 });
 
 test("S08 DENY send edge: markDispatching on a DISPATCHING, UNCERTAIN, RESPONSE_STORED, FAILED or CANCELLED request returns null, a direct UPDATE into DISPATCHING from any state but RESERVED is refused KA007, and an edge retried after its first COMMIT and an audit cancellation sends nothing", async () => {
@@ -300,8 +311,10 @@ test("S08 DENY send edge: markDispatching on a DISPATCHING, UNCERTAIN, RESPONSE_
   const at = async (state: string): Promise<Admission> => {
     const a = await admit(env, run, 50_000n);
     if (state === "RESERVED") return a;
-    if (state === "CANCELLED") {
+    if (state === "RELEASED" || state === "CANCELLED") {
+      // IC's RELEASED leaves the row RESERVED (S09); GRANT_RECONCILIATION's cancel at its fence then makes it CANCELLED
       await settle(a, "RELEASED", 0n);
+      if (state === "CANCELLED") await journal(a, (j) => j.markCancelled(a.requestId, 1, clock.now()));
       return a;
     }
     await dispatch(env, a);
@@ -310,12 +323,14 @@ test("S08 DENY send edge: markDispatching on a DISPATCHING, UNCERTAIN, RESPONSE_
     if (state === "FAILED") await journal(a, (j) => j.markFailed(a.requestId, 1, clock.now()));
     return a;
   };
+  // and a RESERVED request its core already RELEASED (S09: it stays RESERVED, settled): no edge either
   const rows = new Map<string, Admission>();
-  for (const s of ["DISPATCHING", "UNCERTAIN", "RESPONSE_STORED", "FAILED", "CANCELLED"]) rows.set(s, await at(s));
+  for (const s of ["DISPATCHING", "UNCERTAIN", "RESPONSE_STORED", "FAILED", "CANCELLED", "RELEASED"]) rows.set(s, await at(s));
   for (const [s, a] of rows) {
-    assert.equal((await requestRow(env, a.requestId)).state, s);
+    const state = s === "RELEASED" ? "RESERVED" : s;
+    assert.equal((await requestRow(env, a.requestId)).state, state);
     assert.equal(await journal(a, (j) => j.markDispatching(a.requestId, 1, "provider-again", clock.now())), null, `markDispatching on ${s} returns null`);
-    assert.equal((await requestRow(env, a.requestId)).state, s, `${s} unchanged`);
+    assert.equal((await requestRow(env, a.requestId)).state, state, `${s} unchanged`);
     assert.deepEqual(await refusal(run.ag.agencyId, "UPDATE kauro.request_journal SET state = 'DISPATCHING' WHERE request_id = $1", [a.requestId]), ["KA007", undefined], `a direct UPDATE from ${s} into DISPATCHING`);
   }
   // the edge retried after its first COMMIT sends nothing (the DISPATCHING row above answered null); after the audit's cancellation a
@@ -391,6 +406,7 @@ test("S15 DENY response edge (B06 contract kept): storeResponse at the request's
   await journal(failed, (j) => j.markFailed(failed.requestId, 1, clock.now()));
   const cancelled = await admit(env, run, 50_000n);
   await settle(cancelled, "RELEASED", 0n);
+  await journal(cancelled, (j) => j.markCancelled(cancelled.requestId, 1, clock.now()));
   const reserved = await admit(env, run, 50_000n);
   for (const [name, a] of [["CONSUMED", consumed], ["FAILED", failed], ["CANCELLED", cancelled], ["RESERVED", reserved]] as const) {
     const before = await requestRow(env, a.requestId);
@@ -1433,7 +1449,11 @@ test("L17 RACE (deadline at COMMIT, every session on one test-clock offset): a r
       }),
       (c, run) => admitWith(rawStore(c), admissionOf(run, 50_000n)),
     );
-    assert.ok(refusedBy("KA081")(rejection(outcome)), "the deadline judged after the audit share");
+    // the admission's MODEL_TASK lease carries the interpretation deadline as its own (audit/store.ts claimTaskLease), and claim_lease
+    // judges it after the wait at the judged instant (0067, FCG-B06-LEASE-1b): the claim refuses first, before the reservation's KA081
+    const refused = rejection(outcome);
+    assert.ok(refusedBy("KA005")(refused), "the deadline judged after the audit share, by the task lease's claim");
+    assert.match(String((refused as { cause?: { message?: unknown } }).cause?.message), /^LEASE: deadline of .* has passed$/, "refused for its deadline, not a fence");
     assert.deepEqual(await money(env, run.grantId), { reserved: 5, spent: 0, state: "AUTHORIZED" }, "nothing reserved beyond the first admission");
     assert.equal((await env.h.oracle.query("SELECT state FROM kauro.audits WHERE audit_id = $1", [run.auditId])).rows[0].state, "INTERPRETING", "the crashed cancellation changed nothing");
   }
