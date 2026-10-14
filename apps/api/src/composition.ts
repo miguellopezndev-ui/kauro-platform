@@ -309,9 +309,7 @@ export interface ApiAssembly {
    * the statement and payout operations (CMD052 judges the proof at its request and again at its effect); absent, the platform's. The
    * fault cells bind the platform's own verifier through an instrumented proxy, so the instant the product judges a proof at is evidence.
    */
-  /** Package B12 (L-SEND): the deployment's outreach sealer (compliance configuration + opt-out key); absent = every CMD063 answers OUTREACH_COMPLIANCE_UNCONFIGURED. */
-  readonly outreach?: { readonly sealer?: OutreachSealer };
-  readonly commercial?: { readonly buyerTypes?: BuyerTypeReader; readonly assurance?: AssuranceVerifier; /** The bound of the collaborator calls of CMD027 and CMD043 (realProviderCallTimer when absent; fault cells bind a clock-driven one). */ readonly providerTimer?: ProviderCallTimer; /** Where the failure of a collaborator call after its bound elapsed goes (stderr when absent). */ readonly onLateFailure?: LateFailureSink };
+  readonly commercial?: { /** Package B12 (L-SEND): the deployment's outreach sealer (compliance configuration + opt-out key); absent = every CMD063 answers OUTREACH_COMPLIANCE_UNCONFIGURED. */ readonly outreachSealer?: OutreachSealer; readonly buyerTypes?: BuyerTypeReader; readonly assurance?: AssuranceVerifier; /** The bound of the collaborator calls of CMD027 and CMD043 (realProviderCallTimer when absent; fault cells bind a clock-driven one). */ readonly providerTimer?: ProviderCallTimer; /** Where the failure of a collaborator call after its bound elapsed goes (stderr when absent). */ readonly onLateFailure?: LateFailureSink };
   /**
    * CMD027 CreateQuote's collaborators that replace the edition's (package B10, mandate B10-COMMANDS-QUOTE): the recorded buyer type (the
    * edition records none, so a quote is refused BUYER_TYPE_UNSET until B11 binds it), the re-binder of a paid purchase (the payment service's
@@ -465,7 +463,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     assurance: assembly.commercial?.assurance ?? createAssuranceVerifier(),
   });
   // package B12 (L-SEND): CMD063 and the sender routes over the kit's stubs
-  const sendLane = createSendLaneHandlers(commerceRuntime, { authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }), assurance: assembly.commercial?.assurance ?? createAssuranceVerifier(), sealer: assembly.outreach?.sealer ?? outreachSealerOf({ compliance: null, optOutKey: null }) });
+  const sendLane = createSendLaneHandlers(commerceRuntime, { authorizer: createCommercialAuthorizer({ principals: commercialPrincipalReader }), assurance: assembly.commercial?.assurance ?? createAssuranceVerifier(), sealer: assembly.commercial?.outreachSealer ?? outreachSealerOf({ compliance: null, optOutKey: null }) });
   return createApiServer({
     ...(assembly.oneTimeDelivery !== undefined ? { oneTimeDelivery: assembly.oneTimeDelivery } : {}),
     environment: assembly.environment,
