@@ -165,6 +165,36 @@
           "version"
         ]
       },
+      "kauro.breakglass_accesses": {
+        "INSERT": [
+          "access_id",
+          "accessed_by_user_id",
+          "agency_id",
+          "file_id",
+          "grant_id",
+          "project_id",
+          "table_id"
+        ]
+      },
+      "kauro.breakglass_grants": {
+        "INSERT": [
+          "agency_id",
+          "assurance_proof_ref",
+          "authorization_kind",
+          "authorization_ref",
+          "grant_id",
+          "holder_user_id",
+          "project_id",
+          "purpose"
+        ],
+        "UPDATE": [
+          "revision",
+          "revoke_reason",
+          "revoked_at",
+          "revoked_by_user_id",
+          "state"
+        ]
+      },
       "kauro.capabilities": {
         "UPDATE": [
           "revision",
@@ -1622,6 +1652,14 @@
       ],
       "using": "(seller_id = kauro.current_seller_id())"
     },
+    "agencies/agencies_breakglass_scope": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(kauro.acting_corporate_owner() AND (EXISTS ( SELECT 1\n   FROM kauro.projects p\n  WHERE ((p.agency_id = agencies.agency_id) AND (p.project_id = kauro.breakglass_scope_project())))))"
+    },
     "agencies/agencies_commission_designation": {
       "check": "(agency_id = kauro.current_agency_id())",
       "command": "UPDATE",
@@ -2425,6 +2463,46 @@
         "kauro_app"
       ],
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.commission_statements s\n  WHERE (s.calendar_id = banking_calendars.calendar_id)))"
+    },
+    "breakglass_accesses/breakglass_accesses_owner_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()"
+    },
+    "breakglass_accesses/breakglass_accesses_record": {
+      "check": "((accessed_by_user_id = kauro.current_user_id()) AND (grant_id = kauro.breakglass_scope_grant()) AND kauro.breakglass_covers(agency_id, project_id))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null
+    },
+    "breakglass_grants/breakglass_grants_owner_close": {
+      "check": "kauro.acting_corporate_owner()",
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()"
+    },
+    "breakglass_grants/breakglass_grants_owner_open": {
+      "check": "(kauro.acting_corporate_owner() AND (holder_user_id = kauro.current_user_id()))",
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null
+    },
+    "breakglass_grants/breakglass_grants_owner_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "kauro.acting_corporate_owner()"
     },
     "capabilities/capabilities_control": {
       "check": "true",
@@ -4651,6 +4729,14 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
+    "projects/projects_breakglass_scope": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(kauro.acting_corporate_owner() AND (project_id = kauro.breakglass_scope_project()))"
+    },
     "projects/projects_control_execution_read": {
       "check": null,
       "command": "SELECT",
@@ -5781,6 +5867,14 @@
       ],
       "using": "true"
     },
+    "source_files/source_files_breakglass_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((state = 'ADMITTED'::text) AND kauro.breakglass_covers(agency_id, project_id))"
+    },
     "source_files/source_files_control_insert": {
       "check": "(agency_id = kauro.current_agency_id())",
       "command": "INSERT",
@@ -5813,6 +5907,14 @@
       ],
       "using": "(agency_id = kauro.current_agency_id())"
     },
+    "source_table_columns/source_table_columns_breakglass_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(kauro.acting_corporate_owner() AND (EXISTS ( SELECT 1\n   FROM kauro.source_tables t\n  WHERE ((t.table_id = source_table_columns.table_id) AND (t.agency_id = source_table_columns.agency_id)))))"
+    },
     "source_table_columns/source_table_columns_control_insert": {
       "check": "(agency_id = kauro.current_agency_id())",
       "command": "INSERT",
@@ -5836,6 +5938,14 @@
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "source_tables/source_tables_breakglass_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(kauro.acting_corporate_owner() AND (EXISTS ( SELECT 1\n   FROM kauro.source_files f\n  WHERE ((f.file_id = source_tables.file_id) AND (f.agency_id = source_tables.agency_id)))))"
     },
     "source_tables/source_tables_control_insert": {
       "check": "(agency_id = kauro.current_agency_id())",
@@ -6029,6 +6139,14 @@
       ],
       "using": "true"
     },
+    "stored_objects/stored_objects_breakglass_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(kauro.acting_corporate_owner() AND (EXISTS ( SELECT 1\n   FROM kauro.source_files f\n  WHERE ((f.accepted_object_id = stored_objects.object_id) AND (f.agency_id = stored_objects.agency_id)))))"
+    },
     "stored_objects/stored_objects_control_insert": {
       "check": "((agency_id = kauro.current_agency_id()) AND (created_by_kind = 'SERVICE'::text))",
       "command": "INSERT",
@@ -6068,6 +6186,14 @@
         "kauro_app"
       ],
       "using": "(agency_id = kauro.current_agency_id())"
+    },
+    "support_cases/support_cases_breakglass_scope": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(kauro.acting_corporate_owner() AND (project_id = kauro.breakglass_scope_project()))"
     },
     "support_cases/support_cases_tenant": {
       "check": "(agency_id = kauro.current_agency_id())",
@@ -6443,6 +6569,12 @@
         "SELECT"
       ],
       "kauro.banking_calendars": [
+        "SELECT"
+      ],
+      "kauro.breakglass_accesses": [
+        "SELECT"
+      ],
+      "kauro.breakglass_grants": [
         "SELECT"
       ],
       "kauro.capabilities": [
