@@ -63,6 +63,7 @@ import {
   dispatchPayment,
   drain,
   fenceRead,
+  journalOfKey,
   footprint,
   getRequest,
   holdPayoutCash,
@@ -80,7 +81,6 @@ import {
   requestRoute,
   requestRow,
   requestsOf,
-  sameButJournal,
   settle,
   settledOf,
   store,
@@ -171,7 +171,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
       const r = await withStoreHook(ref, async () => { ctx.clock.past(deadline); await new Promise((res) => setTimeout(res, 120)); }, () => onClock(ctx, `CMD215 whose ${which} read outlives its bound`, () => w.run()));
       assert.equal(code(r), "503 CAPACITY_UNAVAILABLE EVIDENCE_UNAVAILABLE", `${which}: unread evidence records nothing`);
       assert.equal(await w.effect(), "NONE");
-      assert.deepEqual(sameButJournal(await footprint(w), before), before, `${which}: nothing written, no intent`);
+      assert.deepEqual(await footprint(w), before, `${which}: nothing written, no intent`);
     }
   });
 
@@ -195,7 +195,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
     assert.equal(code(await ctx.attempt(() => replaced.run())), "422 INTEGRITY_FAILURE HASH_MISMATCH", "replaced bytes record nothing");
     const other = await withdrawal("st1-retry-other");
     assert.equal(code(await ctx.attempt(() => settle(w.accountRef, other.settlement, null))), "422 INTEGRITY_FAILURE UNKNOWN_EVIDENCE", "another account's record");
-    assert.deepEqual(sameButJournal(await footprint(w), before), before, "no refused evidence left an intent");
+    assert.deepEqual(await footprint(w), before, "no refused evidence left an intent");
     // the valid bytes classify the same way every time: the command answers them once (one intent, no money), then replays
     const key = freshKey("st1-valid");
     const ok = await ctx.attempt(() => w.run({ key }));
@@ -284,7 +284,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
     const fp = await footprint(w);
     assert.deepEqual(fp.requests, [["RECORDED", null]], "only the holder's intent");
     assert.equal(code(await w.run({ key })), LOSER, "the same key, once the holder committed, is the loser's answer");
-    assert.deepEqual(sameButJournal(await footprint(w), fp), fp, "the recovery wrote nothing");
+    assert.deepEqual(await footprint(w), fp, "the recovery wrote nothing");
   });
 
   cell(t("DENY", "EXPIRY", "period end and step-up"), "expiry", async (ctx) => {
@@ -299,13 +299,13 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
       const future = await withdrawal(`st2-expiry-future-${late}`, { at: effect, instants: { [late]: plusMs(effect, 1) } });
       const before = await footprint(future);
       assert.equal(code(await onClock(ctx, `CMD215 whose ${late} ends 1 ms after the effect instant`, () => future.run({ proof }))), "409 PRECONDITION_FAILED COVERAGE_END_IN_FUTURE", `${late} end > effectNow`);
-      assert.deepEqual(sameButJournal(await footprint(future), before), before, `${late}: nothing written, no intent`);
+      assert.deepEqual(await footprint(future), before, `${late}: nothing written, no intent`);
     }
     const stale = await withdrawal("st2-expiry-stale");
     const before = await footprint(stale);
     ctx.clock.set(plusMs(expiresAt, 1));
     assert.equal(code(await onClock(ctx, "CMD215 1 ms after the proof expired", () => stale.run({ proof }))), "403 ASSURANCE_REQUIRED STEP_UP_STALE", "+1 ms: judged at the effect clock");
-    assert.deepEqual(sameButJournal(await footprint(stale), before), before, "nothing written, no intent");
+    assert.deepEqual(await footprint(stale), before, "nothing written, no intent");
     assert.equal(await stale.effect(), "NONE");
   });
 
@@ -343,7 +343,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
       assert.deepEqual([fp.requests, fp.settlements, fp.ledger, fp.requestEvents], [[["RECORDED", null]], [], [], 1], "an intent and its recorded.v1, no settlement, no posting");
       const replay = await w.run({ key });
       const view = recordOf(replay, w, "the same key returns the committed intent");
-      assert.deepEqual(sameButJournal(await footprint(w), fp), fp, "the replay wrote nothing");
+      assert.deepEqual(await footprint(w), fp, "the replay wrote nothing");
       assert.equal(await deliver(view.requestId), "APPLIED", "delivered: applied once");
       assert.deepEqual((await footprint(w)).ledger, postingsOf(w), "one balanced set");
       assert.equal(await deliver(view.requestId), "DUPLICATE", "delivered again: nothing more");
@@ -361,7 +361,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
     // (1) identical replay
     const replay = await ctx.attempt(() => w.run({ key }));
     assert.equal(replayedBody(replay.text), replayedBody(first.text), "the same body (the replayed flag aside)");
-    assert.deepEqual(sameButJournal(await footprint(w), fp), fp, "the replay writes nothing");
+    assert.deepEqual(await footprint(w), fp, "the replay writes nothing");
     // (2) same key, other body
     assert.equal(code(await ctx.attempt(() => w.run({ key, variant: true }))), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
     // (3) a new key while the intent is RECORDED, then after it was APPLIED
@@ -402,7 +402,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
         await held.release();
       }
       assert.equal(await w.effect(), "NONE", `${what}: refused`);
-      assert.deepEqual(sameButJournal(await footprint(w), before), before, `${what}: nothing written, no intent`);
+      assert.deepEqual(await footprint(w), before, `${what}: nothing written, no intent`);
       recordOf(await w.run(), w, `${what}: the lane owner then records the intent`);
     }
     const a = await agentOf(L().iw, "st2-billing");
@@ -431,10 +431,12 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
       } finally {
         await conn.end();
       }
-      assert.deepEqual(sameButJournal(await footprint(w), before), before, `${at}: the whole footprint rolled back (intent, event, outbox)`);
+      assert.deepEqual(await footprint(w), before, `${at}: the whole footprint rolled back (intent, event, outbox)`);
+      assert.deepEqual(await journalOfKey(key), [], `${at}: the journal reservation rolled back with the unit, no row left behind`);
       assert.equal(await w.effect(), "NONE", `${at}: no intent`);
     }
     recordOf(await w.run({ key }), w, "the same key then records once");
+    assert.deepEqual(await journalOfKey(key), [["COMMITTED", true]], "and its journal row is the one committed entry");
     assert.deepEqual((await footprint(w)).requests, [["RECORDED", null]]);
     assert.equal((await footprint(w)).requestEvents, 1, "one recorded.v1");
   });
@@ -742,7 +744,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
         advance(301_000);
         assert.equal((await deliveryIn(await dispatchPayment(), requestId)).outcome, "DUPLICATE", `${label}: redelivered, nothing more`);
         assert.deepEqual([(await outboxOf(requestId)).state, (await outboxOf(requestId)).attempts], ["DELIVERED", 2]);
-        assert.deepEqual(sameButJournal(await footprint(w), fp), fp, `${label}: one effect`);
+        assert.deepEqual(await footprint(w), fp, `${label}: one effect`);
         const view = await outcomeOf(w.accountRef, requestId);
         assert.deepEqual([view.state, view.reason], [committed.state, committed.reason], `${label}: GET returns the committed state`);
       }
@@ -756,7 +758,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
     assert.equal(await ctx.attempt(() => deliver(ok.requestId)), "APPLIED");
     const fp = await footprint(ok.w);
     assert.equal(await ctx.attempt(() => deliver(ok.requestId)), "DUPLICATE", "the identical event redelivered");
-    assert.deepEqual(sameButJournal(await footprint(ok.w), fp), fp, "nothing more");
+    assert.deepEqual(await footprint(ok.w), fp, "nothing more");
     const no = await recorded("st3-retry-refused", { fund: 0n });
     assert.equal(await ctx.attempt(() => deliver(no.requestId)), "APPLIED");
     await providerAvailable(no.w.route, no.w.withdrawnCents + no.w.feeCents);

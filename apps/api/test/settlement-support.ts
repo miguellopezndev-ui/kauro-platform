@@ -265,7 +265,8 @@ export async function footprint(w: Pick<Withdrawal, "route">): Promise<Settlemen
     settlements: rows.map((r) => [r.w, r.c, r.r, r.b] as const),
     events: await count("SELECT 1 FROM kauro.domain_events WHERE aggregate_kind = 'settlement' AND aggregate_id::text = ANY($1::text[])", [idsOf]),
     outbox: await count("SELECT 1 FROM kauro.outbox_records o JOIN kauro.domain_events e USING (event_id) WHERE e.aggregate_kind = 'settlement' AND e.aggregate_id::text = ANY($1::text[])", [idsOf]),
-    journal: await count("SELECT 1 FROM kauro.command_journal WHERE resource_id::text = ANY($1::text[])", [[...idsOf, ...reqIds]]),
+    // ADV-6: the committed entries of its settlements and intents, plus every CMD215 entry that is not COMMITTED (a failed command has no resource)
+    journal: await count("SELECT 1 FROM kauro.command_journal WHERE resource_id::text = ANY($1::text[]) OR (operation = 'CMD215' AND state <> 'COMMITTED')", [[...idsOf, ...reqIds]]),
     ledger: (await q<{ a: string; d: string; n: string }>("SELECT account_code AS a, direction AS d, amount_cents::text AS n FROM kauro.ledger_entries WHERE settlement_id::text = ANY($1::text[]) ORDER BY settlement_id, line_no", [idsOf])).map((r) => [r.a, r.d, r.n] as const),
     available: (await availableOf(w.route)).toString(),
     requests: reqs.map((r) => [r.o ?? "RECORDED", r.r] as const),
@@ -273,7 +274,10 @@ export async function footprint(w: Pick<Withdrawal, "route">): Promise<Settlemen
     cases: await casesOf({ accountRef: w.route.accountRef }),
   };
 }
-export const sameButJournal = (a: SettlementFootprint, b: SettlementFootprint): SettlementFootprint => ({ ...a, journal: b.journal });
+/** The journal rows of one CMD215 idempotency key: [state, has resource] per row (ADV-6: the footprint's count is keyed by resource ids, which a failed command never has). */
+export async function journalOfKey(key: string): Promise<ReadonlyArray<readonly [string, boolean]>> {
+  return (await q<{ s: string; r: boolean }>("SELECT state AS s, resource_id IS NOT NULL AS r FROM kauro.command_journal WHERE operation = 'CMD215' AND idempotency_key = $1 ORDER BY entry_id", [key])).map((x) => [x.s, x.r] as const);
+}
 /** Every posting set of the route's settlements balances by itself (D-SET-6), and PSP_AVAILABLE never goes below zero. */
 export async function assertBalanced(w: Pick<Withdrawal, "route">, what: string): Promise<void> {
   const unbalanced = await q<{ id: string; net: string }>(
