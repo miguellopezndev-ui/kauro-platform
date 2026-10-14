@@ -13,7 +13,8 @@
  * Registering these beside REQUEST_SCHEMAS (widening the validator's known schema ids) is the command lanes' step when they serve
  * the routes; the `$id`s do not clash with the B06 or B09 ones.
  */
-import { LABEL_PATTERN, REQUEST_SCHEMA_PREFIX, type RequestSchema } from "../api/request-schemas.js";
+import { LABEL_PATTERN, REQUEST_SCHEMA_PREFIX, TEXT_PATTERN, type RequestSchema } from "../api/request-schemas.js";
+import { OUTREACH_PURPOSES } from "@kauro/domain";
 
 const ID = { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" } as const;
 const VERSION = { type: "integer", minimum: 1, maximum: 9007199254740991 } as const;
@@ -21,6 +22,9 @@ const VERSION = { type: "integer", minimum: 1, maximum: 9007199254740991 } as co
 const ACCOUNT_VERSION = { type: "integer", minimum: 0, maximum: 9007199254740991 } as const;
 const HASH = { type: "string", pattern: "^[0-9a-f]{64}$" } as const;
 const LABEL = { type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PATTERN } as const;
+const PURPOSE = { type: "string", enum: [...OUTREACH_PURPOSES] } as const;
+/** A UTC instant with up to microsecond precision (B12 judges at the microsecond; plan §W). */
+const UTC_INSTANT = { type: "string", pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$" } as const;
 
 function schema(command: string, required: ReadonlyArray<string>, properties: RequestSchema["properties"]): RequestSchema {
   return {
@@ -88,6 +92,103 @@ export const COMMERCIAL_REQUEST_SCHEMAS = Object.freeze({
   }),
   /** RestrictCapability: the capability version read and the incident that shows unsafe or unavailable behavior. */
   CMD059: schema("CMD059", ["expectedVersion", "incidentRef"], { expectedVersion: VERSION, incidentRef: ID }),
+  // --- package B12 (outreach; K2) ---------------------------------------------------------------------------------------------------
+  /** PrepareOutreachDraft: the prospect, the registered sender, the reviewed purpose, the stored content and the source evidence the draft rests on. */
+  CMD061: schema("CMD061", ["prospectId", "senderIdentityRef", "purpose", "contentRef", "provenanceEvidenceHash"], {
+    prospectId: ID,
+    senderIdentityRef: ID,
+    purpose: PURPOSE,
+    contentRef: HASH,
+    provenanceEvidenceHash: HASH,
+  }),
+  /** AuthorizeOutreach: the sender, the sealed drafts' content bindings, the window, the bound count, the review digest and the owner's step-up proof. */
+  CMD062: schema("CMD062", ["senderIdentityRef", "allowedContentHashes", "validFrom", "expiresAt", "maximumSends", "permissionEvidenceHash", "assuranceProofRef"], {
+    senderIdentityRef: ID,
+    allowedContentHashes: { type: "array", minItems: 1, maxItems: 100, items: HASH },
+    validFrom: UTC_INSTANT,
+    expiresAt: UTC_INSTANT,
+    maximumSends: { type: "integer", minimum: 1, maximum: 100 },
+    permissionEvidenceHash: HASH,
+    assuranceProofRef: ID,
+  }),
+  /** SendAuthorizedOutreach: the draft version read, the grant it is sent under and the content binding the server recomputes. */
+  CMD063: schema("CMD063", ["expectedVersion", "authorizationId", "contentHash"], { expectedVersion: VERSION, authorizationId: ID, contentHash: HASH }),
+  /** RecordSalesActivity: one evidence-backed activity; the prospect and kind decide which of the optional members the kind needs. */
+  CMD064: schema("CMD064", ["activity"], {
+    activity: {
+      type: "object",
+      additionalProperties: false,
+      required: ["prospectId", "kind", "occurredAt", "evidenceHash", "providerMessageRef"],
+      properties: {
+        prospectId: ID,
+        draftId: ID,
+        kind: { type: "string", enum: ["REPLIED", "BOUNCED", "SUPPRESSED", "HUMAN_SEND_OBSERVED"] },
+        occurredAt: UTC_INSTANT,
+        evidenceHash: HASH,
+        providerMessageRef: { type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PATTERN },
+        observation: { type: "string", enum: ["SENT", "NOT_SENT"] },
+        suppressionKeyKind: { type: "string", enum: ["ORGANIZATION", "CONTACT"] },
+        suppressionReason: { type: "string", enum: ["OPT_OUT", "COMPLAINT", "REFUSAL", "DISQUALIFIED"] },
+      },
+    },
+  }),
+  /** PutOutreachContent: the subject (one line) and the plain-text body; the content is addressed by their hash. */
+  PutOutreachContent: schema("PutOutreachContent", ["subject", "body"], {
+    subject: { type: "string", minLength: 1, maxLength: 200, pattern: LABEL_PATTERN },
+    body: { type: "string", minLength: 1, maxLength: 20000, pattern: TEXT_PATTERN },
+  }),
+  /** PublishSalesResource: the family, the version read (0 for a new family), the stored content, the capabilities it describes and the owner's step-up proof. */
+  PublishSalesResource: schema("PublishSalesResource", ["familyId", "expectedVersion", "contentRef", "capabilityIds", "assuranceProofRef"], {
+    familyId: ID,
+    expectedVersion: ACCOUNT_VERSION,
+    contentRef: HASH,
+    capabilityIds: { type: "array", minItems: 1, maxItems: 50, items: ID },
+    assuranceProofRef: ID,
+  }),
+  /** RegisterSenderIdentity: the person, the mailbox, the route, the person's consent evidence (required for GMAIL_API) and the owner's step-up proof. */
+  RegisterSenderIdentity: schema("RegisterSenderIdentity", ["userId", "address", "route", "assuranceProofRef"], {
+    userId: ID,
+    address: { type: "string", minLength: 3, maxLength: 254, pattern: "^[^\\s@]+@[^\\s@]+$" },
+    route: { type: "string", enum: ["GMAIL_API", "RESEND_TRANSACTIONAL"] },
+    consentEvidenceRef: HASH,
+    assuranceProofRef: ID,
+  }),
+  /** VerifySenderIdentity: the evidence that the person controls the mailbox. */
+  VerifySenderIdentity: schema("VerifySenderIdentity", ["verificationEvidenceHash"], { verificationEvidenceHash: HASH }),
+  /** RecordSenderRevocation: nothing but the path's sender. */
+  RecordSenderRevocation: schema("RecordSenderRevocation", [], {}),
+  /** PrepareOutreachReview: the sender, the drafts to show the owner and the owner's step-up proof the review is bound to. */
+  PrepareOutreachReview: schema("PrepareOutreachReview", ["senderIdentityRef", "draftIds", "assuranceProofRef"], {
+    senderIdentityRef: ID,
+    draftIds: { type: "array", minItems: 1, maxItems: 100, items: ID },
+    assuranceProofRef: ID,
+  }),
+  /** RecordOutreachDiagnosis: the person whose pause the owner lifts, the diagnosis evidence and the owner's step-up proof. */
+  RecordOutreachDiagnosis: schema("RecordOutreachDiagnosis", ["personUserId", "evidenceHash", "assuranceProofRef"], { personUserId: ID, evidenceHash: HASH, assuranceProofRef: ID }),
+  /** RevokeOutreachAuthorization: nothing but the path's grant. */
+  RevokeOutreachAuthorization: schema("RevokeOutreachAuthorization", [], {}),
+  /** WithdrawOutreachChannelPolicy: the policy's jurisdiction and purpose, the version read and the owner's step-up proof. */
+  WithdrawOutreachChannelPolicy: schema("WithdrawOutreachChannelPolicy", ["jurisdiction", "purpose", "expectedVersion", "assuranceProofRef"], {
+    jurisdiction: LABEL,
+    purpose: PURPOSE,
+    expectedVersion: VERSION,
+    assuranceProofRef: ID,
+  }),
+  /** RecordProspectSource: the collection evidence of a prospect (the source URL travels as a digest only). */
+  RecordProspectSource: schema("RecordProspectSource", ["evidenceHash", "sourceUrlDigest", "observedOn", "lawfulBasis", "segment"], {
+    evidenceHash: HASH,
+    sourceUrlDigest: HASH,
+    observedOn: { type: "string", pattern: "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$" },
+    lawfulBasis: { type: "string", pattern: "^[A-Z][A-Z0-9_]{2,63}$" },
+    segment: { type: "string", enum: ["AGENCY", "COMPANY"] },
+  }),
+  /** RecordProspectContact: the seller's label for the contact, its role, the channel and the address (stored in the restricted record only). */
+  RecordProspectContact: schema("RecordProspectContact", ["contactLabel", "channel", "address"], {
+    contactLabel: LABEL,
+    roleLabel: LABEL,
+    channel: { type: "string", pattern: "^[A-Z][A-Z0-9_]{2,63}$" },
+    address: { type: "string", minLength: 3, maxLength: 254, pattern: "^[^\\s@]+@[^\\s@]+$" },
+  }),
 } as const);
 
 export type CommercialRequestSchemaCommand = keyof typeof COMMERCIAL_REQUEST_SCHEMAS;

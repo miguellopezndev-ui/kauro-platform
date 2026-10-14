@@ -36,7 +36,9 @@ import {
 import { commerceWorld, type CommerceWorld } from "./commerce-support.js";
 
 const B10_COMMANDS = ["CMD002", "CMD027", "CMD043", "CMD045", "CMD046", "CMD047", "CMD048", "CMD049", "CMD050", "CMD051", "CMD052", "CMD053"] as const;
-const ALL_COMMANDS = [...B10_COMMANDS, "CMD056", "CMD057", "CMD058", "CMD059"] as const;
+const B12_COMMANDS = ["CMD061", "CMD062", "CMD063", "CMD064", "PutOutreachContent", "PublishSalesResource", "RegisterSenderIdentity", "VerifySenderIdentity", "RecordSenderRevocation", "PrepareOutreachReview", "RecordOutreachDiagnosis", "RevokeOutreachAuthorization", "WithdrawOutreachChannelPolicy", "RecordProspectSource", "RecordProspectContact"] as const;
+const B12_READS = ["GetOutreachDraft", "GetOutreachReview", "ListSalesActivities", "GetOutreachMetrics", "GetSalesResource"] as const;
+const ALL_COMMANDS = [...B10_COMMANDS, "CMD056", "CMD057", "CMD058", "CMD059", ...B12_COMMANDS] as const;
 const require = createRequire(import.meta.url);
 const bundle = JSON.parse(readFileSync(require.resolve("@kauro/contracts/schemas.json"), "utf8")) as RegistryBundle;
 
@@ -58,7 +60,7 @@ test("every B10 command spec matches its catalogue entry: name, method, path, ro
     else assert.ok(spec.path.includes(`{${spec.aggregateParam}}`), id);
     assert.equal(spec.expectedVersionRequired, catalogue.fields.some((f) => f.name === "expectedVersion"), id);
   }
-  assert.deepEqual(Object.keys(COMMERCIAL_COMMANDS), [...B10_COMMANDS, "CMD056", "CMD057", "CMD058", "CMD059"], "B10 twelve, the two operations commands and B18 two capability commands");
+  assert.deepEqual(Object.keys(COMMERCIAL_COMMANDS), [...ALL_COMMANDS], "B10 twelve, the two operations commands, B18 two capability commands and B12 fifteen (K2)");
   assert.equal(COMMERCIAL_COMMANDS.CMD045.aggregateParam, null, "a prospect is registered before it has an identity");
 });
 
@@ -189,10 +191,10 @@ test("the commercial contracts: every request schema carries exactly the registr
   assert.equal(new Set(viewNames).size, viewNames.length, "a view is defined once");
   assert.deepEqual(Object.keys(defs), viewNames);
   assert.ok(viewNames.every((n) => !(n in bundle.$defs) && !(n in shared)), "no B10 view shadows a registry or an earlier package's definition");
-  assert.deepEqual(Object.keys(COMMERCIAL_COMMAND_RESPONSES), [...B10_COMMANDS, "CMD056", "CMD057", "CMD058", "CMD059"]);
-  assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.status), [200, 201, 200, 201, 201, 200, 200, 200, 200, 200, 200, 200, 201, 200, 200, 200]);
+  assert.deepEqual(Object.keys(COMMERCIAL_COMMAND_RESPONSES), [...ALL_COMMANDS]);
+  assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.status), [200, 201, 200, 201, 201, 200, 200, 200, 200, 200, 200, 200, 201, 200, 200, 200, 201, 201, 200, 201, 201, 201, 201, 200, 200, 201, 201, 200, 200, 201, 201]);
   assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.accepted), ALL_COMMANDS.map((c) => c === "CMD027"));
-  assert.deepEqual(Object.keys(roots).sort(), [...ALL_COMMANDS.map((c) => commercialCommandResponseSchemaId(c)), commercialReadResponseSchemaId("GetCommissionStatement")].sort());
+  assert.deepEqual(Object.keys(roots).sort(), [...ALL_COMMANDS.map((c) => commercialCommandResponseSchemaId(c)), ...(["GetCommissionStatement", ...B12_READS] as const).map((r) => commercialReadResponseSchemaId(r))].sort());
   assert.deepEqual(COMMERCIAL_READ_ROUTES.GetCommissionStatement, {
     path: "/api/v1/sales/statements/{statementId}",
     scope: "CORPORATE",
@@ -269,7 +271,7 @@ test("the commercial contracts: every request schema carries exactly the registr
   // a view that does not select the seller's own statement fields cannot leak another seller's: no view of the package lists sellers
   for (const view of COMMERCIAL_VIEW_DEFINITIONS) {
     const arrays = Object.entries(view.members).filter(([, m]) => m.kind === "platform" && (m.schema as { type?: string }).type === "array").map(([name]) => name);
-    for (const name of arrays) assert.ok(["offeredModes", "items", "balanceItems", "lineIds", "affectedScopeRefs", "openResponsibilities"].includes(name), `${view.name}.${name}: a list in a commercial view is the caller's own`);
+    for (const name of arrays) assert.ok(["offeredModes", "items", "balanceItems", "lineIds", "affectedScopeRefs", "openResponsibilities", /* B12 (K2): the grant's sealed content hashes and a resource's capability ids, never a list of sellers */ "allowedContentHashes", "capabilityIds"].includes(name), `${view.name}.${name}: a list in a commercial view is the caller's own`);
   }
 
   // injected definitions are refused by the same builder (a start-up check, not a convention)

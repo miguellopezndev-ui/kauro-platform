@@ -14,14 +14,14 @@ import { DomainFailure, NotFoundFailure, registryCommissionPolicy } from "@kauro
 import { problemOf, type Problem } from "../../api/problems.js";
 import { CommerceAccessDenied, recordOperatorDenial, type CommerceRequestRuntime } from "../../commerce/request/runtime.js";
 import type { ReadRequest, ReadResult, ReadSpec } from "../../queries/reads.js";
-import { COMMERCIAL_READ_ROUTES } from "../response-schemas.js";
+import { COMMERCIAL_READ_ROUTES, type CommercialReadOperationId } from "../response-schemas.js";
 import type { CommissionStatementView, StatementBalanceItemView, StatementItemView } from "../views.js";
 import { calendarDateIn } from "./close-period.js";
 import type { StatementRequestCollaborators } from "./runtime.js";
 
 /** A served B10 read: its route, the spec the transport's admission reads, and its execution. */
 export interface CommercialReadHandler<View> {
-  readonly operationId: "GetCommissionStatement";
+  readonly operationId: CommercialReadOperationId;
   readonly admission: ReadSpec<string>;
   execute(request: ReadRequest): Promise<ReadResult<View>>;
 }

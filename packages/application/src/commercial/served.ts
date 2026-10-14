@@ -20,12 +20,13 @@ import { HEADERS } from "../api/envelope.js";
 import { PROBLEM_RESPONSE, type DeclaredResponse, type RouteResponses } from "../api/response-contract.js";
 import { ACCEPTED_RESPONSE_SCHEMA_ID } from "../api/response-schemas.js";
 import type { KnownSchemaId } from "../ports/schema-validator.js";
-import { COMMERCIAL_COMMANDS } from "./contracts.js";
+import { COMMERCIAL_COMMANDS, type CommercialCommandId } from "./contracts.js";
+import { B12_SERVED_COMMAND_IDS } from "./outreach/served-ids.js";
 import { COMMERCIAL_COMMAND_OUTCOMES, COMMERCIAL_READ_OUTCOMES } from "./outcomes.js";
 import { COMMERCIAL_COMMAND_RESPONSES, commercialCommandResponseSchemaId, commercialReadResponseSchemaId, type CommercialReadOperationId, type CommercialServedCommandId } from "./response-schemas.js";
 
 /** The B10 commands the api serves. */
-export const COMMERCIAL_SERVED_COMMAND_IDS = Object.freeze(["CMD002", "CMD027", "CMD043", "CMD045", "CMD046", "CMD047", "CMD048", "CMD049", "CMD050", "CMD051", "CMD052", "CMD053", "CMD056", "CMD057", "CMD058", "CMD059"] as const satisfies ReadonlyArray<CommercialServedCommandId>);
+export const COMMERCIAL_SERVED_COMMAND_IDS = Object.freeze(["CMD002", "CMD027", "CMD043", "CMD045", "CMD046", "CMD047", "CMD048", "CMD049", "CMD050", "CMD051", "CMD052", "CMD053", "CMD056", "CMD057", "CMD058", "CMD059", ...B12_SERVED_COMMAND_IDS] as const satisfies ReadonlyArray<CommercialServedCommandId>);
 export type CommercialServedRouteCommandId = (typeof COMMERCIAL_SERVED_COMMAND_IDS)[number];
 
 export function isServedCommercialCommand(id: string): id is CommercialServedRouteCommandId {
@@ -36,7 +37,7 @@ export function isServedCommercialCommand(id: string): id is CommercialServedRou
  * The declared replies of a served B10 command route (its `config.responses`): its COMPLETED status with the command's envelope, and
  * the Problem document of its closed outcome catalogue for every other status. The operationId is the catalogue's name of the command.
  */
-export function commercialCommandRouteResponses(command: CommercialServedRouteCommandId): RouteResponses {
+export function commercialCommandRouteResponses(command: CommercialCommandId): RouteResponses {
   if (!isServedCommercialCommand(command)) throw new TypeError(`${command} is not a served commercial command (COMMERCIAL_SERVED_COMMAND_IDS)`);
   const reply = COMMERCIAL_COMMAND_RESPONSES[command];
   const declared: Record<string, DeclaredResponse> = {
@@ -74,6 +75,23 @@ export const COMMERCIAL_COMMAND_EVENTS: Readonly<Record<CommercialServedRouteCom
   CMD057: [],
   CMD058: [],
   CMD059: [],
+  // package B12 (K2): CMD063 stores the send intent and publishes outreach.send_intended.v1 (one event per version); every other B12 command
+  // writes corporate records whose transitions are commercial_transitions (D10-EVT-1) and publishes none
+  CMD061: [],
+  CMD062: [],
+  CMD063: ["outreach.send_intended.v1"],
+  CMD064: [],
+  PutOutreachContent: [],
+  PublishSalesResource: [],
+  RegisterSenderIdentity: [],
+  VerifySenderIdentity: [],
+  RecordSenderRevocation: [],
+  PrepareOutreachReview: [],
+  RecordOutreachDiagnosis: [],
+  RevokeOutreachAuthorization: [],
+  WithdrawOutreachChannelPolicy: [],
+  RecordProspectSource: [],
+  RecordProspectContact: [],
   CMD027: [
     "quote.drafted.v1",
     "quote.issued.v1",
@@ -86,7 +104,7 @@ export const COMMERCIAL_COMMAND_EVENTS: Readonly<Record<CommercialServedRouteCom
 });
 
 /** The B10 reads the api serves (design §13): GetCommissionStatement since B10-STATEMENTS-PAYOUTS. */
-export const COMMERCIAL_SERVED_READ_IDS = Object.freeze(["GetCommissionStatement"] as const satisfies ReadonlyArray<CommercialReadOperationId>);
+export const COMMERCIAL_SERVED_READ_IDS = Object.freeze(["GetCommissionStatement", "GetOutreachDraft", "GetOutreachReview", "ListSalesActivities", "GetOutreachMetrics", "GetSalesResource"] as const satisfies ReadonlyArray<CommercialReadOperationId>);
 
 export function isServedCommercialRead(id: string): id is CommercialReadOperationId {
   return (COMMERCIAL_SERVED_READ_IDS as ReadonlyArray<string>).includes(id);
