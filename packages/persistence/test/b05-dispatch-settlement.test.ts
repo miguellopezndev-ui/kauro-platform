@@ -1358,12 +1358,13 @@ test("L22 OK migration on a live pool: 00NN applied by the migration runner as t
   const all = listMigrations(MIGRATIONS_DIR);
   const target = all.find((m) => m.name === "b05_dispatch_settlement");
   assert.ok(target, "00NN is the dispatch-settlement migration");
-  // the cluster at 00NN-1 holds every migration before it (later lanes add migrations after 00NN; the runner applies them in order)
-  const earlier = all.filter((m) => m.version < target.version);
-  assert.equal(earlier.length, target.version - 1, "00NN-1 is every migration before it");
+  // the cluster stops just before 00NN, wherever later migrations put it (incident MIGRATION-POSITION-ASSUMED 2026-10-13: "00NN is
+  // the last migration" broke every branch that adds a migration)
+  const at = all.indexOf(target);
+  assert.ok(at > 0, "00NN has a predecessor");
   const dir = mkdtempSync(join(tmpdir(), "kauro-l22-"));
   try {
-    for (const m of earlier) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
+    for (const m of all.slice(0, at)) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));
     const at58 = await openDispatchEnv({ migrationsDir: dir });
     try {
       const e2 = at58;
@@ -1449,7 +1450,7 @@ test("L17 RACE (deadline at COMMIT, every session on one test-clock offset): a r
       (c, run) => admitWith(rawStore(c), admissionOf(run, 50_000n)),
     );
     // the admission's MODEL_TASK lease carries the interpretation deadline as its own (audit/store.ts claimTaskLease), and claim_lease
-    // judges it after the wait at the judged instant (0063, FCG-B06-LEASE-1b): the claim refuses first, before the reservation's KA081
+    // judges it after the wait at the judged instant (0067, FCG-B06-LEASE-1b): the claim refuses first, before the reservation's KA081
     const refused = rejection(outcome);
     assert.ok(refusedBy("KA005")(refused), "the deadline judged after the audit share, by the task lease's claim");
     assert.match(String((refused as { cause?: { message?: unknown } }).cause?.message), /^LEASE: deadline of .* has passed$/, "refused for its deadline, not a fence");

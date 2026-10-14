@@ -34,7 +34,7 @@ import type {
   VersionedWrite,
 } from "@kauro/domain";
 import { DomainFailure, NotFoundFailure, providerScopeKey } from "@kauro/domain";
-import type { CommerceReconciler, ProviderDispatchResult, ProviderOrderObservation, ReconcileResult } from "../ports.js";
+import type { AfterOrderLocks, CommerceReconciler, ProviderDispatchResult, ProviderOrderObservation, ReconcileResult } from "../ports.js";
 import { MAX_ATTEMPTS_PER_OPERATION } from "../protocol.js";
 import { publishVersionEvent } from "./events.js";
 import { planObservation, type ObservationContent, type ObservationOrigin, type ObservationPlan } from "./observation.js";
@@ -67,7 +67,7 @@ function requireService(uow: CommerceUnitOfWork): void {
 export function createCommerceReconciler(deps: CommerceReconcilerDependencies): CommerceReconciler {
   const maxAttempts = deps.maxAttempts ?? MAX_ATTEMPTS_PER_OPERATION;
 
-  async function planFor(uow: CommerceUnitOfWork, orderId: PaymentOrderId, origin: ObservationOrigin, content: ObservationContent, now: UtcInstant): Promise<ObservationPlan> {
+  async function planFor(uow: CommerceUnitOfWork, orderId: PaymentOrderId, origin: ObservationOrigin, content: ObservationContent, at: UtcInstant, afterLocks?: AfterOrderLocks): Promise<{ readonly plan: ObservationPlan; readonly now: UtcInstant }> {
     const c = uow.commerce;
     // ids first, without a lock (design §6.2): the order names its quote, the quote its subject
     const unlocked = await c.orders.get(orderId);
@@ -79,6 +79,9 @@ export function createCommerceReconciler(deps: CommerceReconcilerDependencies): 
     const currentProfile = await c.fiscal.currentProfile(unlocked.agencyId);
     const order = await c.orders.lock(orderId);
     if (order === null) throw new NotFoundFailure("payment_order");
+    // a caller with locks of its own after the order's (a bank instruction) judges its effect instant after the last of them
+    const judged = afterLocks === undefined ? null : await afterLocks(order);
+    const now = judged?.now ?? at;
     const attempts = await c.attempts.listForOrder(orderId);
     const captures = await c.captures.listForOrder(orderId);
     const authorizations = new Map<string, CommercialAuthorizationRecord>();
@@ -91,10 +94,11 @@ export function createCommerceReconciler(deps: CommerceReconcilerDependencies): 
       refunds.push(...(await c.refunds.listForCapture(capture.captureId)));
     }
     const observations = await c.observations.listForOrder(orderId);
-    return planObservation(
-      { now, order, quote, subject, currentProfile, attempts, captures, authorizations: [...authorizations.values()], refunds, observations, approvalHosts: deps.approvalHosts, maxAttempts },
+    const plan = planObservation(
+      { now, order, quote, subject, currentProfile, attempts, captures, authorizations: [...authorizations.values()], refunds, observations, approvalHosts: deps.approvalHosts, maxAttempts, authorityBlocker: judged?.authorityBlocker ?? null },
       { origin, content, mint: () => uow.ids.next() },
     );
+    return { plan, now };
   }
 
   async function execute(uow: CommerceUnitOfWork, plan: ObservationPlan, causationId: CausationId, now: UtcInstant): Promise<{ readonly result: ReconcileResult; readonly published: ReadonlyArray<DomainEventRecord> }> {
@@ -217,8 +221,8 @@ export function createCommerceReconciler(deps: CommerceReconcilerDependencies): 
       }
       const content: ObservationContent = orderObservation ? { kind: "ORDER_OBSERVATION", observation } : { kind: "DISPATCH_RESULT", result: observation };
       if (!orderObservation && origin.source === "PROVIDER_QUERY") throw new DomainFailure("INTEGRITY_FAILURE", "a stored provider query is an order observation");
-      const plan = await planFor(uow, input.orderId, origin, content, input.now);
-      return (await execute(uow, plan, input.causationId, input.now)).result;
+      const { plan, now } = await planFor(uow, input.orderId, origin, content, input.now, input.afterLocks);
+      return (await execute(uow, plan, input.causationId, now)).result;
     },
 
     async applyProviderEvent(uow, input) {
@@ -253,7 +257,7 @@ export function createCommerceReconciler(deps: CommerceReconcilerDependencies): 
       if (uow.commerceScope === null) {
         if ((await uow.adoptScope(attribution.kind, attribution.key)) === null) return unattributed("UNKNOWN_PROVIDER_REFERENCE", "IGNORED");
       }
-      const plan = await planFor(uow, attribution.orderId, { source: "WEBHOOK", inboxId: input.inboxId as InboxId }, { kind: "PROVIDER_EVENT", event }, now);
+      const { plan } = await planFor(uow, attribution.orderId, { source: "WEBHOOK", inboxId: input.inboxId as InboxId }, { kind: "PROVIDER_EVENT", event }, now);
       const { result, published } = await execute(uow, plan, input.causationId, now);
       const first = published[0];
       if (plan.providerQueryRequired && first === undefined) {

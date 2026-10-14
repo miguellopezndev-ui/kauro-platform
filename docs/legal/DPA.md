@@ -27,8 +27,9 @@ of roles:
 - **Agency–end-client chain:** the End Client is the controller of its CRM data, the Customer (agency) acts as its processor and
   Kauro is the Customer's sub-processor. The Customer warrants that its contract with the End Client allows it to engage Kauro as
   a sub-processor on the terms of this Agreement, including the sub-processors in Annex III and the transmissions in section 10.
-- **Two-party chain:** where the Customer is the controller of the data (an In-house Customer processing its own company's data,
-  or an agency processing its own business data), the Customer is the controller and Kauro its processor.
+- **Two-party chain:** where the Customer is the controller of the data (an Internal Customer under the Terms, that is, a
+  company processing its own data, or an agency processing its own business data), the Customer is the controller and Kauro its
+  processor.
 
 Kauro does not presume that the Customer owns all data. A generic "I am the controller" checkbox is not enough: the Platform
 records the Customer's authority over each end client's data (processing-authority reference).

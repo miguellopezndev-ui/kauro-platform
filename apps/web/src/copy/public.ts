@@ -7,7 +7,8 @@
 // what is written here: the free step is the "Free data health check" (never an audit or a diagnosis), one call to action, one AI sentence
 // on Home and none in a headline, CLEAN beside the two qualified modes without a compatibility claim, "another CRM" and never a third-party
 // CRM name, a mode named as qualified only when the capability publication lists it (those sentences are chosen at render time from the
-// published modes, see src/public/capabilities.ts), one in-house sentence on Pricing, no savings amount, and the founding line absent.
+// published modes, see src/public/capabilities.ts), no savings amount, and the founding line absent. Agencies and companies buy on the
+// same terms (D-33), so a line about who may buy, who gets a discount or whose data is protected names any customer.
 //
 // Ids whose last segment is title, heading, label, cta, offer, subject or name are surfaces: no AI word is allowed in them (lint.ts).
 // The one catalogue of the application (src/copy/en.ts EN, merged at the stage-1 integration) is W3's entries and these, by key prefix.
@@ -36,7 +37,7 @@ export const PUBLIC_COPY = {
   // ---- names shared with the application ----------------------------------------------------------------------------------------------
   "health-check.title": "Free data health check",
   "public.cta.request-health-check.cta": "Request a free data health check",
-  "pricing.in-house.body": "In-house CRM and data teams can use Kauro too.",
+  "pricing.in-house.body": "Companies preparing their own CRM data can buy Kauro directly, at the same prices and discounts as agencies.",
 
   // ---- UI01 Home ----------------------------------------------------------------------------------------------------------------------
   "home.meta.title": "Kauro: prepare and verify CRM data from files",
@@ -147,7 +148,7 @@ export const PUBLIC_COPY = {
   "pricing.ladder.salesforce.name": "Salesforce preparation",
   "pricing.ladder.salesforce.body": "From {price} for up to {units} billable source units.",
   "pricing.ladder.repeat.name": "Repeat discounts",
-  "pricing.ladder.repeat.body": "{low}, {mid} and {high} off a new quote for an agency that has bought before.",
+  "pricing.ladder.repeat.body": "{low}, {mid} and {high} off a new quote for a customer that has bought before.",
   "pricing.table.caption": "Indicative price by billable source units and service",
   "pricing.table.units.label": "Billable source units",
   "pricing.table.not-offered": "Not offered yet",
@@ -159,7 +160,7 @@ export const PUBLIC_COPY = {
   "pricing.quote.body": "An estimate on this page is not a quote. A binding quote is issued from your sealed files, stays valid for {days} days, and shows the band, any discount, taxes, the total and the currency.",
   "pricing.tax.body": "Prices are before tax. Any tax that applies is shown on your quote before you pay.",
   "pricing.repeat.heading": "Repeat discounts",
-  "pricing.repeat.body": "If your agency sells periodic cleanups, each one is a new project. The repeat discount starts with your second project and does not stack with another discount. Safe templates carry your earlier column and target settings forward for review, and approvals are never reused.",
+  "pricing.repeat.body": "If you run periodic cleanups, each one is a new project. The repeat discount starts with your second project and does not stack with another discount. Safe templates carry your earlier column and target settings forward for review, and approvals are never reused.",
   "pricing.repeat.table.caption": "Repeat discount by qualifying projects in the preceding {days} days",
   "pricing.repeat.projects.label": "Qualifying projects",
   "pricing.repeat.discount.label": "Discount on the new quote",
@@ -179,7 +180,7 @@ export const PUBLIC_COPY = {
   "pricing.estimate.mode-unread": "Whether {mode} is available cannot be read right now.",
   "pricing.estimate.noscript": "The estimate needs JavaScript. The table above shows every band and price.",
   "pricing.account.heading": "Create an account",
-  "pricing.account.body": "An account is where your agency uploads files, receives the free data health check and, when it decides to buy, receives a quote.",
+  "pricing.account.body": "An account is where your team uploads files, receives the free data health check and, when it decides to buy, receives a quote.",
   "pricing.account.cta": "Sign in or create an account",
 
   // ---- UI05 Sample delivery -----------------------------------------------------------------------------------------------------------
@@ -225,10 +226,10 @@ export const PUBLIC_COPY = {
   "security.title": "Know what is processed and when it is deleted.",
   "security.lead": "This page describes what Kauro does today, and it says plainly what Kauro does not claim.",
   "security.processed.heading": "What Kauro processes",
-  "security.processed.body": "The files your agency uploads, the settings and decisions it enters, and the account and billing details needed to run the service.",
+  "security.processed.body": "The files your team uploads, the settings and decisions it enters, and the account and billing details needed to run the service.",
   "security.excluded.body": "Do not upload credentials or secrets, full payment card data, or health data. A field called notes can hold sensitive information. The checks Kauro runs on uploaded content reduce that risk but cannot promise to find every case.",
-  "security.isolation.heading": "How agencies are kept apart",
-  "security.isolation.body": "Each agency's data is separated from every other agency's, by the application and by rules that the database itself enforces. A request for another agency's project is answered exactly like a request for a project that does not exist.",
+  "security.isolation.heading": "How customers are kept apart",
+  "security.isolation.body": "Each customer's data is separated from every other customer's, by the application and by rules that the database itself enforces. A request for another customer's project is answered exactly like a request for a project that does not exist.",
   "security.model.heading": "What a model may see",
   "security.model.body": "When a model helps to interpret data, it receives only a limited context that Kauro selects, never your files as a whole. It cannot approve a change and it cannot write to your CRM. The limited context is deleted together with the project data it came from.",
   "security.authority.heading": "Who decides",
@@ -257,7 +258,7 @@ export const PUBLIC_COPY = {
   "contact.form.noscript": "This form needs JavaScript to send your inquiry.",
   "contact.buyer.legend": "Who will use Kauro?",
   "contact.buyer.agency": "An agency preparing data for clients",
-  "contact.buyer.in-house": "An in-house team working on our own company's data",
+  "contact.buyer.in-house": "A company working on its own data",
   "contact.name.label": "Your name",
   "contact.email.label": "Work email",
   "contact.company.label": "Company",

@@ -36,12 +36,12 @@ import type { PlatformBinding } from "../commerce/ports.js";
 
 // --- BuyerTypeReader (A3 3.7; design §3.4 CMD027 precondition BUYER_TYPE_UNSET) --------------------------------------------------
 
-/** The agency's recorded buyer type (B11 stores `agency` / `in-house`; the adapter maps). Only an AGENCY buyer earns a commission (A3 3.7). */
+/** The agency's recorded buyer type (B11 stores `agency` / `in-house`; the adapter maps). It changes no price, discount or attribution (A3 3.7, D-33). */
 export type BuyerType = DomainBuyerType;
 
 /**
- * The agency's recorded buyer type, or null while none is recorded — which CMD027 refuses BUYER_TYPE_UNSET and CMD047 refuses as an
- * unset attribution. Read in the caller's unit of work; never a request member, so a caller cannot state it.
+ * The agency's recorded buyer type, or null while none is recorded — which CMD027 refuses BUYER_TYPE_UNSET. Read in the caller's unit
+ * of work; never a request member, so a caller cannot state it.
  */
 export interface BuyerTypeReader {
   readonly binding: PlatformBinding;

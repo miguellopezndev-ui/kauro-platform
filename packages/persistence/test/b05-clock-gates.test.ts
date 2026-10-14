@@ -31,11 +31,11 @@ after(async () => {
 /** The package owning each migration file (its header; 0001-0007 the B06 foundation; 0023's deadline gates are B05's, D5-20). */
 function ownerOfFile(tag: string): string {
   const n = Number(tag);
-  if (n <= 8 || n === 54 || n === 63) return "B06";
+  if (n <= 8 || n === 54 || n === 67) return "B06";
   if ((n >= 9 && n <= 12) || n === 18 || n === 20) return "B07";
   if ((n >= 13 && n <= 17) || n === 19 || n === 53) return "B09";
   if (n === 21 || n === 22 || n === 24 || n === 44) return "B08";
-  if (n === 23 || n === 58 || n === 61 || n === 62) return "B05";
+  if (n === 23 || n === 58 || n === 61 || n === 66 || n === 68) return "B05";
   if (n >= 25 && n <= 27) return "B11";
   if ((n >= 28 && n <= 43) || n === 48 || n === 49 || n === 56 || n === 57) return "B10";
   if (n === 45 || n === 46 || n === 47 || n === 55) return "PV1";
@@ -48,7 +48,7 @@ const fileTag = (at: string): string => at.split(":")[0]!;
 
 /** AT_COMMIT judges (D5-20): the 0023 gates re-judged at COMMIT by a deferred trigger reading the same column with effect_now(). */
 const AT_COMMIT: ReadonlyArray<{ object: string; text: RegExp; nth?: number; trigger: string; table: string; column: string; site: string }> = [
-  // L3t, 0062
+  // L3t, 0066
   { object: "function:cost_grants_workflow", text: /NEW\.expires_at <= clock/, trigger: "cost_grants_birth_at_commit", table: "cost_grants", column: "expires_at", site: "0023:145 birth" },
   { object: "function:cost_grants_workflow", text: /OLD\.expires_at <= clock$/, nth: 1, trigger: "cost_grants_authorized_at_commit", table: "cost_grants", column: "expires_at", site: "0023:169 PREPARED -> AUTHORIZED" },
   { object: "function:cost_grants_workflow", text: /OLD\.expires_at <= clock$/, nth: 2, trigger: "cost_grants_authorized_at_commit", table: "cost_grants", column: "expires_at", site: "0023:178 EXHAUSTED -> AUTHORIZED" },
@@ -59,13 +59,13 @@ const AT_COMMIT: ReadonlyArray<{ object: string; text: RegExp; nth?: number; tri
   { object: "function:audit_steps_workflow", text: /clock >= a\.absolute_deadline_at/, nth: 1, trigger: "audit_steps_claim_at_commit", table: "audit_steps", column: "absolute_deadline_at", site: "0023:584 claim" },
   { object: "function:audit_steps_workflow", text: /clock >= a\.absolute_deadline_at/, nth: 2, trigger: "audit_steps_result_at_commit", table: "audit_steps", column: "absolute_deadline_at", site: "0023:598 result" },
   { object: "function:model_tasks_current_step", text: /clock >= a\.interpretation_deadline_at/, trigger: "model_tasks_planned_at_commit", table: "model_tasks", column: "interpretation_deadline_at", site: "0023:693 model task" },
-  // L3t, 0062: the deferred judges themselves (effect_now() at COMMIT)
-  { object: "function:cost_grants_authority_at_commit", text: /g\.expires_at <= judged/, trigger: "cost_grants_birth_at_commit", table: "cost_grants", column: "expires_at", site: "0062 the grant's expiry at COMMIT" },
-  { object: "function:cost_grants_authority_at_commit", text: /g\.pool_expires_at <= judged/, trigger: "cost_grants_birth_at_commit", table: "cost_grants", column: "expires_at", site: "0062 the AUDIT grant's pool expiry at COMMIT" },
-  { object: "function:audits_authority_at_commit", text: /grant_expires <= judged/, trigger: "audits_birth_at_commit", table: "audits", column: "expires_at", site: "0062 the audit's grant expiry at COMMIT" },
-  { object: "function:audits_authority_at_commit", text: /judged >= a\.absolute_deadline_at/, trigger: "audits_edge_at_commit", table: "audits", column: "absolute_deadline_at", site: "0062 the audit's absolute deadline at COMMIT" },
-  { object: "function:audit_steps_authority_at_commit", text: /kauro\.effect_now\(\) >= a\.absolute_deadline_at/, trigger: "audit_steps_claim_at_commit", table: "audit_steps", column: "absolute_deadline_at", site: "0062 a step's absolute deadline at COMMIT" },
-  { object: "function:model_tasks_authority_at_commit", text: /kauro\.effect_now\(\) >= NEW\.interpretation_deadline_at/, trigger: "model_tasks_planned_at_commit", table: "model_tasks", column: "interpretation_deadline_at", site: "0062 a task's interpretation deadline at COMMIT" },
+  // L3t, 0066: the deferred judges themselves (effect_now() at COMMIT)
+  { object: "function:cost_grants_authority_at_commit", text: /g\.expires_at <= judged/, trigger: "cost_grants_birth_at_commit", table: "cost_grants", column: "expires_at", site: "0066 the grant's expiry at COMMIT" },
+  { object: "function:cost_grants_authority_at_commit", text: /g\.pool_expires_at <= judged/, trigger: "cost_grants_birth_at_commit", table: "cost_grants", column: "expires_at", site: "0066 the AUDIT grant's pool expiry at COMMIT" },
+  { object: "function:audits_authority_at_commit", text: /grant_expires <= judged/, trigger: "audits_birth_at_commit", table: "audits", column: "expires_at", site: "0066 the audit's grant expiry at COMMIT" },
+  { object: "function:audits_authority_at_commit", text: /judged >= a\.absolute_deadline_at/, trigger: "audits_edge_at_commit", table: "audits", column: "absolute_deadline_at", site: "0066 the audit's absolute deadline at COMMIT" },
+  { object: "function:audit_steps_authority_at_commit", text: /kauro\.effect_now\(\) >= a\.absolute_deadline_at/, trigger: "audit_steps_claim_at_commit", table: "audit_steps", column: "absolute_deadline_at", site: "0066 a step's absolute deadline at COMMIT" },
+  { object: "function:model_tasks_authority_at_commit", text: /kauro\.effect_now\(\) >= NEW\.interpretation_deadline_at/, trigger: "model_tasks_planned_at_commit", table: "model_tasks", column: "interpretation_deadline_at", site: "0066 a task's interpretation deadline at COMMIT" },
   // L3m, 0061: the reservation's and the send's judgements after their last lock wait (judged := effect_now()), re-judged at COMMIT by
   // request_journal_commit_gate (0023:272, :284, :309 replaced; the lease, grant and pool expiries)
   { object: "function:request_journal_reserves_grant", text: /judged >= m\.interpretation_deadline_at/, trigger: "request_journal_commit_gate_reserve", table: "request_journal", column: "interpretation_deadline_at", site: "0023:272 the reservation's interpretation deadline" },
@@ -391,7 +391,7 @@ test("CK2 (CK) DENY commit-time locks (census): in the live schema no deferred c
   const { live } = await liveRows(h.oracle);
   assert.deepEqual(commitTimeLocks(live), []);
   assert.ok(live.deferredTriggers.some((t) => t.fn === "request_journal_commit_gate") && live.deferredTriggers.some((t) => t.fn === "dispatch_liabilities_commit_gate"), "the two gates are deferred");
-  assert.ok(live.deferredTriggers.filter((t) => !GATE_FUNCTIONS.has(t.fn)).length >= 7, "0062's deferred judges are censused");
+  assert.ok(live.deferredTriggers.filter((t) => !GATE_FUNCTIONS.has(t.fn)).length >= 7, "0066's deferred judges are censused");
   assert.deepEqual(listed().deferredForeignKeys, live.deferredForeignKeys.map((k) => `${k.table}.${k.name} -> ${k.references}`));
   const lockPlant = await plantedRows(`
     CREATE FUNCTION kauro.ck2_planted_lock() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $f$
@@ -404,7 +404,7 @@ test("CK2 (CK) DENY commit-time locks (census): in the live schema no deferred c
   assert.ok(fkProblems.some((p) => p.includes("not D5-11's 14")), "the count changed");
 });
 
-test("CK3 (CK) DENY process clock (census): in persistence src/audit/**, src/request-journal.ts, src/lease-store.ts, apps/control/src/audit/**, domain src/model/audit/** and ports, application src/audit/**, data-plane src/cores/** and application src/adapters/cores/intelligence/** there is no Date.now(, zero-argument new Date(, performance.now( or process.hrtime( and no comparison of a database instant with a process clock; the database clock reads from the app (serverNow, serverInstantOf) and the app-side judges (reached) equal the checked-in list with their class, LeaseStore claim/heartbeat/checkpoint have no caller in those paths and their product callers are exactly the checked-in outbox dispatchers, whose expiry claim_lease/heartbeat_lease/checkpoint_lease judge after the row lock at GREATEST(p_now, effect_now()) (0054) in their latest definition, claim_lease's deadline judged at that same instant after the lock and never at p_now (0063), and the process clocks of the product are exactly the four injection points (apps/control composition.ts:70, apps/api composition.ts:48, apps/api identity-verifier.ts:60, application sources/provider-holds.ts:28); a planted Date.now() in apps/control/src/audit fails", () => {
+test("CK3 (CK) DENY process clock (census): in persistence src/audit/**, src/request-journal.ts, src/lease-store.ts, apps/control/src/audit/**, domain src/model/audit/** and ports, application src/audit/**, data-plane src/cores/** and application src/adapters/cores/intelligence/** there is no Date.now(, zero-argument new Date(, performance.now( or process.hrtime( and no comparison of a database instant with a process clock; the database clock reads from the app (serverNow, serverInstantOf) and the app-side judges (reached) equal the checked-in list with their class, LeaseStore claim/heartbeat/checkpoint have no caller in those paths and their product callers are exactly the checked-in outbox dispatchers, whose expiry claim_lease/heartbeat_lease/checkpoint_lease judge after the row lock at GREATEST(p_now, effect_now()) (0054) in their latest definition, claim_lease's deadline judged at that same instant after the lock and never at p_now (0067), and the process clocks of the product are exactly the four injection points (apps/control composition.ts:70, apps/api composition.ts:48, apps/api identity-verifier.ts:60, application sources/provider-holds.ts:28); a planted Date.now() in apps/control/src/audit fails", () => {
   const app = appSide();
   assert.deepEqual(app.problems, [], "no process clock in the B05/B08 paths");
   for (const p of CK3_PATHS) assert.ok(tsFiles(p).length > 0, `${p} is scanned`);
@@ -414,7 +414,7 @@ test("CK3 (CK) DENY process clock (census): in persistence src/audit/**, src/req
   assert.deepEqual(product.leaseCallers, [...LEASE_CALLERS].sort(), "the LeaseStore claim/heartbeat/checkpoint callers are the checked-in outbox dispatchers");
   for (const caller of product.leaseCallers) assert.ok(!CK3_PATHS.some((p) => caller.startsWith(p)), `${caller} is not in a B05 path`);
   // their expiry is judged after the row lock at the database clock (0054) in the definition that is in force, the latest migration
-  // defining the function: the param is never the judge alone. claim_lease's deadline is judged at that instant too (0063)
+  // defining the function: the param is never the judge alone. claim_lease's deadline is judged at that instant too (0067)
   const latestBody = (fn: string): { file: string; body: string } => {
     const defining = readdirSync(MIGRATIONS_DIR)
       .filter((f) => f.endsWith(".sql"))

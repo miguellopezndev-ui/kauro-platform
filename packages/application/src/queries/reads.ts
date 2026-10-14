@@ -35,6 +35,37 @@ import { AUTHORIZATION_POLICY_VERSION, type AuthorizationDecision } from "../por
 import { AUDIT_READ_ROUTES } from "../audit/read-specs.js";
 import { EXECUTION_READ_ROUTES } from "../execution/read-specs.js";
 import { SOURCE_READ_ROUTES } from "../sources/read-specs.js";
+import { buyerTypeView, type AgencyAppStores, type BuyerTypeView, type ProjectDashboardRow } from "../agency/buyer-type.js";
+import { PROJECT_DASHBOARD_FILTERS, type ProjectDashboardFilter } from "../agency/dashboard-vocabulary.js";
+
+/** One item of the project dashboard (ListProjects, UI11): every member from a durable fact of the project. */
+export interface ProjectDashboardItem {
+  readonly projectId: string;
+  readonly clientId: string;
+  readonly clientLabel: string;
+  readonly mode: string;
+  readonly revision: { readonly revisionId: string; readonly state: string };
+  readonly phase: ProjectDashboardRow["phase"];
+  readonly requiredAction: ProjectDashboardRow["requiredAction"];
+  readonly deadline: UtcInstant | null;
+  readonly lastActivityAt: UtcInstant;
+  readonly version: number;
+}
+
+function projectDashboardItem(row: ProjectDashboardRow): ProjectDashboardItem {
+  return {
+    projectId: row.projectId,
+    clientId: row.clientId,
+    clientLabel: row.clientLabel,
+    mode: row.mode,
+    revision: { revisionId: row.revisionId, state: row.revisionState },
+    phase: row.phase,
+    requiredAction: row.requiredAction,
+    deadline: row.deadline,
+    lastActivityAt: row.lastActivityAt,
+    version: row.version,
+  };
+}
 
 export interface ReadSpec<Id extends string = ReadOperationId> {
   readonly operationId: Id;
@@ -50,6 +81,8 @@ export interface ReadSpec<Id extends string = ReadOperationId> {
   readonly summary: string;
   /** The manual section that requires the read. */
   readonly authority: string;
+  /** A list's closed `filter` query member, when it has one: its values and the one an absent member means (B11 lane A1, ListProjects). */
+  readonly filter?: { readonly values: ReadonlyArray<string>; readonly default: string };
 }
 
 function readSpec(s: ReadSpec): ReadSpec {
@@ -129,6 +162,27 @@ export const READ_ROUTES: Readonly<Record<ReadOperationId, ReadSpec>> = Object.f
     summary: "One support case with its severity, state and next review",
     authority: "design section 5, W4 row: \"one case\"; owner manual 18",
   }),
+  GetBuyerType: readSpec({
+    operationId: "GetBuyerType",
+    method: "GET",
+    path: "/api/v1/agencies/{agencyId}/buyer-type",
+    action: "GET_BUYER_TYPE",
+    scope: "AGENCY_PATH",
+    paginated: false,
+    summary: "The agency's buyer type as its owner recorded it once (agency or in-house), or not recorded yet",
+    authority: 'A3 3.7: "the buyer type is answered once during onboarding, before the first quote"; SCREENS-PLAN section 3, rows A1',
+  }),
+  ListProjects: readSpec({
+    operationId: "ListProjects",
+    method: "GET",
+    path: "/api/v1/agencies/{agencyId}/projects",
+    action: "LIST_PROJECTS",
+    scope: "AGENCY_PATH",
+    paginated: true,
+    summary: "The agency's project dashboard, newest first: client, mode, current revision, phase, required agency action, deadline and last activity, under one of five filters",
+    authority: '11 UI11 "Project dashboard": client, mode, current revision, phase, required agency action and deadline, with the filters active, awaiting agency, delivered, failed and archived; SCREENS-PLAN section 3, rows A1',
+    filter: { values: PROJECT_DASHBOARD_FILTERS, default: "active" },
+  }),
   ...EXECUTION_READ_ROUTES,
   ...AUDIT_READ_ROUTES,
 });
@@ -139,13 +193,15 @@ export interface ReadQuery {
   /** Page size: the R2 policy's api.pageDefault when absent, at most api.pageMaximum. */
   readonly limit: number;
   readonly cursor: string | null;
+  /** The list's filter: one of its spec's values (its default when the member is absent); absent or null for a read without one. */
+  readonly filter?: string | null;
 }
 
 const LIMIT = /^[1-9][0-9]{0,2}$/;
 const CURSOR_SHAPE = new RegExp(CURSOR_PATTERN);
 const QUERY_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 
-function schemaViolation(field: string, code: "UNKNOWN_FIELD" | "TYPE" | "FORMAT" | "RANGE"): DomainFailure {
+function schemaViolation(field: string, code: "UNKNOWN_FIELD" | "TYPE" | "FORMAT" | "RANGE" | "ENUM"): DomainFailure {
   return new DomainFailure("INVALID_REQUEST", "read query refused", { reason: "SCHEMA_VIOLATION", fields: [{ field, code }] });
 }
 
@@ -158,11 +214,17 @@ function schemaViolation(field: string, code: "UNKNOWN_FIELD" | "TYPE" | "FORMAT
 export function admitReadQuery(spec: ReadSpec<string>, query: Readonly<Record<string, unknown>>): ReadQuery {
   let limit: number = REQUEST_LIMITS.pageDefault;
   let cursor: string | null = null;
+  let filter: string | null = spec.filter?.default ?? null;
   for (const [name, value] of Object.entries(query)) {
     const field = QUERY_NAME.test(name) ? `query.${name}` : "query";
-    if (!spec.paginated || (name !== "limit" && name !== "cursor")) throw schemaViolation(field, "UNKNOWN_FIELD");
+    const known = name === "limit" || name === "cursor" || (name === "filter" && spec.filter !== undefined);
+    if (!spec.paginated || !known) throw schemaViolation(field, "UNKNOWN_FIELD");
     if (typeof value !== "string") throw schemaViolation(field, "TYPE");
-    if (name === "limit") {
+    if (name === "filter") {
+      // closed and case-sensitive: the five filter tokens, nothing coerced
+      if (!(spec.filter?.values ?? []).includes(value)) throw schemaViolation(field, "ENUM");
+      filter = value;
+    } else if (name === "limit") {
       if (!LIMIT.test(value)) throw schemaViolation(field, "FORMAT");
       limit = Number(value);
       if (limit > REQUEST_LIMITS.pageMaximum) throw schemaViolation(field, "RANGE");
@@ -171,7 +233,7 @@ export function admitReadQuery(spec: ReadSpec<string>, query: Readonly<Record<st
       cursor = value;
     }
   }
-  return { limit, cursor };
+  return spec.filter === undefined ? { limit, cursor } : { limit, cursor, filter };
 }
 
 /** What a read's admission needs from the transport: the request head, its route parameters and its parsed query string. */
@@ -236,6 +298,8 @@ export interface ReadHandler<View> {
 /** What every read needs: the command runtime's unit of work, authorizer and clock, and the key its cursors are sealed with. */
 export interface ReadRuntime extends Pick<CommandRuntime, "unitOfWork" | "authorizer" | "clock"> {
   readonly cursorKey: Uint8Array;
+  /** The agency app's stores (B11 lane A1: GetBuyerType, ListProjects); a deployment without them answers those reads INTEGRITY_FAILURE. */
+  readonly agencyApp?: AgencyAppStores;
 }
 
 export interface ReadContext {
@@ -329,6 +393,8 @@ export interface ReadHandlers {
   readonly GetProject: ReadHandler<ProjectView>;
   readonly ListSupportCases: ReadHandler<Page<SupportCaseView>>;
   readonly GetSupportCase: ReadHandler<SupportCaseView>;
+  readonly GetBuyerType: ReadHandler<BuyerTypeView>;
+  readonly ListProjects: ReadHandler<Page<ProjectDashboardItem>>;
 }
 
 export function createReadHandlers(runtime: ReadRuntime): ReadHandlers {
@@ -438,6 +504,38 @@ export function createReadHandlers(runtime: ReadRuntime): ReadHandlers {
       }),
   };
 
+  const agencyApp = (): AgencyAppStores => {
+    if (runtime.agencyApp === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "no agency-app store is bound in this deployment");
+    return runtime.agencyApp;
+  };
+
+  const getBuyerType: ReadHandler<BuyerTypeView> = {
+    spec: READ_ROUTES.GetBuyerType,
+    execute: (request) =>
+      runRead(READ_ROUTES.GetBuyerType, runtime, request, async (uow, ctx) => {
+        const membership = member(ctx);
+        return buyerTypeView(membership.agencyId, await agencyApp().buyerTypes(uow).get(membership.agencyId));
+      }),
+  };
+
+  const listProjects: ReadHandler<Page<ProjectDashboardItem>> = {
+    spec: READ_ROUTES.ListProjects,
+    execute: (request) =>
+      runRead(READ_ROUTES.ListProjects, runtime, request, async (uow, ctx) => {
+        const membership = member(ctx);
+        const filter = request.query.filter ?? READ_ROUTES.ListProjects.filter?.default;
+        if (!(PROJECT_DASHBOARD_FILTERS as ReadonlyArray<string | undefined>).includes(filter)) throw new DomainFailure("INTEGRITY_FAILURE", "the dashboard filter was not admitted");
+        // the cursor is bound to the filter and to this list's newest-first order, so it continues no other filter, caller or agency
+        const binding: CursorBinding = { operation: "ListProjects", userId: membership.userId, agencyId: membership.agencyId, filter: `${filter};createdAt,projectId:desc` };
+        const after = positionOf(runtime, binding, request.query.cursor);
+        const rows = await agencyApp().dashboard(uow).page(membership.agencyId, filter as ProjectDashboardFilter, {
+          limit: request.query.limit,
+          ...(after !== undefined ? { after: { createdAt: after.createdAt, id: after.id } } : {}),
+        });
+        return pageOf(runtime, binding, rows, request.query.limit, projectDashboardItem, (r) => r.position);
+      }),
+  };
+
   return Object.freeze({
     ListAgencies: listAgencies,
     GetAgency: getAgency,
@@ -446,5 +544,7 @@ export function createReadHandlers(runtime: ReadRuntime): ReadHandlers {
     GetProject: getProject,
     ListSupportCases: listSupportCases,
     GetSupportCase: getSupportCase,
+    GetBuyerType: getBuyerType,
+    ListProjects: listProjects,
   });
 }

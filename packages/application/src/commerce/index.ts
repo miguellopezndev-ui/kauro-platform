@@ -94,6 +94,7 @@ export type {
   AdoptedScope,
   ReconcileResult,
   CommerceReconciler,
+  AfterOrderLocks,
   CommerceEventDelivery,
   CommerceEventConsumer,
   PlatformBinding,

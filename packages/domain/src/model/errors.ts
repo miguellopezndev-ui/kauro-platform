@@ -291,6 +291,9 @@ export const FAILURE_REASONS = [
   // the public inquiry (B11 W5b, D-PUB-3): refused by the per-address or per-e-mail limiter; its origin rule reuses ORIGIN_REJECTED
   // (W2) and its detector the support reasons above
   "INQUIRY_RATE_LIMITED",
+  // the agency's buyer type (B11 W6, CMD101 SetBuyerType): answered once; a second answer with the other value is refused, never
+  // overwritten (R2 A3 3.7); placed with B11's reasons before B09's list so that B09, B08 and B10 keep their order (D11-SYNC-1)
+  "BUYER_TYPE_ALREADY_SET",
   // attribution claims (B10 failure matrix CLAIM_DEADLINE, CLAIM_LAPSE_ACCEPT): CMD047 meets a claim whose review deadline is reached on the
   // database clock; placed before B09's list, like B11's, so that B09, B08 and B10's section 12 keep their order (D11-SYNC-1)
   "CLAIM_EXPIRED",

@@ -211,7 +211,7 @@ const stepUpRefused = (reason: "STEP_UP_STALE" | "STEP_UP_MISSING" | "STEP_UP_NO
  * await after it. A proof or details validity that crosses its boundary while the proof read waits is refused, never judged at an earlier
  * sample. DETAILS_EXPIRED precedes the step-up refusal at one instant (the order of the commands' original checks).
  */
-async function assuredAt(co: BankRouteCollaborators, uow: CommerceUnitOfWork, userId: UserId, authorizationRef: string, detailsValidUntil: string | null): Promise<UtcInstant> {
+export async function assuredAt(co: BankRouteCollaborators, uow: CommerceUnitOfWork, userId: UserId, authorizationRef: string, detailsValidUntil: string | null): Promise<UtcInstant> {
   const outcome = await co.assurance.verifyStepUp(uow, userId, isUuidV7(authorizationRef) ? (authorizationRef as AssuranceProofId) : undefined, await co.effectNow(uow));
   const at = await co.effectNow(uow);
   // no await below this line: the judgments and the instant the caller writes are this one
@@ -226,7 +226,7 @@ async function assuredAt(co: BankRouteCollaborators, uow: CommerceUnitOfWork, us
  * and the details validity (verify, enable) and the owner's step-up are judged at it. Crossing either boundary after the command's earlier
  * decision refuses the command with nothing committed (the unit rolls back: no route change, no event, no journal row).
  */
-function judgedAtCommit(co: BankRouteCollaborators, uow: CommerceUnitOfWork, userId: UserId, authorizationRef: string, detailsValidUntil: string | null, authority: RequestAuthority | undefined, clock: Clock): void {
+export function judgedAtCommit(co: BankRouteCollaborators, uow: CommerceUnitOfWork, userId: UserId, authorizationRef: string, detailsValidUntil: string | null, authority: RequestAuthority | undefined, clock: Clock): void {
   beforeCommitOf(uow, async () => {
     // rule 16 (PV1R-07 r4): the caller's session row locked FOR SHARE in this unit (its COMMIT is the release), THEN the proof read
     // and the effect clock with their judgments (PV1R-03 r2), THEN the session judged at the process clock read last; only COMMIT follows
@@ -234,7 +234,7 @@ function judgedAtCommit(co: BankRouteCollaborators, uow: CommerceUnitOfWork, use
   });
 }
 
-const STEP_UP_ALLOW = { reasonCode: ALLOW_REASONS.STEP_UP_FRESH, assuranceClass: "STEP_UP" as const, policyVersion: COMMERCE_POLICY_VERSION };
+export const STEP_UP_ALLOW = { reasonCode: ALLOW_REASONS.STEP_UP_FRESH, assuranceClass: "STEP_UP" as const, policyVersion: COMMERCE_POLICY_VERSION };
 
 /** The payee digest of a bank route's payment route: the account in its environment (no account number enters it). */
 export function bankPayeeDigest(environment: string, accountRef: string): Sha256Hex {

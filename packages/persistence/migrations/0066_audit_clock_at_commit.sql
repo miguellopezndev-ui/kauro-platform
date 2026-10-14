@@ -1,4 +1,4 @@
--- Migration 0062: the audit's and the grant's authority deadlines judged at COMMIT (package B05 L3t, D5-20; r5 D17, r7 ADV-11;
+-- Migration 0066: the audit's and the grant's authority deadlines judged at COMMIT (package B05 L3t, D5-20; r5 D17, r7 ADV-11;
 -- provisional number, renumbered at merge).
 --
 -- 0023's BEFORE triggers compare their deadlines and expiries with kauro.server_now(), the transaction's start: a statement whose lock
