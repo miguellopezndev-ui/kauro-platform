@@ -841,6 +841,24 @@ APPLICABILITY.CMD055 = {
 // CMD059 admits the operations service as its second principal: the service cases join the owner's
 for (const [cell, extra] of [["legitimate state", CMD059_SERVICE_OK], ["wrong role", CMD059_SERVICE_DENY], ["wrong agency", CMD059_SERVICE_DENY], ["duplicate request", CMD059_SERVICE_RACE], ["changed-body same key", CMD059_SERVICE_RACE], ["lost response", CMD059_SERVICE_RACE], ["stale version", CMD059_SERVICE_RACE]]) APPLICABILITY.CMD059[cell].push([OPERATIONS, extra]);
 
+// package B12 (outreach; kit K2): every command is registered with a NOT_BUILT stub. The generic cells (duplicate, changed body, schema, lost
+// response) are the pipeline's and hold already; the cells that depend on the handler read PLACEHOLDER until the serving lane replaces its row
+// with the cited OK/DENY/RACE tests (docs/design/B12-outreach-plan-cells.md); the PLACEHOLDER text is what the lane's done criteria grep for.
+const B12_PLACEHOLDER = "NOT_APPLICABLE: PLACEHOLDER-B12-NOT-BUILT: the command is a NOT_BUILT stub (kit K2); the serving lane replaces this cell with its cited tests";
+for (const id of ["CMD061", "CMD062", "CMD063", "CMD064", "PutOutreachContent", "PublishSalesResource", "RegisterSenderIdentity", "VerifySenderIdentity", "RecordSenderRevocation", "PrepareOutreachReview", "RecordOutreachDiagnosis", "RevokeOutreachAuthorization", "WithdrawOutreachChannelPolicy", "RecordProspectSource", "RecordProspectContact"]) {
+  APPLICABILITY[id] = {
+    "legitimate state": B12_PLACEHOLDER,
+    "wrong role": B12_PLACEHOLDER,
+    "wrong agency": B12_PLACEHOLDER,
+    "stale version": B12_PLACEHOLDER,
+    "duplicate request": common["duplicate request"],
+    "changed-body same key": common["changed-body same key"],
+    "invalid schema": common["invalid schema"],
+    "lost response": common["lost response"],
+    "external uncertainty": B12_PLACEHOLDER,
+  };
+}
+
 // package B09's served payment commands (stage-2 mandate M3; docs/design/B09-payments-fiscal.md §8 CMD030, CMD033, CMD034)
 const WEBHOOK = "cmd030-payment-webhook.test.ts";
 const EXECUTE = "cmd033-execute-refund.test.ts";

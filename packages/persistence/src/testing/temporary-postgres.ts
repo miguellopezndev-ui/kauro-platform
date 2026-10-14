@@ -25,6 +25,7 @@ export const ROLES = Object.freeze({
   ingress: "kauro_ingress",
   payment: "kauro_payment",
   commission: "kauro_commission",
+  outreach: "kauro_outreach",
   appLogin: "kauro_app_test",
   controlLogin: "kauro_control_test",
   assuranceLogin: "kauro_assurance_test",
@@ -32,11 +33,12 @@ export const ROLES = Object.freeze({
   ingressLogin: "kauro_ingress_test",
   paymentLogin: "kauro_payment_test",
   commissionLogin: "kauro_commission_test",
+  outreachLogin: "kauro_outreach_test",
   superuser: "postgres",
   database: "kauro",
 });
 
-export type LoginRole = "postgres" | "kauro_owner" | "kauro_app_test" | "kauro_control_test" | "kauro_assurance_test" | "kauro_validator_test" | "kauro_ingress_test" | "kauro_payment_test" | "kauro_commission_test";
+export type LoginRole = "postgres" | "kauro_owner" | "kauro_app_test" | "kauro_control_test" | "kauro_assurance_test" | "kauro_validator_test" | "kauro_ingress_test" | "kauro_payment_test" | "kauro_commission_test" | "kauro_outreach_test";
 
 export interface TemporaryPostgres {
   readonly port: number;
@@ -229,6 +231,10 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
         await su2.query(`CREATE ROLE ${ROLES.ingressLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.ingress}${pwd}`);
         await su2.query(`CREATE ROLE ${ROLES.paymentLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.payment}${pwd}`);
         await su2.query(`CREATE ROLE ${ROLES.commissionLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.commission}${pwd}`);
+        // the outreach group is born in B12's migration (0072, provisional): a cluster migrated only up to an earlier migration (the
+        // L22 migration-on-a-live-pool cell stops before 0058) has no such group, so its login is created only once the group exists
+        const outreachGroup = await su2.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [ROLES.outreach]);
+        if (outreachGroup.rowCount === 1) await su2.query(`CREATE ROLE ${ROLES.outreachLogin} LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE ${ROLES.outreach}${pwd}`);
       } finally {
         await su2.end();
       }

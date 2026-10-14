@@ -16,7 +16,7 @@ import { PgCommercialUnitOfWork, PgCommercialUnitOfWorkFactory } from "@kauro/pe
 import { crashableFactory, instrumentPort, raceStatementTimeoutMs, runtimeRoleOf, type FaultPoints, type HarnessConnection, type SqlSession } from "@kauro/persistence/testing";
 import { clock } from "./support.js";
 
-export type RouteRole = "kauro_app" | "kauro_payment" | "kauro_commission" | "kauro_control";
+export type RouteRole = "kauro_app" | "kauro_payment" | "kauro_commission" | "kauro_control" | "kauro_outreach";
 
 /** A statement of the unit of work that a cell instruments: `<db.label>.before` and `.after` points around it. */
 export interface SqlStep {
@@ -157,7 +157,7 @@ function poolOf(route: Route, role: RouteRole): unknown {
 
 class RoutedFactory extends PgCommercialUnitOfWorkFactory {
   constructor(private readonly route: Route, private readonly stand: () => { readonly at: string } | null, statementTimeoutMs: number | null, private readonly clockOf: () => StepClockOf | null = () => null) {
-    super({ app: poolOf(route, "kauro_app"), payment: poolOf(route, "kauro_payment"), commission: poolOf(route, "kauro_commission"), control: poolOf(route, "kauro_control") } as never, { clock, random: (n) => new Uint8Array(randomBytes(n)), defaultStatementTimeoutMs: statementTimeoutMs ?? raceStatementTimeoutMs() });
+    super({ app: poolOf(route, "kauro_app"), payment: poolOf(route, "kauro_payment"), commission: poolOf(route, "kauro_commission"), outreach: poolOf(route, "kauro_outreach"), control: poolOf(route, "kauro_control") } as never, { clock, random: (n) => new Uint8Array(randomBytes(n)), defaultStatementTimeoutMs: statementTimeoutMs ?? raceStatementTimeoutMs() });
   }
 
   // the routed unit of work is the production one: the factory's own createUnitOfWork, with the price policies production binds (deps

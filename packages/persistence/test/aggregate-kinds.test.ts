@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Client } from "pg";
-import { AGGREGATE_KINDS, AUDIT_AGGREGATE_KINDS, BANK_CREDIT_AGGREGATE_KINDS, BANK_ROUTE_AGGREGATE_KINDS, COMMERCE_AGGREGATE_KINDS, EXECUTION_AGGREGATE_KINDS, TREASURY_REFUND_AGGREGATE_KINDS, OUTBOUND_ATTEMPT_AGGREGATE_KINDS, type AggregateKind, type UserId } from "@kauro/domain";
+import { AGGREGATE_KINDS, AUDIT_AGGREGATE_KINDS, BANK_CREDIT_AGGREGATE_KINDS, BANK_ROUTE_AGGREGATE_KINDS, COMMERCE_AGGREGATE_KINDS, EXECUTION_AGGREGATE_KINDS, TREASURY_REFUND_AGGREGATE_KINDS, OUTBOUND_ATTEMPT_AGGREGATE_KINDS, type AggregateKind, type UserId, OUTREACH_AGGREGATE_KINDS } from "@kauro/domain";
 import { RUNTIME_ROLES } from "../src/index.js";
 import { ROLES, sealSourceRevision, startHarness, type AgencyFixture, type Harness } from "../src/testing/index.js";
 import { constraintOf, event, ids, plan, project, sha, sourceSessions, sqlState, supportCase, tx, type PlanFixture } from "./support.js";
@@ -39,10 +39,10 @@ let carolInA: string;
 // its own schema tests (execution-migrations.test.ts, execution-adapters.test.ts; audit-migrations.test.ts, audit-adapters.test.ts)
 /** Kinds walked by their own command's tests (B16 L5: download_authorization, by apps/api/test/cmd038-authorize-download.test.ts). */
 const WALKED_ELSEWHERE = ["download_authorization"] as const;
-type WalkedKind = Exclude<AggregateKind, (typeof COMMERCE_AGGREGATE_KINDS)[number] | (typeof EXECUTION_AGGREGATE_KINDS)[number] | (typeof AUDIT_AGGREGATE_KINDS)[number] | (typeof BANK_ROUTE_AGGREGATE_KINDS)[number] | (typeof BANK_CREDIT_AGGREGATE_KINDS)[number] | (typeof TREASURY_REFUND_AGGREGATE_KINDS)[number] | (typeof OUTBOUND_ATTEMPT_AGGREGATE_KINDS)[number] | (typeof WALKED_ELSEWHERE)[number]>;
+type WalkedKind = Exclude<AggregateKind, (typeof COMMERCE_AGGREGATE_KINDS)[number] | (typeof EXECUTION_AGGREGATE_KINDS)[number] | (typeof AUDIT_AGGREGATE_KINDS)[number] | (typeof BANK_ROUTE_AGGREGATE_KINDS)[number] | (typeof BANK_CREDIT_AGGREGATE_KINDS)[number] | (typeof TREASURY_REFUND_AGGREGATE_KINDS)[number] | (typeof OUTBOUND_ATTEMPT_AGGREGATE_KINDS)[number] | (typeof OUTREACH_AGGREGATE_KINDS)[number] | (typeof WALKED_ELSEWHERE)[number]>;
 const WALKED_KINDS: ReadonlyArray<WalkedKind> = AGGREGATE_KINDS.filter(
   (k): k is WalkedKind =>
-    !(COMMERCE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(EXECUTION_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(AUDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_ROUTE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_CREDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(TREASURY_REFUND_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(OUTBOUND_ATTEMPT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(WALKED_ELSEWHERE as ReadonlyArray<string>).includes(k),
+    !(COMMERCE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(EXECUTION_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(AUDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_ROUTE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_CREDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(TREASURY_REFUND_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(OUTBOUND_ATTEMPT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(OUTREACH_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(WALKED_ELSEWHERE as ReadonlyArray<string>).includes(k),
 );
 const ofA = new Map<WalkedKind, { readonly id: string; readonly version: number }>();
 
@@ -93,6 +93,8 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   treasury_refund: ["treasury_refunds", "treasury_refund_id"],
   // Payments V1 outbound execution attempt (0080 slice 2, lane L-REFUND; walked by apps/api/test/refund-generic-cells.test.ts)
   outbound_execution_attempt: ["outbound_execution_attempts", "attempt_id"],
+  // package B12 lane K1b (0072): the agency-less send intent
+  outreach_send_intent: ["outreach_send_intents", "intent_id"],
 });
 
 // every runtime login of this branch: B06 five, package B09's payment service and package B10's commission service

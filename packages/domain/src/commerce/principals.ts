@@ -14,7 +14,7 @@
  *    verified service identities, mapped to their one technical role by this code-owned table (D-AUTHZ-B3).
  */
 
-export type ServiceRole = "PAYMENT_SERVICE" | "AUTHENTICATED_PROVIDER" | "FISCAL_SERVICE" | "COMMISSION_SERVICE" | "FINANCE_SERVICE" | "OPERATIONS_SERVICE";
+export type ServiceRole = "PAYMENT_SERVICE" | "AUTHENTICATED_PROVIDER" | "FISCAL_SERVICE" | "COMMISSION_SERVICE" | "FINANCE_SERVICE" | "OPERATIONS_SERVICE" | "OUTREACH_SERVICE";
 
 /** A service identity the service authenticator verified (issuer, audience, expected identity, environment; 10). */
 export interface ServiceIdentity {
@@ -42,6 +42,9 @@ export const SERVICE_ROLE_TABLE: Readonly<Record<string, ServiceRole>> = Object.
   // incident and restricts a capability; it holds no other command, and no other service holds its role. It runs in kauro_commission's group
   // beside the commission and finance services (decision B18-OPS-1: that group's pools are the only verified service pools of the api).
   "operations-service": "OPERATIONS_SERVICE",
+  // package B12 (plan A1, A14, D-B12O-12): the outreach service runs the dispatcher units D2..D5 and the public opt-out on its own
+  // runtime group kauro_outreach (0072), which acts on no agency; it holds no command of the registry.
+  "outreach-service": "OUTREACH_SERVICE",
 });
 
 export function serviceHoldsRole(serviceId: string, role: ServiceRole): boolean {

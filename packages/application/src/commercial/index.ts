@@ -25,3 +25,4 @@ export * from "./quotes/index.js";
 export * from "./statements/index.js";
 export * from "./capabilities/index.js";
 export * from "./operations/index.js";
+export * from "./outreach/index.js";

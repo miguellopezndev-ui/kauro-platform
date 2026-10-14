@@ -160,3 +160,8 @@ export { PgCommissionWork, commissionWorkOf } from "./commission-service-access.
 export type { DueReservation, LedgerPurchase, ReleasableFundsHold, LineOnHeldFunds } from "./commission-service-access.js";
 export { ConnectionSecurityError, connectionSecurityOf, sslOptionsOf } from "./tls.js";
 export type { ConnectionSecurityInput, DatabaseTls, VerifiedSslOptions } from "./tls.js";
+// package B12 (lane K1): the outreach writers with their T2 subjects, the ordered advisory locks and the effect_now lease fence (plan §L)
+export { PgOutreachWriters } from "./repositories/commercial-outreach.js";
+export type { OutreachIntentKeys, NewOutreachIntent, IntentAnswer } from "./repositories/commercial-outreach.js";
+export { OutreachLocks, holdOutreachLease } from "./outreach-access.js";
+export type { OutreachLockMode } from "./outreach-access.js";

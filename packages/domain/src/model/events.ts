@@ -16,6 +16,7 @@ import { BANK_ROUTE_AGGREGATE_KINDS, BANK_ROUTE_EVENT_PAYLOAD_ALLOWLIST, BANK_RO
 import { TREASURY_REFUND_AGGREGATE_KINDS, TREASURY_REFUND_EVENT_PAYLOAD_ALLOWLIST, TREASURY_REFUND_EVENT_SUBSCRIPTIONS, TREASURY_REFUND_EVENT_TYPES } from "../commerce/treasury-refund.js";
 import { OUTBOUND_ATTEMPT_AGGREGATE_KINDS, OUTBOUND_ATTEMPT_EVENT_PAYLOAD_ALLOWLIST, OUTBOUND_ATTEMPT_EVENT_SUBSCRIPTIONS, OUTBOUND_ATTEMPT_EVENT_TYPES } from "../commerce/execution-attempt.js";
 import { COMMERCIAL_EVENT_PAYLOAD_ALLOWLIST, COMMERCIAL_EVENT_SUBSCRIPTIONS, COMMERCIAL_EVENT_TYPES } from "../commercial/events.js";
+import { OUTREACH_AGGREGATE_KINDS, OUTREACH_CONSUMERS, OUTREACH_EVENT_PAYLOAD_ALLOWLIST, OUTREACH_EVENT_SUBSCRIPTIONS, OUTREACH_EVENT_TYPES } from "../commercial/outreach-events.js";
 import { EXECUTION_AGGREGATE_KINDS, EXECUTION_CONSUMERS, EXECUTION_EVENT_PAYLOAD_ALLOWLIST, EXECUTION_EVENT_SUBSCRIPTIONS, EXECUTION_EVENT_TYPES } from "./execution/events.js";
 import { AUDIT_AGGREGATE_KINDS, AUDIT_AUTHORITY_EVENT_TYPES, AUDIT_CONSUMERS, AUDIT_EVENT_PAYLOAD_ALLOWLIST, AUDIT_EVENT_SUBSCRIPTIONS } from "./audit/events.js";
 import type { AgencyId, CausationId, CorrelationId, EventId } from "./ids.js";
@@ -121,6 +122,8 @@ export const EVENT_TYPES = [
   ...TREASURY_REFUND_EVENT_TYPES,
   // Payments V1 outbound execution attempts (commerce/execution-attempt.ts; migration 0080 slice 2, lane L-REFUND)
   ...OUTBOUND_ATTEMPT_EVENT_TYPES,
+  // Outreach (commercial/outreach-events.ts; migration 0072, package B12)
+  ...OUTREACH_EVENT_TYPES,
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -132,8 +135,15 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * 0012; B09: the commerce kinds, registered by migrations 0013..0017; B08: processing_job and package_version, registered by
  * migrations 0021 and 0022, and audit and cost_grant, registered by migration 0023; B11: support_case, registered by migration 0026, and agency_buyer_type, registered by migration 0062).
  */
-export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS, "support_case", ...BANK_ROUTE_AGGREGATE_KINDS, "agency_buyer_type", ...BANK_CREDIT_AGGREGATE_KINDS, "download_authorization", ...TREASURY_REFUND_AGGREGATE_KINDS, ...OUTBOUND_ATTEMPT_AGGREGATE_KINDS] as const;
+export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS, "support_case", ...BANK_ROUTE_AGGREGATE_KINDS, "agency_buyer_type", ...BANK_CREDIT_AGGREGATE_KINDS, "download_authorization", ...TREASURY_REFUND_AGGREGATE_KINDS, ...OUTBOUND_ATTEMPT_AGGREGATE_KINDS, ...OUTREACH_AGGREGATE_KINDS] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
+
+/**
+ * The kinds whose registry row is agency_scoped = false (migration 0072): the aggregate's table has no agency_id, its events carry no
+ * agency and the database refuses an event of the kind that names one. Every other kind is agency scoped (a bank route's NULL agency_id is a
+ * value of an agency-scoped kind). The persistence tests prove the registry agrees with this list.
+ */
+export const UNSCOPED_AGGREGATE_KINDS = OUTREACH_AGGREGATE_KINDS;
 
 /** Keys each event type may carry (07: references and safe counts only). */
 export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<string>>> = Object.freeze({
@@ -223,6 +233,8 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   ...TREASURY_REFUND_EVENT_PAYLOAD_ALLOWLIST,
   // Payments V1 outbound execution attempts (commerce/execution-attempt.ts): references, hashes, tokens, instants and counts only
   ...OUTBOUND_ATTEMPT_EVENT_PAYLOAD_ALLOWLIST,
+  // outreach (commercial/outreach-events.ts): ids, the sealed payload hash and tokens only
+  ...OUTREACH_EVENT_PAYLOAD_ALLOWLIST,
 });
 
 /**
@@ -235,7 +247,7 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
  * launch, staging, verification and publication of a job; model/execution/events.ts, D8-XPKG-7), and so are AUDIT_ORCHESTRATION
  * (an audit's PROFILE, INTERPRET and VALIDATE steps) and PLAN_VALIDATION (a plan's validation intent; model/audit/events.ts).
  */
-export const CONSUMERS = ["NOTIFICATIONS", "EXECUTION_CONTROL", "UPLOAD_INSPECTION", "SELECTION_EVALUATION", "STORAGE_LIFECYCLE", "AUTHORITY_JOURNAL", "DELETION_EXECUTOR", ...COMMERCE_CONSUMERS, ...EXECUTION_CONSUMERS, ...AUDIT_CONSUMERS] as const;
+export const CONSUMERS = ["NOTIFICATIONS", "EXECUTION_CONTROL", "UPLOAD_INSPECTION", "SELECTION_EVALUATION", "STORAGE_LIFECYCLE", "AUTHORITY_JOURNAL", "DELETION_EXECUTOR", ...COMMERCE_CONSUMERS, ...EXECUTION_CONSUMERS, ...AUDIT_CONSUMERS, ...OUTREACH_CONSUMERS] as const;
 export type Consumer = (typeof CONSUMERS)[number];
 
 export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType; readonly consumer: Consumer }> = Object.freeze([
@@ -301,6 +313,8 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   ...TREASURY_REFUND_EVENT_SUBSCRIPTIONS,
   // Payments V1 outbound execution attempts (commerce/execution-attempt.ts): the owner is notified
   ...OUTBOUND_ATTEMPT_EVENT_SUBSCRIPTIONS,
+  // outreach (commercial/outreach-events.ts): the dispatcher learns of a queued intent
+  ...OUTREACH_EVENT_SUBSCRIPTIONS,
 ]);
 
 export function consumersOf(eventType: EventType): ReadonlyArray<Consumer> {

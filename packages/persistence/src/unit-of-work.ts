@@ -137,6 +137,12 @@ const COMMISSION_GROUP_SERVICES: ReadonlySet<string> = new Set(["commission-serv
 const OPERATIONS_GROUP_SERVICES: ReadonlySet<string> = new Set(["operations-service"]);
 
 /**
+ * The outreach service (package B12, plan A1/A14): the dispatcher units D2..D5 and the public opt-out run under kauro_outreach (0072), a
+ * group that holds no grant on any agency-scoped table.
+ */
+const OUTREACH_GROUP_SERVICES: ReadonlySet<string> = new Set(["outreach-service"]);
+
+/**
  * SYSTEM runs under the control plane, SERVICE under the payment service (package B09, D-CTX-B1) — or, for the commission and finance
  * services, under the commission service's group (package B10, D10-CTX-1) — and every other context under the request handlers.
  */
@@ -145,6 +151,7 @@ export function runtimeRoleOf(context: ExecutionContext): RuntimeRole {
     case "SYSTEM":
       return "kauro_control";
     case "SERVICE":
+      if (OUTREACH_GROUP_SERVICES.has(context.serviceId)) return "kauro_outreach";
       return COMMISSION_GROUP_SERVICES.has(context.serviceId) || OPERATIONS_GROUP_SERVICES.has(context.serviceId) ? "kauro_commission" : "kauro_payment";
     default:
       return "kauro_app";
@@ -856,6 +863,8 @@ export interface CommercePools {
   readonly payment?: KauroPool;
   /** kauro_commission: the commission and finance services (package B10, D10-CTX-1). */
   readonly commission?: KauroPool;
+  /** kauro_outreach: the outreach service (package B12). */
+  readonly outreach?: KauroPool;
   /** kauro_control: SYSTEM contexts. */
   readonly control?: KauroPool;
 }
@@ -870,13 +879,14 @@ export class PgCommerceUnitOfWorkFactory extends PgUnitOfWorkFactory implements 
   readonly #pools: Readonly<Partial<Record<RuntimeRole, KauroPool>>>;
 
   constructor(pools: CommercePools, deps: UnitOfWorkDependencies) {
-    const any = pools.app ?? pools.payment ?? pools.commission ?? pools.control;
+    const any = pools.app ?? pools.payment ?? pools.commission ?? pools.outreach ?? pools.control;
     if (any === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "a commerce unit-of-work factory needs at least one verified pool");
     super(any, deps);
     const routes: Partial<Record<RuntimeRole, KauroPool>> = {};
     if (pools.app !== undefined) routes.kauro_app = pools.app;
     if (pools.payment !== undefined) routes.kauro_payment = pools.payment;
     if (pools.commission !== undefined) routes.kauro_commission = pools.commission;
+    if (pools.outreach !== undefined) routes.kauro_outreach = pools.outreach;
     if (pools.control !== undefined) routes.kauro_control = pools.control;
     this.#pools = routes;
   }
