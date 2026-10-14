@@ -114,6 +114,9 @@ export const COMMERCE_FAILURE_REASONS = [
   "STATEMENT_ALREADY_IMPORTED",
   "PROVIDER_INCONSISTENCY",
   "ATTRIBUTION_NOT_OVERRIDABLE",
+  // the owner's evidence upload (B12 D-B12S-2, GAP-API-8): refused before the restricted store is called
+  "ARTIFACT_SIZE_INVALID",
+  "ARTIFACT_TYPE_MISMATCH",
 ] as const;
 
 export type CommerceFailureReason = (typeof COMMERCE_FAILURE_REASONS)[number];

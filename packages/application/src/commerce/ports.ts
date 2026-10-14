@@ -477,6 +477,12 @@ export interface StoredBankEvidence extends Omit<StoredEvidence, "provider" | "n
 export interface BankEvidenceStore {
   readonly integrationClass: BankIntegrationClass;
   get(artifactRef: string): Promise<StoredBankEvidence | null>;
+  /**
+   * The owner's upload (B12 D-B12S-2, GAP-API-8): stores the exact bytes for the account under their content address and answers that address
+   * and the bytes' SHA-256; the same bytes answer the same reference. The store assigns the provenance (a caller cannot self-assert it).
+   * Optional: a store without it refuses every upload (EVIDENCE_UNAVAILABLE). Never called inside a database transaction.
+   */
+  put?(input: { readonly bytes: Uint8Array; readonly accountRef: BankAccountRef }): Promise<{ readonly artifactRef: string; readonly sha256: Sha256Hex }>;
 }
 
 /** The port a bank-transfer adapter implements (D-ACH-15). */

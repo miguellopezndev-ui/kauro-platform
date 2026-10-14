@@ -136,7 +136,7 @@ export function admitHeaders(head: RequestHead): Extract<AdmissionOutcome<never>
  * Steps 0-4 of the admission order for a JSON body (a command's, or an operational route's that takes one): a repeated envelope
  * header, the content type, the byte size, strict UTF-8 and strict JSON, then the closed schema. Throws the refusal.
  */
-function admitJsonBody<Body>(raw: Pick<RawRequest, "headers" | "repeatedHeaders" | "body">, schemaId: KnownSchemaId, validator: SchemaValidator): Body {
+function admitJsonBody<Body>(raw: Pick<RawRequest, "headers" | "repeatedHeaders" | "body">, schemaId: KnownSchemaId, validator: SchemaValidator, maxStringLength?: number): Body {
   // 0-1. repeated envelope header, content type (the header-only head, also run by the transport before the body is read)
   const early = headerFailure(raw);
   if (early !== null) throw early;
@@ -153,7 +153,7 @@ function admitJsonBody<Body>(raw: Pick<RawRequest, "headers" | "repeatedHeaders"
   }
   let parsed: unknown;
   try {
-    parsed = parseStrictJson(text);
+    parsed = parseStrictJson(text, maxStringLength === undefined ? {} : { maxStringLength });
   } catch (e) {
     if (e instanceof StrictJsonError) throw invalid(e.reason);
     throw e;
@@ -266,7 +266,7 @@ export function admitDocument(route: DocumentRoute, raw: RawRequest, validator: 
 export function admitOperationalBody<Body>(route: OperationalRoute, raw: Pick<RawRequest, "headers" | "repeatedHeaders" | "correlationId" | "body">, validator: SchemaValidator): { readonly kind: "ADMITTED"; readonly body: Body } | Extract<AdmissionOutcome<never>, { readonly kind: "PROBLEM" }> {
   if (route.request === undefined) throw new TypeError(`the operational route ${route.operationId} takes no body`);
   try {
-    return { kind: "ADMITTED", body: admitJsonBody<Body>(raw, operationalRequestSchemaId(route.operationId), validator) };
+    return { kind: "ADMITTED", body: admitJsonBody<Body>(raw, operationalRequestSchemaId(route.operationId), validator, route.maxStringLength) };
   } catch (e) {
     if (e instanceof DomainFailure) return { kind: "PROBLEM", correlationId: raw.correlationId, problem: problemOf(e, raw.correlationId) };
     throw e;

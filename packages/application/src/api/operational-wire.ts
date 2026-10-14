@@ -37,6 +37,10 @@ export const OPERATIONAL_WIRE: Readonly<Record<string, OperationalWire>> = Objec
   getBankCredit: entry("NONE", false, "KAURO_OWNER"),
   getBankOrderMatchKeys: entry("NONE", false, "KAURO_OWNER"),
   retireBankCheckout: entry("REQUIRED", true, "AGENCY_BILLING", true),
+  // B12 (D-B12S-2, D-B12S-3): the owner's content-addressed evidence upload is not journaled (the same bytes answer the same reference) but is an
+  // unsafe cookie request; the credit queue is an owner-only read
+  uploadBankEvidenceArtifact: entry("NONE", true, "KAURO_OWNER"),
+  listBankCredits: entry("NONE", false, "KAURO_OWNER"),
   // B11 A1: the agency owner records the buyer type once (CMD101), journaled and cookie-authenticated; the agency is the path id
   setBuyerType: entry("REQUIRED", true, "AGENCY_OWNER"),
 });

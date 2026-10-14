@@ -1,5 +1,6 @@
 // D-ROUTE-1 / D-TOPO-2: every PUBLIC and APP screen of the registry's screens.json has exactly one route, tenant screens live under
-// /agencies/{agencyId}, OPS screens have none here, and the return path after sign-in is an allowlist of this application's own APP routes.
+// /agencies/{agencyId}, OPS screens live under /ops (D-SCR-1), and the return path after sign-in is an allowlist of this application's own APP
+// and OPS routes.
 import assert from "node:assert/strict";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -27,17 +28,25 @@ function expectedRoute(row: RegistryRow): string {
   return `/agencies/{agencyId}${row.route}`;
 }
 
-test("D-ROUTE-1: every PUBLIC and APP screen of the registry is mapped to exactly one route, and no other screen is", () => {
+test("D-ROUTE-1, D-SCR-1: every screen of the registry is mapped to exactly one route, the 15 OPS screens under /ops plus their registry route", () => {
   assert.equal(registry.length, 55, "the registry has 55 screen rows");
-  assert.equal(served.length, 40, "13 public and 27 app screens; the 15 OPS screens are the private origin's");
-  assert.deepEqual([...SCREENS.map((screen) => screen.id)].sort(), served.map((row) => row.id).sort());
+  assert.equal(served.length, 40, "13 public and 27 app screens");
+  const ops = registry.filter((row) => row.origin === "OPS");
+  assert.equal(ops.length, 15, "the 15 OPS screens of the private origin");
+  assert.deepEqual([...SCREENS.map((screen) => screen.id)].sort(), registry.map((row) => row.id).sort());
+  for (const row of ops) {
+    const screen = SCREENS.find((candidate) => candidate.id === row.id);
+    assert.equal(screen?.origin, "OPS", row.id);
+    assert.equal(screen?.route, row.route === "/" ? "/ops" : "/ops" + row.route, row.id + " route");
+    assert.equal(screen?.tenant, false, row.id + " is never a tenant screen");
+    assert.equal(screen?.anonymous, false, row.id + " is never drawn without a session");
+  }
   assert.equal(new Set(SCREENS.map((screen) => screen.id)).size, SCREENS.length, "one row per screen");
   for (const row of served) {
     const mapped = SCREENS.filter((screen) => screen.id === row.id);
     assert.equal(mapped.length, 1, row.id);
     assert.equal(mapped[0]?.origin, row.origin, `${row.id} origin`);
   }
-  for (const row of registry.filter((candidate) => candidate.origin === "OPS")) assert.equal(SCREENS.some((screen) => screen.id === row.id), false, `${row.id} is private-origin only`);
 });
 
 test("D-ROUTE-1: tenant screens live under /agencies/{agencyId} plus the registry route; UI09, UI10, UI50 and UI51 keep their own; UI24 names its order", () => {
@@ -79,7 +88,7 @@ test("D-ROUTE-1: a concrete path is matched to its one screen with its parameter
   assert.equal(matchRoute(`/agencies/${AGENCY}/projects`)?.screen.id, "UI11");
   assert.equal(matchRoute(`/agencies/${AGENCY}/payments/ord_1`)?.screen.id, "UI24");
   assert.equal(matchRoute("/unsubscribe/abc-DEF_123")?.screen.id, "UI49");
-  for (const bad of ["", "agencies", "/agencies/", `/agencies/${AGENCY}/projects/`, `/agencies/${AGENCY}//projects`, `/agencies/${AGENCY}/projects/..`, `/agencies/${AGENCY}/projects/%2e%2e`, `/agencies/${AGENCY}/projects/a b`, "/agencies/a/b/c/d/e/f", "/sales/prospects", "/finance", "/operations/jobs", "/owner/actions", "/login/", "/Login", "/agencies/\u0000"]) {
+  for (const bad of ["", "agencies", "/agencies/", `/agencies/${AGENCY}/projects/`, `/agencies/${AGENCY}//projects`, `/agencies/${AGENCY}/projects/..`, `/agencies/${AGENCY}/projects/%2e%2e`, `/agencies/${AGENCY}/projects/a b`, "/agencies/a/b/c/d/e/f", "/sales/prospects", "/finance", "/operations/jobs", "/owner/actions", "/ops/", "/ops/finance/", "/ops/ops", "/ops/sales/agencies/a.b", "/login/", "/Login", "/agencies/\u0000"]) {
     assert.equal(matchRoute(bad), null, JSON.stringify(bad));
   }
   assert.equal(matchRoute(`/agencies/${"a".repeat(129)}/projects`), null, "a segment is at most 128 characters");
@@ -87,7 +96,9 @@ test("D-ROUTE-1: a concrete path is matched to its one screen with its parameter
   assert.equal(originOfPath(`/agencies/${AGENCY}/projects`), "APP");
   assert.equal(originOfPath("/login"), "APP");
   assert.equal(originOfPath("/livez"), null, "a system path belongs to no group");
-  assert.equal(originOfPath("/sales/prospects"), null, "the private origin's paths are nobody's here");
+  assert.equal(originOfPath("/sales/prospects"), null, "a registry route of the private origin is nobody's without its /ops prefix");
+  assert.equal(originOfPath("/ops/finance"), "OPS");
+  assert.equal(originOfPath("/ops"), "OPS");
 });
 
 test("D-ROUTE-1: a path is built from exactly its parameters, each one URL-safe, and round-trips through the matcher", () => {
@@ -107,8 +118,8 @@ test("D-ROUTE-1: a path is built from exactly its parameters, each one URL-safe,
   assert.equal(pathOf("UI10"), "/agencies");
 });
 
-test("D-ROUTE-1: the return path after sign-in is a plain path of an APP screen of this application and nothing else", () => {
-  const good = [`/agencies/${AGENCY}/projects`, `/agencies/${AGENCY}/projects/p-1/plan/approval`, "/agencies", "/onboarding", "/invitations/inv-1", `/agencies/${AGENCY}/payments/o-1`];
+test("D-ROUTE-1: the return path after sign-in is a plain path of an APP or OPS screen of this application and nothing else", () => {
+  const good = ["/ops", "/ops/finance", `/agencies/${AGENCY}/projects`, `/agencies/${AGENCY}/projects/p-1/plan/approval`, "/agencies", "/onboarding", "/invitations/inv-1", `/agencies/${AGENCY}/payments/o-1`];
   for (const path of good) assert.equal(safeReturnPath(path), path, path);
   const bad: readonly unknown[] = [
     "https://elsewhere.test/agencies",
@@ -169,6 +180,7 @@ test("D-ROUTE-1: navigation offers only agency-level screens that exist, in refe
   };
   walk(join(webRoot, "src", "app", "(public)"), "PUBLIC", "");
   walk(join(webRoot, "src", "app", "(app)"), "APP", "");
+  walk(join(webRoot, "src", "app", "(ops)"), "OPS", "");
   const implementedRoutes = [...IMPLEMENTED_SCREENS].map((id) => {
     const screen = SCREENS.find((candidate) => candidate.id === id);
     return `${screen?.origin}:${screen?.route}`;

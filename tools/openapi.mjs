@@ -167,6 +167,8 @@ export function generateOpenApi(sources) {
   const { application, domain, registryCommands, provenance, operationalRoutes } = sources;
   const { byId, defs } = runtimeSchemas(sources);
   const ID = { type: "string", pattern: application.RESPONSE_FIELD_VOCABULARY.UUID_PATTERN };
+  // B12 D-B12S-4: a *Ref path value (a bank account reference) is what apps/api bank-route-routes admits, REF_PATH; every other a UUID
+  const REF = { type: "string", pattern: "^[A-Za-z0-9._:-]{1,128}$" };
   const components = { schemas: {}, parameters: {}, headers: {}, securitySchemes: {} };
   const addComponent = (name, schema, schemaId) => {
     if (name in components.schemas) throw new Error(`component ${name} is generated twice`);
@@ -632,10 +634,22 @@ Failure: ${command.failure}`,
     // an unsafe route the session cookie authenticates carries the CSRF token; the fit inquiry names the Origin it demands
     const unsafe = route.method === "POST";
     // the wire record (B11 P0, D-GEN-1) says which headers the api demands of the route; the path parameters are the template's own, a UUID
+    // (a *Ref one: a reference of the REF pattern); a route that declares a query documents its filter, limit and cursor (B12 D-B12S-3)
     const wire = application.OPERATIONAL_WIRE[route.operationId];
     if (route.path.startsWith("/api/v1/")) {
       operation.parameters = [
-        ...pathParameters(route.path).map((name) => ({ name, in: "path", required: true, description: "Path id (a UUID).", schema: ID })),
+        ...pathParameters(route.path).map((name) =>
+          name.endsWith("Ref")
+            ? { name, in: "path", required: true, description: "Path reference (letters, digits and . _ : -, at most 128).", schema: REF }
+            : { name, in: "path", required: true, description: "Path id (a UUID).", schema: ID },
+        ),
+        ...(route.query !== undefined
+          ? [
+              { name: route.query.filter.name, in: "query", required: false, description: "The list's filter; a value not listed is SCHEMA_VIOLATION (ENUM). The cursor is bound to it.", schema: { type: "string", enum: [...route.query.filter.values], default: route.query.filter.default } },
+              { $ref: "#/components/parameters/PageLimit" },
+              { $ref: "#/components/parameters/PageCursor" },
+            ]
+          : []),
         ...(wire?.idempotency === "REQUIRED" ? [{ $ref: "#/components/parameters/IdempotencyKey" }] : []),
         ...(wire?.agencySelector === true ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
         { $ref: "#/components/parameters/CorrelationId" },

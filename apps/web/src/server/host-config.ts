@@ -3,17 +3,19 @@
 // with `import "server-only"`.
 //
 // Hosts are deployment facts. A deployment names both origins (`KAURO_PUBLIC_ORIGIN`, `KAURO_APP_ORIGIN`), each an https origin with no
-// path, and the two differ. Only the local stack (`KAURO_ENV=LOCAL`) may name none, and then one origin serves both groups; a deployment
+// path, and the two differ. The private origin (`KAURO_OPS_ORIGIN`, D-SCR-1) is optional: named, it is a third distinct https origin that
+// serves the OPS screens and its own sign-in; not named, a split deployment serves the OPS screens on no host. Only the local stack (`KAURO_ENV=LOCAL`) may name none, and then one origin serves both groups; a deployment
 // that names none, or one, or a malformed one, does not serve either group (503) instead of guessing.
 /** How the deployment's hosts are arranged. LOCAL serves both groups on whatever host it is reached (the local stack and the browser suite). */
 export type HostPolicy =
   | { readonly kind: "LOCAL" }
-  | { readonly kind: "SPLIT"; readonly publicHost: string; readonly appHost: string };
+  | { readonly kind: "SPLIT"; readonly publicHost: string; readonly appHost: string; readonly opsHost?: string };
 
 export interface HostEnvironment {
   readonly KAURO_ENV: string | undefined;
   readonly KAURO_PUBLIC_ORIGIN: string | undefined;
   readonly KAURO_APP_ORIGIN: string | undefined;
+  readonly KAURO_OPS_ORIGIN?: string | undefined;
 }
 
 export type HostConfigProblem = "ORIGINS_MISSING" | "ONE_ORIGIN_ONLY" | "ORIGIN_INVALID" | "ORIGINS_NOT_DISTINCT";
@@ -41,11 +43,18 @@ export function parseHostPolicy(environment: HostEnvironment): HostConfig {
   const local = environment.KAURO_ENV === "LOCAL";
   const publicOrigin = environment.KAURO_PUBLIC_ORIGIN;
   const appOrigin = environment.KAURO_APP_ORIGIN;
+  const opsOrigin = environment.KAURO_OPS_ORIGIN;
+  // an ops origin needs the other two: the private screens never run on a deployment that serves the others on one host
+  if (blank(publicOrigin) && blank(appOrigin) && !blank(opsOrigin)) return { ok: false, problem: "ONE_ORIGIN_ONLY" };
   if (blank(publicOrigin) && blank(appOrigin)) return local ? { ok: true, policy: { kind: "LOCAL" } } : { ok: false, problem: "ORIGINS_MISSING" };
   if (blank(publicOrigin) || blank(appOrigin) || publicOrigin === undefined || appOrigin === undefined) return { ok: false, problem: "ONE_ORIGIN_ONLY" };
   const publicHost = hostOf(publicOrigin, local);
   const appHost = hostOf(appOrigin, local);
   if (publicHost === null || appHost === null) return { ok: false, problem: "ORIGIN_INVALID" };
   if (publicHost === appHost) return { ok: false, problem: "ORIGINS_NOT_DISTINCT" };
-  return { ok: true, policy: { kind: "SPLIT", publicHost, appHost } };
+  if (blank(opsOrigin) || opsOrigin === undefined) return { ok: true, policy: { kind: "SPLIT", publicHost, appHost } };
+  const opsHost = hostOf(opsOrigin, local);
+  if (opsHost === null) return { ok: false, problem: "ORIGIN_INVALID" };
+  if (opsHost === publicHost || opsHost === appHost) return { ok: false, problem: "ORIGINS_NOT_DISTINCT" };
+  return { ok: true, policy: { kind: "SPLIT", publicHost, appHost, opsHost } };
 }

@@ -208,6 +208,23 @@ export class PgBankCredits {
     return r.rows[0] ? creditOf(r.rows[0]) : null;
   }
 
+  /**
+   * The owner's credit queue (B12 D-B12S-3, GAP-API-9): the credits in one state, oldest first, keyset on (created_at, bank_credit_id) after
+   * `after` (exclusive), at most `limit` rows. Each row carries its keyset position at microsecond precision (the cursor's). No lock: a read.
+   */
+  async listCredits(state: string, after: { readonly createdAt: string; readonly id: string } | null, limit: number): Promise<ReadonlyArray<{ readonly credit: BankCreditRecord; readonly position: { readonly createdAt: string; readonly id: string } }>> {
+    const r = await execute<CreditRow & { position_at: string }>(
+      this.db,
+      `SELECT ${CREDIT_COLUMNS}, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS position_at
+       FROM kauro.bank_credits
+       WHERE state = $1 AND ($2::timestamptz IS NULL OR (created_at, bank_credit_id) > ($2::timestamptz, $3::uuid))
+       ORDER BY created_at, bank_credit_id
+       LIMIT $4`,
+      [state, after?.createdAt ?? null, after?.id ?? null, limit],
+    );
+    return r.rows.map((row) => ({ credit: creditOf(row), position: { createdAt: row.position_at, id: row.bank_credit_id } }));
+  }
+
   /** The credit identity lock Lc: the credit's row, FOR UPDATE, held to COMMIT. */
   async lockCredit(creditId: string): Promise<BankCreditRecord | null> {
     const r = await execute<CreditRow>(this.db, `SELECT ${CREDIT_COLUMNS} FROM kauro.bank_credits WHERE bank_credit_id = $1 FOR UPDATE`, [creditId]);

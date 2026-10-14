@@ -21,7 +21,7 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { LateFailureSink, BankEvidenceClassifier, BankEvidenceStore, BankInboundCollaborators, ObjectReadSigningPort } from "@kauro/application";
-import { createBankInboundHandlers, createBankRouteHandlers, realProviderCallTimer } from "@kauro/application";
+import { createBankEvidenceUpload, createBankInboundHandlers, createBankRouteHandlers, realProviderCallTimer } from "@kauro/application";
 import type { AssuranceVerifier, AuditReadRuntime, AuditRuntime, B06Collaborators, B07Collaborators, BuyerTypeReader, CommercialCommandHandler, CommercialReadHandler, CommerceCommandHandler, CommerceReadHandler, CommerceRequestCollaborators, CommerceRequestRuntime, CoreServices, ExecutionReadRuntime, ExecutionRuntime, SchemaValidator, SourceReadRuntime, SourceRuntime, QuoteCollaborators, ProviderCallTimer } from "@kauro/application";
 import { RecordedBuyerTypeReader, SESSION_POLICY_VERSION, createAgencyAppHandlers, type AgencyAppStores, createAgencyLifecycleHandlers, createAuditHandlers, createAuditIntakeHandlers, createAuditReadHandlers, createB06Handlers, createB07Handlers, createRetentionHandlers, createCommerceAuthorizer, createCommerceRequestHandlers, createCommercialAuthorizer, createExecutionHandlers, createExecutionReadHandlers, createProspectHandlers, createReadHandlers, createSessionService, createSourceIntakeHandlers, createSourceReadHandlers, createSupportHandlers, createTeamHandlers, isCursorKey, refuseAnonymously, refuseUnauthenticated, unavailableCoreServices, createSellerCommandHandlers, createCapabilityCommandHandlers, createOperationsCommandHandlers, createOperationsReadHandlers, createQuoteHandlers, createStatementRequestHandlers, problemOf, recordOperatorDenial } from "@kauro/application";
 import { createAdmissionLimiter, createAssuranceVerifier, createAuthorizer } from "@kauro/authorization";
@@ -415,11 +415,14 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     assurance: createAssuranceVerifier(),
     timer: assembly.commercial?.providerTimer ?? realProviderCallTimer,
     random: assembly.random ?? systemRandom,
+    cursorKey,
   };
   const commerceCollaborators: CommerceRequestCollaborators = { ...commerceEdition(), ...paymentService, bank, ...assembly.commerce };
   const bankRoutes = createBankRouteHandlers(commerceRuntime, bank);
   // the owner's inbound credit commands and CMD214's record run on the request pool (kauro_app, D-ACH-16, D-INB-CTX-1/2)
   const bankInbound = createBankInboundHandlers(commerceRuntime, bank);
+  // B12 GAP-API-8: the owner's evidence upload into the late-bound restricted store
+  const bankUpload = createBankEvidenceUpload(commerceRuntime, bank);
   const commerce = createCommerceRequestHandlers(commerceRuntime, commerceCollaborators);
   // package B10: the agency lifecycle (CMD002, CMD043) on the same runtime, over the lifecycle adapter of the persistence package, B06's
   // active-work inspector and the step-up verifier
@@ -490,7 +493,7 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
     ids,
     paymentRoutes: (app, kit) => {
       registerPaymentRoutes(app, kit, { payments: assembly.payments ?? null, validator, clock, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
-      registerBankRouteRoutes(app, kit, { handlers: bankRoutes, inbound: bankInbound, runtime: commerceRuntime, bank, validator, clock, environment: assembly.environment, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
+      registerBankRouteRoutes(app, kit, { handlers: bankRoutes, inbound: bankInbound, upload: bankUpload, runtime: commerceRuntime, bank, validator, clock, environment: assembly.environment, refuseUnauthenticated: (action, request) => refuseUnauthenticated(runtime, action, request) });
     },
     agencyRoutes: (app, kit) => registerAgencyAppRoutes(app, kit, { handlers: createAgencyAppHandlers(runtime, agencyApp), validator, clock, environment: assembly.environment }),
     commissionRoutes: (app, kit) =>

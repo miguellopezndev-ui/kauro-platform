@@ -32,7 +32,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   // B10 (CMD002 and CMD043, mandate B10-AGENCY-LIFECYCLE; CMD027, mandate B10-COMMANDS-QUOTE; CMD045..CMD047, mandate B10-COMMANDS-PROSPECTS; CMD048..CMD050, mandate B10-COMMANDS-SELLERS),
   // the five routes of the browser session boundary (B11 W2), the two public routes (B11 W5b), and the Payments V1 bank-transfer
   // routes (L-ROUTE: the five operational bank-route commands, getBankRoute, and the KIT read getTransferInstructions; PV1-INBOUND:
-  // the four bank-credit commands, the credit and match-key reads, and the checkout retirement)
+  // the four bank-credit commands, the credit and match-key reads, and the checkout retirement; B12: the owner's evidence upload and
+  // the credit queue)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -44,6 +45,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/agencies/{agencyId}/projects ListProjects",
       "GET /api/v1/audits/{auditId} GetAudit",
       "GET /api/v1/jobs/{jobId} GetJob",
+      "GET /api/v1/operations/bank-credits listBankCredits",
       "GET /api/v1/operations/bank-credits/{creditId} getBankCredit",
       "GET /api/v1/operations/bank-orders/{orderId}/match-keys getBankOrderMatchKeys",
       "GET /api/v1/operations/bank-routes/{routeId} getBankRoute",
@@ -87,6 +89,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/memberships/{membershipId}/capabilities ChangeMembership",
       "POST /api/v1/memberships/{membershipId}/revoke RevokeMembership",
       "POST /api/v1/operations/bank-accounts/{accountRef}/credits enterBankCredit",
+      "POST /api/v1/operations/bank-accounts/{accountRef}/evidence-artifacts uploadBankEvidenceArtifact",
       "POST /api/v1/operations/bank-accounts/{accountRef}/statement-imports importBankStatement",
       "POST /api/v1/operations/bank-credits/{creditId}/attributions attributeBankCredit",
       "POST /api/v1/operations/bank-credits/{creditId}/confirmations confirmBankCredit",
@@ -201,6 +204,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
     "POST /api/v1/operations/bank-accounts/{accountRef}/statement-imports importBankStatement",
     "GET /api/v1/operations/bank-credits/{creditId} getBankCredit",
     "GET /api/v1/operations/bank-orders/{orderId}/match-keys getBankOrderMatchKeys",
+    "POST /api/v1/operations/bank-accounts/{accountRef}/evidence-artifacts uploadBankEvidenceArtifact",
+    "GET /api/v1/operations/bank-credits listBankCredits",
     "POST /api/v1/agencies/{agencyId}/buyer-type setBuyerType",
   ]);
   // the public routes take no credential (an explicit empty security requirement) and the inquiry names the Origin it demands
@@ -483,4 +488,39 @@ test("operational routes: every path parameter, Idempotency-Key and agency selec
     assert.equal(refsOf(op).includes("#/components/parameters/CsrfToken"), entry.csrf, `${r.operationId} CSRF token`);
   }
   for (const id of Object.keys(wire)) assert.ok(sources.operationalRoutes.some((r) => r.operationId === id), `${id} names an operational route`);
+});
+
+test("B12: a Ref path parameter is documented with the REF pattern, and the credit queue documents its closed query", () => {
+  const UUID = sources.application.RESPONSE_FIELD_VOCABULARY.UUID_PATTERN;
+  const REF = "^[A-Za-z0-9._:-]{1,128}$";
+  const opOf = (id) => {
+    const route = sources.operationalRoutes.find((r) => r.operationId === id);
+    assert.ok(route, id);
+    return expected.paths[route.path][route.method.toLowerCase()];
+  };
+  const refsOf = (op) => (op.parameters ?? []).map((p) => p.$ref ?? `${p.in}:${p.name}`);
+  // what bank-route-routes.ts admits: a *Ref path value of the REF pattern, every other one a UUID
+  for (const r of sources.operationalRoutes) {
+    if (!r.path.startsWith("/api/v1/")) continue;
+    for (const p of opOf(r.operationId).parameters.filter((x) => x.in === "path")) {
+      assert.equal(p.schema.pattern, p.name.endsWith("Ref") ? REF : UUID, `${r.operationId} ${p.name}`);
+    }
+  }
+  const upload = opOf("uploadBankEvidenceArtifact");
+  assert.equal(upload["x-kauro-idempotency"], "NONE");
+  assert.equal(upload["x-kauro-role"], "KAURO_OWNER");
+  assert.ok(refsOf(upload).includes("#/components/parameters/CsrfToken"), "the upload is an unsafe cookie request");
+  assert.ok(!refsOf(upload).includes("#/components/parameters/IdempotencyKey"), "content-addressed: no key");
+  const queue = opOf("listBankCredits");
+  assert.equal(queue["x-kauro-role"], "KAURO_OWNER");
+  const state = queue.parameters.find((p) => p.in === "query" && p.name === "state");
+  assert.deepEqual(state?.schema, { type: "string", enum: ["DRAFT_MANUAL", "OBSERVED", "MATCH_REVIEW", "MATCHED", "APPLIED", "RETURN_REVIEW"], default: "MATCH_REVIEW" });
+  assert.ok(refsOf(queue).includes("#/components/parameters/PageLimit"));
+  assert.ok(refsOf(queue).includes("#/components/parameters/PageCursor"));
+  // only the queue documents a query: no other operational route takes one
+  for (const r of sources.operationalRoutes) {
+    if (r.operationId === "listBankCredits" || !r.path.startsWith("/api/v1/")) continue;
+    const op = opOf(r.operationId);
+    assert.deepEqual((op.parameters ?? []).filter((p) => p.in === "query" || p.$ref === "#/components/parameters/PageLimit"), [], r.operationId);
+  }
 });

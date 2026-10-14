@@ -1,6 +1,7 @@
-// The route map of the web application (design D-ROUTE-1, D-TOPO-2): every PUBLIC and APP screen of the registry's screens.json is mapped to
-// exactly one route here, and nothing else in the application names a route. OPS screens (UI33-UI44, UI53-UI55) belong to the private
-// origin and have no route in this application.
+// The route map of the web application (design D-ROUTE-1, D-TOPO-2, D-SCR-1): every screen of the registry's screens.json is mapped to
+// exactly one route here, and nothing else in the application names a route. The OPS screens (UI33-UI44, UI53-UI55) belong to the private
+// origin: they live under `/ops` followed by their registry route (UI33, the private home, is `/ops`), and the proxy serves them only on the
+// ops host (KAURO_OPS_ORIGIN; server/host-routing.ts).
 //
 // The rule that produces the routes (tested against the registry, not restated by it): a tenant screen lives under `/agencies/{agencyId}`
 // followed by its registry route, so the agency travels in the URL (per tab, survives refresh, deep links) and as `X-Kauro-Agency`; the four
@@ -9,7 +10,7 @@
 import type { MessageId } from "./copy/en.ts";
 import { IMPLEMENTED_BY_AREA } from "./screens/implemented/index.ts";
 
-export type Origin = "PUBLIC" | "APP";
+export type Origin = "PUBLIC" | "APP" | "OPS";
 
 export interface Screen {
   readonly id: string;
@@ -25,6 +26,7 @@ export interface Screen {
 const pub = (id: string, route: string): Screen => ({ id, origin: "PUBLIC", route, tenant: false, anonymous: true });
 const own = (id: string, route: string, anonymous = false): Screen => ({ id, origin: "APP", route, tenant: false, anonymous });
 const tenant = (id: string, route: string): Screen => ({ id, origin: "APP", route: `/agencies/{agencyId}${route}`, tenant: true, anonymous: false });
+const ops = (id: string, route: string): Screen => ({ id, origin: "OPS", route: route === "/" ? "/ops" : `/ops${route}`, tenant: false, anonymous: false });
 
 export const SCREENS: readonly Screen[] = [
   pub("UI01", "/"),
@@ -67,6 +69,21 @@ export const SCREENS: readonly Screen[] = [
   own("UI50", "/login", true),
   own("UI51", "/invitations/{id}", true),
   tenant("UI52", "/support"),
+  ops("UI33", "/"),
+  ops("UI34", "/sales/prospects"),
+  ops("UI35", "/sales/agencies/{id}"),
+  ops("UI36", "/sales/statements"),
+  ops("UI37", "/sales/sellers/{id}"),
+  ops("UI38", "/owner/actions"),
+  ops("UI39", "/finance"),
+  ops("UI40", "/operations/jobs"),
+  ops("UI41", "/operations/deletion"),
+  ops("UI42", "/operations/incidents"),
+  ops("UI43", "/releases"),
+  ops("UI44", "/reviews"),
+  ops("UI53", "/sales/resources"),
+  ops("UI54", "/sales/outreach"),
+  ops("UI55", "/support"),
 ];
 
 /**
@@ -176,7 +193,8 @@ export function navigationFor(agencyId: string, implemented: ReadonlySet<string>
 const MAX_RETURN_PATH = 512;
 
 /**
- * The only paths sign-in may send a person back to: a plain path of an APP screen of this application. No scheme, host, query, fragment,
+ * The only paths sign-in may send a person back to: a plain path of an APP or OPS screen of this application (an OPS path is served only on
+ * the ops host, whose sign-in is the one that sends the person back to it). No scheme, host, query, fragment,
  * backslash, control character, dot segment or encoded separator; never the sign-in screen itself. Anything else is null, and the caller
  * sends the person to the agency switcher instead. (An open redirect after login is a phishing surface: 08 "Browser, API and cache isolation".)
  */
@@ -185,7 +203,7 @@ export function safeReturnPath(candidate: unknown): string | null {
   if (!/^\/[A-Za-z0-9_\-/]*$/.test(candidate)) return null;
   if (candidate.includes("//") || (candidate.length > 1 && candidate.endsWith("/"))) return null;
   const match = matchRoute(candidate);
-  if (match === null || match.screen.origin !== "APP" || match.screen.id === "UI50") return null;
+  if (match === null || match.screen.origin === "PUBLIC" || match.screen.id === "UI50") return null;
   return candidate;
 }
 
