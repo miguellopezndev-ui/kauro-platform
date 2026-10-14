@@ -13,7 +13,7 @@
  * INSERT agency_buyer_types (v1) → agency_buyer_type.recorded.v1 → journal 201.
  *
  * The recorded value is what B10's BuyerTypeReader port answers (RecordedBuyerTypeReader): CMD027 CreateQuote refuses BUYER_TYPE_UNSET
- * until it exists, and CMD047 AcceptAttribution refuses an in-house tenant IN_HOUSE_NOT_ATTRIBUTABLE.
+ * until it exists; attribution (CMD047) does not depend on it (owner decision D-33).
  */
 import type { CommandId, UtcInstant } from "@kauro/contracts";
 import type { AgencyId, CorrelationId, Environment, MembershipId, UnitOfWork, UserId } from "@kauro/domain";

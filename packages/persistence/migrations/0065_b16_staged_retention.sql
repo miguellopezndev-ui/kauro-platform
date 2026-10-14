@@ -1,4 +1,4 @@
--- Migration 0063 (provisional number; the coordinator renumbers at merge): the PAID_STAGED retention deadlines of a staged CRM import
+-- Migration 0065 (provisional number; the coordinator renumbers at merge): the PAID_STAGED retention deadlines of a staged CRM import
 -- workflow (package B16 lane L7, cases R2-054 and R2-055, gate G-DELETE; mandate B16-REST-PLAN §5 C7).
 --
 -- Authority: 09 "Retention schedule" (staged CRM import source and stage artifacts: "Stage workflow expires twenty-one days after first

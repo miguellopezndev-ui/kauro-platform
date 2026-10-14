@@ -264,6 +264,12 @@ test("exactly the fourteen catalogue routes and the selection manifest intake ar
   const bankGets = new Set(["/api/v1/operations/bank-routes/:routeId", "/api/v1/payment-orders/:orderId/transfer-instructions"].filter((path) => !commerceGets.has(path)));
   assert.deepEqual(inventory.filter((r) => r.method === "POST" && bankPosts.has(r.url)).map((r) => r.url).sort(), [...bankPosts].sort());
   assert.deepEqual(inventory.filter((r) => r.method === "GET" && bankGets.has(r.url)).map((r) => r.url).sort(), [...bankGets].sort());
+  // lane PV1 L-INBOUND (ACH-ROUTE r12 §7.5, §7.9, §7.12, §7.23): the manual credit, statement import and checkout retirement commands as
+  // POST and the credit and match-key reads as GET, named here exactly
+  for (const path of ["/api/v1/operations/bank-accounts/:accountRef/credits", "/api/v1/operations/bank-credits/:creditId/confirmations", "/api/v1/operations/bank-credits/:creditId/attributions", "/api/v1/operations/bank-accounts/:accountRef/statement-imports", "/api/v1/payment-orders/:orderId/retirements"]) bankPosts.add(path);
+  for (const path of ["/api/v1/operations/bank-credits/:creditId", "/api/v1/operations/bank-orders/:orderId/match-keys"]) bankGets.add(path);
+  assert.deepEqual(inventory.filter((r) => r.method === "POST" && bankPosts.has(r.url)).map((r) => r.url).sort(), [...bankPosts].sort());
+  assert.deepEqual(inventory.filter((r) => r.method === "GET" && bankGets.has(r.url)).map((r) => r.url).sort(), [...bankGets].sort());
   // B06's seven commands, B07's six (design §11), B08's two job commands and four audit commands (design §12), B17 four commands (CMD018, CMD019, CMD040, CMD041), B11's CMD044, B16's five team commands (CMD003..CMD007) and the
   // selection manifest and decision artifact intakes (D-SEL-2, D8-CMA-7); beside them every served route of
   // package B09 — the request side (M4) and the payment service's routes (M3), served in every edition (D-REQ-B1, D-M3-B1) — and

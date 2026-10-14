@@ -1345,6 +1345,7 @@ test("L22 OK migration on a live pool: 00NN applied by the migration runner as t
   // the cluster stops just before 00NN, wherever later migrations put it (incident MIGRATION-POSITION-ASSUMED 2026-10-13: "00NN is
   // the last migration" broke every branch that adds a migration)
   const at = all.indexOf(target);
+  assert.ok(at > 0, "00NN has a predecessor");
   const dir = mkdtempSync(join(tmpdir(), "kauro-l22-"));
   try {
     for (const m of all.slice(0, at)) copyFileSync(join(MIGRATIONS_DIR, m.file), join(dir, m.file));

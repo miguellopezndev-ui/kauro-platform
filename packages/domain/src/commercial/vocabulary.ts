@@ -37,8 +37,8 @@ export const COMMERCIAL_VOCABULARY = Object.freeze({
   destinationCurrencies: ["USD", "COP"],
   payoutDestinationStates: ["PENDING_VERIFICATION", "VERIFIED", "REJECTED", "SUPERSEDED"],
   prospectStates: ["RESEARCHED", "QUALIFIED", "CONTACTED", "ENGAGED", "OPPORTUNITY", "WON", "LOST", "SUPPRESSED"],
-  /** Prospects are agencies only (18 "Prospect qualification" as amended by A3; D58). */
-  prospectSegments: ["AGENCY"],
+  /** Prospects are agencies and companies (owner decision D-33, superseding A3 3.7's agency-only prospecting; 18 "Prospect qualification"). */
+  prospectSegments: ["AGENCY", "COMPANY"],
   /** A suppression matches the organization key or the contact key (KC016). */
   suppressionKeyKinds: ["ORGANIZATION", "CONTACT"],
   attributionClaimStates: ["SUBMITTED", "ACCEPTED", "DISPUTED", "REJECTED", "EXPIRED", "CONVERTED"],

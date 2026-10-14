@@ -28,7 +28,7 @@
  * (INSTRUCTIONS_NOT_AVAILABLE) and the instruction deadline (INSTRUCTIONS_EXPIRED). Every failure of the evidence is answered after these,
  * and no part of the snapshot is ever answered with a refusal.
  */
-import type { UtcInstant } from "@kauro/contracts";
+import { rawDigest, type UtcInstant } from "@kauro/contracts";
 import type { CommerceUnitOfWork, MembershipId, PaymentOrderId, PaymentOrderRecord, QuoteId, QuoteRecord, ResolvedMembership, TenantContext, UserId } from "@kauro/domain";
 import { BANK_TRANSFER_ROUTE_KIND, DomainFailure, beforeCommitOf, NotFoundFailure, StaleVersionFailure, actorOf, blockerFailure, checkoutBlockers, paymentIntentHash, toUtcInstant, transferReferenceOf, transferWindowOf } from "@kauro/domain";
 import { judgedUnderHold, type CredentialHold, type RequestAuthority } from "../../api/authority.js";
@@ -212,6 +212,7 @@ export async function issueBankTransfer(runtime: CommerceRequestRuntime, co: Com
           transferExpiresAt: toUtcInstant(window.transferExpiresAtMs),
           sendBy: toUtcInstant(window.sendByMs),
           issuedAt: effect,
+          acceptedPayerDigest: read.profile === null ? null : rawDigest(new TextEncoder().encode(`kauro.bank-order.payer|${read.profile.customerLegalRef}`)),
         });
       }
       if (snapshot === null) throw new DomainFailure("CAPACITY_UNAVAILABLE", "no free transfer reference was drawn", {}, true);

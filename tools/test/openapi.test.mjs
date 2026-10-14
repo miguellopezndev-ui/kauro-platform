@@ -31,7 +31,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
   // package B09 (M4: the request side, M3: the payment service's; D-REQ-B7, D-INT2-B1), the execution and audit routes of package B08 (CMD036 ExecuteProject, CMD037 CancelJob, GetJob; CMD020 StartAudit, CMD021 CancelAudit, CMD022 CreatePlan, CMD024 ValidatePlan, GetAudit and the decision artifact intake; D8-API-1, D8-CMA-7), the served commands of package
   // B10 (CMD002 and CMD043, mandate B10-AGENCY-LIFECYCLE; CMD027, mandate B10-COMMANDS-QUOTE; CMD045..CMD047, mandate B10-COMMANDS-PROSPECTS; CMD048..CMD050, mandate B10-COMMANDS-SELLERS),
   // the five routes of the browser session boundary (B11 W2), the two public routes (B11 W5b), and the Payments V1 bank-transfer
-  // routes (L-ROUTE: the five operational bank-route commands, getBankRoute, and the KIT read getTransferInstructions)
+  // routes (L-ROUTE: the five operational bank-route commands, getBankRoute, and the KIT read getTransferInstructions; PV1-INBOUND:
+  // the four bank-credit commands, the credit and match-key reads, and the checkout retirement)
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
@@ -43,6 +44,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/agencies/{agencyId}/projects ListProjects",
       "GET /api/v1/audits/{auditId} GetAudit",
       "GET /api/v1/jobs/{jobId} GetJob",
+      "GET /api/v1/operations/bank-credits/{creditId} getBankCredit",
+      "GET /api/v1/operations/bank-orders/{orderId}/match-keys getBankOrderMatchKeys",
       "GET /api/v1/operations/bank-routes/{routeId} getBankRoute",
       "GET /api/v1/operations/refunds/{refundId} GetRefundReview",
       "GET /api/v1/payment-orders/{orderId} GetPaymentOrder",
@@ -82,6 +85,10 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/jobs/{jobId}/cancel CancelJob",
       "POST /api/v1/memberships/{membershipId}/capabilities ChangeMembership",
       "POST /api/v1/memberships/{membershipId}/revoke RevokeMembership",
+      "POST /api/v1/operations/bank-accounts/{accountRef}/credits enterBankCredit",
+      "POST /api/v1/operations/bank-accounts/{accountRef}/statement-imports importBankStatement",
+      "POST /api/v1/operations/bank-credits/{creditId}/attributions attributeBankCredit",
+      "POST /api/v1/operations/bank-credits/{creditId}/confirmations confirmBankCredit",
       "POST /api/v1/operations/bank-routes configureBankRoute",
       "POST /api/v1/operations/bank-routes/{routeId}/details replaceBankRouteDetails",
       "POST /api/v1/operations/bank-routes/{routeId}/disable disableBankRoute",
@@ -93,6 +100,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/operations/recoveries AuthorizeRecovery",
       "POST /api/v1/payment-orders/{orderId}/capture CapturePayment",
       "POST /api/v1/payment-orders/{orderId}/reconcile ReconcilePayment",
+      "POST /api/v1/payment-orders/{orderId}/retirements retireBankCheckout",
       "POST /api/v1/payments/webhooks/{provider} ReceivePaymentWebhook",
       "POST /api/v1/plans/{planId}/approve ApprovePlan",
       "POST /api/v1/plans/{planId}/revisions RevisePlan",
@@ -180,6 +188,13 @@ test("the committed document is the generated one, byte for byte, and matches ev
     "POST /api/v1/operations/bank-routes/{routeId}/details replaceBankRouteDetails",
     "GET /api/v1/operations/bank-routes/{routeId} getBankRoute",
     "GET /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions",
+    "POST /api/v1/payment-orders/{orderId}/retirements retireBankCheckout",
+    "POST /api/v1/operations/bank-accounts/{accountRef}/credits enterBankCredit",
+    "POST /api/v1/operations/bank-credits/{creditId}/confirmations confirmBankCredit",
+    "POST /api/v1/operations/bank-credits/{creditId}/attributions attributeBankCredit",
+    "POST /api/v1/operations/bank-accounts/{accountRef}/statement-imports importBankStatement",
+    "GET /api/v1/operations/bank-credits/{creditId} getBankCredit",
+    "GET /api/v1/operations/bank-orders/{orderId}/match-keys getBankOrderMatchKeys",
     "POST /api/v1/agencies/{agencyId}/buyer-type setBuyerType",
   ]);
   // the public routes take no credential (an explicit empty security requirement) and the inquiry names the Origin it demands
