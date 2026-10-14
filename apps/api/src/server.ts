@@ -74,6 +74,7 @@ import type {
   SchemaValidator,
   SourceIntakeHandlers,
   SourceReadHandlers,
+  RetentionHandlers,
   SupportHandlers,
   TeamHandlers,
   UnauthenticatedRequest,
@@ -170,7 +171,7 @@ export interface ApiServerOptions {
    * The seven B06 commands, the six B07 source-lifecycle commands (B07 design §11), the two B08 execution commands and the four B08
    * audit commands (B08 design §12), the support package's CMD044 (B11 W4) and the team package's CMD003..CMD007 (B16).
    */
-  readonly handlers: B06Handlers & B07Handlers & ExecutionHandlers & AuditHandlers & SupportHandlers & TeamHandlers;
+  readonly handlers: B06Handlers & B07Handlers & ExecutionHandlers & AuditHandlers & SupportHandlers & TeamHandlers & RetentionHandlers;
   /**
    * The manual-10 agency, team, client and project reads (re-check finding N16), the two support reads (B11 W4), the source reads
    * (B07 design §9.1), GetJob and GetAudit (B08 design §12).

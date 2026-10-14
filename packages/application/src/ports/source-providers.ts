@@ -394,15 +394,19 @@ export type AuthorityTombstoneKind =
   | "REVISION_REJECTED"
   | "REVISION_EXPIRED"
   | "REVISION_DELETED"
-  | "FILE_ADMISSION_REVOKED";
+  | "FILE_ADMISSION_REVOKED"
+  /** B16 CMD060: the project used its one soft-deadline extension; a restore must not forget it (14), or a second one could be granted. */
+  | "RETENTION_EXTENDED";
 
 /**
  * The state a tombstoned subject reached, named exactly as the subject's own machine names it (closed: a tombstone never records
  * a live state): UploadSession CANCELLED, EXPIRED, REJECTED; DatasetRevision CANCELLED, SUPERSEDED, REJECTED, EXPIRED, DELETED;
  * SourceFile ADMISSION_REVOKED. Decision D-RESTORE-2 (residual FINAL-N1): the AUTHORITY_JOURNAL consumer compares this state with
  * the subject's current state before appending, so a name the machine does not have would dead-letter every such tombstone.
+ * The one exception is EXTENDED (B16 CMD060): an extension is not a state of the RetentionRecord machine (the record stays ACTIVE and may
+ * later expire), so the consumer proves it by the project's extension row, which no later transition removes.
  */
-export type AuthorityTombstoneState = "CANCELLED" | "EXPIRED" | "REJECTED" | "SUPERSEDED" | "DELETED" | "ADMISSION_REVOKED";
+export type AuthorityTombstoneState = "CANCELLED" | "EXPIRED" | "REJECTED" | "SUPERSEDED" | "DELETED" | "ADMISSION_REVOKED" | "EXTENDED";
 
 /**
  * Which tombstone each event routed to AUTHORITY_JOURNAL produces (EVENT_SUBSCRIPTIONS): the AUTHORITY_JOURNAL consumer appends
@@ -419,6 +423,7 @@ export const AUTHORITY_TOMBSTONES = Object.freeze({
   "dataset_revision.expired.v1": { kind: "REVISION_EXPIRED", state: "EXPIRED" },
   "dataset_revision.deleted.v1": { kind: "REVISION_DELETED", state: "DELETED" },
   "source_file.admission_revoked.v1": { kind: "FILE_ADMISSION_REVOKED", state: "ADMISSION_REVOKED" },
+  "retention_record.extended.v1": { kind: "RETENTION_EXTENDED", state: "EXTENDED" },
 } as const satisfies Readonly<Record<string, { readonly kind: AuthorityTombstoneKind; readonly state: AuthorityTombstoneState }>>);
 
 /** A minimal durable fact (14: scoped ids, deadlines, sequence and evidence hashes; no CRM payload). */

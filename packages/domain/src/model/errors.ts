@@ -316,6 +316,14 @@ export const FAILURE_REASONS = [
   ...CAPABILITY_FAILURE_REASONS,
   // operations and recovery (package B16: CMD057)
   ...RECOVERY_FAILURE_REASONS,
+  // the one soft-deadline extension of a project (package B16 lane L2: CMD060 RequestRetentionExtension; R2-123, R2-124)
+  "TERMS_VERSION_MISMATCH",
+  "NO_EXTENDABLE_RECORD",
+  "RETENTION_EXPIRED",
+  "EXTENSION_ALREADY_USED",
+  "NO_SOFT_DEADLINE",
+  "SOFT_DEADLINE_PASSED",
+  "NO_EXTENSION_ROOM",
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

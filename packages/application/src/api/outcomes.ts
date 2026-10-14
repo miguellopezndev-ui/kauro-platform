@@ -52,7 +52,7 @@ const NOT_CONTROLLER = outcome("COMMAND", "NOT_AUTHORIZED", "NOT_APPROVAL_CONTRO
 
 /** The command-specific outcomes, by served command (design §8; reference/COMMAND_CATALOGUE preconditions and failures). */
 /** The commands this module catalogues itself: B06's seven and B11's CMD044 (B07's come composed from sources/outcomes). */
-type CatalogueCommandId = B06CommandId | "CMD044" | TeamCommandId;
+type CatalogueCommandId = B06CommandId | "CMD044" | "CMD060" | TeamCommandId;
 
 const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<ProblemOutcome>>> = Object.freeze({
   CMD001: [
@@ -163,6 +163,17 @@ const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<Proble
     outcome("COMMAND", "PRECONDITION_FAILED", "RECIPIENT_NOT_ACTIVE", "the successor's membership is not ACTIVE"),
     outcome("COMMAND", "PRECONDITION_FAILED", "NO_SEMANTIC_CHANGE", "the successor already owns the agency"),
   ],
+  CMD060: [
+    NOT_VISIBLE("the project"),
+    STALE("retention record"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "TERMS_VERSION_MISMATCH", "termsVersion is not the terms version the agency accepted; nothing changed"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "NO_EXTENDABLE_RECORD", "the project has no PAID_ORDINARY or PAID_STAGED retention record (an unpaid source gets no extension)"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "RETENTION_EXPIRED", "the governing record is expired or in managed deletion; an expired or deleted scope is never extended", { current: "ALWAYS" }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "EXTENSION_ALREADY_USED", "the project already used its one extension; nothing resets a clock", { current: "ALWAYS" }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "NO_SOFT_DEADLINE", "no package has been made available yet, so there is no soft deadline to extend", { current: "ALWAYS" }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "SOFT_DEADLINE_PASSED", "the soft deadline has passed on the database clock", { current: "ALWAYS" }),
+    outcome("COMMAND", "PRECONDITION_FAILED", "NO_EXTENSION_ROOM", "the soft deadline is already at the hard cap; nothing is granted and the extension is not consumed", { current: "ALWAYS" }),
+  ],
   CMD044: [
     NOT_VISIBLE("the project"),
     ...CONTENT_REFUSED,
@@ -170,8 +181,8 @@ const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<Proble
   ],
 });
 
-const TENANT_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD003", "CMD005", "CMD006", "CMD007", "CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044"]);
-const HEADER_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD005", "CMD006", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044"]);
+const TENANT_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD003", "CMD005", "CMD006", "CMD007", "CMD009", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044", "CMD060"]);
+const HEADER_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD005", "CMD006", "CMD010", "CMD011", "CMD023", "CMD025", "CMD026", "CMD044", "CMD060"]);
 /** Routes with an id in the path and no tenant selector at all: CMD004 (the invitation names its agency, never the request). */
 const PATH_ONLY_COMMANDS: ReadonlySet<CatalogueCommandId> = new Set(["CMD004"]);
 
@@ -212,6 +223,7 @@ export const COMMAND_OUTCOMES: Readonly<Record<ServedCommandId, ReadonlyArray<Pr
   CMD026: catalogueOf("CMD026"),
   ...SOURCE_COMMAND_OUTCOMES,
   CMD044: catalogueOf("CMD044"),
+  CMD060: catalogueOf("CMD060"),
   ...EXECUTION_COMMAND_OUTCOMES,
   ...AUDIT_COMMAND_OUTCOMES,
 });

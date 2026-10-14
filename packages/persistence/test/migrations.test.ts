@@ -141,6 +141,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0062_agency_buyer_types.sql",
     // Payments V1 PV1-INBOUND: credit and statement-import aggregates, guards, the owner pipeline on the payment pool (provisional number)
     "0063_bank_inbound.sql",
+    // B16 L2 CMD060: the one retention extension, its guard path B (KA085) and the request role update grant (provisional number)
+    "0064_b16_retention_extensions.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

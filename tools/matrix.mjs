@@ -572,6 +572,18 @@ export const APPLICABILITY = {
     "invalid schema": [...common["invalid schema"], ["request-validation.test.ts", "CMD044 closed request"]],
     "lost response": [...common["lost response"], ["cmd044-create-support-case.test.ts", "RACE: an identical retry, the same key with another digest"]],
   },
+  // B16 lane L2: CMD060 RequestRetentionExtension (docs/design/B16-L2-failure-matrix.md)
+  CMD060: {
+    ...common,
+    "legitimate state": [["cmd060-request-retention-extension.test.ts", "CMD060-OK: one extension of a PAID_ORDINARY soft deadline"]],
+    "wrong role": [["cmd060-request-retention-extension.test.ts", "CMD060-DENY: a VIEWER or BILLING member"], ROLE_MATRIX],
+    "wrong agency": [["cmd060-request-retention-extension.test.ts", "CMD060-DENY: a VIEWER or BILLING member"]],
+    "stale version": [["cmd060-request-retention-extension.test.ts", "CMD060-DENY: a VIEWER or BILLING member"]],
+    "duplicate request": [...common["duplicate request"], ["cmd060-request-retention-extension.test.ts", "RETRY: an identical replay answers 200 byte for byte"]],
+    "changed-body same key": [...common["changed-body same key"], ["cmd060-request-retention-extension.test.ts", "RETRY: an identical replay answers 200 byte for byte"]],
+    "invalid schema": common["invalid schema"],
+    "lost response": [...common["lost response"], ["cmd060-request-retention-extension.test.ts", "RACE (crash after COMMIT): the lost answer is recovered by the key"]],
+  },
   // package B10's agency lifecycle (mandate B10-AGENCY-LIFECYCLE; docs/design/B10-case-map.md CMD002, CMD043): neither reaches a provider
   CMD002: {
     "legitimate state": [["cmd002-activate-agency.test.ts", "OK: the agency's OWNER activates its DRAFT agency"]],
@@ -1000,6 +1012,7 @@ export async function loadMatrixSources() {
     CMD016: "sources/handlers/select-input-tables.ts",
     CMD017: "sources/handlers/seal-revision.ts",
     CMD044: "commands/handlers/create-support-case.ts",
+    CMD060: "sources/handlers/request-retention-extension.ts",
     CMD022: "audit/handlers/create-plan.ts",
   };
   const published = {};
@@ -1048,7 +1061,7 @@ export async function loadMatrixSources() {
   published.CMD040 = [];
   published.CMD041 = [];
   // package B09's served commands (D-REQ-B7): their specs, catalogues and published events from the application's served lists
-  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS, ...application.TEAM_COMMANDS };
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS, ...application.TEAM_COMMANDS, ...application.RETENTION_COMMANDS };
   const outcomes = { ...application.COMMAND_OUTCOMES };
   for (const id of application.COMMERCE_SERVED_COMMAND_IDS) {
     const c = application.COMMERCE_COMMANDS[id];
