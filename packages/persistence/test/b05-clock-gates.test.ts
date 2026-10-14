@@ -196,6 +196,8 @@ const LEASE_CALLERS = [
   "apps/api/src/commissions/dispatcher.ts#heartbeat2",
   "apps/api/src/payments/dispatcher.ts#claim1",
   "apps/api/src/payments/dispatcher.ts#heartbeat1",
+  "apps/api/src/outreach/dispatcher.ts#claim1",
+  "apps/api/src/outreach/dispatcher.ts#heartbeat1",
   "apps/control/src/dispatcher.ts#claim1",
 ];
 const PROCESS_CLOCK = /\bDate\.now\s*\(|\bnew\s+Date\s*\(\s*\)|\bperformance\.now\s*\(|\bprocess\.hrtime\b/g;
