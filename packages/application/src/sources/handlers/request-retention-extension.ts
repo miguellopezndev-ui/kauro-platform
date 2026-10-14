@@ -15,7 +15,7 @@ import type { Id } from "@kauro/contracts";
 import type { ProjectId, RetentionExtensionId, RetentionRecordRow } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
 import type { RetentionExtensionView } from "../../api/views.js";
-import { REQUEST_RETENTION_EXTENSION, type RequestRetentionExtensionBody, type RequestRetentionExtensionHandler } from "../../commands/contracts.js";
+import { REQUEST_RETENTION_EXTENSION, type RequestDeletionHandler, type RequestRetentionExtensionBody, type RequestRetentionExtensionHandler } from "../../commands/contracts.js";
 import { checkExpectedVersion, requireMembership } from "../../commands/handlers/shared.js";
 import { reachedOnServer, runSourceCommand, utc, type SourceRuntime } from "./shared.js";
 
@@ -26,6 +26,7 @@ function currentOf(record: RetentionRecordRow): { readonly currentVersion: numbe
 
 /** The retention package's commands (B16): CMD060, served beside B07's six. */
 export interface RetentionHandlers {
+  readonly CMD042: RequestDeletionHandler;
   readonly CMD060: RequestRetentionExtensionHandler;
 }
 

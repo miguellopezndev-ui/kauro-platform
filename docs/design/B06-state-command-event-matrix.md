@@ -276,8 +276,8 @@ platform machine (decisions D-AGG-1, D-AGG-2); initial OPEN; terminal DELETED; u
 | --- | --- | --- | --- | --- | --- |
 | — | (initial OPEN) | OPEN | CMD011 CreateProject (B06) | project.created.v1 | route |
 | OPEN | close_project | CLOSED | B08: delivery closes the project; no registry command names it | — (no event type registered: the owning package registers it with the edge) | database |
-| OPEN | request_deletion | DELETION_REQUESTED | CMD042 RequestDeletion (B16) | — (no event type registered: the owning package registers it with the edge) | database |
-| CLOSED | request_deletion | DELETION_REQUESTED | CMD042 RequestDeletion (B16) | — (no event type registered: the owning package registers it with the edge) | database |
+| OPEN | request_deletion | DELETION_REQUESTED | CMD042 RequestDeletion (B16) | — (no event type registered: the owning package registers it with the edge) | route |
+| CLOSED | request_deletion | DELETION_REQUESTED | CMD042 RequestDeletion (B16) | — (no event type registered: the owning package registers it with the edge) | route |
 | DELETION_REQUESTED | deletion_verified | DELETED | B16: verified managed deletion | — (no event type registered: the owning package registers it with the edge) | database |
 
 ### Quote
@@ -483,7 +483,7 @@ platform machine of the source lifecycle (B07 decision D-RET-2); initial ACTIVE;
 | --- | --- | --- | --- | --- | --- |
 | — | (initial ACTIVE) | ACTIVE | CMD017 SealRevision (B07); the UNPAID record anchored on the first seal of its bytes: hard deadline fourteen days after it, never restarted by a re-seal (D-RET-2, D-RET-3); later packages create the paid classes | retention_record.created.v1 | route |
 | ACTIVE | effective_deadline_reached | EXPIRED | B07: the retention sweeper (control plane), never before the effective deadline | retention_record.expired.v1 | database |
-| ACTIVE | early_deletion_requested | DELETING | CMD042 RequestDeletion (B16) | — (no event type registered: the owning package registers it with the edge) | database |
+| ACTIVE | early_deletion_requested | DELETING | CMD042 RequestDeletion (B16) | — (no event type registered: the owning package registers it with the edge) | route |
 | EXPIRED | cleanup_started | DELETING | B16: managed deletion of expired data | — (no event type registered: the owning package registers it with the edge) | database |
 | DELETING | cleanup_verified | DELETED | B16: verified managed deletion | — (no event type registered: the owning package registers it with the edge) | database |
 | DELETING | cleanup_verified_with_residuals | DELETED_WITH_RESIDUALS | B16: verified managed deletion with recorded provider residuals | — (no event type registered: the owning package registers it with the edge) | database |
@@ -518,6 +518,7 @@ settle step that its call causes (D-PROTO-B5); `Step-up` of CMD032 is a fresh st
 | CMD016 SelectInputTables | POST /api/v1/revisions/{revisionId}/selection | AGENCY_OPERATOR | AGENCY_HEADER | — | DatasetRevision all_uploads_completed; DatasetRevision previously_admitted_inputs_selected; DatasetRevision selection_changes | dataset_revision.selection_changed.v1 | dataset_revision.selection_changed.v1 → SELECTION_EVALUATION |
 | CMD017 SealRevision | POST /api/v1/revisions/{revisionId}/seal | AGENCY_OPERATOR | AGENCY_HEADER | — | DatasetRevision seal_command; RetentionRecord (initial ACTIVE) | retention_record.created.v1, dataset_revision.sealed.v1 | dataset_revision.sealed.v1 → NOTIFICATIONS |
 | CMD044 CreateSupportCase | POST /api/v1/projects/{projectId}/support-cases | AGENCY_MEMBER | AGENCY_HEADER | — | SupportCase (initial OPEN) | support_case.opened.v1 | — |
+| CMD042 RequestDeletion | POST /api/v1/projects/{projectId}/deletion-requests | AGENCY_OWNER_OR_ADMIN | AGENCY_HEADER | fresh | RetentionRecord early_deletion_requested; Project request_deletion | project.deletion_requested.v1, upload_session.cancelled.v1, dataset_revision.cancelled.v1, retention_record.deleting.v1 | upload_session.cancelled.v1 → STORAGE_LIFECYCLE; upload_session.cancelled.v1 → AUTHORITY_JOURNAL; dataset_revision.cancelled.v1 → STORAGE_LIFECYCLE; dataset_revision.cancelled.v1 → AUTHORITY_JOURNAL; project.deletion_requested.v1 → DELETION_EXECUTOR; project.deletion_requested.v1 → AUTHORITY_JOURNAL |
 | CMD060 RequestRetentionExtension | POST /api/v1/projects/{projectId}/retention-extensions | AGENCY_OWNER_OR_ADMIN | AGENCY_HEADER | — |  | retention_record.extended.v1 | retention_record.extended.v1 → AUTHORITY_JOURNAL |
 | CMD036 ExecuteProject | POST /api/v1/projects/{projectId}/execute | AGENCY_OPERATOR | AGENCY_HEADER | — | Job (initial QUEUED) | processing_job.queued.v1 | processing_job.queued.v1 → JOB_EXECUTION |
 | CMD037 CancelJob | POST /api/v1/jobs/{jobId}/cancel | AGENCY_OPERATOR | AGENCY_HEADER | — | Job cancel_command | processing_job.cancel_requested.v1 | processing_job.cancel_requested.v1 → EXECUTION_CONTROL |
@@ -1159,6 +1160,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the revision's current version; the current safe version and state come back |
 | 409 | PRECONDITION_FAILED | AGENCY_NOT_ACTIVE | — | always | COMMAND | customer data enters only an ACTIVE agency (07: DRAFT permits identity and agreement setup, not customer-data execution; B06 D-CMD-2) |
 | 409 | PRECONDITION_FAILED | PROJECT_NOT_OPEN | — | always | COMMAND | the project is not OPEN (closed or being deleted): it takes no new revision or upload |
+| 409 | PRECONDITION_FAILED | PROJECT_DELETION_REQUESTED | — | always | COMMAND | the project's deletion was requested: it takes no new upload |
 | 409 | PRECONDITION_FAILED | REVISION_NOT_ACCEPTING_UPLOADS | — | always | COMMAND | the revision is not DRAFT or UPLOADING: adding a file after inspection or sealing needs a new revision |
 | 409 | PRECONDITION_FAILED | FILE_TOO_LARGE | — | — | COMMAND | declaredBytes exceeds the per-file envelope (policy input.fileBytes, 2,000,000,000) |
 | 409 | PRECONDITION_FAILED | REVISION_QUOTA_EXCEEDED | — | — | COMMAND | the revision's reserved and admitted bytes with this declaration exceed 5,000,000,000 (R2-052: decided on the committed ledger) |
@@ -1399,6 +1401,48 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | SUPPORT_CALENDAR_UNAVAILABLE | — | — | COMMAND | the versioned holiday calendar does not cover the year of the follow-up, so no next review can be promised; retry with the same key |
+
+### CMD042 RequestDeletion
+
+| Status | Code | Reason | Field codes | current | Layer | Meaning |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 | INVALID_REQUEST | HEADER_REPEATED | — | — | TRANSPORT | a single-valued envelope header was sent more than once; nothing that depends on it was decided (R41) |
+| 400 | INVALID_REQUEST | REQUEST_MALFORMED | — | — | TRANSPORT | the request's framing cannot be trusted (a body shorter or longer than its Content-Length) or it ended before it was complete (R39, R40) |
+| 400 | INVALID_REQUEST | CONTENT_TYPE_UNSUPPORTED | — | — | ADMISSION | the body is not application/json (UTF-8) |
+| 400 | INVALID_REQUEST | BODY_TOO_LARGE | — | — | ADMISSION | the body exceeds the policy's api.jsonBytes (1 MiB) |
+| 400 | INVALID_REQUEST | JSON_SYNTAX | — | — | ADMISSION | the body is not strict UTF-8 JSON |
+| 400 | INVALID_REQUEST | JSON_DUPLICATE_KEY | — | — | ADMISSION | an object of the body repeats a member name |
+| 400 | INVALID_REQUEST | JSON_DEPTH_EXCEEDED | — | — | ADMISSION | the body nests deeper than the parser bound |
+| 400 | INVALID_REQUEST | JSON_STRING_TOO_LONG | — | — | ADMISSION | a string of the body exceeds the parser bound |
+| 400 | INVALID_REQUEST | SCHEMA_VIOLATION | REQUIRED, UNKNOWN_FIELD, TYPE, FORMAT, RANGE, ENUM | — | ADMISSION | the body does not satisfy the closed request schema (R2-058, R2-059); each field error names the member and why |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_MISSING | — | — | ADMISSION | the Idempotency-Key header is absent |
+| 400 | INVALID_REQUEST | IDEMPOTENCY_KEY_INVALID | — | — | ADMISSION | the Idempotency-Key header is not a key of the accepted shape |
+| 400 | INVALID_REQUEST | AMBIGUOUS_CREDENTIALS | — | — | AUTHENTICATION | a session cookie beside an Authorization header, or two session cookies: nothing is decided for either (B11 D-AUTH-5); the anonymous denial is recorded |
+| 400 | INVALID_REQUEST | PATH_ID_INVALID | FORMAT | — | ADMISSION | a path parameter is not an id |
+| 400 | INVALID_REQUEST | AGENCY_SELECTOR_INVALID | — | — | ADMISSION | the X-Kauro-Agency selector is absent or not an id |
+| 401 | AUTHENTICATION_REQUIRED | — | — | — | AUTHENTICATION | no authenticated subject: the anonymous denial is recorded |
+| 401 | AUTHENTICATION_REQUIRED | SUBJECT_UNAUTHENTICATED | — | — | AUTHENTICATION | the subject is not the identity the unit of work is bound to |
+| 403 | NOT_AUTHORIZED | IDENTITY_DISABLED | — | — | ACCESS | the token's or the stored identity state is DISABLED |
+| 403 | NOT_AUTHORIZED | IDENTITY_UNVERIFIED | — | — | ACCESS | the launch policy needs a verified email and enrolled MFA |
+| 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_SUSPENDED | — | — | ACCESS | the caller's membership is SUSPENDED |
+| 403 | NOT_AUTHORIZED | MEMBERSHIP_NOT_ACTIVE | — | — | ACCESS | the caller's membership is not ACTIVE (INVITED) |
+| 403 | NOT_AUTHORIZED | ROLE_INSUFFICIENT | — | — | ACCESS | the caller's role does not hold the route's role |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_MISSING | — | — | ASSURANCE | no step-up proof, or not a step-up proof |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_NOT_OWNED | — | — | ASSURANCE | the proof is not the caller's |
+| 403 | ASSURANCE_REQUIRED | STEP_UP_STALE | — | — | ASSURANCE | the step-up is older than the freshness window or expired |
+| 404 | NOT_FOUND | TENANT_CONTEXT_MISSING | — | — | ACCESS | the request is not bound to the agency it selects |
+| 404 | NOT_FOUND | NOT_A_MEMBER | — | — | ACCESS | no live membership of the caller in the selected agency: a foreign and a nonexistent agency answer alike |
+| 404 | NOT_FOUND | — | — | — | COMMAND | the project is not visible to the caller's agency |
+| 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
+| 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | STALE_VERSION | — | — | always | COMMAND | expectedVersion is not the project's current version; the current safe version and state come back |
+| 409 | PRECONDITION_FAILED | PROJECT_DELETION_REQUESTED | — | always | COMMAND | the project's deletion was already requested (one request per project); nothing changed |
+| 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
+| 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
 ### CMD060 RequestRetentionExtension
 
@@ -1739,6 +1783,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 404 | NOT_FOUND | — | — | — | COMMAND | the revision is not visible to the caller's agency |
 | 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
 | 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | PROJECT_DELETION_REQUESTED | — | — | COMMAND | the project's deletion was requested: it starts no audit |
 | 409 | PRECONDITION_FAILED | REVISION_NOT_SEALED | — | always | COMMAND | the revision is not SEALED: a draft, a locked or a rejected revision has no immutable manifest to audit; current names its version and state |
 | 409 | PRECONDITION_FAILED | AUDIT_EXISTS | — | — | COMMAND | the revision was already audited against this target contract: one audit per subject, for good (D8-AUD-1); a retry is not a new free audit |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
@@ -1905,6 +1950,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 404 | NOT_FOUND | — | — | — | COMMAND | the quote is not visible to the caller's scope |
 | 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
 | 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
+| 409 | PRECONDITION_FAILED | PROJECT_DELETION_REQUESTED | — | — | COMMAND | the project's deletion was requested: it takes no payment order |
 | 409 | STALE_VERSION | HASH_MISMATCH | — | always | COMMAND | termsHash is not the quote's terms: current.mismatch names it and the UI reloads the terms it displayed |
 | 409 | PRECONDITION_FAILED | QUOTE_NOT_ACTIVE | — | always | COMMAND | the quote is not ISSUED or ACCEPTED_FOR_CHECKOUT |
 | 409 | PRECONDITION_FAILED | QUOTE_EXPIRED | — | always | COMMAND | the price expired: checkout is blocked and a new quote is required |
@@ -3020,6 +3066,20 @@ the check proves every citation resolves to an existing test.
 | changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…"<br>`cmd044-create-support-case.test.ts` :: "RACE: an identical retry, the same key with another digest…" |
 | invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…"<br>`request-validation.test.ts` :: "CMD044 closed request…" |
 | lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…"<br>`cmd044-create-support-case.test.ts` :: "RACE: an identical retry, the same key with another digest…" |
+| external uncertainty | NOT_APPLICABLE: the command performs no external effect; every effect is rows of one database transaction, and an outbox row is dispatched later by its consumer's package (N20), whose uncertainty belongs to that consumer |
+
+### CMD042 RequestDeletion
+
+| Mutation | Applicability |
+| --- | --- |
+| legitimate state | `cmd042-request-deletion.test.ts` :: "CMD042-OK (request): the OWNER with a fresh step-up…" |
+| wrong role | `cmd042-request-deletion.test.ts` :: "CMD042-DENY: foreign 404, VIEWER 403…"<br>`role-matrix.test.ts` :: "N17: every served command against every role…" |
+| wrong agency | `cmd042-request-deletion.test.ts` :: "CMD042-DENY: foreign 404, VIEWER 403…" |
+| stale version | `cmd042-request-deletion.test.ts` :: "CMD042-DENY: foreign 404, VIEWER 403…" |
+| duplicate request | `idempotency.test.ts` :: "same key + same body → 200/201 replayed:true with the original body…"<br>`idempotency.test.ts` :: "concurrent duplicate: two in-flight identical requests…"<br>`cmd042-request-deletion.test.ts` :: "RETRY: an identical replay answers 200 byte for byte…" |
+| changed-body same key | `idempotency.test.ts` :: "same key + different body → 409 IDEMPOTENCY_CONFLICT and no effect…"<br>`cmd042-request-deletion.test.ts` :: "RETRY: an identical replay answers 200 byte for byte…" |
+| invalid schema | `request-validation.test.ts` :: "manual-10 admission order…"<br>`schema-boundary.test.ts` :: "through the served routes, schema-shaped request members are refused…" |
+| lost response | `idempotency.test.ts` :: "response lost after commit → retry with the same key returns the journaled result…"<br>`cmd042-request-deletion.test.ts` :: "RACE (crash after COMMIT): the request's lost answer is recovered by the key…" |
 | external uncertainty | NOT_APPLICABLE: the command performs no external effect; every effect is rows of one database transaction, and an outbox row is dispatched later by its consumer's package (N20), whose uncertainty belongs to that consumer |
 
 ### CMD060 RequestRetentionExtension

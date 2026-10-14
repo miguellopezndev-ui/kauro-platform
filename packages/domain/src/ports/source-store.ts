@@ -84,6 +84,17 @@ import type {
   UploadState,
 } from "../model/source/records.js";
 import type { SelectionManifestDocument } from "../model/source/selection.js";
+import type {
+  DeletionDerivedRows,
+  DeletionId,
+  DeletionPackageRef,
+  DeletionReceiptBody,
+  DeletionReceiptId,
+  DeletionRecordRef,
+  DeletionRequestRow,
+  DeletionRequestState,
+  DeletionScope,
+} from "../model/source/index.js";
 import type { ExecutionContext } from "../model/tenant.js";
 import type { VersionedWrite } from "./repositories.js";
 import type { UnitOfWork, UnitOfWorkFactory, UnitOfWorkOptions } from "./unit-of-work.js";
@@ -670,7 +681,53 @@ export interface PendingOperationJournal {
   attach(entryId: JournalEntryId, resourceKind: string, resourceId: Id): Promise<void>;
 }
 
+/**
+ * Managed deletion of a project (package B16 lane L3; table kauro.deletion_requests and kauro.deletion_receipts, migration 0071).
+ * The request half (CMD042, kauro_app) inserts the one request of the project and moves its retention records to DELETING; the
+ * executor half (DELETION_EXECUTOR, kauro_control) advances the request, enumerates and closes what the project owns and appends
+ * one receipt per attempt. The database refuses a COMPLETE receipt while a registered object of the project is not DELETED (KA088).
+ */
+export interface DeletionRepository {
+  /** CMD042: inserts the project's one REQUESTED deletion (the database judges the step-up again at COMMIT, KC020). */
+  insertRequest(input: { readonly deletionId: DeletionId; readonly projectId: ProjectId; readonly reasonCode: string; readonly membershipId: MembershipId; readonly assuranceProofRef: string }): Promise<DeletionRequestRow>;
+  /** CMD042: every retention record of the project, locked FOR NO KEY UPDATE in retention-id order, as the locked rows read it. */
+  lockRecordsOfProject(projectId: ProjectId): Promise<ReadonlyArray<DeletionRecordRef>>;
+  /** CMD042: ACTIVE or EXPIRED -> DELETING at expectedVersion + 1; null when the record is in another state or version. */
+  moveRecordToDeleting(retentionId: RetentionId, expectedVersion: number): Promise<DeletionRecordRef | null>;
+  /** The scope the request discloses: the project's revisions, retention records and package versions, in id order. */
+  scopeOf(projectId: ProjectId): Promise<DeletionScope>;
+  /** The deletion of a project (one per project), as the caller's context sees it. */
+  forProject(projectId: ProjectId): Promise<DeletionRequestRow | null>;
+  /** The deletion by id, locked FOR UPDATE. */
+  lock(deletionId: DeletionId): Promise<DeletionRequestRow | null>;
+  /** Advances the request from one of `from` to `to` (COMPLETED stamps completed_at at the server's instant); null when it is in another state. */
+  advance(deletionId: DeletionId, from: ReadonlyArray<DeletionRequestState>, to: DeletionRequestState): Promise<DeletionRequestRow | null>;
+  /** Every registered object of the project in the managed zones (all but LEGAL_FINANCE and SECURITY), in object-id order. */
+  managedObjects(projectId: ProjectId): Promise<ReadonlyArray<StoredObjectRecord>>;
+  /** The project's registered objects in the zones a deletion leaves by policy (LEGAL_FINANCE, SECURITY), named in the receipt. */
+  retainedObjects(projectId: ProjectId): Promise<ReadonlyArray<StoredObjectRecord>>;
+  /** INTENDED / PRESENT / VERIFIED -> DELETION_REQUESTED for managed objects, whatever admission retains them (the project is going away). */
+  requestManagedDeletion(objectIds: ReadonlyArray<StoredObjectId>, reason: string): Promise<number>;
+  /** The audits and model tasks derived from the project. */
+  derivedOf(projectId: ProjectId): Promise<DeletionDerivedRows>;
+  /** Every revision of the project, locked FOR NO KEY UPDATE in id order (after the records, before the packages). */
+  lockRevisionsOfProject(projectId: ProjectId): Promise<ReadonlyArray<SourceRevisionRecord>>;
+  /** Every package version of the project, locked FOR NO KEY UPDATE in id order. */
+  lockPackagesOfProject(projectId: ProjectId): Promise<ReadonlyArray<DeletionPackageRef>>;
+  /** Moves a package to REVOKED (with its reason) or DELETED at expectedVersion + 1; null when it moved. */
+  movePackage(packageVersionId: string, expectedVersion: number, to: "REVOKED" | "DELETED", reason: string): Promise<DeletionPackageRef | null>;
+  /** DELETING -> DELETED or DELETED_WITH_RESIDUALS at expectedVersion + 1; null when the record moved. */
+  closeRecord(retentionId: RetentionId, expectedVersion: number, withResiduals: boolean): Promise<DeletionRecordRef | null>;
+  /** DELETION_REQUESTED -> DELETED at expectedVersion + 1; null when the project moved. */
+  markProjectDeleted(projectId: ProjectId, expectedVersion: number): Promise<{ readonly version: number } | null>;
+  /** The project's row version and state (control plane: the columns its grant covers). */
+  projectState(projectId: ProjectId, lock?: boolean): Promise<{ readonly state: string; readonly version: number; readonly currentRevisionId: RevisionId } | null>;
+  /** Appends one receipt (the database refuses a COMPLETE one while a managed object is not DELETED, KA088). */
+  appendReceipt(input: { readonly receiptId: DeletionReceiptId; readonly deletionId: DeletionId; readonly projectId: ProjectId; readonly status: "PARTIAL" | "COMPLETE_FOR_MANAGED_SCOPE"; readonly body: DeletionReceiptBody }): Promise<void>;
+}
+
 export interface SourceStore {
+  readonly deletions: DeletionRepository;
   readonly uploads: UploadSessionRepository;
   readonly sessionSecrets: SessionSecretRepository;
   readonly objects: StoredObjectRepository;

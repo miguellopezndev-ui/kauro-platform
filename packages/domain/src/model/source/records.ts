@@ -18,6 +18,8 @@ import type {
   ProjectionId,
   RetentionAnchorId,
   RetentionExtensionId,
+  DeletionId,
+  DeletionReceiptId,
   RetentionId,
   SealAttemptId,
   SelectionManifestId,
@@ -669,6 +671,79 @@ export interface RetentionExtensionRow {
   readonly cappedAtHardDeadline: boolean;
   readonly purpose: string;
   readonly termsVersion: string;
+}
+
+/** DeletionRequest.state (registry contract DeletionRequest; table kauro.deletion_requests). */
+export type DeletionRequestState = "REQUESTED" | "AUTHORITY_REVOKED" | "DELETING" | "VERIFYING" | "COMPLETED" | "RESIDUAL_HOLD" | "FAILED_RETRYABLE";
+
+/** A requested managed deletion of a project (CMD042). */
+export interface DeletionRequestRow {
+  readonly deletionId: DeletionId;
+  readonly agencyId: AgencyId;
+  readonly projectId: ProjectId;
+  readonly state: DeletionRequestState;
+  readonly reasonCode: string;
+  readonly requestedByMembershipId: MembershipId;
+  readonly assuranceProofRef: string;
+  readonly requestedAt: UtcInstant;
+  readonly completedAt?: UtcInstant;
+}
+
+/** The scope CMD042 discloses: every revision, retention record and package version of the project. */
+export interface DeletionScope {
+  readonly revisionIds: ReadonlyArray<string>;
+  readonly retentionIds: ReadonlyArray<string>;
+  readonly packageVersionIds: ReadonlyArray<string>;
+}
+
+/** A retention record as the deletion locks and closes it. */
+export interface DeletionRecordRef {
+  readonly retentionId: RetentionId;
+  readonly state: string;
+  readonly version: number;
+}
+
+/** A package version of the project as the deletion closes it. */
+export interface DeletionPackageRef {
+  readonly packageVersionId: string;
+  readonly jobId: string;
+  readonly state: string;
+  readonly version: number;
+}
+
+/** The audit-side rows derived from the project (R2-057): enumerated in the receipt, never silently kept. */
+export interface DeletionDerivedRows {
+  readonly audits: ReadonlyArray<{ readonly auditId: string; readonly revisionId: string; readonly grantId: string; readonly state: string }>;
+  readonly modelTaskIds: ReadonlyArray<string>;
+}
+
+/** The body of a deletion receipt (docs/design/B16-L3-failure-matrix.md "Contract"). */
+export interface DeletionReceiptBody {
+  readonly objects: ReadonlyArray<{ readonly objectId: string; readonly zone: string; readonly generation: string | null; readonly result: string }>;
+  readonly residuals: ReadonlyArray<{ readonly objectId: string; readonly generation: string | null; readonly cause: string; readonly retry: string }>;
+  readonly providerResiduals: ReadonlyArray<{ readonly objectName: string; readonly generation: string; readonly expiresAt: string }>;
+  readonly derived: ReadonlyArray<{ readonly kind: string; readonly id: string }>;
+  readonly excluded: ReadonlyArray<string>;
+  /**
+   * The project's registered objects in the zones that outlive a deletion by policy (09 "Storage zones": LEGAL_FINANCE and SECURITY "contain
+   * separately classified residual records"; "Financial evidence storage can use a different retention design under the legal profile"): named,
+   * never silently omitted, and never deleted by this executor.
+   */
+  readonly retainedByPolicy: ReadonlyArray<{ readonly objectId: string; readonly zone: string; readonly basis: string }>;
+  /**
+   * The project's revisions the deletion leaves in their state, named with the registry citation: SEALED and REJECTED have no deletion edge
+   * in R2 state_transitions DatasetRevision (a deletion request does not make their retention deadline "now", 09 "Early deletion"); SUPERSEDED
+   * belongs to the retention lane. Their reads and execution end through the project's DELETION_REQUESTED fact.
+   */
+  readonly retainedRevisions: ReadonlyArray<{ readonly revisionId: string; readonly state: string; readonly basis: string }>;
+}
+
+/** One appended deletion receipt: PARTIAL while a residual stands, COMPLETE_FOR_MANAGED_SCOPE when none does. */
+export interface DeletionReceiptRow {
+  readonly receiptId: DeletionReceiptId;
+  readonly deletionId: DeletionId;
+  readonly status: "PARTIAL" | "COMPLETE_FOR_MANAGED_SCOPE";
+  readonly body: DeletionReceiptBody;
 }
 
 /** A part the preflight expects the scanner to cover, as recorded (re-exported for receipts). */

@@ -78,6 +78,7 @@ export {
   PgPendingOperationJournal,
   PgSealedManifestRepository,
   PgRetentionRepository,
+  PgDeletionRepository,
   PgSourceAvailabilityReader,
   PgRevisionLineageReader,
   serverInstantOf,

@@ -5,6 +5,7 @@
  */
 import type { SourceStore } from "@kauro/domain";
 import type { Queryable } from "../sql.js";
+import { PgDeletionRepository } from "./deletion.js";
 import { PgObjectHoldRepository } from "./holds.js";
 import { PgInspectionReceiptRepository, PgSourceFileRepository } from "./inspection.js";
 import { PgStoredObjectRepository } from "./objects.js";
@@ -30,6 +31,7 @@ export class PgSourceStore implements SourceStore {
   readonly projects: PgProjectRevisionPointer;
   readonly authority: PgRevisionAuthorityInspector;
   readonly retention: PgRetentionRepository;
+  readonly deletions: PgDeletionRepository;
   readonly operations: PgPendingOperationJournal;
   readonly availability: PgSourceAvailabilityReader;
   readonly lineage: PgRevisionLineageReader;
@@ -48,6 +50,7 @@ export class PgSourceStore implements SourceStore {
     this.projects = new PgProjectRevisionPointer(db);
     this.authority = new PgRevisionAuthorityInspector(db);
     this.retention = new PgRetentionRepository(db);
+    this.deletions = new PgDeletionRepository(db);
     this.operations = new PgPendingOperationJournal(db);
     this.availability = new PgSourceAvailabilityReader(db);
     this.lineage = new PgRevisionLineageReader(db);
