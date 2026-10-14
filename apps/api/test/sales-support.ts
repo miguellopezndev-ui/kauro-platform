@@ -93,9 +93,11 @@ export async function recordSourceEvidence(
 export async function suppress(h: Harness, ownerUserId: string, target: { readonly domain: string } | { readonly contactKey: string }): Promise<void> {
   const keyKind = "domain" in target ? "ORGANIZATION" : "CONTACT";
   const key = "domain" in target ? (organizationKeyOf(target.domain)?.key ?? "") : target.contactKey;
-  await asOperator(h, ownerUserId, (c) =>
-    c.query("INSERT INTO kauro.prospect_suppressions (suppression_id, key_kind, suppression_key, reason, recorded_by_user_id, recorded_at, created_at) VALUES ($1, $2, $3, 'OPTED_OUT', $4, kauro.server_now(), now())", [ids.next(), keyKind, key, ownerUserId]),
-  );
+  // the writer holds L8 X of 'KEYKIND:key' (B12 0072 prospect_suppressions_locks, plan §L), the lock CMD064 SUPPRESSED takes
+  await asOperator(h, ownerUserId, async (c) => {
+    await c.query("SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.prospect_suppressions', $1))", [`${keyKind}:${key}`]);
+    await c.query("INSERT INTO kauro.prospect_suppressions (suppression_id, key_kind, suppression_key, reason, recorded_by_user_id, recorded_at, created_at) VALUES ($1, $2, $3, 'OPTED_OUT', $4, kauro.server_now(), now())", [ids.next(), keyKind, key, ownerUserId]);
+  });
 }
 
 /** A seller's claim evidence for a prospect: first meaningful contact two days ago and the given activity kinds (substantive by default). */

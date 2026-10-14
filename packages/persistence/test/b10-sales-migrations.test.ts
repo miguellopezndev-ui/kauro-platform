@@ -366,17 +366,21 @@ test("CMD045 at the database: source evidence admits the AGENCY and COMPANY segm
   );
 
   // suppression by organization key and by contact key refuses the registration (KC016); a neighbour with another contact registers
+  // a suppression INSERT holds L8 X of its key (B12 0072 prospect_suppressions_locks, plan §L)
   await within(w.app, ownerOf(w), async (c) => {
+    await c.query("SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.prospect_suppressions', $1))", [`ORGANIZATION:${sha("organization:south.example")}`]);
     await c.query("INSERT INTO kauro.prospect_suppressions (suppression_id, key_kind, suppression_key, reason, recorded_by_user_id, recorded_at, created_at) VALUES ($1, 'ORGANIZATION', $2, 'OPTED_OUT', $3, kauro.server_now(), now())", [ids.next(), sha("organization:south.example"), w.kora]);
+    await c.query("SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.prospect_suppressions', $1))", [`CONTACT:${sha("contact:ops@east.example")}`]);
     await c.query("INSERT INTO kauro.prospect_suppressions (suppression_id, key_kind, suppression_key, reason, recorded_by_user_id, recorded_at, created_at) VALUES ($1, 'CONTACT', $2, 'OPTED_OUT', $3, kauro.server_now(), now())", [ids.next(), sha("contact:ops@east.example"), w.kora]);
   });
   await assert.rejects(registerProspect(w, s, "south.example"), refusedWith("KC016"), "a suppressed organization, whatever its label");
   await assert.rejects(registerProspect(w, t, "east.example", { contactKey: sha("contact:ops@east.example") }), refusedWith("KC016"), "a suppressed contact");
   await registerProspect(w, t, "west.example", { contactKey: sha("contact:ops@west.example") });
   // a seller records a suppression too (an opt-out it received); a suppression is never removed
-  await within(w.app, personOf(t.userId), (c) =>
-    c.query("INSERT INTO kauro.prospect_suppressions (suppression_id, key_kind, suppression_key, reason, recorded_by_user_id, recorded_at, created_at) VALUES ($1, 'ORGANIZATION', $2, 'OPTED_OUT', $3, kauro.server_now(), now())", [ids.next(), sha("organization:quiet.example"), t.userId]),
-  );
+  await within(w.app, personOf(t.userId), async (c) => {
+    await c.query("SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.prospect_suppressions', $1))", [`ORGANIZATION:${sha("organization:quiet.example")}`]);
+    await c.query("INSERT INTO kauro.prospect_suppressions (suppression_id, key_kind, suppression_key, reason, recorded_by_user_id, recorded_at, created_at) VALUES ($1, 'ORGANIZATION', $2, 'OPTED_OUT', $3, kauro.server_now(), now())", [ids.next(), sha("organization:quiet.example"), t.userId]);
+  });
   await assert.rejects(registerProspect(w, s, "quiet.example"), refusedWith("KC016"));
   await assert.rejects(within(w.app, ownerOf(w), (c) => c.query("DELETE FROM kauro.prospect_suppressions")), refusedWith("42501"));
   await oracleProbe(w, "DELETE FROM kauro.prospect_suppressions", [], refusedWith("KA004"), "suppressions survive");
