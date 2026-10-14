@@ -731,6 +731,23 @@ test("CMD053 at the database: a line becomes PAID only when its statement's inte
   // SETTLED needs the evidence hash and its matching recorded evidence; evidence of another amount is never recorded
   await assert.rejects(within(w.commission, corporate, (c) => c.query("UPDATE kauro.payout_intents SET state = 'SETTLED', settled_at = kauro.server_now(), version = version + 1 WHERE intent_id = $1", [sIntent])), refusedWith("23514", "payout_intents_evidence"));
   await assert.rejects(within(w.commission, corporate, (c) => c.query("UPDATE kauro.payout_intents SET state = 'SETTLED', evidence_hash = $2, settled_at = kauro.server_now(), version = version + 1 WHERE intent_id = $1", [sIntent, sha("unrecorded")])), refusedWith("23514", "payout_intents_reconciled"));
+  // the settlement instant is one of this transaction's (B10-CMD053-SETTLED-AT, 0072): with its matching evidence recorded, a stamp
+  // before the transaction's start or after the instant judged at COMMIT is refused all the same
+  for (const [what, stamp] of [["before the transaction", "kauro.server_now() - interval '1 second'"], ["after COMMIT", "kauro.effect_now() + interval '1 hour'"]] as const) {
+    await assert.rejects(
+      within(w.commission, corporate, async (c) => {
+        const evidenceHash = sha(`stamp-${what}-${sIntent}`);
+        await c.query(
+          `INSERT INTO kauro.payout_reconciliations (reconciliation_id, intent_id, evidence_kind, evidence_hash, reference, destination_digest, amount_cents, currency, provider_ref, observed_at, recorded_at, created_at)
+           SELECT $1, p.intent_id, 'SETTLED', $2, p.reference, p.destination_digest, p.amount_cents, p.currency, $3, now(), kauro.server_now(), now() FROM kauro.payout_intents p WHERE p.intent_id = $4`,
+          [ids.next(), evidenceHash, `TR-${sIntent.slice(-12)}`, sIntent],
+        );
+        await c.query(`UPDATE kauro.payout_intents SET state = 'SETTLED', evidence_hash = $2, settled_at = ${stamp}, version = version + 1 WHERE intent_id = $1`, [sIntent, evidenceHash]);
+      }),
+      refusedWith("23514", "payout_intents_reconciled"),
+      `a settlement stamped ${what}`,
+    );
+  }
   await assert.rejects(
     within(w.commission, corporate, (c) =>
       c.query(
