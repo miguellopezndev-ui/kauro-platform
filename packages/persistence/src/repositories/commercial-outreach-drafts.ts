@@ -13,7 +13,7 @@
  * L7 S sender, L8 S CONTACT key then ORGANIZATION key, L10 X the new draft. PublishSalesResource: L5 S (ascending), L6 X of the family.
  * PutOutreachContent: no B12 subject (content-addressed, ON CONFLICT DO NOTHING).
  */
-import { DomainFailure, NotFoundFailure, StaleVersionFailure, outreachBindingHash, outreachContentId, type AssuranceProofId, type UserId } from "@kauro/domain";
+import { DomainFailure, NotFoundFailure, StaleVersionFailure, outreachBindingHash, outreachContentId, type UserId } from "@kauro/domain";
 import { OutreachLocks } from "../outreach-access.js";
 import { execute, type Queryable } from "../sql.js";
 import { requireHeld, type Need } from "./commercial-outreach.js";
@@ -33,8 +33,10 @@ export interface PrepareDraftInput {
 
 export interface PublishResourceInput {
   readonly resourceId: string;
-  readonly familyId: string | null;
-  readonly expectedVersion: number | null;
+  /** The family: chosen by the publisher for a new family (expectedVersion 0), the existing one otherwise. */
+  readonly familyId: string;
+  /** The CURRENT version the publisher read; 0 publishes version 1 of a new family. */
+  readonly expectedVersion: number;
   readonly contentRef: string;
   readonly capabilityIds: ReadonlyArray<string>;
   readonly publishedByUserId: UserId;
@@ -57,6 +59,7 @@ interface Verdict {
   offered_resources: string;
 }
 
+const ISO = `to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
 const unique = (ids: ReadonlyArray<string>): string[] => [...new Set(ids)];
 
 export class PgOutreachDrafts {
@@ -158,16 +161,18 @@ export class PgOutreachDrafts {
   }
 
   /** PutOutreachContent: content-addressed (domain outreachContentId); a second put of the same text is a no-op that answers the same id. */
-  async putContent(content: { readonly subject: string; readonly body: string }, recordedByUserId: UserId): Promise<string> {
+  async putContent(content: { readonly subject: string; readonly body: string }, recordedByUserId: UserId): Promise<{ readonly contentRef: string; readonly createdAt: string }> {
     const contentId = outreachContentId(content.subject, content.body);
     await execute(this.db, "INSERT INTO kauro.outreach_contents (content_id, subject, body, recorded_by_user_id) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", [contentId, content.subject, content.body, recordedByUserId]);
-    return contentId;
+    const row = (await execute<{ created_at: string }>(this.db, `SELECT ${ISO} AS created_at FROM kauro.outreach_contents WHERE content_id = $1`, [contentId])).rows[0];
+    if (row === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the stored content cannot be read back");
+    return { contentRef: contentId, createdAt: row.created_at };
   }
 
   /** PublishSalesResource: version n+1 of a family (or version 1 of a new one); n is superseded in the same transaction. */
   async publishResource(i: PublishResourceInput): Promise<{ readonly resourceId: string; readonly familyId: string; readonly version: number; readonly state: "CURRENT" }> {
     const capabilityIds = unique(i.capabilityIds);
-    const familyId = i.familyId ?? i.resourceId;
+    const familyId = i.familyId;
     // --- discovery ---
     if ((await execute(this.db, "SELECT 1 FROM kauro.outreach_contents WHERE content_id = $1", [i.contentRef])).rowCount !== 1) throw new NotFoundFailure("content");
     let capabilitySubjects: string[] = [];
@@ -188,11 +193,10 @@ export class PgOutreachDrafts {
         [familyId],
       )
     ).rows[0];
-    if (i.expectedVersion === null) {
-      if (latest !== undefined) throw new DomainFailure("PRECONDITION_FAILED", "the family already exists: name the version read", { reason: "RESOURCE_NOT_CURRENT" });
-    } else {
-      if (latest === undefined) throw new NotFoundFailure("sales_resource_family");
-      if (latest.version !== i.expectedVersion || latest.state !== "CURRENT") throw new StaleVersionFailure(latest.version, latest.state);
+    if (latest === undefined) {
+      if (i.expectedVersion !== 0) throw new NotFoundFailure("sales_resource_family");
+    } else if (latest.version !== i.expectedVersion || latest.state !== "CURRENT") {
+      throw new StaleVersionFailure(latest.version, latest.state);
     }
     const needs: Need[] = [["L6", familyId, "X"]];
     for (const s of capabilitySubjects) needs.push(["L5", s, "S"]);
@@ -222,11 +226,12 @@ export class PgOutreachDrafts {
     readonly version: number;
     readonly state: string;
     readonly resourceIds: ReadonlyArray<string>;
+    readonly createdAt: string;
   } | null> {
     const r = (
-      await execute<{ draft_id: string; prospect_id: string; sender_id: string; purpose: Purpose; content_ref: string; content_hash: string; provenance_evidence_hash: string; version: string; state: string }>(
+      await execute<{ draft_id: string; prospect_id: string; sender_id: string; purpose: Purpose; content_ref: string; content_hash: string; provenance_evidence_hash: string; version: string; state: string; created_at: string }>(
         this.db,
-        "SELECT draft_id, prospect_id, sender_id, purpose, content_ref, content_hash, provenance_evidence_hash, version, state FROM kauro.outreach_drafts WHERE draft_id = $1",
+        `SELECT draft_id, prospect_id, sender_id, purpose, content_ref, content_hash, provenance_evidence_hash, version, state, ${ISO} AS created_at FROM kauro.outreach_drafts WHERE draft_id = $1`,
         [draftId],
       )
     ).rows[0];
@@ -243,6 +248,7 @@ export class PgOutreachDrafts {
       version: Number(r.version),
       state: r.state,
       resourceIds: cited.rows.map((c) => c.resource_id),
+      createdAt: r.created_at,
     };
   }
 
@@ -254,11 +260,12 @@ export class PgOutreachDrafts {
     readonly currentResourceId: string;
     readonly contentRef: string;
     readonly capabilityIds: ReadonlyArray<string>;
+    readonly createdAt: string;
   } | null> {
     const r = (
-      await execute<{ resource_id: string; family_id: string; version: number; state: "CURRENT" | "SUPERSEDED"; content_id: string; current_resource_id: string | null }>(
+      await execute<{ resource_id: string; family_id: string; version: number; state: "CURRENT" | "SUPERSEDED"; content_id: string; current_resource_id: string | null; created_at: string }>(
         this.db,
-        `SELECT r.resource_id, r.family_id, r.version, r.state, r.content_id,
+        `SELECT r.resource_id, r.family_id, r.version, r.state, r.content_id, to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
                 (SELECT c.resource_id FROM kauro.sales_resources c WHERE c.family_id = r.family_id AND c.state = 'CURRENT') AS current_resource_id
            FROM kauro.sales_resources r WHERE r.resource_id = $1`,
         [resourceId],
@@ -274,12 +281,7 @@ export class PgOutreachDrafts {
       currentResourceId: r.current_resource_id ?? r.resource_id,
       contentRef: r.content_id,
       capabilityIds: claims.rows.map((c) => c.capability_id),
+      createdAt: r.created_at,
     };
-  }
-
-  /** The person's latest STEP_UP proof (assurance_proofs is read under its self policy: only the person's own rows are visible). */
-  async latestStepUpProof(userId: UserId): Promise<AssuranceProofId | undefined> {
-    const r = await execute<{ proof_id: string }>(this.db, "SELECT proof_id FROM kauro.assurance_proofs WHERE user_id = $1 AND kind = 'STEP_UP' ORDER BY issued_at DESC LIMIT 1", [userId]);
-    return r.rows[0]?.proof_id as AssuranceProofId | undefined;
   }
 }

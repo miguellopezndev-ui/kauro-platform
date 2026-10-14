@@ -36,7 +36,7 @@ const asOwner = <T>(fn: (d: PgOutreachDrafts, c: Client) => Promise<T>): Promise
 async function publish(family: string | null, expected: number | null, caps: ReadonlyArray<string> = []): Promise<{ resourceId: string; familyId: string; version: number }> {
   const contentRef = await content(w, w.kora, `resource-${ids.next().slice(-8)}`);
   const resourceId = ids.next();
-  return asOwner((d) => d.publishResource({ resourceId, familyId: family, expectedVersion: expected, contentRef, capabilityIds: caps, publishedByUserId: w.kora as UserId }));
+  return asOwner((d) => d.publishResource({ resourceId, familyId: family ?? ids.next(), expectedVersion: expected ?? 0, contentRef, capabilityIds: caps, publishedByUserId: w.kora as UserId }));
 }
 
 async function inputFor(p: { prospectId: string; evidenceHash: string }, resourceIds: ReadonlyArray<string> = [], purpose: "INDIVIDUAL_PROSPECT_CONTACT" | "FOLLOW_UP" = "INDIVIDUAL_PROSPECT_CONTACT", s: Sender = snd) {
@@ -127,9 +127,9 @@ describe("B12 L-DRAFT accessor: putContent", () => {
   test("is content-addressed and idempotent whoever puts it", async () => {
     const a = await asSeller((d) => d.putContent({ subject: "Hello", body: "Same body" }, w.s.userId as UserId));
     const b = await asOwner((d) => d.putContent({ subject: "Hello", body: "Same body" }, w.kora as UserId));
-    assert.equal(a, contentIdOf("Hello", "Same body"));
-    assert.equal(b, a);
-    assert.equal((await w.h.oracle.query("SELECT 1 FROM kauro.outreach_contents WHERE content_id = $1", [a])).rowCount, 1);
+    assert.equal(a.contentRef, contentIdOf("Hello", "Same body"));
+    assert.deepEqual(b, a);
+    assert.equal((await w.h.oracle.query("SELECT 1 FROM kauro.outreach_contents WHERE content_id = $1", [a.contentRef])).rowCount, 1);
   });
 });
 
@@ -148,25 +148,19 @@ describe("B12 L-DRAFT accessor: publishResource", () => {
     assert.equal(await asOwner((d) => d.resourceOf(ids.next())), null);
   });
 
-  test("a stale expectedVersion is STALE_VERSION, an unknown family NOT_FOUND, an existing family without a version refused, nothing is written", async () => {
+  test("a stale expectedVersion is STALE_VERSION, an unknown family NOT_FOUND, an existing family named as new refused as stale, nothing is written", async () => {
     const v1 = await publish(null, null);
     await publish(v1.familyId, 1);
     await assert.rejects(publish(v1.familyId, 1), failure("STALE_VERSION"));
     await assert.rejects(publish(ids.next(), 1), failure("NOT_FOUND"));
-    await assert.rejects(publish(v1.familyId, null), failure("PRECONDITION_FAILED", "RESOURCE_NOT_CURRENT"));
+    await assert.rejects(publish(v1.familyId, 0), failure("STALE_VERSION"));
     const n = await w.h.oracle.query("SELECT count(*)::int AS n FROM kauro.sales_resources WHERE family_id = $1", [v1.familyId]);
     assert.equal(n.rows[0].n, 2);
   });
 
   test("an unknown content or capability is NOT_FOUND", async () => {
     const resourceId = ids.next();
-    await assert.rejects(asOwner((d) => d.publishResource({ resourceId, familyId: null, expectedVersion: null, contentRef: contentIdOf("x", "y"), capabilityIds: [], publishedByUserId: w.kora as UserId })), failure("NOT_FOUND"));
+    await assert.rejects(asOwner((d) => d.publishResource({ resourceId, familyId: ids.next(), expectedVersion: 0, contentRef: contentIdOf("x", "y"), capabilityIds: [], publishedByUserId: w.kora as UserId })), failure("NOT_FOUND"));
     await assert.rejects(publish(null, null, [ids.next()]), failure("NOT_FOUND"));
-  });
-});
-
-describe("B12 L-DRAFT accessor: latestStepUpProof", () => {
-  test("is undefined for a person with no proof", async () => {
-    assert.equal(await asOwner((d) => d.latestStepUpProof(ids.next() as UserId)), undefined);
   });
 });
