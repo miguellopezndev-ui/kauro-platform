@@ -89,7 +89,7 @@ describe("B12 L-DRAFT accessor: prepareDraft (CMD061)", () => {
   test("a pending sender is SENDER_NOT_VERIFIED", async () => {
     const p = await prospectIn(w, w.s, freshDomain("pend"));
     const pending = await sender(w, w.s.userId, { pending: true });
-    await assert.rejects(asSeller(async (d) => d.prepareDraft(await inputFor(p, [], "INDIVIDUAL_PROSPECT_CONTACT", pending))), failure("PRECONDITION_FAILED", "SENDER_NOT_VERIFIED"));
+    { const i = await inputFor(p, [], "INDIVIDUAL_PROSPECT_CONTACT", pending); await assert.rejects(asSeller((d) => d.prepareDraft(i)), failure("PRECONDITION_FAILED", "SENDER_NOT_VERIFIED")); }
   });
 
   test("a revoked sender is SENDER_REVOKED", async () => {
@@ -99,18 +99,18 @@ describe("B12 L-DRAFT accessor: prepareDraft (CMD061)", () => {
       await new OutreachLocks(c).take("L7", revoked.senderId);
       await c.query("UPDATE kauro.sender_identities SET state = 'REVOKED' WHERE sender_id = $1", [revoked.senderId]);
     });
-    await assert.rejects(asSeller(async (d) => d.prepareDraft(await inputFor(p, [], "INDIVIDUAL_PROSPECT_CONTACT", revoked))), failure("PRECONDITION_FAILED", "SENDER_REVOKED"));
+    { const i = await inputFor(p, [], "INDIVIDUAL_PROSPECT_CONTACT", revoked); await assert.rejects(asSeller((d) => d.prepareDraft(i)), failure("PRECONDITION_FAILED", "SENDER_REVOKED")); }
   });
 
   test("an unreviewed jurisdiction is OUTREACH_JURISDICTION_UNREVIEWED", async () => {
     const nowhere = await prospectIn(w, w.s, freshDomain("juris"), "Atlantis");
-    await assert.rejects(asSeller(async (d) => d.prepareDraft(await inputFor(nowhere))), failure("PRECONDITION_FAILED", "OUTREACH_JURISDICTION_UNREVIEWED"));
+    { const i = await inputFor(nowhere); await assert.rejects(asSeller((d) => d.prepareDraft(i)), failure("PRECONDITION_FAILED", "OUTREACH_JURISDICTION_UNREVIEWED")); }
   });
 
   test("a suppressed contact is PROSPECT_SUPPRESSED", async () => {
     const sup = await prospectIn(w, w.s, freshDomain("sup"));
     await at(w.app, personOf(w.s.userId), w.base, (c) => suppressionIn(c, w.s.userId, "CONTACT", sup.contactKey, "REFUSAL"));
-    await assert.rejects(asSeller(async (d) => d.prepareDraft(await inputFor(sup))), failure("PRECONDITION_FAILED", "PROSPECT_SUPPRESSED"));
+    { const i = await inputFor(sup); await assert.rejects(asSeller((d) => d.prepareDraft(i)), failure("PRECONDITION_FAILED", "PROSPECT_SUPPRESSED")); }
   });
 
   test("a superseded resource is RESOURCE_NOT_CURRENT", async () => {
