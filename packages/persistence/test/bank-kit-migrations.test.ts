@@ -311,7 +311,7 @@ test("the source union is closed: a CAPTURE source names agency, capture and ref
   await assert.rejects(attempt(oracle, { source_kind: "CAPTURE", bank_credit_id: null, treasury_refund_id: null }), (e: unknown) => sqlState(e) === "23502" || constraintOf(e) === "outbound_attempts_source_union");
   await assert.rejects(attempt(oracle, { kind: "RESEND" }), (e: unknown) => constraintOf(e) === "outbound_attempts_kind_parent");
   await assert.rejects(attempt(oracle, { parent_bounce_id: id() }), (e: unknown) => constraintOf(e) === "outbound_attempts_kind_parent");
-  // a RESEND names a bounce that exists and never exceeds it (0071): a stranger id is refused, a real bounce admits up to its cents
+  // a RESEND names a bounce that exists and never exceeds it (0080): a stranger id is refused, a real bounce admits up to its cents
   await assert.rejects(attempt(oracle, { kind: "RESEND", parent_bounce_id: id() }), (e: unknown) => sqlState(e) === "23514");
   const creditId = id();
   const treasuryId = id();

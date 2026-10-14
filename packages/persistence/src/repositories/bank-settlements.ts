@@ -22,7 +22,7 @@ export interface BankSettlementRoute {
 
 export interface NewBankSettlement {
   readonly settlementId: string;
-  /** The intent the settlement is born of (0071 settlements_request_birth). */
+  /** The intent the settlement is born of (0079 settlements_request_birth). */
   readonly requestId: string;
   readonly paymentRouteId: string;
   readonly bankRouteId: string;
@@ -53,7 +53,7 @@ export interface NewBankSettlement {
   readonly createdAt: string;
 }
 
-/** The receipt facts an intent freezes (all or none, 0071 settlement_requests_receipt_group). */
+/** The receipt facts an intent freezes (all or none, 0079 settlement_requests_receipt_group). */
 export interface SettlementRequestReceipt {
   readonly artifactRef: string;
   readonly evidenceHash: string;

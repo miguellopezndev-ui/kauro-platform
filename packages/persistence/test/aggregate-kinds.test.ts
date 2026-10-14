@@ -89,9 +89,9 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   download_authorization: ["download_authorizations", "authorization_id"],
   settlement: ["settlements", "settlement_id"],
   settlement_request: ["settlement_requests", "request_id"],
-  // Payments V1 treasury refund of an unassigned credit (0071, lane L-REFUND; walked by apps/api/test/ach-refund-cells.test.ts)
+  // Payments V1 treasury refund of an unassigned credit (0080, lane L-REFUND; walked by apps/api/test/ach-refund-cells.test.ts)
   treasury_refund: ["treasury_refunds", "treasury_refund_id"],
-  // Payments V1 outbound execution attempt (0071 slice 2, lane L-REFUND; walked by apps/api/test/refund-generic-cells.test.ts)
+  // Payments V1 outbound execution attempt (0080 slice 2, lane L-REFUND; walked by apps/api/test/refund-generic-cells.test.ts)
   outbound_execution_attempt: ["outbound_execution_attempts", "attempt_id"],
 });
 

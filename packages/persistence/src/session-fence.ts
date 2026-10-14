@@ -26,7 +26,7 @@ interface FenceRow {
 
 /**
  * Which statement takes the lock: REQUEST, the request handlers' own (kauro_app, migration 0047: its policies over the session the
- * transaction presents for the person it binds); SERVICE, the payment service's (kauro_payment, migration 0072: a SERVICE unit binds no
+ * transaction presents for the person it binds); SERVICE, the payment service's (kauro_payment, migration 0081: a SERVICE unit binds no
  * person and holds no privilege on the table, so the definer kauro.payment_session_fence locks and returns the same row and columns).
  */
 export type SessionFenceMode = "REQUEST" | "SERVICE";

@@ -59,7 +59,7 @@ export const SETTLEMENT_INVARIANTS: ReadonlyArray<Invariant> = Object.freeze([
   {
     id: "INV-SET-6",
     whys: ["a settlement that received more than it withdrew", "an intent that received more than it withdrew"],
-    decision: "received <= withdrawn on every settlement and every intent (R2-085; the CHECKs of 0071)",
+    decision: "received <= withdrawn on every settlement and every intent (R2-085; the CHECKs of 0079)",
     sql: `SELECT s.settlement_id::text AS ref, NULL AS other, 'a settlement that received more than it withdrew' AS why FROM kauro.settlements s WHERE s.received_cents > s.withdrawn_cents
           UNION ALL
           SELECT r.request_id::text, NULL, 'an intent that received more than it withdrew' FROM kauro.settlement_requests r WHERE r.received_cents > r.withdrawn_cents`,

@@ -45,7 +45,7 @@ export const SQLSTATE = Object.freeze({
   FISCAL_VALIDATION_REFUSED: "KP011",
   REFUND_TAX_INCONSISTENT: "KP012",
   REPLACEMENT_REFUSED: "KP013",
-  // Payments V1 (migration 0071, lane L-REFUND): a manual-rail refund or treasury refund completed without its recorded execution
+  // Payments V1 (migration 0080, lane L-REFUND): a manual-rail refund or treasury refund completed without its recorded execution
   EXECUTION_EVIDENCE_MISSING: "KP014",
   // package B10 (migrations 0028..0031; docs/design/B10-commercial-domain.md §12): each stage-2 lane adds the KC codes its adapters
   // surface. B10-ADAPTERS-RECURRENCE: the designation's writes and the founding reservation's release (0028)

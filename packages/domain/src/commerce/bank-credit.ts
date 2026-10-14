@@ -16,7 +16,7 @@ export type BankCreditRail = (typeof BANK_CREDIT_RAILS)[number];
 
 /** The credit and statement import are agency-less aggregates (platform scope); an order's bank state change is the agency's. */
 // `settlement`: the settlement observation of the route account (0017 kauro.settlements; an aggregate of its own from 0062, lane PV1-SETTLE)
-// `settlement_request`: the owner's recorded settlement intent the payment service applies (0071, PV1-SETTLE two-step D-SET-10)
+// `settlement_request`: the owner's recorded settlement intent the payment service applies (0079, PV1-SETTLE two-step D-SET-10)
 export const BANK_CREDIT_AGGREGATE_KINDS = ["bank_credit", "statement_import", "settlement", "settlement_request"] as const;
 export const BANK_CREDIT_EVENT_TYPES = [
   "bank_credit.drafted.v1",

@@ -43,7 +43,7 @@ export const settledOf = <T>(p: Promise<T>): Promise<PromiseSettledResult<T>> =>
 
 // --- the two-step's table must exist (an assertion, never a crash of the harness) --------------------------------------------------------
 
-/** The lane's intent table (0071): absent, CMD215 records no intent and nothing below can be asked of it. */
+/** The lane's intent table (0079): absent, CMD215 records no intent and nothing below can be asked of it. */
 export async function twoStep(): Promise<void> {
   const [r] = await q<{ t: string | null }>("SELECT to_regclass('kauro.settlement_requests')::text AS t");
   assert.ok(r?.t !== null && r?.t !== undefined, "kauro.settlement_requests exists: CMD215 records an owner intent the payment service applies (two-step, D-SET-10)");

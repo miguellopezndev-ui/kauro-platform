@@ -624,7 +624,7 @@ export async function applySettlementRequest(uow: CommerceUnitOfWork, ports: Set
     });
     return "APPLIED";
   }
-  // A8: the settlement copies its intent (0071 settlements_request_birth), its event, its posting set (D-SET-6), the intent APPLIED
+  // A8: the settlement copies its intent (0079 settlements_request_birth), its event, its posting set (D-SET-6), the intent APPLIED
   const settlementId = uow.ids.next();
   const observedAt = receipt?.observedAt ?? request.observedAt;
   const receivedCents = receipt?.receivedCents ?? null;

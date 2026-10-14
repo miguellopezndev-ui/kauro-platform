@@ -78,7 +78,7 @@ test("RACE hold point L3: a held attempt row blocks a writer of that row (observ
       ctx,
       held,
       async (c) => {
-        // the state alone: a version bump needs its domain event at COMMIT (0071 outbound_execution_attempts_event_per_version)
+        // the state alone: a version bump needs its domain event at COMMIT (0080 outbound_execution_attempts_event_per_version)
         const r = await c.query("UPDATE kauro.outbound_execution_attempts SET state = 'UNCERTAIN' WHERE attempt_id = $1", [attemptId]);
         return r.rowCount;
       },

@@ -1,4 +1,4 @@
--- Migration 0072: the session fence of the bank owner commands (Payments V1, lane L-REFUND; FAILURE-MATRIX-TEMPLATE rule 16, PV1R-07 r4).
+-- Migration 0081: the session fence of the bank owner commands (Payments V1, lane L-REFUND; FAILURE-MATRIX-TEMPLATE rule 16, PV1R-07 r4).
 -- Provisional number (renumbered at merge by tools/renumber-migration.mjs).
 --
 -- Every bank owner command (F2, X1, X4, G2, G3, X3) runs its units of work as the payment service (kauro_payment), in SERVICE contexts that
@@ -9,7 +9,7 @@
 -- its clock after the lock was granted and judges the row). Every writer of the row (revoke, resume touch, step-up: FOR UPDATE first) then
 -- waits until the payment transaction ends.
 --
--- SECURITY DEFINER (the third definer of the schema; 0046 and 0071 are the others), justified: kauro_payment gets no privilege on
+-- SECURITY DEFINER (the fourth definer of the schema; 0046, 0079 and 0080 are the others), justified: kauro_payment gets no privilege on
 -- kauro.web_sessions at all (no table or column grant, no policy), only EXECUTE on this function. Inside it FORCE ROW LEVEL SECURITY applies
 -- to the function owner: the two policies below admit the owner to exactly the row whose hash the function itself binds transaction-locally
 -- (kauro.session_sha256, the GUC 0025 and 0047 use), and the UPDATE policy's WITH CHECK (false) refuses every new row, so the owner's

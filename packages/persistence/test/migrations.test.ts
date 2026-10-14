@@ -174,9 +174,9 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // Payments V1 PV1-SETTLE: the bank-route settlement observation (CMD215), its event and the route's provider-available read (provisional number)
     "0079_bank_settlement.sql",
     // Payments V1 L-REFUND: the corporate owner's step-up approval of a manual-rail refund applied by the payment service (bank_owner_authority, owner acts, treasury refund approval; provisional number)
-    "0071_refund_owner_authority.sql",
+    "0080_refund_owner_authority.sql",
     // Payments V1 L-REFUND: the session fence of the bank owner commands, a definer kauro_payment executes (rule 16; provisional number)
-    "0072_payment_session_fence.sql",
+    "0081_payment_session_fence.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

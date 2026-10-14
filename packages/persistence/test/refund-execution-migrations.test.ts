@@ -1,4 +1,4 @@
-// Payments V1 lane L-REFUND slice 2 (migration 0071 sections 6-9; docs/design/ACH-ROUTE.md r12 §7.21-§7.22, DV1-08): the outbound execution
+// Payments V1 lane L-REFUND slice 2 (migration 0080 sections 6-9; docs/design/ACH-ROUTE.md r12 §7.21-§7.22, DV1-08): the outbound execution
 // attempt is an aggregate with the platform's guards: only the machine's edges (KA008), the columns of a declaration never change (KA004), what
 // a record learns is learned once (KA004), and every version has its event in the same transaction (KA003 at COMMIT). The never-COMPLETED-
 // without-evidence guards (KP014) are exercised through the real commands in apps/api (refund-generic-cells, the DB-guard cell), where the

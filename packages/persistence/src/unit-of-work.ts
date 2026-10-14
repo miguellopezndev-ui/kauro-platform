@@ -227,7 +227,7 @@ export class PgUnitOfWork implements UnitOfWork {
   ) {
     this.context = context;
     this.ids = ids;
-    // a SERVICE unit of the payment service binds no person: its fence is the definer of migration 0072 (rule 16 for the bank owner commands)
+    // a SERVICE unit of the payment service binds no person: its fence is the definer of migration 0081 (rule 16 for the bank owner commands)
     this.sessionFence = new PgSessionFence(client, roleFor(context) === "kauro_payment" ? "SERVICE" : "REQUEST");
     this.buyerTypes = new PgBuyerTypes(client);
     this.projectDashboard = new PgProjectDashboard(client);
@@ -751,7 +751,7 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   readonly requestReads: PgCommerceRequestReads;
   /** The bank-transfer route's tables (migration 0046, lane L-ROUTE), read through bankRoutesOf(uow). */
   readonly bankRoutes: PgBankRoutes;
-  /** The manual-assisted refund tables of the bank-transfer route (migration 0071, lane L-REFUND), read through bankRefundsOf(uow). */
+  /** The manual-assisted refund tables of the bank-transfer route (migration 0080, lane L-REFUND), read through bankRefundsOf(uow). */
   readonly bankRefunds: PgBankRefunds;
   /** The inbound credit, statement and order-state tables (migration 0063, lane PV1-INBOUND), read through bankCreditsOf(uow). */
   readonly bankCredits: PgBankCredits;
