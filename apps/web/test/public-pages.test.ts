@@ -424,7 +424,7 @@ test("Data handling: what is processed, isolation, what a model sees, who decide
     "A defect in Kauro's work can be reported for 30 days after the package is prepared, and Kauro aims to repair a verified material defect within 5 business days.",
     "a claim made after they are removed may need the exact source files to be uploaded again",
     "Do not upload credentials or secrets, full payment card data, or health data.",
-    "A request for another agency's project is answered exactly like a request for a project that does not exist.",
+    "A request for another customer's project is answered exactly like a request for a project that does not exist.",
     "it receives only a limited context that Kauro selects, never your files as a whole. It cannot approve a change and it cannot write to your CRM.",
     "A copy your agency downloaded stays with your agency",
     "has not been through an independent security certification and does not claim one",
