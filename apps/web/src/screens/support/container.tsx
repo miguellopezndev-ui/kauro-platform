@@ -24,6 +24,7 @@ function OneCase({ agencyId, projectId, caseId }: { readonly agencyId: string; r
   const { client } = useShell();
   const { state, refresh } = useRead((signal) => client.call("GetSupportCase", { path: { caseId }, signal }), caseId);
   if (state.kind === "LOADING") return <StatePanel decision={state.decision} />;
+  if (state.kind === "ERROR") return <StatePanel decision={state.decision} onNext={refresh} />;
   const backProject = projectId ?? (state.answer.kind === "REPLY" ? state.answer.body.data.projectId : null);
   return <CaseOrRefusal answer={state.answer} backHref={backProject === null ? pathOf("UI52", { agencyId }) : listHref(agencyId, backProject)} onNext={refresh} />;
 }
