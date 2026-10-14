@@ -492,3 +492,20 @@ test("R2-023: RACE (revocation) CMD026 withdraws the plan approval while CMD041 
     assert.deepEqual([continued.status, withdrawn.status], [200, 200]);
   }
 });
+
+test("R2-025: DENY a child continuing from a parent whose identities are under an open reconciliation (PARENT_IDENTITY_UNDER_RECONCILIATION); OK once none is open", async () => {
+  const c = await approvedContext("t1-x4");
+  const parent = await seedStage(c);
+  await receiptThroughRoute(c, parent, matched("src", 1, 4));
+  const settledChild = await seedStage(c, { parents: [parent.stageId] });
+  const ok = await receiptThroughRoute(c, settledChild, matched("src", 1, 4));
+  // the OK sibling first: no reconciliation is open on the parent, the child continues
+  completed<ImportStageView>(await proceed(c, settledChild, ok), 200);
+  // a differing receipt for the finalized parent opens a reconciliation: its identities are no longer settled for any child
+  const differing = await storeReceipt(c, parent, [...matched("src", 1, 3), { sourceId: "src-4", status: "MATCHED", targetId: "crm-other" }]);
+  assert.equal(completed<ImportStageView>(await submit(c, parent, differing.artifactRef), 200).data.reconciliation?.state, "OPEN");
+  const child = await seedStage(c, { parents: [parent.stageId] });
+  const cv = await receiptThroughRoute(c, child, matched("src", 1, 4));
+  assert.equal(outcome(w, await proceed(c, child, cv)), "409 PRECONDITION_FAILED PARENT_IDENTITY_UNDER_RECONCILIATION");
+  assert.equal((await stageRow(child.stageId))?.continued_at, null, "nothing continued");
+});
