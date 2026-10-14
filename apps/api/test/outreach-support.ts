@@ -9,11 +9,18 @@
  * (provider calls the fake counted, rows, final states) and only then the outcome, so under a control the red is always the effect.
  * Unlike mustWait (interleave.ts) it never throws when the second settles, so a control (the serializer set removed) runs to its effect.
  *
+ * Crediting the wait: runCell("race") requires ctx.observedWaits > 0, and only ctx.mustWait (never this oracle) increments it, so a race cell
+ * built on raceAtWrite alone ended in FaultNotInjected even when green (found by L-DRAFT). With `credit` the second runs THROUGH
+ * credit.mustWait on its own connection (`second.waiter` / `second.runOn`): the harness itself observes the wait and credits it; a second
+ * that settles without waiting (a control) is not credited, keeps its own answer as the outcome, and the cell is red where it belongs
+ * ("no lock wait of the operation on the intended holder was observed"). Self-test: outreach-race-credit.test.ts.
+ *
  * tokenFromSentMime: the credential of an opt-out cell comes only from the MIME the Gmail fake recorded (rule 24b): the List-Unsubscribe
  * https URI of the intent's first message. An intent the fake never received has no token, and asking for it throws.
  */
 import { setTimeout as delay } from "node:timers/promises";
 import type { Client } from "pg";
+import { InterleavingNotObserved, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import type { ContractFakeGmailSend } from "@kauro/application/testing";
 
 export type RaceOutcome = "blocked" | "settled";
@@ -42,6 +49,10 @@ export interface PausedFirst<A> extends RaceActor<A> {
 export interface Second<B> extends RaceActor<B> {
   /** The second's backend pid (its connection, opened before it runs, or known once it started). */
   pid(): number | Promise<number>;
+  /** With `credit`: the connection the harness opened for the second (openConnection), the one mustWait observes. */
+  readonly waiter?: HarnessConnection;
+  /** With `credit`: the second's operation on the connection mustWait hands it (it replaces `run`, which is then not called). */
+  runOn?(client: HarnessConnection): Promise<B>;
 }
 
 export interface RaceAtWrite<A, B> {
@@ -51,6 +62,10 @@ export interface RaceAtWrite<A, B> {
   readonly second: Second<B>;
   /** How long the second may neither block nor settle before the race is reported as broken (default 10 s). */
   readonly limitMs?: number;
+  /** The cell's FaultContext: the second's wait is credited through ctx.mustWait (needs second.waiter and second.runOn). */
+  readonly credit?: Pick<FaultContext, "mustWait">;
+  /** What the credited wait is called in the harness's messages (default "the second waits on the first"). */
+  readonly what?: string;
 }
 
 /** The race did not happen as staged (the first never paused, or the second neither waited nor settled): never an outcome. */
@@ -58,6 +73,10 @@ export class RaceNotObserved extends Error {}
 
 export async function raceAtWrite<A, B>(race: RaceAtWrite<A, B>): Promise<RaceResult<A, B>> {
   const limitMs = race.limitMs ?? 10_000;
+  // refused before the first actor starts: a credited race whose second cannot be handed to mustWait must not run half-staged
+  if (race.credit !== undefined && (race.second.waiter === undefined || race.second.runOn === undefined)) {
+    throw new TypeError("raceAtWrite with credit: the second names its waiter connection and runOn (the operation mustWait hands the connection to)");
+  }
   const first = settle(race.first.run());
   const reached = await Promise.race([race.first.reached.then(() => "reached" as const), first.then(() => "ended" as const)]);
   if (reached === "ended") throw new RaceNotObserved(`the first actor ended before its pause point: ${describe(await first)}`);
@@ -66,7 +85,7 @@ export async function raceAtWrite<A, B>(race: RaceAtWrite<A, B>): Promise<RaceRe
   try {
     const firstPid = await race.first.pid();
     let secondDone = false;
-    second = settle(race.second.run()).then((r) => {
+    second = settle(startSecond(race, firstPid, limitMs)).then((r) => {
       secondDone = true;
       return r;
     });
@@ -94,6 +113,28 @@ export async function raceAtWrite<A, B>(race: RaceAtWrite<A, B>): Promise<RaceRe
   }
   const [a, b] = await Promise.all([first, second]);
   return { outcome, first: a, second: b };
+}
+
+/**
+ * Starts the second actor. Without `credit` that is `second.run()`. With it the second runs through credit.mustWait: the harness observes
+ * the wait on the first's backend (and counts it); if the second settles without waiting, mustWait throws InterleavingNotObserved, which is
+ * swallowed here — the second's own answer is the outcome and nothing is credited, so the cell goes red at the harness's check, not here.
+ */
+async function startSecond<A, B>(race: RaceAtWrite<A, B>, firstPid: number, limitMs: number): Promise<B> {
+  if (race.credit === undefined) return race.second.run();
+  const { waiter, runOn } = race.second;
+  if (waiter === undefined || runOn === undefined) throw new TypeError("raceAtWrite with credit: the second names its waiter connection and runOn (the operation mustWait hands the connection to)");
+  let started: Promise<B> | undefined;
+  const what = race.what ?? "the second waits on the first";
+  try {
+    const waiting = await race.credit.mustWait(race.oracle, { waiter, holder: firstPid }, (client) => (started = runOn.call(race.second, client)), what, limitMs);
+    const settled = await waiting.pending;
+    if (settled.status === "rejected") throw settled.reason;
+    return settled.value;
+  } catch (e) {
+    if (e instanceof InterleavingNotObserved && started !== undefined) return await started;
+    throw e;
+  }
 }
 
 function settle<T>(p: Promise<T>): Promise<PromiseSettledResult<T>> {

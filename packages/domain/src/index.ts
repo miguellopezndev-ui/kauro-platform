@@ -75,6 +75,7 @@ export type { EventType, AggregateKind, Consumer, EventPayload, SafePayloadValue
 export {
   EVENT_TYPES,
   AGGREGATE_KINDS,
+  UNSCOPED_AGGREGATE_KINDS,
   EVENT_PAYLOAD_ALLOWLIST,
   CONSUMERS,
   EVENT_SUBSCRIPTIONS,

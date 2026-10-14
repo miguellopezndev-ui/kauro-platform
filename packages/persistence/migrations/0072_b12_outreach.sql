@@ -1442,3 +1442,131 @@ BEGIN
   END LOOP;
 END
 $$;
+
+-- --- K1b: the send intent's event, an agency-less aggregate (lane K1b; plan §1 CMD063 "One COMMIT: intent QUEUED + draft AUTHORIZED + event
+-- outreach.send_intended.v1 + outbox"; 07 "event per committed version") -----------------------------------------------------------------
+-- kauro.outreach_send_intents carries no agency_id and must not gain one (A17: kauro_outreach holds no grant on an agency_id table), yet the
+-- registry (0008), the event binding (0046) and the event-per-version rule were written for aggregates of an agency. A registry column says
+-- which: agency_scoped (default true, so every registered kind keeps its rule: a bank route's NULL agency_id is a VALUE of a scoped kind).
+-- An unscoped kind's table has no agency_id column, its events name no agency and the binding refuses one (KA006, as an unknown aggregate);
+-- require_event_for_version (0046) already reads a row without agency_id as agency NULL (to_jsonb ->> 'agency_id' is NULL; IS NOT DISTINCT FROM).
+ALTER TABLE kauro.aggregate_kinds ADD COLUMN agency_scoped boolean NOT NULL DEFAULT true;
+
+CREATE OR REPLACE FUNCTION kauro.aggregate_kinds_bind_catalog() RETURNS trigger
+  LANGUAGE plpgsql SECURITY INVOKER SET search_path = pg_catalog, pg_temp AS
+$$
+DECLARE
+  rel oid;
+  key_column name;
+  key_type regtype;
+BEGIN
+  SELECT c.oid INTO rel
+    FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'kauro' AND c.relname = NEW.table_name AND c.relkind IN ('r', 'p');
+  IF rel IS NULL THEN
+    RAISE EXCEPTION 'AGGREGATE_KIND_BINDING: kind % names %, which is not a table of schema kauro', NEW.aggregate_kind, NEW.table_name
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'aggregate_kinds_bind_catalog', SCHEMA = 'kauro', TABLE = 'aggregate_kinds';
+  END IF;
+  SELECT a.attname, a.atttypid::pg_catalog.regtype INTO key_column, key_type
+    FROM pg_catalog.pg_constraint k
+    JOIN pg_catalog.pg_attribute a ON a.attrelid = k.conrelid AND a.attnum = k.conkey[1]
+   WHERE k.conrelid = rel AND k.contype = 'p' AND pg_catalog.cardinality(k.conkey) = 1;
+  IF key_column IS DISTINCT FROM NEW.id_column::name OR key_type IS DISTINCT FROM 'pg_catalog.uuid'::pg_catalog.regtype THEN
+    RAISE EXCEPTION 'AGGREGATE_KIND_BINDING: kind % names %.%, which is not the single uuid primary-key column of that table', NEW.aggregate_kind, NEW.table_name, NEW.id_column
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'aggregate_kinds_bind_catalog', SCHEMA = 'kauro', TABLE = 'aggregate_kinds';
+  END IF;
+  -- the version column the binding reads, always; the agency_id column exactly when the kind is agency scoped (and no agency_id of any type
+  -- on an unscoped kind's table: the table would be both)
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_attribute a
+     WHERE a.attrelid = rel AND a.attname = 'version' AND a.attnum > 0 AND NOT a.attisdropped
+       AND a.atttypid = 'pg_catalog.int8'::pg_catalog.regtype
+  ) THEN
+    RAISE EXCEPTION 'AGGREGATE_KIND_BINDING: kind % names %, which lacks the version bigint column the event binding reads', NEW.aggregate_kind, NEW.table_name
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'aggregate_kinds_bind_catalog', SCHEMA = 'kauro', TABLE = 'aggregate_kinds';
+  END IF;
+  IF NEW.agency_scoped AND NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_attribute a
+     WHERE a.attrelid = rel AND a.attname = 'agency_id' AND a.attnum > 0 AND NOT a.attisdropped
+       AND a.atttypid = 'pg_catalog.uuid'::pg_catalog.regtype
+  ) THEN
+    RAISE EXCEPTION 'AGGREGATE_KIND_BINDING: kind % names %, which lacks the agency_id uuid or version bigint column the event binding reads', NEW.aggregate_kind, NEW.table_name
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'aggregate_kinds_bind_catalog', SCHEMA = 'kauro', TABLE = 'aggregate_kinds';
+  END IF;
+  IF NOT NEW.agency_scoped AND EXISTS (
+    SELECT 1 FROM pg_catalog.pg_attribute a
+     WHERE a.attrelid = rel AND a.attname = 'agency_id' AND a.attnum > 0 AND NOT a.attisdropped
+  ) THEN
+    RAISE EXCEPTION 'AGGREGATE_KIND_BINDING: kind % is registered agency-less but % carries an agency_id column', NEW.aggregate_kind, NEW.table_name
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'aggregate_kinds_bind_catalog', SCHEMA = 'kauro', TABLE = 'aggregate_kinds';
+  END IF;
+  RETURN NEW;
+END
+$$;
+
+-- the binding of 0046, with the agency-less arm: an unscoped kind is looked up by its id alone and its event must name no agency
+CREATE OR REPLACE FUNCTION kauro.domain_events_bind_aggregate() RETURNS trigger
+  LANGUAGE plpgsql SECURITY INVOKER SET search_path = pg_catalog, pg_temp AS
+$$
+DECLARE
+  binding record;
+  current_version bigint;
+BEGIN
+  SELECT k.table_name, k.id_column, k.agency_scoped INTO binding FROM kauro.aggregate_kinds k WHERE k.aggregate_kind = NEW.aggregate_kind;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'CONTEXT: aggregate kind % has no binding', NEW.aggregate_kind USING ERRCODE = 'KA006';
+  END IF;
+  IF binding.agency_scoped THEN
+    EXECUTE pg_catalog.format('SELECT a.version FROM kauro.%I a WHERE a.%I = $1 AND a.agency_id IS NOT DISTINCT FROM $2', binding.table_name, binding.id_column)
+      INTO current_version USING NEW.aggregate_id, NEW.agency_id;
+  ELSE
+    IF NEW.agency_id IS NOT NULL THEN
+      RAISE EXCEPTION 'CONTEXT: % % is an agency-less aggregate and is not an aggregate of agency %', NEW.aggregate_kind, NEW.aggregate_id, NEW.agency_id USING ERRCODE = 'KA006';
+    END IF;
+    EXECUTE pg_catalog.format('SELECT a.version FROM kauro.%I a WHERE a.%I = $1', binding.table_name, binding.id_column)
+      INTO current_version USING NEW.aggregate_id;
+  END IF;
+  IF current_version IS NULL THEN
+    RAISE EXCEPTION 'CONTEXT: % % is not an aggregate of agency % visible in this transaction', NEW.aggregate_kind, NEW.aggregate_id, NEW.agency_id USING ERRCODE = 'KA006';
+  END IF;
+  IF NEW.aggregate_version > current_version THEN
+    RAISE EXCEPTION 'VERSION_DISCIPLINE: an event of % % records version % ahead of the aggregate (version %)', NEW.aggregate_kind, NEW.aggregate_id, NEW.aggregate_version, current_version USING ERRCODE = 'KA002';
+  END IF;
+  RETURN NEW;
+END
+$$;
+
+-- the intent is born at version 1 and its later states are rows of the intent, not aggregate versions: exactly one event, at birth. The
+-- column is in no role's UPDATE grant; the CHECK keeps an INSERT from naming another version.
+ALTER TABLE kauro.outreach_send_intents ADD COLUMN version bigint NOT NULL DEFAULT 1 CONSTRAINT outreach_send_intents_version_one CHECK (version = 1);
+INSERT INTO kauro.aggregate_kinds (aggregate_kind, table_name, id_column, owner_package, agency_scoped) VALUES
+  ('outreach_send_intent', 'outreach_send_intents', 'intent_id', 'B12', false);
+-- the vocabulary is extended by lifting FORCE for this migration's own transaction, as 0013, 0028 and 0046 do, and restoring it before COMMIT
+ALTER TABLE kauro.event_types NO FORCE ROW LEVEL SECURITY;
+INSERT INTO kauro.event_types (event_type) VALUES ('outreach.send_intended.v1');
+ALTER TABLE kauro.event_types FORCE ROW LEVEL SECURITY;
+-- AFTER INSERT only (statement_imports, 0063): an intent cannot commit without its event
+CREATE CONSTRAINT TRIGGER outreach_send_intents_event_per_version AFTER INSERT ON kauro.outreach_send_intents
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('outreach_send_intent', 'intent_id');
+
+-- Who writes and reads it. The writer is CMD063's session, kauro_app: the intent's own person acting as an ACTIVE seller or as the corporate
+-- owner, no agency bound (the policy that lets it queue the intent). kauro_outreach appends and reads NO event and NO outbox record: both
+-- tables are granted by table (domain_events has an agency_id column, A17), the dispatcher's records are claimed by the control plane
+-- (kauro_control, D1) and the service's units D2..D5 write intents, evidence and activities, never events. The author reads its own event
+-- (the event-per-version check reads it at COMMIT as the writer) and no other.
+CREATE POLICY domain_events_outreach_author_read ON kauro.domain_events FOR SELECT TO kauro_app
+  USING (agency_id IS NULL AND aggregate_kind = 'outreach_send_intent' AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text AND kauro.current_agency_id() IS NULL);
+CREATE POLICY domain_events_outreach_publish ON kauro.domain_events FOR INSERT TO kauro_app
+  WITH CHECK (agency_id IS NULL AND aggregate_kind = 'outreach_send_intent' AND event_type = 'outreach.send_intended.v1'
+    AND actor_kind = 'USER' AND actor_id = kauro.current_user_id()::text AND kauro.current_agency_id() IS NULL
+    AND (kauro.acting_seller_id() IS NOT NULL OR kauro.acting_corporate_owner()));
+-- A policy expression names no other relation (an expression that does takes that relation's lock at plan time): the lookup of the event's
+-- kind is this STABLE function, whose body is locked when it runs. SECURITY INVOKER: it reads through the caller's own policies, so a
+-- writer can address a record only to an event it authored (domain_events_outreach_author_read).
+CREATE OR REPLACE FUNCTION kauro.outreach_event(p_event_id uuid) RETURNS boolean
+  LANGUAGE sql STABLE SECURITY INVOKER SET search_path = pg_catalog, pg_temp AS
+$$ SELECT EXISTS (SELECT 1 FROM kauro.domain_events e WHERE e.event_id = p_event_id AND e.agency_id IS NULL AND e.aggregate_kind = 'outreach_send_intent') $$;
+REVOKE ALL ON FUNCTION kauro.outreach_event(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION kauro.outreach_event(uuid) TO kauro_app;
+CREATE POLICY outbox_records_outreach_enqueue ON kauro.outbox_records FOR INSERT TO kauro_app
+  WITH CHECK (consumer = 'OUTREACH_SENDER' AND kauro.current_agency_id() IS NULL AND kauro.outreach_event(event_id));

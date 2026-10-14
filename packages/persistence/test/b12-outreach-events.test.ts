@@ -208,11 +208,11 @@ describe("B12 K1b: who may write and read the event and its outbox record (RLS)"
     });
   });
 
-  test("reads: the seller's session sees none of these events or records (the agency-less rows are the control plane's), kauro_control dispatches them, kauro_outreach holds no privilege on either table", async () => {
+  test("reads: the seller's session sees its own intent's event and no outbox record (the records are the control plane's), kauro_control dispatches them, kauro_outreach holds no privilege on either table", async () => {
     const { d, authorizationId, slot } = await granted();
     const i = await at(w.app, personCtx(w, d.personUserId), plus(slot, 2), (c) => queueIn(c, d, authorizationId));
     await at(w.app, personCtx(w, d.personUserId), plus(slot, 3), async (c) => {
-      assert.equal((await c.query("SELECT 1 FROM kauro.domain_events WHERE aggregate_kind = 'outreach_send_intent'")).rowCount, 0, "events");
+      assert.equal((await c.query("SELECT 1 FROM kauro.domain_events WHERE aggregate_kind = 'outreach_send_intent'")).rowCount, 1, "its own event, and no other");
       assert.equal((await c.query("SELECT 1 FROM kauro.outbox_records WHERE consumer = 'OUTREACH_SENDER'")).rowCount, 0, "records");
     });
     const ctl = await w.control.query("SELECT e.event_id FROM kauro.domain_events e JOIN kauro.outbox_records o ON o.event_id = e.event_id WHERE e.aggregate_id = $1 AND o.consumer = 'OUTREACH_SENDER'", [i.intentId]);
@@ -222,7 +222,7 @@ describe("B12 K1b: who may write and read the event and its outbox record (RLS)"
     assert.deepEqual(g.rows, []);
   });
 
-  test("outreach_event(event_id): STABLE SECURITY DEFINER with a pinned search_path, owned by the migration owner, executable by kauro_app alone; true for this kind only", async () => {
+  test("outreach_event(event_id): STABLE SECURITY INVOKER with a pinned search_path, owned by the migration owner, executable by kauro_app alone; true for this kind only", async () => {
     const { d, authorizationId, slot } = await granted();
     const i = await at(w.app, personCtx(w, d.personUserId), plus(slot, 2), (c) => queueIn(c, d, authorizationId));
     const f = await w.h.oracle.query<{ sig: string; secdef: boolean; volatile: string; owner: string; config: string[] | null; runtime: string[]; public_exec: boolean }>(
@@ -232,7 +232,7 @@ describe("B12 K1b: who may write and read the event and its outbox record (RLS)"
               EXISTS (SELECT 1 FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE') AS public_exec
          FROM pg_proc p WHERE p.oid = 'kauro.outreach_event(uuid)'::regprocedure`,
     );
-    assert.deepEqual(f.rows, [{ sig: "kauro.outreach_event(uuid)", secdef: true, volatile: "s", owner: "kauro_owner", config: ["search_path=pg_catalog, pg_temp"], runtime: ["kauro_app"], public_exec: false }]);
+    assert.deepEqual(f.rows, [{ sig: "kauro.outreach_event(uuid)", secdef: false, volatile: "s", owner: "kauro_owner", config: ["search_path=pg_catalog, pg_temp"], runtime: ["kauro_app"], public_exec: false }]);
     const ev = await w.h.oracle.query<{ event_id: string }>("SELECT event_id FROM kauro.domain_events WHERE aggregate_id = $1", [i.intentId]);
     const agencyEvent = await w.h.oracle.query<{ event_id: string }>("SELECT event_id FROM kauro.domain_events WHERE agency_id = $1 LIMIT 1", [agencyId]);
     const answers = await w.h.oracle.query("SELECT kauro.outreach_event($1) AS yes, kauro.outreach_event($2) AS agency, kauro.outreach_event($3) AS unknown", [ev.rows[0]!.event_id, agencyEvent.rows[0]!.event_id, ids.next()]);
