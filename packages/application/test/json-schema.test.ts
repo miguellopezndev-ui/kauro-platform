@@ -24,7 +24,7 @@ test("the validator compiles exactly the 73 contracts, the 16 request schemas an
   const readIds = READ_OPERATION_IDS.map(readResponseSchemaId);
   assert.equal(readIds.length, 18, "the five manual-10 reads (N16), the two support reads (B11 W4), the seven source reads (B07 design §9.1), GetJob and GetAudit (B08 design §12), GetBuyerType and ListProjects (B11 lane A1)");
   const completedIds = SERVED_COMMAND_IDS.filter((command) => COMMAND_RESPONSES[command].view !== null).map(commandResponseSchemaId);
-  assert.equal(completedIds.length, 27, "every served command but CMD014, CMD036, CMD020 and CMD024, answered ACCEPTED (B07 D-RUN-1, B08 D8-API-1); B16's CMD042, CMD060, CMD038, CMD044 of B11 W4 and B17's CMD018/CMD019 and CMD040/CMD041 among them");
+  assert.equal(completedIds.length, 28, "every served command but CMD014, CMD036, CMD020 and CMD024, answered ACCEPTED (B07 D-RUN-1, B08 D8-API-1); B16's CMD042, CMD060, CMD038, CMD044 of B11 W4 and B17's CMD018/CMD019 and CMD040/CMD041 among them");
   const intakeIds = INTAKE_OPERATION_IDS.map(intakeResponseSchemaId);
   assert.equal(intakeIds.length, 2, "the selection manifest intake (B07 D-SEL-2) and the decision artifact intake (B08 D8-CMA-7)");
   // package B09 (D-REQ-B7): the payment catalogue's closed request schemas and the envelopes of its replies and reads
