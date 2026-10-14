@@ -43,10 +43,15 @@ import {
   type TargetContractRepository,
   type TargetInstanceRef,
   type VersionedWrite,
+  type BoundPlan,
+  type NewRecheckPlan,
+  type PlanBody,
+  type PlanId,
   targetBodyDigest,
 } from "@kauro/domain";
 import { execute, instant, int, optionalInstant, optionalText, text, withOptional, type Queryable } from "../sql.js";
 import { awaitTransition, staleOrMissing } from "./tenancy.js";
+import { planBodyHash } from "./plans.js";
 
 // --- processing authorities -------------------------------------------------------------------------------------------
 
@@ -499,6 +504,76 @@ export class PgTargetContractRepository implements TargetContractRepository {
     const now = await this.getLifecycle(contractId);
     if (!now) throw new DomainFailure("NOT_FOUND", "target contract is not visible in this context");
     return { kind: "STALE", currentVersion: now.version, currentState: now.state };
+  }
+
+  // --- B17 L1: CMD019's supersession (R2-026, D-R3-1; migration 0073 (b)-(e)) ----------------------------------------------------
+
+  async lockCurrentOfProject(agencyId: AgencyId, projectId: ProjectId, except: TargetContractId): Promise<ReadonlyArray<TargetContractRecord>> {
+    const r = await execute<ContractRow>(
+      this.db,
+      `SELECT ${CONTRACT_COLUMNS} FROM kauro.target_contracts
+        WHERE agency_id = $1 AND project_id = $2 AND contract_id <> $3 AND confirmed_at IS NOT NULL AND superseded_at IS NULL
+        ORDER BY contract_id FOR NO KEY UPDATE`,
+      [agencyId, projectId, except],
+    );
+    return r.rows.map(contractRecord);
+  }
+
+  async holdTransitions(contractIds: ReadonlyArray<TargetContractId>): Promise<void> {
+    // one statement, the halves in ascending contract_id (the order every multi-contract holder takes them in)
+    await execute(
+      this.db,
+      "SELECT count(pg_advisory_xact_lock(kauro.transition_key('kauro.target_contracts', x.id))) FROM (SELECT DISTINCT unnest($1::uuid[])::text AS id ORDER BY 1) x",
+      [[...contractIds]],
+    );
+  }
+
+  async lockPlansBoundTo(agencyId: AgencyId, projectId: ProjectId, targetContractHashes: ReadonlyArray<Sha256Hex>): Promise<void> {
+    if (targetContractHashes.length === 0) return;
+    await execute(
+      this.db,
+      `SELECT plan_id FROM kauro.plans WHERE agency_id = $1 AND project_id = $2 AND target_contract_hash = ANY($3::text[]) ORDER BY plan_id FOR SHARE`,
+      [agencyId, projectId, [...targetContractHashes]],
+    );
+  }
+
+  async approvedPlansBoundTo(agencyId: AgencyId, projectId: ProjectId, targetContractHashes: ReadonlyArray<Sha256Hex>): Promise<ReadonlyArray<BoundPlan>> {
+    if (targetContractHashes.length === 0) return [];
+    const r = await execute<{ plan_id: string; version: number | string; target_contract_hash: string; body: PlanBody }>(
+      this.db,
+      `SELECT plan_id, version, target_contract_hash, body FROM kauro.plans
+        WHERE agency_id = $1 AND project_id = $2 AND state = 'APPROVED' AND target_contract_hash = ANY($3::text[])
+        ORDER BY plan_id`,
+      [agencyId, projectId, [...targetContractHashes]],
+    );
+    return r.rows.map((row) => ({ planId: row.plan_id as PlanId, version: int(row.version), targetContractHash: row.target_contract_hash as Sha256Hex, body: row.body }));
+  }
+
+  async supersede(contractId: TargetContractId, by: TargetContractId): Promise<TargetContractRecord> {
+    // superseded_at is the database's instant (the 0073 trigger stamps it); the superseder is confirmed in this same transaction (deferred)
+    const r = await execute<ContractRow>(
+      this.db,
+      `UPDATE kauro.target_contracts SET superseded_at = kauro.server_now(), superseded_by_contract_id = $2
+        WHERE contract_id = $1 AND confirmed_at IS NOT NULL AND superseded_at IS NULL RETURNING ${CONTRACT_COLUMNS}`,
+      [contractId, by],
+    );
+    const row = r.rows[0];
+    if (!row) throw new DomainFailure("INTEGRITY_FAILURE", "a current contract held under its row lock was not superseded");
+    return contractRecord(row);
+  }
+
+  async insertRecheckPlan(input: NewRecheckPlan): Promise<{ readonly planId: PlanId; readonly version: number; readonly bodyHash: Sha256Hex }> {
+    const b = input.body;
+    const bodyHash = planBodyHash(b);
+    const r = await execute<{ plan_id: string; version: number | string; body_hash: string }>(
+      this.db,
+      `INSERT INTO kauro.plans (plan_id, agency_id, project_id, version, state, revision_hash, target_contract_hash, policy_hash, body, body_hash, recheck_of_plan_id, created_by_membership_id, created_at, updated_at)
+       VALUES ($1, $2, $3, 1, 'DRAFT', $4, $5, $6, $7::jsonb, $8, $9, $10, kauro.server_now(), kauro.server_now()) RETURNING plan_id, version, body_hash`,
+      [input.planId, input.agencyId, input.projectId, b.revisionHash, b.targetContractHash, b.policyHash, JSON.stringify(b), bodyHash, input.recheckOfPlanId, input.createdByMembershipId],
+    );
+    const row = r.rows[0];
+    if (!row) throw new DomainFailure("INTEGRITY_FAILURE", "the re-check plan was not recorded");
+    return { planId: row.plan_id as PlanId, version: int(row.version), bodyHash: row.body_hash as Sha256Hex };
   }
 }
 

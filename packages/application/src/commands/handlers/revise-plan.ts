@@ -108,6 +108,10 @@ export function revisePlanHandler(runtime: CommandRuntime, artifacts: ArtifactRe
         if (successorHash === predecessor.bodyHash) {
           throw new DomainFailure("PRECONDITION_FAILED", "the patch changes nothing", { reason: "NO_SEMANTIC_CHANGE", currentState: predecessor.state, currentVersion: predecessor.version });
         }
+        // the plan's target after its shared transition half (R2-026, B17 L1 meeting row 12): a successor is never born on a superseded
+        // contract; a supersession issued meanwhile waits for this unit, one committed first refuses (the plans birth trigger backstops it)
+        const target = await uow.targetContracts.lockCurrentByHash(membership.agencyId, predecessor.projectId, predecessor.targetContractHash);
+        if (target === null || target.confirmedAt === undefined || target.supersededAt !== undefined) throw new DomainFailure("TARGET_STALE", "the plan's target contract is not confirmed and current");
         const successorId = uow.ids.next() as PlanId;
         // serialization point: the compare-and-swap on the predecessor plus plans_supersedes_once close the race (S051)
         const superseded = applied(await uow.plans.transition(planId, envelope.body.expectedVersion, { state: "SUPERSEDED", supersededByPlanId: successorId }, ctx.now));

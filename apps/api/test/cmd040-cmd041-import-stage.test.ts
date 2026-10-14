@@ -4,7 +4,9 @@
 // through the owner's oracle connection, as no request role may); a receipt is data an agency member stored for the stage's project and target
 // instance. CMD040 validates it against the stage's exact membership, CMD041 records the approver's continuation of exactly that validated
 // identity mapping. The digest oracle below is written from the preimage rules (HASHING_AND_ACCOUNTING_RULES: closed wrapper under the canonical
-// profile), not from the product function under test.
+// profile), not from the product function under test. Since B17 L1 (R2-024) every receipt row carries the KAURO_STAGE_CORRELATION_V1 key
+// of its stage, package and source identity (the oracle below); bytes the stage already holds are idempotent (R2-025), a differing receipt
+// for a finalized stage opens a reconciliation instead of overwriting it, and an unverified parent is refused at CMD040 already (R2-023).
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { after, before, test } from "node:test";
@@ -14,9 +16,38 @@ import { toUtcInstant, type ProjectId } from "@kauro/domain";
 import { serverNow } from "@kauro/persistence/testing";
 import { approveThroughRoute, call, completed, freshKey, ids, outcome, sha, world, type Person, type Reply, type World } from "./support.js";
 
+/** While set, every api unit of work opens with kauro.server_now() at this instant (transaction-local offset of the TEST CLOCK). */
+let stand: string | null = null;
+function standing<F extends object>(inner: F): F {
+  return new Proxy(inner, {
+    get(target, prop) {
+      const value: unknown = Reflect.get(target, prop, target);
+      if ((prop === "run" || prop === "runSource") && typeof value === "function") {
+        return (context: unknown, work: (uow: unknown) => Promise<unknown>, options?: unknown) =>
+          (value as (...a: unknown[]) => Promise<unknown>).call(
+            target,
+            context,
+            async (uow: unknown) => {
+              const at = stand;
+              if (at !== null) {
+                await (uow as { readonly client: { query(text: string, values: unknown[]): Promise<unknown> } }).client.query(
+                  "SELECT set_config('kauro_test.clock_offset_seconds', extract(epoch FROM ($1::timestamptz - transaction_timestamp()))::text, true)",
+                  [at],
+                );
+              }
+              return work(uow);
+            },
+            options,
+          );
+      }
+      return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+    },
+  });
+}
+
 let w: World;
 before(async () => {
-  w = await world();
+  w = await world({ wrapUnitOfWork: standing });
 });
 after(async () => {
   await w.stop();
@@ -31,6 +62,11 @@ interface Row {
   readonly sourceId: string;
   readonly status: "MATCHED" | "FAILED";
   readonly targetId?: string;
+  readonly correlationKey?: string;
+}
+interface Stage {
+  readonly stageId: string;
+  readonly packageHash: string;
 }
 const matched = (n: number): Row[] => Array.from({ length: n }, (_, i) => ({ sourceId: `src-${i + 1}`, status: "MATCHED" as const, targetId: `crm-${i + 1}` }));
 const SOURCES = ["src-1", "src-2", "src-3", "src-4"];
@@ -44,6 +80,13 @@ async function dbInstant(offsetMs: number): Promise<string> {
 function mappingOracle(stageId: string, instanceId: string, packageHash: string, mapping: ReadonlyArray<Record<string, string>>): string {
   return createHash("sha256").update(canonicalBytes({ domain: "KAURO_STAGE_IDENTITY_MAPPING_V1", version: 1, payload: { stageId, instanceId, sourcePackageHash: packageHash, mapping } })).digest("hex");
 }
+
+/** KAURO_STAGE_CORRELATION_V1 from the rules: the key a receipt row carries back for its stage, package and source identity (R2-024). */
+function correlation(stageId: string, packageHash: string, sourceId: string): string {
+  return createHash("sha256").update(canonicalBytes({ domain: "KAURO_STAGE_CORRELATION_V1", version: 1, payload: { stageId, packageHash, sourceId } })).digest("hex");
+}
+/** The rows keyed for `stage`, as the agency's importer returns them. */
+const keyed = (stage: Stage, rows: ReadonlyArray<Row>): Row[] => rows.map((r) => ({ ...r, correlationKey: correlation(stage.stageId, stage.packageHash, r.sourceId) }));
 
 interface Context {
   readonly projectId: ProjectId;
@@ -99,12 +142,14 @@ interface UploadOptions {
   readonly instanceId?: string;
   readonly document?: Record<string, unknown>;
   readonly projectId?: string;
+  /** The stage whose correlation keys the rows carry (none: the rows as given). */
+  readonly stage?: Stage;
 }
 
 /** A receipt upload stored through the tenant role (RLS and the insert grant apply), as an agency member would. */
 async function storeUpload(c: Context, rows: ReadonlyArray<Row> | null, o: UploadOptions = {}): Promise<{ readonly artifactRef: string; readonly contentHash: string }> {
   const artifactRef = ids.next();
-  const document = o.document ?? { rows: rows ?? [] };
+  const document = o.document ?? { rows: o.stage === undefined ? (rows ?? []) : keyed(o.stage, rows ?? []) };
   const contentHash = sha(JSON.stringify(document) + artifactRef);
   await w.asTenant(w.A, (conn) =>
     conn.query(
@@ -134,7 +179,7 @@ const receiptCount = (stageId: string): Promise<number> => w.count("stage_receip
 
 /** Submits a receipt through the real CMD040 route and returns the stage view. */
 async function submitThroughRoute(c: Context, stage: { readonly stageId: string; readonly packageHash: string }, rows: ReadonlyArray<Row>): Promise<ImportStageView> {
-  const upload = await storeUpload(c, rows);
+  const upload = await storeUpload(c, rows, { stage });
   return completed<ImportStageView>(await submit(c.projectId, stage.stageId, { receiptUploadRef: upload.artifactRef, sourcePackageHash: stage.packageHash }), 200).data;
 }
 
@@ -143,7 +188,7 @@ const FAILED_ONE: Row[] = [...matched(3), { sourceId: "src-4", status: "FAILED" 
 test("CMD040-OK: an OPERATOR submits a complete receipt; the exact membership is validated, the stage is VERIFIED_SUCCESS and the identity mapping digest equals the independent oracle", async () => {
   const c = await approvedContext("cmd040-ok");
   const stage = await seedStage(c);
-  const upload = await storeUpload(c, matched(4));
+  const upload = await storeUpload(c, matched(4), { stage });
   const key = freshKey("cmd040-ok");
   const done = completed<ImportStageView>(await submit(c.projectId, stage.stageId, { receiptUploadRef: upload.artifactRef, sourcePackageHash: stage.packageHash }, w.operator, key), 200);
   assert.equal(done.version, 2);
@@ -195,10 +240,10 @@ test("CMD040-OK: failed rows are accounted and the stage awaits the approver; mi
   assert.equal(await receiptCount(stage.stageId), 2);
 });
 
-test("CMD040-DENY: a VIEWER, an APPROVER and a non-member are refused; a foreign stage, wrong project, foreign or wrong-kind upload, other instance or package, invalid or foreign-ID receipt, reused bytes, a settled or expired stage and an unknown field write nothing", async () => {
+test("CMD040-DENY: a VIEWER, an APPROVER and a non-member are refused; a foreign stage, wrong project, foreign or wrong-kind upload, other instance or package, invalid, foreign-stage or foreign-ID receipt, a cancelled or expired stage and an unknown field write nothing; reused bytes and a settled stage write no revision", async () => {
   const c = await approvedContext("cmd040-deny");
   const stage = await seedStage(c);
-  const upload = await storeUpload(c, matched(4));
+  const upload = await storeUpload(c, matched(4), { stage });
   const good = { receiptUploadRef: upload.artifactRef, sourcePackageHash: stage.packageHash };
   const unchanged = async (): Promise<void> => {
     const row = await stageRow(stage.stageId);
@@ -234,18 +279,27 @@ test("CMD040-DENY: a VIEWER, an APPROVER and a non-member are refused; a foreign
     const u = await storeUpload(c, null, { document });
     return outcome(w, await submit(c.projectId, stage.stageId, { ...good, receiptUploadRef: u.artifactRef }));
   };
-  assert.equal(await invalid({ rows: matched(4), verified: true }), "400 INVALID_REQUEST RECEIPT_INVALID");
-  assert.equal(await invalid({ rows: [{ sourceId: "src-1", status: "MATCHED" }] }), "400 INVALID_REQUEST RECEIPT_INVALID", "a match without its target identity");
-  assert.equal(await invalid({ rows: [{ sourceId: "src-1", status: "FAILED", targetId: "crm-1" }] }), "400 INVALID_REQUEST RECEIPT_INVALID", "a failure that names a target identity");
-  assert.equal(await invalid({ rows: [{ sourceId: "src-1", status: "MATCHED", targetId: "crm-1", extra: 1 }] }), "400 INVALID_REQUEST RECEIPT_INVALID");
+  const key1 = correlation(stage.stageId, stage.packageHash, "src-1");
+  assert.equal(await invalid({ rows: keyed(stage, matched(4)), verified: true }), "400 INVALID_REQUEST RECEIPT_INVALID");
+  assert.equal(await invalid({ rows: [{ sourceId: "src-1", status: "MATCHED", correlationKey: key1 }] }), "400 INVALID_REQUEST RECEIPT_INVALID", "a match without its target identity");
+  assert.equal(await invalid({ rows: [{ sourceId: "src-1", status: "FAILED", targetId: "crm-1", correlationKey: key1 }] }), "400 INVALID_REQUEST RECEIPT_INVALID", "a failure that names a target identity");
+  assert.equal(await invalid({ rows: [{ sourceId: "src-1", status: "MATCHED", targetId: "crm-1", correlationKey: key1, extra: 1 }] }), "400 INVALID_REQUEST RECEIPT_INVALID");
   assert.equal(await invalid({ rows: "src-1" }), "400 INVALID_REQUEST RECEIPT_INVALID");
-  assert.equal(await invalid({ rows: [...matched(4), { sourceId: "src-99", status: "MATCHED", targetId: "crm-99" }] }), "409 PRECONDITION_FAILED RECEIPT_FOREIGN_IDS");
+  assert.equal(await invalid({ rows: matched(4) }), "400 INVALID_REQUEST RECEIPT_INVALID", "rows without their correlation keys");
+  assert.equal(await invalid({ rows: keyed(stage, [...matched(4), { sourceId: "src-99", status: "MATCHED", targetId: "crm-99" }]) }), "409 PRECONDITION_FAILED RECEIPT_FOREIGN_IDS");
+  // a receipt produced for another stage, the same rows and package claimed: never this stage's evidence (R2-024)
+  const elsewhere = await seedStage(c);
+  assert.equal(await invalid({ rows: keyed({ stageId: elsewhere.stageId, packageHash: stage.packageHash }, matched(4)) }), "409 PRECONDITION_FAILED RECEIPT_FOREIGN_STAGE");
   await unchanged();
 
-  // a settled stage and an expired one
+  // a settled stage: a differing receipt opens one reconciliation request, never a revision (R2-025); the same bytes again are that request
   const settled = await seedStage(c, { state: "VERIFIED_SUCCESS" });
-  const settledOutcome = await submit(c.projectId, settled.stageId, { receiptUploadRef: upload.artifactRef, sourcePackageHash: settled.packageHash });
-  assert.equal(outcome(w, settledOutcome), "409 PRECONDITION_FAILED STAGE_NOT_AWAITING_RECEIPT");
+  const forSettled = await storeUpload(c, matched(4), { stage: settled });
+  const reconciled = completed<ImportStageView>(await submit(c.projectId, settled.stageId, { receiptUploadRef: forSettled.artifactRef, sourcePackageHash: settled.packageHash }), 200).data;
+  assert.deepEqual([reconciled.state, reconciled.version, reconciled.reconciliation?.state, reconciled.reconciliation?.contentHash], ["VERIFIED_SUCCESS", 1, "OPEN", forSettled.contentHash]);
+  const again = completed<ImportStageView>(await submit(c.projectId, settled.stageId, { receiptUploadRef: forSettled.artifactRef, sourcePackageHash: settled.packageHash }), 200).data;
+  assert.equal(again.reconciliation?.reconciliationId, reconciled.reconciliation?.reconciliationId, "the same bytes under another key are the same request");
+  assert.equal(await w.count("stage_receipt_reconciliations", "stage_id = $1", [settled.stageId]), 1);
   const cancelled = await seedStage(c, { state: "CANCELLED" });
   assert.equal(outcome(w, await submit(c.projectId, cancelled.stageId, { receiptUploadRef: upload.artifactRef, sourcePackageHash: cancelled.packageHash })), "409 PRECONDITION_FAILED STAGE_NOT_AWAITING_RECEIPT");
   const lapsed = await seedStage(c, { expiresOffsetMs: -60_000 });
@@ -254,45 +308,51 @@ test("CMD040-DENY: a VIEWER, an APPROVER and a non-member are refused; a foreign
   assert.equal(outcome(w, await submit(c.projectId, expired.stageId, { receiptUploadRef: upload.artifactRef, sourcePackageHash: expired.packageHash })), "409 PRECONDITION_FAILED STAGE_EXPIRED", "no old receipt resurrects an expired stage");
   for (const s of [settled, cancelled, lapsed, expired]) assert.equal(await receiptCount(s.stageId), 0);
 
-  // the same bytes again are not new evidence; the first submission settles, the resubmission of a NEEDS_CORRECTION stage cannot reuse them
+  // the same bytes again are not new evidence: the resubmission of a NEEDS_CORRECTION stage answers the revision they already are (R2-025)
   const retry = await seedStage(c);
-  const bad = await storeUpload(c, [{ sourceId: "src-1", status: "MATCHED", targetId: "crm-1" }]);
+  const bad = await storeUpload(c, [{ sourceId: "src-1", status: "MATCHED", targetId: "crm-1" }], { stage: retry });
   completed<ImportStageView>(await submit(c.projectId, retry.stageId, { receiptUploadRef: bad.artifactRef, sourcePackageHash: retry.packageHash }), 200);
   assert.equal((await stageRow(retry.stageId))?.state, "NEEDS_CORRECTION");
-  assert.equal(outcome(w, await submit(c.projectId, retry.stageId, { receiptUploadRef: bad.artifactRef, sourcePackageHash: retry.packageHash })), "409 PRECONDITION_FAILED RECEIPT_ALREADY_SUBMITTED");
+  const reused = completed<ImportStageView>(await submit(c.projectId, retry.stageId, { receiptUploadRef: bad.artifactRef, sourcePackageHash: retry.packageHash }), 200).data;
+  assert.deepEqual([reused.state, reused.version, reused.receiptRevision], ["NEEDS_CORRECTION", 2, 1]);
   assert.equal(await receiptCount(retry.stageId), 1);
 });
 
-test("CMD040-RACE: the same key replays one revision, the same key with another request conflicts, and two receipts racing on one stage yield one revision (the loser is told the stage is no longer awaiting)", async () => {
+test("CMD040-RACE: the same key replays one revision, the same key with another request conflicts, and two receipts racing on one stage yield one revision and one reconciliation (a stage awaiting the approver is told it is no longer awaiting)", async () => {
   const c = await approvedContext("cmd040-race");
   const stage = await seedStage(c);
-  const a = await storeUpload(c, matched(4));
-  const b = await storeUpload(c, matched(4));
+  const a = await storeUpload(c, matched(4), { stage });
+  const b = await storeUpload(c, matched(4), { stage });
 
   // same key, another request: nothing is executed again
   const lone = await seedStage(c);
-  const u1 = await storeUpload(c, matched(4));
-  const u2 = await storeUpload(c, matched(4));
+  const u1 = await storeUpload(c, matched(4), { stage: lone });
+  const u2 = await storeUpload(c, matched(4), { stage: lone });
   const key = freshKey("cmd040-race");
   completed<ImportStageView>(await submit(c.projectId, lone.stageId, { receiptUploadRef: u1.artifactRef, sourcePackageHash: lone.packageHash }, w.operator, key), 200);
   assert.equal(outcome(w, await submit(c.projectId, lone.stageId, { receiptUploadRef: u2.artifactRef, sourcePackageHash: lone.packageHash }, w.operator, key)), "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS");
   assert.equal(await receiptCount(lone.stageId), 1);
 
-  // two keys, two receipts, one stage: exactly one revision
+  // two keys, two receipts, one stage: exactly one revision; the other bytes become the one reconciliation, the repeated bytes are idempotent
   const replies = await Promise.all([
     submit(c.projectId, stage.stageId, { receiptUploadRef: a.artifactRef, sourcePackageHash: stage.packageHash }),
     submit(c.projectId, stage.stageId, { receiptUploadRef: b.artifactRef, sourcePackageHash: stage.packageHash }),
     submit(c.projectId, stage.stageId, { receiptUploadRef: a.artifactRef, sourcePackageHash: stage.packageHash }),
   ]);
-  const outcomes = replies.map((r) => (r.status === 200 ? "200" : outcome(w, r))).sort();
-  assert.deepEqual(outcomes, ["200", "409 PRECONDITION_FAILED STAGE_NOT_AWAITING_RECEIPT", "409 PRECONDITION_FAILED STAGE_NOT_AWAITING_RECEIPT"]);
   assert.equal(await receiptCount(stage.stageId), 1, "no duplicate authority");
+  assert.equal(await w.count("stage_receipt_reconciliations", "stage_id = $1", [stage.stageId]), 1, "the differing bytes are one reconciliation request");
+  assert.deepEqual(replies.map((r) => (r.status === 200 ? "200" : outcome(w, r))), ["200", "200", "200"]);
   assert.equal((await stageRow(stage.stageId))?.version, 2);
 
-  // the loser is told where the stage stands
-  const later = await submit(c.projectId, stage.stageId, { receiptUploadRef: b.artifactRef, sourcePackageHash: stage.packageHash });
+  // a stage awaiting the approver's partial scope takes no other receipt, and the refusal says where it stands
+  const pending = await seedStage(c);
+  await submitThroughRoute(c, pending, FAILED_ONE);
+  const other = await storeUpload(c, matched(4), { stage: pending });
+  const later = await submit(c.projectId, pending.stageId, { receiptUploadRef: other.artifactRef, sourcePackageHash: pending.packageHash });
+  assert.equal(outcome(w, later), "409 PRECONDITION_FAILED STAGE_NOT_AWAITING_RECEIPT");
   const problem = later.json<{ current?: { version: number; state: string } }>();
-  assert.deepEqual([problem.current?.version, problem.current?.state], [2, "VERIFIED_SUCCESS"]);
+  assert.deepEqual([problem.current?.version, problem.current?.state], [2, "RECEIPT_VALIDATING"]);
+  assert.equal(await receiptCount(pending.stageId), 1);
 });
 
 /** A verified stage (through the real CMD040 route) whose parent is verified and whose plan is approved. */
@@ -365,26 +425,38 @@ test("CMD041-DENY: an OPERATOR, a VIEWER and a non-member are refused; a stale v
   assert.equal(outcome(w, await proceed(c.projectId, lapsed.stageId, { expectedVersion: 1, validatedReceiptHash: view.identityMappingHash })), "409 PRECONDITION_FAILED STAGE_EXPIRED");
   await notContinued(lapsed.stageId);
 
-  // a required parent that is not verified, a parent that does not exist, a plan that is not approved, a target that is not the project's
+  // a required parent that is not verified and a parent that does not exist are refused at the receipt already (R2-023, CMD040); a parent
+  // whose deadline passes after the child's receipt is refused at the continuation (the TEST CLOCK stands past it)
   const unverifiedParent = await seedStage(c, { state: "AWAITING_AGENCY_IMPORT" });
   const childOfUnverified = await seedStage(c, { parents: [unverifiedParent.stageId] });
-  const cv = await submitThroughRoute(c, childOfUnverified, matched(4));
-  assert.equal(outcome(w, await proceed(c.projectId, childOfUnverified.stageId, { expectedVersion: cv.version, validatedReceiptHash: cv.identityMappingHash })), "409 PRECONDITION_FAILED PARENT_STAGE_NOT_VERIFIED");
+  const cu = await storeUpload(c, matched(4), { stage: childOfUnverified });
+  assert.equal(outcome(w, await submit(c.projectId, childOfUnverified.stageId, { receiptUploadRef: cu.artifactRef, sourcePackageHash: childOfUnverified.packageHash })), "409 PRECONDITION_FAILED PARENT_STAGE_NOT_VERIFIED");
   const orphan = await seedStage(c, { parents: [ids.next()] });
-  const ov = await submitThroughRoute(c, orphan, matched(4));
-  assert.equal(outcome(w, await proceed(c.projectId, orphan.stageId, { expectedVersion: ov.version, validatedReceiptHash: ov.identityMappingHash })), "409 PRECONDITION_FAILED PARENT_STAGE_NOT_VERIFIED");
+  const ou = await storeUpload(c, matched(4), { stage: orphan });
+  assert.equal(outcome(w, await submit(c.projectId, orphan.stageId, { receiptUploadRef: ou.artifactRef, sourcePackageHash: orphan.packageHash })), "409 PRECONDITION_FAILED PARENT_STAGE_NOT_VERIFIED");
+  for (const s of [childOfUnverified, orphan]) assert.equal(await receiptCount(s.stageId), 0);
+  const lapsingParent = await seedStage(c, { state: "VERIFIED_SUCCESS", expiresOffsetMs: 3_600_000 });
+  const childOfLapsing = await seedStage(c, { parents: [lapsingParent.stageId] });
+  const lv = await submitThroughRoute(c, childOfLapsing, matched(4));
+  stand = await dbInstant(2 * 3_600_000);
+  try {
+    assert.equal(outcome(w, await proceed(c.projectId, childOfLapsing.stageId, { expectedVersion: lv.version, validatedReceiptHash: lv.identityMappingHash })), "409 PRECONDITION_FAILED PARENT_STAGE_NOT_VERIFIED");
+  } finally {
+    stand = null;
+  }
 
+  const foreignTarget = ids.next();
+  const mismatched = await seedStage(c, { instanceId: foreignTarget });
+  const upload = await storeUpload(c, matched(4), { instanceId: foreignTarget, stage: mismatched });
+  const mv = completed<ImportStageView>(await submit(c.projectId, mismatched.stageId, { receiptUploadRef: upload.artifactRef, sourcePackageHash: mismatched.packageHash }), 200).data;
+  assert.equal(outcome(w, await proceed(c.projectId, mismatched.stageId, { expectedVersion: mv.version, validatedReceiptHash: mv.identityMappingHash })), "409 PRECONDITION_FAILED STAGE_TARGET_MISMATCH");
+  // a second approvable plan confirms a newer target contract of the project (R2-026): it is the last check of the project's plan here
   const unapprovedPlan = await w.approvable(w.A, c.projectId, "cmd041-deny-unapproved");
   const planless = await seedStage(c, { planId: unapprovedPlan.planId });
   const pv = await submitThroughRoute(c, planless, matched(4));
   assert.equal(outcome(w, await proceed(c.projectId, planless.stageId, { expectedVersion: pv.version, validatedReceiptHash: pv.identityMappingHash })), "409 PRECONDITION_FAILED CHILD_PLAN_NOT_APPROVED");
 
-  const foreignTarget = ids.next();
-  const mismatched = await seedStage(c, { instanceId: foreignTarget });
-  const upload = await storeUpload(c, matched(4), { instanceId: foreignTarget });
-  const mv = completed<ImportStageView>(await submit(c.projectId, mismatched.stageId, { receiptUploadRef: upload.artifactRef, sourcePackageHash: mismatched.packageHash }), 200).data;
-  assert.equal(outcome(w, await proceed(c.projectId, mismatched.stageId, { expectedVersion: mv.version, validatedReceiptHash: mv.identityMappingHash })), "409 PRECONDITION_FAILED STAGE_TARGET_MISMATCH");
-  for (const s of [childOfUnverified, orphan, planless, mismatched]) await notContinued(s.stageId);
+  for (const s of [childOfUnverified, orphan, childOfLapsing, planless, mismatched]) await notContinued(s.stageId);
 
   // the stored mapping changed under its digest: only a replica-role superuser can simulate it (the table is append-only for every writer)
   const tampered = await readyStage("cmd041-deny-tampered");
@@ -396,7 +468,7 @@ test("CMD041-DENY: an OPERATOR, a VIEWER and a non-member are refused; a stale v
   await notContinued(tampered.stage.stageId);
 });
 
-test("CMD041-RACE: two approvers continuing one stage yield one continuation (the loser is told it was continued), the same key replays, the same key with another digest conflicts, and a receipt racing a continuation leaves one winner", async () => {
+test("CMD041-RACE: two approvers continuing one stage yield one continuation (the loser is told it was continued), the same key replays, the same key with another digest conflicts, and a receipt racing a continuation never replaces the continued mapping", async () => {
   const { c, stage, view } = await readyStage("cmd041-race");
   const body = { expectedVersion: view.version, validatedReceiptHash: view.identityMappingHash };
   const replies = await Promise.all([proceed(c.projectId, stage.stageId, body, w.approver), proceed(c.projectId, stage.stageId, body, w.approver2), proceed(c.projectId, stage.stageId, body, w.owner)]);
@@ -422,12 +494,18 @@ test("CMD041-RACE: two approvers continuing one stage yield one continuation (th
   const c2 = await approvedContext("cmd041-race-vs-receipt");
   const partialStage = await seedStage(c2);
   const pv = await submitThroughRoute(c2, partialStage, FAILED_ONE);
-  const correction = await storeUpload(c2, matched(4));
+  const correction = await storeUpload(c2, matched(4), { stage: partialStage });
   const raced = await Promise.all([
     proceed(c2.projectId, partialStage.stageId, { expectedVersion: pv.version, validatedReceiptHash: pv.identityMappingHash }),
     submit(c2.projectId, partialStage.stageId, { receiptUploadRef: correction.artifactRef, sourcePackageHash: partialStage.packageHash }),
   ]);
+  // the forbidden effect first: the continued mapping is the one revision, never replaced; the receipt either came first (refused, the
+  // stage awaits the approver) or after (a reconciliation request beside the continued identity)
+  assert.equal(await receiptCount(partialStage.stageId), 1, "no revision replaces the mapping the approver continued");
+  const row = await stageRow(partialStage.stageId);
+  assert.deepEqual([row?.state, row?.continuation_receipt_hash], ["VERIFIED_PARTIAL", pv.identityMappingHash]);
+  const reconciliations = await w.count("stage_receipt_reconciliations", "stage_id = $1", [partialStage.stageId]);
   const raceOutcomes = raced.map((r) => (r.status === 200 ? "200" : outcome(w, r)));
-  assert.equal(raceOutcomes.filter((o) => o === "200").length, 1, `exactly one of the two wins: ${raceOutcomes.join(" | ")}`);
-  assert.equal(await receiptCount(partialStage.stageId) + Number((await stageRow(partialStage.stageId))?.continued_at !== null), 2, "one receipt and no continuation, or one receipt and one continuation, never a continuation of a replaced mapping");
+  assert.equal(raceOutcomes[0], "200", "the continuation commits in either order");
+  assert.equal(raceOutcomes[1], reconciliations === 1 ? "200" : "409 PRECONDITION_FAILED STAGE_NOT_AWAITING_RECEIPT", `the receipt: ${raceOutcomes.join(" | ")}`);
 });

@@ -20,7 +20,7 @@
  * record in the statement that inserts the job.
  */
 import type { CommercialAuthorizationId, MembershipId, ProcessingJobId, ProcessingJobRecord, ProjectId } from "@kauro/domain";
-import { DomainFailure, EXECUTION_POLICY, jobInputBindingHashOf } from "@kauro/domain";
+import { DomainFailure, EXECUTION_POLICY, effectNowOf, jobInputBindingHashOf } from "@kauro/domain";
 import type { AcceptedOutcome } from "../../commands/runtime.js";
 import { requireMembership } from "../../commands/handlers/shared.js";
 import { EXECUTE_POLL_AFTER_SECONDS, EXECUTE_PROJECT, type ExecuteProjectBody, type ExecuteProjectHandler } from "../contracts.js";
@@ -101,8 +101,14 @@ export function executeProjectHandler(runtime: ExecutionRuntime): ExecuteProject
           await x.awaitTransition({ kind: "AGENCY", key: membership.agencyId });
           const facts = await x.readAuthority(subject);
 
-          // the prerequisites in the order of design §4 item 1; each refusal writes nothing and leaves the authorization ACTIVE
+          // the reads the judgments need, then the agency's bound (D8-CAP-2: the ledger's own CHECK is the arbiter under concurrency; this read
+          // answers the common case with its reason) as the last await, then the effect clock (r15/r25, B17 L1 section 4 EXP)
           const agency = await uow.agencies.get(membership.agencyId);
+          const plan = await uow.plans.get(authorization.planId);
+          const capacity = await x.capacity(membership.agencyId);
+          const nowAt = await effectNowOf(uow);
+
+          // the prerequisites in the order of design §4 item 1; each refusal writes nothing and leaves the authorization ACTIVE
           if (!agency) throw new DomainFailure("INTEGRITY_FAILURE", "a member's agency is not visible");
           if (agency.state !== "ACTIVE") {
             throw new DomainFailure("PRECONDITION_FAILED", "customer data is processed only in an ACTIVE agency", { reason: "AGENCY_NOT_ACTIVE", currentVersion: agency.version, currentState: agency.state });
@@ -114,19 +120,16 @@ export function executeProjectHandler(runtime: ExecutionRuntime): ExecuteProject
             throw new DomainFailure("PRECONDITION_FAILED", "the commercial authorization is no longer active", { reason: "AUTHORIZATION_REVOKED", currentVersion: authorization.version, currentState: authorization.state });
           }
           if (!facts.approvalLive || facts.planState !== "APPROVED") {
-            const plan = await uow.plans.get(authorization.planId);
             if (!plan) throw new DomainFailure("INTEGRITY_FAILURE", "an authorization's plan is not visible");
             throw new DomainFailure("PRECONDITION_FAILED", "the authorization's approval is no longer live on an approved plan", { reason: "PLAN_NOT_APPROVED", currentVersion: plan.version, currentState: plan.state });
           }
           // the source stays executable while it is SEALED and its retention has not ended, judged on the database's clock (D8-STALE-1, D8-CLOCK-1)
-          const sourceEnded = facts.retentionEffectiveDeadline !== null && reachedOnServer(facts.retentionEffectiveDeadline, await uow.serverInstant());
+          const sourceEnded = facts.retentionEffectiveDeadline !== null && reachedOnServer(facts.retentionEffectiveDeadline, nowAt);
           // B08-R1: an INCLUDED sealed file whose admission was revoked (the revision itself stays SEALED) ends the source as well
           if (facts.revisionState !== "SEALED" || sourceEnded || !facts.sourceFilesAdmitted) throw new DomainFailure("SOURCE_EXPIRED", "the authorization's source revision is no longer available");
           if (!facts.targetCurrent) throw new DomainFailure("TARGET_STALE", "the authorization's target contract is no longer confirmed and current");
           if (!facts.capabilityOffered) throw new DomainFailure("CAPABILITY_UNAVAILABLE", "the authorization's mode is no longer offered", { reason: "MODE_NOT_OFFERED" });
 
-          // the agency's bound (D8-CAP-2): the ledger's own CHECK is the arbiter under concurrency; this read answers the common case with its reason
-          const capacity = await x.capacity(membership.agencyId);
           if (capacity.agencyLiveJobs >= EXECUTION_POLICY.agencyLiveJobs) {
             throw new DomainFailure("CAPACITY_UNAVAILABLE", "the agency already holds its live jobs", { reason: "EXECUTION_QUEUE_FULL" });
           }

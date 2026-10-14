@@ -17,7 +17,7 @@
  * The request calls no core: profiling and interpretation are the orchestration's, after commit (D8-AUD-2).
  */
 import type { AuditId, CostGrantId, RevisionId, TargetContractId, AuditRecord } from "@kauro/domain";
-import { AUDIT_POLICY, AUDIT_PRICE_PROFILE_HASH, DomainFailure } from "@kauro/domain";
+import { AUDIT_POLICY, AUDIT_PRICE_PROFILE_HASH, DomainFailure, effectNowOf } from "@kauro/domain";
 import type { AcceptedOutcome } from "../../commands/runtime.js";
 import { requireMembership } from "../../commands/handlers/shared.js";
 import { AUDIT_POLL_AFTER_SECONDS, START_AUDIT, type StartAuditBody, type StartAuditHandler } from "../contracts.js";
@@ -61,13 +61,14 @@ export function startAuditHandler(runtime: AuditRuntime): StartAuditHandler {
           if (!availability || availability.manifestHash === null || revision.manifestHash === undefined || availability.manifestHash !== revision.manifestHash) {
             throw new DomainFailure("INTEGRITY_FAILURE", "a sealed revision has no manifest hash its own records agree on");
           }
-          if (availability.availableUntil === null || reachedOnServer(availability.availableUntil, await uow.serverInstant())) {
-            throw new DomainFailure("SOURCE_EXPIRED", "the revision's source is no longer available");
-          }
-
-          // the target contract after its shared transition lock (source before target, D8-LOCK-1): confirmed, current, of this project
+          // the target contract after its shared transition lock (source before target, D8-LOCK-1), the last await; then the effect clock
+          // (r15/r25, B17 L1 section 4 STA): the retention is judged at that one instant, SOURCE_EXPIRED before TARGET_STALE as before
           await uow.execution.awaitTransition({ kind: "TARGET_CONTRACT", key: targetContractId });
           const target = await uow.targetContracts.get(targetContractId);
+          const now = await effectNowOf(uow);
+          if (availability.availableUntil === null || reachedOnServer(availability.availableUntil, now)) {
+            throw new DomainFailure("SOURCE_EXPIRED", "the revision's source is no longer available");
+          }
           if (!target || target.agencyId !== membership.agencyId || target.projectId !== revision.projectId || target.confirmedAt === undefined || target.supersededAt !== undefined) {
             throw new DomainFailure("TARGET_STALE", "the target contract is not confirmed and current");
           }

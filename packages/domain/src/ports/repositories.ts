@@ -323,6 +323,50 @@ export interface TargetContractRepository {
   createDraft(input: NewTargetContract): Promise<TargetContractLifecycle | null>;
   /** The DRAFT to CONFIRMED edge at `expectedVersion`: the instant is the database's; a version miss is STALE, nothing changes. */
   confirm(contractId: TargetContractId, expectedVersion: number, confirmation: { readonly membershipId: MembershipId; readonly evidenceRef: ArtifactRef }): Promise<VersionedWrite<TargetContractLifecycle>>;
+
+  // --- B17 L1: CMD019's supersession of the project's current contracts (R2-026, decision D-R3-1) ------------------------------
+  /**
+   * The project's current contracts (confirmed, not superseded) other than `except`, locked FOR NO KEY UPDATE in ascending contract_id
+   * (one statement): the contracts a confirmation of `except` supersedes.
+   */
+  lockCurrentOfProject(agencyId: AgencyId, projectId: ProjectId, except: TargetContractId): Promise<ReadonlyArray<TargetContractRecord>>;
+  /**
+   * The exclusive transition half of each listed contract, taken in ascending contract_id and held until the unit of work ends: every
+   * reader of a contract's currency (its shared half: issuance, admission, publication, StartAudit, lockCurrentByHash) is ordered with it.
+   */
+  holdTransitions(contractIds: ReadonlyArray<TargetContractId>): Promise<void>;
+  /**
+   * Every plan of the project bound to one of the listed target body hashes, FOR SHARE in ascending plan_id, taken BEFORE the exclusive
+   * halves: a reader that holds a plan row and then waits on a contract's shared half (CMD041, ApprovePlan) is ordered before the
+   * supersession instead of deadlocking with it (the re-check plan's birth references the bound plan, a FOR KEY SHARE on its row).
+   */
+  lockPlansBoundTo(agencyId: AgencyId, projectId: ProjectId, targetContractHashes: ReadonlyArray<Sha256Hex>): Promise<void>;
+  /** The APPROVED plans of the project bound to one of the listed target body hashes, with their bodies, ascending plan_id (a plain read). */
+  approvedPlansBoundTo(agencyId: AgencyId, projectId: ProjectId, targetContractHashes: ReadonlyArray<Sha256Hex>): Promise<ReadonlyArray<BoundPlan>>;
+  /** Supersedes a current contract by `by` (confirmed in this same unit of work): the instant is the database's; learned once. */
+  supersede(contractId: TargetContractId, by: TargetContractId): Promise<TargetContractRecord>;
+  /**
+   * Inserts the re-check plan of `recheckOf` as a DRAFT: its body is the re-checked plan's body with only targetContractHash replaced
+   * (the database refuses any other body and any target but the contract that superseded the re-checked plan's).
+   */
+  insertRecheckPlan(input: NewRecheckPlan): Promise<{ readonly planId: PlanId; readonly version: number; readonly bodyHash: Sha256Hex }>;
+}
+
+/** An APPROVED plan bound to a contract being superseded, as CMD019 reads it to birth its re-check plan. */
+export interface BoundPlan {
+  readonly planId: PlanId;
+  readonly version: number;
+  readonly targetContractHash: Sha256Hex;
+  readonly body: PlanBody;
+}
+
+export interface NewRecheckPlan {
+  readonly planId: PlanId;
+  readonly agencyId: AgencyId;
+  readonly projectId: ProjectId;
+  readonly recheckOfPlanId: PlanId;
+  readonly body: PlanBody;
+  readonly createdByMembershipId: MembershipId;
 }
 
 // --- plans and approvals ----------------------------------------------------------------------------------------------

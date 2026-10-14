@@ -85,6 +85,7 @@ const COMMAND_SPECIFIC: Readonly<Record<CatalogueCommandId, ReadonlyArray<Proble
     outcome("COMMAND", "PRECONDITION_FAILED", "UNLISTED_TRANSITION", "the plan's state lists no new_plan_revision edge (VALIDATING)", { current: "ALWAYS" }),
     outcome("COMMAND", "PRECONDITION_FAILED", "CONSEQUENCES_UNRECONCILED", "commercial or execution consequences of the approval are not reconciled (edge guard)", { current: "ALWAYS" }),
     outcome("COMMAND", "PRECONDITION_FAILED", "NO_SEMANTIC_CHANGE", "the patch compiles to the body the plan already has", { current: "ALWAYS" }),
+    outcome("COMMAND", "TARGET_STALE", null, "the plan's target contract was superseded (R2-026): no revision is born on it; its re-check plan is the way on"),
     outcome("COMMAND", "INVALID_REQUEST", "UNKNOWN_REFERENCE", "the decision patch artifact is not visible to the agency", { fieldCodes: ["UNKNOWN_REFERENCE"] }),
     outcome("COMMAND", "INVALID_REQUEST", "PATCH_UNKNOWN_CANDIDATE", "the typed patch names a candidate the plan does not have", { fieldCodes: ["PATCH_UNKNOWN_CANDIDATE"] }),
     outcome("COMMAND", "INVALID_REQUEST", "PATCH_UNKNOWN_FIELD", "the typed patch names a field the plan does not have", { fieldCodes: ["PATCH_UNKNOWN_FIELD"] }),
