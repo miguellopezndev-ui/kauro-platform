@@ -358,7 +358,8 @@ export interface CommerceReconciler {
 export interface CommerceEventDelivery {
   readonly eventId: EventId;
   readonly eventType: string;
-  readonly agencyId: AgencyId;
+  /** null only for the closed set of agency-less bank events the payment dispatcher delivers to PAYMENT_SERVICE (PV1-SETTLE §3.0). */
+  readonly agencyId: AgencyId | null;
   readonly aggregateId: string;
   readonly aggregateVersion: number;
   readonly payload: Readonly<Record<string, unknown>>;

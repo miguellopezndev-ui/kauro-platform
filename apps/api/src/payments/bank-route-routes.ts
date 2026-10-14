@@ -17,7 +17,7 @@
  * the instructions never carry an ETag.
  */
 import type { BankInboundHandlers, BankSettlementHandlers, BankRouteCollaborators, BankRouteHandlers, BankRouteRequest, CommandResult, CompletedResponse, Problem, SchemaValidator, UnauthenticatedRequest } from "@kauro/application";
-import { HEADERS, OPERATIONAL_ROUTES, admitEmptyRequest, admitHeaders, admitOperationalBody, operationalRouteResponses, problemOf, readTransferInstructions, repeatedHeaderNames, type CommerceRequestRuntime } from "@kauro/application";
+import { CURSOR_PATTERN, HEADERS, OPERATIONAL_ROUTES, admitEmptyRequest, admitHeaders, admitOperationalBody, operationalRouteResponses, problemOf, readTransferInstructions, repeatedHeaderNames, type CommerceRequestRuntime } from "@kauro/application";
 import type { AgencyId, Clock, CorrelationId, Environment } from "@kauro/domain";
 import { DomainFailure, IDEMPOTENCY_KEY, isUuid } from "@kauro/domain";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -38,6 +38,7 @@ export interface BankRouteRouteDependencies {
 }
 
 const REF_PATH = /^[A-Za-z0-9._:-]{1,128}$/;
+const CURSOR_SHAPE = new RegExp(CURSOR_PATTERN);
 const UUID_PATH = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function routeOf(operationId: string) {
@@ -138,7 +139,11 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
   const settlement = deps.settlement;
   if (settlement !== undefined) command("recordBankSettlement", "CMD215", (req) => settlement.record(req as never));
 
-  function read(operationId: string, run: (request: FastifyRequest<{ Params: Record<string, string> }>, correlationId: CorrelationId, path: Readonly<Record<string, string>>, headers: Readonly<Record<string, string | undefined>>) => Promise<FastifyReplyAnswer>): void {
+  function read(
+    operationId: string,
+    run: (request: FastifyRequest<{ Params: Record<string, string> }>, correlationId: CorrelationId, path: Readonly<Record<string, string>>, headers: Readonly<Record<string, string | undefined>>) => Promise<FastifyReplyAnswer>,
+    admitQuery?: (query: Readonly<Record<string, unknown>>, correlationId: CorrelationId) => Problem | null,
+  ): void {
     const route = routeOf(operationId);
     app.route<{ Params: Record<string, string> }>({
       method: route.method,
@@ -147,8 +152,12 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
       handler: async (request, r) => {
         const correlationId = request.id as CorrelationId;
         const headers = kit.singleValued(request.headers);
-        const refusal = admitEmptyRequest({ headers, repeatedHeaders: repeatedHeaderNames(request.raw.rawHeaders), correlationId, body: Buffer.isBuffer(request.body) ? request.body : null, query: request.query as Readonly<Record<string, unknown>> });
+        // a read that takes a query admits its own members (admitQuery) and nothing else; any other read takes none
+        const query = (request.query ?? {}) as Readonly<Record<string, unknown>>;
+        const refusal = admitEmptyRequest({ headers, repeatedHeaders: repeatedHeaderNames(request.raw.rawHeaders), correlationId, body: Buffer.isBuffer(request.body) ? request.body : null, query: admitQuery === undefined ? query : {} });
         if (refusal !== null) return kit.sendProblem(r, refusal.problem);
+        const queryRefusal = admitQuery?.(query, correlationId) ?? null;
+        if (queryRefusal !== null) return kit.sendProblem(r, queryRefusal);
         const path = pathIds(route.path, request.params, correlationId);
         if (isProblem(path)) return kit.sendProblem(r, path);
         return guarded(r, correlationId, async () => {
@@ -178,6 +187,28 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     };
     read("getBankCredit", (request, correlationId, path, headers) => ownerRead(headers, request, "READ_BANK_CREDIT", correlationId, (r) => inbound.getCredit({ ...r, creditId: path["creditId"]! })));
     read("getBankOrderMatchKeys", (request, correlationId, path, headers) => ownerRead(headers, request, "READ_BANK_ORDER_MATCH_KEYS", correlationId, (r) => inbound.getMatchKeys({ ...r, orderId: path["orderId"]! })));
+    // lane PV1-SETTLE two-step (§3.4, §3.5): the owner's reads of its settlement intents; the in-transit page takes one query member, the
+    // sealed cursor of a previous page (any other member, a repeated one or a cursor of another shape is refused before the read)
+    if (settlement !== undefined) {
+      read("getBankSettlementRequest", (request, correlationId, path, headers) =>
+        ownerRead(headers, request, "READ_BANK_SETTLEMENT", correlationId, (r) => settlement.get({ ...r, environment: deps.environment, accountRef: path["accountRef"]!, requestId: path["requestId"]! })),
+      );
+      read(
+        "listBankSettlementsInTransit",
+        (request, correlationId, path, headers) => {
+          const cursor = (request.query as Readonly<Record<string, unknown>>)["cursor"];
+          return ownerRead(headers, request, "READ_BANK_SETTLEMENT", correlationId, (r) => settlement.list({ ...r, environment: deps.environment, accountRef: path["accountRef"]!, cursor: typeof cursor === "string" ? cursor : null }));
+        },
+        (query, correlationId) => {
+          for (const [name, value] of Object.entries(query)) {
+            if (name !== "cursor") return problemOf(new DomainFailure("INVALID_REQUEST", "read query refused", { reason: "SCHEMA_VIOLATION", fields: [{ field: "query", code: "UNKNOWN_FIELD" }] }), correlationId);
+            if (typeof value !== "string") return problemOf(new DomainFailure("INVALID_REQUEST", "read query refused", { reason: "SCHEMA_VIOLATION", fields: [{ field: "query.cursor", code: "TYPE" }] }), correlationId);
+            if (!CURSOR_SHAPE.test(value)) return problemOf(new DomainFailure("INVALID_REQUEST", "cursor is not of the cursor's shape", { reason: "CURSOR_INVALID" }), correlationId);
+          }
+          return null;
+        },
+      );
+    }
   }
 
   read("getTransferInstructions", async (request, correlationId, path, headers) => {

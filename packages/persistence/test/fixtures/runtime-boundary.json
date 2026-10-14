@@ -559,6 +559,33 @@
           "version"
         ]
       },
+      "kauro.settlement_requests": {
+        "INSERT": [
+          "account_ref",
+          "artifact_ref",
+          "bank_available_cents",
+          "bank_transaction_id",
+          "booked_at",
+          "currency",
+          "environment",
+          "evidence_hash",
+          "fee_cents",
+          "gross_cents",
+          "held_cents",
+          "normalizer_version",
+          "observed_at",
+          "period_end",
+          "period_start",
+          "receipt_artifact_ref",
+          "receipt_evidence_hash",
+          "receipt_observed_at",
+          "received_cents",
+          "receiving_account_ref",
+          "request_id",
+          "withdrawal_id",
+          "withdrawn_cents"
+        ]
+      },
       "kauro.stage_receipts": {
         "INSERT": [
           "agency_id",
@@ -1582,6 +1609,15 @@
           "retention_id",
           "revision_id",
           "state"
+        ]
+      },
+      "kauro.settlement_requests": {
+        "UPDATE": [
+          "consumed_at",
+          "outcome",
+          "refusal_reason",
+          "review_case_id",
+          "settlement_id"
         ]
       },
       "kauro.target_contracts": {
@@ -3420,6 +3456,22 @@
       ],
       "using": "((agency_id IS NULL) AND (aggregate_kind = 'bank_route'::text) AND kauro.acting_corporate_owner())"
     },
+    "domain_events/domain_events_owner_settlement_request_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((agency_id IS NULL) AND (aggregate_kind = 'settlement_request'::text) AND kauro.acting_corporate_owner())",
+      "check": null
+    },
+    "domain_events/domain_events_owner_settlement_request_record": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "((agency_id IS NULL) AND (aggregate_kind = 'settlement_request'::text) AND (event_type = 'settlement_request.recorded.v1'::text) AND kauro.acting_corporate_owner())"
+    },
     "domain_events/domain_events_payment": {
       "check": "((agency_id = kauro.current_agency_id()) AND (aggregate_kind = ANY (ARRAY['quote'::text, 'payment_order'::text, 'payment_attempt'::text, 'capture'::text, 'commercial_authorization'::text, 'refund'::text, 'tax_document'::text, 'reconciliation_case'::text])))",
       "command": "ALL",
@@ -3443,6 +3495,22 @@
       ],
       "using": "((agency_id = kauro.current_agency_id()) AND (aggregate_kind = 'bank_transfer_instruction'::text))",
       "check": "((agency_id = kauro.current_agency_id()) AND (aggregate_kind = 'bank_transfer_instruction'::text) AND (event_type = 'bank_transfer_instruction.order_state_changed.v1'::text))"
+    },
+    "domain_events/domain_events_payment_settlement_request_outcome": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": null,
+      "check": "((agency_id IS NULL) AND (aggregate_kind = 'settlement_request'::text) AND (event_type = ANY (ARRAY['settlement_request.applied.v1'::text, 'settlement_request.refused.v1'::text])))"
+    },
+    "domain_events/domain_events_payment_settlement_request_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "((agency_id IS NULL) AND (aggregate_kind = 'settlement_request'::text))",
+      "check": null
     },
     "domain_events/domain_events_tenant": {
       "check": "(agency_id = kauro.current_agency_id())",
@@ -4217,6 +4285,22 @@
       ],
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'bank_route'::text) AND kauro.acting_corporate_owner())))"
     },
+    "outbox_records/outbox_records_owner_settlement_request_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'settlement_request'::text)))) AND kauro.acting_corporate_owner())",
+      "check": null
+    },
+    "outbox_records/outbox_records_owner_settlement_request_record": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "((EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'settlement_request'::text) AND (e.event_type = 'settlement_request.recorded.v1'::text)))) AND kauro.acting_corporate_owner())"
+    },
     "outbox_records/outbox_records_payment": {
       "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id = kauro.current_agency_id()))))",
       "command": "ALL",
@@ -4232,6 +4316,22 @@
       ],
       "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text, 'settlement'::text])))))",
       "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = ANY (ARRAY['bank_credit'::text, 'statement_import'::text, 'settlement'::text])))))"
+    },
+    "outbox_records/outbox_records_payment_settlement_request_outcome": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": null,
+      "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'settlement_request'::text) AND (e.event_type = ANY (ARRAY['settlement_request.applied.v1'::text, 'settlement_request.refused.v1'::text])))))"
+    },
+    "outbox_records/outbox_records_payment_settlement_request_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id IS NULL) AND (e.aggregate_kind = 'settlement_request'::text) AND (e.event_type = ANY (ARRAY['settlement_request.applied.v1'::text, 'settlement_request.refused.v1'::text])))))",
+      "check": null
     },
     "outbox_records/outbox_records_tenant": {
       "check": "(EXISTS ( SELECT 1\n   FROM kauro.domain_events e\n  WHERE ((e.event_id = outbox_records.event_id) AND (e.agency_id = kauro.current_agency_id()))))",
@@ -5797,6 +5897,38 @@
       ],
       "using": "(seller_id = kauro.current_seller_id())"
     },
+    "settlement_requests/settlement_requests_owner_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(kauro.acting_corporate_owner() AND (agency_id IS NULL))",
+      "check": null
+    },
+    "settlement_requests/settlement_requests_owner_record": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "(kauro.acting_corporate_owner() AND (agency_id IS NULL))"
+    },
+    "settlement_requests/settlement_requests_service_consume": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "(consumed_at IS NULL)",
+      "check": "(consumed_at IS NOT NULL)"
+    },
+    "settlement_requests/settlement_requests_service_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_payment"
+      ],
+      "using": "true",
+      "check": null
+    },
     "settlements/settlements_control_read": {
       "check": null,
       "command": "SELECT",
@@ -6856,6 +6988,9 @@
         "INSERT",
         "SELECT"
       ],
+      "kauro.settlement_requests": [
+        "SELECT"
+      ],
       "kauro.settlements": [
         "SELECT"
       ],
@@ -7561,6 +7696,9 @@
       ],
       "kauro.security_events": [
         "INSERT"
+      ],
+      "kauro.settlement_requests": [
+        "SELECT"
       ],
       "kauro.settlements": [
         "INSERT",

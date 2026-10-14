@@ -415,8 +415,9 @@ export function assembleApi(assembly: ApiAssembly): FastifyInstance {
   const bankRoutes = createBankRouteHandlers(commerceRuntime, bank);
   // the owner's inbound credit commands and CMD214's record run on the request pool (kauro_app, D-ACH-16, D-INB-CTX-1/2)
   const bankInbound = createBankInboundHandlers(commerceRuntime, bank);
-  // CMD215 (lane PV1-SETTLE): the settlement observation, with the settlement tables of its unit
-  const bankSettlement = createBankSettlementHandlers(commerceRuntime, { ...bank, settlements: (uow) => bankSettlementsOf(uow as never) });
+  // CMD215 (lane PV1-SETTLE two-step): the owner's settlement intent and its reads, with the settlement tables of its unit and the cursor
+  // key of the in-transit page; the payment service applies the intent (payments/bank-settlement-service.ts)
+  const bankSettlement = createBankSettlementHandlers(commerceRuntime, { ...bank, settlements: (uow) => bankSettlementsOf(uow as never), cursorKey });
   const commerce = createCommerceRequestHandlers(commerceRuntime, commerceCollaborators);
   // package B10: the agency lifecycle (CMD002, CMD043) on the same runtime, over the lifecycle adapter of the persistence package, B06's
   // active-work inspector and the step-up verifier

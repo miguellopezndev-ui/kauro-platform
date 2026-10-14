@@ -268,6 +268,8 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["GET", "/api/v1/operations/bank-routes/:routeId", "getBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankRoute:200" } }],
       ["GET", "/api/v1/operations/bank-credits/:creditId", "getBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankCredit:200" } }],
       ["GET", "/api/v1/operations/bank-orders/:orderId/match-keys", "getBankOrderMatchKeys", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankOrderMatchKeys:200" } }],
+      ["GET", "/api/v1/operations/bank-accounts/:accountRef/settlements/:requestId", "getBankSettlementRequest", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankSettlementRequest:200" } }],
+      ["GET", "/api/v1/operations/bank-accounts/:accountRef/settlements", "listBankSettlementsInTransit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:listBankSettlementsInTransit:200" } }],
       ["GET", "/api/v1/payment-orders/:orderId/transfer-instructions", "getTransferInstructions", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getTransferInstructions:200" } }],
       // the commission group's service routes of package B10 (mandate B10-STATEMENTS-PAYOUTS), served in every edition, synchronous
       ["POST", "/api/v1/sales/commission-periods/:periodId/close", "CloseCommissionPeriod", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD051" } }],

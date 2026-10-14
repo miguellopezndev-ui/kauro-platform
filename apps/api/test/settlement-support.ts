@@ -475,7 +475,7 @@ export async function directRequest(w: Withdrawal, over: RequestOverrides = {}, 
       agencyId: null,
       eventType: RECORDED_EVENT,
       actor: { kind: "USER", userId: owner.userId },
-      causationId: null,
+      causationId: ids.next(),
       correlationId: ids.next(),
       payload: { requestId, evidenceHash: w.settlement.evidenceHash },
     } as never);

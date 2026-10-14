@@ -150,7 +150,8 @@ APPLIED|REFUSED, reason|null, requestedAt, consumedAt|null, reviewCaseId|null, d
 account's id → 404.
 ### 3.5 In-transit page (F3, R2 15:101/15:153/15:57)
 `listBankSettlementsInTransit` GET `/api/v1/operations/bank-accounts/{accountRef}/settlements?cursor=` (same entry/action): requests with
-outcome NULL or REFUSED, (requested_at, request_id) order, ≤ 100 per page, sealed cursor bound to caller+account (cursor.ts:54/64). Item:
+outcome NULL (whatever its delivery state), or REFUSED while its SETTLEMENT_REFUSED case is not RESOLVED (coordinator decision at build:
+a REFUSED request whose case was RESOLVED, by a later apply of the same withdrawal, leaves the page; cell 21), (requested_at, request_id) order, ≤ 100 per page, sealed cursor bound to caller+account (cursor.ts:54/64). Item:
 requestId, withdrawalId, state, reason, withdrawnCents, receivedCents|null, feeCents, requestedAt, ageSeconds (SQL `kauro.effect_now() −
 requested_at`, one DB clock), delivery (PAYMENT_SERVICE outbox state of its recorded.v1: PENDING|RETRYING|DEAD_LETTER), reviewCaseId|null.
 ### 3.6 Refusal mapping

@@ -16,7 +16,8 @@ export type BankCreditRail = (typeof BANK_CREDIT_RAILS)[number];
 
 /** The credit and statement import are agency-less aggregates (platform scope); an order's bank state change is the agency's. */
 // `settlement`: the settlement observation of the route account (0017 kauro.settlements; an aggregate of its own from 0062, lane PV1-SETTLE)
-export const BANK_CREDIT_AGGREGATE_KINDS = ["bank_credit", "statement_import", "settlement"] as const;
+// `settlement_request`: the owner's recorded settlement intent the payment service applies (0071, PV1-SETTLE two-step D-SET-10)
+export const BANK_CREDIT_AGGREGATE_KINDS = ["bank_credit", "statement_import", "settlement", "settlement_request"] as const;
 export const BANK_CREDIT_EVENT_TYPES = [
   "bank_credit.drafted.v1",
   "bank_credit.received.v1",
@@ -26,6 +27,9 @@ export const BANK_CREDIT_EVENT_TYPES = [
   "statement_import.recorded.v1",
   "bank_transfer_instruction.order_state_changed.v1",
   "settlement.recorded.v1",
+  "settlement_request.recorded.v1",
+  "settlement_request.applied.v1",
+  "settlement_request.refused.v1",
 ] as const;
 export type BankCreditEventType = (typeof BANK_CREDIT_EVENT_TYPES)[number];
 
@@ -39,13 +43,20 @@ export const BANK_CREDIT_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<BankCreditEven
   "statement_import.recorded.v1": ["importId", "evidenceHash", "lines", "newLines"],
   "bank_transfer_instruction.order_state_changed.v1": ["orderId", "agencyId", "previousState", "orderState", "cause"],
   "settlement.recorded.v1": ["settlementId", "withdrawnCents", "feeCents", "receivedCents", "bankEvidence"],
+  "settlement_request.recorded.v1": ["requestId", "evidenceHash"],
+  "settlement_request.applied.v1": ["requestId", "settlementId"],
+  "settlement_request.refused.v1": ["requestId", "reason", "reviewCaseId", "withdrawnCents", "receivedCents", "feeCents"],
 });
 
-/** The payment service learns of a received and a matched credit; the owner (NOTIFICATIONS) of every credit, import and order-state change. */
+/**
+ * The payment service learns of a received and a matched credit and of a recorded settlement intent (it applies it); the owner
+ * (NOTIFICATIONS) of every credit, import, order-state change, settlement and intent outcome.
+ */
 export const BANK_CREDIT_EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: BankCreditEventType; readonly consumer: "PAYMENT_SERVICE" | "NOTIFICATIONS" }> = Object.freeze([
   ...BANK_CREDIT_EVENT_TYPES.map((eventType) => Object.freeze({ eventType, consumer: "NOTIFICATIONS" as const })),
   Object.freeze({ eventType: "bank_credit.received.v1" as const, consumer: "PAYMENT_SERVICE" as const }),
   Object.freeze({ eventType: "bank_credit.matched.v1" as const, consumer: "PAYMENT_SERVICE" as const }),
+  Object.freeze({ eventType: "settlement_request.recorded.v1" as const, consumer: "PAYMENT_SERVICE" as const }),
 ]);
 
 /** The credit as the tables hold it (money as integer cents; the payer as a digest only). */

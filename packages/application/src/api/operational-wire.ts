@@ -37,6 +37,8 @@ export const OPERATIONAL_WIRE: Readonly<Record<string, OperationalWire>> = Objec
   // Payments V1 settlement (CMD215): the owner's journaled, cookie-authenticated observation of one withdrawal (PV1-SETTLE D-SET-1)
   recordBankSettlement: entry("REQUIRED", true, "KAURO_OWNER"),
   getBankCredit: entry("NONE", false, "KAURO_OWNER"),
+  getBankSettlementRequest: entry("NONE", false, "KAURO_OWNER"),
+  listBankSettlementsInTransit: entry("NONE", false, "KAURO_OWNER"),
   getBankOrderMatchKeys: entry("NONE", false, "KAURO_OWNER"),
   retireBankCheckout: entry("REQUIRED", true, "AGENCY_BILLING", true),
   // B11 A1: the agency owner records the buyer type once (CMD101), journaled and cookie-authenticated; the agency is the path id

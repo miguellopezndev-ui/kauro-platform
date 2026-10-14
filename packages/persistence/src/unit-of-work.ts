@@ -323,6 +323,17 @@ export class PgUnitOfWork implements UnitOfWork {
     return at as UtcInstant;
   }
 
+  /**
+   * The exact effect instant of this unit of work (kauro.effect_now() to the microsecond, never rounded; PV1-SETTLE two-step §3.3 A6):
+   * what a step passes to a judgment the database makes at microseconds (kauro.settlement_request_refusal). Read once, after the locks.
+   */
+  async effectNow(): Promise<string> {
+    const r = await execute<{ at: string }>(this.client, "SELECT to_char(kauro.effect_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS at");
+    const at = r.rows[0]?.at;
+    if (at === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the server answered no effect instant");
+    return at;
+  }
+
   /** Runs the registered pre-commit checks in registration order (the factory, once the work returned). */
   async runBeforeCommit(): Promise<void> {
     for (const check of this.#beforeCommit.splice(0)) await check();
@@ -688,6 +699,12 @@ export function bankRoutesOf(uow: UnitOfWork): PgBankRoutes {
 export function effectInstantOf(uow: UnitOfWork): Promise<UtcInstant> {
   if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the effect instant is read in a commerce unit of work of @kauro/persistence");
   return uow.effectInstant();
+}
+
+/** The exact (microsecond) effect instant of a unit of work of this package (read after its locks; PV1-SETTLE two-step A6). */
+export function exactEffectNowOf(uow: UnitOfWork): Promise<string> {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the effect instant is read in a unit of work of @kauro/persistence");
+  return uow.effectNow();
 }
 
 /** The periodic pass's queries of a commerce unit of work of this package (D-PROTO-B4; stage-2 mandate M3). */

@@ -119,6 +119,9 @@ export const COMMERCE_FAILURE_REASONS = [
   "RECEIPT_MISMATCH",
   "SETTLEMENT_INCONSISTENT",
   "WITHDRAWAL_ALREADY_SETTLED",
+  // the two-step apply of a recorded settlement intent (lane PV1-SETTLE; docs/design/PV1-SETTLE-two-step.md §3.3 A7)
+  "REQUEST_STALE",
+  "EVIDENCE_MISMATCH",
 ] as const;
 
 export type CommerceFailureReason = (typeof COMMERCE_FAILURE_REASONS)[number];

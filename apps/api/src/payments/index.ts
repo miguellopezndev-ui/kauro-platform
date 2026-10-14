@@ -8,6 +8,7 @@ import type { CommandResult, ExecuteRefundBody, ExecuteRefundView, PurchaseRebin
 import type { AgencyId, Clock, Environment, IdGenerator } from "@kauro/domain";
 import type { PaymentServiceAssembly } from "./assembly.js";
 import "./bank-inbound-service.js";
+import "./bank-settlement-service.js";
 import { fiscalConsumer, financeConsumer, paymentServiceEffect, unitOfWorkEffect, type DeliveryEffect } from "./consumers.js";
 import { createPaymentDispatcher, type PaymentDispatcher } from "./dispatcher.js";
 import { sourceLineageReader } from "../edition.js";
@@ -72,7 +73,7 @@ export { AWAIT_INVOICE_SECONDS, eventTypesOf, financeConsumer, fiscalConsumer, p
 export type { ConsumerOutcome, DeliveryEffect, PaymentConsumerName } from "./consumers.js";
 export { registerBankDeliveryHandler } from "./consumers.js";
 export type { BankDeliveryHandler } from "./consumers.js";
-export { DISPATCH_LEASE_DEADLINE, DISPATCH_LEASE_SECONDS, MAX_DELIVERY_ATTEMPTS, OUTBOX_CLAIM_SECONDS, createPaymentDispatcher, leaseResourceOf } from "./dispatcher.js";
+export { AGENCY_LESS_PAYMENT_EVENT_TYPES, DISPATCH_LEASE_DEADLINE, DISPATCH_LEASE_SECONDS, MAX_DELIVERY_ATTEMPTS, OUTBOX_CLAIM_SECONDS, createPaymentDispatcher, leaseResourceOf } from "./dispatcher.js";
 export type { DispatchPass, PaymentDispatcher } from "./dispatcher.js";
 export { CLAIM_NEVER_COMMITTED, CLAIM_WINDOW_SECONDS, cancelUnclaimed } from "./sweep.js";
 export type { SweepPass } from "./sweep.js";

@@ -16,7 +16,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { PROVIDER_CALL_TIMEOUT_MS } from "@kauro/domain";
 import { fakeCreditBytes, fakeSettlementBytes } from "@kauro/application/testing";
-import { LOCK_WAIT_OBSERVATION_MS, connectionPid, openConnection, runCell, type FaultContext, type FaultKind, type HarnessConnection } from "@kauro/persistence/testing";
+import { LOCK_WAIT_OBSERVATION_MS, connectionPid, openConnection, runCell, simulatedCrashOf, type FaultContext, type FaultKind, type HarnessConnection } from "@kauro/persistence/testing";
 import type { PayoutIntentView, PeriodCloseView } from "@kauro/application";
 import { paymentServiceEffect } from "../src/payments/consumers.js";
 import { DISPATCH_LEASE_SECONDS, OUTBOX_CLAIM_SECONDS } from "../src/payments/dispatcher.js";
@@ -425,7 +425,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
           if (r.status >= 500) throw iw.w.internalErrors[seen]?.error ?? new Error(String(r.status));
           return r;
         });
-        assert.match(String(failure), new RegExp(`db\\.${at}\\.before`), `${at}: the injected step fired`);
+        assert.match(String(simulatedCrashOf(failure)?.point), new RegExp(`db\\.${at}\\.before`), `${at}: the injected step fired`);
       } finally {
         await conn.end();
       }
@@ -445,8 +445,8 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
 
   cell(t("RACE", "RACE", "two deliveries, dispatcher takeover"), "race", async (ctx) => {
     // 10(a): D1 claims and holds U1 at its settlement write (A2-A5 held); its lease and claim lapse; D2 takes over, claims, U2 blocks at A2
-    const { w, requestId } = await recorded("st3-race-takeover");
     await drain();
+    const { w, requestId } = await recorded("st3-race-takeover");
     const { rival, stale } = takeOver((Math.max(DISPATCH_LEASE_SECONDS, OUTBOX_CLAIM_SECONDS) + 1) * 1000);
     const r = await holdAndWait(
       ctx,
@@ -572,8 +572,8 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
   cell(t("RACE", "TIMEOUT", "lock timeout under the real dispatcher"), "race", async (ctx) => {
     // 11: the apply times out at A2 behind a held OUTBOUND stream: FAILED, retried later, never dead-lettered for it
     const { iw, bw } = L();
-    const { w, requestId } = await recorded("st3-timeout");
     await drain();
+    const { w, requestId } = await recorded("st3-timeout");
     const held = await holdStream(w.accountRef, "OUTBOUND");
     let pass: Awaited<ReturnType<typeof dispatchPayment>>;
     iw.faults.statementTimeoutMs = LOCK_TIMEOUT_MS;
@@ -729,8 +729,8 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
     async (ctx) => {
       // 14: the apply (and a refusal) committed, the dispatcher's settle lost: redelivery DUPLICATE, outbox DELIVERED, GET the committed state
       for (const [label, fund, step] of [["applied", undefined, SETTLEMENT_INSERT], ["refused", 0n, CASE_INSERT]] as const) {
-        const { w, requestId } = await recorded(`st3-cra-${label}`, fund === undefined ? {} : { fund });
         await drain();
+        const { w, requestId } = await recorded(`st3-cra-${label}`, fund === undefined ? {} : { fund });
         const lost = await crashedAt(ctx, `the ${label} delivery whose settle is lost`, "after-commit", step, () => dispatchPayment());
         assert.equal(lost.status, "fulfilled", `${label}: the dispatcher survived the lost answer`);
         const committed = await requestRow(requestId);
@@ -794,8 +794,8 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
 
   cell(t("DENY", "REVOCATION", "dispatcher lease taken over"), "revocation", async (ctx) => {
     // 16(b): a dispatcher whose lease was taken over finds it HELD; the intent is applied once, by the rival
-    const { w, requestId } = await recorded("st3-revoke-lease");
     await drain();
+    const { w, requestId } = await recorded("st3-revoke-lease");
     const { rival, stale } = takeOver((DISPATCH_LEASE_SECONDS + 1) * 1000);
     await ctx.revoked("the lease taken over by a rival", async () => {
       const pass = await rival.runOnce("PAYMENT_SERVICE", { limit: 100 });
@@ -836,7 +836,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
         ["INSERT a settlement", "INSERT INTO kauro.settlements (settlement_id, route_id, provider_balance_ref, currency, gross_cents, fee_cents, held_cents, withdrawn_cents, bank_available_cents, period_start, period_end, observed_at, evidence_hash, created_at) VALUES ($1, $2, $1, 'USD', 1, 0, 0, 0, 0, now(), now(), now(), $3, now())", [ids.next(), w.route.paymentRouteId, w.settlement.evidenceHash]],
         ["INSERT a ledger line", "INSERT INTO kauro.ledger_entries (entry_id, settlement_id, line_no, account_code, account_version, direction, amount_cents, currency, source_kind, source_ref, effective_at, observed_at, posted_at, evidence_hash, policy_version) VALUES ($1, $1, 1, 'BANK_CASH', 'OPS-1', 'DEBIT', 1, 'USD', 'SETTLEMENT', $1, now(), now(), now(), $2, 'B09-1')", [ids.next(), w.settlement.evidenceHash]],
         ["UPDATE the intent", "UPDATE kauro.settlement_requests SET outcome = 'APPLIED' WHERE request_id = $1", [requestId]],
-        ["INSERT applied.v1", "INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at) VALUES ($1, 'settlement_request', $2, 2, NULL, 'settlement_request.applied.v1', 'USER', $3, NULL, $1, '{}'::jsonb, $4, 1, now())", [ids.next(), requestId, L().owner.userId, w.settlement.evidenceHash]],
+        ["INSERT applied.v1", "INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at) VALUES ($1, 'settlement_request', $2, 1, NULL, 'settlement_request.applied.v1', 'USER', $3, NULL, $1, '{}'::jsonb, $4, 1, now())", [ids.next(), requestId, L().owner.userId, w.settlement.evidenceHash]],
         ["UPDATE its outbox record", "UPDATE kauro.outbox_records SET state = 'DELIVERED', delivered_at = now() WHERE event_id = $1", [eventId]],
         ["EXECUTE route_provider_available_cents", "SELECT kauro.route_provider_available_cents($1, 'USD')", [w.route.paymentRouteId]],
         ["EXECUTE settlement_request_refusal", "SELECT kauro.settlement_request_refusal($1, now(), interval '900 seconds')", [requestId]],
@@ -875,7 +875,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
       const conn = await openPay();
       try {
         const failure = await ctx.partial(`the apply failing at ${at}`, `db.${at}.before`, () => routed(ctx, conn, () => deliver(requestId), steps));
-        assert.match(String(failure), new RegExp(`db\\.${at}\\.before`), `${at}: the injected step fired`);
+        assert.match(String(simulatedCrashOf(failure)?.point), new RegExp(`db\\.${at}\\.before`), `${at}: the injected step fired`);
       } finally {
         await conn.end();
       }
@@ -893,7 +893,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
       const conn = await openPay();
       try {
         const failure = await ctx.partial(`the refusal failing at ${at}`, `db.${at}.before`, () => routed(ctx, conn, () => deliver(r.requestId), refusalSteps));
-        assert.match(String(failure), new RegExp(`db\\.${at}\\.before`), `(r) ${at}: the injected step fired`);
+        assert.match(String(simulatedCrashOf(failure)?.point), new RegExp(`db\\.${at}\\.before`), `(r) ${at}: the injected step fired`);
       } finally {
         await conn.end();
       }
@@ -967,7 +967,7 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
     // 20(a) an inflated frozen figure; (b) a changed withdrawn figure and another account's artifact: EVIDENCE_MISMATCH, case, no money
     const cases: ReadonlyArray<readonly [string, (w: Withdrawal, other: Withdrawal) => Record<string, string | null>]> = [
       ["bank_available_cents inflated", (w) => ({ bank_available_cents: (w.facts.bankAvailableCents + 1n).toString() })],
-      ["withdrawn_cents changed", (w) => ({ withdrawn_cents: (w.withdrawnCents - 1n).toString() })],
+      ["withdrawn_cents changed", (w) => ({ withdrawn_cents: (w.withdrawnCents + 1n).toString() })],
       ["another account's artifact", (_w, other) => ({ artifact_ref: other.settlement.artifactRef, evidence_hash: other.settlement.evidenceHash, withdrawal_id: other.withdrawalId, receipt_artifact_ref: other.receipt!.artifactRef, receipt_evidence_hash: other.receipt!.evidenceHash, bank_transaction_id: other.bankTransactionId, receiving_account_ref: other.receivingAccountRef })],
     ];
     for (const [what, over] of cases) {
@@ -982,8 +982,8 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
       assert.deepEqual([fp.settlements, fp.ledger], [[], []], `${what}: no settlement, no posting`);
     }
     // 20(c): the store not bound: CAPACITY_UNAVAILABLE, retried, never refused
-    const { w, requestId } = await recorded("st3-evidence-unbound");
     await drain();
+    const { w, requestId } = await recorded("st3-evidence-unbound");
     const pass = await dispatchPayment({ bank: false });
     const d = await deliveryIn(pass, requestId);
     assert.deepEqual([d.outcome, d.errorCode], ["FAILED", "CAPACITY_UNAVAILABLE"], "an unbound store is capacity, not evidence");
@@ -996,8 +996,8 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
   test("OK SET-M-ST3-CASE (refusal case and the in-transit page): Apply settlement request", async () => {
     // 21: a refusal opens SETTLEMENT_REFUSED; the page lists RECORDED and REFUSED with its figures and age; re-record + apply resolves it
     const no = await recorded("st3-case-refused", { fund: 0n });
-    const pending = await recorded("st3-case-pending", { route: no.w.route, receivedCents: null });
     assert.equal(await deliver(no.requestId), "APPLIED");
+    const pending = await recorded("st3-case-pending", { route: no.w.route, receivedCents: null });
     const refused = await requestRow(no.requestId);
     const [c] = await q<{ id: string; k: string; s: string; sk: string; si: string; d: string; e: string | null }>("SELECT case_id::text AS id, kind AS k, state AS s, source_kind AS sk, source_id::text AS si, detail_code AS d, evidence_hash AS e FROM kauro.bank_review_cases WHERE account_ref = $1", [no.w.accountRef]);
     assert.deepEqual([c?.k, c?.s, c?.sk, c?.si, c?.d, c?.e], ["SETTLEMENT_REFUSED", "OPEN", "SETTLEMENT_REQUEST", no.requestId, "FUNDS_UNAVAILABLE", no.w.settlement.evidenceHash], "the case names the intent, its reason and its evidence");
