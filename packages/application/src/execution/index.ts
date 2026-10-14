@@ -9,20 +9,22 @@ export type {
   ExecuteProjectHandler,
   CancelJobBody,
   CancelJobHandler,
+  AuthorizeDownloadBody,
+  AuthorizeDownloadHandler,
   ExecutionCommandId,
   ExecutionHandlers,
   ExecutionRouteId,
   ExecutionRouteSpec,
 } from "./contracts.js";
-export { EXECUTE_PROJECT, CANCEL_JOB, EXECUTE_POLL_AFTER_SECONDS, EXECUTION_COMMANDS, EXECUTION_ROUTES } from "./contracts.js";
+export { EXECUTE_PROJECT, CANCEL_JOB, AUTHORIZE_DOWNLOAD, EXECUTE_POLL_AFTER_SECONDS, EXECUTION_COMMANDS, EXECUTION_ROUTES } from "./contracts.js";
 export type { ExecutionRequestSchemaCommand, ExecutionRequestSchemaId } from "./request-schemas.js";
-export { EXECUTION_REQUEST_SCHEMAS, EXECUTION_REQUEST_SCHEMA_IDS } from "./request-schemas.js";
-export type { ActiveProviderState, ExecutionResourceAction, JobView } from "./views.js";
+export { DOWNLOAD_MAX_ARTIFACTS, EXECUTION_REQUEST_SCHEMAS, EXECUTION_REQUEST_SCHEMA_IDS } from "./request-schemas.js";
+export type { ActiveProviderState, DownloadArtifactView, DownloadGrantView, DownloadView, ExecutionResourceAction, JobView } from "./views.js";
 export { ACTIVE_PROVIDER_STATES, EXECUTION_RESOURCE_ACTIONS } from "./views.js";
 export { EXECUTION_COMMAND_OUTCOMES, EXECUTION_ROUTE_OUTCOMES } from "./outcomes.js";
 export { EXECUTION_COMMAND_RESPONSES, EXECUTION_VIEW_DEFINITIONS } from "./response-views.js";
 export { EXECUTION_READ_ROUTES } from "./read-specs.js";
-export type { ExecutionReadHandlers, ExecutionReadRuntime, ExecutionRuntime } from "./handlers/index.js";
+export type { ExecutionHandlerOptions, ExecutionReadHandlers, ExecutionReadRuntime, ExecutionRuntime } from "./handlers/index.js";
 export { createExecutionHandlers, createExecutionReadHandlers } from "./handlers/index.js";
 export { activeProviderStateOf, jobActions, jobView } from "./handlers/projections.js";
 export { EXECUTION_SWEEPERS } from "./pipeline-contracts.js";

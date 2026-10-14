@@ -4,14 +4,19 @@
  * of work).
  */
 import type { ExecutionHandlers } from "../contracts.js";
+import { authorizeDownloadHandler, type AuthorizeDownloadOptions } from "./authorize-download.js";
 import { cancelJobHandler } from "./cancel-job.js";
 import { executeProjectHandler } from "./execute-project.js";
 import type { ExecutionRuntime } from "./shared.js";
 
-export function createExecutionHandlers(runtime: ExecutionRuntime): ExecutionHandlers {
+/** What the execution handlers are built with beside the runtime: CMD038's read signer (B16 lane L5; unbound: CMD038 refuses). */
+export type ExecutionHandlerOptions = AuthorizeDownloadOptions;
+
+export function createExecutionHandlers(runtime: ExecutionRuntime, options: ExecutionHandlerOptions = {}): ExecutionHandlers {
   return Object.freeze({
     CMD036: executeProjectHandler(runtime),
     CMD037: cancelJobHandler(runtime),
+    CMD038: authorizeDownloadHandler(runtime, options),
   });
 }
 

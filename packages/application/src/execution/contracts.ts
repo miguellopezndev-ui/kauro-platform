@@ -10,7 +10,7 @@
 import type { JobState } from "@kauro/domain";
 import type { CommandResult } from "../api/envelope.js";
 import type { CommandHandler, CommandSpec } from "../ports/command-handler.js";
-import type { JobView } from "./views.js";
+import type { DownloadView, JobView } from "./views.js";
 
 function spec<Body>(s: CommandSpec<Body>): CommandSpec<Body> {
   return Object.freeze(s);
@@ -71,15 +71,45 @@ export const CANCEL_JOB: CommandSpec<CancelJobBody> = spec<CancelJobBody>({
 });
 export type CancelJobHandler = CommandHandler<CancelJobBody, JobView>;
 
+// --- CMD038 AuthorizeDownload (package B16 lane L5) ------------------------------------------------------------------------------
+
+export interface AuthorizeDownloadBody {
+  /** The delivery copies to grant (stored object ids of the package's delivery artifacts), at least one, each once; answered in this order. */
+  readonly artifactIds: ReadonlyArray<string>;
+  /** A fresh step-up of the requester: a download is a disclosure of the customer's data. */
+  readonly assuranceProofRef: string;
+}
+/**
+ * AuthorizeDownload answers 201 with the grant: short-lived read URLs bound to the requester, valid until expiresAt =
+ * least(issue + 900 s, the governing retention deadline). The journal stores the grant without its URLs (bearer secrets); every answer,
+ * first or replayed, re-signs the same scope at the same expiry after re-checking the membership, the package, the project and the record.
+ */
+export const AUTHORIZE_DOWNLOAD: CommandSpec<AuthorizeDownloadBody> = spec<AuthorizeDownloadBody>({
+  id: "CMD038",
+  name: "AuthorizeDownload",
+  method: "POST",
+  path: "/api/v1/packages/{packageId}/download-authorizations",
+  role: "AGENCY_READER",
+  scope: "AGENCY_HEADER",
+  aggregateParam: "packageId",
+  expectedVersionRequired: false,
+  stepUpRequired: true,
+  authorityHashFields: [],
+  fields: ["artifactIds", "assuranceProofRef"],
+});
+export type AuthorizeDownloadHandler = CommandHandler<AuthorizeDownloadBody, DownloadView>;
+
 export const EXECUTION_COMMANDS = Object.freeze({
   CMD036: EXECUTE_PROJECT,
   CMD037: CANCEL_JOB,
+  CMD038: AUTHORIZE_DOWNLOAD,
 } as const);
 export type ExecutionCommandId = keyof typeof EXECUTION_COMMANDS;
 
 export interface ExecutionHandlers {
   readonly CMD036: ExecuteProjectHandler;
   readonly CMD037: CancelJobHandler;
+  readonly CMD038: AuthorizeDownloadHandler;
 }
 
 // --- the read ------------------------------------------------------------------------------------------------------------------

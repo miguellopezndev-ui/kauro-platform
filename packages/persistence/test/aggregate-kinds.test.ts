@@ -37,10 +37,12 @@ let carolInA: string;
  */
 // package B08's kinds (processing_job, package_version; audit, cost_grant) bind through the same unchanged function and are walked by
 // its own schema tests (execution-migrations.test.ts, execution-adapters.test.ts; audit-migrations.test.ts, audit-adapters.test.ts)
-type WalkedKind = Exclude<AggregateKind, (typeof COMMERCE_AGGREGATE_KINDS)[number] | (typeof EXECUTION_AGGREGATE_KINDS)[number] | (typeof AUDIT_AGGREGATE_KINDS)[number] | (typeof BANK_ROUTE_AGGREGATE_KINDS)[number] | (typeof BANK_CREDIT_AGGREGATE_KINDS)[number]>;
+/** Kinds walked by their own command's tests (B16 L5: download_authorization, by apps/api/test/cmd038-authorize-download.test.ts). */
+const WALKED_ELSEWHERE = ["download_authorization"] as const;
+type WalkedKind = Exclude<AggregateKind, (typeof COMMERCE_AGGREGATE_KINDS)[number] | (typeof EXECUTION_AGGREGATE_KINDS)[number] | (typeof AUDIT_AGGREGATE_KINDS)[number] | (typeof BANK_ROUTE_AGGREGATE_KINDS)[number] | (typeof BANK_CREDIT_AGGREGATE_KINDS)[number] | (typeof WALKED_ELSEWHERE)[number]>;
 const WALKED_KINDS: ReadonlyArray<WalkedKind> = AGGREGATE_KINDS.filter(
   (k): k is WalkedKind =>
-    !(COMMERCE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(EXECUTION_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(AUDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_ROUTE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_CREDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k),
+    !(COMMERCE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(EXECUTION_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(AUDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_ROUTE_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(BANK_CREDIT_AGGREGATE_KINDS as ReadonlyArray<string>).includes(k) && !(WALKED_ELSEWHERE as ReadonlyArray<string>).includes(k),
 );
 const ofA = new Map<WalkedKind, { readonly id: string; readonly version: number }>();
 
@@ -83,6 +85,8 @@ const TABLE_OF: Readonly<Record<AggregateKind, readonly [table: string, idColumn
   // Payments V1 inbound credits (0063, lane PV1-INBOUND)
   bank_credit: ["bank_credits", "bank_credit_id"],
   statement_import: ["statement_imports", "import_id"],
+  // package B16 lane L5 (0074, provisional): one download authorization per CMD038 grant
+  download_authorization: ["download_authorizations", "authorization_id"],
 });
 
 // every runtime login of this branch: B06 five, package B09's payment service and package B10's commission service

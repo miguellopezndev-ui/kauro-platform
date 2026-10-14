@@ -169,6 +169,8 @@ test("R23: every served route declares its replies (the route inventory the Open
       // the two execution commands (B08 design §12): ExecuteProject answers the shared ACCEPTED envelope, CancelJob the job
       ["POST", "/api/v1/projects/:projectId/execute", "ExecuteProject", { 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
       ["POST", "/api/v1/jobs/:jobId/cancel", "CancelJob", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD037" } }],
+      // package B16 L5 (CMD038): a grant of short-lived read URLs over an AVAILABLE package's delivery copies, synchronous
+      ["POST", "/api/v1/packages/:packageId/download-authorizations", "AuthorizeDownload", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD038" } }],
       // the target contract commands (B17): CMD018 creates a DRAFT version (201), CMD019 confirms it (200)
       ["POST", "/api/v1/projects/:projectId/target-contracts", "CreateTargetContract", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD018" } }],
       ["POST", "/api/v1/target-contracts/:contractId/confirm", "ConfirmTargetContract", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD019" } }],

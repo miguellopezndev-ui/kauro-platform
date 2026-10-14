@@ -252,6 +252,12 @@
           "kind"
         ]
       },
+      "kauro.download_authorizations": {
+        "UPDATE": [
+          "sign_state",
+          "signed_at"
+        ]
+      },
       "kauro.execution_capacity": {
         "SELECT": [
           "active_jobs",
@@ -3332,6 +3338,14 @@
       ],
       "using": "((kauro.current_agency_id() IS NULL) OR (agency_id = kauro.current_agency_id()))"
     },
+    "delivery_artifacts/delivery_artifacts_tenant_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": null
+    },
     "dispatch_liabilities/dispatch_liabilities_control": {
       "check": "true",
       "command": "ALL",
@@ -3475,6 +3489,38 @@
         "kauro_app"
       ],
       "using": null
+    },
+    "download_authorization_artifacts/download_authorization_artifacts_tenant": {
+      "command": "ALL",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": "(agency_id = kauro.current_agency_id())"
+    },
+    "download_authorizations/download_authorizations_tenant_insert": {
+      "command": "INSERT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": null,
+      "check": "((agency_id = kauro.current_agency_id()) AND (user_id = kauro.current_user_id()))"
+    },
+    "download_authorizations/download_authorizations_tenant_read": {
+      "command": "SELECT",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "(agency_id = kauro.current_agency_id())",
+      "check": null
+    },
+    "download_authorizations/download_authorizations_tenant_sign": {
+      "command": "UPDATE",
+      "roles": [
+        "kauro_app"
+      ],
+      "using": "((agency_id = kauro.current_agency_id()) AND (user_id = kauro.current_user_id()))",
+      "check": "((agency_id = kauro.current_agency_id()) AND (user_id = kauro.current_user_id()))"
     },
     "end_clients/end_clients_tenant": {
       "check": "(agency_id = kauro.current_agency_id())",
@@ -6535,12 +6581,23 @@
       "kauro.decision_artifacts": [
         "SELECT"
       ],
+      "kauro.delivery_artifacts": [
+        "SELECT"
+      ],
       "kauro.domain_events": [
         "INSERT",
         "SELECT"
       ],
       "kauro.domain_events_sequence_seq": [
         "USAGE"
+      ],
+      "kauro.download_authorization_artifacts": [
+        "INSERT",
+        "SELECT"
+      ],
+      "kauro.download_authorizations": [
+        "INSERT",
+        "SELECT"
       ],
       "kauro.end_clients": [
         "INSERT",

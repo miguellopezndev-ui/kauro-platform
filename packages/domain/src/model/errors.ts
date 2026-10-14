@@ -130,6 +130,17 @@ export const RETENTION_EXTENSION_FAILURE_REASONS = [
   "NO_EXTENSION_ROOM",
 ] as const;
 
+/** The refusals of CMD038 AuthorizeDownload (package B16 lane L5; R2-048, S048), appended after the retention-extension reasons. */
+export const DOWNLOAD_FAILURE_REASONS = [
+  "ARTIFACT_NOT_FOUND",
+  "ARTIFACT_UNAVAILABLE",
+  "PACKAGE_NOT_AVAILABLE",
+  "MEMBERSHIP_CHANGED",
+  "SIGNING_UNCERTAIN",
+  "DOWNLOAD_SIGNER_UNAVAILABLE",
+  "DOWNLOAD_AUTHORIZATION_EXPIRED",
+] as const;
+
 export const FAILURE_REASONS = [
   // authorization (08 "Identity is not permission")
   "SUBJECT_UNAUTHENTICATED",
@@ -329,6 +340,8 @@ export const FAILURE_REASONS = [
   ...RECOVERY_FAILURE_REASONS,
   // the one soft-deadline extension of a project (package B16 lane L2: CMD060 RequestRetentionExtension; R2-123, R2-124)
   ...RETENTION_EXTENSION_FAILURE_REASONS,
+  // download authorizations (package B16 lane L5: CMD038 AuthorizeDownload; R2-048, S048)
+  ...DOWNLOAD_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 
