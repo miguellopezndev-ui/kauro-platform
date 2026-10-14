@@ -21,7 +21,7 @@ import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { R2_DOMAIN_ALIASES } from "@kauro/contracts";
 import { PUBLIC_COPY } from "../src/copy/public.ts";
-import { HEALTH_CHECK_CTA, IN_HOUSE_SENTENCE, PERMITTED_AI_SENTENCE, lintText } from "../src/copy/lint.ts";
+import { HEALTH_CHECK_CTA, PERMITTED_AI_SENTENCE, lintText } from "../src/copy/lint.ts";
 import { parsePublication, UNAVAILABLE, type Publication } from "../src/public/capabilities.ts";
 import { DESTINATIONS, RECORD_BANDS, TIMINGS } from "../src/public/inquiry.ts";
 import { HelpPage } from "../src/public/pages/help.tsx";
@@ -211,7 +211,6 @@ test("Home: the job line, one call to action, the sample and pricing beside it, 
   assert.ok(text.indexOf(HEALTH_CHECK_CTA) < ai, "the call to action comes before it");
   assert.equal(headings(html).some((heading) => /\bAI\b/.test(heading.text)), false, "no AI in a headline");
   for (const claim of ["never connects to or changes a live CRM", "does not connect to, change or delete records in a live CRM", "prepared for import, and never as imported"]) assert.ok(text.includes(claim), claim);
-  assert.doesNotMatch(text, /\bIn-house\b/, "the in-house sentence is on Pricing only");
 });
 
 test("Home lists the services the publication lists, and says so plainly when it lists none or cannot be read", () => {
@@ -331,10 +330,10 @@ test("Pricing: every price is an indicative band until the server quotes, tax is
   assert.doesNotMatch(text, /\b(save|saving|savings|discount of|% off your project)\b/i, "no savings claim, only the repeat discount on a new quote");
 });
 
-test("Pricing: the in-house sentence appears exactly once and the repeat discounts are the policy's tiers over its lookback window", () => {
+test("Pricing: the company sentence says a company buys at the same prices and discounts, and the repeat discounts are the policy's tiers over its lookback window", () => {
   const html = page("pricing").html(ALL);
   const text = textOf(html);
-  assert.equal(count(text, IN_HOUSE_SENTENCE), 1);
+  assert.equal(count(text, "Companies preparing their own CRM data can buy Kauro directly, at the same prices and discounts as agencies."), 1);
   const table = [...html.matchAll(/<table[\s\S]*?<\/table>/g)].map((match) => match[0])[1] ?? "";
   const rows = [...table.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map((match) => [...(match[1] ?? "").matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((cell) => textOf(cell[1] ?? "")));
   assert.deepEqual(rows, [["Qualifying projects", "Discount on the new quote"], ["1 to 9 projects", "5%"], ["10 to 24 projects", "10%"], ["25 or more projects", "15%"]]);
@@ -446,7 +445,7 @@ test("Contact: a labelled fit form with the buyer-type question, the api's vocab
   assert.match(html, /<fieldset[^>]*>\s*<legend>Who will use Kauro\?<\/legend>/);
   assert.deepEqual([...html.matchAll(/<input[^>]*type="radio"[^>]*value="([^"]*)"/g)].map((match) => match[1]), ["agency", "in-house"]);
   assert.match(text, /An agency preparing data for clients/);
-  assert.match(text, /An in-house team working on our own company's data/);
+  assert.match(text, /A company working on its own data/);
   const options = (name: string): string[] => [...((new RegExp(`<select[^>]*name="${name}"[\\s\\S]*?</select>`).exec(html)?.[0] ?? "").matchAll(/<option[^>]*value="([^"]*)"/g))].map((match) => match[1] ?? "");
   assert.deepEqual(options("destination"), ["", ...DESTINATIONS]);
   assert.deepEqual(options("recordBand"), ["", ...RECORD_BANDS.map((band) => band.value)]);

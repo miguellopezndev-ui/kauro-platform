@@ -82,29 +82,31 @@ repositories or unpaid model services.
 
 ### 6.3. Leads and prospects
 
-- **Data subjects:** people who fill in the site's contact form, and people at **agencies** who authorized Kauro to contact
-  them.
+- **Data subjects:** people who fill in the site's contact form, and people at **prospect organizations** (agencies and
+  companies) who authorized Kauro to contact them.
 - **Data:** from the form: name, email and company, buyer type, target, approximate record band and desired date (the form
-  accepts no CRM files). From prospect agencies, **organization data only**: agency name, domain, country, source and date of
-  observation, bounded commercial notes without data of individuals, opt-out status and, as a contact channel, only an email or
-  phone that meets **all three facts** of section 6.3.1. Any data of an individual (name, title, email, phone) is processed
-  **only after that person authorizes** the processing, and Kauro keeps the proof.
+  accepts no CRM files). From prospect organizations (agencies and companies), **organization data only**: organization
+  name, domain, country, source and date of observation, bounded commercial notes without data of individuals, opt-out
+  status and, as a contact channel, only an email or phone that meets **all three facts** of section 6.3.1. Any data of an
+  individual (name, title, email, phone) is processed **only after that person authorizes** the processing, and Kauro keeps the
+  proof.
 - **6.3.1. When a channel is the organization's.** An email or phone is organization data, and not personal data, only if all
   three of the following facts are met, verified and recorded, never inferred from the shape of the email or number: (a) the
   organization itself, which is a legal entity, publishes it as its commercial contact channel, and Kauro keeps the evidence
   (web address, date and capture); (b) it does not identify or cannot be attributed to a natural person: it does not contain a
-  person's name, the agency is not a sole-trader merchant or a one-person business, and the number is not a mobile or personal
+  person's name, the organization is not a sole-trader merchant or a one-person business, and the number is not a mobile or personal
   line; and (c) Kauro re-verifies (a) and (b) each time it is about to use it. If any of the three fails or cannot be determined,
   the channel is **personal data** and requires prior authorization. The same rule applies to each imported field, to the source
   reference and to the notes.
-- **Purposes:** answer requests; assess whether the project fits the service; contact the agency through its organization
+- **Purposes:** answer requests; assess whether the project fits the service; contact the organization through its organization
   channels (section 6.3.1) to present the service and, if a person wants to continue the conversation, ask for authorization;
   send commercial communications only under section 17; and record opt-outs to always respect them.
-- **Limits:** Kauro prospects only agencies. It never researches, records as a prospect or contacts for sale companies that are
-  not agencies or their in-house teams, or the end clients of its agency customers. **It does not collect from websites,
-  directories or social networks names, named emails or direct phones of individuals to prospect them.** It does not use the
-  data in its customers' CRM files for commercial purposes.
-<!-- auth: 02 §1 Discover and qualify fit; 12 §Prospect record (contact person "where appropriate": restricted by the coordinator's decisions of 2026-10-06, CHECKLIST S-22); 18 §Prospect qualification; 18 §Communication compliance ("Publicly available contact details do not automatically authorize every use"); 16 §Offer and buyer fit; A3 §3.7 · law: C-04, C-06, C-19 (Ley 1581 arts. 3 lit. c, 9 and 10; SIC Circular 002 de 2024, instruction IX; SIC, concept file 23-571469 (corporate data of a legal entity)) · CHECKLIST A-13 -->
+- **Limits:** Kauro prospects only organizations (agencies and companies), never individuals for their personal use. It never
+  researches, records as a prospect or contacts for sale the end clients of its agency customers, and never uses information
+  received from an agency customer to do so. **It does not collect from websites, directories or social networks names, named
+  emails or direct phones of individuals to prospect them.** It does not use the data in its customers' CRM files for commercial
+  purposes.
+<!-- auth: 02 §1 Discover and qualify fit; 12 §Prospect record (contact person "where appropriate": restricted by the coordinator's decisions of 2026-10-06, CHECKLIST S-22); 18 §Prospect qualification; 18 §Communication compliance ("Publicly available contact details do not automatically authorize every use"); 16 §Offer and buyer fit; A3 §3.7 as superseded in part by D-33 (docs/authority/decisions/2026-10-13-COMMERCIAL-SCOPE.md; wording changed 2026-10-13, pending competent review, D-31) · law: C-04, C-06, C-19 (Ley 1581 arts. 3 lit. c, 9 and 10; SIC Circular 002 de 2024, instruction IX; SIC, concept file 23-571469 (corporate data of a legal entity)) · CHECKLIST A-13 -->
 
 ### 6.4. Commercial collaborators and providers
 
@@ -146,7 +148,7 @@ Policy and the Privacy Notice; or a signed document when contracting collaborato
 8.2. Authorization is not required in the cases of article 10 of Ley 1581 de 2012, among them data of a public nature and
 information required by an authority in the exercise of its functions. Data accessible to the public, for example on a website,
 is not for that reason of a public nature; therefore Kauro does not process data of contact persons for prospecting without their
-authorization (section 6.3). The authorization of a person at a prospect agency is obtained when that person fills in the contact
+authorization (section 6.3). The authorization of a person at a prospect organization is obtained when that person fills in the contact
 form themselves, or when they respond in writing to a first message sent to an organization channel that meets section 6.3.1
 and that asks for that authorization; Kauro keeps the response as proof.
 <!-- law: C-04, C-05, C-06, C-19 (Ley 1581 arts. 9 and 10; Decreto 1074 arts. 2.2.2.25.2.2, 2.2.2.25.2.4 and 2.2.2.25.2.5; SIC Circular Externa 002 de 2024, instruction IX) · CHECKLIST A-13, S-22 -->
@@ -281,8 +283,8 @@ before using them.
 ## 17. Commercial communications
 
 17.1. **To whom.** Kauro sends commercial communications only (a) to users and leads who authorized them separately (section 8.3),
-through the channels they authorized; (b) to the channels of a prospect agency that meet the three facts of section 6.3.1,
-verified again before sending; and (c) to people at an agency who authorized that contact. It never obliges anyone to accept
+through the channels they authorized; (b) to the channels of a prospect organization that meet the three facts of section 6.3.1,
+verified again before sending; and (c) to people at an agency or company who authorized that contact. It never obliges anyone to accept
 advertising to obtain the service.
 
 17.2. **CRC Excluded Numbers Registry.** Before each commercial sending by email, call, SMS or messaging to recipients in

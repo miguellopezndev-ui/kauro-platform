@@ -7,7 +7,8 @@
 // what is written here: the free step is the "Free data health check" (never an audit or a diagnosis), one call to action, one AI sentence
 // on Home and none in a headline, CLEAN beside the two qualified modes without a compatibility claim, "another CRM" and never a third-party
 // CRM name, a mode named as qualified only when the capability publication lists it (those sentences are chosen at render time from the
-// published modes, see src/public/capabilities.ts), one in-house sentence on Pricing, no savings amount, and the founding line absent.
+// published modes, see src/public/capabilities.ts), no savings amount, and the founding line absent. Agencies and companies buy on the
+// same terms (D-33), so a line about who may buy, who gets a discount or whose data is protected names any customer.
 //
 // Ids whose last segment is title, heading, label, cta, offer, subject or name are surfaces: no AI word is allowed in them (lint.ts).
 // The one catalogue of the application (src/copy/en.ts EN, merged at the stage-1 integration) is W3's entries and these, by key prefix.
@@ -36,7 +37,7 @@ export const PUBLIC_COPY = {
   // ---- names shared with the application ----------------------------------------------------------------------------------------------
   "health-check.title": "Free data health check",
   "public.cta.request-health-check.cta": "Request a free data health check",
-  "pricing.in-house.body": "In-house CRM and data teams can use Kauro too.",
+  "pricing.in-house.body": "Companies preparing their own CRM data can buy Kauro directly, at the same prices and discounts as agencies.",
 
   // ---- UI01 Home ----------------------------------------------------------------------------------------------------------------------
   "home.meta.title": "Kauro: prepare and verify CRM data from files",
@@ -257,7 +258,7 @@ export const PUBLIC_COPY = {
   "contact.form.noscript": "This form needs JavaScript to send your inquiry.",
   "contact.buyer.legend": "Who will use Kauro?",
   "contact.buyer.agency": "An agency preparing data for clients",
-  "contact.buyer.in-house": "An in-house team working on our own company's data",
+  "contact.buyer.in-house": "A company working on its own data",
   "contact.name.label": "Your name",
   "contact.email.label": "Work email",
   "contact.company.label": "Company",

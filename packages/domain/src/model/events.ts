@@ -11,6 +11,7 @@
 import type { DomainEvent, Id, Sha256Hex, UtcInstant } from "@kauro/contracts";
 import { canonicalBytes, isSha256Hex, rawDigest } from "@kauro/contracts";
 import { COMMERCE_AGGREGATE_KINDS, COMMERCE_CONSUMERS, COMMERCE_EVENT_PAYLOAD_ALLOWLIST, COMMERCE_EVENT_SUBSCRIPTIONS, COMMERCE_EVENT_TYPES } from "../commerce/events.js";
+import { BANK_CREDIT_AGGREGATE_KINDS, BANK_CREDIT_EVENT_PAYLOAD_ALLOWLIST, BANK_CREDIT_EVENT_SUBSCRIPTIONS, BANK_CREDIT_EVENT_TYPES } from "../commerce/bank-credit.js";
 import { BANK_ROUTE_AGGREGATE_KINDS, BANK_ROUTE_EVENT_PAYLOAD_ALLOWLIST, BANK_ROUTE_EVENT_SUBSCRIPTIONS, BANK_ROUTE_EVENT_TYPES } from "../commerce/bank-route.js";
 import { COMMERCIAL_EVENT_PAYLOAD_ALLOWLIST, COMMERCIAL_EVENT_SUBSCRIPTIONS, COMMERCIAL_EVENT_TYPES } from "../commercial/events.js";
 import { EXECUTION_AGGREGATE_KINDS, EXECUTION_CONSUMERS, EXECUTION_EVENT_PAYLOAD_ALLOWLIST, EXECUTION_EVENT_SUBSCRIPTIONS, EXECUTION_EVENT_TYPES } from "./execution/events.js";
@@ -103,6 +104,8 @@ export const EVENT_TYPES = [
   ...COMMERCIAL_EVENT_TYPES,
   // Payments V1 bank-transfer route (commerce/bank-route.ts; migration 0046, lane L-ROUTE)
   ...BANK_ROUTE_EVENT_TYPES,
+  // Payments V1 inbound credits (commerce/bank-credit.ts; migration 0063, lane PV1-INBOUND)
+  ...BANK_CREDIT_EVENT_TYPES,
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -114,7 +117,7 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * 0012; B09: the commerce kinds, registered by migrations 0013..0017; B08: processing_job and package_version, registered by
  * migrations 0021 and 0022, and audit and cost_grant, registered by migration 0023; B11: support_case, registered by migration 0026, and agency_buyer_type, registered by migration 0062).
  */
-export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS, "support_case", ...BANK_ROUTE_AGGREGATE_KINDS, "agency_buyer_type"] as const;
+export const AGGREGATE_KINDS = ["agency", "membership", "end_client", "project", "dataset_revision", "plan", "approval", "upload_session", "source_file", "retention_record", ...COMMERCE_AGGREGATE_KINDS, ...EXECUTION_AGGREGATE_KINDS, ...AUDIT_AGGREGATE_KINDS, "support_case", ...BANK_ROUTE_AGGREGATE_KINDS, "agency_buyer_type", ...BANK_CREDIT_AGGREGATE_KINDS] as const;
 export type AggregateKind = (typeof AGGREGATE_KINDS)[number];
 
 /** Keys each event type may carry (07: references and safe counts only). */
@@ -193,6 +196,7 @@ export const EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<EventType, ReadonlyArray<s
   ...COMMERCIAL_EVENT_PAYLOAD_ALLOWLIST,
   // Payments V1 bank-transfer route (commerce/bank-route.ts): references, hashes and tokens only
   ...BANK_ROUTE_EVENT_PAYLOAD_ALLOWLIST,
+  ...BANK_CREDIT_EVENT_PAYLOAD_ALLOWLIST,
 });
 
 /**
@@ -259,6 +263,8 @@ export const EVENT_SUBSCRIPTIONS: ReadonlyArray<{ readonly eventType: EventType;
   ...COMMERCIAL_EVENT_SUBSCRIPTIONS,
   // Payments V1 bank-transfer route (commerce/bank-route.ts): the owner and the buyer are notified
   ...BANK_ROUTE_EVENT_SUBSCRIPTIONS,
+  // Payments V1 inbound credits (commerce/bank-credit.ts)
+  ...BANK_CREDIT_EVENT_SUBSCRIPTIONS,
 ]);
 
 export function consumersOf(eventType: EventType): ReadonlyArray<Consumer> {
