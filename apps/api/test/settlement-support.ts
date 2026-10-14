@@ -15,7 +15,7 @@ import { toUtcInstant, type Clock, type LeaseOwnerId } from "@kauro/domain";
 import { PgEventPublisher } from "@kauro/persistence";
 import { connectionPid, type FaultContext, type HarnessConnection } from "@kauro/persistence/testing";
 import "../src/payments/index.js";
-import { paymentServiceEffect } from "../src/payments/consumers.js";
+import { financeConsumer, fiscalConsumer, paymentServiceEffect, unitOfWorkEffect } from "../src/payments/consumers.js";
 import { DISPATCH_LEASE_SECONDS, createPaymentDispatcher, type DispatchPass, type PaymentDispatcher } from "../src/payments/dispatcher.js";
 import type { PaymentRuntime } from "../src/payments/runtime.js";
 import type { HeldLock, StoredBankArtifact } from "./bank-support.js";
@@ -368,6 +368,11 @@ export function laneRuntime(o: LaneRuntimeOptions = {}): PaymentRuntime {
 export function laneDispatcher(o: LaneRuntimeOptions & { readonly owner?: LeaseOwnerId } = {}): PaymentDispatcher {
   const rt = laneRuntime(o);
   return createPaymentDispatcher(rt, [paymentServiceEffect(rt)], { ownerId: o.owner ?? lane.owner });
+}
+/** A dispatcher with the effects of all three consumers, as the production wiring binds them (payments/index.ts): FINANCE and FISCAL deliver too. */
+export function laneAllConsumersDispatcher(): PaymentDispatcher {
+  const rt = laneRuntime();
+  return createPaymentDispatcher(rt, [unitOfWorkEffect(rt, financeConsumer()), unitOfWorkEffect(rt, fiscalConsumer()), paymentServiceEffect(rt)], { ownerId: lane.owner });
 }
 /** One real pass of the PAYMENT_SERVICE dispatcher (every due record of the consumer), as the lane's lease owner. */
 export async function dispatchPayment(o: LaneRuntimeOptions = {}): Promise<DispatchPass> {

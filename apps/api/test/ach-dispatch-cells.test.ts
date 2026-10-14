@@ -7,7 +7,7 @@ import { after, before, test } from "node:test";
 import * as dispatcherModule from "../src/payments/dispatcher.js";
 import { MAX_DELIVERY_ATTEMPTS } from "../src/payments/dispatcher.js";
 import { L, awaitingOrder, confirmed, creditRow, exactFor, importSI2, latestEvent, q, startLane, statementArtifact, stopLane } from "./inbound-lane-support.js";
-import { advance, deliveryIn, dispatchPayment, drain, inTransit, outboxOf, recorded, requestRow } from "./settlement-support.js";
+import { advance, deliveryIn, dispatchPayment, drain, inTransit, laneAllConsumersDispatcher, outboxOf, recorded, recordedEventOf, requestRow } from "./settlement-support.js";
 import { ids } from "./support.js";
 import { settlementOracleAfterEach } from "./settlement-oracle.js";
 
@@ -96,4 +96,49 @@ test(t("DENY", "SET-M-DSP-UNLISTED", "dead letter for a non-enumerated agency-le
   const d = (await dispatchPayment()).deliveries.find((x) => x.eventId === e.id);
   assert.deepEqual([d?.outcome, d?.errorCode], ["DEAD_LETTER", "INTEGRITY_FAILURE"], `an unlisted agency-less type is never delivered: ${JSON.stringify(d)}`);
   assert.deepEqual(await outboxOfEvent(e.id), ["DEAD_LETTER", 1, "INTEGRITY_FAILURE"]);
+});
+
+test(t("DENY", "SET-M-DSP-CONSUMER", "agency-less events only to PAYMENT_SERVICE"), async () => {
+  // D5 (ADV-5): each of the three enumerated agency-less types forged onto FINANCE and FISCAL is an INTEGRITY_FAILURE dead letter at 1:
+  // the allowlist applies to PAYMENT_SERVICE only, never as a blanket null agency for another consumer
+  await drain();
+  for (const other of ["FINANCE", "FISCAL"] as const) {
+    for (let i = 0; i < 5; i++) if ((await laneAllConsumersDispatcher().runOnce(other, { limit: 100 })).deliveries.length === 0) break;
+  }
+  const { requestId } = await recorded("dsp-consumer");
+  const o = await awaitingOrder("dsp-consumer-credit");
+  const c = await confirmed(o.route.accountRef, exactFor(o));
+  const received = await latestEvent(c.creditId, "bank_credit.received.v1");
+  assert.ok(received !== undefined, "C6 published bank_credit.received.v1");
+  assert.equal((await dispatchPayment()).deliveries.find((x) => x.eventId === received)?.outcome, "APPLIED", "Kmatch ran");
+  const matched = await latestEvent(c.creditId, "bank_credit.matched.v1");
+  assert.ok(matched !== undefined, "Kmatch published bank_credit.matched.v1");
+  const types = new Map<string, string>([
+    ["settlement_request.recorded.v1", await recordedEventOf(requestId)],
+    ["bank_credit.received.v1", received],
+    ["bank_credit.matched.v1", matched],
+  ]);
+  assert.deepEqual([...types.keys()].sort(), [...dispatcherModule.AGENCY_LESS_PAYMENT_EVENT_TYPES].sort(), "all three enumerated types are forged");
+  const effects = async (): Promise<string> =>
+    JSON.stringify(
+      (await q<Record<string, string>>(
+        `SELECT (SELECT count(*) FROM kauro.ledger_entries)::text AS ledger, (SELECT count(*) FROM kauro.domain_events)::text AS events, (SELECT count(*) FROM kauro.capture_facts)::text AS captures,
+                (SELECT coalesce(string_agg(state, ',' ORDER BY bank_credit_id), '') FROM kauro.bank_credits)::text AS credits, (SELECT coalesce(string_agg(outcome, ',' ORDER BY request_id), '-') FROM kauro.settlement_requests)::text AS requests`,
+      ))[0],
+    );
+  for (const other of ["FINANCE", "FISCAL"] as const) {
+    for (const [type, eventId] of types) {
+      await L().iw.h.oracle.query(
+        "INSERT INTO kauro.outbox_records (outbox_id, event_id, consumer, state, attempts, next_attempt_at, created_at, updated_at) VALUES ($1, $2, $3, 'PENDING', 0, now() - interval '1 second', now(), now()) ON CONFLICT (event_id, consumer) DO NOTHING",
+        [ids.next(), eventId, other],
+      );
+      const before = await effects();
+      const pass = await laneAllConsumersDispatcher().runOnce(other, { limit: 100 });
+      const d = pass.deliveries.find((x) => x.eventId === eventId);
+      assert.deepEqual([d?.outcome, d?.errorCode], ["DEAD_LETTER", "INTEGRITY_FAILURE"], `${type} on ${other} is never delivered: ${JSON.stringify(d)} in ${JSON.stringify(pass)}`);
+      const [r] = await q<{ s: string; a: number; e: string | null }>("SELECT state AS s, attempts AS a, last_error_code AS e FROM kauro.outbox_records WHERE event_id = $1 AND consumer = $2", [eventId, other]);
+      assert.deepEqual([r?.s, r?.a, r?.e], ["DEAD_LETTER", 1, "INTEGRITY_FAILURE"], `${type} on ${other}: the outbox record`);
+      assert.equal(await effects(), before, `${type} on ${other}: no consumer effect`);
+    }
+  }
 });

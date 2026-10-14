@@ -833,19 +833,22 @@ const settlementOf = async (w: Pick<Withdrawal, "accountRef" | "withdrawalId">):
           void what;
         }
       };
-      const refused = (r: string): boolean => r === "error 42501" || r === "rows 0";
+      // version 1: the owner INSERT policy refuses before any constraint runs (a permissive policy would surface as 23502/23505);
+      // version 2 (the realistic forgery: the next version of a live request): the aggregate binding raises KA002 before the policy, or the policy 42501
+      const refused = (r: string, what: string): boolean => r === "error 42501" || r === "rows 0" || (what.endsWith("at version 2") && r === "error KA002");
       const checks: ReadonlyArray<readonly [string, string, ReadonlyArray<unknown>]> = [
         ["INSERT a settlement", "INSERT INTO kauro.settlements (settlement_id, route_id, provider_balance_ref, currency, gross_cents, fee_cents, held_cents, withdrawn_cents, bank_available_cents, period_start, period_end, observed_at, evidence_hash, created_at) VALUES ($1, $2, $1, 'USD', 1, 0, 0, 0, 0, now(), now(), now(), $3, now())", [ids.next(), w.route.paymentRouteId, w.settlement.evidenceHash]],
         ["INSERT a ledger line", "INSERT INTO kauro.ledger_entries (entry_id, settlement_id, line_no, account_code, account_version, direction, amount_cents, currency, source_kind, source_ref, effective_at, observed_at, posted_at, evidence_hash, policy_version) VALUES ($1, $1, 1, 'BANK_CASH', 'OPS-1', 'DEBIT', 1, 'USD', 'SETTLEMENT', $1, now(), now(), now(), $2, 'B09-1')", [ids.next(), w.settlement.evidenceHash]],
         ["UPDATE the intent", "UPDATE kauro.settlement_requests SET outcome = 'APPLIED' WHERE request_id = $1", [requestId]],
-        ["INSERT applied.v1", "INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at) VALUES ($1, 'settlement_request', $2, 1, NULL, 'settlement_request.applied.v1', 'USER', $3, NULL, $1, '{}'::jsonb, $4, 1, now())", [ids.next(), requestId, L().owner.userId, w.settlement.evidenceHash]],
+        ["INSERT applied.v1 at version 1", "INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at) VALUES ($1, 'settlement_request', $2, 1, NULL, 'settlement_request.applied.v1', 'USER', $3, NULL, $1, '{}'::jsonb, $4, 1, now())", [ids.next(), requestId, L().owner.userId, w.settlement.evidenceHash]],
+        ["INSERT applied.v1 at version 2", "INSERT INTO kauro.domain_events (event_id, aggregate_kind, aggregate_id, aggregate_version, agency_id, event_type, actor_kind, actor_id, causation_id, correlation_id, payload, payload_hash, schema_version, created_at) VALUES ($1, 'settlement_request', $2, 2, NULL, 'settlement_request.applied.v1', 'USER', $3, NULL, $1, '{}'::jsonb, $4, 1, now())", [ids.next(), requestId, L().owner.userId, w.settlement.evidenceHash]],
         ["UPDATE its outbox record", "UPDATE kauro.outbox_records SET state = 'DELIVERED', delivered_at = now() WHERE event_id = $1", [eventId]],
         ["EXECUTE route_provider_available_cents", "SELECT kauro.route_provider_available_cents($1, 'USD')", [w.route.paymentRouteId]],
         ["EXECUTE settlement_request_refusal", "SELECT kauro.settlement_request_refusal($1, now(), interval '900 seconds')", [requestId]],
       ];
       for (const [what, sql, params] of checks) {
         const r = await attempt(what, sql, params);
-        assert.ok(refused(r), `kauro_app: ${what} is refused (42501 or 0 rows), got ${r}`);
+        assert.ok(refused(r, what), `kauro_app: ${what} is refused (42501 or 0 rows; KA002 at version 2), got ${r}`);
       }
       await c.query("ROLLBACK");
     } finally {
