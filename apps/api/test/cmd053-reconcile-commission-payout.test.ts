@@ -249,3 +249,36 @@ test("RACE: an identical retry replays the 200, the same key with other evidence
   completed<PayoutReconciliationView>(await reconcilePayout(sw, c.statementId, { providerPayoutEvidenceRef: cRef }, { key: crashKey }), 200);
   assert.deepEqual(await state(c).then((x) => [x.intent, x.statement, x.lines]), ["SETTLED", "PAID", ["PAID:3300"]]);
 });
+
+// --- CMD053-RACE: the settlement instant after the cash-basis lock wait (B10-CMD053-SETTLED-AT, template rule 15) -----------------------
+
+test("RACE (settled_at after the lock wait, template rule 15): CMD053 waits (observed) behind a held payout-cash lock for more than 1 s; once the holder commits, the intent's settled_at is at or after the holder's release instant on the database clock, never the reconciliation's transaction start", async () => {
+  const s = await seller(sw, "cmd053-settled-at", WHOLE);
+  const a = (await approved("2026-05", [{ s, cents: 4_100n }])).get(s.sellerId)!;
+  const ref = scriptEvidence(sw, sw.payouts.matching(facts(a), "SETTLED"));
+  // the holder: another transaction holding the one payout-cash basis lock (lockPayoutCash, D10-GAP-1), as a B09 settlement record does
+  const holder = await sw.h.pg.connect("postgres");
+  let releasedUs = "";
+  let releasedAt = "";
+  let reconciling: ReturnType<typeof reconcilePayout> | undefined;
+  try {
+    await holder.query("BEGIN");
+    await holder.query("SELECT pg_advisory_xact_lock(hashtextextended('kauro.payout-cash', 0))");
+    reconciling = reconcilePayout(sw, a.statementId, { providerPayoutEvidenceRef: ref });
+    await waitForLockWait(sw.h.oracle, SERVICE_POOL, "pg_advisory_xact_lock");
+    // the wait outlasts 1 s on the database clock (the holder's own transaction holds it, no process timer), then the release instant
+    // is read in microseconds as the holder's last statement before COMMIT
+    await holder.query("SELECT pg_sleep(1.2)");
+    const r = await holder.query<{ us: string; at: string }>("SELECT (extract(epoch FROM c.t) * 1000000)::bigint::text AS us, c.t::text AS at FROM (SELECT clock_timestamp() AS t) c");
+    releasedUs = r.rows[0]!.us;
+    releasedAt = r.rows[0]!.at;
+    await holder.query("COMMIT");
+  } finally {
+    await holder.end();
+  }
+  const done = completed<PayoutReconciliationView>(await reconciling!, 200);
+  assert.equal(done.data.intentState, "SETTLED");
+  const settled = await rows<{ us: string; at: string }>(sw, "SELECT (extract(epoch FROM settled_at) * 1000000)::bigint::text AS us, settled_at::text AS at FROM kauro.payout_intents WHERE intent_id = $1", [a.intent.intentId]);
+  assert.ok(BigInt(settled[0]!.us) >= BigInt(releasedUs), `settled_at ${settled[0]!.at} is before the cash lock's release ${releasedAt}: the instant was taken before the wait`);
+  assert.deepEqual(await state(a), { intent: "SETTLED", evidence: (await state(a)).evidence, statement: "PAID", paidHash: (await state(a)).evidence, lines: ["PAID:4100"], reconciliations: 1 });
+});
