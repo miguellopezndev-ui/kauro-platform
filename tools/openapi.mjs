@@ -267,7 +267,7 @@ export function generateOpenApi(sources) {
   const paths = {};
   const served = new Set(application.SERVED_COMMAND_IDS);
   // the served commands' specs: B06's seven, B07's six (mandate B07-COMMANDS), B08's two execution commands (mandate B08-COMMANDS-EXECUTION) and its four audit commands (mandate B08-COMMANDS-AUDIT), and B11's CMD044 (mandate W4)
-  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS };
+  const specs = { ...application.B06_COMMANDS, ...application.B07_COMMANDS, ...application.EXECUTION_COMMANDS, ...application.AUDIT_COMMANDS, ...application.SUPPORT_COMMANDS, ...application.TEAM_COMMANDS };
   for (const command of registryCommands) {
     if (!served.has(command.id)) continue;
     const spec = specs[command.id];
@@ -340,6 +340,10 @@ export function generateOpenApi(sources) {
       ...pathParameters(spec.path).map((name) => ({ name, in: "path", required: true, description: "Path id, resolved with server-owned tenant scope.", schema: ID })),
       ...(spec.scope === "AGENCY_HEADER" ? [{ $ref: "#/components/parameters/AgencySelector" }] : []),
       ...(spec.paginated ? [{ $ref: "#/components/parameters/PageLimit" }, { $ref: "#/components/parameters/PageCursor" }] : []),
+      // a list's closed filter (B11 lane A1, ListProjects): its values and the one an absent member means
+      ...(spec.filter !== undefined
+        ? [{ name: "filter", in: "query", required: false, description: "The list's filter; a value not listed is SCHEMA_VIOLATION (ENUM). The cursor is bound to it.", schema: { type: "string", enum: [...spec.filter.values], default: spec.filter.default } }]
+        : []),
       { $ref: "#/components/parameters/CorrelationId" },
     ];
     paths[spec.path] = {

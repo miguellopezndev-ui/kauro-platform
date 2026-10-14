@@ -23,8 +23,10 @@ test("the committed generated module is the generated one, byte for byte, and ge
   assert.equal(text.includes("\r"), false, "no carriage returns: the file is the same on every platform");
 });
 
-// the five operational bank-route commands carry no registry command but are journaled all the same (OPERATIONAL_WIRE, Idempotency-Key REQUIRED)
-const BANK_ROUTE_COMMANDS = ["configureBankRoute", "verifyBankRoute", "enableBankRoute", "disableBankRoute", "replaceBankRouteDetails"];
+// the operational commands carry no registry command id on the route but are journaled all the same (OPERATIONAL_WIRE, Idempotency-Key
+// REQUIRED): the five bank-route commands and the agency owner's setBuyerType (B11 A1, CMD101). Named here by hand on purpose: this list is
+// the oracle the generated descriptors are checked against, not a copy of OPERATIONAL_WIRE
+const JOURNALED_OPERATIONAL_COMMANDS = ["configureBankRoute", "verifyBankRoute", "enableBankRoute", "disableBankRoute", "replaceBankRouteDetails", "setBuyerType"];
 
 test("every served operation of the document is a descriptor with its method, path, idempotency and reply schemas", () => {
   const { text } = generate();
@@ -51,7 +53,7 @@ test("every served operation of the document is a descriptor with its method, pa
     assert.equal(descriptor.idempotency, operation["x-kauro-idempotency"] === "REQUIRED" ? "REQUIRED" : "NONE");
     assert.equal(descriptor.command, operation["x-kauro-command"] ?? null);
     assert.deepEqual(Object.keys(descriptor.replies).sort(), Object.keys(operation.responses).sort());
-    assert.equal(descriptor.idempotency === "REQUIRED", method === "post" && (operation["x-kauro-command"] !== undefined || BANK_ROUTE_COMMANDS.includes(operation.operationId)), `${operation.operationId}: every command is idempotent and nothing else is`);
+    assert.equal(descriptor.idempotency === "REQUIRED", method === "post" && (operation["x-kauro-command"] !== undefined || JOURNALED_OPERATIONAL_COMMANDS.includes(operation.operationId)), `${operation.operationId}: every command is idempotent and nothing else is`);
   }
   for (const name of Object.keys(document.components.schemas)) assert.ok(text.includes(`export function is${name[0].toUpperCase()}${name.slice(1)}(value: unknown)`), `a closed guard for ${name}`);
 });

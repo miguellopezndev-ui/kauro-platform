@@ -28,4 +28,6 @@ export const OPERATIONAL_WIRE: Readonly<Record<string, OperationalWire>> = Objec
   getBankRoute: entry("NONE", false, "KAURO_OWNER"),
   // the buyer's bank details: an agency member under the active agency
   getTransferInstructions: entry("NONE", false, null, true),
+  // B11 A1: the agency owner records the buyer type once (CMD101), journaled and cookie-authenticated; the agency is the path id
+  setBuyerType: entry("REQUIRED", true, "AGENCY_OWNER"),
 });
