@@ -39,7 +39,8 @@ const OWNER_LANE = Object.freeze({
   termination_manifests: "L-OWNER",
 });
 /** Read by a B10 command, written by no product code and named by no B12 lane: an open producer gap reported to the coordinator. */
-const UNOWNED = Object.freeze(["allocation_shares", "attribution_allocations", "claim_evidence", "corporate_roles", "service_agreement_versions"]);
+// capabilities: read by CMD062 (L-AUTH, R2-135: a claimed capability still offered); written by the platform (B05 seeds, CMD059 moves state), no B12 writer by design
+const UNOWNED = Object.freeze(["allocation_shares", "attribution_allocations", "capabilities", "claim_evidence", "corporate_roles", "service_agreement_versions"]);
 
 function written() {
   const out = new Set();

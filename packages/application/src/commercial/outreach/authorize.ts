@@ -79,7 +79,7 @@ export function authorizeHandler(runtime: CommerceRequestRuntime, co: OutreachAu
           const draftIds = review.items.map((i) => i.draftId).sort();
           // the serializer set in the global order, then the judgment (nothing but the first write follows it)
           await store.lockGrantSet(draftIds, named.senderId);
-          const facts = await store.grantFacts({ reviewId: review.reviewId, draftIds, senderId: named.senderId, validFrom: body.validFrom, expiresAt: body.expiresAt });
+          const facts = await store.grantFacts({ reviewId: review.reviewId, draftIds, senderId: named.senderId, validFrom: body.validFrom, expiresAt: body.expiresAt }); /* b12:judge */
           if (!facts.reviewLive) throw refuse("OUTREACH_REVIEW_INVALID", "the review expired");
           if (facts.reviewConsumed) throw refuse("OUTREACH_REVIEW_INVALID", "the review was already consumed by a grant");
           if (facts.sender === null) throw new NotFoundFailure("sender_identity");
@@ -100,7 +100,7 @@ export function authorizeHandler(runtime: CommerceRequestRuntime, co: OutreachAu
           }
           if (!facts.windowOk) throw refuse("OUTREACH_GRANT_INVALID", "the window is empty or longer than 14 days");
           const authorizationId = uow.ids.next() as string;
-          const grant = await store.insertGrant({
+          const grant = await store.insertGrant({ /* b12:write */
             authorizationId,
             reviewId: review.reviewId,
             grantingUserId: envelope.userId,
