@@ -456,6 +456,8 @@ function declareExecution(d: OwnerRefundDependencies, request: BankRouteRequest<
       if (current.total === null || current.total !== amount) throw precondition("EXECUTION_AMOUNT_MISMATCH", "the declared amount is not the approved amount");
       const bound = recipient === null ? null : await judgeRecipient(recipient, source, destination);
       const attemptNumber = await repo.nextAttemptNumber(source.scope, source.sourceId);
+      // rule 16: the caller's session fenced in this unit (kauro.payment_session_fence, 0072), the last lock before the effect instant
+      await judgedUnderHold(request.authority, uow, d.runtime.clock);
       const at = await bank.effectNow(uow);
       // no await between this instant and its judgment
       if (!freshAt(verdict, at)) throw stepUpStale();
@@ -569,6 +571,8 @@ function recordBounce(d: OwnerRefundDependencies, request: BankRouteRequest<Reco
       }
       const destination = await repo.destinationOf(attempt.sourceKind, refundIdOf(attempt));
       if (destination === null) throw new DomainFailure("INTEGRITY_FAILURE", "a recorded attempt without the destination it was declared to");
+      // rule 16: the caller's session fenced in this unit (kauro.payment_session_fence, 0072), the last lock before the effect instant
+      await judgedUnderHold(request.authority, uow, d.runtime.clock);
       const at = await bank.effectNow(uow);
       // no await between this instant and its judgment
       if (!freshAt(verdict, at)) throw stepUpStale();
@@ -634,6 +638,8 @@ function declareResend(d: OwnerRefundDependencies, request: BankRouteRequest<Dec
       if (destination === null) throw precondition("DESTINATION_NOT_CAPTURED", "the refund was approved without its destination captured");
       const bound = recipient === null ? null : await judgeRecipient(recipient, attempt, destination);
       const attemptNumber = await repo.nextAttemptNumber(attempt.sourceKind, attempt.sourceId);
+      // rule 16: the caller's session fenced in this unit (kauro.payment_session_fence, 0072), the last lock before the effect instant
+      await judgedUnderHold(request.authority, uow, d.runtime.clock);
       const at = await bank.effectNow(uow);
       // no await between this instant and its judgment
       if (!freshAt(verdict, at)) throw stepUpStale();
@@ -804,6 +810,8 @@ function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<R
       const fresh: ExecutionOfferRecord = { offerId: uow.ids.next() as string, attemptId, command, idempotencyKey: key, requestedArtifactRef: body.evidence.artifactRef, expectedEvidenceHash: body.evidence.evidenceHash, actorUserId: userId };
       await repo.insertOffer(fresh);
       if (contradicting) await repo.contradictOffered(uow.ids.next() as string, uow.ids.next() as string, attempt, body.evidence.evidenceHash);
+      // rule 16: the caller's session fenced in this unit (kauro.payment_session_fence, 0072), the last lock before the effect instant
+      await judgedUnderHold(request.authority, uow, d.runtime.clock);
       await allowFact(uow, context, operation, await bank.effectNow(uow));
       return fresh;
     });
@@ -876,6 +884,8 @@ function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<R
         // a DECLARED/UNCERTAIN RETURN attempt always has its refund SUBMITTING or UNCERTAIN (X1/X2 move both in one transaction)
         if (state !== "SUBMITTING" && state !== "UNCERTAIN") throw new DomainFailure("INTEGRITY_FAILURE", "the refund this execution returns is not SUBMITTING or UNCERTAIN");
       }
+      // rule 16: the caller's session fenced in this unit (kauro.payment_session_fence, 0072), the last lock before the effect instant
+      await judgedUnderHold(request.authority, uow, d.runtime.clock);
       const at = await bank.effectNow(uow);
       // no await between this instant and its judgment
       if (!freshAt(verdict, at)) throw stepUpStale();
@@ -986,6 +996,8 @@ function resolveNotExecuted(d: OwnerRefundDependencies, request: BankRouteReques
       // 4. NX-LAG, NX-COVERAGE, NX-NO-POTENTIAL at the effect clock, read under L1 (a statement import inserts its lines only under L1)
       const timing = await repo.routeTimingOf(attempt.environment, attempt.accountRef);
       if (timing === null) throw precondition("COVERAGE_INCOMPLETE", "the account has no route: its coverage is unknown");
+      // rule 16: the caller's session fenced in this unit (kauro.payment_session_fence, 0072), the last lock before the effect instant
+      await judgedUnderHold(request.authority, uow, d.runtime.clock);
       const at = await bank.effectNow(uow);
       if (Date.parse(at) < Date.parse(attempt.declaredAt) + timing.windowMs + timing.coverageLagMs) throw precondition("NOT_EXECUTED_TOO_EARLY", "the window and the coverage lag have not passed since the declaration");
       const to = toUtcInstant(Date.parse(at) - timing.coverageLagMs);

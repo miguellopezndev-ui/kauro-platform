@@ -225,7 +225,8 @@ export class PgUnitOfWork implements UnitOfWork {
   ) {
     this.context = context;
     this.ids = ids;
-    this.sessionFence = new PgSessionFence(client);
+    // a SERVICE unit of the payment service binds no person: its fence is the definer of migration 0072 (rule 16 for the bank owner commands)
+    this.sessionFence = new PgSessionFence(client, roleFor(context) === "kauro_payment" ? "SERVICE" : "REQUEST");
     this.buyerTypes = new PgBuyerTypes(client);
     this.projectDashboard = new PgProjectDashboard(client);
     this.agencies = new PgAgencyRepository(client);

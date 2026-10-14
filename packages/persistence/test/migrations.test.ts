@@ -157,6 +157,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0070_b05_model_task_request_key.sql",
     // Payments V1 L-REFUND: the corporate owner's step-up approval of a manual-rail refund applied by the payment service (bank_owner_authority, owner acts, treasury refund approval; provisional number)
     "0071_refund_owner_authority.sql",
+    // Payments V1 L-REFUND: the session fence of the bank owner commands, a definer kauro_payment executes (rule 16; provisional number)
+    "0072_payment_session_fence.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
@@ -218,11 +220,13 @@ test("runtime roles are neither owners nor superusers and have no BYPASSRLS; the
     // SECURITY DEFINER requires specific justification (08): the one function is the registration of a bank route's payment route
     // (migration 0046, coordinator decision #2 of lane L-ROUTE: payment_routes stays closed to every runtime role; the function checks the
     // caller's ACTIVE KAURO_OWNER grant and writes CONFIGURED rows only), and the owner authority of a manual-rail refund (migration 0071,
-    // lane L-REFUND: the payment service never reads identities, grants or proofs; the function judges them and records the act), each with a
-    // pinned search_path
+    // lane L-REFUND: the payment service never reads identities, grants or proofs; the function judges them and records the act), and the session
+    // fence of the bank owner commands (migration 0072: kauro_payment holds no privilege on web_sessions; the function locks FOR SHARE and
+    // returns the liveness of the one presented session), each with a pinned search_path
     const definers = await su.query<{ proname: string; proconfig: string[] | null }>("SELECT p.proname, p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef ORDER BY p.proname");
     assert.deepEqual(definers.rows, [
       { proname: "bank_owner_authority", proconfig: ["search_path=pg_catalog, pg_temp"] },
+      { proname: "payment_session_fence", proconfig: ["search_path=pg_catalog, pg_temp"] },
       { proname: "register_bank_payment_route", proconfig: ["search_path=pg_catalog, pg_temp"] },
     ]);
     // request handlers never hold DELETE on any table

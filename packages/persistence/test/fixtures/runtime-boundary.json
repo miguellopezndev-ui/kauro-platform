@@ -6503,6 +6503,22 @@
       ],
       "using": null
     },
+    "web_sessions/web_sessions_payment_fence_lock": {
+      "check": "false",
+      "command": "UPDATE",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": "(secret_sha256 = kauro.current_session_sha256())"
+    },
+    "web_sessions/web_sessions_payment_fence_read": {
+      "check": null,
+      "command": "SELECT",
+      "roles": [
+        "kauro_owner"
+      ],
+      "using": "(secret_sha256 = kauro.current_session_sha256())"
+    },
     "web_sessions/web_sessions_presented": {
       "check": null,
       "command": "SELECT",
