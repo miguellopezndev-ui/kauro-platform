@@ -33,9 +33,11 @@ import type {
   CapabilityRestrictionView,
   IncidentView,
   RecoveryAuthorizationView,
+  BreakglassGrantView,
+  BreakglassRevocationView,
 } from "./views.js";
 
-export type CommercialCommandId = "CMD002" | "CMD027" | "CMD043" | "CMD045" | "CMD046" | "CMD047" | "CMD048" | "CMD049" | "CMD050" | "CMD051" | "CMD052" | "CMD053" | "CMD056" | "CMD057" | "CMD058" | "CMD059";
+export type CommercialCommandId = "CMD002" | "CMD027" | "CMD043" | "CMD045" | "CMD046" | "CMD047" | "CMD048" | "CMD049" | "CMD050" | "CMD051" | "CMD052" | "CMD053" | "CMD054" | "CMD055" | "CMD056" | "CMD057" | "CMD058" | "CMD059";
 
 export type CommercialPrincipalKind = "AGENCY_MEMBER" | "SELLER" | "SELLER_OR_OWNER" | "CORPORATE_OPERATOR" | "COMMERCIAL_SERVICE";
 
@@ -47,7 +49,7 @@ export interface CommercialCommandSpec<Body> {
   readonly method: "POST";
   readonly path: string;
   /** The catalogue role (commands.json through @kauro/contracts, brand-mapped: KAURO_OWNER). */
-  readonly role: "AGENCY_OWNER" | "AGENCY_BILLING" | "ACTIVE_SELLER_OR_OWNER" | "ACTIVE_SELLER" | "KAURO_OWNER" | "OPERATIONS_SERVICE_OR_OWNER" | "COMMISSION_SERVICE" | "FINANCE_SERVICE";
+  readonly role: "AGENCY_OWNER" | "AGENCY_BILLING" | "ACTIVE_SELLER_OR_OWNER" | "ACTIVE_SELLER" | "KAURO_OWNER" | "KAURO_OWNER_OR_SECURITY_SERVICE" | "OPERATIONS_SERVICE_OR_OWNER" | "COMMISSION_SERVICE" | "FINANCE_SERVICE";
   readonly principal: CommercialPrincipalKind;
   /**
    * The database role of the command's unit of work: kauro_app for a request handler (TENANT for an agency member, OPERATOR for a
@@ -377,6 +379,60 @@ export const RECONCILE_COMMISSION_PAYOUT = spec<ReconcileCommissionPayoutBody>({
   stepUp: false,
 });
 
+// --- CMD054 OpenBreakglass, CMD055 RevokeBreakglass (package B16 lane L4; gate G-SECURITY) ----------------------------------------------
+
+export interface OpenBreakglassBody {
+  /** The ONE project the grant covers (a grant is never blanket raw-data access). */
+  readonly scopeRef: string;
+  readonly purpose: string;
+  /** A fresh step-up proof of the opening owner (08), used once. */
+  readonly assuranceProofRef: string;
+  /** The support case of that project, or the actual incident naming it, that justifies the grant. */
+  readonly authorizationRef: string;
+}
+export type OpenBreakglassResult = BreakglassGrantView;
+export const OPEN_BREAKGLASS = spec<OpenBreakglassBody>({
+  id: "CMD054",
+  name: "OpenBreakglass",
+  method: "POST",
+  path: "/api/v1/operations/breakglass-grants",
+  role: "KAURO_OWNER",
+  principal: "CORPORATE_OPERATOR",
+  runtimeRole: "kauro_app",
+  scope: "CORPORATE",
+  aggregateParam: null,
+  scopeKind: null,
+  expectedVersionRequired: false,
+  authorityHashFields: [],
+  fields: ["scopeRef", "purpose", "assuranceProofRef", "authorizationRef"],
+  stepUp: true,
+});
+
+export interface RevokeBreakglassBody {
+  readonly reasonCode: string;
+}
+export type RevokeBreakglassResult = BreakglassRevocationView;
+/**
+ * The registry role is KAURO_OWNER_OR_SECURITY_SERVICE; this lane serves the owner's path. The security service's principal (a verified
+ * service identity with its own journal stream) is not bound yet: GAP-BG-SVC in docs/design/B16-case-map.md.
+ */
+export const REVOKE_BREAKGLASS = spec<RevokeBreakglassBody>({
+  id: "CMD055",
+  name: "RevokeBreakglass",
+  method: "POST",
+  path: "/api/v1/operations/breakglass-grants/{grantId}/revoke",
+  role: "KAURO_OWNER_OR_SECURITY_SERVICE",
+  principal: "CORPORATE_OPERATOR",
+  runtimeRole: "kauro_app",
+  scope: "CORPORATE",
+  aggregateParam: "grantId",
+  scopeKind: null,
+  expectedVersionRequired: false,
+  authorityHashFields: [],
+  fields: ["reasonCode"],
+  stepUp: false,
+});
+
 // --- CMD056 RecordIncident, CMD057 AuthorizeRecovery (package B16; gate G-RECOVERY) ------------------------------------------------
 
 export interface RecordIncidentBody {
@@ -488,6 +544,8 @@ export const COMMERCIAL_COMMANDS = Object.freeze({
   CMD051: CLOSE_COMMISSION_PERIOD,
   CMD052: APPROVE_COMMISSION_PAYOUT,
   CMD053: RECONCILE_COMMISSION_PAYOUT,
+  CMD054: OPEN_BREAKGLASS,
+  CMD055: REVOKE_BREAKGLASS,
   CMD056: RECORD_INCIDENT,
   CMD057: AUTHORIZE_RECOVERY,
   CMD058: CHANGE_CAPABILITY,

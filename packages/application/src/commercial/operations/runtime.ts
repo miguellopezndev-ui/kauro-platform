@@ -7,16 +7,21 @@
  * service identity, journaled under it with no agency (migration 0059).
  */
 import type { UtcInstant } from "@kauro/contracts";
-import type { Clock, CommerceUnitOfWork, Environment, ExecutionContext, OperationsRepository, UnitOfWork } from "@kauro/domain";
+import type { BreakglassRepository, Clock, CommerceUnitOfWork, Environment, ExecutionContext, OperationsRepository, UnitOfWork } from "@kauro/domain";
 import type { AssuranceVerifier } from "../../ports/assurance-and-admission.js";
+import type { B07Collaborators } from "../../sources/handlers/shared.js";
 import type { CommercialAuthorizer } from "../authorizer.js";
 
 /** CMD056 and CMD057: the owner's request side (kauro_app). */
 export interface OperationsRequestCollaborators {
   readonly operations: (uow: UnitOfWork) => OperationsRepository;
   readonly authorizer: CommercialAuthorizer;
-  /** B06's step-up verifier (08): CMD057's authorizationRef. */
+  /** B06's step-up verifier (08): CMD057's authorizationRef, CMD054's assuranceProofRef. */
   readonly assurance: AssuranceVerifier;
+  /** The breakglass records (package B16 lane L4) on the unit of work's own transaction: breakglassOf (@kauro/persistence). */
+  readonly breakglass: (uow: UnitOfWork) => BreakglassRepository;
+  /** B07's object-storage adapter and preview reader, for the breakglass preview; absent or unbound, it answers SOURCE_SERVICES_UNAVAILABLE. */
+  readonly sources?: Pick<B07Collaborators, "providers" | "preview">;
 }
 
 /** Where an operations service command is held by a test, inside its unit of work before COMMIT (only tests bind it). */

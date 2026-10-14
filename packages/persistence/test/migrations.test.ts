@@ -161,6 +161,8 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0075_owner_outbox_policy.sql",
     // B10-CMD053-SETTLED-AT: a payout intent's settlement instant is one of its transaction's, read after the cash lock (provisional number)
     "0076_payout_effect_instant.sql",
+    // B16 L4 CMD054/CMD055: the breakglass grants, their accesses and the policies a named grant reads under (KA089; provisional number)
+    "0071_b16_breakglass.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

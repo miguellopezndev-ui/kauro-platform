@@ -807,6 +807,37 @@ APPLICABILITY.CMD057 = {
   "lost response": [[OPERATIONS, CMD057_RACE]],
   "external uncertainty": "NOT_APPLICABLE: an authorization runs no restore (the control plane runs and releases it after its own checks); the candidate's edge, the recovery row, the step-up fact and the journal entry are rows of one database transaction (the registry lists no event for it)",
 };
+// package B16 lane L4's breakglass commands (registry CMD054 OpenBreakglass, CMD055 RevokeBreakglass; 08 "Breakglass"): the corporate
+// owner's, none reaches a provider
+const BREAKGLASS = "cmd054-cmd055-breakglass.test.ts";
+const CMD054_OK = "CMD054-OK: the corporate owner with a fresh step-up opens a breakglass grant over one project";
+const CMD054_DENY = "CMD054-DENY: no credential, an agency OWNER, a seller, a stale or foreign step-up";
+const CMD054_RACE = "CMD054-RACE: an identical retry replays the 201";
+const CMD055_OK = "CMD055-OK: the corporate owner revokes a live grant";
+const CMD055_DENY = "CMD055-DENY: no credential, an agency OWNER or a seller cannot revoke";
+const CMD055_RACE = "CMD055-RACE: an identical retry replays the 200";
+APPLICABILITY.CMD054 = {
+  "legitimate state": [[BREAKGLASS, CMD054_OK]],
+  "wrong role": [[BREAKGLASS, CMD054_DENY]],
+  "wrong agency": [[BREAKGLASS, CMD054_DENY]],
+  "stale version": "NOT_APPLICABLE: OpenBreakglass creates a grant and carries no expectedVersion (registry fields: scopeRef, purpose, assuranceProofRef, authorizationRef); the live grant of the scope is the conflict (BREAKGLASS_GRANT_LIVE with the current grant, CMD054-RACE)",
+  "duplicate request": [[BREAKGLASS, CMD054_RACE]],
+  "changed-body same key": [[BREAKGLASS, CMD054_RACE]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[BREAKGLASS, CMD054_RACE]],
+  "external uncertainty": "NOT_APPLICABLE: opening a grant reaches no provider; the grant, its ALLOW fact and the journal entry are rows of one database transaction (the registry lists no event for it)",
+};
+APPLICABILITY.CMD055 = {
+  "legitimate state": [[BREAKGLASS, CMD055_OK]],
+  "wrong role": [[BREAKGLASS, CMD055_DENY]],
+  "wrong agency": [[BREAKGLASS, CMD055_DENY]],
+  "stale version": [[BREAKGLASS, CMD055_DENY], [BREAKGLASS, CMD055_RACE]],
+  "duplicate request": [[BREAKGLASS, CMD055_RACE]],
+  "changed-body same key": [[BREAKGLASS, CMD055_RACE]],
+  "invalid schema": common["invalid schema"],
+  "lost response": [[BREAKGLASS, CMD055_RACE]],
+  "external uncertainty": "NOT_APPLICABLE: a revocation reaches no provider; every new read under the grant is refused at once and a bearer capability already issued lives at most the residual lifetime the answer states (never claimed zero); the revoked edge, its ALLOW fact and the journal entry are rows of one database transaction",
+};
 // CMD059 admits the operations service as its second principal: the service cases join the owner's
 for (const [cell, extra] of [["legitimate state", CMD059_SERVICE_OK], ["wrong role", CMD059_SERVICE_DENY], ["wrong agency", CMD059_SERVICE_DENY], ["duplicate request", CMD059_SERVICE_RACE], ["changed-body same key", CMD059_SERVICE_RACE], ["lost response", CMD059_SERVICE_RACE], ["stale version", CMD059_SERVICE_RACE]]) APPLICABILITY.CMD059[cell].push([OPERATIONS, extra]);
 

@@ -270,6 +270,47 @@ export interface StatementCorrectionView {
   readonly statement: CommissionStatementView;
 }
 
+// --- CMD054 OpenBreakglass, CMD055 RevokeBreakglass, the breakglass preview (package B16 lane L4) -------------------------------------
+
+/** CMD054: the grant as opened. It covers one project, gives a bounded preview only and expires 1800 s after the database's instant. */
+export interface BreakglassGrantView {
+  readonly grantId: string;
+  readonly scopeRef: string;
+  readonly agencyId: string;
+  readonly purpose: string;
+  readonly authorizationRef: string;
+  readonly authorizationKind: "SUPPORT_CASE" | "INCIDENT";
+  readonly state: "ACTIVE";
+  readonly openedAt: UtcInstant;
+  readonly expiresAt: UtcInstant;
+  readonly access: "PREVIEW_ONLY";
+  readonly version: number;
+}
+
+/**
+ * CMD055: the grant after its revocation. Every new read under it is refused at once (refreshRevoked); a bearer capability the providers
+ * already issued may live up to residualBearerLifetimeSeconds after revokedAt, never claimed zero (registry CMD055 failure clause).
+ */
+export interface BreakglassRevocationView {
+  readonly grantId: string;
+  readonly state: "REVOKED";
+  readonly revokedAt: UtcInstant;
+  readonly refreshRevoked: true;
+  readonly residualBearerLifetimeSeconds: number;
+  readonly residualBearerUntil: UtcInstant;
+  readonly version: number;
+}
+
+/** The breakglass preview: the bounded sample of an admitted table of the grant's project (at most 20 rows of 50 cells of 200 characters). */
+export interface BreakglassPreviewView {
+  readonly grantId: string;
+  readonly tableId: string;
+  readonly fileId: string;
+  readonly rows: ReadonlyArray<ReadonlyArray<string | null>>;
+  readonly truncated: boolean;
+  readonly expiresAt: UtcInstant;
+}
+
 // --- CMD056 RecordIncident, CMD057 AuthorizeRecovery (package B16) ---------------------------------------------------------------
 
 /** CMD056: the incident as recorded. A false positive is CLOSED with no responsibility and its severity says so; an actual one is DETECTED. */

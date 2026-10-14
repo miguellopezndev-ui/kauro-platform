@@ -24,6 +24,7 @@ export type {
   IncidentId,
   RestoreCandidateId,
   RecoveryId,
+  BreakglassGrantId,
   EventId,
   InquiryId,
   OutboxId,
@@ -248,6 +249,8 @@ export * from "./model/target-contract.js";
 export * from "./model/capability-governance.js";
 // operations and recovery (package B16/B18: CMD056, CMD057, the operations service principal)
 export * from "./model/operations-recovery.js";
+// breakglass (package B16 lane L4: CMD054, CMD055, the breakglass preview)
+export * from "./model/breakglass.js";
 // import stages and their receipts (package B17: CMD040, CMD041)
 export * from "./model/import-stage.js";
 // PAID_STAGED retention deadlines of a staged import workflow (package B16 lane L7: R2-054, R2-055; mirror of migration 0062)

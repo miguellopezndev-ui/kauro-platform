@@ -3,7 +3,7 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B16-case-map.md",
-  "sha256": "7c3eb63d27e835da0c4893d86e09286ae0db73fffebd320bfb0c8ce5b2d18557"
+  "sha256": "c0f0b9dc2cf6e0a241a1b86f15ebc6a33a123f2fc237695e01f1082c8d29254c"
  },
  "rows": [
   {
@@ -82,12 +82,15 @@
   },
   {
    "case": "S071",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: S071: a seller, an agency OWNER on another agency and the corporate owner without a grant are refused raw CRM by URL and by DTO field; with a grant: preview only, expiring, audited",
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: REVOCATION (GAP-BG-7): a grant cannot survive the closure of its support case, the deletion request of its project or the closure of its agency — each makes the grant unusable at the next read, the record kept"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "S076",
@@ -138,23 +141,27 @@
   },
   {
    "case": "R2-049",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "packages/data-plane/test/b16-metadata-sim.test.ts :: R2-049 (SIM): the worker sandbox reaches no metadata endpoint and holds no broad credential; only the broker issues prefix-scoped capabilities"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [
     "B14"
    ],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target PART(B14) SIMULATED"
+   "claimed": "OPEN -> L4 PARTIAL (PLANNED L4; target PART(B14) SIMULATED: the local SIM half is executed, the provider half is BLOCKED_OWNER on the AWS account, D-14)"
   },
   {
    "case": "R2-050",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: R2-050: renewal after the 30-min expiry is refused, a new justified grant is required, the expired record kept — the expired grant reads nothing, the same justification (even with a fresh step-up) is a renewal and is refused, a new support case opens a new grant; a read whose grant lock wait crosses expiresAt is refused (GAP-BG-2, GAP-BG-3)"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-053",
@@ -517,57 +524,69 @@
   },
   {
    "case": "CMD054-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: CMD054-OK: the corporate owner with a fresh step-up opens a breakglass grant over one project for an OPEN support case of that project — 201 ACTIVE, preview only, expiring 1800 s after the database's instant, with its ALLOW fact and one journal entry; an ACTUAL incident naming the project justifies a grant too; the grant reads the table's bounded preview and every read is audited"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD054-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: CMD054-DENY: no credential, an agency OWNER, a seller, a stale or foreign step-up, a reused step-up (silent reuse), a support case of another project or agency, an unknown, closed or resolved authorization, a false-positive incident or one not naming the project, a project whose deletion was requested, and a body asking more than a scope (blanket raw access) are refused — nothing is written"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD054-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: CMD054-RACE: an identical retry replays the 201 and the same key with another body is 409 IDEMPOTENCY_CONFLICT; two opens of one scope yield one live grant and one 409 BREAKGLASS_GRANT_LIVE with the wait observed (both justifications real); a crash before COMMIT leaves no grant and the retry opens one; a crash after COMMIT is replayed, never a second grant; a fault at the journal append (the second write) leaves no grant (GAP-BG-4..6, GAP-BG-8)"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD055-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: CMD055-OK: the corporate owner revokes a live grant — 200 REVOKED with the reason, the database's instant and the residual bearer lifetime of capabilities already issued (900 s, never zero); the grant reads nothing more and the record is kept; another corporate owner may revoke a grant it does not hold"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD055-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: CMD055-DENY: no credential, an agency OWNER or a seller cannot revoke; an unknown grant is 404; a revoked grant is not revoked again and an expired one is not revoked at all (its record kept); a reason with a control character is 400 — and no answer ever claims a zero residual bearer lifetime"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD055-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd054-cmd055-breakglass.test.ts :: CMD055-RACE: an identical retry replays the 200; two revocations of one grant yield one revocation and one 409 BREAKGLASS_GRANT_NOT_ACTIVE with the wait observed; a revocation held at the grant lock against a preview read under the grant, both orders — read first completes, revoke first refuses (GAP-BG-1); a crash before COMMIT leaves the grant live and the retry revokes it once; a lock wait past the statement bound is CAPACITY_UNAVAILABLE and revokes nothing"
+   ],
    "commit": null,
    "reviewId": null,
    "inheritedTo": [],
-   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD056-OK",

@@ -21,6 +21,7 @@ import { TARGET_FAILURE_REASONS } from "./target-contract.js";
 import { IMPORT_STAGE_FAILURE_REASONS } from "./import-stage.js";
 import { CAPABILITY_FAILURE_REASONS } from "./capability-governance.js";
 import { RECOVERY_FAILURE_REASONS } from "./operations-recovery.js";
+import { BREAKGLASS_FAILURE_REASONS } from "./breakglass.js";
 
 export const FAILURE_CODES = [
   "INVALID_REQUEST",
@@ -334,6 +335,8 @@ export const FAILURE_REASONS = [
   ...RETENTION_EXTENSION_FAILURE_REASONS,
   // managed deletion of a project (package B16 lane L3: CMD042 RequestDeletion)
   ...DELETION_FAILURE_REASONS,
+  // breakglass (package B16 lane L4: CMD054 OpenBreakglass, CMD055 RevokeBreakglass, the breakglass preview; R2-050, S071)
+  ...BREAKGLASS_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 
