@@ -15,6 +15,7 @@
  */
 import { LABEL_PATTERN, REQUEST_SCHEMA_PREFIX, TEXT_PATTERN, type RequestSchema } from "../api/request-schemas.js";
 import { OUTREACH_PURPOSES } from "@kauro/domain";
+import { B12_PRODUCER_REQUEST_SCHEMAS } from "./sellers/owner-tools/request-schemas.js";
 
 const ID = { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" } as const;
 const VERSION = { type: "integer", minimum: 1, maximum: 9007199254740991 } as const;
@@ -189,6 +190,8 @@ export const COMMERCIAL_REQUEST_SCHEMAS = Object.freeze({
     channel: { type: "string", pattern: "^[A-Z][A-Z0-9_]{2,63}$" },
     address: { type: "string", minLength: 3, maxLength: 254, pattern: "^[^\\s@]+@[^\\s@]+$" },
   }),
+  // package B12 lane L-OWNER: the owner tools (plan companion §P)
+  ...B12_PRODUCER_REQUEST_SCHEMAS,
 } as const);
 
 export type CommercialRequestSchemaCommand = keyof typeof COMMERCIAL_REQUEST_SCHEMAS;

@@ -35,6 +35,9 @@ export const B12_PRODUCER_OPERATIONS = [
   "RecordAssistanceAgreement",
   "PrepareTerminationTerms",
   "PrepareTerminationManifest",
+  // the producers of the attribution rows CMD046 and CMD047 consume (lane L-OWNER; 0087 widens the journal list by these two)
+  "RecordClaimEvidence",
+  "PrepareAttributionAllocation",
 ] as const;
 
 export const B12_OPERATIONS = [...B12_OUTREACH_OPERATIONS, ...B12_PRODUCER_OPERATIONS] as const;
