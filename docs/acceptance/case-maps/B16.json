@@ -3,7 +3,7 @@
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
   "file": "docs/design/B16-case-map.md",
-  "sha256": "290f9c03907923967897cbca24847fe489faface8c2fecd86cb0f3c3003767e9"
+  "sha256": "d4757542a4c9ca5b4a5be97e7cee99d12c9a540bc201f828996152e5014e59b6"
  },
  "rows": [
   {
