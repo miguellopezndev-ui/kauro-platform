@@ -58,11 +58,10 @@ export const B12_PRODUCER_OUTCOMES: Readonly<Record<B12ProducerCommandId, Readon
     PRE("PAYEE_UNVERIFIED", "the change carried no seller step-up, or its 172800 s cooling period has not passed on the database clock"),
     PRE("SELF_TARGET", "the verifier is the person who changed the destination"),
   ],
-  PrepareServiceAssignment: [SELLER_UNKNOWN, SELLER_TERMINATED, NOT_FOUND("the agency"), PRE("UNKNOWN_REFERENCE", "assistanceAgreementId is not an assistance agreement of this seller and agency, or is given with compensation NONE")],
+  PrepareServiceAssignment: [NOT_FOUND("the seller or the agency"), SELLER_TERMINATED, PRE("UNKNOWN_REFERENCE", "assistanceAgreementId is not an assistance agreement of this seller and agency, or is given with compensation NONE")],
   RecordAssistanceAgreement: [
-    SELLER_UNKNOWN,
+    NOT_FOUND("the seller or the agency"),
     SELLER_TERMINATED,
-    NOT_FOUND("the agency"),
     PRE("AGREEMENT_VERSION_MISMATCH", "agreementId is not a signed agreement of this seller"),
     PRE("CROSS_AGENCY", "projectId is not a project of the agency, or is given for NEXT_PURCHASE"),
   ],
