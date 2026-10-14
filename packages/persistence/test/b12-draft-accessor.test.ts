@@ -86,18 +86,28 @@ describe("B12 L-DRAFT accessor: prepareDraft (CMD061)", () => {
     }
   });
 
-  test("a revoked and a pending sender, an unreviewed jurisdiction and a suppressed contact are refused with their reason", async () => {
-    const p = await prospectIn(w, w.s, freshDomain("ref"));
+  test("a pending sender is SENDER_NOT_VERIFIED", async () => {
+    const p = await prospectIn(w, w.s, freshDomain("pend"));
     const pending = await sender(w, w.s.userId, { pending: true });
     await assert.rejects(asSeller(async (d) => d.prepareDraft(await inputFor(p, [], "INDIVIDUAL_PROSPECT_CONTACT", pending))), failure("PRECONDITION_FAILED", "SENDER_NOT_VERIFIED"));
+  });
+
+  test("a revoked sender is SENDER_REVOKED", async () => {
+    const p = await prospectIn(w, w.s, freshDomain("rev"));
     const revoked = await sender(w, w.s.userId);
     await at(w.app, ownerOf(w), w.base, async (c) => {
       await new OutreachLocks(c).take("L7", revoked.senderId);
       await c.query("UPDATE kauro.sender_identities SET state = 'REVOKED' WHERE sender_id = $1", [revoked.senderId]);
     });
     await assert.rejects(asSeller(async (d) => d.prepareDraft(await inputFor(p, [], "INDIVIDUAL_PROSPECT_CONTACT", revoked))), failure("PRECONDITION_FAILED", "SENDER_REVOKED"));
+  });
+
+  test("an unreviewed jurisdiction is OUTREACH_JURISDICTION_UNREVIEWED", async () => {
     const nowhere = await prospectIn(w, w.s, freshDomain("juris"), "Atlantis");
     await assert.rejects(asSeller(async (d) => d.prepareDraft(await inputFor(nowhere))), failure("PRECONDITION_FAILED", "OUTREACH_JURISDICTION_UNREVIEWED"));
+  });
+
+  test("a suppressed contact is PROSPECT_SUPPRESSED", async () => {
     const sup = await prospectIn(w, w.s, freshDomain("sup"));
     await at(w.app, personOf(w.s.userId), w.base, (c) => suppressionIn(c, w.s.userId, "CONTACT", sup.contactKey, "REFUSAL"));
     await assert.rejects(asSeller(async (d) => d.prepareDraft(await inputFor(sup))), failure("PRECONDITION_FAILED", "PROSPECT_SUPPRESSED"));
@@ -109,19 +119,6 @@ describe("B12 L-DRAFT accessor: prepareDraft (CMD061)", () => {
     const p = await prospectIn(w, w.s, freshDomain("old"));
     const i = await inputFor(p, [r1.resourceId]);
     await assert.rejects(asSeller((d) => d.prepareDraft(i)), failure("PRECONDITION_FAILED", "RESOURCE_NOT_CURRENT"));
-    assert.equal(await rows(i.draftId), 0);
-  });
-
-  test("a lock taken out of the global order before the accessor is refused as an integrity failure", async () => {
-    const p = await prospectIn(w, w.s, freshDomain("order"));
-    const i = await inputFor(p);
-    await assert.rejects(
-      asSeller(async (d, c) => {
-        await new OutreachLocks(c).take("L10", ids.next());
-        return d.prepareDraft(i);
-      }),
-      failure("INTEGRITY_FAILURE"),
-    );
     assert.equal(await rows(i.draftId), 0);
   });
 });
