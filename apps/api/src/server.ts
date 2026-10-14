@@ -117,6 +117,7 @@ import { requestAuthorityOf } from "./request-authority.js";
 import { sendProblem, singleValued } from "./http.js";
 import { registerSessionRoutes, type SessionRoutesOptions } from "./sessions.js";
 import { registerPublicRoutes, type PublicApiOptions } from "./public-routes.js";
+import { registerOptOutRoutes, type OptOutRoutesOptions } from "./outreach/opt-out-route.js";
 import { HEALTH_PATHS, registerHealthRoutes, type HealthOptions } from "./health.js";
 
 /** Request and socket deadlines (10 "Request envelope": a reverse proxy's limit is not the only guard; review R36). */
@@ -220,6 +221,8 @@ export interface ApiServerOptions {
   readonly sessions?: Omit<SessionRoutesOptions, "validator" | "refuseUnauthenticated" | "refuseCredentials" | "sink">;
   /** The two public routes of B11 W5b (no authentication), registered when bound; without it neither route exists. */
   readonly publicApi?: PublicApiOptions;
+  /** The public opt-out routes of B12 (keys + store; the network and sink come from the server). */
+  readonly optOut?: Omit<OptOutRoutesOptions, "clientNetwork" | "sink">;
   readonly validator: SchemaValidator;
   readonly clock: Clock;
   readonly ids: IdGenerator;
@@ -585,6 +588,9 @@ export function createApiServer(options: ApiServerOptions): FastifyInstance {
       sink,
       onUnavailable: options.onUnavailable ?? sink,
     });
+  }
+  if (options.optOut !== undefined) {
+    registerOptOutRoutes(app, { ...options.optOut, clientNetwork: (address) => (address === undefined || address === "" ? null : clientNetworkOf(address)), sink });
   }
   return app;
 }
