@@ -6876,7 +6876,7 @@
             ]
           },
           "422": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 4 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -6910,6 +6910,12 @@
                 "reason": "BODY_DIGEST_MISMATCH",
                 "layer": "COMMAND",
                 "meaning": "a compiled plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10)"
+              },
+              {
+                "code": "TARGET_STALE",
+                "reason": null,
+                "layer": "COMMAND",
+                "meaning": "the audit's target contract was superseded (R2-026): no plan is born on it"
               },
               {
                 "code": "INTEGRITY_FAILURE",
@@ -15610,7 +15616,7 @@
             ]
           },
           "422": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 4 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -15638,6 +15644,12 @@
                 "reason": "RESPONSE_CONTRACT_VIOLATION",
                 "layer": "PLATFORM",
                 "meaning": "the reply its route's contract refused was not sent (R23, N13)"
+              },
+              {
+                "code": "TARGET_STALE",
+                "reason": null,
+                "layer": "COMMAND",
+                "meaning": "the plan's target contract was superseded (R2-026): no revision is born on it; its re-check plan is the way on"
               },
               {
                 "code": "INTEGRITY_FAILURE",
@@ -18238,7 +18250,7 @@
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 9 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 10 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -18311,11 +18323,17 @@
                 "reason": "STAGE_TARGET_MISMATCH",
                 "layer": "COMMAND",
                 "meaning": "the stage's target instance is not the project's current target: explicit recovery, not guessed IDs"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "PARENT_IDENTITY_UNDER_RECONCILIATION",
+                "layer": "COMMAND",
+                "meaning": "a parent stage holds an open receipt reconciliation: its identities are not settled, so no child continues from them (R2-023, R2-025)"
               }
             ]
           },
           "422": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 4 outcomes of this operation answered 422, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -18349,6 +18367,12 @@
                 "reason": "RECEIPT_DIGEST_MISMATCH",
                 "layer": "COMMAND",
                 "meaning": "the stored receipt mapping is not the mapping its digest names"
+              },
+              {
+                "code": "TARGET_STALE",
+                "reason": null,
+                "layer": "COMMAND",
+                "meaning": "the target contract the stage's plan binds is no longer a confirmed, current contract (R2-026): nothing was continued"
               }
             ]
           },
@@ -18755,7 +18779,7 @@
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 9 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 11 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -18824,9 +18848,21 @@
               },
               {
                 "code": "PRECONDITION_FAILED",
-                "reason": "RECEIPT_ALREADY_SUBMITTED",
+                "reason": "RECEIPT_FOREIGN_STAGE",
                 "layer": "COMMAND",
-                "meaning": "these exact receipt bytes were already submitted for the stage: a correction is new evidence"
+                "meaning": "a receipt row's correlation key is not this stage's for its source identity: the receipt belongs to another stage (R2-024), nothing was recorded"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "PARENT_STAGE_NOT_VERIFIED",
+                "layer": "COMMAND",
+                "meaning": "a required parent stage is not verified, or its workflow lapsed: a child receipt binds only to verified parent identities"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "CHILD_EDGE_BLOCKED",
+                "layer": "COMMAND",
+                "meaning": "the receipt claims MATCHED for a child source whose parent identity is not MATCHED in the parent's latest receipt (R2-023): nothing was recorded"
               }
             ]
           },
@@ -40794,6 +40830,38 @@
             "pattern": "Z$",
             "description": "When the approver recorded the continuation (the database's instant); absent before."
           },
+          "reconciliation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reconciliationId",
+              "state",
+              "contentHash",
+              "openedAt"
+            ],
+            "properties": {
+              "reconciliationId": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "OPEN"
+                ]
+              },
+              "contentHash": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "openedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              }
+            },
+            "description": "The reconciliation request a differing receipt for the finalized stage opened (R2-025: a reconciliation, never an overwrite); the stage's identity and receipts are unchanged. Present when the answered receipt bytes are the reconciliation's."
+          },
           "permittedActions": {
             "type": "array",
             "maxItems": 2,
@@ -42713,6 +42781,9 @@
               "PARENT_STAGE_NOT_VERIFIED",
               "CHILD_PLAN_NOT_APPROVED",
               "STAGE_TARGET_MISMATCH",
+              "RECEIPT_FOREIGN_STAGE",
+              "CHILD_EDGE_BLOCKED",
+              "PARENT_IDENTITY_UNDER_RECONCILIATION",
               "CAPABILITY_NOT_ACCEPTED",
               "CAPABILITY_PROFILE_UNCHANGED",
               "CAPABILITY_NOT_RESTRICTABLE",
@@ -46917,6 +46988,52 @@
             "type": "integer",
             "minimum": 0,
             "description": "How many target objects the stored body describes."
+          },
+          "supersedes": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "contractId",
+                "supersededAt"
+              ],
+              "properties": {
+                "contractId": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                },
+                "supersededAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                }
+              }
+            },
+            "description": "The project's current contracts this confirmation superseded, each with the database's instant (R2-026: a confirmed newer contract supersedes every current contract of its project, no equivalence branch). Present only on a confirmation that superseded one."
+          },
+          "recheckPlanIds": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+            },
+            "description": "One re-check plan per APPROVED plan bound to a superseded contract, born VALIDATION_REQUIRED with the old body and only the target replaced: a previously approved plan never survives automatically (R2 05:121); validate and approve it again."
+          },
+          "includedPaths": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "type": "string",
+              "enum": [
+                "REPAIR",
+                "REQUEST_REFUND",
+                "NEW_SCOPE"
+              ]
+            },
+            "description": "What a paid scope bound to a superseded contract keeps: REPAIR (re-bind through the re-check plan's validation and approval, no charge), REQUEST_REFUND (the unconsumed cents) and NEW_SCOPE. The paid authorization stays unconsumed."
           },
           "permittedActions": {
             "type": "array",

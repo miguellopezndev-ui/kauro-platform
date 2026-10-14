@@ -985,6 +985,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | NO_SEMANTIC_CHANGE | — | always | COMMAND | the patch compiles to the body the plan already has |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
+| 422 | TARGET_STALE | — | — | — | COMMAND | the plan's target contract was superseded (R2-026): no revision is born on it; its re-check plan is the way on |
 | 422 | INTEGRITY_FAILURE | BODY_DIGEST_MISMATCH | — | — | COMMAND | a plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10) |
 | 422 | INTEGRITY_FAILURE | CORE_SERVICES_UNAVAILABLE | — | — | COMMAND | no adapter of the Intelligence core is bound in this edition (D8-PORT-1): nothing was written |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
@@ -1700,7 +1701,9 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | RECEIPT_INSTANCE_MISMATCH | — | — | COMMAND | the receipt was produced for another target instance than the stage's |
 | 409 | PRECONDITION_FAILED | RECEIPT_PACKAGE_MISMATCH | — | — | COMMAND | sourcePackageHash is not the stage's exact package |
 | 409 | PRECONDITION_FAILED | RECEIPT_FOREIGN_IDS | — | — | COMMAND | the receipt names source identities that are not members of the stage: nothing was recorded |
-| 409 | PRECONDITION_FAILED | RECEIPT_ALREADY_SUBMITTED | — | — | COMMAND | these exact receipt bytes were already submitted for the stage: a correction is new evidence |
+| 409 | PRECONDITION_FAILED | RECEIPT_FOREIGN_STAGE | — | — | COMMAND | a receipt row's correlation key is not this stage's for its source identity: the receipt belongs to another stage (R2-024), nothing was recorded |
+| 409 | PRECONDITION_FAILED | PARENT_STAGE_NOT_VERIFIED | — | — | COMMAND | a required parent stage is not verified, or its workflow lapsed: a child receipt binds only to verified parent identities |
+| 409 | PRECONDITION_FAILED | CHILD_EDGE_BLOCKED | — | — | COMMAND | the receipt claims MATCHED for a child source whose parent identity is not MATCHED in the parent's latest receipt (R2-023): nothing was recorded |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
@@ -1745,9 +1748,11 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | PARENT_STAGE_NOT_VERIFIED | — | — | COMMAND | a required parent stage is not verified, or its workflow lapsed |
 | 409 | PRECONDITION_FAILED | CHILD_PLAN_NOT_APPROVED | — | — | COMMAND | the plan the stage belongs to is not an APPROVED plan |
 | 409 | PRECONDITION_FAILED | STAGE_TARGET_MISMATCH | — | — | COMMAND | the stage's target instance is not the project's current target: explicit recovery, not guessed IDs |
+| 409 | PRECONDITION_FAILED | PARENT_IDENTITY_UNDER_RECONCILIATION | — | — | COMMAND | a parent stage holds an open receipt reconciliation: its identities are not settled, so no child continues from them (R2-023, R2-025) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 422 | INTEGRITY_FAILURE | RECEIPT_DIGEST_MISMATCH | — | — | COMMAND | the stored receipt mapping is not the mapping its digest names |
+| 422 | TARGET_STALE | — | — | — | COMMAND | the target contract the stage's plan binds is no longer a confirmed, current contract (R2-026): nothing was continued |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
 
@@ -1875,6 +1880,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 422 | INTEGRITY_FAILURE | BODY_DIGEST_MISMATCH | — | — | COMMAND | a compiled plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10) |
+| 422 | TARGET_STALE | — | — | — | COMMAND | the audit's target contract was superseded (R2-026): no plan is born on it |
 | 422 | INTEGRITY_FAILURE | CORE_SERVICES_UNAVAILABLE | — | — | COMMAND | no adapter of the Intelligence core is bound in this edition (D8-PORT-1): nothing was written |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
