@@ -113,6 +113,8 @@ async function runBankSweeps(rt: PaymentRuntime): Promise<void> {
 
 /** One bounded pass over up to `agencies` agencies holding stored payment operations, up to `limit` attempts of each. */
 export async function runSweepPass(rt: PaymentRuntime, options: { readonly agencies?: number; readonly limit?: number; readonly after?: AgencyId } = {}): Promise<SweepPass> {
+  // the bank sweeps first: each takes its own locks in its first unit of work (ACH-ROUTE §7.28), the card attempts' pass follows
+  await runBankSweeps(rt);
   const now = rt.clock.now();
   const startedBefore = toUtcInstant(Date.parse(now) - CLAIM_WINDOW_SECONDS * 1000);
   const agencies = await rt.assembly.commerce.run(serviceContext(rt), (uow) => paymentSweepsOf(uow).agenciesWithPayments(options.agencies ?? 50, options.after ?? null));
@@ -144,6 +146,5 @@ export async function runSweepPass(rt: PaymentRuntime, options: { readonly agenc
       }
     }
   }
-  await runBankSweeps(rt);
   return { agencies: agencies.length, cancelled, watched };
 }

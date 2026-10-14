@@ -1,4 +1,4 @@
--- Migration 0063 (provisional number; the coordinator renumbers at merge): prospects are agencies and companies (owner decision D-33,
+-- Migration 0064 (provisional number; the coordinator renumbers at merge): prospects are agencies and companies (owner decision D-33,
 -- 2026-10-13, which supersedes the agency-only prospecting of A3 3.7 and design decision D10-PROS-1's segment clause).
 --
 -- 0029 admitted only the AGENCY segment in kauro.prospect_source_evidence (constraint prospect_source_evidence_agency_segment), so a
