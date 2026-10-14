@@ -23,6 +23,19 @@ export interface ContentSecurityPolicyOptions {
 const NONCE = /^[A-Za-z0-9+/]{22}==$/;
 const HTTPS_ORIGIN = /^https:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 
+/**
+ * The one upload origin of the deployment (D-SCR-3): the configured value when it is exactly one https origin (no path, no wildcard, no
+ * credentials), otherwise null. Null means the upload is unavailable and the policy gains no origin; a malformed value never widens it.
+ */
+export function uploadOriginOrNull(value: string | undefined): string | null {
+  return value !== undefined && HTTPS_ORIGIN.test(value) ? value : null;
+}
+
+/** The extra connect-src origins uploads need: exactly the configured origin, or none. */
+export function uploadConnectOrigins(origin: string | null): ReadonlyArray<string> {
+  return origin === null ? [] : [origin];
+}
+
 /** A fresh 128-bit nonce, base64 (the CSP nonce-source grammar). */
 export function newNonce(): string {
   const bytes = new Uint8Array(16);
