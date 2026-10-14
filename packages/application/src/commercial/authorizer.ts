@@ -11,6 +11,9 @@
  *  authorizeStatementSeller the same identity checks → the caller's own seller row in ACTIVE, SUSPENDED or TERMINATED (a terminated seller keeps its
  *                           home, statements and support route, R2-066; B12 lane L-HOME). A CANDIDATE and a person with no seller row are
  *                           CORPORATE_ROLE_MISSING. It admits statements and the home only: every prospect-data command keeps authorizeSeller.
+ *  authorizeSellerSelf      the same identity checks → the caller's own seller row, read after its transition lock, in ANY state (B12 L-OWNER:
+ *                           the payout destination change is the seller's own fact before activation and after termination, 0029
+ *                           seller_payout_destinations_seller_change). A missing row or another person's row is CORPORATE_ROLE_MISSING.
  *  authorizeCorporateOwner  the same identity checks → the caller's own ACTIVE KAURO_OWNER grant, read after its transition lock.
  *  authorizeCommercialService the verified service identity holds the command's role in the code-owned SERVICE_ROLE_TABLE
  *                           (COMMISSION_SERVICE, FINANCE_SERVICE or, since package B18, OPERATIONS_SERVICE) and was issued for this deployment's environment.
@@ -41,6 +44,7 @@ export interface CommercialAuthorizer {
   authorizeSeller(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts }): Promise<SellerDecision>;
   /** The caller's own seller in any state but CANDIDATE, read after its transition lock (L1); carries the state read. */
   authorizeStatementSeller(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts }): Promise<StatementSellerDecision>;
+  authorizeSellerSelf(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts }): Promise<SellerDecision>;
   authorizeCorporateOwner(uow: CommerceUnitOfWork, request: { readonly identity: IdentityFacts }): Promise<OperatorDecision>;
   authorizeCommercialService(request: {
     readonly identity: ServiceIdentity;
@@ -91,6 +95,15 @@ export function createCommercialAuthorizer(deps: CommercialAuthorizerDependencie
         return deny("NOT_AUTHORIZED", "CORPORATE_ROLE_MISSING");
       }
       return { kind: "ALLOW", userId: identity.userId, sellerId: seller.sellerId, sellerState: seller.state, policyVersion: COMMERCE_POLICY_VERSION };
+    },
+
+    async authorizeSellerSelf(uow, request) {
+      const identity = request.identity;
+      const refused = await refuseUnadmittedPerson(uow, identity);
+      if (refused !== null) return refused;
+      const seller = await deps.principals.sellerOf(uow, identity.userId);
+      if (seller === null || seller.userId !== identity.userId) return deny("NOT_AUTHORIZED", "CORPORATE_ROLE_MISSING");
+      return { kind: "ALLOW", userId: identity.userId, sellerId: seller.sellerId, policyVersion: COMMERCE_POLICY_VERSION };
     },
 
     async authorizeCorporateOwner(uow, request) {

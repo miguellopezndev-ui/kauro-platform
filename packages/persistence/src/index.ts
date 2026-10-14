@@ -163,6 +163,8 @@ export type { ConnectionSecurityInput, DatabaseTls, VerifiedSslOptions } from ".
 // package B12 (lane K1): the outreach writers with their T2 subjects, the ordered advisory locks and the effect_now lease fence (plan §L)
 export { PgOutreachWriters } from "./repositories/commercial-outreach.js";
 export type { OutreachIntentKeys, NewOutreachIntent, IntentAnswer } from "./repositories/commercial-outreach.js";
+export { PgOwnerToolStore, PgControlPlaneRecords, ownerToolsOf, manifestHashOf } from "./repositories/commercial-owner-tools.js";
+export type { OwnerToolSeller, OwnerToolSellerState, OwnerToolAgreement, OwnerToolDestination, OwnerToolRecord, PayoutDestinationState, ShareClaim, NewAgreement, NewAllocation } from "./repositories/commercial-owner-tools.js";
 export { OutreachLocks, holdOutreachLease } from "./outreach-access.js";
 // package B12 (lane L-DRAFT): drafts, contents and sales resources (CMD061, PutOutreachContent, PublishSalesResource and the reads)
 export { PgOutreachDrafts } from "./repositories/commercial-outreach-drafts.js";

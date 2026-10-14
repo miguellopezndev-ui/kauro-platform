@@ -13,6 +13,8 @@ import { CHANGE_CAPABILITY_OUTCOMES, RESTRICT_CAPABILITY_OUTCOMES } from "./capa
 import { ACTIVATE_SELLER_OUTCOMES, ASSIGN_ACCOUNT_OUTCOMES, CORPORATE_OWNER_ACCESS, TERMINATE_SELLER_OUTCOMES } from "./sellers/outcomes.js";
 import type { CommercialReadOperationId } from "./response-schemas.js";
 import * as B12 from "./outreach/outcomes.js";
+import { B12_PRODUCER_COMMANDS, B12_PRODUCER_SERVED_IDS, type B12ProducerCommandId } from "./sellers/owner-tools/contracts.js";
+import { ACTIVE_SELLER_ACCESS, B12_PRODUCER_OUTCOMES, SELLER_SELF_ACCESS } from "./sellers/owner-tools/outcomes.js";
 import {
   APPROVE_COMMISSION_PAYOUT_OUTCOMES,
   CLOSE_COMMISSION_PERIOD_OUTCOMES,
@@ -23,6 +25,14 @@ import {
 } from "./statements/outcomes.js";
 
 const { EVERY_ROUTE, PATH_IDS, TENANT, AGENCY_HEADER, EVERY_READ, NO_QUERY, COOKIE_CSRF } = OUTCOME_BLOCKS;
+
+/** An owner tool (lane L-OWNER, plan companion §P): the path id when the route has one, its principal's access, its own outcomes. */
+const producerCommand = (id: B12ProducerCommandId): ReadonlyArray<ProblemOutcome> => {
+  const spec = B12_PRODUCER_COMMANDS[id];
+  const access = spec.role === "KAURO_OWNER" ? CORPORATE_OWNER_ACCESS : spec.role === "SELLER_SELF" ? SELLER_SELF_ACCESS : ACTIVE_SELLER_ACCESS;
+  return closedCatalogue(id, [...EVERY_ROUTE, ...COOKIE_CSRF, ...(spec.aggregateParam !== null ? PATH_IDS : []), ...access, ...B12_PRODUCER_OUTCOMES[id]]);
+};
+const PRODUCER_COMMAND_OUTCOMES = Object.fromEntries(B12_PRODUCER_SERVED_IDS.map((id) => [id, producerCommand(id)])) as Readonly<Record<B12ProducerCommandId, ReadonlyArray<ProblemOutcome>>>;
 
 /** The corporate principals of the sales commands (D10-CTX-1, D10-CTX-2): a person without the ACTIVE seller row or owner grant the command needs. */
 const CORPORATE_ACCESS: ReadonlyArray<ProblemOutcome> = Object.freeze([
@@ -123,6 +133,8 @@ export const COMMERCIAL_COMMAND_OUTCOMES: Readonly<Record<CommercialServedRouteC
   WithdrawOutreachChannelPolicy: closedCatalogue("WithdrawOutreachChannelPolicy", [...EVERY_ROUTE, ...COOKIE_CSRF, ...CORPORATE_OWNER_ACCESS, ...B12.WITHDRAW_OUTREACH_CHANNEL_POLICY_OUTCOMES]),
   RecordProspectSource: closedCatalogue("RecordProspectSource", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.RECORD_PROSPECT_SOURCE_OUTCOMES]),
   RecordProspectContact: closedCatalogue("RecordProspectContact", [...EVERY_ROUTE, ...COOKIE_CSRF, ...PATH_IDS, ...B12.OUTREACH_SELLER_OR_OWNER_ACCESS, ...B12.RECORD_PROSPECT_CONTACT_OUTCOMES]),
+  // package B12 lane L-OWNER: the owner tools
+  ...PRODUCER_COMMAND_OUTCOMES,
 });
 
 /** The closed problem catalogue of each served B10 read route (GetCommissionStatement: no query, the path id, the seller's or owner's access). */

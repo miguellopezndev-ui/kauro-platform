@@ -29,6 +29,7 @@ import {
 import { VIEW_MEMBER_KIT } from "../api/view-kit.js";
 import { MONEY_PATTERN } from "../commerce/response-schemas.js";
 import { COMMERCIAL_VIEW_VOCABULARY as V } from "./vocabulary.js";
+import { B12_PRODUCER_COMMAND_RESPONSES, B12_PRODUCER_VIEW_DEFINITIONS } from "./sellers/owner-tools/views.js";
 
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
 const { ID, VERSION, HASH, UTC, COUNT, LABEL, UUID_PATTERN } = RESPONSE_FIELD_VOCABULARY;
@@ -722,6 +723,7 @@ export const COMMERCIAL_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object
     },
   },
   ...B12_VIEW_DEFINITIONS,
+  ...B12_PRODUCER_VIEW_DEFINITIONS,
 ] satisfies ReadonlyArray<ViewDefinition>);
 
 /** The success reply of each B10 command: status and the view its COMPLETED envelope carries. B10 answers synchronously, except CMD027's replacement whose re-binding timed out (ACCEPTED). */
@@ -761,6 +763,8 @@ export const COMMERCIAL_COMMAND_RESPONSES = Object.freeze({
   WithdrawOutreachChannelPolicy: { status: 200, view: "OutreachChannelPolicyView", accepted: false },
   RecordProspectSource: { status: 201, view: "ProspectSourceView", accepted: false },
   RecordProspectContact: { status: 201, view: "ProspectContactView", accepted: false },
+  // package B12 lane L-OWNER: the owner tools (plan companion §P), all synchronous
+  ...B12_PRODUCER_COMMAND_RESPONSES,
 } as const);
 export type CommercialServedCommandId = keyof typeof COMMERCIAL_COMMAND_RESPONSES;
 
