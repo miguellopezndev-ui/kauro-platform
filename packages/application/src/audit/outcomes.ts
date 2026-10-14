@@ -48,7 +48,9 @@ const COMMAND_SPECIFIC: Readonly<Record<AuditCommandId, ReadonlyArray<ProblemOut
     outcome("COMMAND", "PRECONDITION_FAILED", "RECEIPT_PACKAGE_MISMATCH", "sourcePackageHash is not the stage's exact package"),
     outcome("COMMAND", "INVALID_REQUEST", "RECEIPT_INVALID", "the receipt document is not the closed source-to-target mapping shape"),
     outcome("COMMAND", "PRECONDITION_FAILED", "RECEIPT_FOREIGN_IDS", "the receipt names source identities that are not members of the stage: nothing was recorded"),
-    outcome("COMMAND", "PRECONDITION_FAILED", "RECEIPT_ALREADY_SUBMITTED", "these exact receipt bytes were already submitted for the stage: a correction is new evidence"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "RECEIPT_FOREIGN_STAGE", "a receipt row's correlation key is not this stage's for its source identity: the receipt belongs to another stage (R2-024), nothing was recorded"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "PARENT_STAGE_NOT_VERIFIED", "a required parent stage is not verified, or its workflow lapsed: a child receipt binds only to verified parent identities"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "CHILD_EDGE_BLOCKED", "the receipt claims MATCHED for a child source whose parent identity is not MATCHED in the parent's latest receipt (R2-023): nothing was recorded"),
   ],
   CMD041: [
     NOT_VISIBLE("the import stage"),
@@ -60,6 +62,8 @@ const COMMAND_SPECIFIC: Readonly<Record<AuditCommandId, ReadonlyArray<ProblemOut
     outcome("COMMAND", "PRECONDITION_FAILED", "CHILD_PLAN_NOT_APPROVED", "the plan the stage belongs to is not an APPROVED plan"),
     outcome("COMMAND", "INTEGRITY_FAILURE", "RECEIPT_DIGEST_MISMATCH", "the stored receipt mapping is not the mapping its digest names"),
     outcome("COMMAND", "PRECONDITION_FAILED", "STAGE_TARGET_MISMATCH", "the stage's target instance is not the project's current target: explicit recovery, not guessed IDs"),
+    outcome("COMMAND", "PRECONDITION_FAILED", "PARENT_IDENTITY_UNDER_RECONCILIATION", "a parent stage holds an open receipt reconciliation: its identities are not settled, so no child continues from them (R2-023, R2-025)"),
+    outcome("COMMAND", "TARGET_STALE", null, "the target contract the stage's plan binds is no longer a confirmed, current contract (R2-026): nothing was continued"),
   ],
   CMD020: [
     NOT_VISIBLE("the revision"),
@@ -85,6 +89,7 @@ const COMMAND_SPECIFIC: Readonly<Record<AuditCommandId, ReadonlyArray<ProblemOut
     outcome("COMMAND", "INVALID_REQUEST", "PATCH_EFFECT_NOT_PERMITTED", "the candidate decisions ask for an effect the plan does not permit, or compile to a plan of another source or target than the audit's (N10)", { fieldCodes: ["PATCH_EFFECT_NOT_PERMITTED"] }),
     outcome("COMMAND", "INVALID_REQUEST", "PATCH_MALFORMED", "the candidate decisions are not a decisions document", { fieldCodes: ["PATCH_MALFORMED"] }),
     outcome("COMMAND", "INTEGRITY_FAILURE", "BODY_DIGEST_MISMATCH", "a compiled plan body is not the body its KAURO_PLAN_BODY_V1 hash names (N10)"),
+    outcome("COMMAND", "TARGET_STALE", null, "the audit's target contract was superseded (R2-026): no plan is born on it"),
     CORE_SERVICES_UNAVAILABLE,
   ],
   CMD024: [

@@ -4,10 +4,11 @@
  * never the sealed revision's or the target's hash, the requesting membership, the profile evidence, a step, a task, a provider or the
  * pool the grant was carved from — and shared by CancelAudit's answer and the GetAudit read, so the two show the audit the same way.
  */
-import type { AuditRecord, CostGrantRecord, ImportStageRecord, MembershipRole, StageReceiptRecord, TargetContractLifecycle } from "@kauro/domain";
+import type { AuditRecord, CostGrantRecord, ImportStageRecord, MembershipRole, StageReceiptReconciliationRecord, StageReceiptRecord, TargetContractLifecycle, TargetContractRecord } from "@kauro/domain";
 import { findTransition, roleSatisfies } from "@kauro/domain";
 import { CANCEL_AUDIT, CONFIRM_TARGET_CONTRACT, CONTINUE_STAGE, CREATE_PLAN, SUBMIT_STAGE_RECEIPT } from "../contracts.js";
 import type { AuditResourceAction, AuditView, ImportStageAction, ImportStageView, TargetContractAction, TargetContractView } from "../views.js";
+import { TARGET_DRIFT_PATHS } from "../views.js";
 import { utc } from "./shared.js";
 
 /**
@@ -49,7 +50,12 @@ export function targetContractActions(role: MembershipRole, contract: Pick<Targe
   return roleSatisfies(CONFIRM_TARGET_CONTRACT.role, role) && contract.state === "DRAFT" ? ["ConfirmTargetContract"] : [];
 }
 
-export function targetContractView(contract: TargetContractLifecycle, objectCount: number, role: MembershipRole): TargetContractView {
+export function targetContractView(
+  contract: TargetContractLifecycle,
+  objectCount: number,
+  role: MembershipRole,
+  supersession: { readonly superseded: ReadonlyArray<TargetContractRecord>; readonly recheckPlanIds: ReadonlyArray<string> } | null = null,
+): TargetContractView {
   return {
     contractId: contract.contractId,
     projectId: contract.projectId,
@@ -65,6 +71,13 @@ export function targetContractView(contract: TargetContractLifecycle, objectCoun
     version: contract.version,
     state: contract.state,
     objectCount,
+    ...(supersession !== null && supersession.superseded.length > 0
+      ? {
+          supersedes: supersession.superseded.map((c) => ({ contractId: c.contractId, supersededAt: utc(c.supersededAt as NonNullable<typeof c.supersededAt>) })),
+          recheckPlanIds: [...supersession.recheckPlanIds],
+          includedPaths: [...TARGET_DRIFT_PATHS],
+        }
+      : {}),
     permittedActions: targetContractActions(role, contract),
   };
 }
@@ -81,7 +94,7 @@ export function importStageActions(role: MembershipRole, stage: Pick<ImportStage
   return out;
 }
 
-export function importStageView(stage: ImportStageRecord, receipt: StageReceiptRecord | null, role: MembershipRole): ImportStageView {
+export function importStageView(stage: ImportStageRecord, receipt: StageReceiptRecord | null, role: MembershipRole, reconciliation: StageReceiptReconciliationRecord | null = null): ImportStageView {
   return {
     stageId: stage.stageId,
     projectId: stage.projectId,
@@ -105,6 +118,9 @@ export function importStageView(stage: ImportStageRecord, receipt: StageReceiptR
         }
       : {}),
     ...(stage.continuedAt !== undefined ? { continuedAt: utc(stage.continuedAt) } : {}),
+    ...(reconciliation !== null
+      ? { reconciliation: { reconciliationId: reconciliation.reconciliationId, state: reconciliation.state, contentHash: reconciliation.contentHash, openedAt: utc(reconciliation.openedAt) } }
+      : {}),
     permittedActions: importStageActions(role, stage),
   };
 }
