@@ -42725,7 +42725,27 @@
               "NO_SOFT_DEADLINE",
               "SOFT_DEADLINE_PASSED",
               "NO_EXTENSION_ROOM",
-              "PROJECT_DELETION_REQUESTED"
+              "PROJECT_DELETION_REQUESTED",
+              "OUTREACH_ROUTE_FORBIDDEN",
+              "SEND_UNCERTAIN_UNRESOLVED",
+              "OUTREACH_GRANT_INVALID",
+              "SENDER_NOT_VERIFIED",
+              "OUTREACH_CAP_REACHED",
+              "RESOURCE_NOT_CURRENT",
+              "OUTREACH_PAUSED",
+              "OUTREACH_REVIEW_INVALID",
+              "OUTREACH_ALREADY_SENT",
+              "OUTREACH_CALENDAR_UNAVAILABLE",
+              "CADENCE_CLOSED",
+              "OUTSIDE_BUSINESS_DAY",
+              "FIRST_NOT_SENT",
+              "OUTREACH_JURISDICTION_UNREVIEWED",
+              "OUTREACH_COMPLIANCE_UNCONFIGURED",
+              "DRAFT_CLOSED",
+              "OUTREACH_BINDING",
+              "SEND_FENCED",
+              "ACTIVITY_EVIDENCE",
+              "OUTREACH_SUPPRESSION_SCOPE"
             ]
           },
           "correlationId": {
