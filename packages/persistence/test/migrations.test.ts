@@ -154,7 +154,7 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // B16 L2 CMD060: the one retention extension, its guard path B (KA085) and the request role update grant (provisional number)
     "0069_b16_retention_extensions.sql",
     // Payments V1 PV1-SETTLE: the bank-route settlement observation (CMD215), its event and the route's provider-available read (provisional number)
-    "0070_bank_settlement.sql",
+    "0071_bank_settlement.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

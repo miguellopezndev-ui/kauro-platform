@@ -1,4 +1,4 @@
--- 0062 — Payments V1, lane PV1-SETTLE (CMD215 RecordSettlementObservation; PROVISIONAL number, renumbered at merge).
+-- 0071 — Payments V1, lane PV1-SETTLE (CMD215 RecordSettlementObservation; PROVISIONAL number, renumbered at merge).
 --
 -- Authority: docs/design/ACH-ROUTE.md r12 §7.25 (ST1, ST2), R2-085 (separate capture / held / withdrawn / bank-available facts; no
 -- payout from imaginary liquidity; never grade from a screenshot), B09 D-SETTLE-B1 and D-LEDGER-B5, docs/design/PV1-SETTLE.md

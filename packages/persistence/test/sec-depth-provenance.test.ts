@@ -9,7 +9,7 @@ let h: Harness;
 before(async () => { h = await start(); });
 after(async () => { await h.stop(); });
 
-test("SEC-DEPTH catalog (R17, definers): the only SECURITY DEFINER routines of kauro, kauro_meta and public are the justified, owner-owned, search_path-pinned registration of a bank payment route (executable by kauro_app alone) and the read-only provider-available balance of a payment route (PV1-SETTLE D-SET-5, migration 0070, executable by kauro_payment alone)", async () => {
+test("SEC-DEPTH catalog (R17, definers): the only SECURITY DEFINER routines of kauro, kauro_meta and public are the justified, owner-owned, search_path-pinned registration of a bank payment route (executable by kauro_app alone) and the read-only provider-available balance of a payment route (PV1-SETTLE D-SET-5, migration 0071, executable by kauro_payment alone)", async () => {
   const r = await h.oracle.query<{ sig: string; owner: string; config: string[] | null; runtime: string[] }>(
     `SELECT p.oid::regprocedure::text AS sig, pg_get_userbyid(p.proowner) AS owner, p.proconfig AS config,
             ARRAY(SELECT g FROM unnest(ARRAY['kauro_app','kauro_control','kauro_assurance','kauro_validator','kauro_ingress','kauro_payment','kauro_commission']) g
