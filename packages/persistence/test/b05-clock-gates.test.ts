@@ -32,7 +32,7 @@ after(async () => {
 function ownerOfFile(tag: string): string {
   const n = Number(tag);
   if (n <= 8 || n === 54 || n === 67) return "B06";
-  if ((n >= 9 && n <= 12) || n === 18 || n === 20) return "B07";
+  if ((n >= 9 && n <= 12) || n === 18 || n === 20 || n === 72) return "B07";
   if ((n >= 13 && n <= 17) || n === 19 || n === 53) return "B09";
   if (n === 21 || n === 22 || n === 24 || n === 44) return "B08";
   if (n === 23 || n === 58 || n === 61 || n === 66 || n === 68 || n === 70) return "B05";
