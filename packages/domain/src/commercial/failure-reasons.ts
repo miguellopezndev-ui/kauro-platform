@@ -39,7 +39,6 @@ export const COMMERCIAL_FAILURE_REASONS = [
   // attribution (CMD047; 17 "The default is one attribution owner"; A3 7.1; KC003)
   "ATTRIBUTION_EXISTS",
   "SHARES_NOT_WHOLE",
-  "IN_HOUSE_NOT_ATTRIBUTABLE",
   // assignment and termination (CMD048, CMD050; 17 "Assignment changes", "Termination and tail"; KC011)
   "SERVICE_ASSIGNMENT_UNPREPARED",
   "TAIL_NOT_ENUMERATED",
