@@ -93,10 +93,10 @@ function securedSettingsOf(config: ConnectionSecurityConfig & { readonly host: s
   return { ...(security.password === undefined ? {} : { password: security.password }), ...(security.tls === undefined ? {} : { ssl: sslOptionsOf(security.tls) }) };
 }
 
-export type RuntimeRole = "kauro_app" | "kauro_control" | "kauro_assurance" | "kauro_validator" | "kauro_ingress" | "kauro_payment" | "kauro_commission";
+export type RuntimeRole = "kauro_app" | "kauro_control" | "kauro_assurance" | "kauro_validator" | "kauro_ingress" | "kauro_payment" | "kauro_commission" | "kauro_outreach";
 
 /** The runtime groups: B06's five, package B09's payment service (0013) and package B10's commission service (0028; D10-CTX-1). */
-export const RUNTIME_ROLES: ReadonlyArray<RuntimeRole> = Object.freeze(["kauro_app", "kauro_control", "kauro_assurance", "kauro_validator", "kauro_ingress", "kauro_payment", "kauro_commission"]);
+export const RUNTIME_ROLES: ReadonlyArray<RuntimeRole> = Object.freeze(["kauro_app", "kauro_control", "kauro_assurance", "kauro_validator", "kauro_ingress", "kauro_payment", "kauro_commission", "kauro_outreach"]);
 
 export interface PoolConfig extends ConnectionSecurityConfig {
   readonly host: string;

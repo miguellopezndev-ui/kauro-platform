@@ -15,6 +15,7 @@
  */
 import { COMMERCE_FAILURE_REASONS } from "../commerce/failure-reasons.js";
 import { COMMERCIAL_FAILURE_REASONS } from "../commercial/failure-reasons.js";
+import { OUTREACH_FAILURE_REASONS } from "../commercial/outreach.js";
 import { EXECUTION_FAILURE_REASONS } from "./execution/failure-reasons.js";
 import { AUDIT_FAILURE_REASONS } from "./audit/failure-reasons.js";
 import { TARGET_FAILURE_REASONS } from "./target-contract.js";
@@ -334,6 +335,8 @@ export const FAILURE_REASONS = [
   ...RETENTION_EXTENSION_FAILURE_REASONS,
   // managed deletion of a project (package B16 lane L3: CMD042 RequestDeletion)
   ...DELETION_FAILURE_REASONS,
+  // outreach (package B12: CMD061..CMD064, the dispatcher D2..D5; KA095..KA098, KC028..KC037)
+  ...OUTREACH_FAILURE_REASONS,
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 
