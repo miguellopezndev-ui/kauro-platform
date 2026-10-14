@@ -259,12 +259,17 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/operations/bank-routes/:routeId/disable", "disableBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:disableBankRoute:200" } }],
       ["POST", "/api/v1/operations/bank-routes/:routeId/details", "replaceBankRouteDetails", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:replaceBankRouteDetails:200" } }],
       // the inbound side (Payments V1, lane PV1-INBOUND): the owner's manual credit commands, the statement import and the retirement
+      // the owner refund commands (Payments V1, lane L-REFUND): the treasury approval, the declaration and the record of a manual execution
+      ["POST", "/api/v1/operations/treasury-refunds/:treasuryRefundId/approve", "approveTreasuryRefund", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:approveTreasuryRefund:200" } }],
+      ["POST", "/api/v1/operations/refunds/:refundId/execution-declarations", "declareRefundExecution", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:declareRefundExecution:201" } }],
+      ["POST", "/api/v1/operations/execution-attempts/:attemptId/records", "recordRefundExecution", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:recordRefundExecution:200" } }],
       ["POST", "/api/v1/operations/bank-accounts/:accountRef/credits", "enterBankCredit", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:enterBankCredit:201" } }],
       ["POST", "/api/v1/operations/bank-credits/:creditId/confirmations", "confirmBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:confirmBankCredit:200" } }],
       ["POST", "/api/v1/operations/bank-credits/:creditId/attributions", "attributeBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:attributeBankCredit:200" } }],
       ["POST", "/api/v1/operations/bank-accounts/:accountRef/statement-imports", "importBankStatement", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:importBankStatement:201" } }],
       ["POST", "/api/v1/payment-orders/:orderId/retirements", "retireBankCheckout", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:retireBankCheckout:201" } }],
       ["GET", "/api/v1/operations/bank-routes/:routeId", "getBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankRoute:200" } }],
+      ["GET", "/api/v1/operations/execution-attempts", "listExecutionAttempts", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:listExecutionAttempts:200" } }],
       ["GET", "/api/v1/operations/bank-credits/:creditId", "getBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankCredit:200" } }],
       ["GET", "/api/v1/operations/bank-orders/:orderId/match-keys", "getBankOrderMatchKeys", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankOrderMatchKeys:200" } }],
       ["GET", "/api/v1/payment-orders/:orderId/transfer-instructions", "getTransferInstructions", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getTransferInstructions:200" } }],
