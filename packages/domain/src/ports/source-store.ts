@@ -40,6 +40,7 @@ import type {
   HoldReleaseId,
   ObjectHoldId,
   RetentionAnchorId,
+  RetentionExtensionId,
   RetentionId,
   SealAttemptId,
   SelectionManifestId,
@@ -63,6 +64,7 @@ import type {
   ProviderCancellationState,
   RejectionClass,
   RetentionAnchorRecord,
+  RetentionExtensionRow,
   RetentionRecordRow,
   RevisionQuota,
   SealedManifestRecord,
@@ -599,6 +601,33 @@ export interface RetentionRepository {
    * retention_record.expired.v1). The database refuses an expiry before the effective deadline; the hard deadline never moves.
    */
   expireRecord(retentionId: RetentionId, expectedVersion: number): Promise<VersionedWrite<RetentionRecordRow>>;
+  /** The record by id, as the tenant (request) or the work item's agency (control plane) sees it; null when not visible. */
+  recordById(retentionId: RetentionId): Promise<RetentionRecordRow | null>;
+  /**
+   * CMD060: every PAID_ORDINARY / PAID_STAGED record of the project, locked FOR NO KEY UPDATE in retention-id order (rule 11a: the
+   * lock is the record's; a concurrent expiry or publication is ordered before or after), as the locked rows read it. Other classes
+   * (UNPAID) are not returned: an UNPAID-only project has nothing to extend (C1).
+   */
+  lockPaidRecordsOfProject(projectId: ProjectId): Promise<ReadonlyArray<RetentionRecordRow>>;
+  /** The project's one extension, if it used it (CMD060: unique per project). */
+  extensionOfProject(projectId: ProjectId): Promise<RetentionExtensionRow | null>;
+  /** kauro.effect_now() as an exact instant: the server's instant of THIS statement, read after the caller's locks (rules 15/16). */
+  effectInstant(): Promise<string>;
+  /**
+   * CMD060: writes the project's one extension and moves the locked record's soft and effective deadlines in this unit of work:
+   * the extension row first (the database binds it to the record, the request session and the window), then
+   * `soft_deadline = least(soft + requestedSeconds, hard)`, `effective_deadline = least(soft, hard)`, version + 1 at
+   * expectedVersion. The caller publishes retention_record.extended.v1 at the returned record's version.
+   */
+  extendSoftDeadline(input: {
+    readonly extensionId: RetentionExtensionId;
+    readonly retentionId: RetentionId;
+    readonly expectedVersion: number;
+    readonly requestedSeconds: number;
+    readonly purpose: string;
+    readonly termsVersion: string;
+    readonly membershipId: MembershipId;
+  }): Promise<{ readonly extension: RetentionExtensionRow; readonly record: RetentionRecordRow }>;
   /** Control-plane discovery: ACTIVE records whose effective deadline has passed on the server clock. */
   findDue(limit: number): Promise<ReadonlyArray<{ readonly retentionId: RetentionId; readonly agencyId: AgencyId; readonly revisionId?: RevisionId }>>;
 }

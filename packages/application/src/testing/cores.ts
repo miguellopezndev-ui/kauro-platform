@@ -18,6 +18,8 @@ export {
   ContractFakeMigrationCore,
 } from "./contract-fake-migration-core.js";
 export type {
+  ContractFakeMigrationCoreOptions,
+  ContractFakeSourcePopulations,
   MigrationCoreCall,
   MigrationCoreExecuteStep,
   MigrationCoreExecutionFault,

@@ -164,6 +164,8 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/uploads/:uploadId/cancel", "CancelUpload", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD015" } }],
       ["POST", "/api/v1/revisions/:revisionId/selection", "SelectInputTables", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD016" } }],
       ["POST", "/api/v1/revisions/:revisionId/seal", "SealRevision", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD017" } }],
+      // package B16 L2 (CMD060): the one soft-deadline extension of a project, synchronous
+      ["POST", "/api/v1/projects/:projectId/retention-extensions", "RequestRetentionExtension", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD060" } }],
       // the two execution commands (B08 design §12): ExecuteProject answers the shared ACCEPTED envelope, CancelJob the job
       ["POST", "/api/v1/projects/:projectId/execute", "ExecuteProject", { 202: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:accepted" } }],
       ["POST", "/api/v1/jobs/:jobId/cancel", "CancelJob", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD037" } }],
@@ -180,6 +182,12 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/projects/:projectId/import-stages/:stageId/continue", "ContinueStage", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD041" } }],
       // the support package (B11 W4)
       ["POST", "/api/v1/projects/:projectId/support-cases", "CreateSupportCase", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD044" } }],
+      // the team package (B16, CMD003..CMD007): an invitation is created (201), the others edit (200)
+      ["POST", "/api/v1/agencies/:agencyId/invitations", "InviteMember", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD003" } }],
+      ["POST", "/api/v1/invitations/:invitationId/accept", "AcceptInvitation", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD004" } }],
+      ["POST", "/api/v1/memberships/:membershipId/capabilities", "ChangeMembership", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD005" } }],
+      ["POST", "/api/v1/memberships/:membershipId/revoke", "RevokeMembership", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD006" } }],
+      ["POST", "/api/v1/agencies/:agencyId/ownership-transfers", "TransferOwnership", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD007" } }],
       // the manual-10 reads (N16)
       ["GET", "/api/v1/agencies", "ListAgencies", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListAgencies" } }],
       ["GET", "/api/v1/agencies/:agencyId", "GetAgency", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetAgency" } }],
@@ -189,6 +197,9 @@ test("R23: every served route declares its replies (the route inventory the Open
       // the support reads (B11 W4), registered with the manual-10 reads (createReadHandlers)
       ["GET", "/api/v1/projects/:projectId/support-cases", "ListSupportCases", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListSupportCases" } }],
       ["GET", "/api/v1/support-cases/:caseId", "GetSupportCase", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetSupportCase" } }],
+      // the agency app's reads (B11 lane A1), registered with the manual-10 reads (createReadHandlers)
+      ["GET", "/api/v1/agencies/:agencyId/buyer-type", "GetBuyerType", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetBuyerType" } }],
+      ["GET", "/api/v1/agencies/:agencyId/projects", "ListProjects", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:ListProjects" } }],
       // the source reads (B07 design §9.1)
       ["GET", "/api/v1/revisions/:revisionId/selection-manifests/:selectionManifestId", "GetSelectionManifest", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetSelectionManifest" } }],
       ["GET", "/api/v1/revisions/:revisionId", "GetRevision", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:read:GetRevision" } }],
@@ -253,7 +264,7 @@ test("R23: every served route declares its replies (the route inventory the Open
       ["POST", "/api/v1/operations/bank-credits/:creditId/attributions", "attributeBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:attributeBankCredit:200" } }],
       ["POST", "/api/v1/operations/bank-accounts/:accountRef/statement-imports", "importBankStatement", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:importBankStatement:201" } }],
       ["POST", "/api/v1/operations/bank-accounts/:accountRef/settlements", "recordBankSettlement", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:recordBankSettlement:201" } }],
-      ["POST", "/api/v1/payment-orders/:orderId/retirements", "retireBankCheckout", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:retireBankCheckout:200" } }],
+      ["POST", "/api/v1/payment-orders/:orderId/retirements", "retireBankCheckout", { 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:retireBankCheckout:201" } }],
       ["GET", "/api/v1/operations/bank-routes/:routeId", "getBankRoute", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankRoute:200" } }],
       ["GET", "/api/v1/operations/bank-credits/:creditId", "getBankCredit", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankCredit:200" } }],
       ["GET", "/api/v1/operations/bank-orders/:orderId/match-keys", "getBankOrderMatchKeys", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:getBankOrderMatchKeys:200" } }],
@@ -261,6 +272,8 @@ test("R23: every served route declares its replies (the route inventory the Open
       // the commission group's service routes of package B10 (mandate B10-STATEMENTS-PAYOUTS), served in every edition, synchronous
       ["POST", "/api/v1/sales/commission-periods/:periodId/close", "CloseCommissionPeriod", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD051" } }],
       ["POST", "/api/v1/sales/statements/:statementId/reconcile-payout", "ReconcileCommissionPayout", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:CMD053" } }],
+      // the agency app's operational command (B11 lane A1): CMD101 SetBuyerType, 201 recorded, 200 the same value again
+      ["POST", "/api/v1/agencies/:agencyId/buyer-type", "setBuyerType", { 200: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:setBuyerType:200" }, 201: { contentType: "application/json", schemaId: "urn:kauro:api:v1:response:op:setBuyerType:201" } }],
     ].map(([m, u, o, d]) => [m, u, o, d, { contentType: "application/problem+json", schemaId: "Problem" }]),
   );
   // another server over the same real unit of work: an undeclared route is refused at registration, before any request

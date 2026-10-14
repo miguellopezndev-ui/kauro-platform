@@ -94,7 +94,15 @@ export interface CommandEnvelope<Body> {
 }
 
 export type CommandResult<View> =
-  | { readonly kind: "COMPLETED"; readonly status: 200 | 201; readonly view: View; readonly version: number; readonly replayed: boolean }
+  | {
+      readonly kind: "COMPLETED";
+      readonly status: 200 | 201;
+      readonly view: View;
+      readonly version: number;
+      readonly replayed: boolean;
+      /** Members the first execution hands to its caller once and the journal never holds (CMD003's invitation token); absent on a replay. */
+      readonly oneTime?: Readonly<Record<string, string>>;
+    }
   | { readonly kind: "ACCEPTED"; readonly status: 202; readonly operationId: string; readonly state: string; readonly statusPath: string; readonly pollAfterSeconds: number }
   | { readonly kind: "CONFLICT"; readonly problem: Problem }
   | { readonly kind: "REJECTED"; readonly problem: Problem }

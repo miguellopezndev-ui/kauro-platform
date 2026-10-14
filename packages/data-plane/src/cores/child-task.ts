@@ -6,6 +6,10 @@
  *                        dispose the run scratch S -> verifyPackage(stagingDir) with a fresh scratch V -> dispose V ->
  *                        promotePackage -> record
  *   profile:             buildSourceProfile over the inputs -> record
+ *   full-validation:     loadConfig (the document as compiled, its paths the input paths; the hash must equal the binding's when
+ *                        one is bound) -> runMigration -> effectsFromMigrationRun while the run's
+ *                        scratch families are live -> effects.ndjson in the call directory (outside S, every write metered) ->
+ *                        writePackage -> dispose S -> verifyPackage(stagingDir) with V -> reportDigest -> dispose V -> record (D5-15)
  *
  * The platform AttemptScratchStore is the core's host-injected ScratchStore (contract 1.0.0), so its `device` is the metered
  * writeSync. The record carries the package's artifacts (path, sha256, length, rows), the core's reconciliation, the residual map of
@@ -13,7 +17,7 @@
  * built-ins, this package's own child modules and the Migration Core wrapper.
  */
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { closeSync, openSync, readFileSync, readdirSync, statSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import {
   CORE_VERSION,
@@ -30,11 +34,12 @@ import {
   type HashedSourceProfile,
   type Reconciliation,
 } from "@kauro/migration-core";
+import { digestOf, effectsFromMigrationRun, type MigrationEffects } from "@kauro/intelligence-core";
 import { AttemptScratchStore } from "../attempt/scratch-store.js";
 import type { CoreChildContext } from "./child-protocol.js";
 
 export interface CoreTaskPayload {
-  readonly mode: "execute" | "validate" | "profile";
+  readonly mode: "execute" | "validate" | "profile" | "full-validation";
   /** The MigrationConfig document (execute, validate); the files of the profile (profile). */
   readonly configText: string;
   /** The same document with each file path rewritten to its input path (D5-5); the run reads these, the hash binds the original. */
@@ -48,6 +53,8 @@ export interface CoreTaskPayload {
   readonly packageDir: string;
   readonly attemptId: string;
   readonly quotaBytes: number;
+  /** full-validation: where the effects are written, in the call directory and outside the run segments S (D5-15). */
+  readonly effectsPath?: string;
 }
 
 export interface CoreTaskArtifact {
@@ -76,6 +83,20 @@ export type CoreTaskRecord =
     }
   | { readonly kind: "CORRUPT"; readonly problems: readonly string[]; readonly maxRssBytes: number }
   | { readonly kind: "PROFILE"; readonly profileHash: string; readonly profileText: string; readonly maxRssBytes: number }
+  | {
+      readonly kind: "FULL_VALIDATION";
+      readonly coreVersion: string;
+      readonly configHash: string;
+      /** The staged package manifest's sha256 as Migration Core wrote it. */
+      readonly manifestSha256: string;
+      /** digestOf the verifier's report, packageDir excluded (the IC receipt's reportDigest). */
+      readonly reportDigest: string;
+      readonly packageVerified: boolean;
+      readonly problems: readonly string[];
+      readonly reconciliation: Reconciliation;
+      readonly effects: { readonly path: string; readonly sha256: string; readonly byteLength: number };
+      readonly maxRssBytes: number;
+    }
   | { readonly kind: "CONFIG_MISMATCH"; readonly actual: string };
 
 function maxRssBytes(): number {
@@ -128,6 +149,78 @@ function directoryBytes(dir: string): Array<readonly [string, number]> {
   return out;
 }
 
+/**
+ * The effects as NDJSON: a head line (configHash, identity) and then one line per element of each family, in the core's order, so
+ * the parent can bound the file by its length before it parses a byte. Every write goes through the metered writeSync.
+ */
+function writeEffects(path: string, effects: MigrationEffects): { path: string; sha256: string; byteLength: number } {
+  const hash = createHash("sha256");
+  let byteLength = 0;
+  const fd = openSync(path, "wx");
+  try {
+    const line = (value: unknown): void => {
+      const bytes = Buffer.from(JSON.stringify(value) + "\n", "utf8");
+      writeSync(fd, bytes);
+      hash.update(bytes);
+      byteLength += bytes.byteLength;
+    };
+    line({ head: { configHash: effects.configHash, identity: effects.identity } });
+    for (const family of EFFECT_FAMILIES) for (const item of effects[family]) line({ [family]: item });
+  } finally {
+    closeSync(fd);
+  }
+  return { path, sha256: hash.digest("hex"), byteLength };
+}
+
+/** The list families of MigrationEffects, in the order they are written and read back. */
+export const EFFECT_FAMILIES = ["records", "fields", "associations", "duplicateClusters", "unmapped", "leftoverFiles"] as const;
+
+async function fullValidation(payload: CoreTaskPayload, context: CoreChildContext): Promise<CoreTaskRecord> {
+  if (payload.effectsPath === undefined) throw new TypeError("full-validation needs an effects path");
+  const loaded = loadConfig(payload.configText, "kauro-core-config");
+  if (payload.expectedConfigHash !== null && loaded.configHash !== payload.expectedConfigHash) return { kind: "CONFIG_MISMATCH", actual: loaded.configHash };
+  if (payload.runConfigText !== undefined) throw new TypeError("full-validation runs the document as compiled, never a rewritten one");
+  const runScratch = new AttemptScratchStore({ root: payload.runDir, attemptId: payload.attemptId, quotaBytes: payload.quotaBytes });
+  let result: ReturnType<typeof runMigration>;
+  let staged: ReturnType<typeof writePackage>;
+  let effects: { path: string; sha256: string; byteLength: number };
+  try {
+    await context.progress("before-run");
+    result = runMigration({ inputRoot: payload.inputRoot, config: loaded.config, configHash: loaded.configHash, scratch: runScratch });
+    await context.progress("after-run");
+    // the effects are read off the run's spooled families while S is live, and written before anything is disposed
+    effects = writeEffects(payload.effectsPath, effectsFromMigrationRun({ loaded, run: result }));
+    await context.progress("after-effects");
+    staged = writePackage({ result, config: loaded.config, normalizedConfig: loaded.normalizedJson, outputDir: payload.packageDir, force: false });
+    await context.progress("after-write");
+  } finally {
+    runScratch.dispose();
+  }
+  const verifyScratch = new AttemptScratchStore({ root: payload.verifyDir, attemptId: payload.attemptId, quotaBytes: payload.quotaBytes });
+  let report: ReturnType<typeof verifyPackage>;
+  let reportDigest: string;
+  try {
+    report = verifyPackage(staged.stagingDir, { scratch: verifyScratch });
+    const { packageDir: _path, ...pathless } = report;
+    reportDigest = digestOf(pathless);
+  } finally {
+    verifyScratch.dispose();
+  }
+  await context.progress("after-verify");
+  return {
+    kind: "FULL_VALIDATION",
+    coreVersion: CORE_VERSION,
+    configHash: loaded.configHash,
+    manifestSha256: sha256File(join(staged.stagingDir, "manifest.json")).sha256,
+    reportDigest,
+    packageVerified: report.passed,
+    problems: report.problems.map((p) => `${p.check}: ${p.detail}`),
+    reconciliation: result.reconciliation,
+    effects,
+    maxRssBytes: maxRssBytes(),
+  };
+}
+
 export async function run(payload: CoreTaskPayload, context: CoreChildContext): Promise<CoreTaskRecord> {
   await context.progress("child:started");
   if (payload.mode === "profile") {
@@ -141,6 +234,8 @@ export async function run(payload: CoreTaskPayload, context: CoreChildContext): 
       scratch.dispose();
     }
   }
+
+  if (payload.mode === "full-validation") return fullValidation(payload, context);
 
   const loaded = loadConfig(payload.configText, "kauro-core-config");
   if (payload.expectedConfigHash !== null && loaded.configHash !== payload.expectedConfigHash) return { kind: "CONFIG_MISMATCH", actual: loaded.configHash };

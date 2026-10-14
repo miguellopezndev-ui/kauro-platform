@@ -71,6 +71,7 @@ import { PgBankRoutes } from "./repositories/bank-routes.js";
 import { PgBankCredits } from "./repositories/bank-credits.js";
 import { PgBankSettlements } from "./repositories/bank-settlements.js";
 import { PgSessionFence } from "./session-fence.js";
+import { PgBuyerTypes, PgProjectDashboard } from "./repositories/agency-app.js";
 import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
 import { PgExecutionDiscovery } from "./execution/discovery.js";
@@ -143,10 +144,6 @@ export function runtimeRoleOf(context: ExecutionContext): RuntimeRole {
       return "kauro_control";
     case "SERVICE":
       return COMMISSION_GROUP_SERVICES.has(context.serviceId) || OPERATIONS_GROUP_SERVICES.has(context.serviceId) ? "kauro_commission" : "kauro_payment";
-    case "TENANT":
-    case "OPERATOR":
-      // Payments V1: a person-authorized money command of the payment boundary names its pool (the inbound bank credits, the checkout retirement)
-      return context.pool === "PAYMENT" ? "kauro_payment" : "kauro_app";
     default:
       return "kauro_app";
   }
@@ -211,6 +208,10 @@ export class PgUnitOfWork implements UnitOfWork {
   readonly auditReads: PgAuditReads;
   /** The session fence (migration 0047, PV1R-07 r4): the presented session locked FOR SHARE inside this unit's own transaction, read through sessionFenceOf(uow). */
   readonly sessionFence: PgSessionFence;
+  /** The agency's recorded buyer type (migration 0062, B11 lane A1), read through buyerTypesOf(uow). */
+  readonly buyerTypes: PgBuyerTypes;
+  /** The project dashboard query (ListProjects, B11 lane A1), read through projectDashboardOf(uow). */
+  readonly projectDashboard: PgProjectDashboard;
   #adoptedAgencyId: AgencyId | null = null;
   #resolvedMembershipId: MembershipId | null = null;
   #abandoned: Error | null = null;
@@ -225,6 +226,8 @@ export class PgUnitOfWork implements UnitOfWork {
     this.context = context;
     this.ids = ids;
     this.sessionFence = new PgSessionFence(client);
+    this.buyerTypes = new PgBuyerTypes(client);
+    this.projectDashboard = new PgProjectDashboard(client);
     this.agencies = new PgAgencyRepository(client);
     this.memberships = new PgMembershipRepository(client);
     this.invitations = new PgInvitationRepository(client);
@@ -663,6 +666,18 @@ export function bankSettlementsOf(uow: UnitOfWork): PgBankSettlements {
   return uow.bankSettlements;
 }
 
+/** The agency's recorded buyer type in a unit of work of this package (B11 lane A1: CMD101 writes it, B10's BuyerTypeReader reads it). */
+export function buyerTypesOf(uow: UnitOfWork): PgBuyerTypes {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the buyer types are read in a unit of work of @kauro/persistence");
+  return uow.buyerTypes;
+}
+
+/** The project dashboard query in a unit of work of this package (B11 lane A1, ListProjects). */
+export function projectDashboardOf(uow: UnitOfWork): PgProjectDashboard {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the project dashboard is read in a unit of work of @kauro/persistence");
+  return uow.projectDashboard;
+}
+
 /** The bank-transfer route's tables in a commerce unit of work of this package (lane L-ROUTE). */
 export function bankRoutesOf(uow: UnitOfWork): PgBankRoutes {
   if (!(uow instanceof PgCommerceUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the bank routes are read in a commerce unit of work of @kauro/persistence");
@@ -706,7 +721,7 @@ export class PgCommerceUnitOfWork extends PgSourceUnitOfWork implements Commerce
   readonly requestReads: PgCommerceRequestReads;
   /** The bank-transfer route's tables (migration 0046, lane L-ROUTE), read through bankRoutesOf(uow). */
   readonly bankRoutes: PgBankRoutes;
-  /** The inbound credit, statement and order-state tables (migration 0061, lane PV1-INBOUND), read through bankCreditsOf(uow). */
+  /** The inbound credit, statement and order-state tables (migration 0063, lane PV1-INBOUND), read through bankCreditsOf(uow). */
   readonly bankCredits: PgBankCredits;
   /** The settlement observations of the bank route (migration 0062, lane PV1-SETTLE), read through bankSettlementsOf(uow). */
   readonly bankSettlements: PgBankSettlements;

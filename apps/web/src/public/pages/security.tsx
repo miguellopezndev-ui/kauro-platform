@@ -1,4 +1,4 @@
-// UI06 Data handling (A3 3.5, manual 09): what is processed, how agencies are kept apart, what a model may see, who decides, how long each
+// UI06 Data handling (A3 3.5, manual 09): what is processed, how customers are kept apart, what a model may see, who decides, how long each
 // kind of data stays (the full schedule, from the policy), what deletion does not cover, and what this page does not claim. It describes what
 // Kauro does today; it claims no certification and no compliance outcome.
 import type { ReactElement } from "react";

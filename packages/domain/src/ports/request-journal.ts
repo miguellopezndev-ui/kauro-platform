@@ -19,6 +19,14 @@ import type { AgencyId, RequestId, TaskId } from "../model/ids.js";
 
 export type { RequestJournalRecord };
 
+/** The three non-acceptance evidences of package B05 D5-18 (migration request_journal.non_acceptance_evidence CHECK). */
+export const NON_ACCEPTANCE_EVIDENCES = Object.freeze([
+  "PROVIDER_DOCUMENTED_NON_ACCEPTANCE:ThrottlingException",
+  "PROVIDER_DOCUMENTED_NON_ACCEPTANCE:RESOURCE_EXHAUSTED",
+  "TRANSPORT_NEVER_SENT",
+] as const);
+export type NonAcceptanceEvidence = (typeof NON_ACCEPTANCE_EVIDENCES)[number];
+
 export interface RequestReservation {
   readonly requestId: RequestId;
   readonly taskId: TaskId;
@@ -34,6 +42,10 @@ export interface RequestReservation {
    */
   readonly upstreamRequestIds: ReadonlyArray<RequestId>;
   readonly reservedAt: UtcInstant;
+  /** B05 D5-18: the admitting INTERPRET step's fence (required for a model task's request; immutable). */
+  readonly stepFence?: number;
+  /** B05 D5-11: the Intelligence Core's admission (run, reservation, request key, exact maximum in micros; immutable). */
+  readonly core?: { readonly runId: string; readonly reservationId: string; readonly requestKey: string; readonly maxChargeMicros: bigint };
 }
 
 export interface RequestJournal {
@@ -48,7 +60,12 @@ export interface RequestJournal {
   markConsumed(requestId: RequestId, fence: number, now: UtcInstant): Promise<RequestJournalRecord | null>;
   /** UNCERTAIN is an explicit state, never a free retry (07; 21 "Unknown external effects remain uncertain and reserved"). */
   markUncertain(requestId: RequestId, fence: number, now: UtcInstant): Promise<RequestJournalRecord | null>;
-  markFailed(requestId: RequestId, fence: number, now: UtcInstant): Promise<RequestJournalRecord | null>;
+  /**
+   * FAILED. `evidence` (package B05 D5-18 rows 5-6) is the non-acceptance evidence of a request that left DISPATCHING without being
+   * accepted (a documented throttling refusal, or the transport proving it never sent); the database records it only on
+   * DISPATCHING -> FAILED with usage UNKNOWN and never rewrites it (KA007 / KA004 otherwise).
+   */
+  markFailed(requestId: RequestId, fence: number, now: UtcInstant, evidence?: NonAcceptanceEvidence): Promise<RequestJournalRecord | null>;
   markCancelled(requestId: RequestId, fence: number, now: UtcInstant): Promise<RequestJournalRecord | null>;
   reconcileUsage(requestId: RequestId, actualCents: MoneyMinorUnits, now: UtcInstant): Promise<RequestJournalRecord | null>;
   get(requestId: RequestId): Promise<RequestJournalRecord | null>;

@@ -167,7 +167,7 @@ export interface ReadyQuote extends IssuedQuote {
  */
 export type EditionCollaborator = "payment" | "provider" | "capacity";
 
-export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<EditionCollaborator>; readonly withoutCapacity?: boolean; readonly commercial?: WorldOptions["commercial"]; readonly quotes?: (h: Harness) => Partial<QuoteCollaborators> } = {}): Promise<PaymentsWorld> {
+export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<EditionCollaborator>; readonly withoutCapacity?: boolean; readonly commercial?: WorldOptions["commercial"]; readonly quotes?: (h: Harness) => Partial<QuoteCollaborators>; readonly wrapUnitOfWork?: WorldOptions["wrapUnitOfWork"] } = {}): Promise<PaymentsWorld> {
   const clock = shiftingClock();
   const provider = createPayPalContractFake({ clock });
   const capacity = createDeliveryCapacityFake({ clock });
@@ -179,6 +179,7 @@ export async function paymentsWorld(options: { readonly unbound?: ReadonlyArray<
     clock,
     ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
     ...(options.quotes !== undefined ? { quotes: options.quotes } : {}),
+    ...(options.wrapUnitOfWork !== undefined ? { wrapUnitOfWork: options.wrapUnitOfWork } : {}),
     commerce: (h) => ({
       ...(unbound.has("payment") ? {} : { payment: h.commerce }),
       ...(unbound.has("provider") ? {} : { provider }),

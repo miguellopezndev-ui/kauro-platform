@@ -76,6 +76,8 @@ export interface CommandOutcome<View> {
   readonly version: number;
   readonly resourceKind: string;
   readonly resourceId: string;
+  /** Secret members answered to the first execution only: not part of the journaled view, never replayed (D-TEAM-1). */
+  readonly oneTime?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -105,6 +107,14 @@ export const ALLOW_REASONS = Object.freeze({
   OWNERSHIP_GRANTED: "OWNERSHIP_GRANTED",
   /** A command whose effect was authorized by a fresh step-up proof of its actor (CMD025). */
   STEP_UP_FRESH: "STEP_UP_FRESH",
+  /** CMD004: an invited identity became a member (an access grant; its stream is the agency's). */
+  ACCESS_GRANTED: "ACCESS_GRANTED",
+  /** CMD005: a member's role changed (an access change). */
+  ROLE_CHANGED: "ROLE_CHANGED",
+  /** CMD006: a member's access, or a pending invitation, was revoked. */
+  ACCESS_REVOKED: "ACCESS_REVOKED",
+  /** CMD007: the ownership of the agency moved to another member (an ownership change). */
+  OWNERSHIP_TRANSFERRED: "OWNERSHIP_TRANSFERRED",
 });
 
 const CONFLICT_CODES: ReadonlySet<FailureCode> = new Set(["STALE_VERSION", "IDEMPOTENCY_CONFLICT", "PRECONDITION_FAILED", "PAYMENT_PENDING", "PAYMENT_UNCERTAIN", "OPERATION_CANCELLED"]);
@@ -297,7 +307,14 @@ export async function runCommandIn<Body, View, U extends UnitOfWork>(
       return { kind: "COMPLETED", status: completed.status, view: completed.view, version: completed.version, replayed: true };
     }
     if (completed.status === 202) return { kind: "ACCEPTED", status: 202, ...completed.accepted };
-    return { kind: "COMPLETED", status: completed.status, view: completed.view, version: completed.version, replayed: false };
+    return {
+      kind: "COMPLETED",
+      status: completed.status,
+      view: completed.view,
+      version: completed.version,
+      replayed: false,
+      ...(completed.oneTime !== undefined ? { oneTime: completed.oneTime } : {}),
+    };
   } catch (e) {
     return settleCommandFailure<View>(runtime, context, spec.id, correlationId, e);
   }

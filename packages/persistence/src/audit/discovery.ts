@@ -26,7 +26,9 @@ import {
   type GrantScope,
   type GrantUsage,
   type PlanId,
+  type ProjectId,
   type RequestId,
+  type ValidationSource,
   type RequestJournalRecord,
   type RevisionId,
   type ValidationSubject,
@@ -37,11 +39,17 @@ import { GRANT_COLUMNS, VALIDATION_COLUMNS, cents, grantRecord, validationRecord
 
 const LIVE = `a.state IN (${LIVE_AUDIT_STATES.map((s) => `'${s}'`).join(", ")})`;
 
-/** The refusal of the check before SEND_STARTED, for a RESERVED intent `r` of model task `m` whose audit is `a` (0023). */
+/**
+ * The refusal of the check before SEND_STARTED, for a RESERVED intent `r` of model task `m` whose audit is `a` (0023); for a DISPATCHING
+ * row the same predicate names a send its owner can no longer make (B05 D5-18 branch (a)). Not widened by B05 (D5-18 grant expiry).
+ */
 const UNSENDABLE = `(a.state IS DISTINCT FROM 'INTERPRETING' OR m.interpretation_deadline_at <= kauro.server_now()
   OR NOT EXISTS (SELECT 1 FROM kauro.leases l WHERE l.resource_kind = 'MODEL_TASK' AND l.resource_id = r.task_id AND l.fence = r.fence AND l.cost_authority_id = m.grant_id))`;
 
 /** A request whose effect is not settled: in flight, uncertain, a stored response not consumed, or a usage not reconciled. */
+// B05 D5-11 / S09: a core reservation its core RELEASED unsent stays RESERVED, its usage reconciled at 0 and its cents back; it is
+// never sent (a settled row is refused the DISPATCHING edge) and GRANT_RECONCILIATION cancels it at its fence, moving no cent
+const RELEASED_UNSENT = `(r.state = 'RESERVED' AND r.settlement_state = 'RELEASED')`;
 const OPEN_REQUEST = `(r.usage_state <> 'RECONCILED' OR r.state IN ('RESERVED', 'DISPATCHING', 'UNCERTAIN', 'RESPONSE_STORED'))`;
 
 function auditRefs(rows: ReadonlyArray<{ audit_id: unknown; agency_id: unknown }>): ReadonlyArray<AuditRef> {
@@ -94,6 +102,41 @@ export class PgAuditDiscovery implements AuditDiscovery {
     };
   }
 
+  async validationSource(agencyId: AgencyId, revisionHash: string): Promise<ValidationSource | null> {
+    const revision = await execute<{ project_id: string; revision_id: string; state: string; physical: string | null; logical: string | null; billable: string | null; edges: string | null }>(
+      this.db,
+      `SELECT r.project_id, r.revision_id, r.state, r.physical_source_rows::text AS physical, r.logical_source_records::text AS logical,
+              r.billable_source_units::text AS billable, r.association_edges::text AS edges
+         FROM kauro.dataset_revisions r WHERE r.agency_id = $1 AND r.manifest_hash = $2`,
+      [agencyId, revisionHash],
+    );
+    // a manifest hash names one revision of the agency; none (or, defensively, two) is no source
+    if (revision.rows.length !== 1) return null;
+    const r = revision.rows[0]!;
+    const files = await execute<{ object_name: string; generation: string; sha256: string; bytes: string }>(
+      this.db,
+      `SELECT o.object_name, f.provider_generation AS generation, f.sha256, f.bytes::text AS bytes
+         FROM kauro.sealed_revision_files s
+         JOIN kauro.source_files f ON f.agency_id = s.agency_id AND f.file_id = s.file_id
+         JOIN kauro.stored_objects o ON o.agency_id = f.agency_id AND o.object_id = f.accepted_object_id
+        WHERE s.agency_id = $1 AND s.revision_id = $2 AND s.disposition = 'INCLUDED'
+        ORDER BY s.ordinal`,
+      [agencyId, r.revision_id],
+    );
+    const count = (v: string | null): number | null => (v !== null && /^\d+$/.test(v) ? Number(v) : null);
+    const [physical, logical, billable, edges] = [count(r.physical), count(r.logical), count(r.billable), count(r.edges)];
+    return {
+      projectId: str(r.project_id) as ProjectId,
+      revisionId: str(r.revision_id) as RevisionId,
+      revisionState: str(r.state),
+      acceptedGenerations: files.rows.map((f) => ({ objectName: str(f.object_name), generation: str(f.generation), sha256: str(f.sha256), byteLength: int(f.bytes) })),
+      populations:
+        physical === null || logical === null || billable === null || edges === null
+          ? null
+          : { physicalSourceRows: physical, logicalSourceRecords: logical, billableSourceUnits: billable, associationEdges: edges },
+    };
+  }
+
   async openDraftValidations(auditId: AuditId): Promise<ReadonlyArray<DraftValidation>> {
     const intents = await execute<Row>(this.db, `SELECT ${VALIDATION_COLUMNS} FROM kauro.plan_validations WHERE audit_id = $1 AND origin = 'AUDIT' AND result IS NULL ORDER BY requested_at, validation_id`, [auditId]);
     const out: DraftValidation[] = [];
@@ -142,7 +185,11 @@ export class PgAuditDiscovery implements AuditDiscovery {
                 SELECT 1 FROM kauro.request_journal r
                   JOIN kauro.model_tasks m ON m.model_task_id = r.task_id
                   LEFT JOIN kauro.audits a ON a.agency_id = m.agency_id AND a.audit_id = m.audit_id
-                 WHERE r.cost_grant_id = g.grant_id AND r.state = 'RESERVED' AND r.usage_state <> 'RECONCILED' AND ${UNSENDABLE})
+                 WHERE r.cost_grant_id = g.grant_id AND r.state IN ('RESERVED', 'DISPATCHING') AND r.usage_state <> 'RECONCILED' AND ${UNSENDABLE})
+           OR EXISTS (
+                SELECT 1 FROM kauro.request_journal r
+                 WHERE r.cost_grant_id = g.grant_id AND r.state = 'FAILED' AND r.non_acceptance_evidence IS NOT NULL AND r.usage_state = 'UNKNOWN')
+           OR EXISTS (SELECT 1 FROM kauro.request_journal r WHERE r.cost_grant_id = g.grant_id AND ${RELEASED_UNSENT})
            OR (g.state IN ('AUTHORIZED', 'EXHAUSTED') AND g.expires_at <= kauro.server_now())
            OR (g.state = 'AUTHORIZED' AND g.reserved_cents + g.reconciled_spend_cents >= g.ceiling_cents)
            OR (g.state = 'EXHAUSTED' AND g.reserved_cents + g.reconciled_spend_cents < g.ceiling_cents AND g.expires_at > kauro.server_now())
@@ -172,14 +219,16 @@ export class PgAuditDiscovery implements AuditDiscovery {
   }
 
   async grantUsage(grantId: CostGrantId): Promise<ReadonlyArray<GrantUsage>> {
-    const r = await execute<{ request_id: string; fence: string; state: string; usage_state: string; reserved: string; actual: string | null; provably_unsent: boolean }>(
+    const r = await execute<{ request_id: string; fence: string; state: string; usage_state: string; reserved: string; actual: string | null; provably_unsent: boolean; stale_dispatch: boolean; non_accepted: boolean }>(
       this.db,
       `SELECT r.request_id, r.fence::text AS fence, r.state, r.usage_state, r.reserved_cents::text AS reserved, r.actual_cents::text AS actual,
-              (r.state = 'RESERVED' AND m.model_task_id IS NOT NULL AND ${UNSENDABLE}) AS provably_unsent
+              (r.state = 'RESERVED' AND (${RELEASED_UNSENT} OR (m.model_task_id IS NOT NULL AND ${UNSENDABLE}))) AS provably_unsent,
+              (r.state = 'DISPATCHING' AND m.model_task_id IS NOT NULL AND ${UNSENDABLE}) AS stale_dispatch,
+              (r.state = 'FAILED' AND r.non_acceptance_evidence IS NOT NULL AND r.usage_state = 'UNKNOWN') AS non_accepted
          FROM kauro.request_journal r
          LEFT JOIN kauro.model_tasks m ON m.model_task_id = r.task_id
          LEFT JOIN kauro.audits a ON a.agency_id = m.agency_id AND a.audit_id = m.audit_id
-        WHERE r.cost_grant_id = $1 AND r.usage_state <> 'RECONCILED'
+        WHERE r.cost_grant_id = $1 AND (r.usage_state <> 'RECONCILED' OR ${RELEASED_UNSENT})
         ORDER BY r.reserved_at, r.request_id
         FOR UPDATE OF r`,
       [grantId],
@@ -192,6 +241,8 @@ export class PgAuditDiscovery implements AuditDiscovery {
       reservedCents: cents(u.reserved),
       actualCents: u.actual === null ? null : cents(u.actual),
       provablyUnsent: u.provably_unsent === true,
+      staleDispatch: u.stale_dispatch === true,
+      nonAccepted: u.non_accepted === true,
     }));
   }
 }

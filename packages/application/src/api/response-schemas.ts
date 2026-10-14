@@ -31,6 +31,7 @@ import type { SourceIntakeId, SourceReadId } from "../sources/outcomes.js";
 import { SESSION_URL_MEMBER, SESSION_URL_VIEW, SOURCE_COMMAND_RESPONSES, SOURCE_VIEW_DEFINITIONS } from "../sources/response-views.js";
 import { LABEL_PATTERN, TEXT_PATTERN } from "./request-schemas.js";
 import { READINESS_BLOCKERS } from "./views.js";
+import { PROJECT_PHASES, PROJECT_REQUIRED_ACTIONS } from "../agency/dashboard-vocabulary.js";
 import {
   FORBIDDEN_RESPONSE_FIELDS,
   RESPONSE_FIELD_VOCABULARY,
@@ -57,6 +58,8 @@ export {
 export type { JsonSchema, DerivedMember, PlatformMember, ViewMember, ViewDefinition, RegistryBundle } from "./view-kit.js";
 
 const { ID, VERSION, HASH, UTC, LABEL, COUNT } = RESPONSE_FIELD_VOCABULARY;
+/** A nullable UTC instant of a view member. */
+const UTC_OR_NULL_VIEW = Object.freeze({ type: ["string", "null"], format: "date-time", pattern: "Z$" });
 const { registry, platform, ref, NARROW_ID, NARROW_LABEL, CURSOR, RESOURCE_ACTIONS_SCHEMA, RESOURCE_ACTIONS_DESCRIPTION } = VIEW_MEMBER_KIT;
 
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
@@ -68,7 +71,7 @@ const NARROW_SUMMARY = Object.freeze({ minLength: 20, pattern: TEXT_PATTERN });
  * (docs/design/B07-upload-source-lifecycle.md §9.5: served routes move from x-kauro-planned to paths), and CMD044 of the support
  * package (B11 W4).
  */
-export type ServedCommandId = "CMD001" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId | ExecutionCommandId | AuditCommandId | "CMD044";
+export type ServedCommandId = "CMD001" | "CMD003" | "CMD004" | "CMD005" | "CMD006" | "CMD007" | "CMD009" | "CMD010" | "CMD011" | "CMD023" | "CMD025" | "CMD026" | B07CommandId | ExecutionCommandId | AuditCommandId | "CMD044" | "CMD060";
 export type CommandResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}${ServedCommandId}`;
 export type AcceptedResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}accepted`;
 export type OperationalResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}op:${string}`;
@@ -76,7 +79,7 @@ export type OperationalResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}op:${
  * The manual-10 reads this edition serves (re-check finding N16), the reads of the source lifecycle (B07), GetJob and GetAudit
  * (B08) and the two support reads (B11 W4), by operation id.
  */
-export type ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | SourceReadId | ExecutionRouteId | AuditRouteId | "ListSupportCases" | "GetSupportCase";
+export type ReadOperationId = "ListAgencies" | "GetAgency" | "ListMembers" | "ListClients" | "GetProject" | SourceReadId | ExecutionRouteId | AuditRouteId | "ListSupportCases" | "GetSupportCase" | "GetBuyerType" | "ListProjects";
 export type ReadResponseSchemaId = `${typeof RESPONSE_SCHEMA_PREFIX}read:${ReadOperationId}`;
 /** The document intakes this edition serves (B07 D-SEL-2: the selection manifest; B08 D8-PLAN-1: the decision artifact), by operation id. */
 export type IntakeOperationId = SourceIntakeId | AuditIntakeId;
@@ -351,6 +354,32 @@ const B06_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
     },
   },
   {
+    name: "InviteMemberView",
+    description: "CMD003 InviteMember result: the pending membership and its invitation. The single-use token is a member of the FIRST execution's reply only; the journal holds no token and a replay answers without it (docs/design/B16-team-commands.md D-TEAM-1).",
+    contract: null,
+    withheld: {},
+    members: {
+      invitationId: platform(true, ID, "The invitation (a forwarded token names this id, never another agency)."),
+      agencyId: platform(true, ID, "The agency the invitation is explicitly scoped to."),
+      membershipId: registry(true, NARROW_ID, ["Membership", "membershipId"]),
+      role: registry(true, undefined, ["Membership", "role"]),
+      state: registry(true, undefined, ["Membership", "state"]),
+      version: registry(true, undefined, ["Membership", "version"]),
+      expiresAt: platform(true, UTC, "When the invitation stops being acceptable, on the database clock."),
+    },
+  },
+  {
+    name: "TransferOwnershipView",
+    description: "CMD007 TransferOwnership result: the agency at its new version, the successor who became OWNER and the former owner who stays ADMIN.",
+    contract: null,
+    withheld: {},
+    members: {
+      agency: platform(true, ref("AgencyView"), "The agency after the transfer."),
+      newOwner: platform(true, ref("MembershipView"), "The successor's membership, now OWNER."),
+      previousOwner: platform(true, ref("MembershipView"), "The former owner's membership, now ADMIN."),
+    },
+  },
+  {
     name: "ArchiveClientView",
     description: "CMD010 ArchiveClient result: the archived client and the work archiving retained; no deletion, refund or rollback member.",
     contract: null,
@@ -422,6 +451,76 @@ const B06_VIEW_DEFINITIONS: ReadonlyArray<ViewDefinition> = Object.freeze([
       nextCursor: platform(false, CURSOR, "The cursor of the next page, when there may be one (opaque, bound to the caller, the project and this list)."),
     },
   },
+  {
+    name: "RetentionExtensionView",
+    description: "CMD060 RequestRetentionExtension result: the project's one soft-deadline extension and its exact endpoint. The endpoint is capped at the hard deadline when the request would pass it (cappedAtHardDeadline), and the hard deadline is shown unchanged (09 Quotes, reuploads and retention; R2-123).",
+    contract: null,
+    withheld: {},
+    members: {
+      extensionId: platform(true, ID, "The extension (at most one per project)."),
+      projectId: platform(true, ID, "The project."),
+      retentionId: platform(true, ID, "The retention record whose soft deadline moved."),
+      retentionVersion: platform(true, VERSION, "The record's version after the extension."),
+      requestedSeconds: platform(true, { type: "integer", minimum: 1, maximum: 259200 }, "What the request asked for."),
+      grantedSeconds: platform(true, COUNT, "Whole seconds actually granted; the exact endpoint is softDeadline."),
+      previousSoftDeadline: platform(true, UTC, "The soft deadline before the extension."),
+      softDeadline: platform(true, UTC, "The exact endpoint: least(previous soft deadline + requestedSeconds, hardDeadline)."),
+      hardDeadline: platform(true, UTC, "The original hard cap, never moved."),
+      effectiveDeadline: platform(true, UTC, "The record's effective deadline after the extension: least(softDeadline, hardDeadline)."),
+      cappedAtHardDeadline: platform(true, { type: "boolean" }, "Whether the request would have passed the hard cap and the endpoint is the cap."),
+    },
+  },
+  {
+    name: "BuyerTypeView",
+    description: "The agency's buyer type as its owner recorded it once during onboarding (A3 3.7: agency or in-house; it does not change the price), or every member null and version 0 while it is not recorded (B11 lane A1).",
+    contract: null,
+    withheld: {},
+    members: {
+      agencyId: platform(true, ID, "The agency."),
+      buyerType: platform(true, { type: ["string", "null"], enum: [...INQUIRY_BUYER_TYPES, null] }, "agency or in-house; null while not recorded."),
+      forEconomicActivity: platform(true, { type: ["boolean", "null"], enum: [true, null] }, "The owner's affirmation that the agency buys for an economic activity: always true once recorded; null while not recorded."),
+      recordedAt: platform(true, UTC_OR_NULL_VIEW, "When the owner recorded it; null while not recorded."),
+      version: platform(true, { type: "integer", minimum: 0, maximum: 1 }, "1 once recorded (it is written once), 0 while not recorded."),
+    },
+  },
+  {
+    name: "ProjectDashboardItem",
+    description: "One project of the agency's dashboard (11 \"Project dashboard\", UI11): client, mode, current revision, phase, required agency action, deadline and last activity, each from a durable fact of the project (the client's display name, the current revision, the latest plan, quote, entitlement and job); nothing inferred.",
+    contract: null,
+    withheld: {},
+    members: {
+      projectId: platform(true, ID, "Project identity."),
+      clientId: platform(true, ID, "The project's client workspace."),
+      clientLabel: platform(true, LABEL, "The client's display name, an untrusted label."),
+      mode: platform(true, { type: "string", enum: [...SERVICE_MODES] }, "Service mode (02 \"Service modes\")."),
+      revision: platform(true, ref("ProjectDashboardRevision"), "The project's current revision."),
+      phase: platform(true, { type: "string", enum: [...PROJECT_PHASES] }, "The project's phase, from its durable facts."),
+      requiredAction: platform(true, { type: "string", enum: [...PROJECT_REQUIRED_ACTIONS] }, "The one action the agency must take next; NONE when the next step is Kauro's or the project is terminal."),
+      deadline: platform(true, UTC_OR_NULL_VIEW, "The issued quote's expiry while it awaits payment, the live job's delivery deadline while processing; null otherwise."),
+      lastActivityAt: platform(true, UTC, "When the fact that decides the phase last changed."),
+      version: platform(true, VERSION, "Concurrency version of the project."),
+    },
+  },
+  {
+    name: "ProjectDashboardRevision",
+    description: "The current revision of a dashboard project: its identity and lifecycle state.",
+    contract: null,
+    withheld: {},
+    members: {
+      revisionId: platform(true, ID, "Revision identity."),
+      state: platform(true, { type: "string", minLength: 1, maxLength: 32, pattern: "^[A-Z][A-Z_]*$" }, "The revision's lifecycle state (DRAFT, SEALED, ...)."),
+    },
+  },
+  {
+    name: "ProjectDashboardPage",
+    description: "A page of the agency's project dashboard under one filter, newest project first ((createdAt, projectId) descending).",
+    contract: null,
+    withheld: {},
+    members: {
+      items: platform(true, { type: "array", maxItems: 100, items: ref("ProjectDashboardItem") }, "The page."),
+      nextCursor: platform(false, CURSOR, "The cursor of the next page, when there may be one (opaque, bound to the caller, the agency, the filter and this order)."),
+    },
+  },
 ] satisfies ReadonlyArray<ViewDefinition>);
 
 /**
@@ -439,6 +538,11 @@ export type CommandReply = { readonly status: 200 | 201; readonly view: string }
 /** The success reply of every served command: status and the view its COMPLETED envelope carries (none for ACCEPTED). */
 export const COMMAND_RESPONSES: Readonly<Record<ServedCommandId, CommandReply>> = Object.freeze({
   CMD001: { status: 201, view: "CreateAgencyView" },
+  CMD003: { status: 201, view: "InviteMemberView" },
+  CMD004: { status: 200, view: "MembershipView" },
+  CMD005: { status: 200, view: "MembershipView" },
+  CMD006: { status: 200, view: "MembershipView" },
+  CMD007: { status: 200, view: "TransferOwnershipView" },
   CMD009: { status: 201, view: "EndClientView" },
   CMD010: { status: 200, view: "ArchiveClientView" },
   CMD011: { status: 201, view: "ProjectView" },
@@ -447,6 +551,7 @@ export const COMMAND_RESPONSES: Readonly<Record<ServedCommandId, CommandReply>> 
   CMD026: { status: 200, view: "WithdrawApprovalView" },
   ...SOURCE_COMMAND_RESPONSES,
   CMD044: { status: 201, view: "SupportCaseView" },
+  CMD060: { status: 200, view: "RetentionExtensionView" },
   ...EXECUTION_COMMAND_RESPONSES,
   ...AUDIT_COMMAND_RESPONSES,
 });
@@ -476,6 +581,8 @@ export const READ_RESPONSES: Readonly<Record<ReadOperationId, { readonly view: s
   PreviewTable: { view: SOURCE_ROUTES.PreviewTable.view },
   ListSupportCases: { view: "SupportCasePage" },
   GetSupportCase: { view: "SupportCaseView" },
+  GetBuyerType: { view: "BuyerTypeView" },
+  ListProjects: { view: "ProjectDashboardPage" },
   GetJob: { view: EXECUTION_ROUTES.GetJob.view },
   GetAudit: { view: AUDIT_ROUTES.GetAudit.view },
 });
@@ -1007,11 +1114,11 @@ const creditCommand = (operationId: string, path: string, summary: string, statu
     request: Object.freeze({ contentType: "application/json" as const, schema: request }),
     responses: Object.freeze({ [status]: Object.freeze({ description: "The credit after the command (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: BANK_CREDIT_COMMAND_RESPONSE_SCHEMA }) }),
   });
-export const RETIRED_CHECKOUT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+export const RECORDED_RETIREMENT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
   kind: { type: "string", enum: ["COMPLETED"] },
   version: { type: "integer", minimum: 1 },
   replayed: { type: "boolean" },
-  data: closedObject(["order"], { order: closedObject(["orderId", "bankState", "expiryCause", "version"], { orderId: BANK_UUID, bankState: { type: "string", enum: ["EXPIRED"] }, expiryCause: { type: "string", enum: ["RETIRED"] }, version: { type: "integer", minimum: 1 } }) }),
+  data: closedObject(["retirement"], { retirement: closedObject(["orderId", "state", "requestedAt"], { orderId: BANK_UUID, state: { type: "string", enum: ["RECORDED"] }, requestedAt: BANK_UTC }) }),
 });
 const STATEMENT_COUNT = { type: "integer", minimum: 0 } as const;
 export const STATEMENT_IMPORT_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
@@ -1055,10 +1162,10 @@ export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = 
     operationId: "retireBankCheckout",
     method: "POST" as const,
     path: "/api/v1/payment-orders/{orderId}/retirements",
-    summary: "Retire an open bank checkout (EXPIRED, cause RETIRED): no further instructions; a later credit is recorded and returned",
+    summary: "Record the retirement of an open bank checkout; the payment service applies it (EXPIRED, cause RETIRED): no further instructions; a later credit is recorded and returned",
     authority: "ACH-ROUTE r12 §7.12 (E1 retirement), D-ACH-05; the agency's billing member (X-Kauro-Agency); Idempotency-Key (the agency's journal)",
     request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["reasonCode"], { reasonCode: { type: "string", minLength: 1, maxLength: 200 } }) }),
-    responses: Object.freeze({ "200": Object.freeze({ description: "The bank order after the retirement (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: RETIRED_CHECKOUT_RESPONSE_SCHEMA }) }),
+    responses: Object.freeze({ "201": Object.freeze({ description: "The retirement as recorded (COMPLETED envelope; an identical replay answers the journaled reply); the payment service's expiry pass applies it.", contentType: JSON_CONTENT_TYPE, schema: RECORDED_RETIREMENT_RESPONSE_SCHEMA }) }),
   }),
   creditCommand("enterBankCredit", "/api/v1/operations/bank-accounts/{accountRef}/credits", "Enter a manual bank credit the owner read in the bank's own artifact (DRAFT_MANUAL: grants nothing until confirmed)", "201",
     closedObject(["bankTransactionId", "rail", "grossCents", "currency", "reference", "bookedAt", "evidence", "authorizationRef"], {
@@ -1126,6 +1233,41 @@ export const BANK_INBOUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = 
   }),
 ] satisfies ReadonlyArray<OperationalRoute>);
 
+// --- the agency app's operational command (B11 lane A1; SCREENS-PLAN section 3 rows A1; A3 3.7) -----------------------------------
+// CMD101 SetBuyerType is not a registry command: it runs the shared command pipeline (journal of the owner in the agency) and answers a
+// COMPLETED envelope carrying the recorded buyer type, 201 when recorded and 200 when the same value was already recorded.
+const BUYER_TYPE_VIEW_SCHEMA: JsonSchema = closedObject(["agencyId", "buyerType", "forEconomicActivity", "recordedAt", "version"], {
+  agencyId: BANK_UUID,
+  buyerType: { type: "string", enum: [...INQUIRY_BUYER_TYPES] },
+  forEconomicActivity: { type: "boolean", const: true },
+  recordedAt: BANK_UTC,
+  version: { type: "integer", minimum: 1, maximum: 1 },
+});
+/** The COMPLETED envelope of SetBuyerType: `{ kind, version, replayed, data }` with the recorded buyer type as data. */
+export const BUYER_TYPE_COMMAND_RESPONSE_SCHEMA: JsonSchema = closedObject(["kind", "version", "replayed", "data"], {
+  kind: { type: "string", enum: ["COMPLETED"] },
+  version: { type: "integer", minimum: 1, maximum: 1 },
+  replayed: { type: "boolean" },
+  data: BUYER_TYPE_VIEW_SCHEMA,
+});
+export const AGENCY_APP_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
+  Object.freeze({
+    operationId: "setBuyerType",
+    method: "POST" as const,
+    path: "/api/v1/agencies/{agencyId}/buyer-type",
+    summary: "Record the agency's buyer type once (agency or in-house), affirming that the agency buys for an economic activity",
+    authority: 'A3 3.7: "the buyer type is answered once during onboarding, before the first quote"; CMD101 AGENCY_OWNER; Idempotency-Key (journal of the owner in the agency); SCREENS-PLAN section 3, rows A1',
+    request: Object.freeze({
+      contentType: JSON_CONTENT_TYPE,
+      schema: closedObject(["buyerType", "forEconomicActivity"], { buyerType: { type: "string", enum: [...INQUIRY_BUYER_TYPES] }, forEconomicActivity: { type: "boolean", const: true } }),
+    }),
+    responses: Object.freeze({
+      "200": Object.freeze({ description: "The same buyer type was already recorded: nothing is written and the recorded one is answered (content-idempotent).", contentType: JSON_CONTENT_TYPE, schema: BUYER_TYPE_COMMAND_RESPONSE_SCHEMA }),
+      "201": Object.freeze({ description: "The buyer type was recorded (an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: BUYER_TYPE_COMMAND_RESPONSE_SCHEMA }),
+    }),
+  }),
+] satisfies ReadonlyArray<OperationalRoute>);
+
 export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze([
   Object.freeze({
     operationId: "getLiveness",
@@ -1172,6 +1314,7 @@ export const OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = Object.freeze
   }),
   ...BANK_ROUTE_OPERATIONAL_ROUTES,
   ...BANK_INBOUND_OPERATIONAL_ROUTES,
+  ...AGENCY_APP_OPERATIONAL_ROUTES,
 ] satisfies ReadonlyArray<OperationalRoute>);
 
 export function operationalResponseSchemaId(operationId: string, status: string): OperationalResponseSchemaId {

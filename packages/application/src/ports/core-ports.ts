@@ -192,6 +192,12 @@ export interface ExecutionLimits {
   readonly hardScratchBytes: number;
   readonly scratchBudgetBytes: number;
   readonly wallClockMs: number;
+  /**
+   * The resident bound of a full-dataset validation's effects (B05 D5-15, M22b): the parent refuses an effects file longer than this
+   * before it parses a byte (EFFECTS_RESIDENT_LIMIT). Required by full validation and by nothing else; the value is the policy
+   * registry's (R2 04 "Resources"), never a constant in code.
+   */
+  readonly effectsResidentBytes?: number;
 }
 
 /**

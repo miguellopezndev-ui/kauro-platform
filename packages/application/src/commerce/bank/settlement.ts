@@ -15,8 +15,8 @@ import { DomainFailure, NotFoundFailure, PROVIDER_CALL_TIMEOUT_MS, actorOf, sett
 import type { CommandEnvelope, CommandResult } from "../../api/envelope.js";
 import type { ProviderCallTimer } from "../../commercial/ports.js";
 import type { BankEvidenceStore, StoredBankEvidence } from "../ports.js";
-import { CommerceAccessDenied, runCommerceCommand, type CommerceRequestRuntime } from "../request/runtime.js";
-import { BANK_INBOUND_COMMAND_IDS, inboundCommandOf, inboundEnvelopeOf, paymentOperatorContextOf } from "./inbound.js";
+import { CommerceAccessDenied, operatorContextOf, runCommerceCommand, type CommerceRequestRuntime } from "../request/runtime.js";
+import { BANK_INBOUND_COMMAND_IDS, inboundCommandOf, inboundEnvelopeOf } from "./inbound.js";
 import type { BankInboundCollaborators } from "./inbound-ports.js";
 import { STEP_UP_ALLOW, assuredAt, evidenceUnavailable, judgedAtCommit, type BankRouteRequest } from "./route-config.js";
 
@@ -186,7 +186,7 @@ export function createBankSettlementHandlers(runtime: CommerceRequestRuntime, co
     async record(request) {
       const id = BANK_INBOUND_COMMAND_IDS.settle;
       const envelope = inboundEnvelopeOf(id, request);
-      const context = paymentOperatorContextOf(envelope);
+      const context = operatorContextOf(envelope);
       const accountRef = request.path["accountRef"]!;
       let environment: "SANDBOX" | "LIVE" | null = null;
       let verified: VerifiedSettlement | null = null;

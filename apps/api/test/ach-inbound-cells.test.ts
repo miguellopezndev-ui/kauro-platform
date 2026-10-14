@@ -49,8 +49,10 @@ import {
   nextTxn,
   onClock,
   onFresh,
+  openApp,
   openPay,
   orderState,
+  OWNER_LOGIN,
   ownOwner,
   ownerGet,
   paid,
@@ -367,7 +369,7 @@ for (const row of OWNER_ROWS) {
       const { proof } = await proofOf(o.person);
       const held = await holdStream(s.accountRef, row.lock);
       try {
-        const { waiting } = await bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => s.run({ owner: o.person, proof })), `${row.code} held at its first lock`);
+        const { waiting } = await bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => s.run({ owner: o.person, proof })), `${row.code} held at its first lock`, OWNER_LOGIN);
         await ctx.revoked(`${what} while ${row.code} is held`, () => revokeOwner(what, o, proof));
         await held.release();
         const expected = what === "grant" ? "403 NOT_AUTHORIZED CORPORATE_ROLE_MISSING" : what === "identity" ? "403 NOT_AUTHORIZED IDENTITY_DISABLED" : "403 ASSURANCE_REQUIRED STEP_UP_STALE";
@@ -392,7 +394,7 @@ for (const row of OWNER_ROWS) {
     const key = freshKey("partial");
     const steps: ReadonlyArray<SqlStep> = [{ label: "first_write", match: row.first }, ...LATER_WRITES];
     for (const at of ["event_insert", "outbox_insert", "journal_final"]) {
-      const conn = await openPay();
+      const conn = await openApp();
       try {
         await ctx.partial(`${row.code} failing at ${at}`, `db.${at}.before`, async () => {
           const seen = iw.w.internalErrors.length;
@@ -442,7 +444,7 @@ for (const row of OWNER_ROWS) {
     const a = await draft("c4-race-replaced-first");
     const held = await holdStream(a.route.accountRef, "INBOUND");
     try {
-      const { waiting } = await bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => confirmC6(a.credit.creditId)), "C6 waits before its read");
+      const { waiting } = await bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => confirmC6(a.credit.creditId)), "C6 waits before its read", OWNER_LOGIN);
       bw.evidence.corrupt(a.artifact.artifactRef, new TextEncoder().encode("replaced"));
       await held.release();
       assert.equal(code(valueOf(await waiting.pending)), "422 INTEGRITY_FAILURE HASH_MISMATCH", "the replaced bytes grant nothing");
@@ -692,7 +694,7 @@ for (const row of OWNER_ROWS) {
     const held = await holdStream(o.route.accountRef, "INBOUND");
     try {
       const version = Number((await creditRow(c.creditId))!.version);
-      const { waiting } = await bw.mustWaitOn(ctx, held, (cc) => routed(ctx, cc, () => attributeM2(c.creditId, o.orderId, version, { owner: own.person, proof })), "the owner's override held");
+      const { waiting } = await bw.mustWaitOn(ctx, held, (cc) => routed(ctx, cc, () => attributeM2(c.creditId, o.orderId, version, { owner: own.person, proof })), "the owner's override held", OWNER_LOGIN);
       await ctx.revoked("the overriding owner's grant", () => L().iw.h.revokeCorporateGrant(own.grantId));
       await held.release();
       await ctx.fenced("the override after the revocation", () => asRefusal(waiting.pending.then(valueOf)), refusedAs("403 NOT_AUTHORIZED CORPORATE_ROLE_MISSING"));
@@ -989,9 +991,12 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
     const o2 = await awaitingOrder("e1-retry-retire");
     const key = freshKey("retire");
     const first = await retire(o2, key);
-    assert.equal(first.status, 200, first.text);
+    assert.equal(first.status, 201, first.text);
     assert.equal(replayedBody((await retire(o2, key)).text), replayedBody(first.text), "the same retirement key replays");
-    assert.equal(code(await retire(o2, freshKey("retire-2"))), "409 PRECONDITION_FAILED ORDER_NOT_CAPTURABLE", "a retired checkout retires once");
+    assert.equal(code(await retire(o2, freshKey("retire-2"))), "409 PRECONDITION_FAILED ORDER_NOT_CAPTURABLE", "a recorded retirement is recorded once");
+    await onClockRaw(ctx, () => expirySweep());
+    assert.equal(await orderState(o2.orderId), "EXPIRED", "the pass consumed the retirement");
+    assert.equal(code(await retire(o2, freshKey("retire-3"))), "409 PRECONDITION_FAILED ORDER_NOT_CAPTURABLE", "a retired checkout retires once");
   });
 
   cell(t("DENY", "REVOCATION", "retiring member withdrawn"), "revocation", async (ctx) => {
@@ -1003,7 +1008,7 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
       await holder.query("SELECT set_config('kauro.agency_id', $1, true)", [o.a.s.agency.agencyId]);
       const locked = await holder.query("SELECT 1 FROM kauro.payment_orders WHERE order_id = $1 FOR NO KEY UPDATE", [o.orderId]);
       assert.equal(locked.rowCount, 1, "the holder holds the order's row lock");
-      const waiter = await openPay();
+      const waiter = await openApp();
       const waiting = await ctx.mustWait(L().iw.h.oracle, { waiter, holder: (await holder.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid }, (cc) => routed(ctx, cc, () => retire(o, freshKey("retire"))), "the retirement waits at the order lock");
       await ctx.revoked("the billing member's identity", () => q("UPDATE kauro.identities SET state = 'DISABLED' WHERE user_id = $1", [o.a.billing.userId]));
       await holder.query("ROLLBACK");
@@ -1033,6 +1038,125 @@ const fpOrder = (o: Order): Promise<Footprint> => footprint({ accountRef: o.rout
       assert.deepEqual(await fpOrder(o), before, `${at}: rollback; the ${part} received cents and their capture unchanged`);
     }
   });
+}
+
+{
+  // D-INB-CTX-2: CMD214 records the retirement on kauro_app (the request pool never writes a money state, D-ACH-16); the payment
+  // service's TRANSFER_EXPIRY pass consumes it, first in the pass: the order becomes EXPIRED RETIRED, the slot is released, one event.
+  const t = (verb: string, col: string, family: string): string => `${verb} ACH-M-E1R-${col} (${family}): CMD214 retirement record and its consumption`;
+  /** Every other order's pending retirement and past deadline consumed first, so the cell's own retirement is the pass's first unit. */
+  const drained = async (ctx: FaultContext, o: Order): Promise<void> => {
+    await sweptBefore(ctx, o);
+    await withClock(ctx, () => expirySweep());
+    assert.equal(await orderState(o.orderId), "AWAITING_TRANSFER", "the draining pass left the cell's own order open");
+    assert.equal(await count("SELECT 1 FROM kauro.bank_checkout_retirements WHERE consumed_at IS NULL", []), 0, "no other retirement is pending");
+  };
+
+  cell(
+    t("RACE", "CRASH-BEFORE", "consumption dies before COMMIT"),
+    "crash-before-commit",
+    async (ctx) => {
+      const o = await awaitingOrder("e1r-crb");
+      await drained(ctx, o);
+      assert.equal((await retire(o, freshKey("e1r-crb"))).status, 201);
+      const before = await fpOrder(o);
+      ctx.points.crash("uow.before-commit");
+      await onClock(ctx, "the consumption dying before COMMIT", () => expirySweep()).catch(() => undefined);
+      assert.deepEqual(await fpOrder(o), before, "no orphan retirement consequence");
+      assert.deepEqual(await retirementOf(o.orderId), { consumed: false, outcome: null }, "the retirement is still pending");
+      await withClock(ctx, () => expirySweep());
+      assert.deepEqual(await retirementOf(o.orderId), { consumed: true, outcome: "RETIRED" }, "the next pass consumes it");
+      assert.equal(await orderState(o.orderId), "EXPIRED");
+    },
+    "uow",
+  );
+
+  cell(
+    t("RACE", "CRASH-AFTER", "record answer lost before the consumption"),
+    "crash-after-commit",
+    async (ctx) => {
+      const o = await awaitingOrder("e1r-cra");
+      await drained(ctx, o);
+      const key = freshKey("e1r-cra");
+      ctx.points.crash("uow.after-commit");
+      const lost = await ctx.operation("CMD214 answer lost", () => onFresh(ctx, () => retire(o, key)));
+      assert.equal(lost.status, 500, `the answer was lost after COMMIT: ${lost.text}`);
+      assert.deepEqual(await retirementOf(o.orderId), { consumed: false, outcome: null }, "the record committed, nothing consumed it yet");
+      assert.equal(await orderState(o.orderId), "AWAITING_TRANSFER", "the request pool wrote no money state");
+      assert.equal(await slotReleased(o.orderId), false, "the slot is still held");
+      const replay = await retire(o, key);
+      assert.equal(replay.status, 201, `the same key returns the committed record: ${replay.text}`);
+      assert.equal(replay.json<{ data: { retirement: { state: string } } }>().data.retirement.state, "RECORDED");
+      await withClock(ctx, () => expirySweep());
+      const fp = await fpOrder(o);
+      assert.deepEqual([fp.orderState, await expiryCause(o.orderId), await slotReleased(o.orderId), await retiredEvents(o.orderId)], ["EXPIRED", "RETIRED", true, 1], "consumed once");
+      await withClock(ctx, () => expirySweep());
+      assert.deepEqual(await fpOrder(o), fp, "a later pass changes nothing");
+    },
+    "uow",
+  );
+
+  cell(t("RACE", "RETRY", "duplicate consumption applies once"), "retry", async (ctx) => {
+    const o = await awaitingOrder("e1r-retry");
+    await drained(ctx, o);
+    assert.equal((await retire(o, freshKey("e1r-retry"))).status, 201);
+    await ctx.attempt(() => withClock(ctx, () => expirySweep()));
+    const fp = await fpOrder(o);
+    await ctx.attempt(() => withClock(ctx, () => expirySweep()));
+    assert.deepEqual(await fpOrder(o), fp, "a repeated pass consumes nothing again");
+    assert.deepEqual([fp.orderState, await retiredEvents(o.orderId)], ["EXPIRED", 1], "sequential: applied once");
+    assert.equal(code(await retire(o, freshKey("e1r-retry-2"))), "409 PRECONDITION_FAILED ORDER_NOT_CAPTURABLE", "a consumed retirement is not recorded again");
+    // concurrent: two passes on the same pending retirement, both orders (the waiter observed at the holder's lock)
+    for (const first of ["A holds", "B holds"]) {
+      const c = await awaitingOrder(`e1r-retry-${first}`);
+      await drained(ctx, c);
+      assert.equal((await retire(c, freshKey("e1r-retry-c"))).status, 201);
+      const r = await holdAndWait(ctx, `${first}: consumption vs consumption`, () => onClockRaw(ctx, () => expirySweep()), () => onClockRaw(ctx, () => expirySweep()));
+      assert.ok(r.held.status === "fulfilled" && r.waited.status === "fulfilled", first);
+      assert.deepEqual([await orderState(c.orderId), await retiredEvents(c.orderId), await slotReleased(c.orderId)], ["EXPIRED", 1, true], `${first}: one consumption`);
+      assert.deepEqual(await retirementOf(c.orderId), { consumed: true, outcome: "RETIRED" });
+    }
+  });
+}
+
+test("OK ACH-M-E1R-OK: CMD214 records the retirement (201 RECORDED, the order still open, its slot held); the payment service's pass retires it once", async () => {
+  const o = await awaitingOrder("e1r-ok");
+  const r = await retire(o, freshKey("e1r-ok"));
+  assert.equal(r.status, 201, r.text);
+  const view = r.json<{ data: { retirement: { orderId: string; state: string; requestedAt: string } } }>().data.retirement;
+  assert.deepEqual([view.orderId, view.state, typeof view.requestedAt], [o.orderId, "RECORDED", "string"]);
+  assert.deepEqual([await orderState(o.orderId), await slotReleased(o.orderId), await retiredEvents(o.orderId)], ["AWAITING_TRANSFER", false, 0], "the record changes no money state");
+  assert.deepEqual(await retirementOf(o.orderId), { consumed: false, outcome: null });
+  await expirySweep();
+  assert.deepEqual([await orderState(o.orderId), await expiryCause(o.orderId), await slotReleased(o.orderId), await retiredEvents(o.orderId)], ["EXPIRED", "RETIRED", true, 1], "the pass applied it");
+  assert.deepEqual(await retirementOf(o.orderId), { consumed: true, outcome: "RETIRED" });
+  const fp = await fpOrder(o);
+  await expirySweep();
+  assert.deepEqual(await fpOrder(o), fp, "applied once");
+});
+
+test("OK ACH-M-E1R-OK: a retirement whose order a credit closed first is consumed as NOT_OPEN (the apply before the consumption is honored)", async () => {
+  const o = await awaitingOrder("e1r-not-open");
+  assert.equal((await retire(o, freshKey("e1r-not-open"))).status, 201);
+  await paid(o);
+  assert.equal(await orderState(o.orderId), "CAPTURED");
+  await expirySweep();
+  assert.deepEqual([await orderState(o.orderId), await retiredEvents(o.orderId)], ["CAPTURED", 0], "the capture stands");
+  assert.deepEqual(await retirementOf(o.orderId), { consumed: true, outcome: "NOT_OPEN" });
+});
+
+async function retirementOf(orderId: string): Promise<{ readonly consumed: boolean; readonly outcome: string | null } | null> {
+  const [r] = await q<{ c: boolean; o: string | null }>("SELECT consumed_at IS NOT NULL AS c, outcome AS o FROM kauro.bank_checkout_retirements WHERE order_id = $1", [orderId]);
+  return r === undefined ? null : { consumed: r.c, outcome: r.o };
+}
+async function slotReleased(orderId: string): Promise<boolean> {
+  return (await q<{ r: boolean }>("SELECT bank_slot_released_at IS NOT NULL AS r FROM kauro.payment_orders WHERE order_id = $1", [orderId]))[0]!.r;
+}
+async function expiryCause(orderId: string): Promise<string | null> {
+  return (await q<{ c: string | null }>("SELECT expiry_cause AS c FROM kauro.bank_transfer_instructions WHERE order_id = $1", [orderId]))[0]!.c;
+}
+async function retiredEvents(orderId: string): Promise<number> {
+  return count("SELECT 1 FROM kauro.domain_events WHERE aggregate_id::text = $1 AND event_type = 'bank_transfer_instruction.order_state_changed.v1' AND payload->>'cause' = 'CHECKOUT_RETIRED'", [orderId]);
 }
 
 {
@@ -1209,8 +1333,8 @@ function retire(o: Order, key: string): Promise<Reply> {
     const { route, a } = await stmt("si1-race");
     const held = await holdStream(route.accountRef, "OUTBOUND");
     try {
-      const w1 = await L().bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => importSI2(route.accountRef, a, { key: freshKey("si1-a") })), "import A reads, then waits at L1");
-      const w2 = await L().bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => importSI2(route.accountRef, a, { key: freshKey("si1-b") })), "import B reads the same ref, then waits at L1");
+      const w1 = await L().bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => importSI2(route.accountRef, a, { key: freshKey("si1-a") })), "import A reads, then waits at L1", OWNER_LOGIN);
+      const w2 = await L().bw.mustWaitOn(ctx, held, (c) => routed(ctx, c, () => importSI2(route.accountRef, a, { key: freshKey("si1-b") })), "import B reads the same ref, then waits at L1", OWNER_LOGIN);
       await held.release();
       const codes = [valueOf(await w1.waiting.pending), valueOf(await w2.waiting.pending)].map((r) => (r.status < 300 ? "201" : code(r))).sort();
       assert.deepEqual(codes, ["201", "409 PRECONDITION_FAILED STATEMENT_ALREADY_IMPORTED"], "identical classifications: one import, the other the same artifact");
@@ -1338,7 +1462,9 @@ function retire(o: Order, key: string): Promise<Reply> {
       const bookedAt = plusMs(o.transferExpiresAt, -60_000);
       ctx.clock.set(plusMs(o.transferExpiresAt, HOUR));
       await withClock(ctx, () => expirySweep());
-      const c = await withClock(ctx, () => confirmed(o.route.accountRef, exactFor(o, { bookedAt })));
+      // the owner confirms an hour after the deadline, on the step clock (kauro_app's units are repositioned on it): a step-up of that instant
+      const proof = await L().iw.h.recordStepUp(L().owner.userId as never, { issuedAt: ctx.clock.at(0) as never });
+      const c = await withClock(ctx, () => confirmed(o.route.accountRef, exactFor(o, { bookedAt }), { proof }));
       await withClock(ctx, () => matchService(c.creditId));
       await ctx.revoked(what, async () => {
         if (what === "route revoked") await disableRoute(o.route);
@@ -1533,7 +1659,8 @@ test("ACH-10 RACE: before, at and after expiry with delayed observation and revo
 
 test("ACH-11 DENY: an explicitly retired checkout keeps its reference bound and a later credit on it is return-only", async () => {
   const o = await awaitingOrder("ach11");
-  assert.equal((await retire(o, freshKey("ach11"))).status, 200);
+  assert.equal((await retire(o, freshKey("ach11"))).status, 201);
+  await expirySweep();
   assert.equal(await orderState(o.orderId), "EXPIRED");
   await paid(o);
   const fp = await fpOrder(o);

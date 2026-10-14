@@ -2,42 +2,61 @@
  "package": "B16",
  "generatedBy": "node tools/ledger.mjs sidecars --write",
  "source": {
-  "file": null,
-  "registry": "packages/contracts/registry/program.json",
-  "note": "no case map yet: no evidence claimed"
+  "file": "docs/design/B16-case-map.md",
+  "sha256": "7c3eb63d27e835da0c4893d86e09286ae0db73fffebd320bfb0c8ce5b2d18557"
  },
  "rows": [
   {
    "case": "S048",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/b16-tenant-sweep.test.ts :: S048 sweep: every id route answers a foreign and a nonexistent id identically, with Cache-Control no-store"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B16"
+   ],
+   "claimed": "OPEN -> L5 PARTIAL (PLANNED L5; target EXECUTED_LOCAL)"
   },
   {
    "case": "S049",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/tenant-isolation.test.ts :: composite foreign keys refuse a child that references another tenant's parent even inside a valid context",
+    "packages/persistence/test/tenant-isolation.test.ts :: the same connection carries no context after commit, after rollback and after an exception",
+    "packages/persistence/test/tenant-isolation.test.ts :: two pooled connections in different contexts interleave without leaking",
+    "packages/persistence/test/adapters-unit-of-work.test.ts :: a connection returned to the pool carries no context after commit, rollback and exception (08: cleared on pool return)"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "S050",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd005-change-membership.test.ts :: DENY: non-owners → 403; missing/stale/foreign step-up → 403 ASSURANCE_REQUIRED; stale version, same role, INVITED target, last owner, unknown role, foreign membership are typed; nothing changes",
+    "apps/api/test/cmd006-revoke-membership.test.ts :: DENY: OPERATOR/APPROVER/VIEWER → 403; ADMIN on an OWNER → 403 OWNER_PROTECTED; last owner → LAST_OWNER_PROTECTED; stale version; already revoked; bad reason; foreign membership → 404; nothing changes",
+    "apps/api/test/cmd003-invite-member.test.ts :: DENY: OPERATOR/APPROVER/VIEWER/BILLING → 403; ADMIN granting OWNER → 403 ROLE_NOT_GRANTABLE; self, live member, bad role, foreign agency, stale version are typed; no state, no journal row",
+    "packages/application/test/command-contracts.test.ts :: no request schema exposes a server-owned member (verified, agencyOwner, state, agencyId, version, hashes of bytes)"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "S063",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/control/test/b16-watchdog.test.ts :: S063: a job that heartbeats but never reaches READY is EXPIRED at its 48 h delivery deadline on the server clock and its terminal retention clock starts"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "S064",
@@ -45,7 +64,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L3 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
   },
   {
    "case": "S065",
@@ -53,7 +75,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L6 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
   },
   {
    "case": "S071",
@@ -61,31 +86,44 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "S076",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/data-plane/test/b16-scanner-feeds.test.ts :: S076: a scanner with no signature feed yields NOT_SCANNED, never PASS",
+    "tools/test/supply-chain-pins.test.mjs :: S076: the detectors flag a tag, a branch, a short sha, a missing ref and an image without a digest, and accept a 40-hex sha and an @sha256 digest",
+    "tools/test/supply-chain-pins.test.mjs :: S076: every workflow uses: is pinned to a 40-hex sha and every image to @sha256"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "S094",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/b16-retention-quotes.test.ts :: S094: CreateQuote, a retry and a re-execution leave every retention anchor and deadline unchanged (non-zero soft deadline fixture)"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-047",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "packages/persistence/test/b16-rls-census.test.ts :: R2-047 census: every kauro table with agency_id has ENABLE+FORCE RLS and every runtime role is non-owner, non-superuser, no BYPASSRLS",
+    "packages/persistence/test/migrations.test.ts :: runtime roles are neither owners nor superusers and have no BYPASSRLS; the owner never serves requests"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-048",
@@ -93,7 +131,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
   },
   {
    "case": "R2-049",
@@ -101,7 +142,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target PART(B14) SIMULATED"
   },
   {
    "case": "R2-050",
@@ -109,31 +153,48 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-053",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/b16-retention-quotes.test.ts :: R2-053: GetQuote shows the 14-day price expiry and the 7-day dataAvailableUntil; at source expiry checkout refuses SOURCE_EXPIRED"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-054",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054: first release + 21 d governs stage continuation when it is earlier than capture + 30 d; a completion inside it gets the full seven-day final download; at each deadline the window is EXPIRED and one microsecond before it is open",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054: capture + 30 d caps continuation when first release + 21 d is later; a final stage completing one day before the hard cap gets exactly one remaining day (deadline capture + 30 d), never seven",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054 EXPIRY: a final completion at the continuation deadline is refused KA072 and creates no final-delivery allowance; one second before it the allowance is granted and still capped at capture + 30 d; a first release at capture + 30 d is refused",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054 RETRY: an identical release replay, a later stage release, a client-supplied instant, a written deadline, a retried completion and a re-read on a later server clock never move an anchor or a deadline",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054 RACE (both orders): two first-release writers on one window; the second is observed waiting on the row lock and the first committer's server instant stays the anchor",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054 TIMEOUT: a final completion that waits on the window's row lock while its effect clock crosses the continuation deadline is refused at that instant (KA072), its transaction's server instant still before the deadline",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054 CRASH-BEFORE / CRASH-AFTER / PARTIAL: a release whose backend dies before COMMIT leaves the window unreleased and the re-run anchors at its own instant; a committed release survives the crash and its replay keeps it; a unit whose second write fails rolls the release back",
+    "apps/control/test/b16-staged-retention.test.ts :: R2-054 REVOCATION (binding): a window is born only on a COMPLETED capture of its own project and plan, once per plan; its capture instant and hard deadline come from the capture fact, never from the writer"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-055",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/control/test/b16-staged-retention.test.ts :: R2-055: a parent stage waiting ten days for the agency's receipt holds no job, attempt, lease, heartbeat or capacity slot, the execution watchdog never fires for it, and its continuation deadline keeps running (eleven days left, never paused) until it is due at release + 21 d"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-056",
@@ -141,7 +202,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L3 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
   },
   {
    "case": "R2-057",
@@ -149,15 +213,19 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L3+L6 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-060",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/reads.test.ts :: N16 ListClients and R2-060: safe client summaries with each caller's permitted actions, pages bound to the caller, the agency and the list — a cursor of agency A presented for agency B, by another caller, edited, or of another list is CURSOR_INVALID without a row or a total"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "R2-074",
@@ -165,15 +233,23 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L6 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
   },
   {
    "case": "R2-076",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "packages/persistence/test/adapters-leases.test.ts :: B06-R1: an expired JOB_ATTEMPT or MODEL_TASK lease that never stored a checkpoint cannot be resumed — another owner's takeover with no checkpoint or an invented one is REFUSED RESUME_WITHOUT_CHECKPOINT and the lease stays as its first owner left it; an OUTBOX_DISPATCH lease, which spends nothing, is still taken over without one, never with an invented one"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L6 PARTIAL (PLANNED L6; target PART(B14) EXECUTED_LOCAL)"
   },
   {
    "case": "R2-123",
@@ -181,7 +257,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-124",
@@ -189,7 +266,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-125",
@@ -197,7 +275,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "R2-126",
@@ -205,127 +284,176 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L6 NOT_EXECUTED; target PART(B14) EXECUTED_LOCAL"
   },
   {
    "case": "CMD003-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd003-invite-member.test.ts :: OK: the OWNER invites an identity; the raw token goes to the delivery channel once and never into the response; the database holds only its SHA-256, an INVITED membership, the event and an expiry seven days out"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD003-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd003-invite-member.test.ts :: DENY: OPERATOR/APPROVER/VIEWER/BILLING → 403; ADMIN granting OWNER → 403 ROLE_NOT_GRANTABLE; self, live member, bad role, foreign agency, stale version are typed; no state, no journal row"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD003-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd003-invite-member.test.ts :: RACE: lock wait on the agency; identical retry replays WITHOUT the token; same key other body conflicts; two concurrent invitations of one identity → one 201 and one MEMBER_ALREADY_LIVE; crash before COMMIT leaves nothing and the key re-executes; response lost after COMMIT is recovered without a token",
+    "apps/api/test/cmd003-invite-member.test.ts :: RACE (revocation): an ADMIN suspended before the call is refused at the next command; nothing is written"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD004-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd004-accept-invitation.test.ts :: OK: the invitee accepts with the token: the membership is ACTIVE at v2, the invitation consumed, the grant is a durable fact, and the new member acts in the agency"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD004-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd004-accept-invitation.test.ts :: DENY: wrong token → 403 INVITATION_TOKEN_MISMATCH; another person's invitation and an unknown id answer the same 404; a malformed token → 400; an unverified identity is refused; a revoked invitation is closed; no state changes"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD004-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd004-accept-invitation.test.ts :: RACE: identical retry replays; same key other body conflicts; two accepts of one invitation → one 200, the other refused 409; expiry is judged at the database clock after the membership lock wait; crash before COMMIT leaves INVITED and the key re-executes; response lost after COMMIT is recovered"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD005-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd005-change-membership.test.ts :: OK: the OWNER changes a role with a fresh step-up; version moves, the event and the ALLOW fact are written, and the old authority ends at the next command"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD005-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd005-change-membership.test.ts :: DENY: non-owners → 403; missing/stale/foreign step-up → 403 ASSURANCE_REQUIRED; stale version, same role, INVITED target, last owner, unknown role, foreign membership are typed; nothing changes"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD005-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd005-change-membership.test.ts :: RACE: two changes with one expectedVersion → one 200, one STALE_VERSION; replay and same-key conflict; crash before COMMIT changes nothing; response lost after COMMIT is recovered; a revocation committed first makes the change refuse"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD006-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd006-revoke-membership.test.ts :: OK: the OWNER revokes an active member (access ends at the very next command); an ADMIN revokes an OPERATOR; revoking an INVITED member cancels the invitation, whose token then fails"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD006-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd006-revoke-membership.test.ts :: DENY: OPERATOR/APPROVER/VIEWER → 403; ADMIN on an OWNER → 403 OWNER_PROTECTED; last owner → LAST_OWNER_PROTECTED; stale version; already revoked; bad reason; foreign membership → 404; nothing changes"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD006-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd006-revoke-membership.test.ts :: RACE: two revocations of one member → one 200, one 409; replay and same-key conflict; crash before COMMIT keeps the member; response lost after COMMIT is recovered; mutual revocation of two admins never leaves both revoked"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD007-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd007-transfer-ownership.test.ts :: OK: the OWNER transfers ownership to an ACTIVE member with a fresh step-up; the roles swap in one commit, the agency version moves, and the old owner's authority ends at the next command"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD007-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd007-transfer-ownership.test.ts :: DENY: non-owner → 403; missing/stale/foreign step-up → 403 ASSURANCE_REQUIRED; self, SUSPENDED, INVITED and REVOKED successors, stale version and foreign membership are typed; nothing changes"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD007-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd007-transfer-ownership.test.ts :: RACE: two transfers at once → exactly one wins and the agency keeps exactly one owner; replay and same-key conflict; crash before COMMIT keeps the owner; response lost after COMMIT leaves the transfer durable (the former owner then reads state, a retry is refused); a successor revoked first is refused"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD038-OK",
@@ -333,7 +461,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
   },
   {
    "case": "CMD038-DENY",
@@ -341,7 +472,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
   },
   {
    "case": "CMD038-RACE",
@@ -349,7 +483,10 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B15"
+   ],
+   "claimed": "OPEN -> L5 NOT_EXECUTED; target PART(B15) EXECUTED_LOCAL"
   },
   {
    "case": "CMD042-OK",
@@ -357,7 +494,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD042-DENY",
@@ -365,7 +503,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD042-RACE",
@@ -373,7 +512,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L3 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD054-OK",
@@ -381,7 +521,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD054-DENY",
@@ -389,7 +530,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD054-RACE",
@@ -397,7 +539,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD055-OK",
@@ -405,7 +548,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD055-DENY",
@@ -413,7 +557,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD055-RACE",
@@ -421,55 +566,76 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L4 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD056-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd056-cmd057-operations.test.ts :: CMD056-OK: the owner records an actual incident — 201 DETECTED with its open responsibilities and the database's checkpoint of the severity (S1 one hour, S4 72 hours), S1 and S2 with the communication review required; a false positive is recorded CLOSED with none; the operations service records one as itself"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD056-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd056-cmd057-operations.test.ts :: CMD056-DENY: an agency member and a stranger are refused (403 CORPORATE_ROLE_MISSING), the commission and finance services and another environment's operations service are wrong service identities, no credential is 401; then one invalid body at a time — nothing is written"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD056-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd056-cmd057-operations.test.ts :: CMD056-RACE: an identical retry replays the 201, the same key with another body is 409 IDEMPOTENCY_CONFLICT, and a crash before COMMIT leaves no incident — for the owner and for the operations service"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD057-OK",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "PARTIAL",
+   "test": [
+    "apps/api/test/cmd056-cmd057-operations.test.ts :: CMD057-OK: the owner with a fresh step-up authorizes a PREPARED restore candidate for its own deletion journal hash — 200 AUTHORIZED at the next candidate revision, one recovery row naming the owner, the proof and the hash, the journal and the step-up fact committed with it"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [
+    "B14"
+   ],
+   "claimed": "OPEN -> L6 PARTIAL (PLANNED L6; target PART(B14) EXECUTED_LOCAL)"
   },
   {
    "case": "CMD057-DENY",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd056-cmd057-operations.test.ts :: CMD057-DENY: an agency member and a stranger are refused (403), a service identity is no owner, no fresh step-up is ASSURANCE_REQUIRED; then one missing prerequisite at a time — an unknown candidate, another deletion journal hash, an already authorized candidate — nothing is written"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD057-RACE",
-   "class": "NOT_EXECUTED",
-   "test": [],
+   "class": "EXECUTED_LOCAL",
+   "test": [
+    "apps/api/test/cmd056-cmd057-operations.test.ts :: CMD057-RACE: an identical retry replays the 200, the same key with another candidate is 409 IDEMPOTENCY_CONFLICT, two authorizations of one candidate yield one recovery and one 409 RECOVERY_CANDIDATE_NOT_PREPARED with the wait observed, and a crash before COMMIT leaves the candidate PREPARED"
+   ],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "DONE EXECUTED_LOCAL"
   },
   {
    "case": "CMD060-OK",
@@ -477,7 +643,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD060-DENY",
@@ -485,7 +652,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
   },
   {
    "case": "CMD060-RACE",
@@ -493,7 +661,8 @@
    "test": [],
    "commit": null,
    "reviewId": null,
-   "inheritedTo": []
+   "inheritedTo": [],
+   "claimed": "OPEN -> L2 NOT_EXECUTED; target EXECUTED_LOCAL"
   }
  ]
 }

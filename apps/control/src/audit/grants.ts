@@ -11,7 +11,9 @@
  *   2. a RESERVED dispatch intent the database can no longer send — the check before SEND_STARTED would refuse it: its audit no longer
  *      interprets, its interpretation deadline passed on the server clock, or its MODEL_TASK lease moved to another fence — is
  *      CANCELLED and reconciled with nothing spent: the only amount ever released unused;
- *   3. every other usage (in flight, UNCERTAIN, a stored response of unknown usage, ESTIMATED) stays reserved;
+ *   3. every other usage (in flight, UNCERTAIN, a stored response of unknown usage, ESTIMATED) stays reserved — package B05 D5-18 adds
+ *      (a) a DISPATCHING request its owner can no longer send moves to UNCERTAIN (still reserved), and (b) a FAILED request carrying
+ *      non-acceptance evidence with usage UNKNOWN is released at 0;
  *   4. then the edges the grant's state admits, on the server clock and never early: an AUTHORIZED grant CLOSES once its scope closed
  *      (its audit ended; a pool's scope closes with its expiry) and nothing it funds is uncertain or live, EXPIRES at its expiry, is
  *      EXHAUSTED when known spend plus reserved reaches its ceiling; an EXHAUSTED one EXPIRES, or is AUTHORIZED again with room; an
@@ -75,8 +77,17 @@ export class GrantReconciliation implements ExecutionSweeper {
         // 2. an intent the database can no longer send: CANCELLED at its fence, reconciled with nothing spent
         const cancelled = await uow.requestJournal.markCancelled(usage.requestId, usage.fence, now);
         if (cancelled === null) throw new StepRefused("REQUEST_FENCED");
-        grant = await uow.audits.reconcileRequest(usage.requestId, 0n);
+        // a reservation its core already RELEASED unsent (S09) was reconciled at 0 then: only the state moves
+        if (usage.usageState !== "RECONCILED") grant = await uow.audits.reconcileRequest(usage.requestId, 0n);
         acted = true;
+      } else if (usage.nonAccepted) {
+        // B05 D5-18 branch (b): a FAILED request the provider or the transport proved never accepted: released at 0 (IC's late RELEASED is a replay)
+        grant = await uow.audits.releaseNonAccepted(usage.requestId);
+        acted = true;
+      } else if (usage.staleDispatch) {
+        // B05 D5-18 branch (a): a send its owner can no longer make counts as sent: UNCERTAIN, its reservation held for provider evidence
+        if (await uow.audits.markStaleDispatchUncertain(usage.requestId)) acted = true;
+        open += 1;
       } else {
         // 3. unknown or uncertain usage stays reserved
         open += 1;

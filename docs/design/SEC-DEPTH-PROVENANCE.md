@@ -228,6 +228,7 @@ exact permitted transition. Queue = the deferred relation checks and what queues
 | 37 | artifact_readbacks | artifact_readbacks_own_artifact (0022:306) | refused (0022:273) | refused (0022:273) | frozen (B11) | append-only | none (immediate) |
 | 38 | source_files | source_files_admitting_upload (0010:284) | per 3b (each column names its trigger) | frozen (B11) | frozen (B11) | source_files_immutable (0010:246) | none (immediate) |
 | 39 | sealed_revision_files | sealed_revision_files_admitted, sealed_rows_bound (0011:253, :232) | refused (0011:177) | refused (0011:177) | frozen (B11) | append-only | none (immediate) |
+| 40 | dispatch_liabilities | dispatch_liabilities_birth (0061): the request's funding grant and its pool, OPEN at now | OPEN -> CLEARED only (dispatch_liabilities_clearing, 0061) | refused (no grant) | frozen (dispatch_liabilities_immutable) | request_id, grant_id, pool_id, excess_micros, opened_at (0061) | dispatch_liabilities_commit_gate (DEFERRED, the pool's gate FOR UPDATE) |
 
 Scope: rows 1-39 (50 tables). Completeness is not asserted by hand: 3b is the machine-checked inventory.
 
@@ -262,6 +263,7 @@ money nor authority. Re-run when 0050-0060 land: a planned trigger missing from 
 - `cost_grants` (row 8; feeds money) birth: [cost_grants_workflow]; imm: `agency_id` `ceiling_cents` `created_at` `expires_at` `grant_id` `grant_kind` `pool_grant_id`; bound: `reconciled_spend_cents` [cost_grants_workflow] B3 event; `reserved_cents` [cost_grants_workflow] B3 event; `state` [cost_grants_transition] listed + B3 close rule; `updated_at` [cost_grants_workflow] now(); `version` [cost_grants_workflow] +1; first: `authorization_ref` [cost_grants_workflow] PREPARED->AUTHORIZED; AUDIT = its pool (0023:172); `authorized_at` [cost_grants_workflow] ->AUTHORIZED := now (0023:175); `closed_at` [cost_grants_workflow] ->CLOSED := now (0023:200); `expired_at` [cost_grants_workflow] ->EXPIRED := now (0023:186).
 - `dataset_revisions` (row 31; feeds authority) birth: [dataset_revisions_initial_state]; imm: `agency_id` `project_id` `revision_id`; bound: `manifest_hash` [dataset_revisions_lifecycle_guard]; `state` [dataset_revisions_transition] listed edge.
 - `delivery_artifacts` (row 36; feeds authority) birth: [delivery_artifacts_in_prefix]; imm: `agency_id` `object_name` `package_version_id` `source_object_name`.
+- `dispatch_liabilities` (row 40; feeds money) birth: [dispatch_liabilities_birth] its request's funding grant and that grant's pool, OPEN at now (B05 D5-11, 0061); imm: `excess_micros` `grant_id` `opened_at` `pool_id` `request_id`; bound: `cleared_at` [dispatch_liabilities_clearing] := now on CLEARED only; `state` [dispatch_liabilities_clearing] OPEN -> CLEARED only.
 - `execution_capacity` (row 22; feeds authority) birth: [execution_capacity_birth]; bound: `active_jobs` [execution_capacity_ledgers] recount (0021:410); `last_admission_at` [execution_capacity_last_admission_guard] G11; `ledger_id` [execution_capacity_last_admission_guard] CHECK = 1 (0021:287); `updated_at` [execution_capacity_last_admission_guard] now(); `waiting_jobs` [execution_capacity_ledgers] recount (0021:410).
 - `founding_slot_reservations` (row 16; feeds money) birth: [founding_slot_reservations_snapshot_binding, founding_slot_reservations_eligibility]; imm: `agency_id` `ends_at` `policy_version` `quote_id` `reservation_id` `slot_no`; bound: `state` [founding_slot_reservations_transition] listed + 0028:237, :270, :290; `version` [founding_slot_reservations_version] +1; first: `consumed_at` [founding_slot_reservations_first_assignment] only in ->CONSUMED := now (B8/B12); `consumed_by_authorization_id` [founding_slot_reservations_first_assignment] only in ->CONSUMED = the purchase's authorization (B8/B12).
 - `founding_slots` (row 25; feeds money) birth: [founding_slots_birth]; bound: `live_reservation_id` [founding_slots_guard] founding_slots_guard (0028:344), settled (0028:375); `policy_version` [founding_slots_guard] birth only by the 0028 seed (B11); founding_slots_guard (0028:344); `slot_no` [founding_slots_guard] birth only by the 0028 seed (B11); founding_slots_guard (0028:344).
@@ -279,7 +281,7 @@ money nor authority. Re-run when 0050-0060 land: a planned trigger missing from 
 - `prospects` (row 17; feeds money) birth: [prospects_initial_state]; imm: `prospect_id`; bound: `state` [prospects_transition] listed edge; `version` [prospects_version] +1.
 - `qualifying_purchases` (row 19; feeds money) birth: [qualifying_purchases_designation_only]; bound: `agency_id` [qualifying_purchases_designation_only]; `allocated_service_cents` [qualifying_purchases_designation_only]; `authorization_id` [qualifying_purchases_designation_only]; `capture_id` [qualifying_purchases_designation_only]; `confirmation_seq` [qualifying_purchases_designation_only]; `confirmed_at` [qualifying_purchases_designation_only]; `created_at` [qualifying_purchases_designation_only]; `founding_basis` [qualifying_purchases_designation_only]; `founding_reservation_id` [qualifying_purchases_designation_only]; `order_created_at` [qualifying_purchases_designation_only]; `order_id` [qualifying_purchases_designation_only]; `project_id` [qualifying_purchases_designation_only]; `provider_completed_at` [qualifying_purchases_designation_only]; `quote_id` [qualifying_purchases_designation_only].
 - `quotes` (row 30; feeds money) birth: [quotes_source_binding, quotes_issuance_clock]; imm: `agency_id` `expires_at` `quote_id`; bound: `state` [quotes_transition] listed edge.
-- `request_journal` (row 10; feeds money) birth: [request_journal_reserves_grant]; imm: `agency_id` `cost_grant_id` `fence` `request_id` `reserved_cents` `task_id`; bound: `response_artifact_hash` [request_journal_guard] once (0006:149); `state` [request_journal_guard] 0006:143-159; `usage_state` [request_journal_guard] frozen once RECONCILED (B3).
+- `request_journal` (row 10; feeds money) birth: [request_journal_reserves_grant]; imm: `agency_id` `cost_grant_id` `fence` `request_id` `reserved_at` `reserved_cents` `task_id` `upstream_request_ids`; bound: `response_artifact_hash` [request_journal_guard] once (0006:149); `state` [request_journal_guard] 0006:143-159; `usage_state` [request_journal_guard] frozen once RECONCILED (B3).
 - `retention_anchors` (row 32; feeds authority) birth: [retention_anchors_bound]; imm: `agency_id` `anchor_kind` `revision_id`.
 - `retention_records` (row 33; feeds authority) birth: [retention_records_initial_state]; imm: `agency_id` `class` `revision_id`.
 - `sealed_revision_files` (row 39; feeds authority) birth: [sealed_revision_files_admitted]; imm: `agency_id` `disposition` `file_id` `revision_id`.
@@ -294,24 +296,24 @@ Residual B-LIFETIME-2 (feeds none): `domain_events` event evidence of versions (
 
 ### 3c Planned enforcing triggers (the check requires each in its migration once that file exists)
 
-- planned `commercial_authorizations_first_assignment` BEFORE INSERT OR UPDATE ON `commercial_authorizations` in 0061 (columns: `job_ref` `consumed_at` `delivered_at`) B10/B12, SDP-36
-- planned `execution_capacity_birth` BEFORE INSERT ON `execution_capacity` in 0061 (columns: `*`) B9: the seed is its only birth
-- planned `leases_birth` BEFORE INSERT ON `leases` in 0062 (columns: `fence` `cancel_version` `heartbeat_at` `expires_at` `created_at` `updated_at` `deadline_at`) B2: deadline_at within its subject's deadline
-- planned `capture_facts_first_assignment` BEFORE INSERT OR UPDATE ON `capture_facts` in 0064 (columns: `provider_completed_at`) B12
-- planned `payment_orders_allocation_birth` BEFORE INSERT ON `payment_orders` in 0064 (columns: `allocated_cents`) B4
-- planned `founding_slot_reservations_first_assignment` BEFORE INSERT OR UPDATE ON `founding_slot_reservations` in 0066 (columns: `consumed_at` `consumed_by_authorization_id`) B8/B12
-- planned `price_eligibility_snapshots_birth` AFTER INSERT ON `price_eligibility_snapshots` in 0066 (columns: `agency_id` `quote_id` `project_id` `founding_slot_ref` `founding_discount_bps` `policy_version` `qualifying_project_ids` `qualifying_count` `as_of` `lookback_starts_at`) B13, SDP-37
-- planned `target_contracts_lifetime` BEFORE INSERT OR UPDATE ON `target_contracts` in 0067 (columns: `confirmed_at` `superseded_at`) B14, SDP-38
-- planned `state_machines_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_machines` in 0067 (columns: `*`) B11
-- planned `state_transitions_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_transitions` in 0067 (columns: `*`) B11
-- planned `founding_slots_birth` BEFORE INSERT ON `founding_slots` in 0067 (columns: `*`) B11, SDP-35
-- planned `quotes_issuance_clock` BEFORE INSERT ON `quotes` in 0066 (columns: `issued_at` `expires_at` `price_policy_version` `replaces_quote_id`) B15, SDP-39
-- planned `founding_slot_reservations_eligibility` BEFORE INSERT ON `founding_slot_reservations` in 0066 (columns: `agency_id` `quote_id` `policy_version` `slot_no`) B13 (iii), SDP-40
-- planned `agency_execution_capacity_guard` BEFORE INSERT OR UPDATE ON `agency_execution_capacity` in 0061 (columns: `agency_id` `last_admitted_at` `live_jobs` `updated_at`) B9: redefined, also at birth
-- planned `execution_capacity_last_admission_guard` BEFORE UPDATE ON `execution_capacity` in 0061 (columns: `last_admission_at` `ledger_id` `updated_at`) B9/G11: redefined
-- planned `request_journal_guard` BEFORE INSERT OR UPDATE ON `request_journal` in 0063 (columns: `usage_state` `actual_cents` `reconciled_at` `state` `response_artifact_hash`) B3: redefined, usage frozen once RECONCILED
-- planned `agency_recurrence_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `agency_recurrence` in 0065 (columns: `*`) B5b: redefined, every column
-- planned `qualifying_purchases_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `qualifying_purchases` in 0066 (columns: `*`) B8: redefined, every column at birth, no update
+- planned `commercial_authorizations_first_assignment` BEFORE INSERT OR UPDATE ON `commercial_authorizations` in sec_depth_l2a_admission (columns: `job_ref` `consumed_at` `delivered_at`) B10/B12, SDP-36
+- planned `execution_capacity_birth` BEFORE INSERT ON `execution_capacity` in sec_depth_l2a_admission (columns: `*`) B9: the seed is its only birth
+- planned `leases_birth` BEFORE INSERT ON `leases` in sec_depth_l2a_leases (columns: `fence` `cancel_version` `heartbeat_at` `expires_at` `created_at` `updated_at` `deadline_at`) B2: deadline_at within its subject's deadline
+- planned `capture_facts_first_assignment` BEFORE INSERT OR UPDATE ON `capture_facts` in sec_depth_l2b_money (columns: `provider_completed_at`) B12
+- planned `payment_orders_allocation_birth` BEFORE INSERT ON `payment_orders` in sec_depth_l2b_money (columns: `allocated_cents`) B4
+- planned `founding_slot_reservations_first_assignment` BEFORE INSERT OR UPDATE ON `founding_slot_reservations` in sec_depth_l3_commercial (columns: `consumed_at` `consumed_by_authorization_id`) B8/B12
+- planned `price_eligibility_snapshots_birth` AFTER INSERT ON `price_eligibility_snapshots` in sec_depth_l3_commercial (columns: `agency_id` `quote_id` `project_id` `founding_slot_ref` `founding_discount_bps` `policy_version` `qualifying_project_ids` `qualifying_count` `as_of` `lookback_starts_at`) B13, SDP-37
+- planned `target_contracts_lifetime` BEFORE INSERT OR UPDATE ON `target_contracts` in sec_depth_l4_lifetime (columns: `confirmed_at` `superseded_at`) B14, SDP-38
+- planned `state_machines_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_machines` in sec_depth_l4_lifetime (columns: `*`) B11
+- planned `state_transitions_frozen` BEFORE INSERT OR UPDATE OR DELETE ON `state_transitions` in sec_depth_l4_lifetime (columns: `*`) B11
+- planned `founding_slots_birth` BEFORE INSERT ON `founding_slots` in sec_depth_l4_lifetime (columns: `*`) B11, SDP-35
+- planned `quotes_issuance_clock` BEFORE INSERT ON `quotes` in sec_depth_l3_commercial (columns: `issued_at` `expires_at` `price_policy_version` `replaces_quote_id`) B15, SDP-39
+- planned `founding_slot_reservations_eligibility` BEFORE INSERT ON `founding_slot_reservations` in sec_depth_l3_commercial (columns: `agency_id` `quote_id` `policy_version` `slot_no`) B13 (iii), SDP-40
+- planned `agency_execution_capacity_guard` BEFORE INSERT OR UPDATE ON `agency_execution_capacity` in sec_depth_l2a_admission (columns: `agency_id` `last_admitted_at` `live_jobs` `updated_at`) B9: redefined, also at birth
+- planned `execution_capacity_last_admission_guard` BEFORE UPDATE ON `execution_capacity` in sec_depth_l2a_admission (columns: `last_admission_at` `ledger_id` `updated_at`) B9/G11: redefined
+- planned `request_journal_guard` BEFORE INSERT OR UPDATE ON `request_journal` in sec_depth_l2b_journal (columns: `usage_state` `actual_cents` `reconciled_at` `state` `response_artifact_hash`) B3: redefined, usage frozen once RECONCILED
+- planned `agency_recurrence_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `agency_recurrence` in sec_depth_l3_recurrence (columns: `*`) B5b: redefined, every column
+- planned `qualifying_purchases_designation_only` BEFORE INSERT OR UPDATE OR DELETE ON `qualifying_purchases` in sec_depth_l3_commercial (columns: `*`) B8: redefined, every column at birth, no update
 
 ## A. Hardening (defence in depth; P2 lists what is NOT hardening)
 
@@ -461,7 +463,7 @@ admission then UPDATEs it; SDP-30). Lifetime (SDP-31): both ledgers frozen again
 with live_jobs = 0 and its agency_id is immutable; execution_capacity refuses INSERT after 0051 (its seed is its only birth; a
 replacement birth is not supported) and its recount is also queued AFTER INSERT. live_jobs is recounted per ledger row and per job
 (0021:406-413).
-B11 lifetime freeze (rule 22), `0067_lifetime_freeze.sql` (planned, next free; 3c): generated from section 3: every "frozen (B11)" cell gets BEFORE DELETE
+B11 lifetime freeze (rule 22), `NNNN_sec_depth_l4_lifetime.sql` (planned, number given at merge; 3c): generated from section 3: every "frozen (B11)" cell gets BEFORE DELETE
 FOR EACH ROW and BEFORE TRUNCATE FOR EACH STATEMENT executing kauro.forbid_change; the three config tables (row 15) also refuse
 INSERT and UPDATE; founding_slots (row 25) refuses INSERT (its 0028 seed is its only birth; a test that needs a synthetic cohort
 seeds it as the oracle under ALTER TABLE ... DISABLE TRIGGER, the TCB path of P2, as a migration would).
@@ -496,7 +498,7 @@ issued_at + price_policies.quote_seconds of its policy (KA004 otherwise; CreateQ
 serverNow() in the writing unit, packages/application/src/commercial/quotes/create-quote.ts:138); price_eligibility_snapshots_birth: as_of = server_now() and lookback_starts_at
 = as_of - repeat_lookback_seconds of its policy. Fixtures that back-date quotes move the test clock (src/testing/server-now.ts),
 not the column (D-FIX-2).
-B14 target contract lifetime (SDP-38), `target_contracts_lifetime` BEFORE INSERT OR UPDATE in `0067` (planned, next free): confirmed_at and superseded_at
+B14 target contract lifetime (SDP-38), `target_contracts_lifetime` BEFORE INSERT OR UPDATE in `sec_depth_l4_lifetime` (planned; section 3c): confirmed_at and superseded_at
 are NULL or := now at birth; each moves only NULL->now, once; superseded_at only once confirmed_at is set; neither is ever cleared
 or moved (KA004). The transition lock (0003:262) stays. R17 asserts, from pg_trigger, that every table of section 3 refuses DELETE and TRUNCATE.
 B10 authorization bounds (G14), in `0051`: copies of 0021:736-752 and 0022:602-618 without the `rolsuper` block (0021:740-742,
@@ -634,7 +636,7 @@ D1 G14 fixture moves (SDP-23; the kit helpers drive only production writers, nev
 | L2b money | migrations/0053, 0054, src/audit/store.ts (:582-600), src/audit/store.ts (:194-198), src/audit/discovery.ts (:161-184), src/request-journal.ts (:78-105), M, audit-migrations, grant-reconciliation, adapters-journals-outbox tests | R12-R14, R12b-e, R26 (SEC-114/115/118/119), B12 grants/captures | 225 min, 530k | Opus |
 | L3 commercial | migrations/0055, 0056, H | R15, R16, R19-R21, R31, B13 (i-iii, R), B15, founding first assignment | 220 min, 500k | Opus |
 | L0b quote fixtures (D-FIX-1, D-FIX-2) | src/testing/commerce-purchases.ts (:205-264), test/commerce-support.ts (:400-432), harness cohort seed | SEC-138/142 siblings | 80 min, 180k | claude-sonnet-5-5 |
-| L4 lifetime | migrations/0067 (planned, next free), T, b10-recurrence-adapters.test.ts (:592-595 only) | R27, R29 (SEC-Fnn, SEC-135), SEC-130, SEC-140/141 (B14) | 180 min, 380k | claude-sonnet-5-5 |
+| L4 lifetime | migrations/NNNN_sec_depth_l4_lifetime.sql (planned; number given at merge), T, b10-recurrence-adapters.test.ts (:592-595 only) | R27, R29 (SEC-Fnn, SEC-135), SEC-130, SEC-140/141 (B14) | 180 min, 380k | claude-sonnet-5-5 |
 
 src/audit/store.ts is split by line ranges (L2a :488, L2b :582-600): L2a lands first, L2b rebases. Order K -> L0 -> (L1 || L2a ||
 L2b) -> L3 -> L4; L2a needs L0 merged (B10 removes the skip the old fixtures used). Done = every GAP rewritten to C with its title; C1

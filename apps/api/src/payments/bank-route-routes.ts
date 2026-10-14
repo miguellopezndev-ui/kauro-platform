@@ -9,7 +9,7 @@
  *   POST /api/v1/operations/bank-routes/{routeId}/details       replaceBankRouteDetails  (KAURO_OWNER)  200
  *   GET  /api/v1/operations/bank-routes/{routeId}               getBankRoute             (KAURO_OWNER)  200
  *   GET  /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions  (agency member, X-Kauro-Agency) 200
- *   POST /api/v1/payment-orders/{orderId}/retirements          retireBankCheckout       (billing member, X-Kauro-Agency) 200
+ *   POST /api/v1/payment-orders/{orderId}/retirements          retireBankCheckout       (billing member, X-Kauro-Agency) 201
  *
  * Admission of a POST: the envelope headers, the closed request schema, an Idempotency-Key, the path ids; then the person's
  * authentication through the server's shared command boundary with the actual method (PV1R-01: an unsafe cookie request's Origin,

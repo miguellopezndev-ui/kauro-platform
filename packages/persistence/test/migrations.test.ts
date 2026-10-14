@@ -135,10 +135,26 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     "0059_b16_operations_recovery.sql",
     // SEC-DEPTH-PROVENANCE L1 (A1/R1/R2): runtime principals outside the guard-execution boundary (provisional number)
     "0060_runtime_hardening.sql",
+    // package B05 L3m: the durable send and the settlement of a model dispatch, dispatch liabilities, the pool's liability gate (provisional number)
+    "0061_b05_dispatch_settlement.sql",
+    // package B11 lane A1: the agency's buyer type, recorded once by SetBuyerType (provisional number)
+    "0062_agency_buyer_types.sql",
     // Payments V1 PV1-INBOUND: credit and statement-import aggregates, guards, the owner pipeline on the payment pool (provisional number)
-    "0061_bank_inbound.sql",
+    "0063_bank_inbound.sql",
+    // owner decision D-33: prospect source evidence of the AGENCY or COMPANY segment (provisional number, renumbered at merge)
+    "0064_d33_company_prospects.sql",
+    // package B16 lane L7: PAID_STAGED retention windows (first release + 21 d, capture + 30 d, final download + 7 d; provisional number)
+    "0065_b16_staged_retention.sql",
+    // package B05 L3t: the audit's and the grant's authority deadlines judged at COMMIT (provisional number)
+    "0066_audit_clock_at_commit.sql",
+    // FCG-B06-LEASE-1b: claim_lease judges its caller's deadline at the database clock after the row lock (provisional number)
+    "0067_lease_deadline_after_lock.sql",
+    // package B05 L1v: a dispatch leaves RESERVED only while it has never been settled (provisional number)
+    "0068_dispatch_from_unsettled_reserved.sql",
+    // B16 L2 CMD060: the one retention extension, its guard path B (KA085) and the request role update grant (provisional number)
+    "0069_b16_retention_extensions.sql",
     // Payments V1 PV1-SETTLE: the bank-route settlement observation (CMD215), its event and the route's provider-available read (provisional number)
-    "0062_bank_settlement.sql",
+    "0070_bank_settlement.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));
@@ -396,10 +412,10 @@ test("registered aggregate kinds are exactly the domain AGGREGATE_KINDS, B06's s
         ["project", "projects", "project_id"],
       ],
     );
-    // B11 W4 registers its own kind in its own migration (0026, D11-SYNC-1), owned by B11
+    // B11 W4 registers its own kind in its own migration (0026, D11-SYNC-1), owned by B11; B11 lane A1 the agency's buyer type (0062)
     assert.deepEqual(
       r.rows.filter((x) => x.owner_package === "B11").map((x) => [x.aggregate_kind, x.table_name, x.id_column]),
-      [["support_case", "support_cases", "case_id"]],
+      [["agency_buyer_type", "agency_buyer_types", "agency_id"], ["support_case", "support_cases", "case_id"]],
     );
     // D-EVT-1 over the registry: every registered kind's table carries require_event_for_version(kind, id column), and every such
     // trigger names a registered kind with that table and column — the event-per-version rule and the binding agree on each kind

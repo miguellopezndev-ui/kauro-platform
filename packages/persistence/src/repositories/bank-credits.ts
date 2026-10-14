@@ -1,8 +1,9 @@
 /**
- * The inbound side of the bank-transfer route over `pg` (migration 0061, lane PV1-INBOUND; docs/design/ACH-ROUTE.md r12 §7.5-§7.12,
+ * The inbound side of the bank-transfer route over `pg` (migration 0063, lane PV1-INBOUND; docs/design/ACH-ROUTE.md r12 §7.5-§7.12,
  * §7.23, §7.28): credits, the account's stream locks, an instruction found by its reference, the bank order state, statement imports,
- * their coverage and lines, and the route-scope review cases. Every statement runs in the caller's unit of work under its policies: the
- * payment service's pool (kauro_payment) for the owner's commands and for the service steps alike.
+ * their coverage and lines, the route-scope review cases and CMD214's checkout retirements. Every statement runs in the caller's unit of
+ * work under its policies: the request pool (kauro_app) for the owner's commands and CMD214's record (D-ACH-16, D-INB-CTX-1/2), the
+ * payment service's pool (kauro_payment) for the service steps (M1, P1, E1 and the retirement's consumption).
  *
  * Locks: `lockStream` is the account's INBOUND or OUTBOUND stream advisory lock (kauro.bank_stream_lock_key, §7.28 L1/L2); the credit
  * identity lock Lc is the credit's row lock (`lockCredit`), taken after the stream lock.
@@ -11,6 +12,32 @@ import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { BankCreditRecord, BankTransferInstructionRecord } from "@kauro/domain";
 import { DomainFailure } from "@kauro/domain";
 import { ConstraintViolation, execute, instant, int, type Queryable } from "../sql.js";
+
+export interface BankCheckoutRetirementRecord {
+  readonly orderId: string;
+  readonly agencyId: string;
+  readonly requestedBy: string;
+  readonly requestedAt: UtcInstant;
+  readonly consumedAt: UtcInstant | null;
+  readonly outcome: "RETIRED" | "NOT_OPEN" | null;
+}
+interface RetirementRow {
+  order_id: string;
+  agency_id: string;
+  requested_by: string;
+  requested_at: Date;
+  consumed_at: Date | null;
+  outcome: "RETIRED" | "NOT_OPEN" | null;
+}
+const RETIREMENT_COLUMNS = "order_id, agency_id, requested_by, requested_at, consumed_at, outcome";
+const retirementOf = (r: RetirementRow): BankCheckoutRetirementRecord => ({
+  orderId: r.order_id,
+  agencyId: r.agency_id,
+  requestedBy: r.requested_by,
+  requestedAt: instant(r.requested_at),
+  consumedAt: r.consumed_at === null ? null : instant(r.consumed_at),
+  outcome: r.outcome,
+});
 
 interface CreditRow {
   bank_credit_id: string;
@@ -291,7 +318,7 @@ export class PgBankCredits {
   }
 
   /**
-   * Releases the project's open checkout of an order whose bank state is EXPIRED (payment_orders.bank_slot_released_at, migration 0061):
+   * Releases the project's open checkout of an order whose bank state is EXPIRED (payment_orders.bank_slot_released_at, migration 0063):
    * set once, in the unit that expired it, under the order's lock; a second call changes nothing.
    */
   async releaseBankSlot(orderId: string): Promise<void> {
@@ -326,6 +353,40 @@ export class PgBankCredits {
   async expiryCauseOf(orderId: string): Promise<"DEADLINE" | "RETIRED" | null> {
     const r = await execute<{ c: "DEADLINE" | "RETIRED" | null }>(this.db, "SELECT expiry_cause AS c FROM kauro.bank_transfer_instructions WHERE order_id = $1", [orderId]);
     return r.rows[0]?.c ?? null;
+  }
+
+  // --- CMD214's checkout retirements (migration 0063, D-INB-CTX-2) ----------------------------------------------------------------
+
+  /** The order's retirement as recorded (and, once the payment service consumed it, its outcome); `lock` takes its row lock. */
+  async retirementOf(orderId: string, lock = false): Promise<BankCheckoutRetirementRecord | null> {
+    const r = await execute<RetirementRow>(this.db, `SELECT ${RETIREMENT_COLUMNS} FROM kauro.bank_checkout_retirements WHERE order_id = $1${lock ? " FOR UPDATE" : ""}`, [orderId]);
+    return r.rows[0] ? retirementOf(r.rows[0]) : null;
+  }
+
+  /** Records the member's retirement of the order (the database stamps requested_at); the caller holds the order's lock. */
+  async recordRetirement(r: { readonly orderId: string; readonly agencyId: string; readonly requestedBy: string; readonly reasonCode: string }): Promise<BankCheckoutRetirementRecord> {
+    const out = await execute<RetirementRow>(
+      this.db,
+      `INSERT INTO kauro.bank_checkout_retirements (order_id, agency_id, requested_by, reason_code) VALUES ($1, $2, $3, $4) RETURNING ${RETIREMENT_COLUMNS}`,
+      [r.orderId, r.agencyId, r.requestedBy, r.reasonCode],
+    );
+    return retirementOf(out.rows[0]!);
+  }
+
+  /** The oldest unconsumed retirements after the pass's cursor (requested_at, order_id), before any agency is adopted. */
+  async pendingRetirements(limit: number, after: { readonly requestedAt: string; readonly orderId: string } | null = null): Promise<ReadonlyArray<BankCheckoutRetirementRecord>> {
+    const r = await execute<RetirementRow>(
+      this.db,
+      `SELECT ${RETIREMENT_COLUMNS} FROM kauro.bank_checkout_retirements WHERE consumed_at IS NULL${after === null ? "" : " AND (requested_at, order_id) > ($2::timestamptz, $3::uuid)"} ORDER BY requested_at, order_id LIMIT $1`,
+      after === null ? [limit] : [limit, after.requestedAt, after.orderId],
+    );
+    return r.rows.map(retirementOf);
+  }
+
+  /** Consumes a retirement once (the database stamps consumed_at); the caller holds its row lock and saw it unconsumed. */
+  async consumeRetirement(orderId: string, outcome: "RETIRED" | "NOT_OPEN"): Promise<void> {
+    const r = await execute(this.db, "UPDATE kauro.bank_checkout_retirements SET consumed_at = kauro.effect_now(), outcome = $2 WHERE order_id = $1 AND consumed_at IS NULL", [orderId, outcome]);
+    if (r.rowCount !== 1) throw new DomainFailure("INTEGRITY_FAILURE", "the retirement was consumed under its lock");
   }
 
   /** The instant the database stamped when the credit was confirmed (OBSERVED), null for a draft. */

@@ -1,7 +1,8 @@
 /**
  * The owner's inbound commands of the bank-transfer route (Payments V1, lane PV1-INBOUND; docs/design/ACH-ROUTE.md r12 §7.5 C5, §7.6
- * C4/C6, §7.9 M2, §7.28 lock order), each in ONE commerce unit of work of the corporate owner's OPERATOR context on the payment service's
- * pool (`pool: "PAYMENT"`), journaled under the owner's own identity (agency NULL), its event agency-less:
+ * C4/C6, §7.9 M2, §7.28 lock order), each in ONE commerce unit of work of the corporate owner's OPERATOR context on the request pool
+ * (kauro_app: the owner's decisions, D-ACH-16, D-INB-CTX-1), journaled under the owner's own identity (agency NULL), its event agency-less.
+ * None of them applies money: P1, E1 and the consumption of a checkout retirement are the payment service's (kauro_payment):
  *
  *   enter     (CMD210) C5: a manual credit the owner typed, naming a stored bank artifact; a DRAFT_MANUAL that grants nothing. The artifact is
  *             NOT read here (C6 reads it); the account's INBOUND stream lock is taken FIRST, then the owner's access decision (a revocation
@@ -76,9 +77,9 @@ export interface StatementImportCommandView {
 export interface RetireBankCheckoutBody {
   readonly reasonCode: string;
 }
-/** CMD214's answer: the bank order as the retirement left it. */
-export interface RetiredCheckoutView {
-  readonly order: { readonly orderId: string; readonly bankState: "EXPIRED"; readonly expiryCause: "RETIRED"; readonly version: number };
+/** CMD214's answer: the retirement as recorded; the payment service's TRANSFER_EXPIRY pass applies it (D-INB-CTX-2). */
+export interface RecordedRetirementView {
+  readonly retirement: { readonly orderId: string; readonly state: "RECORDED"; readonly requestedAt: UtcInstant };
 }
 
 export interface BankCreditView {
@@ -133,9 +134,6 @@ export function bankCreditView(c: BankCreditRecord): BankCreditView {
     captureId: c.captureId,
   };
 }
-
-/** The owner's context on the payment service's pool: the units of the inbound commands run as kauro_payment (migration 0061). */
-export const paymentOperatorContextOf = (envelope: Pick<CommandEnvelope<unknown>, "userId" | "correlationId">): OperatorContext => ({ ...operatorContextOf(envelope), pool: "PAYMENT" as const });
 
 export function inboundEnvelopeOf<Body>(id: InboundCommandId, request: BankRouteRequest<Body>): CommandEnvelope<Body> {
   return {
@@ -230,7 +228,7 @@ export interface BankInboundHandlers {
   /** CMD213 SI1+SI2: the owner imports a statement's coverage, its lines and their exceptions. */
   importStatement(request: BankRouteRequest<ImportStatementBody>): Promise<CommandResult<StatementImportCommandView>>;
   /** CMD214: the agency's billing member retires its open bank checkout (E1's retirement half). */
-  retire(request: BankRouteRequest<RetireBankCheckoutBody> & { readonly agencyId: AgencyId }): Promise<CommandResult<RetiredCheckoutView>>;
+  retire(request: BankRouteRequest<RetireBankCheckoutBody> & { readonly agencyId: AgencyId }): Promise<CommandResult<RecordedRetirementView>>;
 }
 export interface InboundReadRequest {
   readonly correlationId: CorrelationId;
@@ -253,7 +251,7 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
     async enter(request) {
       const id = BANK_INBOUND_COMMAND_IDS.enter;
       const envelope = inboundEnvelopeOf(id, request);
-      const context = paymentOperatorContextOf(envelope);
+      const context = operatorContextOf(envelope);
       const accountRef = request.path["accountRef"]!;
       let environment: "SANDBOX" | "LIVE" | null = null;
       return runCommerceCommand<EnterBankCreditBody, BankCreditCommandView>(runtime, {
@@ -307,7 +305,7 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
     async confirm(request) {
       const id = BANK_INBOUND_COMMAND_IDS.confirm;
       const envelope = inboundEnvelopeOf(id, request);
-      const context = paymentOperatorContextOf(envelope);
+      const context = operatorContextOf(envelope);
       const creditId = request.path["creditId"]!;
       let verified: Verified | null = null;
       let deferred: DomainFailure | null = null;
@@ -345,13 +343,18 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
         async body(uow, causationId) {
           const body = envelope.body;
           const repo = co.credits(uow);
+          // a credit is visible only to an acting owner (kauro_app's policy, 0062): a credit not found is judged as the owner first, so a
+          // withdrawal committed meanwhile answers its refusal, never a 404
           const seen = await repo.credit(creditId);
-          if (seen === null) throw new NotFoundFailure("bank credit");
+          if (seen === null) {
+            await authorizeOwner(uow, envelope, id);
+            throw new NotFoundFailure("bank credit");
+          }
           await repo.lockStream(seen.environment, seen.accountRef, "INBOUND");
           const credit = await repo.lockCredit(creditId);
-          if (credit === null) throw new NotFoundFailure("bank credit");
           // the owner is judged again under the lock (a withdrawal while the command waited or read is seen)
           await authorizeOwner(uow, envelope, id);
+          if (credit === null) throw new NotFoundFailure("bank credit");
           if (credit.version !== body.expectedVersion || credit.state !== "DRAFT_MANUAL") throw stale(credit);
           if (deferred !== null) throw deferred;
           const facts = verified;
@@ -369,7 +372,7 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
     async attribute(request) {
       const id = BANK_INBOUND_COMMAND_IDS.attribute;
       const envelope = inboundEnvelopeOf(id, request);
-      const context = paymentOperatorContextOf(envelope);
+      const context = operatorContextOf(envelope);
       const creditId = request.path["creditId"]!;
       let seen: BankCreditRecord | null = null;
       return runCommerceCommand<AttributeBankCreditBody, BankCreditCommandView>(runtime, {
@@ -416,7 +419,7 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
     async importStatement(request) {
       const id = BANK_INBOUND_COMMAND_IDS.statement;
       const envelope = inboundEnvelopeOf(id, request);
-      const context = paymentOperatorContextOf(envelope);
+      const context = operatorContextOf(envelope);
       const accountRef = request.path["accountRef"]!;
       let environment: "SANDBOX" | "LIVE" | null = null;
       let read: { readonly page: StatementPage; readonly normalizerVersion: string } | null = null;
@@ -571,8 +574,9 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
     async retire(request) {
       const id = BANK_INBOUND_COMMAND_IDS.retire;
       const envelope: CommandEnvelope<RetireBankCheckoutBody> = { ...inboundEnvelopeOf(id, request), agencyId: request.agencyId };
-      // the payment boundary's pool: the instruction, the order lock and the slot are the payment service's columns (0061 CMD214)
-      const context = { ...tenantContextOf(envelope), pool: "PAYMENT" as const };
+      // the request pool (D-ACH-16): the member's decision is RECORDED here; the payment service's TRANSFER_EXPIRY pass applies it, under
+      // the order's and the instruction's locks, and releases the slot (D-INB-CTX-2). This unit writes no money state.
+      const context = tenantContextOf(envelope);
       const agencyId = context.agencyId;
       const orderId = request.path["orderId"]!;
       const authorize = async (uow: CommerceUnitOfWork): Promise<void> => {
@@ -580,43 +584,43 @@ export function createBankInboundHandlers(runtime: CommerceRequestRuntime, co: B
         const decision = await runtime.authorizer.authorize(uow, { command: "CMD028", identity: envelope.subject.identity, agencyId });
         if (decision.kind === "DENY") throw CommerceAccessDenied.of(id, decision);
       };
-      return runCommerceCommand<RetireBankCheckoutBody, RetiredCheckoutView>(runtime, {
+      return runCommerceCommand<RetireBankCheckoutBody, RecordedRetirementView>(runtime, {
         command: { id, journalScope: "TENANT" },
         envelope,
         context,
-        replayVersion: (view) => view.order.version,
+        // a retirement is one immutable record (version 1); its consumption is the payment service's, not a version of it
+        replayVersion: () => 1,
         async access(uow) {
           // a caller with no ACTIVE membership in the agency it names is refused before any of its rows is locked (ADV-PV1R-10): the
           // membership read under a savepoint rolled back at once, so no membership half is held across the order's lock wait
           const member = await co.credits(uow).released(() => uow.memberships.findLive(agencyId, context.userId));
           if (member === null || member.state !== "ACTIVE") await authorize(uow);
         },
-        async body(uow, causationId) {
+        async body(uow) {
           const repo = co.credits(uow);
           const seen = await repo.instruction(orderId);
           if (seen === null || seen.agencyId !== agencyId) throw new NotFoundFailure("payment order");
           // lock order (§7.28, E1's): the order's row lock, then the member's access decision after that wait (a revocation committed
-          // meanwhile is seen), then the instruction's row lock; the state is judged after the last lock
+          // meanwhile is seen); the bank state is read after the lock (P1, E1 and the consumption change it only under the order's lock)
           const order = await uow.commerce.orders.lock(orderId as PaymentOrderId);
           if (order === null || order.agencyId !== agencyId) throw new NotFoundFailure("payment order");
           await authorize(uow);
-          const instruction = await repo.instruction(orderId, true);
+          const instruction = await repo.instruction(orderId);
           if (instruction === null) throw new NotFoundFailure("payment order");
-          if (instruction.orderState !== "AWAITING_TRANSFER" && instruction.orderState !== "PARTIALLY_RECEIVED") {
+          // an order no longer open, or one already retired (recorded or consumed), is not retired again
+          if ((instruction.orderState !== "AWAITING_TRANSFER" && instruction.orderState !== "PARTIALLY_RECEIVED") || (await repo.retirementOf(orderId)) !== null) {
             throw new DomainFailure("PRECONDITION_FAILED", "the bank checkout is no longer open", { reason: "ORDER_NOT_CAPTURABLE" });
           }
-          const after = await repo.expireOrder(orderId, instruction.version, "RETIRED");
-          await repo.releaseBankSlot(orderId);
-          await publishOrderStateEvent(uow, causationId, after, instruction.orderState, "CHECKOUT_RETIRED");
-          const view: RetiredCheckoutView = { order: { orderId, bankState: "EXPIRED", expiryCause: "RETIRED", version: after.version } };
-          return { status: 200, view, version: after.version, resourceKind: "bank_transfer_instruction", resourceId: orderId };
+          const recorded = await repo.recordRetirement({ orderId, agencyId, requestedBy: context.userId, reasonCode: envelope.body.reasonCode });
+          const view: RecordedRetirementView = { retirement: { orderId, state: "RECORDED", requestedAt: recorded.requestedAt } };
+          return { status: 201, view, version: 1, resourceKind: "bank_transfer_instruction", resourceId: orderId };
         },
       });
     },
   };
 
   async function ownerRead<View>(request: InboundReadRequest, what: string, read: (uow: CommerceUnitOfWork) => Promise<View>): Promise<InboundReadAnswer<View>> {
-    const context: OperatorContext = { kind: "OPERATOR", userId: request.subject.identity.userId as UserId, correlationId: request.correlationId, pool: "PAYMENT" };
+    const context: OperatorContext = { kind: "OPERATOR", userId: request.subject.identity.userId as UserId, correlationId: request.correlationId };
     let denied = false;
     try {
       const view = await runtime.unitOfWork.run(context, async (uow) => {
