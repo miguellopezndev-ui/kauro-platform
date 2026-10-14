@@ -64,6 +64,14 @@ test("R2-047 census: every kauro table with agency_id has ENABLE+FORCE RLS and e
     const foreign = owned.rows.filter((o) => o.owner !== "kauro_owner").map((o) => `${o.kind} ${o.name} owned by ${o.owner}`).filter((o) => o !== REGISTRAR_ROUTINE);
     const registrar = await su.query<{ rolcanlogin: boolean }>("SELECT rolcanlogin FROM pg_roles WHERE rolname = 'kauro_route_registrar'");
     assert.deepEqual(registrar.rows, [{ rolcanlogin: false }], "the route registrar cannot log in");
+    // it owns exactly that one object in the whole cluster (pg_shdepend, owner dependencies) and is a member of no role
+    const registrarOwns = await su.query<{ obj: string }>(
+      `SELECT pg_describe_object(d.classid, d.objid, d.objsubid) AS obj FROM pg_shdepend d JOIN pg_roles r ON r.oid = d.refobjid
+        WHERE r.rolname = 'kauro_route_registrar' AND d.deptype = 'o' ORDER BY 1`,
+    );
+    assert.deepEqual(registrarOwns.rows.map((o) => o.obj), ["function kauro.register_bank_payment_route(uuid,text,text,uuid,text,text)"], "the route registrar owns exactly the registration routine");
+    const registrarMember = await su.query("SELECT 1 FROM pg_auth_members am JOIN pg_roles m ON m.oid = am.member WHERE m.rolname = 'kauro_route_registrar'");
+    assert.equal(registrarMember.rowCount, 0, "the route registrar is a member of no role");
     assert.deepEqual(foreign, [], "no kauro object is owned by a runtime role (an owner bypasses RLS unless forced, and may alter its policies)");
     const members = await su.query<{ member: string; role: string }>(
       `SELECT m.rolname AS member, r.rolname AS role FROM pg_auth_members am JOIN pg_roles m ON m.oid = am.member JOIN pg_roles r ON r.oid = am.roleid
