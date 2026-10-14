@@ -315,8 +315,8 @@ CREATE CONSTRAINT TRIGGER outbound_execution_attempts_event_per_version AFTER UP
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION kauro.require_event_for_version('outbound_execution_attempt', 'attempt_id');
 ALTER TABLE kauro.event_types NO FORCE ROW LEVEL SECURITY;
 INSERT INTO kauro.event_types (event_type) VALUES
-  ('outbound.declared.v1'), ('outbound.uncertain.v1'), ('outbound.recorded.v1'),
-  ('treasury_refund.submitting.v1'), ('treasury_refund.uncertain.v1'), ('treasury_refund.completed.v1')
+  ('outbound.declared.v1'), ('outbound.uncertain.v1'), ('outbound.recorded.v1'), ('outbound.not_executed.v1'),
+  ('treasury_refund.submitting.v1'), ('treasury_refund.uncertain.v1'), ('treasury_refund.completed.v1'), ('treasury_refund.failed.v1')
   ON CONFLICT DO NOTHING;
 ALTER TABLE kauro.event_types FORCE ROW LEVEL SECURITY;
 -- the payment service's attempt events (agency NULL for a BANK_CREDIT source, the adopted agency for a CAPTURE source) and their outbox

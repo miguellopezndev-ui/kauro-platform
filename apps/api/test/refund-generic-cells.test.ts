@@ -777,7 +777,12 @@ async function coveredForNx(ctx: FaultContext, attempt: AttemptView, debits: Par
   const { manualExecutionWindowMs, coverageLagMs } = routeTiming();
   const nx = plusMs(attempt.declaredAt, manualExecutionWindowMs + coverageLagMs);
   ctx.clock.set(new Date(Math.max(Date.parse(nx), ctx.clock.nowMs())));
-  const r = await importSI2(await statementWith(plusMs(attempt.declaredAt, -60_000), plusMs(ctx.clock.now(), -coverageLagMs), debits));
+  // the coverage ends the harness margin past effectNow − lag: X3's effect clock runs on with its transaction (kauro.effect_now(), 0038)
+  // its debits stand inside the judged interval [declaredAt, effectNow − lag] (at the clock − lag unless the cell places them)
+  const judged = plusMs(ctx.clock.now(), -coverageLagMs);
+  const stmt = await statementWith(plusMs(attempt.declaredAt, -60_000), plusMs(ctx.clock.now(), EFFECT_CLOCK_MARGIN_MS - coverageLagMs), debits.map((d) => ({ executedAt: judged, ...d })));
+  // SI2 judges COVERAGE_END_IN_FUTURE at its effect instant: it imports on the cell clock the coverage ends behind
+  const r = await onClock(ctx, "SI2 imports the coverage", () => importSI2(stmt));
   assert.equal(r.status, 201, `SI2 imports the coverage: ${r.text}`);
 }
 
@@ -1174,11 +1179,18 @@ function nxControl(title: string, refusalText: string, debits: (a: AttemptView) 
           const { manualExecutionWindowMs, coverageLagMs } = routeTiming();
           const nx = plusMs(a.attempt.declaredAt, manualExecutionWindowMs + coverageLagMs);
           ctx.clock.set(new Date(Math.max(Date.parse(plusMs(nx, options.early === true ? -1 : 0)), ctx.clock.nowMs())));
-          const to = plusMs(ctx.clock.now(), -coverageLagMs);
+          // the coverage ends the harness margin past effectNow − lag: X3's effect clock runs on with its transaction (kauro.effect_now(), 0038)
+          const to = plusMs(ctx.clock.now(), EFFECT_CLOCK_MARGIN_MS - coverageLagMs);
           if (options.gapDay === true) {
-            assert.equal((await importSI2(await statementWith(plusMs(a.attempt.declaredAt, -60_000), plusMs(a.attempt.declaredAt, 3_600_000), []))).status, 201);
-            assert.equal((await importSI2(await statementWith(plusMs(a.attempt.declaredAt, 3_600_000 + 86_400_000), to, []))).status, 201);
-          } else assert.equal((await importSI2(await statementWith(plusMs(a.attempt.declaredAt, -60_000), to, await debits(a.attempt)))).status, 201);
+            const s1 = await statementWith(plusMs(a.attempt.declaredAt, -60_000), plusMs(a.attempt.declaredAt, 3_600_000), []);
+            assert.equal((await onClock(ctx, "SI2 before the gap", () => importSI2(s1))).status, 201);
+            const s2 = await statementWith(plusMs(a.attempt.declaredAt, 3_600_000 + 86_400_000), to, []);
+            assert.equal((await onClock(ctx, "SI2 after the gap", () => importSI2(s2))).status, 201);
+          } else {
+            const judged = plusMs(ctx.clock.now(), -coverageLagMs);
+            const s3 = await statementWith(plusMs(a.attempt.declaredAt, -60_000), to, (await debits(a.attempt)).map((d) => ({ executedAt: judged, ...d })));
+            assert.equal((await onClock(ctx, "SI2 imports the coverage", () => importSI2(s3))).status, 201);
+          }
           const before = await footprint(a.src);
           const r = await onClock(ctx, `${scope} ${kind}: NOT_EXECUTED`, () => resolveX3(a.attempt, "NOT_EXECUTED", null));
           assertRefused(r, refusalText, `${scope} ${kind}`);

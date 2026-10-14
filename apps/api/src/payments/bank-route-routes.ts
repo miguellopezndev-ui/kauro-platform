@@ -11,6 +11,7 @@
  *   POST /api/v1/operations/treasury-refunds/{treasuryRefundId}/approve  approveTreasuryRefund  (KAURO_OWNER)  200 (lane L-REFUND)
  *   POST /api/v1/operations/refunds/{refundId}/execution-declarations   declareRefundExecution (KAURO_OWNER)  201 (lane L-REFUND, X1)
  *   POST /api/v1/operations/execution-attempts/{attemptId}/records      recordRefundExecution  (KAURO_OWNER)  200 (lane L-REFUND, G2/G4)
+ *   POST /api/v1/operations/execution-attempts/{attemptId}/resolutions  resolveUncertainExecution (KAURO_OWNER) 200 (lane L-REFUND, X3)
  *   GET  /api/v1/operations/execution-attempts                           listExecutionAttempts  (KAURO_OWNER)  200 (lane L-REFUND, the queue)
  *   GET  /api/v1/payment-orders/{orderId}/transfer-instructions getTransferInstructions  (agency member, X-Kauro-Agency) 200
  *   POST /api/v1/payment-orders/{orderId}/retirements          retireBankCheckout       (billing member, X-Kauro-Agency) 201
@@ -135,6 +136,7 @@ export function registerBankRouteRoutes(app: FastifyInstance, kit: RouteKit, dep
     command("approveTreasuryRefund", "CMD220", (req) => refunds.approveTreasury(req as never));
     command("declareRefundExecution", "CMD221", (req) => refunds.declareExecution(req as never));
     command("recordRefundExecution", "CMD222", (req) => refunds.recordExecution(req as never));
+    command("resolveUncertainExecution", "CMD223", (req) => refunds.resolveExecution(req as never));
   }
 
   const inbound = deps.inbound;

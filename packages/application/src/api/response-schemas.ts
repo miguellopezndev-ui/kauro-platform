@@ -1114,6 +1114,7 @@ const executionEnvelope = (data: JsonSchema): JsonSchema =>
   closedObject(["kind", "version", "replayed", "data"], { kind: { type: "string", enum: ["COMPLETED"] }, version: { type: "integer", minimum: 1 }, replayed: { type: "boolean" }, data });
 export const DECLARE_EXECUTION_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(closedObject(["attempt", "refund"], { attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA, refund: REFUND_STATE_VIEW_SCHEMA }));
 export const RECORD_EXECUTION_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(closedObject(["attempt", "refund", "offerId"], { attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA, refund: REFUND_STATE_VIEW_SCHEMA, offerId: BANK_UUID }));
+export const RESOLVE_EXECUTION_RESPONSE_SCHEMA: JsonSchema = executionEnvelope(closedObject(["attempt", "refund", "offerId"], { attempt: EXECUTION_ATTEMPT_VIEW_SCHEMA, refund: REFUND_STATE_VIEW_SCHEMA, offerId: { type: ["string", "null"], pattern: BANK_UUID.pattern } }));
 export const EXECUTION_QUEUE_RESPONSE_SCHEMA: JsonSchema = closedObject(["data"], {
   data: closedObject(["items"], {
     items: {
@@ -1171,6 +1172,15 @@ export const BANK_REFUND_OPERATIONAL_ROUTES: ReadonlyArray<OperationalRoute> = O
     authority: "ACH-ROUTE r12 §7.22 (G1, G2, G4), D-24 A; " + OWNER_REFUND_AUTHORITY,
     request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["evidence", "authorizationRef"], { evidence: BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA, authorizationRef: BANK_UUID }) }),
     responses: Object.freeze({ "200": Object.freeze({ description: "The RECORDED attempt, the refund after it and the offer of this key (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: RECORD_EXECUTION_RESPONSE_SCHEMA }) }),
+  }),
+  Object.freeze({
+    operationId: "resolveUncertainExecution",
+    method: "POST" as const,
+    path: "/api/v1/operations/execution-attempts/{attemptId}/resolutions",
+    summary: "Resolve an UNCERTAIN attempt: EXECUTED records it through the receipt gate (G1/G2/G4) and completes the refund; NOT_EXECUTED, only after the window and the coverage lag with the outbound coverage complete and no correlated or unexplained debit, marks it NOT_EXECUTED and a RETURN's refund FAILED (NEVER-RESEND: the attempt is never re-sent)",
+    authority: "ACH-ROUTE r12 §7.22 (X3), D-24 A; " + OWNER_REFUND_AUTHORITY,
+    request: Object.freeze({ contentType: "application/json" as const, schema: closedObject(["outcome", "authorizationRef"], { outcome: { type: "string", enum: ["EXECUTED", "NOT_EXECUTED"] }, evidence: BANK_REFUND_DESTINATION_EVIDENCE_SCHEMA, authorizationRef: BANK_UUID }) }),
+    responses: Object.freeze({ "200": Object.freeze({ description: "The resolved attempt, the refund after it and the offer of this key (null for NOT_EXECUTED) (COMPLETED envelope; an identical replay answers the journaled reply).", contentType: JSON_CONTENT_TYPE, schema: RESOLVE_EXECUTION_RESPONSE_SCHEMA }) }),
   }),
   Object.freeze({
     operationId: "listExecutionAttempts",

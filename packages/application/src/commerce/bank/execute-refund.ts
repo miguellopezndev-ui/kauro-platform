@@ -16,6 +16,14 @@
  *       the refund's completion (CAPTURE RETURN: refund COMPLETED citing the execution, the live entitlement revoked when the service is fully
  *       refunded; BANK_CREDIT: treasury refund COMPLETED) and the owner's journal response. A RECORDED refund always cites a RECORDED attempt
  *       (KP014), so a refund is never COMPLETED without the evidence of its execution.
+ *   X3  CMD223 ResolveUncertainExecution  the owner's resolution of an UNCERTAIN attempt (D-24 A). EXECUTED: the G2/G4 path above with the
+ *       offer command RESOLVE_EXECUTED, admitted only while the attempt is UNCERTAIN (else REFUND_NOT_UNCERTAIN). NOT_EXECUTED: one unit
+ *       under L1 -> L2 -> L3: the authority, the journal, then UNCERTAIN, no execution offer of the attempt (CORR-OFFERED: CONTRADICTORY_EVIDENCE),
+ *       NX-LAG (effectNow >= declaredAt + window + coverageLag, else NOT_EXECUTED_TOO_EARLY), NX-COVERAGE (the imported OUTBOUND coverage is
+ *       contiguous over [declaredAt, effectNow - coverageLag], else COVERAGE_INCOMPLETE) and NX-NO-POTENTIAL (no debit of that interval
+ *       correlated with the attempt: CONTRADICTORY_EVIDENCE; every other one explained by another RECORDED attempt, else UNEXPLAINED_DEBIT);
+ *       then the attempt NOT_EXECUTED and, for a RETURN, its refund FAILED owner_attested_no_effect (the share released), the
+ *       UNCERTAIN_EFFECT case resolved, the ALLOW fact and the journal's answer. Nothing is ever re-sent (NEVER-RESEND).
  *   The queue: the DECLARED attempts with what to send (last four and holder only), for the corporate owner (kauro_app, OPERATOR).
  *
  * GAP (reported): the cookie-session fence of rule 16 is not taken in these SERVICE units (see approve-destination.ts); the recipient-record
@@ -35,10 +43,12 @@ import {
   commandRequestDigest,
   componentsTotal,
   formatMoney,
+  InvalidRequestFailure,
   isUuid,
   normalizeDestination,
   outboundReference,
   revocationPhaseOf,
+  toUtcInstant,
 } from "@kauro/domain";
 import { judgedUnderHold, type RequestAuthority } from "../../api/authority.js";
 import type { AuthenticatedSubject, CommandResult } from "../../api/envelope.js";
@@ -48,7 +58,7 @@ import { STEP_UP_FRESHNESS_SECONDS } from "../../ports/assurance-and-admission.j
 import type { DestinationFingerprinter, StoredBankEvidence } from "../ports.js";
 import { CommerceAccessDenied, DENIAL_CODES, recordCommerceDenial, resultOf } from "../request/runtime.js";
 import { BANK_REFUND_COMMAND_IDS, approveTreasuryHandler, freshAt, integrity, stepUpStale, verdictFailure, type ApproveTreasuryRefundBody, type OwnerRefundDependencies, type TreasuryRefundView } from "./approve-destination.js";
-import type { BankCreditClassifier, BankRefundRepository, BankRouteCollaborators, CapturedDestination, ExecutionAttemptRecord, ExecutionGateOutcomeName, ExecutionOfferRecord, OwnerAuthorityVerdict } from "./ports.js";
+import type { BankCreditClassifier, BankRefundRepository, BankRouteCollaborators, CapturedDestination, ExecutionAttemptRecord, ExecutionGateOutcomeName, ExecutionOfferCommandName, ExecutionOfferRecord, OwnerAuthorityVerdict } from "./ports.js";
 import { evidenceUnavailable, type BankRouteRequest } from "./route-config.js";
 
 // --- requests and views ---------------------------------------------------------------------------------------------------------------
@@ -57,6 +67,17 @@ export interface DeclareRefundExecutionBody {
   readonly expectedVersion: number;
   readonly amountCents: string;
   readonly authorizationRef: string;
+}
+export interface ResolveExecutionBody {
+  readonly outcome: "EXECUTED" | "NOT_EXECUTED";
+  readonly evidence?: { readonly artifactRef: string; readonly evidenceHash: string };
+  readonly authorizationRef: string;
+}
+/** X3's answer: the attempt and the refund after the resolution, and the offer of this key (EXECUTED; null for NOT_EXECUTED). */
+export interface ResolveExecutionView {
+  readonly attempt: ExecutionAttemptView;
+  readonly refund: RefundStateView | null;
+  readonly offerId: string | null;
 }
 export interface RecordExecutionBody {
   readonly evidence: { readonly artifactRef: string; readonly evidenceHash: string };
@@ -112,6 +133,7 @@ export interface BankRefundHandlers {
   approveTreasury(request: BankRouteRequest<ApproveTreasuryRefundBody>): Promise<CommandResult<TreasuryRefundView>>;
   declareExecution(request: BankRouteRequest<DeclareRefundExecutionBody>): Promise<CommandResult<DeclareExecutionView>>;
   recordExecution(request: BankRouteRequest<RecordExecutionBody>): Promise<CommandResult<RecordExecutionView>>;
+  resolveExecution(request: BankRouteRequest<ResolveExecutionBody>): Promise<CommandResult<ResolveExecutionView>>;
   executionQueue(request: ExecutionQueueRequest): Promise<{ readonly kind: "READ"; readonly view: ExecutionQueueView } | { readonly kind: "PROBLEM"; readonly problem: Problem }>;
 }
 
@@ -236,7 +258,7 @@ async function answer<View>(uow: CommerceUnitOfWork, entryId: string, status: 20
 
 const withoutNulls = (payload: Readonly<Record<string, unknown>>): Record<string, unknown> => Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== null && v !== undefined));
 
-async function publishAttempt(uow: CommerceUnitOfWork, context: ServiceContext, causationId: CausationId, attempt: ExecutionAttemptRecord, eventType: "outbound.declared.v1" | "outbound.uncertain.v1" | "outbound.recorded.v1", payload: Readonly<Record<string, unknown>>): Promise<void> {
+async function publishAttempt(uow: CommerceUnitOfWork, context: ServiceContext, causationId: CausationId, attempt: ExecutionAttemptRecord, eventType: "outbound.declared.v1" | "outbound.uncertain.v1" | "outbound.recorded.v1" | "outbound.not_executed.v1", payload: Readonly<Record<string, unknown>>): Promise<void> {
   await uow.events.publish({
     aggregateKind: "outbound_execution_attempt",
     aggregateId: attempt.attemptId as never,
@@ -250,7 +272,7 @@ async function publishAttempt(uow: CommerceUnitOfWork, context: ServiceContext, 
   } as never);
 }
 
-async function publishTreasury(uow: CommerceUnitOfWork, context: ServiceContext, causationId: CausationId, row: { readonly treasuryRefundId: string; readonly version: number; readonly bankCreditId: string }, eventType: "treasury_refund.submitting.v1" | "treasury_refund.uncertain.v1" | "treasury_refund.completed.v1", payload: Readonly<Record<string, unknown>>): Promise<void> {
+async function publishTreasury(uow: CommerceUnitOfWork, context: ServiceContext, causationId: CausationId, row: { readonly treasuryRefundId: string; readonly version: number; readonly bankCreditId: string }, eventType: "treasury_refund.submitting.v1" | "treasury_refund.uncertain.v1" | "treasury_refund.completed.v1" | "treasury_refund.failed.v1", payload: Readonly<Record<string, unknown>>): Promise<void> {
   await uow.events.publish({
     aggregateKind: "treasury_refund",
     aggregateId: row.treasuryRefundId as never,
@@ -458,8 +480,27 @@ async function judgeExecution(
 
 const refusalOf = (code: string): DomainFailure => (code === "EVIDENCE_UNAVAILABLE" ? evidenceUnavailable() : precondition(code as FailureReason, `the execution evidence was refused: ${code}`));
 
-function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<RecordExecutionBody>): Promise<CommandResult<RecordExecutionView>> {
-  const operation = BANK_REFUND_COMMAND_IDS.recordExecution;
+/** What distinguishes G2/G4 (CMD222) from X3 EXECUTED (CMD223) on the shared offer -> read -> outcome path. */
+interface RecordMode {
+  readonly operation: string;
+  readonly command: (a: ExecutionAttemptRecord) => ExecutionOfferCommandName;
+  /** The attempt states the command records from (checked at the offer and again under the outcome's locks). */
+  readonly admits: (a: ExecutionAttemptRecord) => DomainFailure | null;
+}
+const RECORD_MODE: RecordMode = {
+  operation: BANK_REFUND_COMMAND_IDS.recordExecution,
+  command: (a) => (a.kind === "RETURN" ? "RECORD_RETURN" : "RECORD_RESEND"),
+  admits: (a) => (a.state === "DECLARED" || a.state === "UNCERTAIN" ? null : notDeclared()),
+};
+const notUncertain = (): DomainFailure => precondition("REFUND_NOT_UNCERTAIN", "the attempt is not UNCERTAIN: only an uncertain execution is resolved by the owner");
+const RESOLVE_EXECUTED_MODE: RecordMode = {
+  operation: BANK_REFUND_COMMAND_IDS.resolveExecution,
+  command: () => "RESOLVE_EXECUTED",
+  admits: (a) => (a.state === "UNCERTAIN" ? null : notUncertain()),
+};
+
+function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<RecordExecutionBody>, mode: RecordMode = RECORD_MODE): Promise<CommandResult<RecordExecutionView>> {
+  const operation = mode.operation;
   const attemptId = request.path["attemptId"]!;
   const userId = request.subject.identity.userId as UserId;
   const body = request.body;
@@ -490,7 +531,7 @@ function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<R
       await ownerAuthority(bank, uow, repo, userId, proofId);
       const attempt = await repo.lockAttempt(attemptId);
       if (attempt === null) throw new NotFoundFailure("execution attempt");
-      const command = attempt.kind === "RETURN" ? "RECORD_RETURN" : "RECORD_RESEND";
+      const command = mode.command(attempt);
       const existing = await repo.findOffer(attemptId, command, key);
       if (existing !== null) {
         if (existing.requestedArtifactRef !== body.evidence.artifactRef || existing.expectedEvidenceHash !== body.evidence.evidenceHash || existing.actorUserId !== userId) {
@@ -498,7 +539,8 @@ function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<R
         }
         return existing;
       }
-      if (attempt.state !== "DECLARED" && attempt.state !== "UNCERTAIN") throw notDeclared();
+      const inadmissible = mode.admits(attempt);
+      if (inadmissible !== null) throw inadmissible;
       const fresh: ExecutionOfferRecord = { offerId: uow.ids.next() as string, attemptId, command, idempotencyKey: key, requestedArtifactRef: body.evidence.artifactRef, expectedEvidenceHash: body.evidence.evidenceHash, actorUserId: userId };
       await repo.insertOffer(fresh);
       await allowFact(uow, context, operation, await bank.effectNow(uow));
@@ -550,7 +592,8 @@ function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<R
         return t === null ? null : { state: t.state, version: t.version };
       };
       // recorded meanwhile under another key: this key records nothing (its offer stays without an outcome); its own replay is above
-      if (attempt.state !== "DECLARED" && attempt.state !== "UNCERTAIN") throw notDeclared();
+      const moved = mode.admits(attempt);
+      if (moved !== null) throw moved;
       const judged = await judgeExecution(read, expired(), theOffer, attempt, classifier, fingerprinter, destination, (id) => repo.executionIdUsed(attempt.environment, attempt.accountRef, id));
       if (judged.kind === "REVIEW") {
         // the refusal is durable: the offer's REVIEW outcome and its review case commit, the attempt and the refund stay as they are
@@ -617,6 +660,114 @@ function recordExecution(d: OwnerRefundDependencies, request: BankRouteRequest<R
   });
 }
 
+// --- X3 CMD223 ResolveUncertainExecution ---------------------------------------------------------------------------------------------
+
+/** NX-COVERAGE: whether the intervals (by start) cover [from, to] without a gap. */
+function covers(intervals: ReadonlyArray<{ readonly from: UtcInstant; readonly to: UtcInstant }>, from: UtcInstant, to: UtcInstant): boolean {
+  let cursor = Date.parse(from);
+  const end = Date.parse(to);
+  for (const iv of intervals) {
+    if (cursor >= end) break;
+    if (Date.parse(iv.from) > cursor) return false;
+    cursor = Math.max(cursor, Date.parse(iv.to));
+  }
+  return cursor >= end;
+}
+
+/** The failure code of a refund the owner attested was never executed (X3 NOT_EXECUTED, `owner_attested_no_effect`). */
+export const OWNER_ATTESTED_NO_EFFECT = "OWNER_ATTESTED_NO_EFFECT";
+
+function resolveExecution(d: OwnerRefundDependencies, request: BankRouteRequest<ResolveExecutionBody>): Promise<CommandResult<ResolveExecutionView>> {
+  const body = request.body;
+  if (body.outcome === "EXECUTED") {
+    if (body.evidence === undefined) return Promise.resolve(resultOf<ResolveExecutionView>(new InvalidRequestFailure([{ field: "evidence", code: "REQUIRED" }]), request.correlationId));
+    // the journal digests the whole body, the outcome with it: the same key under the other outcome is BODY_CONFLICT
+    return recordExecution(d, request as unknown as BankRouteRequest<RecordExecutionBody>, RESOLVE_EXECUTED_MODE) as Promise<CommandResult<ResolveExecutionView>>;
+  }
+  if (body.evidence !== undefined) return Promise.resolve(resultOf<ResolveExecutionView>(new InvalidRequestFailure([{ field: "evidence", code: "UNKNOWN_FIELD" }]), request.correlationId));
+  return resolveNotExecuted(d, request);
+}
+
+function resolveNotExecuted(d: OwnerRefundDependencies, request: BankRouteRequest<ResolveExecutionBody>): Promise<CommandResult<ResolveExecutionView>> {
+  const operation = BANK_REFUND_COMMAND_IDS.resolveExecution;
+  const attemptId = request.path["attemptId"]!;
+  const userId = request.subject.identity.userId as UserId;
+  return ownerCommand<ResolveExecutionView>(d, operation, request.correlationId, async (context, adopt) => {
+    const { bank, payment, refunds } = partsOf(d);
+    const journal = journalOf(operation, request);
+    const proofId = isUuid(request.body.authorizationRef) ? request.body.authorizationRef : null;
+    const out = await payment.run(context, async (uow): Promise<{ readonly view: ResolveExecutionView } | Replayed> => {
+      const repo = refunds(uow);
+      const c = uow.commerce;
+      // 1. the attempt's scope, L1, the owner's authority, the journal
+      const seen = await repo.attempt(attemptId);
+      if (seen === null) throw new NotFoundFailure("execution attempt");
+      if (seen.sourceKind === "CAPTURE") {
+        if ((await uow.adoptScope("REFUND", seen.refundId as RefundId)) === null) throw new NotFoundFailure("execution attempt");
+        adopt(uow.commerceScope);
+      }
+      await repo.lockOutboundStream(seen.environment, seen.accountRef);
+      const verdict = await ownerAuthority(bank, uow, repo, userId, proofId);
+      const reservation = await reserve(uow, journal);
+      if (reservation instanceof Replayed) return reservation;
+      // 2. L2, then the attempt (L3)
+      await lockSource(repo, seen);
+      const attempt = await repo.lockAttempt(attemptId);
+      if (attempt === null) throw new NotFoundFailure("execution attempt");
+      if (attempt.state !== "UNCERTAIN") throw notUncertain();
+      // 3. CORR-OFFERED: the owner's claim that it was executed (any offer of the attempt, whatever its outcome) blocks NOT_EXECUTED
+      if (await repo.anyOfferFor(attemptId)) throw precondition("CONTRADICTORY_EVIDENCE", "an execution was offered for this attempt");
+      // 4. NX-LAG, NX-COVERAGE, NX-NO-POTENTIAL at the effect clock, read under L1 (a statement import inserts its lines only under L1)
+      const timing = await repo.routeTimingOf(attempt.environment, attempt.accountRef);
+      if (timing === null) throw precondition("COVERAGE_INCOMPLETE", "the account has no route: its coverage is unknown");
+      const at = await bank.effectNow(uow);
+      if (Date.parse(at) < Date.parse(attempt.declaredAt) + timing.windowMs + timing.coverageLagMs) throw precondition("NOT_EXECUTED_TOO_EARLY", "the window and the coverage lag have not passed since the declaration");
+      const to = toUtcInstant(Date.parse(at) - timing.coverageLagMs);
+      if (!covers(await repo.outboundCoverage(attempt.environment, attempt.accountRef, attempt.declaredAt, to), attempt.declaredAt, to)) {
+        throw precondition("COVERAGE_INCOMPLETE", "the imported outbound coverage has a gap since the declaration");
+      }
+      const debits = await repo.debitsAgainst(attempt.attemptId, attempt.environment, attempt.accountRef, attempt.declaredAt, to);
+      if (debits.some((x) => x.correlated)) throw precondition("CONTRADICTORY_EVIDENCE", "a debit of the covered interval is correlated with this attempt");
+      if (debits.some((x) => !x.explained)) throw precondition("UNEXPLAINED_DEBIT", "a debit of the covered interval is not explained by another recorded execution");
+      const destination = await repo.destinationOf(attempt.sourceKind, refundIdOf(attempt));
+      if (destination === null) throw new DomainFailure("INTEGRITY_FAILURE", "a declared attempt without the destination it was declared to");
+      // no await between this instant and its judgment
+      if (!freshAt(verdict, at)) throw stepUpStale();
+      const causationId = reservation.entryId as string as CausationId;
+      // 5. the attempt NOT_EXECUTED; a RETURN's refund FAILED (its share released); a RESEND's payable stays open
+      const resolved = await repo.notExecuteAttempt(attempt.attemptId, attempt.version);
+      if (resolved === null) throw new StaleVersionFailure(attempt.version, attempt.state);
+      await publishAttempt(uow, context, causationId, resolved, "outbound.not_executed.v1", { previousState: attempt.state });
+      let refundState: RefundStateView | null = null;
+      if (attempt.kind === "RETURN" && attempt.sourceKind === "CAPTURE") {
+        const r = (await c.refunds.lock(attempt.refundId as RefundId)) ?? (await c.refunds.get(attempt.refundId as RefundId));
+        if (r === null) throw new NotFoundFailure("refund");
+        if (r.state !== "UNCERTAIN") throw new DomainFailure("INTEGRITY_FAILURE", "the refund of an UNCERTAIN return is not UNCERTAIN");
+        const w = await c.refunds.transition(r.refundId, r.version, { state: "FAILED", failureCode: OWNER_ATTESTED_NO_EFFECT }, at);
+        if (w.kind === "STALE") throw new StaleVersionFailure(w.currentVersion, w.currentState);
+        refundState = { state: w.record.state, version: w.record.version };
+      } else if (attempt.kind === "RETURN") {
+        const t = await repo.lockTreasuryRefund(attempt.treasuryRefundId!);
+        if (t === null) throw new NotFoundFailure("treasury refund");
+        if (t.state !== "UNCERTAIN") throw new DomainFailure("INTEGRITY_FAILURE", "the treasury refund of an UNCERTAIN return is not UNCERTAIN");
+        const failed = await repo.transitionTreasuryRefund(t.treasuryRefundId, t.version, "FAILED");
+        if (failed === null) throw new StaleVersionFailure(t.version, t.state);
+        await publishTreasury(uow, context, causationId, failed, "treasury_refund.failed.v1", { attemptId: resolved.attemptId, failureCode: OWNER_ATTESTED_NO_EFFECT, previousState: failed.previousState });
+        refundState = { state: failed.state, version: failed.version };
+      }
+      await repo.resolveOpenCases("UNCERTAIN_EFFECT", resolved.attemptId, at);
+      await allowFact(uow, context, operation, at);
+      const view: ResolveExecutionView = { attempt: attemptView(resolved, destination), refund: refundState, offerId: null };
+      return { view: await answer(uow, reservation.entryId, 200, view, "outbound_execution_attempt", resolved.attemptId) };
+    });
+    if (out instanceof Replayed) {
+      const view = out.view as ResolveExecutionView;
+      return { kind: "COMPLETED", status: out.status, view, version: view.refund?.version ?? 1, replayed: true };
+    }
+    return { kind: "COMPLETED", status: 200, view: out.view, version: out.view.refund?.version ?? 1, replayed: false };
+  });
+}
+
 // --- the owner queue ------------------------------------------------------------------------------------------------------------------
 
 async function executionQueue(d: OwnerRefundDependencies, request: ExecutionQueueRequest): Promise<{ readonly kind: "READ"; readonly view: ExecutionQueueView } | { readonly kind: "PROBLEM"; readonly problem: Problem }> {
@@ -661,6 +812,7 @@ export function createBankRefundHandlers(d: OwnerRefundDependencies): BankRefund
     approveTreasury: approveTreasuryHandler(d),
     declareExecution: (request) => declareExecution(d, request),
     recordExecution: (request) => recordExecution(d, request),
+    resolveExecution: (request) => resolveExecution(d, request),
     executionQueue: (request) => executionQueue(d, request),
   };
 }

@@ -4,7 +4,7 @@
  * amount, no service or tax component). Pure: no clock, no I/O.
  */
 export const TREASURY_REFUND_AGGREGATE_KINDS = ["treasury_refund"] as const;
-export const TREASURY_REFUND_EVENT_TYPES = ["treasury_refund.approved.v1", "treasury_refund.submitting.v1", "treasury_refund.uncertain.v1", "treasury_refund.completed.v1"] as const;
+export const TREASURY_REFUND_EVENT_TYPES = ["treasury_refund.approved.v1", "treasury_refund.submitting.v1", "treasury_refund.uncertain.v1", "treasury_refund.completed.v1", "treasury_refund.failed.v1"] as const;
 export type TreasuryRefundEventType = (typeof TREASURY_REFUND_EVENT_TYPES)[number];
 
 /** References, hashes and tokens only: never an account or routing number, never a holder name (the destination stays in its own row). */
@@ -14,6 +14,8 @@ export const TREASURY_REFUND_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<TreasuryRe
   "treasury_refund.submitting.v1": ["treasuryRefundId", "bankCreditId", "attemptId", "previousState"],
   "treasury_refund.uncertain.v1": ["treasuryRefundId", "bankCreditId", "attemptId", "previousState"],
   "treasury_refund.completed.v1": ["treasuryRefundId", "bankCreditId", "attemptId", "amountCents", "evidenceHash", "previousState"],
+  // X3 NOT_EXECUTED of its RETURN attempt: FAILED owner_attested_no_effect, the credit's share released
+  "treasury_refund.failed.v1": ["treasuryRefundId", "bankCreditId", "attemptId", "failureCode", "previousState"],
 });
 
 /** The owner learns of every treasury refund change (no account data in any of them). */

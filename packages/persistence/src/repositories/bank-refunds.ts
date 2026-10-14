@@ -482,8 +482,8 @@ export class PgBankRefunds {
     return r.rowCount ?? 0;
   }
 
-  /** A treasury refund's execution move at expectedVersion (+1): APPROVED → SUBMITTING, → UNCERTAIN, → COMPLETED; null when it moved. */
-  async transitionTreasuryRefund(treasuryRefundId: string, expectedVersion: number, state: "SUBMITTING" | "UNCERTAIN" | "COMPLETED"): Promise<(TreasuryRefundRow & { readonly previousState: TreasuryRefundRow["state"] }) | null> {
+  /** A treasury refund's execution move at expectedVersion (+1): APPROVED → SUBMITTING, → UNCERTAIN, → COMPLETED or FAILED (X3); null when it moved. */
+  async transitionTreasuryRefund(treasuryRefundId: string, expectedVersion: number, state: "SUBMITTING" | "UNCERTAIN" | "COMPLETED" | "FAILED"): Promise<(TreasuryRefundRow & { readonly previousState: TreasuryRefundRow["state"] }) | null> {
     const r = await execute<TreasuryRow & { previous_state: TreasuryRefundRow["state"] }>(
       this.db,
       `UPDATE kauro.treasury_refunds AS t SET state = $3, version = t.version + 1 FROM kauro.treasury_refunds AS o
@@ -551,5 +551,71 @@ export class PgBankRefunds {
       accountLast4: x.account_last4,
       holderName: x.holder_name,
     }));
+  }
+
+  /** X3 NOT_EXECUTED: UNCERTAIN → NOT_EXECUTED at expectedVersion (+1); null when the row moved meanwhile. */
+  async notExecuteAttempt(attemptId: string, expectedVersion: number): Promise<ExecutionAttemptRow | null> {
+    const r = await execute<AttemptDbRow>(
+      this.db,
+      `UPDATE kauro.outbound_execution_attempts SET state = 'NOT_EXECUTED', version = version + 1, updated_at = now() WHERE attempt_id = $1 AND version = $2 AND state = 'UNCERTAIN' RETURNING ${ATTEMPT_COLUMNS}`,
+      [attemptId, expectedVersion],
+    );
+    return r.rows[0] ? attemptOf(r.rows[0]) : null;
+  }
+
+  /** CORR-OFFERED (DV1-11): whether any execution offer exists for the attempt (any command, with or without an outcome). */
+  async anyOfferFor(attemptId: string): Promise<boolean> {
+    const r = await execute(this.db, "SELECT 1 FROM kauro.execution_offers WHERE attempt_id = $1 LIMIT 1", [attemptId]);
+    return r.rows.length > 0;
+  }
+
+  /** The manual execution window and the coverage lag of the account's route version in force (null: the account has no route). */
+  async routeTimingOf(environment: string, accountRef: string): Promise<{ readonly windowMs: number; readonly coverageLagMs: number } | null> {
+    const r = await execute<{ w: string; l: string }>(
+      this.db,
+      `SELECT v.manual_execution_window_ms::text AS w, v.coverage_lag_ms::text AS l FROM kauro.bank_routes r JOIN kauro.bank_route_versions v ON v.route_id = r.route_id AND v.route_version = r.current_version
+        WHERE r.environment = $1 AND r.account_ref = $2`,
+      [environment, accountRef],
+    );
+    const row = r.rows[0];
+    return row === undefined ? null : { windowMs: Number(row.w), coverageLagMs: Number(row.l) };
+  }
+
+  /** NX-COVERAGE: the imported OUTBOUND coverage intervals of the account that overlap [from, to], by start. */
+  async outboundCoverage(environment: string, accountRef: string, from: UtcInstant, to: UtcInstant): Promise<ReadonlyArray<{ readonly from: UtcInstant; readonly to: UtcInstant }>> {
+    const r = await execute<{ f: Date; t: Date }>(
+      this.db,
+      `SELECT c.covered_from AS f, c.covered_to AS t FROM kauro.statement_coverage c JOIN kauro.statement_imports i USING (import_id)
+        WHERE i.environment = $1 AND i.account_ref = $2 AND c.stream = 'OUTBOUND' AND c.covered_to >= $3 AND c.covered_from <= $4
+        ORDER BY c.covered_from, c.covered_to`,
+      [environment, accountRef, from, to],
+    );
+    return r.rows.map((x) => ({ from: instant(x.f), to: instant(x.t) }));
+  }
+
+  /**
+   * NX-NO-POTENTIAL (DV1-10): every debit line of the account in [from, to] (its execution instant, else its booking, else its observation)
+   * as the X3 judgment needs it: whether it is correlated with the attempt (CORR-REF: its reference is the attempt's; CORR-RECIPIENT: its
+   * recipient is the bound one; a recorded correlation of the line with the attempt) and whether it is explained (linked by execution id to
+   * another RECORDED attempt).
+   */
+  async debitsAgainst(attemptId: string, environment: string, accountRef: string, from: UtcInstant, to: UtcInstant): Promise<ReadonlyArray<{ readonly lineId: string; readonly correlated: boolean; readonly explained: boolean }>> {
+    const r = await execute<{ line_id: string; correlated: boolean; explained: boolean }>(
+      this.db,
+      `SELECT l.line_id,
+              (l.reference IS NOT DISTINCT FROM a.reference
+               OR (a.recipient_ref IS NOT NULL AND l.recipient_ref IS NOT DISTINCT FROM a.recipient_ref)
+               OR l.linked_attempt_id IS NOT DISTINCT FROM a.attempt_id
+               OR EXISTS (SELECT 1 FROM kauro.execution_correlations x WHERE x.line_id = l.line_id AND x.attempt_id = a.attempt_id)) AS correlated,
+              (l.linked_attempt_id IS NOT NULL AND l.linked_attempt_id <> a.attempt_id
+               AND EXISTS (SELECT 1 FROM kauro.outbound_execution_attempts o WHERE o.attempt_id = l.linked_attempt_id AND o.state = 'RECORDED')) AS explained
+         FROM kauro.statement_lines l
+         JOIN kauro.outbound_execution_attempts a ON a.attempt_id = $1
+        WHERE l.environment = $2 AND l.account_ref = $3 AND l.line_kind = 'DEBIT'
+          AND coalesce(l.executed_at, l.booked_at, l.observed_at) >= $4 AND coalesce(l.executed_at, l.booked_at, l.observed_at) <= $5
+        ORDER BY l.line_id`,
+      [attemptId, environment, accountRef, from, to],
+    );
+    return r.rows.map((x) => ({ lineId: x.line_id, correlated: x.correlated === true, explained: x.explained === true }));
   }
 }

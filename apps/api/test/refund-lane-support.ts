@@ -244,7 +244,29 @@ export interface OwnerCall {
 async function ownerCall(url: string, body: Record<string, unknown>, o: OwnerCall, label: string): Promise<Reply> {
   const { iw } = L();
   const owner = o.owner ?? L().owner;
-  return call(iw.w, { url, token: owner.token, agency: null, key: o.key ?? freshKey(label), body: { ...body, authorizationRef: o.proof ?? (await iw.w.stepUp(owner, o.stepUp ?? "FRESH")) } });
+  return call(iw.w, { url, token: owner.token, agency: null, key: o.key ?? freshKey(label), body: { ...body, authorizationRef: o.proof ?? (await proofFor(owner, o.stepUp ?? "FRESH")) } });
+}
+/**
+ * The owner's step-up proof for a call. Under a cell's step clock the command judges the proof's freshness at its repositioned effect
+ * instant (past declaredAt + window + coverageLag for X3 NOT_EXECUTED), so the proof is issued on that clock (one second before it, a
+ * STALE one twenty minutes before), read from a transaction the clock positions; otherwise on the database clock now (World.stepUp).
+ */
+async function proofFor(owner: Person, freshness: "FRESH" | "STALE"): Promise<string> {
+  const { iw } = L();
+  const clock = iw.faults.clock;
+  if (clock === null) return iw.w.stepUp(owner, freshness);
+  const c = await openBank();
+  let at: string;
+  try {
+    await c.query("BEGIN");
+    await clock.onServer(c);
+    at = (await c.query<{ at: string }>(`SELECT to_char(kauro.server_now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at`)).rows[0]!.at;
+    await c.query("ROLLBACK");
+  } finally {
+    await c.end();
+  }
+  const issuedMs = Date.parse(at) - 1000 - (freshness === "FRESH" ? 0 : 20 * 60_000);
+  return iw.h.recordStepUp(owner.userId as UserId, { issuedAt: new Date(issuedMs).toISOString() as never });
 }
 
 export interface DeclareOptions extends OwnerCall {
@@ -409,7 +431,8 @@ export async function lapsed(ctx: FaultContext, scope: Scope, kind: Kind, label:
   const { manualExecutionWindowMs } = routeTiming();
   const boundary = plusMs(attempt.declaredAt, manualExecutionWindowMs);
   ctx.deadline(boundary, `the manual execution window of ${label}`);
-  ctx.clock.past(boundary);
+  // a cell looping its legs may already stand past this boundary (the controlled clock never moves backwards): the pass lapses it there
+  if (ctx.clock.nowMs() <= Date.parse(boundary)) ctx.clock.past(boundary);
   await ctx.operation(`X2 lapses ${label}`, async (op) => {
     L().iw.faults.clock = op.clock;
     try {
@@ -613,7 +636,7 @@ const RED_FIRST: ReadonlyArray<readonly [RegExp, string]> = [
   [/ RFG-M-X1-REVOCATION-SESSION /, "todo: GAP session fence: the owner commands run in SERVICE units of kauro_payment, which take no lock on the caller's web session (rule 16); a session revoked while X1 waits at L1 is not refused"],
   [/ RFG-M-(X1-RACE|LOCK-L3) /, "todo: seam S5 (bankWorld.reverseCredit, the G6 Kreversal racing the declaration)"],
   [/RFG-P-DEST-RECIPIENT|RFG-M-DEST-RECIPIENT /, "todo: GAP seam S4 (bankWorld.storeRecipientRecord, the DP-RECIPIENT proof is not offered)"],
-  [/^(NEVER-RESEND:|RFG-03 |RFG-04 )/, "todo: red-first, slice 3 (X3 resolution, X4 resend, the owner queue)"],
+  [/^(NEVER-RESEND:|RFG-04 )/, "todo: red-first, slice 3 (X4 resend: the NEVER-RESEND cells and RFG-04 loop RESEND attempts, declared only by X4)"],
   [/ RFG-M-NR-/, "todo: red-first, slice 3 (NEVER-RESEND at every entry point: X3, X4)"],
   [/ RFG-M-X3-|: Resolve uncertain execution|RFG-M-OFFER-OUTCOME-/, "todo: red-first, slice 3 (X3 resolve uncertain execution)"],
   [/ RFG-M-X4-|: Declare a resend execution| RFG-P-DF-(EQUIV|FULLWIDTH|HYPHEN|UNICODE-DIGITS-EVIDENCE)/, "todo: red-first, slices 2-3 (X1 and X4 bind the destination)"],

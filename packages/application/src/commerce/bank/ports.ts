@@ -262,9 +262,15 @@ export interface BankRefundRepository {
   insertOutcome(o: ExecutionOutcomeRecord): Promise<void>;
   openCaseIfNone(c: NewBankReviewCaseInput): Promise<boolean>;
   resolveOpenCases(kind: string, attemptId: string, at: UtcInstant): Promise<number>;
-  transitionTreasuryRefund(treasuryRefundId: string, expectedVersion: number, state: "SUBMITTING" | "UNCERTAIN" | "COMPLETED"): Promise<(TreasuryRefundRecord & { readonly previousState: TreasuryRefundRecord["state"] }) | null>;
+  transitionTreasuryRefund(treasuryRefundId: string, expectedVersion: number, state: "SUBMITTING" | "UNCERTAIN" | "COMPLETED" | "FAILED"): Promise<(TreasuryRefundRecord & { readonly previousState: TreasuryRefundRecord["state"] }) | null>;
   dueAttempts(at: UtcInstant, limit: number): Promise<ReadonlyArray<{ readonly attemptId: string; readonly sourceKind: "CAPTURE" | "BANK_CREDIT"; readonly refundId: string | null }>>;
   executionWindowMs(environment: string, accountRef: string): Promise<number | null>;
+  // X3 ResolveUncertainExecution (§7.22, DV1-10, DV1-11)
+  notExecuteAttempt(attemptId: string, expectedVersion: number): Promise<ExecutionAttemptRecord | null>;
+  anyOfferFor(attemptId: string): Promise<boolean>;
+  routeTimingOf(environment: string, accountRef: string): Promise<{ readonly windowMs: number; readonly coverageLagMs: number } | null>;
+  outboundCoverage(environment: string, accountRef: string, from: UtcInstant, to: UtcInstant): Promise<ReadonlyArray<{ readonly from: UtcInstant; readonly to: UtcInstant }>>;
+  debitsAgainst(attemptId: string, environment: string, accountRef: string, from: UtcInstant, to: UtcInstant): Promise<ReadonlyArray<{ readonly lineId: string; readonly correlated: boolean; readonly explained: boolean }>>;
   ownerQueue(limit: number): Promise<ReadonlyArray<QueuedAttemptRecord>>;
 }
 

@@ -5,13 +5,15 @@
  * of the destination (the destination stays in its own row). Pure: no clock, no I/O.
  */
 export const OUTBOUND_ATTEMPT_AGGREGATE_KINDS = ["outbound_execution_attempt"] as const;
-export const OUTBOUND_ATTEMPT_EVENT_TYPES = ["outbound.declared.v1", "outbound.uncertain.v1", "outbound.recorded.v1"] as const;
+export const OUTBOUND_ATTEMPT_EVENT_TYPES = ["outbound.declared.v1", "outbound.uncertain.v1", "outbound.recorded.v1", "outbound.not_executed.v1"] as const;
 export type OutboundAttemptEventType = (typeof OUTBOUND_ATTEMPT_EVENT_TYPES)[number];
 
 export const OUTBOUND_ATTEMPT_EVENT_PAYLOAD_ALLOWLIST: Readonly<Record<OutboundAttemptEventType, ReadonlyArray<string>>> = Object.freeze({
   "outbound.declared.v1": ["attemptId", "kind", "state", "sourceKind", "sourceId", "refundId", "treasuryRefundId", "attemptNumber", "amountCents", "declaredAt", "destinationFingerprint"],
   "outbound.uncertain.v1": ["attemptId", "kind", "state", "previousState", "sourceKind", "sourceId", "refundId", "treasuryRefundId"],
   "outbound.recorded.v1": ["attemptId", "kind", "state", "previousState", "sourceKind", "sourceId", "refundId", "treasuryRefundId", "evidenceHash", "destinationProof"],
+  // X3 NOT_EXECUTED: the owner attests no effect under NX-LAG, NX-COVERAGE and NX-NO-POTENTIAL
+  "outbound.not_executed.v1": ["attemptId", "kind", "state", "previousState", "sourceKind", "sourceId", "refundId", "treasuryRefundId"],
 });
 
 /** The owner learns of every attempt change (no account data in any of them). */
