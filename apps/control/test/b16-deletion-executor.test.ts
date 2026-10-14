@@ -366,7 +366,8 @@ async function admitModelTask(run: Interpreting): Promise<{ readonly taskId: str
         taskKey: sha(`del-task-${reservationSeq}-${run.auditId}`),
         candidateManifestHash: run.manifest as never,
         policyHash: sha("model-policy"),
-        minimizedRequestHash: sha(`minimized-${reservationSeq}`),
+        minimizedRequestHash: sha(`request-${reservationSeq}`),
+        core: { runId: run.auditId as never, requestKey: sha(`del-key-${reservationSeq}`) },
         providerProfileId: ids.next() as never,
         maximumCostCents: 40n,
       });
