@@ -22,7 +22,7 @@
 import type { PurchaseRebinder, SourceLineageReader } from "@kauro/application";
 import { publishVersionEvent, versionEvent } from "@kauro/application";
 import type { CommercialAuthorizationId, CommercialAuthorizationRecord, PurchaseRebindingId, QuoteRecord, RebindingReason, ReplacementBlocker } from "@kauro/domain";
-import { COMMITTING_REFUND_STATES, DomainFailure, NotFoundFailure, authorizesObligation, rebindingRevocationCode, replacementBlockers, targetRepairLineageHash } from "@kauro/domain";
+import { COMMITTING_REFUND_STATES, DomainFailure, NotFoundFailure, OFFERED_CAPABILITY_STATES, authorizesObligation, rebindingRevocationCode, replacementBlockers, targetRepairLineageHash } from "@kauro/domain";
 import { purchasedSubjectReader } from "../edition.js";
 
 function applied<T>(write: { readonly kind: "APPLIED"; readonly record: T } | { readonly kind: "STALE"; readonly currentVersion: number; readonly currentState: string }, what: string): T {
@@ -83,6 +83,9 @@ export function createPurchaseRebinder(deps: { readonly lineage?: SourceLineageR
       ];
       if (replaced === null || replaced.quoteId !== from.quoteId) blockers.push("PURCHASE_NOT_INTACT");
       if (subject === null || subject.approval === null || subject.capability === null) blockers.push("NOT_A_REPLACEMENT");
+      // the capability the replacement entitlement is issued under is still offered, read after its shared half (a suspension committed
+      // while this waited refuses it here, never as the issuance trigger's KP004)
+      if (subject !== null && subject.capability !== null && !OFFERED_CAPABILITY_STATES.has(subject.capability.state)) blockers.push("CAPABILITY_RESTRICTED");
       if (blockers.length > 0 || replaced === null || lineage === null || subject === null || subject.approval === null || subject.capability === null) {
         return { kind: "REFUSED", blockers: [...new Set(blockers)] };
       }

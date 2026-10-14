@@ -235,7 +235,7 @@ export function targetRepairLineageHash(oldBodyHash: string, newBodyHash: string
   return rawDigest(canonicalBytes({ domain: "KAURO_TARGET_REPAIR_V1", version: 1, payload: { oldBodyHash, newBodyHash } }));
 }
 
-export type ReplacementBlocker = "EXECUTION_STARTED" | "PURCHASE_NOT_INTACT" | "NOT_A_REPLACEMENT" | "ALLOWANCE_USED" | "LINEAGE_MISSING" | "TARGET_NOT_CURRENT";
+export type ReplacementBlocker = "EXECUTION_STARTED" | "PURCHASE_NOT_INTACT" | "NOT_A_REPLACEMENT" | "ALLOWANCE_USED" | "LINEAGE_MISSING" | "TARGET_NOT_CURRENT" | "CAPABILITY_RESTRICTED";
 
 /**
  * The included pre-execution source replacement (16 "Scope changes and credits": one replacement after revalidation, provided no
