@@ -31,7 +31,7 @@ export interface ChromiumProbe {
   readonly version: string;
   readonly platform: string;
   /** Linux: the browser's descendants as the kernel reports them; null elsewhere. */
-  readonly processes: ReadonlyArray<{ readonly type: string; readonly seccomp: number | null; readonly noNewPrivs: number | null }> | null;
+  readonly processes: ReadonlyArray<{ readonly pid: number; readonly ppid: number; readonly comm: string; readonly type: string; readonly seccomp: number | null; readonly noNewPrivs: number | null }> | null;
   /** Linux: whether any process of the tree carries a flag that turns a sandbox layer off. */
   readonly sandboxDisabledFlag: boolean | null;
 }
@@ -39,25 +39,25 @@ export interface ChromiumProbe {
 const SANDBOX_OFF_FLAGS = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-seccomp-filter-sandbox", "--disable-gpu-sandbox", "--disable-namespace-sandbox"];
 
 /** The Linux process tree below the browser Playwright started (found by its `--remote-debugging-pipe` and temporary profile). */
-function browserTreeOf(): Array<{ pid: number; args: string[]; status: string }> {
-  const all = new Map<number, { ppid: number; args: string[]; status: string }>();
+function browserTreeOf(): Array<{ pid: number; ppid: number; comm: string; args: string[]; status: string }> {
+  const all = new Map<number, { ppid: number; comm: string; args: string[]; status: string }>();
   for (const name of readdirSync("/proc")) {
     if (!/^\d+$/.test(name)) continue;
     try {
       const status = readFileSync(`/proc/${name}/status`, "utf8");
       const ppid = Number(/^PPid:\s+(\d+)/m.exec(status)?.[1] ?? "0");
       const args = readFileSync(`/proc/${name}/cmdline`, "utf8").split("\0").filter((a) => a !== "");
-      all.set(Number(name), { ppid, args, status });
+      all.set(Number(name), { ppid, comm: readFileSync(`/proc/${name}/comm`, "utf8").trim(), args, status });
     } catch {
       // the process ended while it was read
     }
   }
   const roots = [...all.entries()].filter(([, v]) => v.args.includes("--remote-debugging-pipe") && !v.args.some((a) => a.startsWith("--type=")));
-  const tree = new Map<number, { pid: number; args: string[]; status: string }>();
+  const tree = new Map<number, { pid: number; ppid: number; comm: string; args: string[]; status: string }>();
   const visit = (pid: number): void => {
     const entry = all.get(pid);
     if (entry === undefined || tree.has(pid)) return;
-    tree.set(pid, { pid, args: entry.args, status: entry.status });
+    tree.set(pid, { pid, ppid: entry.ppid, comm: entry.comm, args: entry.args, status: entry.status });
     for (const [child, v] of all) if (v.ppid === pid) visit(child);
   };
   for (const [pid] of roots) visit(pid);
@@ -156,6 +156,9 @@ export class ChromiumPdfEngine implements PdfEngine {
       if (process.platform !== "linux") return { version, platform: process.platform, processes: null, sandboxDisabledFlag: null };
       const tree = browserTreeOf();
       const processes = tree.map((p) => ({
+        pid: p.pid,
+        ppid: p.ppid,
+        comm: p.comm,
         type: p.args.find((a) => a.startsWith("--type="))?.slice("--type=".length) ?? "browser",
         seccomp: Number(/^Seccomp:\s+(\d+)/m.exec(p.status)?.[1] ?? Number.NaN),
         noNewPrivs: Number(/^NoNewPrivs:\s+(\d+)/m.exec(p.status)?.[1] ?? Number.NaN),
@@ -163,7 +166,7 @@ export class ChromiumPdfEngine implements PdfEngine {
       return {
         version,
         platform: process.platform,
-        processes: processes.map((p) => ({ type: p.type, seccomp: Number.isNaN(p.seccomp) ? null : p.seccomp, noNewPrivs: Number.isNaN(p.noNewPrivs) ? null : p.noNewPrivs })),
+        processes: processes.map((p) => ({ pid: p.pid, ppid: p.ppid, comm: p.comm, type: p.type, seccomp: Number.isNaN(p.seccomp) ? null : p.seccomp, noNewPrivs: Number.isNaN(p.noNewPrivs) ? null : p.noNewPrivs })),
         sandboxDisabledFlag: tree.some((p) => p.args.some((a) => SANDBOX_OFF_FLAGS.some((f) => a === f || a.startsWith(`${f}=`)))),
       };
     } finally {

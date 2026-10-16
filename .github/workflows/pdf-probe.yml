@@ -1,0 +1,46 @@
+name: pdf-probe
+# TEMPORARY (order 4): the report PDF suite alone on the Linux runner, to iterate on the sandbox evidence without the full verify. Removed before merge.
+on:
+  pull_request:
+    paths: ['.github/workflows/pdf-probe.yml', 'packages/data-plane/**', 'tools/ci/prepare-chromium.sh']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 10.16.1
+          run_install: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: bash tools/ci/prepare-chromium.sh
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run generate
+      - run: pnpm --filter "@kauro/data-plane..." run build
+      - name: raw process facts of the sandboxed browser
+        run: |
+          set -u
+          mkdir -p "$GITHUB_WORKSPACE/pdf-evidence"
+          pnpm --filter @kauro/data-plane exec node --input-type=module -e '
+            import { writeFileSync } from "node:fs";
+            const m = await import("./dist/src/index.js");
+            const out = JSON.stringify(await m.ChromiumPdfEngine.probe(process.env.KAURO_PDF_BROWSER), null, 1);
+            console.log(out);
+            writeFileSync(process.env.GITHUB_WORKSPACE + "/pdf-evidence/raw-probe.json", out);'
+      - run: pnpm --filter @kauro/data-plane exec node --test --test-reporter=spec dist/test/report-pdf.test.js
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: pdf-probe-evidence
+          path: pdf-evidence/
+          if-no-files-found: warn
