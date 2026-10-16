@@ -59,7 +59,7 @@ interface Verdict {
   offered_resources: string;
 }
 
-const ISO = `to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
+const ISO = `to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 const unique = (ids: ReadonlyArray<string>): string[] => [...new Set(ids)];
 
 export class PgOutreachDrafts {
@@ -265,7 +265,7 @@ export class PgOutreachDrafts {
     const r = (
       await execute<{ resource_id: string; family_id: string; version: number; state: "CURRENT" | "SUPERSEDED"; content_id: string; current_resource_id: string | null; created_at: string }>(
         this.db,
-        `SELECT r.resource_id, r.family_id, r.version, r.state, r.content_id, to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at,
+        `SELECT r.resource_id, r.family_id, r.version, r.state, r.content_id, to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
                 (SELECT c.resource_id FROM kauro.sales_resources c WHERE c.family_id = r.family_id AND c.state = 'CURRENT') AS current_resource_id
            FROM kauro.sales_resources r WHERE r.resource_id = $1`,
         [resourceId],

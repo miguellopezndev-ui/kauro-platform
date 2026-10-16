@@ -248,7 +248,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
   const lock = (c: Client, kind: string, subject: string, mode: "X" | "S" = "X"): Promise<unknown> =>
     c.query(`SELECT ${mode === "X" ? "pg_advisory_xact_lock" : "pg_advisory_xact_lock_shared"}(kauro.transition_key($1, $2))`, [kind, subject]);
 
-  const owner = w.owner;
+  const owner = sw.owner; // the corporate KAURO_OWNER (statements world), not the agency owner of w
   const recorded = new Map<string, RecordedSeller>();
   let seq = 0;
 
