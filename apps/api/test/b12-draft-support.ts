@@ -268,7 +268,7 @@ export const W = {
   senderUpdate: { label: "sender_update", match: /UPDATE kauro\.sender_identities\b/ },
   suppressionInsert: { label: "suppression_insert", match: /INSERT INTO kauro\.prospect_suppressions\b/ },
   /** CMD061's wait at the resource family subject L6 (GAP-DR-3). */
-  resourceLock: { label: "resource_lock", match: /kauro\.sales_resources'/ },
+  resourceLock: { label: "resource_lock", match: /pg_advisory_xact_lock(_shared)?\(kauro\.transition_key\(\$1, \$2\)\)/, when: (params) => params[0] === "kauro.sales_resources" },
 } as const satisfies Record<string, SqlStep>;
 
 // --- the race harness (§M; K1 raceAtWrite + ctx.mustWait) ---------------------------------------------------------------------------

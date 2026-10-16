@@ -444,6 +444,11 @@ export function controlOf(cell: string): Control | null {
 /** M14 (i): the rev-2 lock order (D4 AUTH_REVOKED taking L7 before L4) instead of removing a lock; KAURO_B12_CONTROL=M14-order. */
 export const rev2OrderControl = (): boolean => process.env["KAURO_B12_CONTROL"] === "M14-order";
 
+/** An advisory subject of §L (OutreachLocks.take): the statement carries its kind as a parameter, so the step names the kind through `when`. */
+function lockStep(label: string, kind: string): SqlStep {
+  return { label, match: /pg_advisory_xact_lock(_shared)?\(kauro\.transition_key\(\$1, \$2\)\)/, when: (params) => params[0] === kind };
+}
+
 // --- first writes of each actor (the `.before` points raceAtWrite pauses at; §M harness) ---------------------------------------------
 export const W = {
   intentInsert: { label: "intent_insert", match: /INSERT INTO kauro\.outreach_send_intents\b/ },
@@ -465,13 +470,14 @@ export const W = {
   activityAfterIntent: { label: "activity_after", match: /INSERT INTO kauro\.sales_activities\b/ },
   leaseShare: { label: "lease_share", match: /FROM kauro\.leases\b[\s\S]*FOR SHARE/ },
   leaseClaim: { label: "lease_claim", match: /kauro\.claim_lease\(/ },
-  personLock: { label: "person_lock", match: /kauro\.outreach_person_caps/ },
-  senderLock: { label: "sender_lock", match: /kauro\.sender_identities'/ },
+  personLock: lockStep("person_lock", "kauro.outreach_person_caps"),
+  senderLock: lockStep("sender_lock", "kauro.sender_identities"),
+  grantLock: lockStep("grant_lock", "kauro.outreach_authorizations"),
   /** D4 on AUTH_REVOKED: its first write is the sender UPDATE (REVOKED) or the intent UPDATE, whichever the unit issues first. */
   d4Revoked: { label: "d4_revoked", match: /UPDATE kauro\.(sender_identities|outreach_send_intents)\b/ },
   /** RegisterSenderIdentity's row INSERT (GAP-RS-1 / GAP-RS-3 pauses). */
   senderInsert: { label: "sender_insert", match: /INSERT INTO kauro\.sender_identities\b/ },
-  draftLock: { label: "draft_lock", match: /kauro\.outreach_drafts'/ },
+  draftLock: lockStep("draft_lock", "kauro.outreach_drafts"),
 } as const satisfies Record<string, SqlStep>;
 
 // --- the race harness (§M; K1 raceAtWrite) ----------------------------------------------------------------------------------------------

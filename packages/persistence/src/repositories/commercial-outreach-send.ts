@@ -152,7 +152,7 @@ function claimRefusalOf(code: string, message: string): { state: "NOT_SENT" | "C
       const sub = capSubReason(message);
       return { state: "NOT_SENT", reason: sub === "OUTSIDE_BUSINESS_DAY" || sub === "CAP_REACHED" ? sub : "CADENCE_CLOSED" };
     }
-    case "KC033": return { state: "NOT_SENT", reason: "RESOURCE_NOT_CURRENT" };
+    case "KC033": return { state: "NOT_SENT", reason: /capability that is not offered/.test(message) ? "CAPABILITY_RESTRICTED" : "RESOURCE_NOT_CURRENT" };
     case "KC034": return { state: "NOT_SENT", reason: "PAUSED" };
     case "KC036": return { state: "NOT_SENT", reason: "ALREADY_SENT" };
     default: return null;
@@ -359,7 +359,7 @@ export class PgOutreachSend {
     const v = (
       await execute<{
         judged_at: Date; state: string; revoked: boolean; valid_from: Date; expires_at: Date; grant_ok: boolean; sender_state: string; policy_state: string | null; suppressed: boolean; owner_seller_id: string | null;
-        seller_state: string | null; offered: string; cited: string; uncertain_open: boolean; already_sent: boolean; retry_at: Date | null; to_address: string | null; subject: string; body: string; sender_address: string; claim_ready: boolean;
+        seller_state: string | null; current_n: string; offered: string; cited: string; uncertain_open: boolean; already_sent: boolean; retry_at: Date | null; to_address: string | null; subject: string; body: string; sender_address: string; claim_ready: boolean;
       }>(
         this.db,
         `/* b12:judge */ SELECT kauro.effect_now() AS judged_at, i.state, g.revoked, g.valid_from, g.expires_at, (g.expires_at > kauro.effect_now() + interval '37 seconds') AS grant_ok,
@@ -369,6 +369,8 @@ export class PgOutreachSend {
                  OR EXISTS (SELECT 1 FROM kauro.prospects p WHERE p.prospect_id = i.prospect_id AND p.state = 'SUPPRESSED')) AS suppressed,
                 (SELECT p.owner_seller_id FROM kauro.prospects p WHERE p.prospect_id = i.prospect_id) AS owner_seller_id,
                 (SELECT s.state FROM kauro.sellers s WHERE s.user_id = i.person_user_id) AS seller_state,
+                (SELECT count(*) FROM kauro.outreach_draft_resources dr JOIN kauro.sales_resources r ON r.resource_id = dr.resource_id
+                  WHERE dr.draft_id = i.draft_id AND r.state = 'CURRENT') AS current_n,
                 (SELECT count(*) FROM kauro.outreach_draft_resources dr JOIN kauro.sales_resources r ON r.resource_id = dr.resource_id
                   WHERE dr.draft_id = i.draft_id AND r.state = 'CURRENT'
                     AND NOT EXISTS (SELECT 1 FROM kauro.sales_resource_capabilities rc JOIN kauro.capabilities k ON k.capability_id = rc.capability_id
@@ -400,7 +402,8 @@ export class PgOutreachSend {
     else if (f.person_seller_id === null && v.owner_seller_id === null) refusal = { state: "CANCELLED", reason: "RECIPIENT_CHANGED" };
     else if (v.sender_state !== "VERIFIED") refusal = { state: "CANCELLED", reason: "SENDER_REVOKED" };
     else if (v.policy_state !== "IN_FORCE") refusal = { state: "NOT_SENT", reason: "POLICY_WITHDRAWN" };
-    else if (Number(v.offered) !== Number(v.cited)) refusal = { state: "NOT_SENT", reason: "RESOURCE_NOT_CURRENT" };
+    else if (Number(v.current_n) !== Number(v.cited)) refusal = { state: "NOT_SENT", reason: "RESOURCE_NOT_CURRENT" };
+    else if (Number(v.offered) !== Number(v.cited)) refusal = { state: "NOT_SENT", reason: "CAPABILITY_RESTRICTED" };
     else if (v.already_sent) refusal = { state: "NOT_SENT", reason: "ALREADY_SENT" };
     else if (v.uncertain_open) refusal = { state: "NOT_SENT", reason: "UNCERTAIN_OPEN" };
     else {

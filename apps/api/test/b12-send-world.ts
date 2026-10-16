@@ -446,18 +446,22 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       const capabilityId = ids.next();
       await h.oracle.query(
         `INSERT INTO kauro.capabilities (capability_id, version, kind, mode, state, profile_hash, qualification_evidence_hashes, review_trigger, created_at, updated_at)
-         VALUES ($1, $2, 'TOOL', NULL, 'AVAILABLE', $3, $4::jsonb, 'b12-send-world', now(), now())`,
-        [capabilityId, `b12-${capabilityId.slice(-8)}`, sha(`capability-${capabilityId}`), JSON.stringify([sha(`qualification-${capabilityId}`)])],
+         VALUES ($1, $2, 'OPERATION', NULL, 'DESIGN', $3, '[]'::jsonb, 'VENDOR_OR_ENVELOPE_CHANGE', now(), now())`,
+        [capabilityId, `b12-${capabilityId.slice(-8)}`, sha(`capability-${capabilityId}`)],
       );
+      // a capability is born DESIGN and reaches AVAILABLE along the listed edges, as the control plane walks it
+      await h.publishCapability(capabilityId as never, "AVAILABLE");
       return publish(ids.next(), capabilityId, label);
     },
-    async metrics(actor) {
+    async metrics(actor, personUserId) {
       // GetOutreachMetrics answers the caller's own policies: the person asks for itself; the pause rule is a bounce among its counted sends
       const r = await api({ method: "GET", url: "/api/v1/ops/outreach/metrics", token: actor.token, key: null });
       if (r.status !== 200) throw new Error(`GetOutreachMetrics answered ${r.status}: ${r.text}`);
       const v = r.json<{ data: Record<string, number> }>();
       const m = v.data;
-      return { accepted: m["accepted"]!, uncertain: m["uncertain"]!, bounced: m["bounced"]!, pauseNumerator: m["pauseNumerator"]!, pauseDenominator: m["pauseDenominator"]!, paused: m["pauseNumerator"]! > 0 };
+      // the pause rule (0088 KC034): a bounce among the latest counted sends, or a provider warning after the person's latest diagnosis
+      const warned = (await h.oracle.query<{ warned: boolean }>("SELECT EXISTS (SELECT 1 FROM kauro.outreach_provider_warnings w WHERE w.person_user_id = $1 AND w.recorded_at > coalesce((SELECT max(recorded_at) FROM kauro.outreach_diagnoses WHERE person_user_id = $1), '-infinity'::timestamptz)) AS warned", [personUserId])).rows[0]!.warned;
+      return { accepted: m["accepted"]!, uncertain: m["uncertain"]!, bounced: m["bounced"]!, pauseNumerator: m["pauseNumerator"]!, pauseDenominator: m["pauseDenominator"]!, paused: m["pauseNumerator"]! > 0 || warned };
     },
     async grant(drafts, options = {}) {
       const first = drafts[0];
@@ -500,6 +504,9 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       let fence: number | null = null;
       const admitted = new Map<string, Parameters<OutreachDispatcher["submit"]>[0]>();
       let leasedAt: string | null = null;
+      // the lease is claimed again only once it ran out on the clock the world stands at (a lease still valid keeps its fence: the old owner of a
+      // takeover cell must not renew the lease the new owner is about to claim)
+      const leaseExpiredAt = (standing: string | null, since: string | null): boolean => standing !== null && since !== null && Date.parse(standing) >= Date.parse(since) + 120_000;
       const takeOver = async (): Promise<number> => {
         const r = await d.takeOver();
         if (r.kind === "HELD") throw new Error(`${name}: another dispatcher holds the OUTBOX_DISPATCH lease`);
@@ -511,7 +518,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       const lease = async (): Promise<OutreachLeaseRef> => {
         // a lease lives 120 s on the clock the world stands at: standing somewhere else, the dispatcher's own lease is claimed again
         // an owner another dispatcher took the lease from keeps its stale fence (its late answers are fenced, never re-leased)
-        if (fence === null || (state.standing !== leasedAt && boundClock === null && (leaseHolder === null || leaseHolder === name))) await takeOver();
+        if (fence === null || (boundClock === null && (leaseHolder === null || leaseHolder === name) && leaseExpiredAt(state.standing, leasedAt))) await takeOver();
         return { resourceId: d.resourceId, ownerId: d.ownerId, fence: fence as number };
       };
       const adapter: Dispatcher = {

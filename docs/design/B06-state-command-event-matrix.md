@@ -3070,6 +3070,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 403 | NOT_AUTHORIZED | ORIGIN_REJECTED | — | — | AUTHENTICATION | the request's Origin is not exactly an application origin (or absent), or the browser reports a cross-site request: nothing is executed and the key is not consumed |
 | 403 | NOT_AUTHORIZED | CSRF_TOKEN_INVALID | — | — | AUTHENTICATION | the request does not carry the session's CSRF token (X-Kauro-CSRF): nothing is executed and the key is not consumed |
 | 403 | NOT_AUTHORIZED | CORPORATE_ROLE_MISSING | — | — | ACCESS | the caller holds no ACTIVE seller row and no ACTIVE KAURO_OWNER grant, read after their transition locks |
+| 403 | NOT_AUTHORIZED | — | — | — | COMMAND | the draft is not the caller's to send: another seller's draft, or a draft the caller is not assigned (403, no reason) |
 | 404 | NOT_FOUND | — | — | — | COMMAND | the draft or the authorization is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
 | 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
 | 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
@@ -3087,14 +3088,14 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | CADENCE_CLOSED | — | — | COMMAND | the cadence window is closed or a stop fact exists (KC032) |
 | 409 | PRECONDITION_FAILED | FIRST_NOT_SENT | — | — | COMMAND | a follow-up has no sent first contact (KC032) |
 | 409 | PRECONDITION_FAILED | OUTREACH_PAUSED | — | — | COMMAND | the sending person is paused until the owner records a diagnosis (KC034) |
-| 409 | PRECONDITION_FAILED | OUTREACH_CALENDAR_UNAVAILABLE | — | — | COMMAND | the date is not covered by the business calendar (KC037) |
 | 409 | PRECONDITION_FAILED | OUTREACH_JURISDICTION_UNREVIEWED | — | — | COMMAND | the channel policy was withdrawn or never reviewed (A13) |
-| 409 | PRECONDITION_FAILED | OUTREACH_COMPLIANCE_UNCONFIGURED | — | — | COMMAND | the postal address or the opt-out origin is not configured (A15) |
 | 409 | PRECONDITION_FAILED | RESOURCE_NOT_CURRENT | — | — | COMMAND | a cited sales resource is no longer current (KC033) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
 | 503 | CAPACITY_UNAVAILABLE | — | — | — | PLATFORM | no database capacity, a serialization or lock conflict, or a draining instance; retry with the same key |
+| 503 | CAPACITY_UNAVAILABLE | OUTREACH_CALENDAR_UNAVAILABLE | — | — | COMMAND | the date is not covered by the business calendar (KC037): the calendar needs its next edition |
+| 503 | CAPACITY_UNAVAILABLE | OUTREACH_COMPLIANCE_UNCONFIGURED | — | — | COMMAND | the postal address or the opt-out origin is not configured (A15): the deployment cannot send until the owner configures it |
 
 ### CMD064 RecordSalesActivity
 

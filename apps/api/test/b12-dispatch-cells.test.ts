@@ -60,14 +60,14 @@ async function claimedAndCalled(disp: Dispatcher, intentId: string, answer: Para
   return disp.submit(intentId);
 }
 /** A redelivery and a recovery never submit an open SEND_UNCERTAIN again, and CMD063 of another draft of its prospect is 409 KC029. */
-async function uncertainStaysClosed(what: string, s: Staged, intentId: string): Promise<void> {
+async function uncertainStaysClosed(what: string, s: Staged, intentId: string, disp: Dispatcher = D()): Promise<void> {
   const i = await intent(w, intentId);
   assert.deepEqual([i.state, await draftState(w, s.draft)], ["SEND_UNCERTAIN", "SEND_UNCERTAIN"], `${what}: intent and draft SEND_UNCERTAIN`);
   assert.equal(callsOf(w, intentId), 1, `${what}: exactly one submission`);
-  await D().dispatch(intentId);
-  await D().recover();
+  await disp.dispatch(intentId);
+  await disp.recover();
   w.standAt(plusMs(i.uncertainAfter ?? T0, D4_GRACE_MS + 1_000));
-  await D().pass();
+  await disp.pass();
   assert.equal(callsOf(w, intentId), 1, `${what}: redelivery and recovery never submit again`);
   assert.equal((await intent(w, intentId)).state, "SEND_UNCERTAIN", `${what}: still SEND_UNCERTAIN`);
   const other = await w.draft(s.seller, s.prospect, s.seller.sender, { label: `${what}-other` });
@@ -121,7 +121,7 @@ cell("R2-129: the Gmail fake accepts but the answer is lost (timeout, reset, cra
     held.answer({ kind: "ACCEPTED_ANSWER_LOST" });
     await call;
     await neu.recover();
-    await uncertainStaysClosed("R2-129 takeover", s, id);
+    await uncertainStaysClosed("R2-129 takeover", s, id, neu); // the lease is the new owner's: it redelivers and recovers
   });
   w.standAt(T0);
 }, "target");
@@ -152,7 +152,7 @@ test("R2-129 (observed sent): after HUMAN_SEND_OBSERVED SENT the intent is OBSER
   w.standAt(T0);
   const seller = await w.seller("r129-obs-sent");
   await firstContacts(w, seller, 9, "r129-obs-sent");
-  const s = await staged(w, "r129-obs-sent-x", { seller, maximumSends: 2 });
+  const s = await staged(w, "r129-obs-sent-x", { seller });
   const id = await queued(w, s);
   w.gmail.script({ kind: "TIMEOUT" });
   await D().dispatch(id);
@@ -272,14 +272,31 @@ test("R2-131: a sales draft on a RESEND_TRANSACTIONAL sender is refused at send 
   // a forged intent on the RESEND route (a copy of an admitted intent with route and draft changed) is refused by the database
   const gmailTwin = await staged(w, "r131-gmail", { seller, prospect: await w.prospect(seller) });
   const model = await queued(w, gmailTwin);
-  await assert.rejects(
-    w.oracle.query(
-      `INSERT INTO kauro.outreach_send_intents SELECT (jsonb_populate_record(NULL::kauro.outreach_send_intents, to_jsonb(i) || jsonb_build_object('intent_id', gen_random_uuid(), 'route', 'RESEND_TRANSACTIONAL', 'draft_id', $2::uuid, 'authorization_id', $3::uuid, 'prospect_id', $4::uuid))).* FROM kauro.outreach_send_intents i WHERE i.intent_id = $1`,
-      [model, s.draft.draftId, s.grant.authorizationId, s.prospect.prospectId],
-    ),
-    (e: unknown) => (e as { code?: string }).code === "KC028",
-    "a forged intent on the RESEND route is refused with KC028",
-  );
+  // the birth locks of an intent (T2) are held, as the writer holds them, so the route guard is what refuses
+  const forger = await w.open("superuser");
+  try {
+    await forger.query("BEGIN");
+    const born = (await forger.query<{ person_user_id: string }>("SELECT person_user_id FROM kauro.outreach_send_intents WHERE intent_id = $1", [model])).rows[0]!;
+    for (const [kind, subject, mode] of [
+      ["kauro.outreach_prospects", s.prospect.prospectId, "X"],
+      ["kauro.outreach_person_caps", born.person_user_id, "X"],
+      ["kauro.outreach_authorizations", s.grant.authorizationId, "S"],
+      ["kauro.outreach_drafts", s.draft.draftId, "X"],
+    ] as const) {
+      await forger.query(mode === "X" ? "SELECT pg_advisory_xact_lock(kauro.transition_key($1, $2))" : "SELECT pg_advisory_xact_lock_shared(kauro.transition_key($1, $2))", [kind, subject]);
+    }
+    await assert.rejects(
+      forger.query(
+        `INSERT INTO kauro.outreach_send_intents SELECT (jsonb_populate_record(NULL::kauro.outreach_send_intents, to_jsonb(i) || jsonb_build_object('intent_id', gen_random_uuid(), 'route', 'RESEND_TRANSACTIONAL', 'draft_id', $2::uuid, 'authorization_id', $3::uuid, 'prospect_id', $4::uuid, 'sender_id', $5::uuid, 'contact_key', $6::text))).* FROM kauro.outreach_send_intents i WHERE i.intent_id = $1`,
+        [model, s.draft.draftId, s.grant.authorizationId, s.prospect.prospectId, resendSender.senderId, s.prospect.contactKey],
+      ),
+      (e: unknown) => (e as { code?: string }).code === "KC028",
+      "a forged intent on the RESEND route is refused with KC028",
+    );
+  } finally {
+    await forger.query("ROLLBACK").catch(() => undefined);
+    await forger.end().catch(() => undefined);
+  }
   assert.equal((await intentsOfDraft(w, s.draft.draftId)).length, 0);
   // the same contentRef on the seller's GMAIL_API sender
   const p = await w.prospect(seller);
@@ -306,7 +323,7 @@ cell("R2-132: the sender's OAuth grant revoked with three queued drafts: the fir
   try {
     await ctx.revoked("the provider refuses the sender's OAuth grant at the first call (AUTH_REVOKED)", async () => {
       w.gmail.script({ kind: "AUTH_REVOKED" });
-      return w.on(conn, "kauro_outreach", ctx, [W.personLock, { label: "grant_lock", match: /kauro\.outreach_authorizations'/ }, W.senderLock, W.senderUpdate], () => D().dispatch(ids[0]!));
+      return w.on(conn, "kauro_outreach", ctx, [W.personLock, W.grantLock, W.senderLock, W.senderUpdate], () => D().dispatch(ids[0]!));
     });
   } finally {
     await conn.end().catch(() => undefined);
@@ -393,7 +410,7 @@ cell("GAP-DI-1b RACE (assignment) M4b: D2 of an owner-sent intent against CMD050
   assert.equal(callsOf(w, o1.id), 0, "order 1: no call to an unassigned prospect (forbidden effect)");
   assert.equal(stateOf(await intent(w, o1.id)), "CANCELLED(RECIPIENT_CHANGED)");
   assert.equal(callsOf(w, o2.id), 1, "order 2: one call");
-  const assigned = await w.oracle.query<{ seller: string | null }>("SELECT assigned_seller_id::text AS seller FROM kauro.prospects WHERE prospect_id = $1", [o2.s.prospect.prospectId]);
+  const assigned = await w.oracle.query<{ seller: string | null }>("SELECT owner_seller_id::text AS seller FROM kauro.prospects WHERE prospect_id = $1", [o2.s.prospect.prospectId]);
   assert.equal(assigned.rows[0]?.seller ?? null, null, "order 2: then unassigned");
   assert.deepEqual(runs.map((x) => x.r.secondBlocked), [true, true]);
 });
@@ -569,7 +586,7 @@ cell("GAP-HP-1 RACE (bounce pause) M18: CMD064 BOUNCED of person X's sent intent
   assert.equal(callsOf(w, o1.id), 0, "order 1: no call of a paused person (forbidden effect)");
   assert.equal(stateOf(await intent(w, o1.id)), "NOT_SENT(PAUSED)");
   assert.equal(callsOf(w, o2.id), 1, "order 2: one call");
-  assert.equal((await w.metrics(w.owner, o2.seller.userId)).paused, true, "order 2: then paused");
+  assert.equal((await w.metrics(o2.seller, o2.seller.userId)).paused, true, "order 2: then paused");
   assert.deepEqual(runs.map((x) => x.r.secondBlocked), [true, true]);
 });
 
@@ -592,7 +609,7 @@ cell("GAP-HP-2 RACE (provider warning pause) M19: D4 recording a Gmail 429 warni
   assert.equal(stateOf(await intent(w, o1.id)), "NOT_SENT(PAUSED)");
   assert.equal(callsOf(w, o2.id), 1, "order 2: one call");
   assert.equal((await warningsOf(w, o2.seller.userId)).length, 1, "order 2: one warning row");
-  assert.equal((await w.metrics(w.owner, o2.seller.userId)).paused, true, "order 2: then paused");
+  assert.equal((await w.metrics(o2.seller, o2.seller.userId)).paused, true, "order 2: then paused");
   assert.deepEqual(runs.map((x) => x.r.secondBlocked), [true, true]);
 });
 
@@ -765,7 +782,7 @@ cell("GAP-DI-2 TIMEOUT: claim lock wait: QUEUED, outbox RETRYABLE, zero calls", 
   const hold = await holdSubject(w, "L10", s.draft.draftId, "X");
   w.setStatementTimeout(1_500);
   try {
-    const waiting = await waitingBehind(ctx, w, hold, "kauro_outreach", "D2 waits at the draft subject L10", () => D().claim(id), [W.draftLock]);
+    const waiting = await waitingBehind(ctx, w, hold, "kauro_outreach", "D2 waits at the draft subject L10", () => D().pass(), [W.draftLock]);
     await waiting.pending.catch((e: unknown) => e);
   } finally {
     w.setStatementTimeout(null);
@@ -1032,7 +1049,8 @@ test("GAP-DI-25 EXPIRY (repeat grace): a repeat claimed 1 us before the previous
   const repeat = intentIdOf(await send(w, s.seller, s.draft, s.grant));
   const grace = plusMs(ua, D4_GRACE_MS);
   w.standAt(plusUs(grace, -1));
-  assert.equal(await disp.claim(repeat), "DEFERRED", "1 us before the grace ends: the unit rolls back");
+  const deferred = (await disp.pass()).find((r) => r.intentId === repeat);
+  assert.equal(deferred?.outcome, "DEFERRED", "1 us before the grace ends: the unit rolls back");
   assert.deepEqual([(await intent(w, repeat)).state, callsOf(w, repeat)], ["QUEUED", 0], "the repeat stays QUEUED with zero calls");
   assert.deepEqual((await outboxOf(w, repeat)).map((o) => o.state), ["RETRYABLE"], "outbox RETRYABLE at that instant");
   w.standAt(grace);
@@ -1073,6 +1091,7 @@ cell("GAP-DI-27 EXPIRY (open call): the Gmail fake holds a call open until its a
 // --- D4 evidence path (D4b) --------------------------------------------------------------------------------------------------------------
 /** In a world of its own: an intent claimed by an old owner whose call is held, the lease taken over, the late answer delivered to the old owner. */
 async function lateAfterTakeover(label: string, late: Parameters<SendWorld["gmail"]["script"]>[0]): Promise<{ s: Staged; id: string; old: Dispatcher; neu: Dispatcher; answer: ClassifiedAnswer }> {
+  await w.beginCell(); // each scenario owns the lease from its own start (an earlier scenario of the cell left its new owner's lease)
   w.standAt(T0);
   const s = await staged(w, label);
   const id = await queued(w, s);
