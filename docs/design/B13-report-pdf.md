@@ -52,7 +52,7 @@ asserts the footer holds the package digest, manifest SHA-256 and model hash and
 
 | case | here | evidence | remaining |
 |---|---|---|---|
-| S069 (PDF engine sandbox) | sandboxed Chromium, JS off, network off, tests with a local server that must see zero hits | EXECUTED_LOCAL (Windows, Edge 155) | Linux run in CI; deployment image and pinned browser |
+| S069 (PDF engine sandbox) | sandboxed Chromium, JS off, network off, tests with a local server that must see zero hits | EXECUTED_LOCAL (Windows, Edge 155); EXECUTED_CI (Linux, Ubuntu 24.04 runner, Google Chrome 155.0.8059.39 as `tools/ci/prepare-chromium.sh` finds it, the runner's own AppArmor profile, sandbox on: no `--no-sandbox`, no privileged container; the browser's descendants report `Seccomp: 2` and `NoNewPrivs: 1` in `/proc`; 11 of 11 tests of `report-pdf.test.ts` run, none skipped, Letter and A4 read back) — run https://github.com/miguellopezndev-ui/kauro-platform/actions/runs/38922835852 | deployment image and pinned browser |
 | S070 (printed Letter/A4) | page sizes read back with pdf.js, multi-page report, long table with header on every page | EXECUTED_LOCAL | — |
 | hash binding | `pdfSha256` equals SHA-256 of the returned bytes; identity equals model/HTML/package values | EXECUTED_LOCAL | — |
 
