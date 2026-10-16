@@ -321,22 +321,15 @@ export async function raceAtWrite<A, B>(ctx: FaultContext, controlId: string, fi
     const runFirst = (): Promise<A> =>
       ctx.operation(`${first.name} (first)`, () => ("raw" in first ? first.raw(fc, () => ctx.points.pass(point)) : w.on(fc, first.role, ctx, [first.at], first.run)));
     const runSecondOn = (client: HarnessConnection): Promise<B> => ("raw" in second ? second.raw(client, async () => undefined) : w.on(client, second.role, ctx, [], second.run));
-    const runSecond = async (): Promise<B> => {
-      let started: Promise<B> | undefined;
-      try {
-        const waiting = await ctx.mustWait(w.oracle, { waiter: sc, holder: connectionPid(fc) }, (client) => (started = runSecondOn(client)), `${second.name} waits on ${first.name}`);
-        return settledValue(await waiting.pending);
-      } catch (e) {
-        // the second settled without waiting (a control): its own answer is the outcome, never the harness's InterleavingNotObserved
-        if (e instanceof InterleavingNotObserved && started !== undefined) return await started;
-        throw e;
-      }
-    };
+    // the second runs THROUGH ctx.mustWait (K1 `credit`): the harness observes its wait on the first's backend and credits it, and the first is held until
+    // it has; without it the oracle may release the first before mustWait's own look, and the cell ends FaultNotInjected although the race happened
     const order = () =>
       k1RaceAtWrite<A, B>({
         oracle: w.oracle,
         first: { run: runFirst, reached: pause.reached, release: () => pause.release(), pid: () => connectionPid(fc) },
-        second: { run: runSecond, pid: () => connectionPid(sc) },
+        second: { run: () => Promise.reject(new Error("credit uses runOn")), runOn: runSecondOn, waiter: sc, pid: () => connectionPid(sc) },
+        credit: ctx,
+        what: `${second.name} waits on ${first.name}`,
       });
     const r = control === null ? await order() : await w.withoutSerializers(control, order);
     return { first: settledOf(r.first), second: settledOf(r.second), secondBlocked: r.outcome === "blocked" };
