@@ -565,12 +565,22 @@ ${seed}`, "utf8").digest("hex");
 
   // ---- D5 -----------------------------------------------------------------------------------------------------------------------------
 
-  /**
-   * The intents D5 visits: every SUBMITTING one that carries its uncertain_after, earliest first (no lock). Whether one is due is judged by its own unit, after
-   * its lease statement and at that statement's instant (plan section W: D5's last await before its judgment is the L13 FOR SHARE); a listing that filtered on
-   * the instant it ran at would miss an intent whose uncertain_after the effect clock crosses while the unit waits at the lease.
-   */
+  /** The intents D5 recovers: SUBMITTING with uncertain_after passed at the database's instant (no lock; the unit re-judges). */
   async dueForRecovery(limit: number): Promise<ReadonlyArray<string>> {
+    const r = await execute<{ intent_id: string }>(
+      this.db,
+      "SELECT intent_id FROM kauro.outreach_send_intents WHERE state = 'SUBMITTING' AND uncertain_after <= kauro.effect_now() ORDER BY uncertain_after, intent_id LIMIT $1",
+      [limit],
+    );
+    return r.rows.map((x) => x.intent_id);
+  }
+
+  /**
+   * The intents D5 visits: every SUBMITTING one that carries its uncertain_after, earliest first (no lock). Whether one is due is judged by its own unit,
+   * after its lease statement and at that statement's instant (plan section W: D5's last await before its judgment is the L13 FOR SHARE); a listing that
+   * filtered on the instant it ran at (dueForRecovery) would miss an intent whose uncertain_after the effect clock crosses while the unit waits at the lease.
+   */
+  async submittingForRecovery(limit: number): Promise<ReadonlyArray<string>> {
     const r = await execute<{ intent_id: string }>(
       this.db,
       "SELECT intent_id FROM kauro.outreach_send_intents WHERE state = 'SUBMITTING' AND uncertain_after IS NOT NULL ORDER BY uncertain_after, intent_id LIMIT $1",

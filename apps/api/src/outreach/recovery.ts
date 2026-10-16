@@ -20,7 +20,7 @@ export interface RecoveryPass {
 const serviceContext = (rt: OutreachRuntime) => ({ kind: "SERVICE" as const, serviceId: "outreach-service", correlationId: rt.ids.next() as CorrelationId });
 
 export async function recoverDue(rt: OutreachRuntime, lease: OutreachLeaseRef, limit: number): Promise<RecoveryPass> {
-  const due = await rt.units.run(serviceContext(rt), (uow) => outreachSendOf(uow).dueForRecovery(limit));
+  const due = await rt.units.run(serviceContext(rt), (uow) => outreachSendOf(uow).submittingForRecovery(limit));
   const recovered: string[] = [];
   const untouched: string[] = [];
   for (const intentId of due) {
