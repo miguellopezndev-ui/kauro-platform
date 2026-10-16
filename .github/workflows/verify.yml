@@ -128,8 +128,7 @@ jobs:
           report "kernel.apparmor_restrict_unprivileged_userns=$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>&1)"
           report "kernel.unprivileged_userns_clone=$(sysctl -n kernel.unprivileged_userns_clone 2>&1)"
           report "unshare -U (plain user): $(unshare -U true 2>&1 && echo allowed || echo refused)"
-          report "apparmor profiles naming chrome: $(sudo aa-status 2>/dev/null | grep -i chrome | tr '
-' ' ' || true)"
+          report "apparmor profiles naming chrome: $(sudo aa-status 2>/dev/null | grep -i chrome | tr -s '[:space:]' ' ' || true)"
           probe() {
             # the browser's own sandbox is on (no --no-sandbox); a refusal prints "No usable sandbox"
             timeout 60 "$chrome" --headless=new --disable-gpu --dump-dom about:blank > "$RUNNER_TEMP/chrome-probe.out" 2> "$RUNNER_TEMP/chrome-probe.err"
