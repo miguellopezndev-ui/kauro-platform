@@ -1,0 +1,193 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-089-k05-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-089-k05-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "d2108a7678529fa98820b99082d2612cd6678ea5d27ae76a5281ec45ec3b7ca8",
+      "candidateSetHash": "b7cf3ac4fc551f82bc221a636d1cd9ab6cd2e56becf1ce83cbd88d97f254cdc7",
+      "targetContractHash": null,
+      "projectRevisionHash": "d261d3fc5eb0680e47c0f2999a353ef163ae7d074561b59eef22024795bf8949"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_b7f4e6c301f53be1",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Antiguo correo (no usar)",
+        "sourceFieldRef": "fld_400fff7e0764ae14",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Ciudad",
+        "sourceFieldRef": "fld_5fde4df2736751bd",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Cargo",
+        "sourceFieldRef": "fld_6f7dd2f6d3077ba4",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.jobTitle"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Antiguo correo (no usar)"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "7eb9d0a42717df560680d12360ff89858b7148f37ae3298cef29fe2f8f4e6fc6"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "kesa.mesanth0@example.test",
+          "risia.orvsorin1@example.test",
+          "zerel.tavunda2@corp.example.test",
+          "finia.tulmar3@corp.example.test",
+          "belia.lumath4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Antiguo correo (no usar)",
+        "fieldRef": "src:Antiguo correo (no usar)",
+        "valueClass": "EMAIL",
+        "values": [
+          "vexis.mesorin40@sample.invalid",
+          "halel.risath41@sample.invalid",
+          "halia.yanorin42@sample.invalid",
+          "joro.belmar43@corp.example.test",
+          "finel.tuliko44@example.test"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Ciudad",
+        "fieldRef": "src:Ciudad",
+        "valueClass": "TEXT",
+        "values": [
+          "Tessin",
+          "Tessin",
+          "Tessin",
+          "Valmora",
+          "Kelmar"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Cargo",
+        "fieldRef": "src:Cargo",
+        "valueClass": "TEXT",
+        "values": [
+          "Site engineer",
+          "Account manager",
+          "Site engineer",
+          "Controller",
+          "Buyer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-headers",
+      "lang:es",
+      "ugly:stale-header"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_3b9a59675565",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ciudad",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_6a4e611a1b63",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cargo",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_676fa29703341274292ec148",
+    "kc_a0f9296afbbe1405f5a9928c"
+  ]
+}

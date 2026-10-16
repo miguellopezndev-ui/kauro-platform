@@ -1,0 +1,28 @@
+{
+  "id": "G29",
+  "title": "Two columns with the same header, both authoritative external identifiers",
+  "intent": "A file carries two \"Legacy ID\" columns from two different legacy systems. Ada holds 500 in the first, Bob holds 500 in the second. The header text is the same, so an identity key built from header text alone renders one string for both and merges two unrelated people; under PREFER_SURVIVOR it deletes one of them outright. The key has to carry where the column is, not only what it is called. These are two records.",
+  "expect": {
+    "rows": { "total": 2, "OUTPUT": 2, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 2, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    { "row": "contacts.csv#2", "disposition": "OUTPUT" },
+    { "row": "contacts.csv#3", "disposition": "OUTPUT" }
+  ],
+  "delivered": [
+    { "sourceRecordId": "1", "values": { "contact.firstName": "Ada", "contact.lastName": "Lovelace" } },
+    { "sourceRecordId": "2", "values": { "contact.firstName": "Bob", "contact.lastName": "Smith" } }
+  ]
+}

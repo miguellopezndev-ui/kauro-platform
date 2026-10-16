@@ -1,0 +1,189 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-018-k04-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-018-k04-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "70938793874d02f2bc62c9dce61dbf3327dca18f48a05c6f977ef07b326be69f",
+      "candidateSetHash": "e3f010c068a22a08736808f89c334109c54c600c43ef51911d13006ae7c3db3f",
+      "targetContractHash": "tc_d73b1d7e1c551c409523fcad02e3232658835f48b592a8444d40076cdf9c28ce",
+      "projectRevisionHash": "db722391663f3f0dc7964ae6f72067ffcab7e2579da21e5b767a47fbd6c3b0a9"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrÃĳnico",
+        "sourceFieldRef": "fld_b94b1c8066b8a4b4",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "TelÃĩfono mÃĳvil",
+        "sourceFieldRef": "fld_dd8ffe9f2c4c1abc",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "DirecciÃĳn",
+        "sourceFieldRef": "fld_73366c38b5d7d2b0",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_76b69442001c8935",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "TelÃĩfono mÃĳvil",
+      "DirecciÃĳn",
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3c19a72de44dd125a55f220819d920ac0e1cb4518036a39e3a78fff3d2d3616f"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrÃĳnico",
+        "fieldRef": "src:Correo electrÃĳnico",
+        "valueClass": "EMAIL",
+        "values": [
+          "halis.yanunda0@example.test",
+          "wilek.zerorin1@example.test",
+          "belo.wilaly2@sample.invalid",
+          "joran.mesvik3@example.test",
+          "tavis.noranth4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "TelÃĩfono mÃĳvil",
+        "fieldRef": "src:TelÃĩfono mÃĳvil",
+        "valueClass": "TEXT",
+        "values": [
+          "+447700900294",
+          "+12025550134",
+          "+12025550197",
+          "+12025550112",
+          "+12025550141"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "DirecciÃĳn",
+        "fieldRef": "src:DirecciÃĳn",
+        "valueClass": "TEXT",
+        "values": [
+          "Avenida CaÃıÃĳn 10",
+          "Calle NÃĺÃıez 2",
+          "Plaza EspaÃıa 87",
+          "Plaza EspaÃıa 81",
+          "Calle NÃĺÃıez 49"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-39",
+          "batch-20",
+          "batch-32",
+          "batch-9",
+          "batch-6"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:mojibake",
+      "lang:es",
+      "ugly:encoding"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_7d5a6ea61218",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Correo electrÃĳnico",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_1cd6768a75e0ea21ccce5d90",
+    "kc_44ee1154b14c315f37b1fce1"
+  ]
+}

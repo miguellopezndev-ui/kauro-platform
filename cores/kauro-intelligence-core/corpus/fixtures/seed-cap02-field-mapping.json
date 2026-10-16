@@ -1,0 +1,151 @@
+{
+  "partition": "FINAL",
+  "fileName": "seed-cap02-field-mapping.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "seed-cap02-field-mapping",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "29e7b207f39d9b2820808df2d33f427d01d1cea5499606f9b88c32506fc218d2",
+      "candidateSetHash": "457168453bb664628cad38e4adfeb562b973e3820f28e65fdc8a27e1d08e9858",
+      "targetContractHash": null,
+      "projectRevisionHash": "3e178fcdbde46203e48b5191d37d289f10b084c2bf865850a50bc5c3d69b045c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-mail",
+        "sourceFieldRef": "fld_00eaa79d1fdcca57",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Given name",
+        "sourceFieldRef": "fld_1f8662438ece379a",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Organisation",
+        "sourceFieldRef": "fld_3cbfcd6e59cfb04f",
+        "decision": "MAP",
+        "destinationField": "contact.companyName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.companyName",
+      "contact.email",
+      "contact.firstName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c979668ed310111ef26e3eabe776ca3f61ec8a15bae48f10c29dd63f67ce9d62"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-mail",
+        "fieldRef": "src:E-mail",
+        "valueClass": "EMAIL",
+        "values": [
+          "a@example.test",
+          "b@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Given name",
+        "fieldRef": "src:Given name",
+        "valueClass": "TEXT",
+        "values": [
+          "Ana",
+          "Luis"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Organisation",
+        "fieldRef": "src:Organisation",
+        "valueClass": "TEXT",
+        "values": [
+          "Acme",
+          "Globex"
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_56400e062408",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Organisation",
+        "targetField": "contact.companyName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_7a3ba77c5b3939b851e1e460",
+    "kc_290b73a9474ea39863ed76b5"
+  ]
+}

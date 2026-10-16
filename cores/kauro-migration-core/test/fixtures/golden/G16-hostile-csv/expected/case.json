@@ -1,0 +1,34 @@
+{
+  "id": "G16",
+  "title": "Hostile CSV cells",
+  "intent": "Quotes, an embedded newline and four values a spreadsheet would read as a formula. The import artifact keeps every value exactly, and the four risky ones are declared in the warning artifact instead of being rewritten.",
+  "expect": {
+    "rows": { "total": 6, "OUTPUT": 6, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 6, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 4,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "delivered": [
+    { "sourceRecordId": "1", "values": { "contact.description": "=SUM(A1:A9)" } },
+    { "sourceRecordId": "2", "values": { "contact.description": "He said \"hello\", then left" } },
+    { "sourceRecordId": "3", "values": { "contact.description": "line one\nline two" } },
+    { "sourceRecordId": "4", "values": { "contact.description": "+1 is a country code, not a formula" } },
+    { "sourceRecordId": "5", "values": { "contact.description": "@channel" } },
+    { "sourceRecordId": "6", "values": { "contact.description": "-not-a-number" } }
+  ],
+  "formulaRiskValues": [
+    "=SUM(A1:A9)",
+    "+1 is a country code, not a formula",
+    "@channel",
+    "-not-a-number"
+  ]
+}

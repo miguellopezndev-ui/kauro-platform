@@ -1,0 +1,170 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-095-k11-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-095-k11-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2acc27d72ba664a07e127e1bdd270bf90ce19ba60fc5816a02f9e5b8a2119d61",
+      "candidateSetHash": "1cacbeea713d5cc8ad633c57052959d959581264b19a9faa55e3ed6a0f3dce77",
+      "targetContractHash": null,
+      "projectRevisionHash": "2a7e9ba6c234392c49e0223f4337bd48ce99778bf2cba014adf538e27cfe2fec"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-MAIL ",
+        "sourceFieldRef": "fld_ebfd61fc9f5546be",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Tel.:",
+        "sourceFieldRef": "fld_0295d9a3e927b0a4",
+        "decision": "MAP",
+        "destinationField": "contact.phone"
+      },
+      {
+        "sourceHeader": "Prénom*",
+        "sourceFieldRef": "fld_2925e2af8e8fd386",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.email",
+      "contact.firstName",
+      "contact.phone",
+      "contact.phoneExtension"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "4d3599bfe4018a6ed20536588f86e8f74641e34b3dd9518d221221b8e8cb0da7"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phoneExtension",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-MAIL ",
+        "fieldRef": "src:E-MAIL ",
+        "valueClass": "EMAIL",
+        "values": [
+          "wilo.dariko0@example.test",
+          "belel.pelenko1@corp.example.test",
+          "wilel.halova2@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Tel.:",
+        "fieldRef": "src:Tel.:",
+        "valueClass": "PHONE",
+        "values": [
+          "+1 202 555 0193",
+          "+1 202 555 0117",
+          "+44 7700 900111"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone"
+      },
+      {
+        "header": "Prénom*",
+        "fieldRef": "src:Prénom*",
+        "valueClass": "TEXT",
+        "values": [
+          "Daria",
+          "Kesek",
+          "Joran"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:header-variants",
+      "lang:fr"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_883b54704d99",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Prénom*",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_2c53cf42da3a3c64f80b2529",
+    "kc_2074aa1827c25313e3059e12"
+  ]
+}

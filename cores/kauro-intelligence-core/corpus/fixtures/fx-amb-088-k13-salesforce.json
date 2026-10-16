@@ -1,0 +1,165 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-088-k13-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-088-k13-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "832d2761da969143e1a2a55dff9b79296a317ae97d9dbe08bde3ca955d32cbe8",
+      "candidateSetHash": "f02c8bf68328bcbe52db8cdc09811ccf791d9600a58c43fa313de2e2319ee517",
+      "targetContractHash": "tc_7d3372fd82c61a0918fdc026bc4395145090233caed28e06daddf1e82b8280ab",
+      "projectRevisionHash": "4cf46403be5c435e2993db9f329ce1152d0bec87cc750ccd3ae6ad15e874d821"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_edc714ac98a1a5fb",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Amount + currency",
+        "sourceFieldRef": "fld_2d2a70f455c1f244",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.currency",
+      "deal.description",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "552272e3ab6b0c767b8bcbc16c82de13e808ad022439803d2094155d8b1666ab"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP03",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "amber",
+          "blue",
+          "amber",
+          "red",
+          "blue",
+          "red"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Amount + currency",
+        "fieldRef": "src:Amount + currency",
+        "valueClass": "MIXED",
+        "values": [
+          "€9,216",
+          "$2,460",
+          "£6,762",
+          "€1,422",
+          "$6,345",
+          "£8,817"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:mixed-currency"
+    ]
+  },
+  "canaries": [
+    "kc_b00abc881a17075c4810385b",
+    "kc_a50137f0600db6687e562668"
+  ]
+}

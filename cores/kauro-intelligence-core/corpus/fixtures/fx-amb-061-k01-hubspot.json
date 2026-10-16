@@ -1,0 +1,121 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-061-k01-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-061-k01-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "3179d929e1f10f921cf0d8924c32368362c37eb9572e663c1762bcfb93d44de5",
+      "candidateSetHash": "f11e47f771d230a70b4886e08db3d1ccb6bf3a2efce3e9db82104a76346999c6",
+      "targetContractHash": "tc_a7a47045a23d25cebfeea6d81210c82756a3c7c00db13a59e17b1fe0c48857fa",
+      "projectRevisionHash": "37af23cb5dda81f2254e76694fd7d7b8911a440f29e10f203bfa9c493b413e21"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Phone",
+        "sourceFieldRef": "fld_c9fd19d04fed34c2",
+        "decision": "MAP",
+        "destinationField": "company.phone"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.name",
+      "company.phone",
+      "company.state",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "8e6cb9332c1d8adcfac2af71ca1d850db017a7493a9b6d5080d6bc5023399754"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Phone",
+        "fieldRef": "src:Phone",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0120",
+          "202-555-0185",
+          "202-555-0122",
+          "7700 900902",
+          "7700 900766",
+          "7700 900391",
+          "7700 900500"
+        ],
+        "decision": "MAP",
+        "destination": "company.phone"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:phone-region"
+    ]
+  },
+  "canaries": [
+    "kc_e210b674d35013b619da030c",
+    "kc_8aebb4742e0ef93c34b261f1"
+  ]
+}

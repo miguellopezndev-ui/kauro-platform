@@ -1,0 +1,193 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-164-cap09-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-164-cap09-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "eb608b57dbde96fa668b8442d959843640fc81390e6aee611cabe72fb62fbd2a",
+      "candidateSetHash": "50ab0e9c8d94c2e802d34ce3c371797a27a3e645a37fbef5bef0577e40e4699c",
+      "targetContractHash": "tc_c483548971e0d33246e64741c8e0396ef85fa63d2c9faa8034324b7b90caac8d",
+      "projectRevisionHash": "5f1fb12daf23e356ed38f2e0b0b61e9bc0d472b930f5be428bf88819ea17bc89"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-mail",
+        "sourceFieldRef": "fld_e2d1e7e1d5c75170",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Endereço",
+        "sourceFieldRef": "fld_f1b714e0fe58a7f1",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_e0968aa3856e1eba",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_6c9863888469131f",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_42682a61447e3f22",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin",
+      "Row checksum",
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "16b6f1ffb2c2e10fae7f3639b8177e49b00e056f8d7898681462fa8aebca2fd3"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-mail",
+        "fieldRef": "src:E-mail",
+        "valueClass": "EMAIL",
+        "values": [
+          "lumek.mesorin0@sample.invalid",
+          "vexan.jorunda1@example.test",
+          "pelo.norell2@sample.invalid",
+          "halo.belsorin3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Endereço",
+        "fieldRef": "src:Endereço",
+        "valueClass": "TEXT",
+        "values": [
+          "105 Nordell Street",
+          "3 Quelero Street",
+          "77 Sovquist Street",
+          "19 Wilath Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-70",
+          "A-64",
+          "C-99",
+          "A-19"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "bf0d30cf",
+          "273fa2d7",
+          "5d757f70",
+          "6b697df0"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-14",
+          "batch-19",
+          "batch-37",
+          "batch-29"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_e19cbb8389b2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Endereço",
+        "targetField": "contact.addressLine1"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_2399ab0fdd7027ace8f9cc3a",
+    "kc_21cd99ab2d5fec35d51a0d19"
+  ]
+}

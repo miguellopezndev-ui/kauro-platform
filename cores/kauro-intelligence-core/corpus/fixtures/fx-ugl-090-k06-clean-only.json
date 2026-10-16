@@ -1,0 +1,168 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-090-k06-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-090-k06-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "4fc44ac6c96b9b1b7345e2b6c34003c653cdd0fc16609f084283fe9e8b8505b3",
+      "candidateSetHash": "a155bba09808a21936d34f381552b04665e35ac2b52198a266cf37ba37675448",
+      "targetContractHash": null,
+      "projectRevisionHash": "97a2e2a65ece9c3efc38db2c51ae9fbac97e287369d8a1c02da36670461d1541"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "姓氏",
+        "sourceFieldRef": "fld_37972e1223925d71",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "电子邮件",
+        "sourceFieldRef": "fld_5208e040e3b67c2c",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.country"
+    ],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "16659565c2fc58f05b8796822ca0e513efe63382b245573e144e8483cc955564"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "姓氏",
+        "fieldRef": "src:姓氏",
+        "valueClass": "TEXT",
+        "values": [
+          "Tavorin",
+          "Kesero",
+          "Lumell",
+          "Noriko",
+          "Mesova"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "电子邮件",
+        "fieldRef": "src:电子邮件",
+        "valueClass": "EMAIL",
+        "values": [
+          "fino.mesmar0@corp.example.test",
+          "risis.vexero1@sample.invalid",
+          "quela.kesrane2@example.test",
+          "wilo.risrane3@sample.invalid",
+          "meso.risquist4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.country"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-memory",
+      "lang:zh"
+    ],
+    "memory": [
+      {
+        "memoryId": "mem_8fb959f2cdb0",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "RETIRED",
+        "sourceHeaderPattern": "姓氏",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_ede2e7a78792",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "姓氏",
+        "targetField": "contact.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_532e2710aaae11d5fe29c078",
+    "kc_9252436b67c565becfb8743f"
+  ]
+}

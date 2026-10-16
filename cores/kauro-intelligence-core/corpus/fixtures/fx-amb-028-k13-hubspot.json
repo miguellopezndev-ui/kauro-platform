@@ -1,0 +1,163 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-028-k13-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-028-k13-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "24b82e0bf74d02da05fa5c3cf27648523ebd4413dfa2a186a88f7efeb42cd1ef",
+      "candidateSetHash": "39097e8e6e2bb3d232668bcbd468a69ad7a1f7e97a690e6073b25d5aa7ea1ea9",
+      "targetContractHash": "tc_b0a85ce8eb6b4d054d77190b98e1090e61e436cb79f3fe39c618897248840593",
+      "projectRevisionHash": "02e7b909ffb283a82c5e1ca00e35840fcc5f5cf4f349dc7518dfbf208d2fcf74"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_232c492a6d4de8ca",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Chiffre d'affaires + currency",
+        "sourceFieldRef": "fld_9d951dbf5fd60f81",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_a8bc88ec74dbb3d8",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.industry",
+      "company.ownerEmail",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "11505a56738f82b14ac1b6bf710afd88cdec13ef4be7a0b4e4a905081c89a2f5"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Industry",
+        "fieldRef": "src:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Packaging",
+          "Software",
+          "Packaging",
+          "Logistics",
+          "Food service"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Chiffre d'affaires + currency",
+        "fieldRef": "src:Chiffre d'affaires + currency",
+        "valueClass": "MIXED",
+        "values": [
+          "€8,317",
+          "$2,572",
+          "£8,322",
+          "€2,103",
+          "$3,540"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-52",
+          "R-21",
+          "R-48",
+          "R-40",
+          "R-15"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:mixed-currency"
+    ]
+  },
+  "canaries": [
+    "kc_6a37da271a88c2c27f1fe932",
+    "kc_9a4d682872928a89670cda19"
+  ]
+}

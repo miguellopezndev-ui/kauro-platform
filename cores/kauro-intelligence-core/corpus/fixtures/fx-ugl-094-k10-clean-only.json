@@ -1,0 +1,156 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-094-k10-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-094-k10-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "c1d6562862cd53924b88205951590c908864476a62376eae702aaf09164dd632",
+      "candidateSetHash": "26c8b5e79954676391ac55d37703db655df26e29b3f84dcc9afeba94d1251e84",
+      "targetContractHash": null,
+      "projectRevisionHash": "fde67fc99c2253edca8a614c21c178d20122546659ed3cf8621d16587b22db40"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Berechnung",
+        "sourceFieldRef": "fld_de1bd523c32dcff1",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "ईमेल",
+        "sourceFieldRef": "fld_801a7f93ce4c4e66",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "पद",
+        "sourceFieldRef": "fld_90ceb443c3e80382",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.jobTitle"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Berechnung"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c9325185e3d7f0cdcdf70a867245e52ee39a5e05cd75229841f15d6e04e0566b"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Berechnung",
+        "fieldRef": "src:Berechnung",
+        "valueClass": "MIXED",
+        "values": [
+          "=SUM(B2:B9)",
+          "#REF!",
+          "(blank)",
+          "null",
+          "N/A"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "ईमेल",
+        "fieldRef": "src:ईमेल",
+        "valueClass": "MIXED",
+        "values": [
+          "vexan.mesorin0@sample.invalid",
+          "#N/A",
+          "quelia.jorquist2@sample.invalid",
+          "",
+          "orva.halero4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "पद",
+        "fieldRef": "src:पद",
+        "valueClass": "TEXT",
+        "values": [
+          "Site engineer",
+          "Site engineer",
+          "Site engineer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:spreadsheet-artefacts",
+      "lang:hi"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_57fe574b368e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "पद",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_8f68e30a51479318fdf83edf",
+    "kc_c222395a97b2c8eb675e93de"
+  ]
+}

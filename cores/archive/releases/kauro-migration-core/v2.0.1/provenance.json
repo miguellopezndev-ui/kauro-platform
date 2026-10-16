@@ -1,0 +1,186 @@
+{
+  "schemaVersion": "1.2.0",
+  "artifactKind": "MIGRATION_CORE_CANDIDATE_PROVENANCE",
+  "generator": "tools/candidate-provenance.mjs",
+  "coreVersion": "2.0.1",
+  "packageVersion": "2.0.1",
+  "packageFormatVersion": "2.0.0",
+  "sourceRegistryVersion": "2026-09-06",
+  "manifestDigest": "f0213b0e49ae2fe853c4db5628dc4f22f5e84d0e78bcb3ea8bfca0f3bff89a77",
+  "codeDigest": "9b7acad83b6998ba68852e9385d50206ac0f43e42842793063c54ccec3d98c24",
+  "manifestFileCount": 573,
+  "digestSerialisationVersion": "2.0.0",
+  "exclusionRuleVersion": "1.4.0",
+  "dependencies": {
+    "runtime": {
+      "fflate": "0.8.3",
+      "libphonenumber-js": "1.13.12"
+    },
+    "development": {
+      "@types/node": "24.13.3",
+      "fast-check": "4.9.0",
+      "typescript": "5.9.3"
+    },
+    "lockfileSha256": "85ef8c49232e5c64e36261b944dae4fdd5fefe662f0a6d6cab2eb13daaaece91"
+  },
+  "authorities": [
+    "KAVO_PRODUCT_CONSTITUTION_V1",
+    "KAVO_MIGRATION_CORE_CANONICO_V1",
+    "KAVO_MIGRATION_CORE_HOJA_DE_RUTA_CIERRE_V1",
+    "KAVO_CUALIFICACION_INTEGRAL_CANONICO_V1"
+  ],
+  "researchSnapshot": {
+    "sourceRegistryVersion": "2026-09-06",
+    "note": "docs/SOURCE_REGISTRY.md carries the per-section review dates and what each fact is based on."
+  },
+  "capacityEvidence": [
+    {
+      "path": "qualification/capacity/clean-only.json",
+      "mode": "CLEAN_ONLY",
+      "profile": "FOUNDING-CLEAN-ONLY-1M",
+      "sourceRows": 1003000,
+      "result": "PASS",
+      "sha256": "75407d8bc00443780a1caf595b2dabedcba218fec6f5b268ae8604f4372f8f60"
+    },
+    {
+      "path": "qualification/capacity/hubspot.json",
+      "mode": "HUBSPOT",
+      "profile": "FOUNDING-HUBSPOT-1M",
+      "sourceRows": 1003750,
+      "result": "PASS",
+      "sha256": "e0d5ae974711856db43daf69e75179afe19901f57003296658f367a3474cb934"
+    },
+    {
+      "path": "qualification/capacity/salesforce.json",
+      "mode": "SALESFORCE",
+      "profile": "FOUNDING-SALESFORCE-1M",
+      "sourceRows": 1003000,
+      "result": "PASS",
+      "sha256": "c9f09cd71ac143b6e46ae0279eff07c6b36cc0ea53527c519fe42ac87d5984dc"
+    }
+  ],
+  "vendorEvidence": [
+    {
+      "path": "qualification/evidence/HUBSPOT_SCOPE_BLOCKER.md",
+      "gate": null,
+      "instance": null,
+      "boundTo": null,
+      "writtenBy": null,
+      "result": null,
+      "sha256": "3095f9c8692281b981a95521acfda6359abb8fc1514d3a77dcb53679352a7e44"
+    },
+    {
+      "path": "qualification/evidence/SF_DATALOADER_AUTH.md",
+      "gate": null,
+      "instance": null,
+      "boundTo": null,
+      "writtenBy": null,
+      "result": null,
+      "sha256": "685a4ff5511ffa1d1d3247a0a49f4bb2d3b53668fc9b66c4fd69288a9fc645c6"
+    },
+    {
+      "path": "qualification/evidence/TENANT_SAFETY.md",
+      "gate": null,
+      "instance": null,
+      "boundTo": null,
+      "writtenBy": null,
+      "result": null,
+      "sha256": "794addfaee4ca99014b226c8c04af4559418a98bc867160b278cc93dfd52284b"
+    },
+    {
+      "path": "qualification/evidence/final-adversarial.json",
+      "gate": "FINAL-ADV-01",
+      "instance": null,
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "98f875a6b140a28ebdf4eef5d404b3cfa90b63b6f00e8dbfdd4b8e33487fe3aa"
+    },
+    {
+      "path": "qualification/evidence/hs-custom-property.json",
+      "gate": "HSP-TARGET-01 (a property Kavo creates)",
+      "instance": "i_0d976747e497fd44",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "c1d3a8973660cab1f1c0319a6a263232731736fc47a76a6f5576f6649f1a2d4a"
+    },
+    {
+      "path": "qualification/evidence/hs-import.json",
+      "gate": "HSP-TARGET-01 (import)",
+      "instance": "i_85d7849b12c37767",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "0126cbe47224f1fa36455cfbce46d016a141e872c8c5b5e6c478c8b2aa59b550"
+    },
+    {
+      "path": "qualification/evidence/hs-metadata.json",
+      "gate": "HSP-TARGET-01 (qualification metadata)",
+      "instance": "i_0d976747e497fd44",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "ea7cf30f5421366c8d1877744f622d24700c5fe40b4ca668c23f43a4e1315e9f"
+    },
+    {
+      "path": "qualification/evidence/hs-property-export.json",
+      "gate": "HSP-TARGET-01 (property export parser)",
+      "instance": "i_0d976747e497fd44",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "15258a8563a37954df3ffbbfaa09b5e622846e7741d1aa2c0e38155dc78c7dd0"
+    },
+    {
+      "path": "qualification/evidence/hs-target-contract.json",
+      "gate": "HSP-TARGET-01 (target contract)",
+      "instance": "i_85d7849b12c37767",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "e081f3c55a9c0079a028f1be8d7e3c7f33d3ba9ec5aee47165825bdeef3c5142"
+    },
+    {
+      "path": "qualification/evidence/sf-dataloader.json",
+      "gate": "SF-TARGET-01 (Data Loader operations)",
+      "instance": "i_fba18c99c632ea0d",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "cf43459293b3ce87c62062cf326fbbd38aa0d3ae0b7e3acb4a4ef02c8b0f4330"
+    },
+    {
+      "path": "qualification/evidence/sf-ocr.json",
+      "gate": "SF-OCR-01",
+      "instance": "i_fba18c99c632ea0d",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "aebc20b4dee9e0f6c434b2f1116587eeca80f09368dcc38f84dc71c95826cc74"
+    },
+    {
+      "path": "qualification/evidence/sf-target-contract.json",
+      "gate": "SF-TARGET-01 (target contract)",
+      "instance": "i_fba18c99c632ea0d",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "8c43d4edf3aa2cfeffe65e07fbab2a41621bf58886ed980c6e0cdf86020f63d8"
+    }
+  ],
+  "supersedes": "migration-core-v1-provenance.json",
+  "knownExclusions": [
+    "No tag or release is created by this record. It identifies a candidate, and publishing one is a separate decision.",
+    "The full-stack CAPACITY-FOUNDING traversal named by KAVO_CUALIFICACION_INTEGRAL_CANONICO_V1 section 83 — upload authorization, object storage read-back, malware preflight, outbox — is not Migration Core’s and is not discharged here. What is discharged is the Migration-Core-shaped subset: a million representative source rows end to end in each mode, inside the founding budgets.",
+    "No external signature. A provenance signed with a key the same process generated would attest that the process ran, which nobody doubts. The post-merge receipt is written by CI, which is a different party.",
+    "No commit SHA and no git tree hash. Neither can be stated from inside the tree that contains this file; both are the receipt’s, and tools/receipt-verify.mjs is what checks them.",
+    "No runtime. This record is compared byte for byte across platforms, so the node version and the operating system it happened to be generated on cannot be in it: they differ between checkouts for reasons that are not the verdict, and a comparison that fails for reasons nobody can act on is a comparison somebody deletes. The platform claim belongs to the CI matrix and is carried by the receipt.",
+    "No freeze flag. This record used to carry MIGRATION_CORE_IMPLEMENTATION_FROZEN as a boolean literal, which made the flag a sentence in a file this same tree produces — and the architecture gate read it back as a fact. It is computed instead, outside the tree, by tools/freeze-verdict.mjs, from the merged commit, the external CI receipt, the branch protection actually in force, the tag, and the release assets as downloaded."
+  ],
+  "freezeDecision": {
+    "decidedBy": "tools/freeze-verdict.mjs",
+    "outsideTree": true,
+    "note": "A flag written here would be this tree describing itself as finished. The verdict is derived from the merged SHA, the external receipt, the ruleset, the tag and the downloaded release assets, and is published as a release asset beside them."
+  }
+}

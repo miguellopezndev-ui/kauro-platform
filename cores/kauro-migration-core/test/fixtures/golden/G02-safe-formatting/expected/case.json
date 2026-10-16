@@ -1,0 +1,40 @@
+{
+  "id": "G02",
+  "title": "Safe formatting only",
+  "intent": "Whitespace, email domain case, international phone form and a declared date format. Every change is one a reader can check by eye, and the extension is moved to its own field rather than dropped.",
+  "expect": {
+    "rows": { "total": 4, "OUTPUT": 4, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 4, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 12,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 4,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [
+    { "row": "contacts.csv#2", "field": "contact.firstName", "from": "  Grace  ", "to": "Grace", "reasonCode": "TRANSFORM_WHITESPACE_TRIMMED" },
+    { "row": "contacts.csv#2", "field": "contact.email", "from": "GRACE@Example.COM", "to": "GRACE@example.com", "reasonCode": "TRANSFORM_EMAIL_DOMAIN_LOWERCASED" },
+    { "row": "contacts.csv#2", "field": "contact.phone", "from": "+1 (212) 555-0147", "to": "+12125550147", "reasonCode": "TRANSFORM_PHONE_E164" },
+    { "row": "contacts.csv#2", "field": "contact.createdAt", "from": "03/04/2026", "to": "2026-03-04", "reasonCode": "TRANSFORM_DATE_PARSED_WITH_DECLARED_FORMAT" },
+
+    { "row": "contacts.csv#3", "field": "contact.lastName", "from": " Johnson", "to": "Johnson", "reasonCode": "TRANSFORM_WHITESPACE_TRIMMED" },
+    { "row": "contacts.csv#3", "field": "contact.phone", "from": "415-555-2671 ext. 44", "to": "+14155552671", "reasonCode": "TRANSFORM_PHONE_EXTENSION_SEPARATED" },
+    { "row": "contacts.csv#3", "field": "contact.phoneExtension", "from": null, "to": "44", "reasonCode": "TRANSFORM_PHONE_EXTENSION_SEPARATED" },
+    { "row": "contacts.csv#3", "field": "contact.createdAt", "from": "07/04/2025", "to": "2025-07-04", "reasonCode": "TRANSFORM_DATE_PARSED_WITH_DECLARED_FORMAT" },
+
+    { "row": "contacts.csv#4", "field": "contact.email", "from": "mary@Example.com", "to": "mary@example.com", "reasonCode": "TRANSFORM_EMAIL_DOMAIN_LOWERCASED" },
+    { "row": "contacts.csv#4", "field": "contact.phone", "from": "+44 20 7946 0958", "to": "+442079460958", "reasonCode": "TRANSFORM_PHONE_E164" },
+    { "row": "contacts.csv#4", "field": "contact.createdAt", "from": "12/25/2025", "to": "2025-12-25", "reasonCode": "TRANSFORM_DATE_PARSED_WITH_DECLARED_FORMAT" },
+
+    { "row": "contacts.csv#5", "field": "contact.createdAt", "from": "01/02/2026", "to": "2026-01-02", "reasonCode": "TRANSFORM_DATE_PARSED_WITH_DECLARED_FORMAT" }
+  ],
+  "flagDetails": [],
+  "delivered": [
+    { "sourceRecordId": "2", "values": { "contact.phone": "+14155552671", "contact.phoneExtension": "44" } },
+    { "sourceRecordId": "4", "values": { "contact.phone": "+34612345678", "contact.createdAt": "2026-01-02" } }
+  ]
+}

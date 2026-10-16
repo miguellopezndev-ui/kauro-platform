@@ -1,0 +1,181 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-113-cap06-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-113-cap06-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "64870bc7d73c4bbcc574202e52c706f889498c425b8e298b875de354090d9f7b",
+      "candidateSetHash": "bf121541616c00c07f395a78ecb065e23fa701b49158ac7b876aa05dc536c9ca",
+      "targetContractHash": null,
+      "projectRevisionHash": "3881bd4580453a0e21552d343edf221709631d2e504667ef50213a462820dbb0"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_96cb067768d4351f",
+        "decision": "MAP",
+        "destinationField": "lead.email",
+        "requiredEvidenceRefs": [
+          "ev_aa52abe9d9ecf2e2"
+        ]
+      },
+      {
+        "sourceHeader": "First name - src",
+        "sourceFieldRef": "fld_9ce7e300348a6b06",
+        "decision": "MAP",
+        "destinationField": "lead.firstName"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_0acf6febc7630f17",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_e1bbf98f14480e55",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.email",
+      "lead.firstName",
+      "lead.state"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Legacy system id",
+      "Folder code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6ee213518752938b78f77fb1da0d42a5a40ae973d2e45fc4051b24b806fa2e8a"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "halo.risdell0@corp.example.test",
+          "joris.tavath1@corp.example.test",
+          "orvo.yanell2@example.test",
+          "joran.finiko3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "lead.email",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "First name - src",
+        "fieldRef": "src:First name - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Mesia",
+          "Mesa",
+          "Quelel",
+          "Jora"
+        ],
+        "decision": "MAP",
+        "destination": "lead.firstName"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L87928",
+          "L19290",
+          "L15574",
+          "L33776"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F169",
+          "F725",
+          "F298",
+          "F679"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_31496d80b438",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "First name - src",
+        "targetField": "lead.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_0c8626222415e57accdfdd82",
+    "kc_75147bc940354c074a754383"
+  ]
+}

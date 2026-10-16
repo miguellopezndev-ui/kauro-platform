@@ -1,0 +1,189 @@
+[
+  {
+    "tag": "v3.0.0",
+    "name": "Kauro Migration Core v3.0.0",
+    "target": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+    "draft": false,
+    "prerelease": false,
+    "createdAt": "2026-10-05T21:39:21Z",
+    "publishedAt": "2026-10-05T21:39:53Z",
+    "body": "Migration Core 3.0.0, package format 2.1.0. Commit 3b4b0aea4f1879ffb4189a55a16f22f4520787d4. Dossier inventory 1.1.0; SHA256SUMS covers every other asset. The freeze verdict is published beside this release, not inside it.",
+    "assets": [
+      {
+        "name": "campaign.json",
+        "size": 3727,
+        "digest": "sha256:dff2eb585d0f2130cf253a1e1ba6b8d3ca2e014ac62daa5e5c0c42ddeece5311"
+      },
+      {
+        "name": "ci-receipt.json",
+        "size": 5187,
+        "digest": "sha256:036b72504a4acf9fe1cb947f86fb2acd134337cc2321666d30e9cc2a088dd856"
+      },
+      {
+        "name": "dossier-manifest.json",
+        "size": 3644,
+        "digest": "sha256:646e48ae125d54bc86dbc2dcbe2dd30e1a3d84bcf2fe9c8b6b77ef91870d769d"
+      },
+      {
+        "name": "evidence.tar.gz",
+        "size": 83307,
+        "digest": "sha256:a3874ebb7011a6ecb4b92f07ebd74bbb26ebc83f5d70d02fb2fde007bd7a507f"
+      },
+      {
+        "name": "kauro-migration-core-3.0.0.tgz",
+        "size": 1037778,
+        "digest": "sha256:2686ee65228ed9c0acc72ebbccfba7599398a7b127dc468eabd2b05fcb5a5312"
+      },
+      {
+        "name": "manifest.json",
+        "size": 118001,
+        "digest": "sha256:4bbaf235e7143bc8ca03b6d937b915fee162a2a143d3e29d8ee6a0bcc9c14d47"
+      },
+      {
+        "name": "migration-core-provenance.json",
+        "size": 12473,
+        "digest": "sha256:5b37235f5cc819b29cccc53521744ae51204091f9533d2dda7e31e56f004352b"
+      },
+      {
+        "name": "preflight.json",
+        "size": 2921,
+        "digest": "sha256:9c102dcc3aa994a4850c68c4ca88772bacc2bc7cbdea717647bcb8a006d9527a"
+      },
+      {
+        "name": "provenance.json",
+        "size": 7249,
+        "digest": "sha256:6de2960309ac99ac6b08c37b587c1d1a7cf8c12935ff70a1ba71d7e4c55bd739"
+      },
+      {
+        "name": "sbom.cdx.json",
+        "size": 2730,
+        "digest": "sha256:048032fc17a575ed9918adcf72c33cd04fc0dbea4c564e9991cc6176381b9536"
+      },
+      {
+        "name": "SHA256SUMS",
+        "size": 1050,
+        "digest": "sha256:4f45d27bba33f13cf033d2b94a2b572a441ff2147a3c3a59ca6074c1d2500e46"
+      },
+      {
+        "name": "source-3b4b0aea4f1879ffb4189a55a16f22f4520787d4.tar.gz",
+        "size": 1728751,
+        "digest": "sha256:bf619c88a6d5bb6cb161d3186b4b56d5d3f850b775de15883084e962f870db91"
+      },
+      {
+        "name": "universe.json",
+        "size": 10426,
+        "digest": "sha256:fa61e1fb4f2a19bfd8520630a499d5720d2768d51e5df91222be2bad526b945c"
+      }
+    ]
+  },
+  {
+    "tag": "v2.0.1",
+    "name": "Kavo Migration Core v2.0.1",
+    "target": "a2a549031de85d95be8645dd9c5156dfff2050a0",
+    "draft": false,
+    "prerelease": false,
+    "createdAt": "2026-09-11T13:25:21Z",
+    "publishedAt": "2026-09-11T13:25:43Z",
+    "body": "Migration Core 2.0.1, package format 2.0.0. Commit a2a549031de85d95be8645dd9c5156dfff2050a0. Dossier inventory 1.0.0; SHA256SUMS covers every other asset. The freeze verdict is published beside this release, not inside it.",
+    "assets": [
+      {
+        "name": "campaign.json",
+        "size": 3727,
+        "digest": "sha256:873f56a7be451ef6874ccc85b83c964dd04e87a56e813d472c2c1a98a0092f87"
+      },
+      {
+        "name": "ci-receipt.json",
+        "size": 5250,
+        "digest": "sha256:76b05c7b563d4c8b11882a851dae5cbbd8512b67ee8b5e7b3663a0e3ef9b6178"
+      },
+      {
+        "name": "dossier-manifest.json",
+        "size": 3641,
+        "digest": "sha256:562d38e83af1f10f3a7fa81fc992c2e91c3bc3ef162cbd021cc8a56b988e2923"
+      },
+      {
+        "name": "evidence.tar.gz",
+        "size": 74878,
+        "digest": "sha256:883dd20b9f1b8e80748ddacdd9956b36960096599c4d5f0875c1dc0b0ac1c18b"
+      },
+      {
+        "name": "kavo-migration-core-2.0.1.tgz",
+        "size": 813057,
+        "digest": "sha256:787f0b80a906d31605e3946ad00df86d2a131e3e89d78855c1c4f327b37fa000"
+      },
+      {
+        "name": "manifest.json",
+        "size": 107129,
+        "digest": "sha256:a1e79648d1dfdc571dacba53114f927818a197010ba4c5788e3213c6cc9c0e41"
+      },
+      {
+        "name": "migration-core-provenance.json",
+        "size": 12073,
+        "digest": "sha256:7b87f67c780690f730330697c66db83ae049602e482882d548cc5153e022257f"
+      },
+      {
+        "name": "preflight.json",
+        "size": 2921,
+        "digest": "sha256:289455fa3a6307a20e02040725f1405a1a5031a25e4fdaa09b1f62b8946f8c54"
+      },
+      {
+        "name": "provenance.json",
+        "size": 7923,
+        "digest": "sha256:4083d7ad7904416f560379939aa6d4e7a4ce93257bfcf04ce12e66c5746c0476"
+      },
+      {
+        "name": "sbom.cdx.json",
+        "size": 3631,
+        "digest": "sha256:caf8114b2a45ff26d0438e18d6bd2b3dfb22bca11f17a8ffbf0b3af7d0ff670d"
+      },
+      {
+        "name": "SHA256SUMS",
+        "size": 1049,
+        "digest": "sha256:744d7a1306e3b5cc8f5a947d9308c9c3b28060311f0f96cda87044fdd509850e"
+      },
+      {
+        "name": "source-a2a549031de85d95be8645dd9c5156dfff2050a0.tar.gz",
+        "size": 1480485,
+        "digest": "sha256:7cb7e4978ee34812cb3daef2507e8b823cf73e75cb78948b0ec62a7a7115b3a8"
+      },
+      {
+        "name": "universe.json",
+        "size": 10314,
+        "digest": "sha256:010d11935da263d9e4f4d449637cb7c28016c30f474409d1604b4b87a09a5e0c"
+      }
+    ]
+  },
+  {
+    "tag": "v1.0.2",
+    "name": "v1.0.2 — MIGRATION_CORE_V1",
+    "target": "main",
+    "draft": false,
+    "prerelease": false,
+    "createdAt": "2026-09-02T19:19:04Z",
+    "publishedAt": "2026-09-02T19:19:07Z",
+    "body": "HubSpot qualified end to end on one portal, all three halves reproducing, and a\ncorrection to something this front got wrong.\n\n## The portal was wrong, and that mattered\n\nA HubSpot property export **carries no portal id anywhere in it** — the reader's\nown design says so. The first export was recorded as coming from portal\n`51872453` because that is where the credential of the day happened to point. It\nwas not. Every property it lists exists in portal `51050101` with none left over\n— 209 contact, 115 company, 73 deal.\n\nSo the contract half was being built from **one portal's export and another\nportal's supplement**, and nothing in either file would ever have said so.\n\nThe runner no longer carries the portal as a constant; it reads it from the\nsupplement the collector captured, because a constant is exactly what let the\nrunner describe one portal while the bundle described another. The evidence\nrecords the attribution and how it was settled rather than quietly showing a\ncorrected number.\n\n## Three halves, one portal, all reproducing\n\n| half | evidence |\n| --- | --- |\n| target contract | 32 checks |\n| import | 23 expectations, CRM Imports API |\n| a property Kavo creates | 11 expectations |\n\nThe last of those is what `v1.0.0` said it could not show. The portal **enforces**\nit rather than merely recording it: a second record carrying a key another record\nalready holds is refused, a value outside the enumeration Kavo defined is\nrefused, and an upsert keyed on the custom property matches — same record ids,\nchanged values, nothing duplicated.\n\n## Which account this ran against\n\nPortal `51050101` is a **standard** account holding the owner's real records,\nsupplied by them for this. The provenance says so, because anyone reading it\nshould know which kind of account the evidence came from. The qualification\nremoved everything it created — five records deleted, six properties archived,\nboth verified — and its cleanup matches on exact values rather than resemblance.\n\n## Gates\n\n| Gate | State |\n| --- | --- |\n| `CORE-CONSTITUTION-01`, `TARGET-CONTRACT-01` | PASS — 26 checks each |\n| sabotage | PASS — 71/71 killed |\n| `SF-TARGET-01`, `SF-OCR-01` | PASS — real org |\n| `HSP-TARGET-01` | PASS — 32 + 23 + 11 expectations, one real portal |\n| `FINAL-ADV-01` | PASS — 8 attacks |\n| `CAPACITY-FOUNDING` | **MATERIAL_FAIL at 1,000,000** |\n\n**Qualified for 500,000 source rows** at 3,971 MiB against a 5,734 MiB budget.\n`MIGRATION_CORE_V1_FROZEN` = **FALSE**, derived from the gates rather than\ndeclared. 1,146 tests, CI green on Ubuntu and Windows, Node 22 and 24.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+    "assets": []
+  },
+  {
+    "tag": "v1.0.1",
+    "name": "v1.0.1 — MIGRATION_CORE_V1",
+    "target": "main",
+    "draft": false,
+    "prerelease": false,
+    "createdAt": "2026-09-02T18:32:01Z",
+    "publishedAt": "2026-09-02T18:32:05Z",
+    "body": "Two changes since `v1.0.0`: one claim withdrawn, one theory disproved.\n\n## A property Kavo creates — settled\n\n`v1.0.0` shipped saying it could not show whether a property **Kavo creates**\nbehaves like one HubSpot ships. Everything about unique-property matching had\nbeen established on `email`, which HubSpot defines — evidence about HubSpot's\nproperty rather than one of ours.\n\nIt is settled now, against a portal the account owner supplied for it, and the\nportal **enforces** rather than merely records:\n\n- a second record carrying a key another record already holds is **refused**;\n- a value outside the enumeration Kavo defined is **refused**;\n- an upsert keyed on the custom property matches — same record ids, changed\n  values, nothing duplicated.\n\nEleven expectations, all met, on values the engine delivered. The account holds\nthe owner's real records, so the qualification removed what it created:\nsynthetic records deleted, six properties archived, both verified, with cleanup\nmatching on exact values rather than resemblance.\n\n## The chunked decode — built, measured, reverted\n\nThe reader can be fed a file a piece at a time, and that is tested against the\nwhole-string reader over seventeen hostile inputs at every chunk size from one\ncharacter upward. What it does not do is lower the peak:\n\n| how the verifier reads an artifact | 500,000 rows |\n| --- | ---: |\n| whole file, one decode | **3,971 MiB** |\n| in 4 MiB pieces | 4,831 MiB |\n| in 64 KiB pieces | 6,537 MiB, verification 5x slower |\n\nA field is a slice of the text it was read from, and a slice keeps that text\nalive. Reading whole means one parent per artifact. Reading in pieces means one\nparent per piece, each pinned by whatever row was kept from it — and the smaller\nthe piece, the more parents a scattered set of retained values pins at once.\n\nSo the theory that peak memory was the whole-file decode is wrong. Three\nattempts past the bounded point — a lineage projection and a chunked decode at\ntwo sizes — all measured worse than doing nothing. The wiring is reverted; the\nreader stays. The useful output is a direction: the **run** stage is 86% of the\nbudget before verification starts.\n\n## Result\n\n| Gate | State |\n| --- | --- |\n| `CORE-CONSTITUTION-01`, `TARGET-CONTRACT-01` | PASS |\n| sabotage | PASS — 71/71 killed |\n| `SF-TARGET-01`, `SF-OCR-01` | PASS — real org |\n| `HSP-TARGET-01` | PASS — 32 + 23 + 11 expectations, two real portals |\n| `FINAL-ADV-01` | PASS |\n| `CAPACITY-FOUNDING` | **MATERIAL_FAIL at 1,000,000** |\n\n**Qualified for 500,000 source rows.** `MIGRATION_CORE_V1_FROZEN` = **FALSE**,\nderived from the gates rather than declared. 1,146 tests, CI green on Ubuntu and\nWindows, Node 22 and 24.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+    "assets": []
+  },
+  {
+    "tag": "v1.0.0",
+    "name": "v1.0.0 — MIGRATION_CORE_V1",
+    "target": "main",
+    "draft": false,
+    "prerelease": false,
+    "createdAt": "2026-09-02T16:34:13Z",
+    "publishedAt": "2026-09-02T16:34:16Z",
+    "body": "A deterministic, clean-room CRM migration engine. Reads a bundle of CSV and XLSX\nfiles, decides what each source row becomes, and writes a package: the import\nfiles for the destination plus the evidence for every decision. The same inputs\nproduce the same bytes.\n\n`docs/release/MIGRATION_CORE_V1_PROVENANCE.md` and\n`migration-core-v1-provenance.json` are the record. Both are generated from\ntracked files and checked in CI, so a checkout can verify them rather than trust\nthem.\n\n## `MIGRATION_CORE_V1_FROZEN` = FALSE\n\nThe flag is **derived from the gates, not asserted**. Seven are green; one is\nnot, so it reads false. Nobody can set it by hand while a gate is failing.\n\n| Gate | State |\n| --- | --- |\n| `CORE-CONSTITUTION-01` | PASS — 26 checks |\n| `TARGET-CONTRACT-01` | PASS — 26 checks |\n| sabotage | PASS — 71 mutations, 71 killed, 0 survived |\n| `SF-TARGET-01` | PASS — 11 contract checks + 23 Data Loader expectations, real org |\n| `SF-OCR-01` | PASS — 8 expectations, real org |\n| `HSP-TARGET-01` | PASS — 32 contract checks + 23 import expectations, real portal |\n| `FINAL-ADV-01` | PASS — 8 attacks |\n| `CAPACITY-FOUNDING` | **MATERIAL_FAIL at 1,000,000 rows** |\n\n1,127 tests. CI green on Ubuntu and Windows, Node 22 and 24.\n\n## What V1 is qualified for\n\n**500,000 source rows, at 3,971 MiB against a 5,734 MiB budget.**\n\nThe 1,000,000 rung reaches 8,178 MiB and is recorded as failing rather than left\nout. Correctness is exact at both: every row accounted for, the partition closed,\nall 54 package checks passing with nothing reported. The failure is resource.\n\nWhere the budget goes at 1,000,000, from the harness's in-stage sampler:\n\n| stage | peak | adds |\n| --- | ---: | ---: |\n| run | 4,950 MiB | — |\n| package | 5,455 MiB | +505 |\n| verify | 8,178 MiB | +2,723 |\n\nThe run stage alone is 86% of the budget before verification starts. Peak memory\nhere is **allocation volume**, not retention: each artifact is materialised as one\nstring, so verifying a 1,896 MB package decodes 1,896 MB of text. Removing the\nretention of a whole artifact moved 500,000 rows by 48 MiB, and a fuller\nprojection made it *worse* — it bought a second read of the largest artifact. The\nnext front is a chunked decode, and it is named rather than attempted here.\n\n## The idea the engine is built on\n\n**A Kavo trace key is not destination match authority.** A synthetic key names a\ndelivered record so it can be traced to the source rows that produced it. It is\nnot evidence about anybody's CRM, and it never becomes a HubSpot unique property\nor a Salesforce External ID. Matching requires a captured target contract, read\nfrom the destination itself, and `UNKNOWN` never authorizes.\n\nTwo real instances found that guard open, twice:\n\n- a HubSpot internal name is `kavo_trace_key`, and the comparison folded case\n  only, so it walked straight past;\n- the guard checked only the *running* adapter's spelling, so a HubSpot run\n  naming the Salesforce trace key was accepted.\n\nBoth are closed, mutation-tested, and held by unit tests.\n\n## What running against real instances corrected\n\nNot one of these came from reading documentation.\n\n**HubSpot.** The property export carries `Read only value` and `Calculated`, in\nthe file and in no documentation, and the parser read neither — so every property\nreached the match authority with updateability `UNKNOWN`, which is refused, and\n**UPSERT and UPDATE_ONLY against HubSpot were unreachable for every portal**. The\nImports API has no \"Don't import column\", so the trace-key column must be removed\nbefore an API import and never mapped to a property. Associations therefore join\non the company's domain, the destination's own identity. And the portal refuses\n`.example`, `.test`, `.invalid` and `.localhost` outright — which this\nrepository's own fixtures used throughout.\n\n**Salesforce.** A describe that states the same picklist value twice is valid,\nand the reader had been refusing real Salesforce data. Data Loader addresses a\nparent by external id with a colon, not the dotted form the adapter documented.\n`Opportunity.ContactId` exists, contrary to what the adapter said. And the org\nanswers in the running user's language, so a check asserting English error prose\npasses only by luck.\n\n## What this release does not claim\n\n- That 1,000,000 rows fit the budget. They do not.\n- That a property **Kavo creates** in a HubSpot portal behaves as one HubSpot\n  ships. The qualification portal's credential carries no schema write scope, and\n  the credential that does belongs to a live account holding real records, which\n  no qualification may touch. Everything else about unique-property matching is\n  established on `email`, which HubSpot itself reports unique.\n- That the packages in `acceptance/` have been imported anywhere. They have not.\n  The packages built from the qualification corpora have, into a real org and a\n  real portal, and that is where the working claim comes from.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+    "assets": []
+  }
+]

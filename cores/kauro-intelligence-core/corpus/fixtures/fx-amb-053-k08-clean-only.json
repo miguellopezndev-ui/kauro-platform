@@ -1,0 +1,159 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-053-k08-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-053-k08-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "c7f9db819fcd2f719b4a2ec21dcb2bd1ba444f10a06b3411d6d57e2311ebfa8d",
+      "candidateSetHash": "92dc41ce495909490bc44d98d5ff00c5a46a450a8351d18fdea5a444e9c126f4",
+      "targetContractHash": null,
+      "projectRevisionHash": "ad2c747dc30a4c7f3ec5afb36800413cca3e5632d373f84769b29bf1498d931a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_00c74caddcb076df",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Email or phone",
+        "sourceFieldRef": "fld_069563f9772057bf",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_9de756c634d99f11",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.doNotCall",
+      "contact.email",
+      "contact.firstName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "b8596d5bb05709e3a520cdb356b4c21b379f2c92b0e4684f168a33b5a91d6975"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Halia",
+          "Vexia",
+          "Zerel",
+          "Vexis",
+          "Norek",
+          "Zeran",
+          "Daria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Email or phone",
+        "fieldRef": "src:Email or phone",
+        "valueClass": "MIXED",
+        "values": [
+          "sovan.zerdell0@sample.invalid",
+          "+447700900123",
+          "bela.darsorin2@example.test",
+          "2068",
+          "pelo.risunda4@example.test",
+          "+12025550130",
+          "noria.orvmar6@example.test",
+          "9288",
+          "luma.tulanth8@sample.invalid"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-5335",
+          "TKT-3404",
+          "TKT-3427",
+          "TKT-7352",
+          "TKT-7906",
+          "TKT-5644",
+          "TKT-7609"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:header-values-conflict"
+    ]
+  },
+  "canaries": [
+    "kc_62cd1ead3a811d923e713d7b",
+    "kc_3162d0d5e1ff57f3c83b559b"
+  ]
+}

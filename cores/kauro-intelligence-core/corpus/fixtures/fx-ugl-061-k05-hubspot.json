@@ -1,0 +1,125 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-061-k05-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-061-k05-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "40c89444ac4a6d01eaad53e3afc6777590d6be5ccb095fbe014b0a1c98a5edbe",
+      "candidateSetHash": "ae972eb5a487ad91526d8d33c05e6d9d92bfc2dd529607643a2a1a7777cc6cdd",
+      "targetContractHash": "tc_b9ece8b9ff4fbf704f9b92b7970c782036173cc5d6f38b5bc4b4ad0e21440eef",
+      "projectRevisionHash": "caa526a01b311a8c950e663daf50cd51c44ceccfdbc0da0e2f8229fc37c1417b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_69fe9b745bdd03ec",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Ancien courriel (obsolète)",
+        "sourceFieldRef": "fld_6bb6d253ca76d44b",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Ancien courriel (obsolète)"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "ed83711d1ae0f2e8285b4a1aab7994dd18399133a7753b07331d61a4132eaa5e"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "noris.kesova0@corp.example.test",
+          "orvis.pelanth1@example.test",
+          "norel.mesaly2@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Ancien courriel (obsolète)",
+        "fieldRef": "src:Ancien courriel (obsolète)",
+        "valueClass": "EMAIL",
+        "values": [
+          "vexel.peldell40@corp.example.test",
+          "finan.norunda41@corp.example.test",
+          "pelan.halsorin42@corp.example.test"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-headers",
+      "lang:vi",
+      "ugly:stale-header"
+    ]
+  },
+  "canaries": [
+    "kc_fd2609734e6d60da06de6dec",
+    "kc_1d586e2cf35c74f154f3fbb7"
+  ]
+}

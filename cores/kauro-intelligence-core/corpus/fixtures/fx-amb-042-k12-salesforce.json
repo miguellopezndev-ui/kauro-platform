@@ -1,0 +1,179 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-042-k12-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-042-k12-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "aff05057f47909003d12dd5fb637cfae05f8248b399af40fe6eb1bab45dcef1a",
+      "candidateSetHash": "1804db0851d85b7d1233b1ea6b0e459cd4534703b7b8d8b5b7460d6f83f477ac",
+      "targetContractHash": "tc_b1e302b3d37d8813f7612c26801a634fccafc53f65303a12c988e98224753635",
+      "projectRevisionHash": "d62e32231f959c36c11a9e2f5f4d1cb7256d3bca3789d60ed9f54a3a903f2cc5"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_2d9419c4ec214f22",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "OK?",
+        "sourceFieldRef": "fld_29f367bffec25eb9",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.source_id",
+      "lead.company",
+      "lead.jobTitle",
+      "lead.lastName",
+      "lead.status",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "8367364b0e5606d5ef4c575524aac5cda7f162d1ed92291a9545094952f631b2"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP05",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Open - Not Contacted",
+              "Working - Contacted",
+              "Closed - Converted",
+              "Closed - Not Converted"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-2529",
+          "TKT-2832",
+          "TKT-9447",
+          "TKT-5858",
+          "TKT-1546"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "OK?",
+        "fieldRef": "src:OK?",
+        "valueClass": "BOOLEAN",
+        "values": [
+          "Y",
+          "N",
+          "?",
+          "Y",
+          "N",
+          "?"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:unknown-flag"
+    ]
+  },
+  "canaries": [
+    "kc_6e1abaa953d630313b3e331c",
+    "kc_4ecae08773ffa15ec0f353b1"
+  ]
+}

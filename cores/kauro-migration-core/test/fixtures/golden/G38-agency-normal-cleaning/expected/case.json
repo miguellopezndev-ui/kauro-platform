@@ -1,0 +1,188 @@
+{
+  "id": "G38",
+  "title": "A normal agency migration the plan knows how to clean",
+  "intent": "One ordinary, moderately dirty export. Where the migration plan says what to do — trim, compose to NFC, re-case, map an exact value, read a declared date format, read a boolean vocabulary, read a phone with a declared country — the engine does it. Where a secondary field cannot be read, the raw value is preserved and flagged and the row is still delivered. Nothing is guessed: a shared full name stays a candidate, only the shared authoritative identifier merges, an unmapped column is preserved rather than dropped, and the relationship survives.",
+  "expect": {
+    "rows": { "total": 8, "OUTPUT": 7, "MERGED_PROVEN": 1, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 5, "COMPANY": 2, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 36,
+    "flags": 1,
+    "unmappedFields": 2,
+    "merges": 1,
+    "mergeConflicts": 0,
+    "mergeFieldDecisions": 1,
+    "duplicateCandidateClusters": 1,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 3,
+    "edges": { "total": 5, "OUTPUT": 5, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [
+    { "row": "contacts.csv#2", "field": "contact.firstName", "from": " MIGUEL ", "to": "Miguel", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#2", "field": "contact.lastName", "from": "LOPEZ", "to": "Lopez", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#2", "field": "contact.email", "from": "  MIGUEL.LOPEZ@ACME.EXAMPLE  ", "to": "MIGUEL.LOPEZ@acme.example", "reasonCode": "TRANSFORM_EMAIL_DOMAIN_LOWERCASED" },
+    { "row": "contacts.csv#2", "field": "contact.phone", "from": "3011234567", "to": "+573011234567", "reasonCode": "TRANSFORM_PHONE_E164" },
+    { "row": "contacts.csv#2", "field": "contact.mobilePhone", "from": "+44 20 7946 0958", "to": "+442079460958", "reasonCode": "TRANSFORM_PHONE_E164" },
+    { "row": "contacts.csv#2", "field": "contact.jobTitle", "from": "Disen\u0303adora Se\u0301nior", "to": "Dise\u00f1adora S\u00e9nior", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#2", "field": "custom:Signup Date", "from": "07/03/2024", "to": "2024-03-07", "reasonCode": "TRANSFORM_DATE_PARSED_WITH_DECLARED_FORMAT" },
+    { "row": "contacts.csv#2", "field": "custom:Newsletter", "from": "yes", "to": "true", "reasonCode": "TRANSFORM_BOOLEAN_PARSED" },
+    { "row": "contacts.csv#2", "field": "custom:Segment", "from": "cliente", "to": "Customer", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+
+    { "row": "contacts.csv#3", "field": "contact.firstName", "from": "MIGUEL", "to": "Miguel", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#3", "field": "contact.lastName", "from": "LOPEZ", "to": "Lopez", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#3", "field": "custom:Signup Date", "from": "15/06/2023", "to": "2023-06-15", "reasonCode": "TRANSFORM_DATE_PARSED_WITH_DECLARED_FORMAT" },
+    { "row": "contacts.csv#3", "field": "custom:Newsletter", "from": "no", "to": "false", "reasonCode": "TRANSFORM_BOOLEAN_PARSED" },
+    { "row": "contacts.csv#3", "field": "custom:Segment", "from": "prospecto", "to": "Lead", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+
+    { "row": "contacts.csv#4", "field": "contact.firstName", "from": "SIOBHAN", "to": "Siobhan", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#4", "field": "contact.lastName", "from": "O'NEILL", "to": "O'Neill", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#4", "field": "custom:Signup Date", "from": "02/11/2022", "to": "2022-11-02", "reasonCode": "TRANSFORM_DATE_PARSED_WITH_DECLARED_FORMAT" },
+    { "row": "contacts.csv#4", "field": "custom:Newsletter", "from": "yes", "to": "true", "reasonCode": "TRANSFORM_BOOLEAN_PARSED" },
+    { "row": "contacts.csv#4", "field": "custom:Segment", "from": "partner", "to": "Partner", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+
+    { "row": "contacts.csv#5", "field": "contact.firstName", "from": "RONALD", "to": "Ronald", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#5", "field": "contact.lastName", "from": "MCDONALD", "to": "McDonald", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#5", "field": "custom:Signup Date", "from": "20/09/2021", "to": "2021-09-20", "reasonCode": "TRANSFORM_DATE_PARSED_WITH_DECLARED_FORMAT" },
+    { "row": "contacts.csv#5", "field": "custom:Newsletter", "from": "no", "to": "false", "reasonCode": "TRANSFORM_BOOLEAN_PARSED" },
+    { "row": "contacts.csv#5", "field": "custom:Segment", "from": "cliente viejo", "to": "Customer", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+
+    { "row": "contacts.csv#6", "field": "contact.firstName", "from": "ADA", "to": "Ada", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#6", "field": "contact.lastName", "from": "LOVELACE", "to": "Lovelace", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#6", "field": "custom:Signup Date", "from": "12/01/2023", "to": "2023-01-12", "reasonCode": "TRANSFORM_DATE_PARSED_WITH_DECLARED_FORMAT" },
+    { "row": "contacts.csv#6", "field": "custom:Newsletter", "from": "yes", "to": "true", "reasonCode": "TRANSFORM_BOOLEAN_PARSED" },
+    { "row": "contacts.csv#6", "field": "custom:Segment", "from": "prospecto", "to": "Lead", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+
+    { "row": "contacts.csv#7", "field": "contact.firstName", "from": "ADA", "to": "Ada", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#7", "field": "contact.lastName", "from": "LOVELACE", "to": "Lovelace", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "contacts.csv#7", "field": "contact.phone", "from": "+34 612 345 678", "to": "+34612345678", "reasonCode": "TRANSFORM_PHONE_E164" },
+
+    { "row": "companies.csv#2", "field": "company.name", "from": "ACME LOGISTICS", "to": "Acme Logistics", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "companies.csv#2", "field": "custom:Segment", "from": "cliente viejo", "to": "Customer", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "companies.csv#3", "field": "company.name", "from": "BLETCHLEY WORKS", "to": "Bletchley Works", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" },
+    { "row": "companies.csv#3", "field": "custom:Segment", "from": "partner", "to": "Partner", "reasonCode": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED" }
+  ],
+  "flagDetails": [
+    {
+      "row": "contacts.csv#2",
+      "field": "custom:Alt Email",
+      "outcome": "INVALID",
+      "preserved": " invalid@@mail.com ",
+      "reasonCode": "TRANSFORM_EMAIL_INVALID_SYNTAX",
+      "blockedDelivery": false
+    }
+  ],
+  "dispositions": [
+    { "row": "contacts.csv#2", "disposition": "OUTPUT", "contributionKind": "RECORD" },
+    { "row": "contacts.csv#3", "disposition": "OUTPUT" },
+    { "row": "contacts.csv#4", "disposition": "OUTPUT" },
+    { "row": "contacts.csv#5", "disposition": "OUTPUT" },
+    { "row": "contacts.csv#6", "disposition": "OUTPUT" },
+    { "row": "contacts.csv#7", "disposition": "MERGED_PROVEN", "reasonCode": "IDENTITY_ROW_ABSORBED_BY_PROVEN_MERGE" },
+    { "row": "companies.csv#2", "disposition": "OUTPUT" },
+    { "row": "companies.csv#3", "disposition": "OUTPUT" }
+  ],
+  "duplicateClusters": [
+    {
+      "signal": "NAME_EXACT",
+      "signalValue": "miguel lopez",
+      "members": 2,
+      "reasonCode": "IDENTITY_CANDIDATE_NAME_EXACT",
+      "notMergedReasonCode": "IDENTITY_CANDIDATE_CONFLICTING_ATTRIBUTES"
+    }
+  ],
+  "merges": [
+    {
+      "survivorRow": "contacts.csv#6",
+      "absorbedRows": ["contacts.csv#7"],
+      "identityEvidenceKinds": ["AUTHORITATIVE_EXTERNAL_ID"],
+      "conflicts": [],
+      "fieldDecisions": [
+        {
+          "field": "contact.phone",
+          "value": "+34612345678",
+          "fromRow": "contacts.csv#7",
+          "reasonCode": "IDENTITY_MERGE_FIELD_FILLED_FROM_ABSORBED_ROW"
+        }
+      ]
+    }
+  ],
+  "edgeDetails": [
+    { "row": "contacts.csv#2", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "K1", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "contacts.csv#3", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "K1", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "contacts.csv#4", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "K2", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "contacts.csv#5", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "K2", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "contacts.csv#6", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "K2", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" }
+  ],
+  "unmapped": [
+    { "row": "contacts.csv#2", "columnHeader": "Internal Note", "value": "legacy tier bronze" },
+    { "row": "contacts.csv#5", "columnHeader": "Internal Note", "value": "archived in 2024" }
+  ],
+  "delivered": [
+    {
+      "sourceRecordId": "1",
+      "values": {
+        "contact.firstName": "Miguel",
+        "contact.lastName": "Lopez",
+        "contact.email": "MIGUEL.LOPEZ@acme.example",
+        "contact.phone": "+573011234567",
+        "contact.mobilePhone": "+442079460958",
+        "contact.jobTitle": "Dise\u00f1adora S\u00e9nior",
+        "contact.city": "Bogota",
+        "custom:Alt Email": " invalid@@mail.com ",
+        "custom:Signup Date": "2024-03-07",
+        "custom:Newsletter": "true",
+        "custom:Segment": "Customer"
+      }
+    },
+    {
+      "sourceRecordId": "2",
+      "values": {
+        "contact.firstName": "Miguel",
+        "contact.lastName": "Lopez",
+        "contact.email": "miguel.lopez@bletchley.example",
+        "custom:Segment": "Lead"
+      }
+    },
+    {
+      "sourceRecordId": "3",
+      "values": {
+        "contact.firstName": "Siobhan",
+        "contact.lastName": "O'Neill",
+        "custom:Segment": "Partner"
+      }
+    },
+    {
+      "sourceRecordId": "4",
+      "values": {
+        "contact.firstName": "Ronald",
+        "contact.lastName": "McDonald",
+        "custom:Segment": "Customer"
+      }
+    },
+    {
+      "sourceRecordId": "5",
+      "values": {
+        "contact.firstName": "Ada",
+        "contact.lastName": "Lovelace",
+        "contact.phone": "+34612345678",
+        "contact.jobTitle": "Analyst",
+        "custom:Segment": "Lead"
+      }
+    },
+    {
+      "sourceRecordId": "K1",
+      "values": {
+        "company.name": "Acme Logistics",
+        "company.industry": "Transportation",
+        "custom:Segment": "Customer"
+      }
+    },
+    {
+      "sourceRecordId": "K2",
+      "values": {
+        "company.name": "Bletchley Works",
+        "custom:Segment": "Partner"
+      }
+    }
+  ],
+  "formulaRiskValues": ["+573011234567", "+442079460958", "+34612345678"]
+}

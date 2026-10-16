@@ -1,0 +1,188 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-ugl-108-k10-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-108-k10-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e5ccee87fa2b4a2c576d3b88d0f377a093f265a26287a8779df341be8ac7cfac",
+      "candidateSetHash": "3929239a3dcc1f68f30ec9bdb43e0e998f8ad71fdd6a98419432e56cd0fd45b2",
+      "targetContractHash": "tc_ff99466c6700d0080a7a138d41c1cfecb653164e3bbc2a3c3d6d88ac769a9aba",
+      "projectRevisionHash": "fa072a47f0a47546ef5d938be125b9af9fd16b750a575d701c6559a4d4e6324c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Calc",
+        "sourceFieldRef": "fld_3418b5ff98df8d65",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "อีเมล",
+        "sourceFieldRef": "fld_dc4da6adbd5b7e77",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "นามสกุล",
+        "sourceFieldRef": "fld_76770ba228ef4b56",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.email",
+      "contact.lastName",
+      "contact.ownerEmail",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Calc"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "d119dcc5661fb45b6ab5bc06af424b053a1aad592328ab920b842eb8fdb62b9a"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Calc",
+        "fieldRef": "src:Calc",
+        "valueClass": "MIXED",
+        "values": [
+          "=SUM(B2:B9)",
+          "#REF!",
+          "(blank)",
+          "null",
+          "N/A"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "อีเมล",
+        "fieldRef": "src:อีเมล",
+        "valueClass": "MIXED",
+        "values": [
+          "vexo.pelrane0@corp.example.test",
+          "#N/A",
+          "kesa.quelrane2@sample.invalid",
+          "",
+          "wilan.risunda4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "นามสกุล",
+        "fieldRef": "src:นามสกุล",
+        "valueClass": "TEXT",
+        "values": [
+          "Norenko",
+          "Risaly",
+          "Sovdell"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:spreadsheet-artefacts",
+      "lang:th"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_811f3e49589b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "อีเมล",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_b23da7a3bff0",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "นามสกุล",
+        "targetField": "contact.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_c0d6f8f29bfb08beab5cd26f",
+    "kc_05c3ea929e9a1e5a03dbae3d"
+  ]
+}

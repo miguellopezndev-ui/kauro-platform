@@ -1,0 +1,190 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-067-k11-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-067-k11-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "76fb39707d6cc806d7d8a4da822712c54c16300a835c5989fd3a87589bd10320",
+      "candidateSetHash": "de1850fc435da3c9302683e1b64a2daa8c54938691785a561015232dccb19ad8",
+      "targetContractHash": "tc_60a636871c35fc0a39dcfbcd93d3f8ac89d78af0c589464b1ea7ef9ab67de667",
+      "projectRevisionHash": "d0b62ba5e9ec97976927155c9b48fbb7fa7da955309680672a78bd82591a3b98"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Tél",
+        "sourceFieldRef": "fld_b4b81b8224645d52",
+        "decision": "MAP",
+        "destinationField": "contact.phone"
+      },
+      {
+        "sourceHeader": " mail",
+        "sourceFieldRef": "fld_6c8fb74645ced65a",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "FIRST_NAME",
+        "sourceFieldRef": "fld_afea2908fea29b93",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.companyName",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.phone",
+      "contact.website",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "d69e01d0fb49e43e421530ac985071a18ad22d464e7a9ad3466eb2e7c005181f"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Tél",
+        "fieldRef": "src:Tél",
+        "valueClass": "PHONE",
+        "values": [
+          "+1-202-555-0180",
+          "(202) 555-0168",
+          "+1-202-555-0116"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone"
+      },
+      {
+        "header": " mail",
+        "fieldRef": "src: mail",
+        "valueClass": "EMAIL",
+        "values": [
+          "tavel.vexell0@example.test",
+          "zero.finath1@corp.example.test",
+          "luman.vexvik2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "FIRST_NAME",
+        "fieldRef": "src:FIRST_NAME",
+        "valueClass": "TEXT",
+        "values": [
+          "Noran",
+          "Jorel",
+          "Mesis"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:header-variants",
+      "lang:es"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_8a87229b7ba6",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Tél",
+        "targetField": "contact.phone"
+      },
+      {
+        "memoryId": "memconv_03b46a3814b1",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "mail",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_56fd3925ae92828413f36bbf",
+    "kc_5c9041b9909c9598fe62786b"
+  ]
+}

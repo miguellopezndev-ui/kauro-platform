@@ -1,0 +1,7 @@
+# Byte-exact repository content.
+#
+# The core proves determinism by comparing SHA-256 hashes of generated
+# artifacts across Ubuntu and Windows. Any git-side line-ending translation
+# would change fixture bytes between platforms and silently break that proof,
+# so all end-of-line conversion is disabled for every path.
+* -text

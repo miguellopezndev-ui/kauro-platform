@@ -1,0 +1,381 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-138-cap07-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-138-cap07-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "d5e9a52477aac0ec45dadf7fbae8be70e021f9ac80e2583015c8b54a6d615007",
+      "candidateSetHash": "9723d2a0a3b50bc9622677d52433cc7749e9542d4654a0ede938a3fe2c3bdeb5",
+      "targetContractHash": "tc_ff2ff44227d1c43adc42da71078a01ee7ae6ab3762bedc6675db5bd3a9512272",
+      "projectRevisionHash": "6837950132138d6db35828be178f1e6afe29d24cf407b2d491bebe48f1162268"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_de792f19d612aea1",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_8a492d5f386a9a77",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contacts.csv",
+        "inDuplicateReview": true
+      },
+      {
+        "sourceHeader": "MailingCity",
+        "sourceFieldRef": "fld_41353eb4e324f72d",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_1db70bf1be28b9b5",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_a2e65b61c5d4a776",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Submission ID",
+        "sourceFieldRef": "fld_826bc02a9aec468e",
+        "decision": "PRESERVE",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_6be91c00e2904eac",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "webform-signups.csv",
+        "inDuplicateReview": true
+      },
+      {
+        "sourceHeader": "MailingCity",
+        "sourceFieldRef": "fld_f8fa25d971c5b856",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_e836c868d918d2a4",
+        "decision": "PRESERVE",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Company ID",
+        "sourceFieldRef": "fld_0609e52c6ab3faa4",
+        "decision": "PRESERVE",
+        "filePath": "company-list.csv"
+      },
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_6c1077c89ecb37ba",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "filePath": "company-list.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.name",
+      "company.source_id",
+      "contact.addressLine1",
+      "contact.city",
+      "contact.email",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Internal ticket ref",
+      "Import batch",
+      "Submission ID",
+      "Internal ticket ref",
+      "Company ID"
+    ],
+    "expectedTaskTypes": [
+      "DUPLICATE_SIGNAL_STRATEGY"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "a33dfbad51aed58de672974b8d76bf21a27b6292403f0a0c18db9da61e84aacd"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "contacts.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "webform-signups.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Submission ID"
+        },
+        "company-list.csv": {
+          "object": "COMPANY",
+          "recordIdColumn": "Company ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:contacts.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-747",
+          "P-748",
+          "P-749",
+          "P-750",
+          "P-751",
+          "P-752"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contacts.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "risa.zeriko0@example.test",
+          "orvo.tulova1@corp.example.test",
+          "fino.lumanth2@corp.example.test",
+          "fino.risenko3@example.test",
+          "luma.darquist4@sample.invalid",
+          "yanel.yananth5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "read": {
+          "destination": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        "inDuplicateReview": true,
+        "file": "contacts.csv"
+      },
+      {
+        "header": "MailingCity",
+        "fieldRef": "src:contacts.csv:MailingCity",
+        "valueClass": "TEXT",
+        "values": [
+          "Nuvia",
+          "Orvale",
+          "Tessin",
+          "Valmora",
+          "Tessin",
+          "Nuvia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:contacts.csv:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-3544",
+          "TKT-3132",
+          "TKT-1758",
+          "TKT-1189",
+          "TKT-2757",
+          "TKT-7513"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:contacts.csv:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-10",
+          "batch-10",
+          "batch-37",
+          "batch-21",
+          "batch-40",
+          "batch-40"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Submission ID",
+        "fieldRef": "src:webform-signups.csv:Submission ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "S-809",
+          "S-810",
+          "S-811"
+        ],
+        "decision": "PRESERVE",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:webform-signups.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "yanel.yananth5@example.test",
+          "zeran.jorunda1@example.test",
+          "yanek.tulunda2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "read": {
+          "destination": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        "inDuplicateReview": true,
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "MailingCity",
+        "fieldRef": "src:webform-signups.csv:MailingCity",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "Brandel",
+          "Quenby"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:webform-signups.csv:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-6918",
+          "TKT-7195",
+          "TKT-7861"
+        ],
+        "decision": "PRESERVE",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Company ID",
+        "fieldRef": "src:company-list.csv:Company ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-833",
+          "C-834",
+          "C-835"
+        ],
+        "decision": "PRESERVE",
+        "file": "company-list.csv"
+      },
+      {
+        "header": "Name",
+        "fieldRef": "src:company-list.csv:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Mesanth Foods GmbH",
+          "Tavenko Systems S.L.",
+          "Kesova Systems LLC"
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "file": "company-list.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "DUPLICATE_SIGNAL_STRATEGY"
+    ]
+  },
+  "canaries": [
+    "kc_17295d110a6387a0624bfc1e",
+    "kc_c2c47c06a7ae59b073d12951"
+  ]
+}

@@ -1,0 +1,150 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-055-k13-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-055-k13-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "1deb5d7372c721d45e26508625a75f1024412bea6e5aa0696c83181df483ccb8",
+      "candidateSetHash": "fffcdb9e23a9f8ed0da139b1d56a80588071fa2849da1ed4565edcf864d71612",
+      "targetContractHash": null,
+      "projectRevisionHash": "715cd0f4f0a78685844e49443357c4bf41dcdb0e5ca3814fde1b1bd904beb58d"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_8bab883bdf24faf4",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "email ",
+        "sourceFieldRef": "fld_1465b25f11df1ad2",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "EMAIL 2",
+        "sourceFieldRef": "fld_a7cc3b49c8d5668f",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.doNotEmail",
+      "contact.email",
+      "contact.state"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "email ",
+      "EMAIL 2"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "598734d22c8c4f0e8494922cdbc55bf5b826fbab9c6704186c5be56c1d0cb5ab"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "darek.joriko0@sample.invalid",
+          "tavel.tuldell1@sample.invalid",
+          "joria.wilath2@corp.example.test",
+          "risa.vexdell3@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "email ",
+        "fieldRef": "src:email ",
+        "valueClass": "EMAIL",
+        "values": [
+          "meso.pelath50@sample.invalid",
+          "",
+          "",
+          ""
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "EMAIL 2",
+        "fieldRef": "src:EMAIL 2",
+        "valueClass": "EMAIL",
+        "values": [
+          "",
+          "",
+          "",
+          "risa.belero60@example.test"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:near-duplicate-headers",
+      "lang:pl"
+    ]
+  },
+  "canaries": [
+    "kc_3f797ce3086b0b9c06575e5e",
+    "kc_67b3a4812b240e20ffbbbc1a"
+  ]
+}

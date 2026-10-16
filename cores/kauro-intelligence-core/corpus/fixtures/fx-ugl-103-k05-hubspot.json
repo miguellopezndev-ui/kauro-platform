@@ -1,0 +1,239 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-ugl-103-k05-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-103-k05-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "83dcef04ff5dd50bf6f587eb110a4377f66a7b627c31789486a800b85a342101",
+      "candidateSetHash": "348316b61cf69004325b3e02ac2ff4e5d280aeec423bd5562b480152305ba26d",
+      "targetContractHash": "tc_57777d4417b65e5e097117e611e0b24878771fb90cfe3f03fd0cb4a8c65dd806",
+      "projectRevisionHash": "eafd7804d9b0d7d5ad5444efc40db0ac96908236e26db8af4509c3829b2f60d5"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-Mail-Adresse",
+        "sourceFieldRef": "fld_e602e2f6317726c8",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "E-mail 2019 (outdated)",
+        "sourceFieldRef": "fld_c25cbd26f8f70a7b",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Vorname",
+        "sourceFieldRef": "fld_ec0b7df7dadba57d",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Land",
+        "sourceFieldRef": "fld_112ee344fe2fdbb8",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_1e1d784303ee7542",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "E-mail 2019 (outdated)",
+      "Folder code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "39e38ddf9d66dd598e5c4852c865ef98261a94bc1c21a7c89c55b9f148fc8b34"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-Mail-Adresse",
+        "fieldRef": "src:E-Mail-Adresse",
+        "valueClass": "EMAIL",
+        "values": [
+          "orvan.haldell0@corp.example.test",
+          "risa.jorrane1@sample.invalid",
+          "mesel.halenko2@example.test",
+          "lumel.taviko3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "E-mail 2019 (outdated)",
+        "fieldRef": "src:E-mail 2019 (outdated)",
+        "valueClass": "EMAIL",
+        "values": [
+          "belek.darath40@sample.invalid",
+          "belel.soviko41@corp.example.test",
+          "kesia.darenko42@corp.example.test",
+          "zerel.orvdell43@example.test"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Vorname",
+        "fieldRef": "src:Vorname",
+        "valueClass": "TEXT",
+        "values": [
+          "Wilia",
+          "Halis",
+          "Daria",
+          "Pelis"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Land",
+        "fieldRef": "src:Land",
+        "valueClass": "TEXT",
+        "values": [
+          "Norvania",
+          "Estmark",
+          "Kelland",
+          "Norvania"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F735",
+          "F694",
+          "F985",
+          "F214"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-headers",
+      "lang:de",
+      "ugly:stale-header"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_a296d52f8df4",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "E-Mail-Adresse",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_5732fa3623bc",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Vorname",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_6e5549a352e4",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Land",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_ed89701322a2483cc7d17d9d",
+    "kc_1198cd66e03b0cd2756d9e97"
+  ]
+}

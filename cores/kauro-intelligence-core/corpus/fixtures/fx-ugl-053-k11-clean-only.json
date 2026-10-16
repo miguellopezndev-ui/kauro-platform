@@ -1,0 +1,179 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-053-k11-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-053-k11-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "7b39b54df309f29d9aa9ec4351b03446c51b323e4918b5e54e5363c66de63204",
+      "candidateSetHash": "e576976f5982037a9df4457824916135358e994cf4418e4316dc4c81d33bb9eb",
+      "targetContractHash": null,
+      "projectRevisionHash": "0adb2ba84343f9410b6a0fb980fb469e6e7c769e1c50092569b1509ab825fd14"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "EMAIL_ADDR",
+        "sourceFieldRef": "fld_62c22888e2d62f9f",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Tel.:",
+        "sourceFieldRef": "fld_4185d4393cbfc6e6",
+        "decision": "MAP",
+        "destinationField": "contact.phone"
+      },
+      {
+        "sourceHeader": "FName",
+        "sourceFieldRef": "fld_0cb90f042e4d26ab",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.description",
+      "contact.email",
+      "contact.firstName",
+      "contact.phone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "455929f11e9bbc73bf1c94dd089b00ba6f12800bd150638a650cbfb5f2298ad3"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "EMAIL_ADDR",
+        "fieldRef": "src:EMAIL_ADDR",
+        "valueClass": "EMAIL",
+        "values": [
+          "kesis.tulrane0@example.test",
+          "keso.jorero1@corp.example.test",
+          "orvek.tuldell2@example.test",
+          "halis.norsorin3@corp.example.test",
+          "pelis.kesaly4@sample.invalid",
+          "darel.jorsorin5@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Tel.:",
+        "fieldRef": "src:Tel.:",
+        "valueClass": "PHONE",
+        "values": [
+          "+44-7700-900-423",
+          "(202) 555-0171",
+          "+44 7700 900915",
+          "+44 7700 900432",
+          "+44 7700 900989",
+          "+44-7700-900-757"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone"
+      },
+      {
+        "header": "FName",
+        "fieldRef": "src:FName",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvo",
+          "Joran",
+          "Sovek",
+          "Vexo",
+          "Halel",
+          "Kesan"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:header-variants",
+      "lang:en"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_de3fc062bce3",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "FName",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_d79ea064605b1aaf3de50302",
+    "kc_2b6bc04faf81b90080d8b07c"
+  ]
+}

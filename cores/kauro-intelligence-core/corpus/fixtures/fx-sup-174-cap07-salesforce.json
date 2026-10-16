@@ -1,0 +1,186 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-174-cap07-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-174-cap07-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "3f2b6bfb9a6bf33f002301c1b6259ed0c65321895b667805f3952ce0cb9a9e32",
+      "candidateSetHash": "f32102b541af719ff2d64c179c8a05ff80db0591e0c8d2827beb7f0ec1b7eb40",
+      "targetContractHash": "tc_41f064025aacbc1c4a37f6d2ffbbf7de7a5952daa31b13255ee2e2ffa08b5d79",
+      "projectRevisionHash": "541ea118d25a1f1a76794d1d60e00ad17178d447a412f6a150a466b8fe7b525f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_3d42ce3ec7e26a26",
+        "decision": "MAP",
+        "destinationField": "lead.email",
+        "requiredEvidenceRefs": [
+          "ev_2a39338ab60b8b75"
+        ]
+      },
+      {
+        "sourceHeader": "Lead source",
+        "sourceFieldRef": "fld_1ab17f70aa6b668f",
+        "decision": "MAP",
+        "destinationField": "lead.leadSource"
+      },
+      {
+        "sourceHeader": "Phone - src",
+        "sourceFieldRef": "fld_dc372428f92e62d0",
+        "decision": "MAP",
+        "destinationField": "lead.phone"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.company",
+      "lead.email",
+      "lead.lastName",
+      "lead.leadSource",
+      "lead.mobilePhone",
+      "lead.phone",
+      "lead.rating",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "9c44a4fa0adb6dd031eb2368a1d005f9e7a2da70dbee182cf7e9939713fb8a43"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "leadSource",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "rating",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "lumis.halova0@corp.example.test",
+          "sova.tavath1@corp.example.test",
+          "tulek.finenko2@sample.invalid",
+          "zeria.halunda3@corp.example.test",
+          "lumis.halova0@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "lead.email",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Lead source",
+        "fieldRef": "src:Lead source",
+        "valueClass": "ENUM",
+        "values": [
+          "partner",
+          "referral",
+          "cold call",
+          "partner",
+          "referral"
+        ],
+        "decision": "MAP",
+        "destination": "lead.leadSource"
+      },
+      {
+        "header": "Phone - src",
+        "fieldRef": "src:Phone - src",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550166",
+          "+12025550153",
+          "+447700900828",
+          "+447700900842",
+          "+447700900678"
+        ],
+        "decision": "MAP",
+        "destination": "lead.phone"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_1f8e5886d3c5f10dfb3d4a99",
+    "kc_a684d325f1d847b12c2a0c04"
+  ]
+}

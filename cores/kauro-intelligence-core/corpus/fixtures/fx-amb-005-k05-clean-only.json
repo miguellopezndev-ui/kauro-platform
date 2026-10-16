@@ -1,0 +1,146 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-005-k05-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-005-k05-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "66b1e354f65dfe57e76942023d21862df8a4d4c10c38dce28615512399d7a22e",
+      "candidateSetHash": "e141abe977899db5609a71ca260778df0dc2505353e0fa0788de9be278f5fc1c",
+      "targetContractHash": null,
+      "projectRevisionHash": "445e177f839186eee95fa810a30d4ca3c4778728c682c75220115c3b1b987680"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_10f57692f941a3d5",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Mail secundario",
+        "sourceFieldRef": "fld_9d1d9621ec00cbb7",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Correo B",
+        "sourceFieldRef": "fld_95288a7bab8c64ef",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lastName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0de871bc62a38bff10455d7556718a1854926ee95e003ca027ee1e0d6238c8e2"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Halanth",
+          "Yanorin",
+          "Haliko",
+          "Norsorin",
+          "Zersorin",
+          "Jordell"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Mail secundario",
+        "fieldRef": "src:Mail secundario",
+        "valueClass": "EMAIL",
+        "values": [
+          "finan.tulmar0@corp.example.test",
+          "sovel.mesanth1@sample.invalid",
+          "yanel.quelero2@corp.example.test",
+          "yana.orvdell3@sample.invalid",
+          "fina.mesaly4@sample.invalid",
+          "lumel.orvaly5@sample.invalid"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Correo B",
+        "fieldRef": "src:Correo B",
+        "valueClass": "EMAIL",
+        "values": [
+          "mesan.risaly0@sample.invalid",
+          "joris.mesell1@corp.example.test",
+          "sovia.kesmar2@example.test",
+          "joro.tulaly3@sample.invalid",
+          "luman.mesdell4@corp.example.test",
+          "halis.sovenko5@corp.example.test"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:two-primary-emails"
+    ]
+  },
+  "canaries": [
+    "kc_383f1f7bb45ded27e99df05a",
+    "kc_0d2ba294b0635c4e690c2de9"
+  ]
+}

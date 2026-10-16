@@ -1,0 +1,64 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g37-collision-evidence"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "a",
+      "path": "a.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "b",
+      "path": "b.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "a-contacts",
+      "fileId": "a",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Row ID"
+      },
+      "authoritativeExternalIdColumns": [
+        {
+          "header": "Legacy ID"
+        }
+      ],
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        }
+      ]
+    },
+    {
+      "id": "b-contacts",
+      "fileId": "b",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Row ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        }
+      ]
+    }
+  ]
+}

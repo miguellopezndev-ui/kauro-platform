@@ -1,0 +1,173 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-amb-099-k09-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-099-k09-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5a2237292904d73be5daf88565ef8e21f4d7c17a8cd40a14565a39fb631aa23d",
+      "candidateSetHash": "23b765724a9fe2ff0e629dbac04cbe4f4ed6276ce790ecfd06415ef845c1cad8",
+      "targetContractHash": null,
+      "projectRevisionHash": "21a627a44908f6d3f08354304117bafc885aa43a8982588f660fad80174aee8a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_ec8d6cf9c03bda64",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_2057a70539f8bd6c",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Contact",
+        "sourceFieldRef": "fld_65a4243060ed56c8",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Ort",
+        "sourceFieldRef": "fld_6791a77cb303e11f",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.firstName",
+      "contact.lastName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "bc7f583f352e686f09ab1ce6b43817e7173525e4823ffcdde7b095643c64eed3"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Queldell",
+          "Tavorin",
+          "Daraly",
+          "Soviko",
+          "Finanth",
+          "Sovrane"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Noria",
+          "Luma",
+          "Kesel",
+          "Jora",
+          "Pelis",
+          "Vexia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Contact",
+        "fieldRef": "src:Contact",
+        "valueClass": "TEXT",
+        "values": [
+          "M. Lumorin",
+          "Mesel Lumorin",
+          "V. Vexanth",
+          "Vexel Vexanth",
+          "J. Orvenko",
+          "Joran Orvenko"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Ort",
+        "fieldRef": "src:Ort",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "valmora",
+          "Valmora",
+          "valmora",
+          "Valmora",
+          "valmora"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:duplicate-people"
+    ]
+  },
+  "canaries": [
+    "kc_0282165cfe7afee06e0e15b0",
+    "kc_41b511d5d24b69b0bd2b75f5"
+  ]
+}

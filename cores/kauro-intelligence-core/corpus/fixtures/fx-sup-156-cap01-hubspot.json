@@ -1,0 +1,287 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-156-cap01-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-156-cap01-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "af69be0755ff9e37bf0eb30656b784f3c551b1117cbe41fadd95f5ae27c784d0",
+      "candidateSetHash": "5bb063702978d87084bc7335f9fc784ff436e7f10638eedaabbdb1c9fe957066",
+      "targetContractHash": "tc_ba76d88569059e7b12b5d43ffee6dd3c5c54658003920c0f162d0354a978a3b1",
+      "projectRevisionHash": "5c130ae05d5a1ff9463c41f6ed5d5c0341f1f49b65e01b599bc70763969b138d"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "City - src",
+        "sourceFieldRef": "fld_7f3f5b103247392f",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Email (CRM)",
+        "sourceFieldRef": "fld_d052e23c7104cd8c",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Website (export)",
+        "sourceFieldRef": "fld_56b5b8a73238eec3",
+        "decision": "MAP",
+        "destinationField": "contact.website"
+      },
+      {
+        "sourceHeader": "Phone (export)",
+        "sourceFieldRef": "fld_2a589025dde9751f",
+        "decision": "MAP",
+        "destinationField": "contact.phone"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "company.website",
+      "company.city",
+      "company.phone"
+    ],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.phone",
+      "company.website",
+      "company.source_id",
+      "contact.city",
+      "contact.email",
+      "contact.phone",
+      "contact.website",
+      "contact.source_id",
+      "deal.name",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "2bea6b53e6a1cebf89940c5b7eb8655affee0705529b6c6fd305e3e0fd7bcf0f"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "City - src",
+        "fieldRef": "src:City - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvale",
+          "Valmora",
+          "Valmora"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Email (CRM)",
+        "fieldRef": "src:Email (CRM)",
+        "valueClass": "EMAIL",
+        "values": [
+          "belan.belero0@example.test",
+          "tulis.tulath1@sample.invalid",
+          "tavan.risunda2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Website (export)",
+        "fieldRef": "src:Website (export)",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.orvath-logistics.test",
+          "https://www.jorero-group.test",
+          "https://www.belsorin-labs.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.website"
+      },
+      {
+        "header": "Phone (export)",
+        "fieldRef": "src:Phone (export)",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550191",
+          "+447700900382",
+          "+12025550178"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone"
+      }
+    ],
+    "forbiddenDestinations": [
+      "company.website",
+      "company.city",
+      "company.phone"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_f8e7a6be7e1e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "City - src",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_99632dc5bb5c",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Email (CRM)",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_a81e83d41635",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Website (export)",
+        "targetField": "contact.website"
+      },
+      {
+        "memoryId": "memconv_59a73fbaa151",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Phone (export)",
+        "targetField": "contact.phone"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_192f30023068da552663e99b",
+    "kc_1fc00a3fc8214d00b4a6e8b3"
+  ]
+}

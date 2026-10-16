@@ -1,0 +1,264 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-190-cap11-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-190-cap11-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "10091276cca0dc015fd3b3552a674789f79fe4b9ae04413a6624c983852a56ff",
+      "candidateSetHash": "a7db4a189825ed111c7b781974fdc10c436b8e4188d39aae474a3800246c760a",
+      "targetContractHash": null,
+      "projectRevisionHash": "a9bac0208ad3bb34f700ae6ef0db8fc8cf729a341b291b8f4829671184c0cefe"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_3d0ef5ff5cd69424",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_513ffaf52ea87d6f",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Company name",
+        "sourceFieldRef": "fld_3d50938ebb3b0ad8",
+        "decision": "MAP",
+        "destinationField": "contact.companyName",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "company.name",
+        "sourceFieldRef": "fld_11b1e701386f98ac",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "filePath": "accounts.csv"
+      },
+      {
+        "sourceHeader": "Domain",
+        "sourceFieldRef": "fld_51e7afb7bcd0bb5c",
+        "decision": "MAP",
+        "destinationField": "company.domain",
+        "filePath": "accounts.csv"
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_259ab43584b2269a",
+        "decision": "MAP",
+        "destinationField": "company.website",
+        "filePath": "accounts.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.domain",
+      "company.name",
+      "company.website",
+      "contact.city",
+      "contact.companyName",
+      "contact.email",
+      "contact.marketingConsent",
+      "contact.mobilePhone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID"
+    ],
+    "expectedTaskTypes": [
+      "CONSISTENCY_REVIEW"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "525090573f49beffcec1d4f8a88a41835c2011249fe9459185cb5c0aa4775da5"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "contacts.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "accounts.csv": {
+          "object": "COMPANY",
+          "recordIdColumn": "company.name"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "marketingConsent",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:contacts.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-207",
+          "P-208",
+          "P-209",
+          "P-210",
+          "P-211"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contacts.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "mesek.lumaly0@sample.invalid",
+          "finis.lumova1@corp.example.test",
+          "vexek.zerero2@sample.invalid",
+          "tavek.wildell3@corp.example.test",
+          "halan.darmar4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Company name",
+        "fieldRef": "src:contacts.csv:Company name",
+        "valueClass": "TEXT",
+        "values": [
+          "Pelero Group GmbH",
+          "Pelero Group GmbH",
+          "Pelero Group GmbH",
+          "Zerorin Works Inc.",
+          "Zerorin Works Inc."
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "company.name",
+        "fieldRef": "src:accounts.csv:company.name",
+        "valueClass": "TEXT",
+        "values": [
+          "Zerorin Works Inc.",
+          "Pelero Group GmbH"
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "file": "accounts.csv"
+      },
+      {
+        "header": "Domain",
+        "fieldRef": "src:accounts.csv:Domain",
+        "valueClass": "TEXT",
+        "values": [
+          "jorrane-works.test",
+          "tulaly-partners.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.domain",
+        "file": "accounts.csv"
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:accounts.csv:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.tuliko-works.test",
+          "https://www.lumunda-group.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website",
+        "file": "accounts.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "CONSISTENCY_REVIEW"
+    ]
+  },
+  "canaries": [
+    "kc_088e68bc80f92a7255e51e4a",
+    "kc_4bb9e0f83d62a95d96f26d96"
+  ]
+}

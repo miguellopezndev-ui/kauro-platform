@@ -1,0 +1,155 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-amb-101-k11-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-101-k11-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2219b32ea10ce73317482a6250f58f934059f0b82329bff611559dd4772dcf3b",
+      "candidateSetHash": "938f51efdc08668928d8cfb65aa81cbc8a6bd46a8293decf95b306dc489b4ff9",
+      "targetContractHash": null,
+      "projectRevisionHash": "f6a6aa3777bd6897280b276bd0b1d5432a76b7b6781ef0528c42f435a3765ee2"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_4822f7e5db264039",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Estado",
+        "sourceFieldRef": "fld_4ae2973c0299fd25",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lifecycleStage",
+      "contact.state",
+      "deal.stage",
+      "lead.status"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "24adfe913d9eeaef194be55b39da91edc1717813f5861b723417e8c740a3d7e0"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "pelis.pelunda0@example.test",
+          "tavis.mesunda1@corp.example.test",
+          "mesan.pelaly2@example.test",
+          "risia.zerorin3@sample.invalid",
+          "wilel.tulorin4@example.test",
+          "pelo.quelaly5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Estado",
+        "fieldRef": "src:Estado",
+        "valueClass": "MIXED",
+        "values": [
+          "Norte",
+          "cerrado",
+          "Central",
+          "pendiente",
+          "Central",
+          "activo"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:homograph-header"
+    ]
+  },
+  "canaries": [
+    "kc_2fd924d603a3877e199222be",
+    "kc_7e51c4708ab19a1fb9a712a2"
+  ]
+}

@@ -1,0 +1,163 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-063-k07-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-063-k07-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "848111e767d2772b5bd281abab3d6e9af048fc0d3c5fc8b238ccf8b062a366d3",
+      "candidateSetHash": "8b82869ca0028d6d55171543fffa045f92a0d2f81a61d8ed72e4565fc9603eef",
+      "targetContractHash": "tc_77a104929f8cff54cd43f211ff611e7ce09725e4012240cd4c61be8892ff6c84",
+      "projectRevisionHash": "6d737ab3e4c69e1b0162cf4225c4168de34e7ae3fd1744e0112284668ca37240"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Ülke",
+        "sourceFieldRef": "fld_64bfa6bf8e7dade8",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Puntuación antigua",
+        "sourceFieldRef": "fld_0e2c689bfc0227e6",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.legacyScore"
+    ],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.lifecycleStage",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "5d0f59ad1f3c4cadb7502bbc89020589f0e337f81fee8b1e79dc05ad3b199287"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Ülke",
+        "fieldRef": "src:Ülke",
+        "valueClass": "TEXT",
+        "values": [
+          "Valdoria",
+          "Estmark",
+          "Estmark",
+          "Estmark",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Puntuación antigua",
+        "fieldRef": "src:Puntuación antigua",
+        "valueClass": "MIXED",
+        "values": [
+          "80",
+          "36",
+          "70",
+          "74",
+          "72"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.legacyScore"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-target",
+      "lang:tr",
+      "ugly:stale-header"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_850446752fbf",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ülke",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b1e2a5bd2ac5e2851856feae",
+    "kc_94f8e19ef649ded50fde2e79"
+  ]
+}

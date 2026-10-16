@@ -1,0 +1,189 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-183-cap04-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-183-cap04-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "819b40a5d3094c393c72957f5593792410dfe58642f9c49cff3d92d034ee20cb",
+      "candidateSetHash": "f5c85fa2f3a449eab5650a8653a3d0ba61b4f0b721e9903f0ee2602131664823",
+      "targetContractHash": null,
+      "projectRevisionHash": "759dd406ce16e4ba1d97d7e587d3aff640ceb0efe4c50c1f3df103d395ac6aae"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Téléphone",
+        "sourceFieldRef": "fld_98c21764f34f3e7d",
+        "decision": "MAP",
+        "destinationField": "lead.phone"
+      },
+      {
+        "sourceHeader": "E-mail addr [v2]",
+        "sourceFieldRef": "fld_37d634d12d3eadd5",
+        "decision": "MAP",
+        "destinationField": "lead.email"
+      },
+      {
+        "sourceHeader": "Employés",
+        "sourceFieldRef": "fld_01f2d7a33935e54c",
+        "decision": "MAP",
+        "destinationField": "lead.employeeCount"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_69fa85b58f820118",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.description",
+      "lead.email",
+      "lead.employeeCount",
+      "lead.phone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "7436daa7d9ce8d0e0c60467c8c98240f488bb0bebc58b5221b06e626a234d952"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD",
+      "locale": {
+        "defaultRegion": "US"
+      }
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Téléphone",
+        "fieldRef": "src:Téléphone",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0138",
+          "202-555-0154",
+          "202-555-0155",
+          "202-555-0170",
+          "202-555-0178"
+        ],
+        "decision": "MAP",
+        "destination": "lead.phone"
+      },
+      {
+        "header": "E-mail addr [v2]",
+        "fieldRef": "src:E-mail addr [v2]",
+        "valueClass": "EMAIL",
+        "values": [
+          "HALEL.QUELIKO0@sample.invalid",
+          "halis.yansorin1@example.test",
+          "RISIA.ZERATH2@corp.example.test",
+          "tavek.finunda3@corp.example.test",
+          "YANIS.QUELELL4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "lead.email"
+      },
+      {
+        "header": "Employés",
+        "fieldRef": "src:Employés",
+        "valueClass": "NUMBER",
+        "values": [
+          "67813,30",
+          "40812,11",
+          "2096,47",
+          "96497,53",
+          "3864,83"
+        ],
+        "decision": "MAP",
+        "destination": "lead.employeeCount"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "2ccc6b16",
+          "65dfc9b9",
+          "ced2082d",
+          "96f67a96",
+          "21628381"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_1fb8dce4d9b5",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Employés",
+        "targetField": "lead.employeeCount"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_6a877634772c1520da2c2901",
+    "kc_8d96dc11d3d5beeb90dfa365"
+  ]
+}

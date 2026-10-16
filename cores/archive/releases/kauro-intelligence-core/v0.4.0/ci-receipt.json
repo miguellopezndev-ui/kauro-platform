@@ -1,0 +1,2984 @@
+{
+  "artifactKind": "INTELLIGENCE_CORE_CI_RECEIPT",
+  "subjectLabel": "CI",
+  "repository": "miguellopezndev-ui/kauro-intelligence-core",
+  "commit": "1c97fa69ba9d5758df8854579341d8c5dab8f8d3",
+  "tree": "635a18615d202534e9932cfbc25f269e8938e824",
+  "ref": "refs/heads/main",
+  "workflow": "intelligence gate",
+  "runId": 36620992913,
+  "runAttempt": 1,
+  "event": "push",
+  "jobs": {
+    "gate": "success",
+    "sabotage": "success",
+    "architecture": "success",
+    "dependencies": "success"
+  },
+  "architecture": {
+    "artifactKind": "INTELLIGENCE_CORE_ARCHITECTURE_GATE",
+    "gate": "INTELLIGENCE-ARCHITECTURE-01",
+    "decidedAt": "2026-09-29T20:37:54Z",
+    "subject": {
+      "commit": "1c97fa69ba9d5758df8854579341d8c5dab8f8d3",
+      "tree": "635a18615d202534e9932cfbc25f269e8938e824",
+      "dirty": false
+    },
+    "node": "v24.21.0",
+    "platform": "linux-x64",
+    "producers": {
+      "tools/architecture-gate.mjs": "6e5c032c38010d61c1e99ea9e22eeb63c096859d42545b87161811703c261fb3",
+      "tools/sabotage.mjs": "25fc190454591dd5669b3b2264c6467cf01e5cb6a831516b9469c1dafa5153d7",
+      "tools/run-tests.mjs": "6ab53f6c8ace191381f1d824b870ef436eaf248b27e51a445af762c7b4aab7a3",
+      "tools/contracts-check.mjs": "e2fcb3d7daa0ba6206f3ab9706a2aabbb5e4ae485702aa48dcce18491ac3d7c0",
+      "tools/consumer-check.mjs": "dbde3646c2e565e50617bba85b3d0c5ff7733ea6d75b3ef59cf540faf6d21103",
+      "tools/behavioural-probes.mjs": "d98bb65c08a9813d5ae9e3c9459400d2a9a6e70d09023d75b761c6d61a9999b2",
+      "tools/lib/verify-sabotage-report.mjs": "96230606caf6d2d8364cd3a8cdc03fdd8eab8b5b165713163f3367b221908ea8",
+      "package-lock.json": "92a6d6131fba0ac7f25e684f882fd16368cd25f098e1b15d2f455ae43bc08661",
+      "tsconfig.json": "f2f92142f54240417c8de838a03d84f542665a2634a66046b1bed5eb9b6de986",
+      "vendor/MANIFEST.json": "7dbda86b94849ce2ff609648e12eb6da778a0ab78c002cd5c0f3a917d40ff1b6"
+    },
+    "dependencyClosure": [
+      {
+        "name": "@types/node",
+        "version": "24.13.3",
+        "resolved": "https://registry.npmjs.org/@types/node/-/node-24.13.3.tgz",
+        "integrity": "sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q=="
+      },
+      {
+        "name": "fflate",
+        "version": "0.8.3",
+        "resolved": "https://registry.npmjs.org/fflate/-/fflate-0.8.3.tgz",
+        "integrity": "sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA=="
+      },
+      {
+        "name": "kavo-migration-core",
+        "version": "2.0.1",
+        "resolved": "file:vendor/kavo-migration-core-2.0.1.tgz",
+        "integrity": "sha512-rp2abBSyVCIPrAx5fTlEH+SEyZ4wRewWFM0V373YTacEwuygI7P3f9Nb929l6WAoV4j4KpbeU/jw8tryKaetbA=="
+      },
+      {
+        "name": "libphonenumber-js",
+        "version": "1.13.12",
+        "resolved": "https://registry.npmjs.org/libphonenumber-js/-/libphonenumber-js-1.13.12.tgz",
+        "integrity": "sha512-uLVeV1c9OTk6qkdqnj+mpMD+ZdnZ0szVyWu58HwMmpwkHA1gCEkyjd3veZQXDnuw9KEwSRjcc9B1pS9XKIN1fA=="
+      },
+      {
+        "name": "typescript",
+        "version": "5.9.3",
+        "resolved": "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz",
+        "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
+      },
+      {
+        "name": "undici-types",
+        "version": "7.18.2",
+        "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-7.18.2.tgz",
+        "integrity": "sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w=="
+      }
+    ],
+    "sabotage": {
+      "reportSha256": "8a1c6a961368ba68c3bd5acfeed743da071b4a6888034cc2c486315e698afeb7",
+      "mode": "QUALIFICATION",
+      "subject": {
+        "commit": "1c97fa69ba9d5758df8854579341d8c5dab8f8d3",
+        "tree": "635a18615d202534e9932cfbc25f269e8938e824",
+        "dirty": false,
+        "dirtyPaths": [],
+        "resolved": true
+      },
+      "counts": {
+        "inventory": 175,
+        "reached": 175,
+        "killed": 175,
+        "survived": 0,
+        "didNotCompile": 0,
+        "infraError": 0,
+        "notReached": 0
+      },
+      "problems": []
+    },
+    "consumer": {
+      "tarball": "kauro-intelligence-core-0.4.0.tgz",
+      "tarballSha256": "af3d603e84887fd091a57eb49304a79f80cf99e543d7e47967292839786784eb",
+      "migrationCoreTarball": "vendor/kavo-migration-core-2.0.1.tgz",
+      "migrationCoreTarballSha256": "787f0b80a906d31605e3946ad00df86d2a131e3e89d78855c1c4f327b37fa000",
+      "observed": {
+        "version": "0.4.0",
+        "state": "PROPOSAL_READY",
+        "draft": "SYSTEM_DRAFT",
+        "fields": 4,
+        "rows": 2,
+        "calls": 1,
+        "invocations": 1,
+        "packageDigest": "4128c74163948fe74437e7892529381703c8a5880d366ecba79336394052a5df",
+        "maxTasks": 32,
+        "mcCore": "2.0.1",
+        "runDir": "/tmp/kauro-ic-consumer-run-1t7UpW"
+      }
+    },
+    "facts": [
+      {
+        "name": "subject_bound",
+        "value": true,
+        "by": "MEASURED",
+        "detail": "commit 1c97fa69ba9d5758df8854579341d8c5dab8f8d3 tree 635a18615d202534e9932cfbc25f269e8938e824, clean"
+      },
+      {
+        "name": "typechecks_strict",
+        "value": true,
+        "by": "EXECUTED",
+        "detail": "tsc -p tsconfig.json exit 0 under strict, exactOptionalPropertyTypes, noUncheckedIndexedAccess"
+      },
+      {
+        "name": "frozen_contracts_verified",
+        "value": true,
+        "by": "EXECUTED",
+        "detail": "CONTRACTS-01 PASS: tarball digest, lockfile, exported versions inside declared ranges, every imported name present"
+      },
+      {
+        "name": "tests_pass",
+        "value": true,
+        "by": "EXECUTED",
+        "detail": "464 tests, 0 failed, exit 0"
+      },
+      {
+        "name": "components_exported",
+        "value": true,
+        "by": "MEASURED",
+        "detail": "33 component names present on the built public entry"
+      },
+      {
+        "name": "no_stub_or_io_on_production_path",
+        "value": true,
+        "by": "MEASURED",
+        "detail": "25 source files: no TODO, stub, SDK, network, filesystem or shell"
+      },
+      {
+        "name": "budget_bounds_as_canon",
+        "value": true,
+        "by": "MEASURED",
+        "detail": "eight bounds of canon §61 on the built BUDGET_LIMITS, frozen, no ninth"
+      },
+      {
+        "name": "model_policy_pinned",
+        "value": true,
+        "by": "MEASURED",
+        "detail": "canon §52 policy pinned on the built MODEL_POLICY_V1 (12 pins); secondary NONE"
+      },
+      {
+        "name": "probe_egress_binding",
+        "value": true,
+        "by": "EXECUTED",
+        "detail": "same envelope accepted; modified refused (EGRESS_BLOCKED: the envelope changed after its egress decision); forged token refused (EGRESS_BLOCKED: the egress decision was not issued by this run)"
+      },
+      {
+        "name": "probe_budget_per_request_ceiling",
+        "value": true,
+        "by": "EXECUTED",
+        "detail": "200000 reserved; 200001 refused (BUDGET_EXHAUSTED: the request asks for 200001 input tokens against a ceiling of 200000)"
+      },
+      {
+        "name": "probe_run_transitions_closed",
+        "value": true,
+        "by": "EXECUTED",
+        "detail": "CREATED → ENVELOPE_VALIDATED applied; CREATED → PROPOSAL_READY refused (INVALID_TRANSITION: CREATED → PROPOSAL_READY is not a transition of the run state machine); 15 states have rows"
+      },
+      {
+        "name": "probe_classifier_email_not_safe",
+        "value": true,
+        "by": "EXECUTED",
+        "detail": "email → POTENTIAL_PII; status word → SAFE_LOW_CARDINALITY_SEMANTICS"
+      },
+      {
+        "name": "probe_compiler_target_outside_envelope",
+        "value": true,
+        "by": "EXECUTED",
+        "detail": "offered target → PROPOSED; outside target → FORBIDDEN_PROPOSAL [TARGET_OUTSIDE_ENVELOPE]"
+      },
+      {
+        "name": "sabotage_all_killed",
+        "value": true,
+        "by": "EXECUTED",
+        "detail": "175 killed of 175 (recomputed from 175 records); survived 0, did not compile 0, infra 0, not reached 0; runner exit 0"
+      },
+      {
+        "name": "sabotage_report_bound_to_subject",
+        "value": true,
+        "by": "MEASURED",
+        "detail": "QUALIFICATION report on commit 1c97fa69ba9d5758df8854579341d8c5dab8f8d3, clean; inventory benchmark.mjs=11e3c8f6cea5,compiler.mjs=683929962641,core.mjs=8b3dceb5f940,kernel.mjs=c6f1698738df,privacy.mjs=c01b2d451aa9,transport.mjs=75097a41e28e; producers and production files hash as in the tree"
+      },
+      {
+        "name": "public_consumer_compiles_and_runs",
+        "value": true,
+        "by": "EXECUTED",
+        "detail": "INTELLIGENCE-CONSUMER-01 = PASS: {\"version\":\"0.4.0\",\"state\":\"PROPOSAL_READY\",\"draft\":\"SYSTEM_DRAFT\",\"fields\":4,\"rows\":2,\"calls\":1,\"invocations\":1,\"packageDigest\":\"4128c74163948fe74437e7892529381703c8a5880d366ecba79336394052a5df\",\"maxTasks\":32,\"mcCore\":\"2.0.1\",\"runDir\":\"/tmp/kauro-ic-consumer-run-1t7UpW\"}"
+      },
+      {
+        "name": "consumer_report_bound",
+        "value": true,
+        "by": "MEASURED",
+        "detail": "tarball kauro-intelligence-core-0.4.0.tgz sha256 af3d603e84887fd0…; Migration Core 2.0.1 sha256 787f0b80a906d316…; consumer observed {\"version\":\"0.4.0\",\"state\":\"PROPOSAL_READY\",\"draft\":\"SYSTEM_DRAFT\",\"fields\":4,\"rows\":2,\"calls\":1,\"invocations\":1,\"packageDigest\":\"4128c74163948fe74437e7892529381703c8a5880d366ecba79336394052a5df\",\"maxTasks\":32,\"mcCore\":\"2.0.1\",\"runDir\":\"/tmp/kauro-ic-consumer-run-1t7UpW\"}"
+      },
+      {
+        "name": "documents_present",
+        "value": true,
+        "by": "MEASURED",
+        "detail": "6 documents"
+      }
+    ],
+    "INTELLIGENCE_CORE_ARCHITECTURE_CLOSED": "TRUE",
+    "INTELLIGENCE_CORE_RELEASE_CANDIDATE": "FALSE",
+    "INTELLIGENCE_CORE_V1_FROZEN": "FALSE",
+    "note": "RELEASE_CANDIDATE and V1_FROZEN are FALSE by construction in IC-1: they need OPUS-Q1, AI-BUDGET-01 and the independent freeze of IC-2/IC-3. Sabotage evidence is executed by this gate and never reused from disk."
+  },
+  "sabotage": {
+    "gate": "INTELLIGENCE-SABOTAGE-01",
+    "mode": "QUALIFICATION",
+    "qualifies": true,
+    "subject": {
+      "commit": "1c97fa69ba9d5758df8854579341d8c5dab8f8d3",
+      "tree": "635a18615d202534e9932cfbc25f269e8938e824",
+      "dirty": false,
+      "dirtyPaths": [],
+      "resolved": true
+    },
+    "node": "v24.21.0",
+    "startedAt": "2026-09-29T19:43:12.390Z",
+    "finishedAt": "2026-09-29T20:59:39.083Z",
+    "inventory": {
+      "files": [
+        {
+          "file": "benchmark.mjs",
+          "sha256": "11e3c8f6cea5dd23f5ff76d8e36a7d385e3cf6c558deb5e7bd30df11b939b9cd"
+        },
+        {
+          "file": "compiler.mjs",
+          "sha256": "6839299626413ce37fe907ecd3c81ebc8b7701af6cd20d324347f04631fa7024"
+        },
+        {
+          "file": "core.mjs",
+          "sha256": "8b3dceb5f9408f36e1727935594f0797b12fa01eba40ff116c0dc391858b0de2"
+        },
+        {
+          "file": "kernel.mjs",
+          "sha256": "c6f1698738dfee20ea8f77256e4abdea05d2d3f0e89a61b3912dcd916b548e19"
+        },
+        {
+          "file": "privacy.mjs",
+          "sha256": "c01b2d451aa93ebfd24e7ff70b72b9525e7daa219995fd196b8f12b0c1fbb90d"
+        },
+        {
+          "file": "transport.mjs",
+          "sha256": "75097a41e28e83fb7aeb577a0ebf7928dd82b2abaa3ba05bc9e4ee23e45e8d88"
+        }
+      ],
+      "ids": [
+        {
+          "id": "bench-candidate-evidence-not-checked",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "a proposal without the evidence the truth requires of its candidate scores correct"
+        },
+        {
+          "id": "bench-global-evidence-not-checked",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "a run that cites none of the required evidence scores correct"
+        },
+        {
+          "id": "bench-destination-not-checked",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "a column mapped to the wrong target scores correct"
+        },
+        {
+          "id": "bench-primitive-not-checked",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "the wrong transform primitive scores correct"
+        },
+        {
+          "id": "bench-preserved-write-not-destructive",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "writing a column the truth preserves is not a destructive action"
+        },
+        {
+          "id": "bench-compiler-result-not-checked",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "the sealed compiler result is decorative again"
+        },
+        {
+          "id": "bench-hash-binding-not-checked",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "a result produced for other inputs is scored as if it answered the fixture"
+        },
+        {
+          "id": "bench-edited-truth-scored",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "a truth edited after sealing is scored"
+        },
+        {
+          "id": "bench-unobserved-gate-counted-zero",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "a gate no fixture exercised is reported at zero"
+        },
+        {
+          "id": "bench-empty-corpus-passes",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "an empty corpus is not a report failure"
+        },
+        {
+          "id": "bench-missing-result-counted-absent",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "a fixture without a result leaves the denominator instead of counting as incorrect"
+        },
+        {
+          "id": "bench-mean-of-three-not-required",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "three runs at 97, 97 and 99 qualify without the 98 mean"
+        },
+        {
+          "id": "bench-extra-field-not-checked",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "a field no expected candidate accounts for and no allowance names scores correct"
+        },
+        {
+          "id": "bench-target-universe-not-checked",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "a destination outside the sealed target universe is not an invented target"
+        },
+        {
+          "id": "bench-receipt-config-binding-not-checked",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "a configuration edited after its validation receipt was issued is scored as the run"
+        },
+        {
+          "id": "bench-three-runs-independence-not-checked",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "one report presented three times qualifies as three runs"
+        },
+        {
+          "id": "bench-budget-violation-still-passes",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "a run with a budget ceiling exceeded is a passing run"
+        },
+        {
+          "id": "bench-budget-violation-not-in-qualification",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "the qualification does not name a budget violation in one of its three runs"
+        },
+        {
+          "id": "bench-test-only-report-qualifies",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "three TEST_ONLY reports qualify"
+        },
+        {
+          "id": "bench-qualification-universe-not-checked",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "a QUALIFICATION report over two fixtures passes"
+        },
+        {
+          "id": "bench-provider-failure-scored-refused",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "a run the provider failed is scored as an abstention or a refusal and observes the gates"
+        },
+        {
+          "id": "bench-obligation-free-truth-sealed",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/fixture.ts",
+          "gate": "a PROPOSED truth that fixes no decision is sealed and a gutted draft scores correct under it"
+        },
+        {
+          "id": "bench-egress-record-not-transport-bytes-accepted",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "an egress record made of envelopes or notes instead of transport bytes is scored"
+        },
+        {
+          "id": "bench-escaped-sentinel-not-matched",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "a secret with a quote or a backslash leaves JSON-escaped and is not seen"
+        },
+        {
+          "id": "bench-correct-score-without-run-id-accepted",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "fabricated correct scores with no run id qualify with nothing for the run-id independence check to compare"
+        },
+        {
+          "id": "bench-capturing-transport-drops-correlation",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "the benchmark capture drops the TransportCorrelation the gateway handed beside the request"
+        },
+        {
+          "id": "bench-runner-surface-not-on-index",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/index.ts",
+          "gate": "an IC-2 runner consuming the tarball cannot capture at the transport or name the qualification universe"
+        },
+        {
+          "id": "bench-report-digest-not-checked",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "a TEST_ONLY report with mode flipped to QUALIFICATION on the object qualifies"
+        },
+        {
+          "id": "gate-counters-not-recomputed",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "a score with checks:[] and gateChecksExecuted 1 per gate is OBSERVED over 600 checks the report never saw"
+        },
+        {
+          "id": "gate-violations-not-recomputed",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "a failing gated check the violation list omits counts the gate at zero"
+        },
+        {
+          "id": "gate-violations-disagreement-not-a-failure",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "a score whose violation list disagrees with its checks is added up instead of refused"
+        },
+        {
+          "id": "gate-checks-disagreement-not-a-failure",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/report.ts",
+          "gate": "a score whose gate counters disagree with its checks is added up instead of refused"
+        },
+        {
+          "id": "schema-failure-scored-refused",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "a model answer that is not JSON is classed REFUSED and scores correct under a REFUSED/ANY safety truth"
+        },
+        {
+          "id": "invented-field-scored-null",
+          "inventoryFile": "benchmark.mjs",
+          "file": "src/benchmark/scorer.ts",
+          "gate": "an invented field with a bound receipt is answered correct:null instead of correct:false with invented_target_accepted"
+        },
+        {
+          "id": "rationale-self-claim-trusted",
+          "inventoryFile": "compiler.mjs",
+          "file": "src/compiler/compiler.ts",
+          "gate": "a rationale code the facts contradict still earns an evidence class and a PROPOSED item"
+        },
+        {
+          "id": "candidate-primitives-not-checked",
+          "inventoryFile": "compiler.mjs",
+          "file": "src/compiler/compiler.ts",
+          "gate": "a primitive the global catalogue supports is accepted for a candidate whose allowlist excludes it"
+        },
+        {
+          "id": "email-uniqueness-proves-identity",
+          "inventoryFile": "compiler.mjs",
+          "file": "src/resolver/deterministic-resolver.ts",
+          "gate": "a unique, well-formed email is classified PROVEN_UNIQUE_IDENTIFIER"
+        },
+        {
+          "id": "claimed-map-global-again",
+          "inventoryFile": "compiler.mjs",
+          "file": "src/resolver/deterministic-resolver.ts",
+          "gate": "the second CONTACT file loses its Email mapping because the first file claimed contact.email for the whole run"
+        },
+        {
+          "id": "ambiguous-evidence-proposed",
+          "inventoryFile": "compiler.mjs",
+          "file": "src/compiler/compiler.ts",
+          "gate": "an item whose claim holds but decides nothing (INSUFFICIENT_EVIDENCE, FOREIGN_KEY_COLUMN, ...) stays PROPOSED on AMBIGUOUS evidence and a status column is drafted as a last name"
+        },
+        {
+          "id": "deferring-code-supports-authority",
+          "inventoryFile": "compiler.mjs",
+          "file": "src/compiler/compiler.ts",
+          "gate": "a claim of insufficient evidence that holds is taken as SUPPORTED evidence for the mapping"
+        },
+        {
+          "id": "assembly-claims-global",
+          "inventoryFile": "compiler.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "assembly claims a destination once per run: the second CONTACT file loses its Email, First Name, Last Name and Phone as DUPLICATE_TARGET"
+        },
+        {
+          "id": "record-id-declaration-dropped",
+          "inventoryFile": "compiler.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "the record id column the project declares never reaches the resolver: no column is PROVEN through run()"
+        },
+        {
+          "id": "declared-email-proves-identity",
+          "inventoryFile": "compiler.mjs",
+          "file": "src/resolver/deterministic-resolver.ts",
+          "gate": "an Email column declared as the record id column is PROVEN_UNIQUE_IDENTIFIER (the round-2 line)"
+        },
+        {
+          "id": "enum-options-not-carried",
+          "inventoryFile": "compiler.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "an ENUM destination reaches the host without allowedValues and the engine refuses the configuration: no picklist mapping is ever drafted"
+        },
+        {
+          "id": "egress-token-not-checked",
+          "inventoryFile": "core.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "a caller-supplied EGRESS_ALLOWED is accepted"
+        },
+        {
+          "id": "egress-hash-not-checked",
+          "inventoryFile": "core.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "an envelope modified after egress is sent"
+        },
+        {
+          "id": "secret-does-not-block",
+          "inventoryFile": "core.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "a secret seen in a column no longer blocks egress"
+        },
+        {
+          "id": "contaminated-field-emits",
+          "inventoryFile": "core.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "a column holding a secret still emits its safe values"
+        },
+        {
+          "id": "pii-classified-safe",
+          "inventoryFile": "core.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "emails and phones are no longer PII"
+        },
+        {
+          "id": "unknown-fails-open",
+          "inventoryFile": "core.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "an unclassifiable value is treated as safe"
+        },
+        {
+          "id": "target-outside-envelope-accepted",
+          "inventoryFile": "core.mjs",
+          "file": "src/compiler/compiler.ts",
+          "gate": "a target the envelope did not offer is accepted"
+        },
+        {
+          "id": "destructive-primitive-accepted",
+          "inventoryFile": "core.mjs",
+          "file": "src/compiler/compiler.ts",
+          "gate": "a model-authorised clear is accepted"
+        },
+        {
+          "id": "identity-proof-not-required",
+          "inventoryFile": "core.mjs",
+          "file": "src/compiler/compiler.ts",
+          "gate": "an identity strategy without proof passes without the agency"
+        },
+        {
+          "id": "envelope-hash-not-checked",
+          "inventoryFile": "core.mjs",
+          "file": "src/compiler/compiler.ts",
+          "gate": "a proposal for another envelope is compiled"
+        },
+        {
+          "id": "enum-option-not-checked",
+          "inventoryFile": "core.mjs",
+          "file": "src/compiler/compiler.ts",
+          "gate": "an enum value outside the target options is accepted"
+        },
+        {
+          "id": "support-envelope-not-checked",
+          "inventoryFile": "core.mjs",
+          "file": "src/compiler/compiler.ts",
+          "gate": "a vendor field Migration Core cannot deliver is mapped"
+        },
+        {
+          "id": "task-cap-removed",
+          "inventoryFile": "core.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "a thirty-third task is started"
+        },
+        {
+          "id": "per-request-ceiling-removed",
+          "inventoryFile": "core.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "a request above the input ceiling is reserved"
+        },
+        {
+          "id": "ambiguous-released",
+          "inventoryFile": "core.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "an ambiguous timeout frees its budget"
+        },
+        {
+          "id": "double-reservation-allowed",
+          "inventoryFile": "core.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "two workers reserve the same request"
+        },
+        {
+          "id": "cancel-ignored",
+          "inventoryFile": "core.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "a cancelled run keeps reserving"
+        },
+        {
+          "id": "transition-table-ignored",
+          "inventoryFile": "core.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "any state jumps to any state"
+        },
+        {
+          "id": "cross-client-memory-served",
+          "inventoryFile": "core.mjs",
+          "file": "src/memory/memory-resolver.ts",
+          "gate": "another client's memory is served"
+        },
+        {
+          "id": "model-promotes-memory",
+          "inventoryFile": "core.mjs",
+          "file": "src/memory/memory-resolver.ts",
+          "gate": "the model promotes memory"
+        },
+        {
+          "id": "unknown-member-accepted",
+          "inventoryFile": "core.mjs",
+          "file": "src/contracts/schema.ts",
+          "gate": "an unknown member passes the closed schema"
+        },
+        {
+          "id": "validation-coverage-not-checked",
+          "inventoryFile": "core.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a validation that covered no rows makes a draft"
+        },
+        {
+          "id": "stale-validation-accepted",
+          "inventoryFile": "core.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a validation of another candidate makes a draft"
+        },
+        {
+          "id": "mode-contract-mismatch-accepted",
+          "inventoryFile": "core.mjs",
+          "file": "src/adapter/contract-adapter.ts",
+          "gate": "a run accepts another vendor's contract"
+        },
+        {
+          "id": "tools-added-to-request",
+          "inventoryFile": "core.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "the provider request carries a tool"
+        },
+        {
+          "id": "identity-conflict-check-removed",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "an attempt id reused for other content opens the old run"
+        },
+        {
+          "id": "time-in-identity",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "a redelivery a second later is a second run"
+        },
+        {
+          "id": "per-invocation-reserve-removed",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a transport retry is sent without a reservation of its own"
+        },
+        {
+          "id": "unknown-usage-as-zero",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "usage the provider did not report is billed as zero"
+        },
+        {
+          "id": "release-without-proof",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a transient failure with no proof of non-send frees its reservation"
+        },
+        {
+          "id": "coverage-exact-relaxed",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a receipt claiming more rows than the profile holds makes a draft"
+        },
+        {
+          "id": "core-version-check-removed",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a receipt from an unsupported Migration Core makes a draft"
+        },
+        {
+          "id": "receipt-consistency-check-removed",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "ok:true over a non-empty problem list makes a draft"
+        },
+        {
+          "id": "configuration-digest-check-removed",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a receipt about other configuration bytes makes a draft"
+        },
+        {
+          "id": "cas-conflict-ignored",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "two workers deciding on the same view both get their append in"
+        },
+        {
+          "id": "reopen-releases-in-flight",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "a reservation left open by a dead process is freed on reopen"
+        },
+        {
+          "id": "stored-response-lookup-removed",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a resumed run buys every response the ledger already holds"
+        },
+        {
+          "id": "semantic-key-includes-budget",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "the request key reads the budget snapshot, so a resumed run misses its stored responses"
+        },
+        {
+          "id": "lease-not-checked",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "a second live worker takes the lease over an unexpired one and sends"
+        },
+        {
+          "id": "lease-owner-not-checked-on-reserve",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "a worker that does not hold the lease reserves all the same"
+        },
+        {
+          "id": "cancel-after-validation-ignored",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a run cancelled while the host validated is promoted to a draft"
+        },
+        {
+          "id": "deadline-after-validation-ignored",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a run whose deadline passed while the host validated reaches PROPOSAL_READY"
+        },
+        {
+          "id": "policy-check-after-stored-result",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a finished attempt resubmitted under another policy is answered from the stored result"
+        },
+        {
+          "id": "over-ceiling-usage-still-drafts",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "usage past the audit ceiling or above the per-request ceiling is promoted to a draft"
+        },
+        {
+          "id": "evidence-nulls-accepted",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a verified verdict with no package or report digest makes a draft"
+        },
+        {
+          "id": "receipt-null-dereferenced",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a receipt that is not a record is read before its shape is known: a TypeError instead of NOT_DRAFTABLE"
+        },
+        {
+          "id": "lease-owner-per-instance",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "every handle is the same owner: two concurrent runs of one attempt both hold the lease and both send"
+        },
+        {
+          "id": "fenced-writes-accepted",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "a worker whose lease was taken over commits, transitions, records and stores a result beside the taker's"
+        },
+        {
+          "id": "lease-not-renewed-during-call",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a provider call longer than the lease loses the attempt to a takeover that buys the request again"
+        },
+        {
+          "id": "lease-not-renewed-during-validation",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a host validation longer than the lease loses the attempt to a takeover"
+        },
+        {
+          "id": "resource-profile-unbound",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a finished attempt resubmitted with another wall-clock bound is answered from the stored result"
+        },
+        {
+          "id": "summaries-unbound",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a finished attempt resubmitted with other column values is answered from the stored result"
+        },
+        {
+          "id": "exhaustion-after-assembly-as-abstention",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "usage over the ceiling found after assembly is published as a material abstention"
+        },
+        {
+          "id": "late-cancel-leaves-no-result",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a cancel that lands under the terminal append makes run() reject and leaves the attempt without a stored answer"
+        },
+        {
+          "id": "deterministic-evidence-dropped",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a SYSTEM_DRAFT whose fields came from deterministic decisions carries no evidence for them"
+        },
+        {
+          "id": "result-after-terminal-state",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "the terminal state is written before the result, so a crash between the two leaves a closed run nobody can answer"
+        },
+        {
+          "id": "renewal-stops-on-lost-cas",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "one lost renewal append stops every further renewal, so a long call lapses the lease and a takeover buys the request again"
+        },
+        {
+          "id": "bill-before-response",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "the bill is written before the response, so a crash between the two loses a paid answer and the reopening buys it again"
+        },
+        {
+          "id": "commit-append-not-decided-again",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/kernel/ledger.ts",
+          "gate": "a host cancel between the response and its bill fails the owner with LEDGER_CONFLICT and leaves the attempt without a stored answer"
+        },
+        {
+          "id": "cancel-cause-unnamed",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a cancellation that lands after the last task ends the run CANCELLED with no unresolved item naming the cause"
+        },
+        {
+          "id": "half-written-cancel-worked-past",
+          "inventoryFile": "kernel.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a cancellation on the record without its closing STATE is worked past: the owner fails with CONTRACT_VIOLATION at its end, a reopening does the same, and a RESULT closes PROPOSAL_READY over a cancelled run"
+        },
+        {
+          "id": "metadata-pii-rule-removed",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "an email, phone, id or address in a header, label or memory pattern is not personal data"
+        },
+        {
+          "id": "given-name-list-ignored",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a given name among low-cardinality values is not personal data"
+        },
+        {
+          "id": "proper-noun-shape-accepted",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a capitalised token outside the safe vocabulary is safe semantics"
+        },
+        {
+          "id": "low-cardinality-token-safe-again",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a short low-cardinality token is safe by shape, as before the correction"
+        },
+        {
+          "id": "header-masking-removed",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "a header that failed classification travels as raw text"
+        },
+        {
+          "id": "memory-text-classification-removed",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "a memory pattern carrying personal data travels as raw text"
+        },
+        {
+          "id": "target-option-pii-kept",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "a picklist option that is an email or a person travels"
+        },
+        {
+          "id": "repair-code-not-classified",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "a validation code echoing model text travels unclassified"
+        },
+        {
+          "id": "personal-value-does-not-close-column",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "a column with a personal or unknown value still emits its safe values"
+        },
+        {
+          "id": "only-first-n-values-classified",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "a value beyond the first N is never classified, so a clean sample authorises the column"
+        },
+        {
+          "id": "egress-does-not-reread-envelope",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "the egress decision trusts the builder instead of reading the envelope"
+        },
+        {
+          "id": "unredacted-options-vouch-values",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a person name that is a picklist option vouches for the identical source value, and it travels as L1"
+        },
+        {
+          "id": "egress-does-not-reread-exemplar-values",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "the egress decision trusts the minimizer for exemplar values: a forged L1 name or an unmasked L2 shape leaves"
+        },
+        {
+          "id": "person-field-options-vouch",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "the options of an owner or assignee picklist travel and vouch for the identical source value"
+        },
+        {
+          "id": "mask-keeps-caseless-letters",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a mask folds only cased letters, so a name in Chinese, Arabic, Korean, Hebrew or Thai is its own shape"
+        },
+        {
+          "id": "caseless-name-treated-free-text",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a short caseless-script token at low cardinality is free text, and its shape may travel"
+        },
+        {
+          "id": "mask-token-keyless",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "a mask token is a plain digest of the text, so any reader of the bytes can verify a guessed header against it"
+        },
+        {
+          "id": "proper-noun-option-vouches",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the round-2 OPTION channel: a single capitalised or cased-script token (Iker, Светлана, Γιώργος, Okonkwo) is an enumeration the contract vouches for, travels as an option under any label the person-field vocabulary does not name, and vouches for the identical source value as L1"
+        },
+        {
+          "id": "enumeration-vocabulary-any-word",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "any alphabetic word is an enumeration piece, so a name is an enumeration token whatever the vocabulary says"
+        },
+        {
+          "id": "georgian-script-cased",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "Georgian Mkhedruli counts as a cased script, so a Georgian name is free text as a value and only its shape rule protects it"
+        },
+        {
+          "id": "iso-shape-without-list",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the round-3 ISO_CODE rule: LEE, WU, LIM and HO are codes by shape and travel as L1 exemplars and as options under any label the name rule does not know"
+        },
+        {
+          "id": "handle-treated-as-code",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the compact rule calls every digit-bearing token a code: HENDERSON7, jkowalski1 and mlopez01 are enumeration codes, travel as options and vouch for the identical source value as L1"
+        },
+        {
+          "id": "handle-letter-runs-unread",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the name list is not read over the letters beside a digit: zuleika7 and ZULEIKA7 are refused as handles at most, never as the names they carry, and the name reading the compact rule is built on is gone"
+        },
+        {
+          "id": "numeric-dominance-authorises",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the forbidden partial repair: digits at or above the letters make a code, so WU99, LI2024 and NDEBELE8 travel as options and vouch for the identical source value"
+        },
+        {
+          "id": "any-short-prefix-admitted",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the forbidden partial repair: any two-to-three capitals before a separator and digits are a prefix, so NDE-8, HEN_2024 and KOW-01 travel as options and vouch for the identical source value"
+        },
+        {
+          "id": "handle-left-unknown-in-value",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a handle among the values is UNKNOWN, not personal: refused by omission, and the audit predicate that a handle must not remain UNKNOWN fails"
+        },
+        {
+          "id": "handle-left-unknown-in-metadata",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a handle as a label, api name, memory pattern or repair code is judged by the channel allow-list alone: HENDERSON7 passes the identifier grammar and travels as an api name and a repair code"
+        },
+        {
+          "id": "iso-code-plus-digits-admitted",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a digit-bearing option is read piece by piece again: ES-2024 is the ISO code ES beside the integer 2024 and travels as an option"
+        },
+        {
+          "id": "camel-hump-single-letter-admitted",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a hump of one letter inside a run is the symbol it spells: nG1, wU99 and yN1 are codes again, travel as options and vouch for the identical source value (review PRIVACY-009-CASE-BYPASS)"
+        },
+        {
+          "id": "compact-token-length-capped",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a handle longer than 64 characters is outside the compact rule: it falls to the length rule as free text, the column that carries it is not withheld and the Active beside it travels as L1 (review PRIVACY-009-LENGTH-BYPASS)"
+        },
+        {
+          "id": "metadata-length-read-before-handle",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the metadata length rule is read before the handle rule: a ninety-seven-character handle is free text on OPTION, LABEL and IDENTIFIER (review PRIVACY-009-LENGTH-BYPASS)"
+        },
+        {
+          "id": "mask-key-unscoped",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "a mask token is keyed by the secret and the profile alone: the same masked label is the same reference across agencies, clients, attempts and revisions (re-anchored for masking policy 1.4.0, which added the attempt to the key)"
+        },
+        {
+          "id": "homonym-tie-break-removed",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "no word is a homonym: Klein, Petit, Price and Campos travel as options beside Zbigniew and García and under Comercial, Vendedor and Created by, and vouch for the identical source value as L1"
+        },
+        {
+          "id": "option-list-not-read-whole",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "the list a homonym stands in is not read: Klein and Petit beside Zbigniew under Segmento travel as options and vouch for the identical source value"
+        },
+        {
+          "id": "person-like-label-not-read",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "only the narrow person-field vocabulary restricts a homonym: Klein and Petit under Comercial, Gross and Grand under Vendedor travel as options and vouch for the identical source value"
+        },
+        {
+          "id": "acronym-shape-admits-label",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the pre-consolidation acronym shape: SMITH, LEE and PATEL are structural labels in capitals while Smith is a name — capitalisation authorises"
+        },
+        {
+          "id": "compound-shape-admits-label",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the pre-consolidation join grammar: OkonkwoNdebele and Okonkwo_Ndebele are structural labels because they are joined, whatever the pieces are"
+        },
+        {
+          "id": "identifier-grammar-admits-whole",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the pre-consolidation identifier grammar: Okonkwo, OKONKWO and OkonkwoNdebele are identifiers by the pattern alone and travel as api names, object names and sheet names"
+        },
+        {
+          "id": "vendor-suffix-admits-option",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the vendor suffix admits a whole option: Okonkwo__c is an enumeration token by its suffix and travels as an option"
+        },
+        {
+          "id": "identifier-lower-word-admitted",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the retained case admission on the IDENTIFIER channel: any lower-case word is an identifier piece, so vaskemar, pelsira and ondriel_vaskemar travel as api names (review PRIVACY-IDENTIFIER-CASE-BYPASS)"
+        },
+        {
+          "id": "identifier-upper-compound-admitted",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the retained constant admission: any upper-case piece of a compound is an identifier piece, so ONDRIEL_VASKEMAR travels as an api name and UNKNOWN_PARAM_TOLVENO as a repair code (review PRIVACY-IDENTIFIER-CASE-BYPASS)"
+        },
+        {
+          "id": "segmentation-admits-any-lower-word",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "the vocabulary segmentation admits a lower-case word it cannot split into vocabulary words: vaskemar and pelsira are identifiers again"
+        },
+        {
+          "id": "segmentation-reads-listed-names",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a surname the lists know is split into vocabulary words: rolland is rol and land, and travels as an api name"
+        },
+        {
+          "id": "joined-handle-left-unknown",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a value joined by underscores around an unknown piece (ondriel_vaskemar, pelsira__c) is UNKNOWN again: the column fails its task closed and the provider never sees the question"
+        },
+        {
+          "id": "joined-name-read-as-text",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a proper noun joined into a compound (OndrielVaskemar) is text again as a value: where no target lists it, a repair round sends masked shapes of a column of names"
+        },
+        {
+          "id": "personal-options-ignored",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a value the target lists as a person is text again: in a repair round the masked shapes of VASKEMAR and vaskemar leave as L2 exemplars of a column of names"
+        },
+        {
+          "id": "option-joined-name-not-personal",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/classifier/data-classifier.ts",
+          "gate": "a suffixed name in an option list does not make it a list of people: Klein beside Pelsira__c is the word and travels as an option"
+        },
+        {
+          "id": "mask-key-without-attempt",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/envelope/envelope-builder.ts",
+          "gate": "a mask token is the same reference across two unrelated attempts of one tenant and revision (R2-030)"
+        },
+        {
+          "id": "provider-text-recorded",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/api/intelligence-core.ts",
+          "gate": "a provider error that echoes the submitted body, a credential or customer text is written into the ledger and the result as it came (R2-028)"
+        },
+        {
+          "id": "agency-memory-naming-client-served",
+          "inventoryFile": "privacy.mjs",
+          "file": "src/memory/memory-resolver.ts",
+          "gate": "another client's decision under an AGENCY label is served to this client and silences its own compatible memory (R2-029)"
+        },
+        {
+          "id": "request-header-drops-run-id",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "the request block names a run that is not this run"
+        },
+        {
+          "id": "request-effort-not-serialised",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "effort is left to the provider default"
+        },
+        {
+          "id": "build-prompt-hash-not-checked",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a request under another prompt bundle hash is built"
+        },
+        {
+          "id": "payload-envelope-hash-not-checked",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a payload whose data block does not hash to its header is answered"
+        },
+        {
+          "id": "usage-count-not-validated",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "NaN, a negative or a fraction is billed as a count"
+        },
+        {
+          "id": "refusal-usage-zeroed",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a refusal with unknown usage is billed as free"
+        },
+        {
+          "id": "wrong-model-accepted",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "an answer from another model is a response"
+        },
+        {
+          "id": "tool-block-accepted",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a tool call to a request that offered no tools is a response"
+        },
+        {
+          "id": "after-send-error-retried",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a failure after sending is retried as free"
+        },
+        {
+          "id": "plain-error-message-trusted",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a phrase in an error message is taken as proof nothing was sent"
+        },
+        {
+          "id": "never-sent-proof-forged",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a request that never left the process is kept as possibly billed (proof dropped)"
+        },
+        {
+          "id": "request-sentence-outside-bundle",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a sentence the prompt bundle hash does not cover reaches the wire"
+        },
+        {
+          "id": "request-closing-outside-bundle",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a closing instruction the prompt bundle hash does not cover reaches the wire"
+        },
+        {
+          "id": "payload-guard-schema-not-checked",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a payload under another output schema is answered"
+        },
+        {
+          "id": "payload-guard-system-not-checked",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a payload under a system prompt that is not the bundle's is answered"
+        },
+        {
+          "id": "payload-guard-shape-not-closed",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a payload with a thinking, tool_choice or other foreign member is answered"
+        },
+        {
+          "id": "payload-guard-ceiling-not-checked",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a payload with a ceiling outside the bundle is answered"
+        },
+        {
+          "id": "temperature-reintroduced",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "a sampling parameter the pinned model does not accept reaches the wire"
+        },
+        {
+          "id": "metadata-reintroduced",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "the ledger correlation is serialised into the provider object"
+        },
+        {
+          "id": "usage-unsafe-integer-counted",
+          "inventoryFile": "transport.mjs",
+          "file": "src/gateway/transport-gateway.ts",
+          "gate": "an integer past MAX_SAFE_INTEGER is billed as a count"
+        }
+      ]
+    },
+    "producers": {
+      "tools/sabotage.mjs": "25fc190454591dd5669b3b2264c6467cf01e5cb6a831516b9469c1dafa5153d7",
+      "tools/run-tests.mjs": "6ab53f6c8ace191381f1d824b870ef436eaf248b27e51a445af762c7b4aab7a3",
+      "tools/lib/verify-sabotage-report.mjs": "96230606caf6d2d8364cd3a8cdc03fdd8eab8b5b165713163f3367b221908ea8"
+    },
+    "productionFiles": [
+      {
+        "file": "src/adapter/contract-adapter.ts",
+        "sha256": "67750f8aa7bcfc6fda999d844be192a1c31ca31370b1007a154af5ff3d09c7c4"
+      },
+      {
+        "file": "src/api/intelligence-core.ts",
+        "sha256": "4e6b1d4a3b4a4ef7d0c46e76387a49118fcee112c654903687824df4dd3d0f54"
+      },
+      {
+        "file": "src/benchmark/fixture.ts",
+        "sha256": "28062e8b2232ff2110fae2fd935a09e0dcef317c158ef4e07e224911edbce49e"
+      },
+      {
+        "file": "src/benchmark/report.ts",
+        "sha256": "638189de798bc116f424ee8b73bdbb5c284506e1240ff657577fb1fc5f0ac2e6"
+      },
+      {
+        "file": "src/benchmark/scorer.ts",
+        "sha256": "b344ad8063a5ef1b435b29ce080dcb81b6f835af374203d86625d351224f87f0"
+      },
+      {
+        "file": "src/classifier/data-classifier.ts",
+        "sha256": "072b06a0c3ea7aea613232e884b9b470caad1b30a875809a0bdea6835fb7a641"
+      },
+      {
+        "file": "src/compiler/compiler.ts",
+        "sha256": "0b3e1de677deca53e3782699f84047966968cb0192692a903db89203755be253"
+      },
+      {
+        "file": "src/contracts/schema.ts",
+        "sha256": "751534fab30165e6b57380524c07a2d8ba736fc82d27d1fa30a7622407354b39"
+      },
+      {
+        "file": "src/envelope/envelope-builder.ts",
+        "sha256": "9428b14986ff3892c23657d6cdcc6e92b4f515e8d97cd9357081d1324ad16e34"
+      },
+      {
+        "file": "src/gateway/transport-gateway.ts",
+        "sha256": "7f9ca470b6df2f6cc169f504a40d975b379d0f06e69274f2aafd20266d98598b"
+      },
+      {
+        "file": "src/index.ts",
+        "sha256": "e5e4e007e59111d81fa3b79f7f76bacc2dd5e357338a1baacbfdf05efbeb7c15"
+      },
+      {
+        "file": "src/kernel/ledger.ts",
+        "sha256": "73914b47ecef9e81f9f777ca959419bc90fb62e234178347bfe266ad994650dc"
+      },
+      {
+        "file": "src/memory/memory-resolver.ts",
+        "sha256": "af721e30dcb489918465f4db546c7c6f08c42126ea165a3aeb9c3d18fd658619"
+      },
+      {
+        "file": "src/resolver/deterministic-resolver.ts",
+        "sha256": "95925e2614994fa4448961092fcd04ece66ad413856842501cd1e3e93e2ea5b9"
+      }
+    ],
+    "baseline": {
+      "outcome": "SURVIVED",
+      "detail": "464 tests passed",
+      "durationMs": 21756
+    },
+    "counts": {
+      "inventory": 175,
+      "reached": 175,
+      "killed": 175,
+      "survived": 0,
+      "didNotCompile": 0,
+      "infraError": 0,
+      "notReached": 0
+    },
+    "mutations": [
+      {
+        "id": "bench-candidate-evidence-not-checked",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "a proposal without the evidence the truth requires of its candidate scores correct",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21603
+      },
+      {
+        "id": "bench-global-evidence-not-checked",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "a run that cites none of the required evidence scores correct",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21617
+      },
+      {
+        "id": "bench-destination-not-checked",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "a column mapped to the wrong target scores correct",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21485
+      },
+      {
+        "id": "bench-primitive-not-checked",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "the wrong transform primitive scores correct",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21667
+      },
+      {
+        "id": "bench-preserved-write-not-destructive",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "writing a column the truth preserves is not a destructive action",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 22078
+      },
+      {
+        "id": "bench-compiler-result-not-checked",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "the sealed compiler result is decorative again",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21555
+      },
+      {
+        "id": "bench-hash-binding-not-checked",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "a result produced for other inputs is scored as if it answered the fixture",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21802
+      },
+      {
+        "id": "bench-edited-truth-scored",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "a truth edited after sealing is scored",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21936
+      },
+      {
+        "id": "bench-unobserved-gate-counted-zero",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "a gate no fixture exercised is reported at zero",
+        "outcome": "KILLED",
+        "detail": "7 of 464 tests failed",
+        "durationMs": 21326
+      },
+      {
+        "id": "bench-empty-corpus-passes",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "an empty corpus is not a report failure",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21835
+      },
+      {
+        "id": "bench-missing-result-counted-absent",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "a fixture without a result leaves the denominator instead of counting as incorrect",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21518
+      },
+      {
+        "id": "bench-mean-of-three-not-required",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "three runs at 97, 97 and 99 qualify without the 98 mean",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21170
+      },
+      {
+        "id": "bench-extra-field-not-checked",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "a field no expected candidate accounts for and no allowance names scores correct",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21663
+      },
+      {
+        "id": "bench-target-universe-not-checked",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "a destination outside the sealed target universe is not an invented target",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21421
+      },
+      {
+        "id": "bench-receipt-config-binding-not-checked",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "a configuration edited after its validation receipt was issued is scored as the run",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21531
+      },
+      {
+        "id": "bench-three-runs-independence-not-checked",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "one report presented three times qualifies as three runs",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21089
+      },
+      {
+        "id": "bench-budget-violation-still-passes",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "a run with a budget ceiling exceeded is a passing run",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21363
+      },
+      {
+        "id": "bench-budget-violation-not-in-qualification",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "the qualification does not name a budget violation in one of its three runs",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21424
+      },
+      {
+        "id": "bench-test-only-report-qualifies",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "three TEST_ONLY reports qualify",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21485
+      },
+      {
+        "id": "bench-qualification-universe-not-checked",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "a QUALIFICATION report over two fixtures passes",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21578
+      },
+      {
+        "id": "bench-provider-failure-scored-refused",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "a run the provider failed is scored as an abstention or a refusal and observes the gates",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21670
+      },
+      {
+        "id": "bench-obligation-free-truth-sealed",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/fixture.ts",
+        "gate": "a PROPOSED truth that fixes no decision is sealed and a gutted draft scores correct under it",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21660
+      },
+      {
+        "id": "bench-egress-record-not-transport-bytes-accepted",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "an egress record made of envelopes or notes instead of transport bytes is scored",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21600
+      },
+      {
+        "id": "bench-escaped-sentinel-not-matched",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "a secret with a quote or a backslash leaves JSON-escaped and is not seen",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21805
+      },
+      {
+        "id": "bench-correct-score-without-run-id-accepted",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "fabricated correct scores with no run id qualify with nothing for the run-id independence check to compare",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21661
+      },
+      {
+        "id": "bench-capturing-transport-drops-correlation",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "the benchmark capture drops the TransportCorrelation the gateway handed beside the request",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21654
+      },
+      {
+        "id": "bench-runner-surface-not-on-index",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/index.ts",
+        "gate": "an IC-2 runner consuming the tarball cannot capture at the transport or name the qualification universe",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21638
+      },
+      {
+        "id": "bench-report-digest-not-checked",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "a TEST_ONLY report with mode flipped to QUALIFICATION on the object qualifies",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21258
+      },
+      {
+        "id": "gate-counters-not-recomputed",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "a score with checks:[] and gateChecksExecuted 1 per gate is OBSERVED over 600 checks the report never saw",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21556
+      },
+      {
+        "id": "gate-violations-not-recomputed",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "a failing gated check the violation list omits counts the gate at zero",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21436
+      },
+      {
+        "id": "gate-violations-disagreement-not-a-failure",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "a score whose violation list disagrees with its checks is added up instead of refused",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21642
+      },
+      {
+        "id": "gate-checks-disagreement-not-a-failure",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/report.ts",
+        "gate": "a score whose gate counters disagree with its checks is added up instead of refused",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21546
+      },
+      {
+        "id": "schema-failure-scored-refused",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "a model answer that is not JSON is classed REFUSED and scores correct under a REFUSED/ANY safety truth",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21623
+      },
+      {
+        "id": "invented-field-scored-null",
+        "inventoryFile": "benchmark.mjs",
+        "file": "src/benchmark/scorer.ts",
+        "gate": "an invented field with a bound receipt is answered correct:null instead of correct:false with invented_target_accepted",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21599
+      },
+      {
+        "id": "rationale-self-claim-trusted",
+        "inventoryFile": "compiler.mjs",
+        "file": "src/compiler/compiler.ts",
+        "gate": "a rationale code the facts contradict still earns an evidence class and a PROPOSED item",
+        "outcome": "KILLED",
+        "detail": "5 of 464 tests failed",
+        "durationMs": 21683
+      },
+      {
+        "id": "candidate-primitives-not-checked",
+        "inventoryFile": "compiler.mjs",
+        "file": "src/compiler/compiler.ts",
+        "gate": "a primitive the global catalogue supports is accepted for a candidate whose allowlist excludes it",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21614
+      },
+      {
+        "id": "email-uniqueness-proves-identity",
+        "inventoryFile": "compiler.mjs",
+        "file": "src/resolver/deterministic-resolver.ts",
+        "gate": "a unique, well-formed email is classified PROVEN_UNIQUE_IDENTIFIER",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21613
+      },
+      {
+        "id": "claimed-map-global-again",
+        "inventoryFile": "compiler.mjs",
+        "file": "src/resolver/deterministic-resolver.ts",
+        "gate": "the second CONTACT file loses its Email mapping because the first file claimed contact.email for the whole run",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21708
+      },
+      {
+        "id": "ambiguous-evidence-proposed",
+        "inventoryFile": "compiler.mjs",
+        "file": "src/compiler/compiler.ts",
+        "gate": "an item whose claim holds but decides nothing (INSUFFICIENT_EVIDENCE, FOREIGN_KEY_COLUMN, ...) stays PROPOSED on AMBIGUOUS evidence and a status column is drafted as a last name",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21714
+      },
+      {
+        "id": "deferring-code-supports-authority",
+        "inventoryFile": "compiler.mjs",
+        "file": "src/compiler/compiler.ts",
+        "gate": "a claim of insufficient evidence that holds is taken as SUPPORTED evidence for the mapping",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21703
+      },
+      {
+        "id": "assembly-claims-global",
+        "inventoryFile": "compiler.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "assembly claims a destination once per run: the second CONTACT file loses its Email, First Name, Last Name and Phone as DUPLICATE_TARGET",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21762
+      },
+      {
+        "id": "record-id-declaration-dropped",
+        "inventoryFile": "compiler.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "the record id column the project declares never reaches the resolver: no column is PROVEN through run()",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21358
+      },
+      {
+        "id": "declared-email-proves-identity",
+        "inventoryFile": "compiler.mjs",
+        "file": "src/resolver/deterministic-resolver.ts",
+        "gate": "an Email column declared as the record id column is PROVEN_UNIQUE_IDENTIFIER (the round-2 line)",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21649
+      },
+      {
+        "id": "enum-options-not-carried",
+        "inventoryFile": "compiler.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "an ENUM destination reaches the host without allowedValues and the engine refuses the configuration: no picklist mapping is ever drafted",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21458
+      },
+      {
+        "id": "egress-token-not-checked",
+        "inventoryFile": "core.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "a caller-supplied EGRESS_ALLOWED is accepted",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21561
+      },
+      {
+        "id": "egress-hash-not-checked",
+        "inventoryFile": "core.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "an envelope modified after egress is sent",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21628
+      },
+      {
+        "id": "secret-does-not-block",
+        "inventoryFile": "core.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "a secret seen in a column no longer blocks egress",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21620
+      },
+      {
+        "id": "contaminated-field-emits",
+        "inventoryFile": "core.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "a column holding a secret still emits its safe values",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21484
+      },
+      {
+        "id": "pii-classified-safe",
+        "inventoryFile": "core.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "emails and phones are no longer PII",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21532
+      },
+      {
+        "id": "unknown-fails-open",
+        "inventoryFile": "core.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "an unclassifiable value is treated as safe",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21535
+      },
+      {
+        "id": "target-outside-envelope-accepted",
+        "inventoryFile": "core.mjs",
+        "file": "src/compiler/compiler.ts",
+        "gate": "a target the envelope did not offer is accepted",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21508
+      },
+      {
+        "id": "destructive-primitive-accepted",
+        "inventoryFile": "core.mjs",
+        "file": "src/compiler/compiler.ts",
+        "gate": "a model-authorised clear is accepted",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21695
+      },
+      {
+        "id": "identity-proof-not-required",
+        "inventoryFile": "core.mjs",
+        "file": "src/compiler/compiler.ts",
+        "gate": "an identity strategy without proof passes without the agency",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21574
+      },
+      {
+        "id": "envelope-hash-not-checked",
+        "inventoryFile": "core.mjs",
+        "file": "src/compiler/compiler.ts",
+        "gate": "a proposal for another envelope is compiled",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21550
+      },
+      {
+        "id": "enum-option-not-checked",
+        "inventoryFile": "core.mjs",
+        "file": "src/compiler/compiler.ts",
+        "gate": "an enum value outside the target options is accepted",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21550
+      },
+      {
+        "id": "support-envelope-not-checked",
+        "inventoryFile": "core.mjs",
+        "file": "src/compiler/compiler.ts",
+        "gate": "a vendor field Migration Core cannot deliver is mapped",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21535
+      },
+      {
+        "id": "task-cap-removed",
+        "inventoryFile": "core.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "a thirty-third task is started",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21811
+      },
+      {
+        "id": "per-request-ceiling-removed",
+        "inventoryFile": "core.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "a request above the input ceiling is reserved",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21509
+      },
+      {
+        "id": "ambiguous-released",
+        "inventoryFile": "core.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "an ambiguous timeout frees its budget",
+        "outcome": "KILLED",
+        "detail": "13 of 464 tests failed",
+        "durationMs": 21539
+      },
+      {
+        "id": "double-reservation-allowed",
+        "inventoryFile": "core.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "two workers reserve the same request",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21436
+      },
+      {
+        "id": "cancel-ignored",
+        "inventoryFile": "core.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "a cancelled run keeps reserving",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21541
+      },
+      {
+        "id": "transition-table-ignored",
+        "inventoryFile": "core.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "any state jumps to any state",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21488
+      },
+      {
+        "id": "cross-client-memory-served",
+        "inventoryFile": "core.mjs",
+        "file": "src/memory/memory-resolver.ts",
+        "gate": "another client's memory is served",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21538
+      },
+      {
+        "id": "model-promotes-memory",
+        "inventoryFile": "core.mjs",
+        "file": "src/memory/memory-resolver.ts",
+        "gate": "the model promotes memory",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21498
+      },
+      {
+        "id": "unknown-member-accepted",
+        "inventoryFile": "core.mjs",
+        "file": "src/contracts/schema.ts",
+        "gate": "an unknown member passes the closed schema",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21512
+      },
+      {
+        "id": "validation-coverage-not-checked",
+        "inventoryFile": "core.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a validation that covered no rows makes a draft",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21739
+      },
+      {
+        "id": "stale-validation-accepted",
+        "inventoryFile": "core.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a validation of another candidate makes a draft",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21523
+      },
+      {
+        "id": "mode-contract-mismatch-accepted",
+        "inventoryFile": "core.mjs",
+        "file": "src/adapter/contract-adapter.ts",
+        "gate": "a run accepts another vendor's contract",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21595
+      },
+      {
+        "id": "tools-added-to-request",
+        "inventoryFile": "core.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "the provider request carries a tool",
+        "outcome": "KILLED",
+        "detail": "178 of 445 tests failed",
+        "durationMs": 76334
+      },
+      {
+        "id": "identity-conflict-check-removed",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "an attempt id reused for other content opens the old run",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21493
+      },
+      {
+        "id": "time-in-identity",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "a redelivery a second later is a second run",
+        "outcome": "KILLED",
+        "detail": "35 of 462 tests failed",
+        "durationMs": 141485
+      },
+      {
+        "id": "per-invocation-reserve-removed",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a transport retry is sent without a reservation of its own",
+        "outcome": "KILLED",
+        "detail": "8 of 464 tests failed",
+        "durationMs": 21548
+      },
+      {
+        "id": "unknown-usage-as-zero",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "usage the provider did not report is billed as zero",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21450
+      },
+      {
+        "id": "release-without-proof",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a transient failure with no proof of non-send frees its reservation",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21497
+      },
+      {
+        "id": "coverage-exact-relaxed",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a receipt claiming more rows than the profile holds makes a draft",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21460
+      },
+      {
+        "id": "core-version-check-removed",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a receipt from an unsupported Migration Core makes a draft",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21447
+      },
+      {
+        "id": "receipt-consistency-check-removed",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "ok:true over a non-empty problem list makes a draft",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21503
+      },
+      {
+        "id": "configuration-digest-check-removed",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a receipt about other configuration bytes makes a draft",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21452
+      },
+      {
+        "id": "cas-conflict-ignored",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "two workers deciding on the same view both get their append in",
+        "outcome": "KILLED",
+        "detail": "10 of 464 tests failed",
+        "durationMs": 21547
+      },
+      {
+        "id": "reopen-releases-in-flight",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "a reservation left open by a dead process is freed on reopen",
+        "outcome": "KILLED",
+        "detail": "9 of 464 tests failed",
+        "durationMs": 21526
+      },
+      {
+        "id": "stored-response-lookup-removed",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a resumed run buys every response the ledger already holds",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21539
+      },
+      {
+        "id": "semantic-key-includes-budget",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "the request key reads the budget snapshot, so a resumed run misses its stored responses",
+        "outcome": "KILLED",
+        "detail": "5 of 464 tests failed",
+        "durationMs": 21438
+      },
+      {
+        "id": "lease-not-checked",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "a second live worker takes the lease over an unexpired one and sends",
+        "outcome": "KILLED",
+        "detail": "10 of 462 tests failed",
+        "durationMs": 141580
+      },
+      {
+        "id": "lease-owner-not-checked-on-reserve",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "a worker that does not hold the lease reserves all the same",
+        "outcome": "KILLED",
+        "detail": "5 of 464 tests failed",
+        "durationMs": 21373
+      },
+      {
+        "id": "cancel-after-validation-ignored",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a run cancelled while the host validated is promoted to a draft",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21437
+      },
+      {
+        "id": "deadline-after-validation-ignored",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a run whose deadline passed while the host validated reaches PROPOSAL_READY",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21402
+      },
+      {
+        "id": "policy-check-after-stored-result",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a finished attempt resubmitted under another policy is answered from the stored result",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21423
+      },
+      {
+        "id": "over-ceiling-usage-still-drafts",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "usage past the audit ceiling or above the per-request ceiling is promoted to a draft",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21548
+      },
+      {
+        "id": "evidence-nulls-accepted",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a verified verdict with no package or report digest makes a draft",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21427
+      },
+      {
+        "id": "receipt-null-dereferenced",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a receipt that is not a record is read before its shape is known: a TypeError instead of NOT_DRAFTABLE",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21476
+      },
+      {
+        "id": "lease-owner-per-instance",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "every handle is the same owner: two concurrent runs of one attempt both hold the lease and both send",
+        "outcome": "KILLED",
+        "detail": "12 of 462 tests failed",
+        "durationMs": 141496
+      },
+      {
+        "id": "fenced-writes-accepted",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "a worker whose lease was taken over commits, transitions, records and stores a result beside the taker's",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21457
+      },
+      {
+        "id": "lease-not-renewed-during-call",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a provider call longer than the lease loses the attempt to a takeover that buys the request again",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21457
+      },
+      {
+        "id": "lease-not-renewed-during-validation",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a host validation longer than the lease loses the attempt to a takeover",
+        "outcome": "KILLED",
+        "detail": "1 of 463 tests failed",
+        "durationMs": 81602
+      },
+      {
+        "id": "resource-profile-unbound",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a finished attempt resubmitted with another wall-clock bound is answered from the stored result",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21461
+      },
+      {
+        "id": "summaries-unbound",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a finished attempt resubmitted with other column values is answered from the stored result",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21455
+      },
+      {
+        "id": "exhaustion-after-assembly-as-abstention",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "usage over the ceiling found after assembly is published as a material abstention",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21626
+      },
+      {
+        "id": "late-cancel-leaves-no-result",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a cancel that lands under the terminal append makes run() reject and leaves the attempt without a stored answer",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21405
+      },
+      {
+        "id": "deterministic-evidence-dropped",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a SYSTEM_DRAFT whose fields came from deterministic decisions carries no evidence for them",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21357
+      },
+      {
+        "id": "result-after-terminal-state",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "the terminal state is written before the result, so a crash between the two leaves a closed run nobody can answer",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21414
+      },
+      {
+        "id": "renewal-stops-on-lost-cas",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "one lost renewal append stops every further renewal, so a long call lapses the lease and a takeover buys the request again",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21387
+      },
+      {
+        "id": "bill-before-response",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "the bill is written before the response, so a crash between the two loses a paid answer and the reopening buys it again",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21574
+      },
+      {
+        "id": "commit-append-not-decided-again",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/kernel/ledger.ts",
+        "gate": "a host cancel between the response and its bill fails the owner with LEDGER_CONFLICT and leaves the attempt without a stored answer",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21414
+      },
+      {
+        "id": "cancel-cause-unnamed",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a cancellation that lands after the last task ends the run CANCELLED with no unresolved item naming the cause",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21446
+      },
+      {
+        "id": "half-written-cancel-worked-past",
+        "inventoryFile": "kernel.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a cancellation on the record without its closing STATE is worked past: the owner fails with CONTRACT_VIOLATION at its end, a reopening does the same, and a RESULT closes PROPOSAL_READY over a cancelled run",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21734
+      },
+      {
+        "id": "metadata-pii-rule-removed",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "an email, phone, id or address in a header, label or memory pattern is not personal data",
+        "outcome": "KILLED",
+        "detail": "5 of 464 tests failed",
+        "durationMs": 21361
+      },
+      {
+        "id": "given-name-list-ignored",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a given name among low-cardinality values is not personal data",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21407
+      },
+      {
+        "id": "proper-noun-shape-accepted",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a capitalised token outside the safe vocabulary is safe semantics",
+        "outcome": "KILLED",
+        "detail": "8 of 464 tests failed",
+        "durationMs": 21536
+      },
+      {
+        "id": "low-cardinality-token-safe-again",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a short low-cardinality token is safe by shape, as before the correction",
+        "outcome": "KILLED",
+        "detail": "11 of 464 tests failed",
+        "durationMs": 21462
+      },
+      {
+        "id": "header-masking-removed",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "a header that failed classification travels as raw text",
+        "outcome": "KILLED",
+        "detail": "77 of 464 tests failed",
+        "durationMs": 20548
+      },
+      {
+        "id": "memory-text-classification-removed",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "a memory pattern carrying personal data travels as raw text",
+        "outcome": "KILLED",
+        "detail": "66 of 464 tests failed",
+        "durationMs": 20791
+      },
+      {
+        "id": "target-option-pii-kept",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "a picklist option that is an email or a person travels",
+        "outcome": "KILLED",
+        "detail": "58 of 464 tests failed",
+        "durationMs": 21143
+      },
+      {
+        "id": "repair-code-not-classified",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "a validation code echoing model text travels unclassified",
+        "outcome": "KILLED",
+        "detail": "23 of 464 tests failed",
+        "durationMs": 21406
+      },
+      {
+        "id": "personal-value-does-not-close-column",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "a column with a personal or unknown value still emits its safe values",
+        "outcome": "KILLED",
+        "detail": "8 of 464 tests failed",
+        "durationMs": 21581
+      },
+      {
+        "id": "only-first-n-values-classified",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "a value beyond the first N is never classified, so a clean sample authorises the column",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21427
+      },
+      {
+        "id": "egress-does-not-reread-envelope",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "the egress decision trusts the builder instead of reading the envelope",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21363
+      },
+      {
+        "id": "unredacted-options-vouch-values",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a person name that is a picklist option vouches for the identical source value, and it travels as L1",
+        "outcome": "KILLED",
+        "detail": "6 of 464 tests failed",
+        "durationMs": 21467
+      },
+      {
+        "id": "egress-does-not-reread-exemplar-values",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "the egress decision trusts the minimizer for exemplar values: a forged L1 name or an unmasked L2 shape leaves",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21377
+      },
+      {
+        "id": "person-field-options-vouch",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "the options of an owner or assignee picklist travel and vouch for the identical source value",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21397
+      },
+      {
+        "id": "mask-keeps-caseless-letters",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a mask folds only cased letters, so a name in Chinese, Arabic, Korean, Hebrew or Thai is its own shape",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21452
+      },
+      {
+        "id": "caseless-name-treated-free-text",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a short caseless-script token at low cardinality is free text, and its shape may travel",
+        "outcome": "KILLED",
+        "detail": "5 of 464 tests failed",
+        "durationMs": 21374
+      },
+      {
+        "id": "mask-token-keyless",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "a mask token is a plain digest of the text, so any reader of the bytes can verify a guessed header against it",
+        "outcome": "KILLED",
+        "detail": "6 of 464 tests failed",
+        "durationMs": 21589
+      },
+      {
+        "id": "proper-noun-option-vouches",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the round-2 OPTION channel: a single capitalised or cased-script token (Iker, Светлана, Γιώργος, Okonkwo) is an enumeration the contract vouches for, travels as an option under any label the person-field vocabulary does not name, and vouches for the identical source value as L1",
+        "outcome": "KILLED",
+        "detail": "43 of 464 tests failed",
+        "durationMs": 21304
+      },
+      {
+        "id": "enumeration-vocabulary-any-word",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "any alphabetic word is an enumeration piece, so a name is an enumeration token whatever the vocabulary says",
+        "outcome": "KILLED",
+        "detail": "51 of 464 tests failed",
+        "durationMs": 21325
+      },
+      {
+        "id": "georgian-script-cased",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "Georgian Mkhedruli counts as a cased script, so a Georgian name is free text as a value and only its shape rule protects it",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21380
+      },
+      {
+        "id": "iso-shape-without-list",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the round-3 ISO_CODE rule: LEE, WU, LIM and HO are codes by shape and travel as L1 exemplars and as options under any label the name rule does not know",
+        "outcome": "KILLED",
+        "detail": "7 of 464 tests failed",
+        "durationMs": 21374
+      },
+      {
+        "id": "handle-treated-as-code",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the compact rule calls every digit-bearing token a code: HENDERSON7, jkowalski1 and mlopez01 are enumeration codes, travel as options and vouch for the identical source value as L1",
+        "outcome": "KILLED",
+        "detail": "42 of 464 tests failed",
+        "durationMs": 20816
+      },
+      {
+        "id": "handle-letter-runs-unread",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the name list is not read over the letters beside a digit: zuleika7 and ZULEIKA7 are refused as handles at most, never as the names they carry, and the name reading the compact rule is built on is gone",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21479
+      },
+      {
+        "id": "numeric-dominance-authorises",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the forbidden partial repair: digits at or above the letters make a code, so WU99, LI2024 and NDEBELE8 travel as options and vouch for the identical source value",
+        "outcome": "KILLED",
+        "detail": "9 of 464 tests failed",
+        "durationMs": 21437
+      },
+      {
+        "id": "any-short-prefix-admitted",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the forbidden partial repair: any two-to-three capitals before a separator and digits are a prefix, so NDE-8, HEN_2024 and KOW-01 travel as options and vouch for the identical source value",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21398
+      },
+      {
+        "id": "handle-left-unknown-in-value",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a handle among the values is UNKNOWN, not personal: refused by omission, and the audit predicate that a handle must not remain UNKNOWN fails",
+        "outcome": "KILLED",
+        "detail": "16 of 464 tests failed",
+        "durationMs": 21465
+      },
+      {
+        "id": "handle-left-unknown-in-metadata",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a handle as a label, api name, memory pattern or repair code is judged by the channel allow-list alone: HENDERSON7 passes the identifier grammar and travels as an api name and a repair code",
+        "outcome": "KILLED",
+        "detail": "14 of 464 tests failed",
+        "durationMs": 21261
+      },
+      {
+        "id": "iso-code-plus-digits-admitted",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a digit-bearing option is read piece by piece again: ES-2024 is the ISO code ES beside the integer 2024 and travels as an option",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21591
+      },
+      {
+        "id": "camel-hump-single-letter-admitted",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a hump of one letter inside a run is the symbol it spells: nG1, wU99 and yN1 are codes again, travel as options and vouch for the identical source value (review PRIVACY-009-CASE-BYPASS)",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21356
+      },
+      {
+        "id": "compact-token-length-capped",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a handle longer than 64 characters is outside the compact rule: it falls to the length rule as free text, the column that carries it is not withheld and the Active beside it travels as L1 (review PRIVACY-009-LENGTH-BYPASS)",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21372
+      },
+      {
+        "id": "metadata-length-read-before-handle",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the metadata length rule is read before the handle rule: a ninety-seven-character handle is free text on OPTION, LABEL and IDENTIFIER (review PRIVACY-009-LENGTH-BYPASS)",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21471
+      },
+      {
+        "id": "mask-key-unscoped",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "a mask token is keyed by the secret and the profile alone: the same masked label is the same reference across agencies, clients, attempts and revisions (re-anchored for masking policy 1.4.0, which added the attempt to the key)",
+        "outcome": "KILLED",
+        "detail": "5 of 464 tests failed",
+        "durationMs": 21435
+      },
+      {
+        "id": "homonym-tie-break-removed",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "no word is a homonym: Klein, Petit, Price and Campos travel as options beside Zbigniew and García and under Comercial, Vendedor and Created by, and vouch for the identical source value as L1",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21418
+      },
+      {
+        "id": "option-list-not-read-whole",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "the list a homonym stands in is not read: Klein and Petit beside Zbigniew under Segmento travel as options and vouch for the identical source value",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21424
+      },
+      {
+        "id": "person-like-label-not-read",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "only the narrow person-field vocabulary restricts a homonym: Klein and Petit under Comercial, Gross and Grand under Vendedor travel as options and vouch for the identical source value",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21461
+      },
+      {
+        "id": "acronym-shape-admits-label",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the pre-consolidation acronym shape: SMITH, LEE and PATEL are structural labels in capitals while Smith is a name — capitalisation authorises",
+        "outcome": "KILLED",
+        "detail": "4 of 464 tests failed",
+        "durationMs": 21530
+      },
+      {
+        "id": "compound-shape-admits-label",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the pre-consolidation join grammar: OkonkwoNdebele and Okonkwo_Ndebele are structural labels because they are joined, whatever the pieces are",
+        "outcome": "KILLED",
+        "detail": "18 of 464 tests failed",
+        "durationMs": 21642
+      },
+      {
+        "id": "identifier-grammar-admits-whole",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the pre-consolidation identifier grammar: Okonkwo, OKONKWO and OkonkwoNdebele are identifiers by the pattern alone and travel as api names, object names and sheet names",
+        "outcome": "KILLED",
+        "detail": "32 of 464 tests failed",
+        "durationMs": 21403
+      },
+      {
+        "id": "vendor-suffix-admits-option",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the vendor suffix admits a whole option: Okonkwo__c is an enumeration token by its suffix and travels as an option",
+        "outcome": "KILLED",
+        "detail": "9 of 464 tests failed",
+        "durationMs": 21431
+      },
+      {
+        "id": "identifier-lower-word-admitted",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the retained case admission on the IDENTIFIER channel: any lower-case word is an identifier piece, so vaskemar, pelsira and ondriel_vaskemar travel as api names (review PRIVACY-IDENTIFIER-CASE-BYPASS)",
+        "outcome": "KILLED",
+        "detail": "11 of 464 tests failed",
+        "durationMs": 21421
+      },
+      {
+        "id": "identifier-upper-compound-admitted",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the retained constant admission: any upper-case piece of a compound is an identifier piece, so ONDRIEL_VASKEMAR travels as an api name and UNKNOWN_PARAM_TOLVENO as a repair code (review PRIVACY-IDENTIFIER-CASE-BYPASS)",
+        "outcome": "KILLED",
+        "detail": "5 of 464 tests failed",
+        "durationMs": 21517
+      },
+      {
+        "id": "segmentation-admits-any-lower-word",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "the vocabulary segmentation admits a lower-case word it cannot split into vocabulary words: vaskemar and pelsira are identifiers again",
+        "outcome": "KILLED",
+        "detail": "23 of 464 tests failed",
+        "durationMs": 21394
+      },
+      {
+        "id": "segmentation-reads-listed-names",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a surname the lists know is split into vocabulary words: rolland is rol and land, and travels as an api name",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21474
+      },
+      {
+        "id": "joined-handle-left-unknown",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a value joined by underscores around an unknown piece (ondriel_vaskemar, pelsira__c) is UNKNOWN again: the column fails its task closed and the provider never sees the question",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21391
+      },
+      {
+        "id": "joined-name-read-as-text",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a proper noun joined into a compound (OndrielVaskemar) is text again as a value: where no target lists it, a repair round sends masked shapes of a column of names",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21484
+      },
+      {
+        "id": "personal-options-ignored",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a value the target lists as a person is text again: in a repair round the masked shapes of VASKEMAR and vaskemar leave as L2 exemplars of a column of names",
+        "outcome": "KILLED",
+        "detail": "6 of 464 tests failed",
+        "durationMs": 21490
+      },
+      {
+        "id": "option-joined-name-not-personal",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/classifier/data-classifier.ts",
+        "gate": "a suffixed name in an option list does not make it a list of people: Klein beside Pelsira__c is the word and travels as an option",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21433
+      },
+      {
+        "id": "mask-key-without-attempt",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/envelope/envelope-builder.ts",
+        "gate": "a mask token is the same reference across two unrelated attempts of one tenant and revision (R2-030)",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21596
+      },
+      {
+        "id": "provider-text-recorded",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/api/intelligence-core.ts",
+        "gate": "a provider error that echoes the submitted body, a credential or customer text is written into the ledger and the result as it came (R2-028)",
+        "outcome": "KILLED",
+        "detail": "9 of 464 tests failed",
+        "durationMs": 21576
+      },
+      {
+        "id": "agency-memory-naming-client-served",
+        "inventoryFile": "privacy.mjs",
+        "file": "src/memory/memory-resolver.ts",
+        "gate": "another client's decision under an AGENCY label is served to this client and silences its own compatible memory (R2-029)",
+        "outcome": "KILLED",
+        "detail": "3 of 464 tests failed",
+        "durationMs": 21411
+      },
+      {
+        "id": "request-header-drops-run-id",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "the request block names a run that is not this run",
+        "outcome": "KILLED",
+        "detail": "166 of 463 tests failed",
+        "durationMs": 76941
+      },
+      {
+        "id": "request-effort-not-serialised",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "effort is left to the provider default",
+        "outcome": "KILLED",
+        "detail": "176 of 445 tests failed",
+        "durationMs": 76243
+      },
+      {
+        "id": "build-prompt-hash-not-checked",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a request under another prompt bundle hash is built",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21348
+      },
+      {
+        "id": "payload-envelope-hash-not-checked",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a payload whose data block does not hash to its header is answered",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21512
+      },
+      {
+        "id": "usage-count-not-validated",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "NaN, a negative or a fraction is billed as a count",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21429
+      },
+      {
+        "id": "refusal-usage-zeroed",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a refusal with unknown usage is billed as free",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21443
+      },
+      {
+        "id": "wrong-model-accepted",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "an answer from another model is a response",
+        "outcome": "KILLED",
+        "detail": "5 of 464 tests failed",
+        "durationMs": 21442
+      },
+      {
+        "id": "tool-block-accepted",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a tool call to a request that offered no tools is a response",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21403
+      },
+      {
+        "id": "after-send-error-retried",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a failure after sending is retried as free",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21513
+      },
+      {
+        "id": "plain-error-message-trusted",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a phrase in an error message is taken as proof nothing was sent",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21607
+      },
+      {
+        "id": "never-sent-proof-forged",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a request that never left the process is kept as possibly billed (proof dropped)",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21384
+      },
+      {
+        "id": "request-sentence-outside-bundle",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a sentence the prompt bundle hash does not cover reaches the wire",
+        "outcome": "KILLED",
+        "detail": "170 of 445 tests failed",
+        "durationMs": 76383
+      },
+      {
+        "id": "request-closing-outside-bundle",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a closing instruction the prompt bundle hash does not cover reaches the wire",
+        "outcome": "KILLED",
+        "detail": "173 of 445 tests failed",
+        "durationMs": 76222
+      },
+      {
+        "id": "payload-guard-schema-not-checked",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a payload under another output schema is answered",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21320
+      },
+      {
+        "id": "payload-guard-system-not-checked",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a payload under a system prompt that is not the bundle's is answered",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21447
+      },
+      {
+        "id": "payload-guard-shape-not-closed",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a payload with a thinking, tool_choice or other foreign member is answered",
+        "outcome": "KILLED",
+        "detail": "2 of 464 tests failed",
+        "durationMs": 21383
+      },
+      {
+        "id": "payload-guard-ceiling-not-checked",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a payload with a ceiling outside the bundle is answered",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21308
+      },
+      {
+        "id": "temperature-reintroduced",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "a sampling parameter the pinned model does not accept reaches the wire",
+        "outcome": "KILLED",
+        "detail": "179 of 445 tests failed",
+        "durationMs": 76207
+      },
+      {
+        "id": "metadata-reintroduced",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "the ledger correlation is serialised into the provider object",
+        "outcome": "KILLED",
+        "detail": "179 of 445 tests failed",
+        "durationMs": 76244
+      },
+      {
+        "id": "usage-unsafe-integer-counted",
+        "inventoryFile": "transport.mjs",
+        "file": "src/gateway/transport-gateway.ts",
+        "gate": "an integer past MAX_SAFE_INTEGER is billed as a count",
+        "outcome": "KILLED",
+        "detail": "1 of 464 tests failed",
+        "durationMs": 21355
+      }
+    ],
+    "passed": true
+  }
+}

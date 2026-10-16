@@ -1,0 +1,170 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-049-k04-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-049-k04-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "58284447e9bbf5b1d494e91e009dbb0c27e4ccea7a7e8d3ec257ff83a1def73e",
+      "candidateSetHash": "a4d0148845d986409801fb2a1d4f92d42b7b6d1659fef40fe3ac5ab6cb0c16ac",
+      "targetContractHash": null,
+      "projectRevisionHash": "df8b665f92eed7c9cefdd5de812795b58b3ba804401f1b9bd6514db3e874aa7c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_82a1beaa1fd20e3c",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_f0f08f3c64b33ba6",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Nombre y empresa",
+        "sourceFieldRef": "fld_d34e46fa4a27c8c1",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.name",
+      "contact.firstName",
+      "contact.lastName",
+      "lead.company",
+      "lead.lastName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "d28cef6535e628d5d6716f4299c58bec8682d2595455e06a4d21b1e193f7424a"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Wila",
+          "Sovo",
+          "Orvia",
+          "Joris"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Finvik",
+          "Nordell",
+          "Halaly",
+          "Quelell"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Nombre y empresa",
+        "fieldRef": "src:Nombre y empresa",
+        "valueClass": "TEXT",
+        "values": [
+          "Mesan Finrane",
+          "Orvorin Studio S.A.",
+          "Noris Peliko",
+          "Lumell Works Ltd"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:person-or-company"
+    ]
+  },
+  "canaries": [
+    "kc_b5a8628e002bfd31c49c993c",
+    "kc_5d748086b825d6f5263f8e92"
+  ]
+}

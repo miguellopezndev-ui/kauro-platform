@@ -1,0 +1,214 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-064-k08-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-064-k08-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "d3b5147f0eceacffbacaee1aa6ea478b30d56377ea05fb0e88246197234dbd7b",
+      "candidateSetHash": "958e282adc0f5d5f2a7d5f971997184029ef96d4b3a830e4a705ded3ebf358c1",
+      "targetContractHash": "tc_362592d3af16afa790f9572c7adfb26ff8ec829d846624af58dcaeb9c4affe94",
+      "projectRevisionHash": "541ebe140d7196074e7ac985c9ed9ad97eb7b2103d1eadb34549574149d789dd"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "البريد الإلكتروني",
+        "sourceFieldRef": "fld_4cd9173096f6a8f9",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "الاسم الأول",
+        "sourceFieldRef": "fld_bd5731c8779e251c",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "اسم العائلة",
+        "sourceFieldRef": "fld_c5212d98abc8627d",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "المدينة / العنوان",
+        "sourceFieldRef": "fld_db7ec63eaa7f4be7",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.lifecycleStage",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "المدينة / العنوان"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "665ee5b545d0d32c526181a41aeba29ea009538341ebe4cccfe133038ac7d83d"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "البريد الإلكتروني",
+        "fieldRef": "src:البريد الإلكتروني",
+        "valueClass": "EMAIL",
+        "values": [
+          "risa.pelmar0@corp.example.test",
+          "risa.finell1@example.test",
+          "riso.vexdell2@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "الاسم الأول",
+        "fieldRef": "src:الاسم الأول",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelel",
+          "Lumek",
+          "Tavek"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "اسم العائلة",
+        "fieldRef": "src:اسم العائلة",
+        "valueClass": "TEXT",
+        "values": [
+          "Halrane",
+          "Lumdell",
+          "Pelanth"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "المدينة / العنوان",
+        "fieldRef": "src:المدينة / العنوان",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora القاهرة",
+          "القاهرة 7",
+          "ירושלים 12"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:rtl",
+      "lang:ar"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_c9c18dd4213b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "البريد الإلكتروني",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_4b0966ee9dac",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "الاسم الأول",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_906f48a2bfff",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "اسم العائلة",
+        "targetField": "contact.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_4dcc09b46af95c9f769e39de",
+    "kc_3d12ee2231e10840a2938a5a"
+  ]
+}

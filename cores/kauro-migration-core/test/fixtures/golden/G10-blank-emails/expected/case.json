@@ -1,0 +1,24 @@
+{
+  "id": "G10",
+  "title": "Many blank email addresses",
+  "intent": "Four contacts have no email address. Blank does not equal blank: they must not form a cluster, and nothing may be combined.",
+  "expect": {
+    "rows": { "total": 5, "OUTPUT": 5, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 5, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "delivered": [
+    { "sourceRecordId": "1", "values": { "contact.firstName": "Ada" } },
+    { "sourceRecordId": "5", "values": { "contact.email": "mary@example.org" } }
+  ]
+}

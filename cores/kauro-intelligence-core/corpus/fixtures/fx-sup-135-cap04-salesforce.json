@@ -1,0 +1,179 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-135-cap04-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-135-cap04-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "7307df587ce46d5158f2b6ba3676644ce40a83337eec7ead516a537417d34f51",
+      "candidateSetHash": "55f78538d04bcd246998a9f58c60b0259e600fc2c93a0e8b80f9dcdfec21c7f0",
+      "targetContractHash": "tc_faa551ebe1b463691c4e2cad43c25f75a3d57fe3f80cddd50345bafac9b9f845",
+      "projectRevisionHash": "eff4490a87bfff1edda4b092b5ac44097a4d9d827702a9486e43285a8f96f189"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Date de clôture",
+        "sourceFieldRef": "fld_daab6477293430e4",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate",
+        "transformPrimitive": "PARSE_DATE_ISO",
+        "typedTransformParams": {
+          "dateFormat": "MM/DD/YYYY"
+        }
+      },
+      {
+        "sourceHeader": "Value (export)",
+        "sourceFieldRef": "fld_278ab26d0d3de9c9",
+        "decision": "MAP",
+        "destinationField": "deal.name",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.description",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "1fc3cfe91bd9b5d6f22a6332757c0220bac3154e55a8977a15d552afc6e6409f"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL",
+      "locale": {
+        "dateFormat": "MM/DD/YYYY"
+      }
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": true
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Date de clôture",
+        "fieldRef": "src:Date de clôture",
+        "valueClass": "DATE",
+        "values": [
+          "09/27/2021",
+          "08/26/2024",
+          "04/16/2022",
+          "01/26/2026",
+          "05/13/2022"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate",
+        "transform": "PARSE_DATE_ISO",
+        "params": {
+          "dateFormat": "MM/DD/YYYY"
+        }
+      },
+      {
+        "header": "Value (export)",
+        "fieldRef": "src:Value (export)",
+        "valueClass": "TEXT",
+        "values": [
+          "  Onboarding 2024 Orvquist",
+          "Pilot 2026 Tavorin ",
+          "  Expansion 2027 Yanath",
+          "Renewal 2025 Sovath ",
+          "  Renewal 2024 Vexorin"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name",
+        "transform": "TRIM_WHITESPACE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_9b77674778b2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Value (export)",
+        "targetField": "deal.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_33d5e8894a1a460ae6660f22",
+    "kc_7fb0bf1a3c8a5372c025b7df"
+  ]
+}

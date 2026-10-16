@@ -1,0 +1,329 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-166-cap11-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-166-cap11-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "a9d1ee1668e8847f1b8d9c192a30a4378d2a777548410ec14ffdb448e3828feb",
+      "candidateSetHash": "425a5fa0a6ffcf4c083b325da7eb710ab10e15f04ff36c9893c32b9796cfd0a3",
+      "targetContractHash": "tc_adb51e12147b7f5cfed22604389e40242fd5a6500f89ee8dcb21d824e23108c6",
+      "projectRevisionHash": "e6122361984770be8039d716ac84e510dbc09121279a26ee2bae8b19c7ce701f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_35e4dab224b8c156",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Provincia",
+        "sourceFieldRef": "fld_1f5e90f5f95c77a6",
+        "decision": "MAP",
+        "destinationField": "contact.state"
+      },
+      {
+        "sourceHeader": "Ciudad",
+        "sourceFieldRef": "fld_88ce4174324d66cb",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Código postal",
+        "sourceFieldRef": "fld_5f3f8ebcf96290a0",
+        "decision": "MAP",
+        "destinationField": "contact.postalCode"
+      },
+      {
+        "sourceHeader": "País",
+        "sourceFieldRef": "fld_51ebb268442252d2",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Dirección",
+        "sourceFieldRef": "fld_798b07288dedd419",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_b87e1555b5989dcc",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_a2ee6ae70cda0aae",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.ownerEmail",
+      "contact.postalCode",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Legacy system id",
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "1af863da9cbdbb015548bc447b80b7612473ea1e435304d47842f712a9214124"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "quelek.darorin0@sample.invalid",
+          "zeria.tuldell1@example.test",
+          "quela.messorin2@example.test",
+          "noro.tavanth3@corp.example.test",
+          "mesel.halrane4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Provincia",
+        "fieldRef": "src:Provincia",
+        "valueClass": "TEXT",
+        "values": [
+          "Upland",
+          "North",
+          "Coastal",
+          "Upland",
+          "North"
+        ],
+        "decision": "MAP",
+        "destination": "contact.state"
+      },
+      {
+        "header": "Ciudad",
+        "fieldRef": "src:Ciudad",
+        "valueClass": "TEXT",
+        "values": [
+          "Tessin",
+          "Orvale",
+          "Kelmar",
+          "Nuvia",
+          "Kelmar"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Código postal",
+        "fieldRef": "src:Código postal",
+        "valueClass": "TEXT",
+        "values": [
+          "28053",
+          "52605",
+          "45749",
+          "98815",
+          "58211"
+        ],
+        "decision": "MAP",
+        "destination": "contact.postalCode"
+      },
+      {
+        "header": "País",
+        "fieldRef": "src:País",
+        "valueClass": "TEXT",
+        "values": [
+          "Estmark",
+          "Estmark",
+          "Kelland",
+          "Norvania",
+          "Norvania"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Dirección",
+        "fieldRef": "src:Dirección",
+        "valueClass": "TEXT",
+        "values": [
+          "63 Finova Street",
+          "51 Finvik Street",
+          "183 Tulenko Street",
+          "152 Wilunda Street",
+          "135 Zerorin Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L12666",
+          "L47635",
+          "L61608",
+          "L86587",
+          "L42895"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-85",
+          "B-46",
+          "C-35",
+          "A-67",
+          "B-88"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_12325e252ff8",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Correo electrónico",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_b30595c62bb2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Provincia",
+        "targetField": "contact.state"
+      },
+      {
+        "memoryId": "memconv_6f00298f5315",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ciudad",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_57b4974dd547",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Código postal",
+        "targetField": "contact.postalCode"
+      },
+      {
+        "memoryId": "memconv_8187bba42747",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "País",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_0fd5ea47337e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Dirección",
+        "targetField": "contact.addressLine1"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_aa967ff7082d7934bd4f3e19",
+    "kc_0f5ba9266334b4e11b22a81c"
+  ]
+}

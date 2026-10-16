@@ -1,0 +1,157 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-ugl-107-k09-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-107-k09-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "20d6c041f5da26ab40f5def9037ff3025892bacc160f4db91007feb4e96d1bbd",
+      "candidateSetHash": "653b880aa5a2975bc5c83e65c1b09a05d4733d2d7f5f1b68a33c83df9e7ac32b",
+      "targetContractHash": "tc_4a354b4843b3c60be6c9b2e974ff623d265a955488212f84b8e3e4c8c08cad20",
+      "projectRevisionHash": "e3eb079bf063788dbbf3f57e71c397201b0e66c80205c8dd2a3480561929e495"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "金额",
+        "sourceFieldRef": "fld_d4928e822d749129",
+        "decision": "MAP",
+        "destinationField": "deal.amount"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.description",
+      "deal.name",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "05052edacab36c4baf58d1a960239301cb1978639d7fafbc4865b4142df8da16"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "金额",
+        "fieldRef": "src:金额",
+        "valueClass": "MIXED",
+        "values": [
+          "７４６１１",
+          "８２６１９",
+          "１２４５９",
+          "１３５１５",
+          "５５０３７"
+        ],
+        "decision": "MAP",
+        "destination": "deal.amount"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:cjk-fullwidth",
+      "lang:zh",
+      "ugly:encoding"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_cb8bb55aa1c2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "金额",
+        "targetField": "deal.amount"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_d1abe9ffbc8638b520500bcc",
+    "kc_50fce6718128d4c7897b2742"
+  ]
+}

@@ -1,0 +1,454 @@
+{
+  "capacityProfilesVersion": "1.2.1",
+  "evidenceSchemaVersion": "3.0.0",
+  "note": "The finite set of source shapes the capacity harness generates. P1 through P14 each stress one dimension the canonical document names; together they cover the ones a representative qualification has to exercise. Sizes are given as a share of the rung being run, so the shape stays the same as the size grows. Every knob here is one the generator implements, and the architecture gate generates every profile and compares what came out against what is declared. The three FOUNDING profiles are different in kind: each one is a single integral profile for one mode, exercising many dimensions at once: several admitted objects, realistic width and value lengths, quoted and multi-line CSV, a workbook, Unicode, blank and ragged rows, custom fields, source identities, candidate duplicates, proven merges, relationships and exceptions, all in the same bundle. They are shaped that way because the founding commitment is a million rows of the work a real migration does rather than a million rows of one dimension at a time. They do not replace the matrix and P1 through P12 are unchanged, with P13 and P14 added in 1.2.0 for the two shapes a review found unbounded (a giant merge cluster and a skewed join). In 1.2.1 P13's cluster is a quarter of the rung rather than half: at a million rows half is 500,000 members, past the 250,000 the engine declares as the largest identity group it will form (MAX_IDENTITY_GROUP_MEMBERS), so the 1.2.0 profile measured the refusal instead of the cluster. A quarter is the largest group the engine admits, which is the case the profile is there to measure, and the harness now refuses a profile whose cluster at the million rung would exceed the limit: an integral profile that fails says the mode failed, and only the matrix says which dimension it failed on. One dimension the founding profiles do not carry is SHEET_COUNT. A record mapping that names no sheet is only meaningful where the workbook has one, and the generator's mappedSheets multiplier applies to every object in the bundle rather than to the workbook alone, so a mixed bundle carries a single-sheet workbook here and P3 keeps the many-sheet, hidden-sheet and unmapped-sheet case. The free-text column in the founding profiles is 64 bytes rather than something wider because Salesforce documents a cap of 104,857,600 bytes on one import file and the verifier enforces it: at 400,000 contacts a wider value fails the package on the file-size rule rather than on anything the ladder is there to measure. VALUE_SIZE stays P8's dimension.",
+  "limits": {
+    "hardMemoryBytes": 8589934592,
+    "memoryBudgetBytes": 6012954214,
+    "hardScratchBytes": 68719476736,
+    "scratchBudgetBytes": 51539607552,
+    "wallClockMs": 28800000
+  },
+  "deferredToMc2": [
+    "Matching against a captured TargetContract. A contract describes one real instance, and MC-1 makes no vendor call; P11 and P12 therefore exercise the target shape and the association mechanics under CREATE_ONLY, as do FOUNDING-HUBSPOT-1M and FOUNDING-SALESFORCE-1M, and MC-2 adds matching against evidence it captures. Every profile here runs under CREATE_ONLY with no contract, which is what lets the capacity harness be run by anybody on any machine."
+  ],
+  "profiles": [
+    {
+      "id": "P1",
+      "title": "many rows, few columns",
+      "dimension": "ROW_COUNT",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "CSV",
+        "objects": [
+          "CONTACT"
+        ],
+        "share": {
+          "CONTACT": 1
+        },
+        "rowFactor": 1,
+        "customFields": 0,
+        "categoricalValues": 8,
+        "maxTextBytes": 32
+      }
+    },
+    {
+      "id": "P2",
+      "title": "fewer rows, many columns",
+      "dimension": "SCHEMA_WIDTH",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n) in rows, linear in columns",
+      "shape": {
+        "format": "CSV",
+        "objects": [
+          "CONTACT"
+        ],
+        "share": {
+          "CONTACT": 1
+        },
+        "rowFactor": 0.1,
+        "customFields": 115,
+        "categoricalValues": 8,
+        "maxTextBytes": 32
+      }
+    },
+    {
+      "id": "P3",
+      "title": "many sheets, mapped and not",
+      "dimension": "SHEET_COUNT",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "XLSX",
+        "objects": [
+          "CONTACT"
+        ],
+        "share": {
+          "CONTACT": 1
+        },
+        "rowFactor": 0.2,
+        "mappedSheets": 10,
+        "hiddenSheets": 1,
+        "leftoverSheets": 1,
+        "customFields": 0,
+        "categoricalValues": 8,
+        "maxTextBytes": 32
+      }
+    },
+    {
+      "id": "P4",
+      "title": "high duplicate-candidate density",
+      "dimension": "DUPLICATE_SIGNALS",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "CSV",
+        "objects": [
+          "CONTACT"
+        ],
+        "share": {
+          "CONTACT": 1
+        },
+        "rowFactor": 0.5,
+        "sourceRecordIds": false,
+        "duplicateSignalRate": 0.5,
+        "customFields": 0,
+        "categoricalValues": 8,
+        "maxTextBytes": 32
+      }
+    },
+    {
+      "id": "P5",
+      "title": "high proven-merge density",
+      "dimension": "PROVEN_MERGES",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "CSV",
+        "objects": [
+          "CONTACT"
+        ],
+        "share": {
+          "CONTACT": 1
+        },
+        "rowFactor": 0.5,
+        "provenMergeRate": 0.5,
+        "customFields": 0,
+        "categoricalValues": 8,
+        "maxTextBytes": 32
+      }
+    },
+    {
+      "id": "P6",
+      "title": "large association graph",
+      "dimension": "EDGE_COUNT",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "CSV",
+        "objects": [
+          "CONTACT",
+          "COMPANY",
+          "DEAL"
+        ],
+        "share": {
+          "CONTACT": 0.6,
+          "COMPANY": 0.1,
+          "DEAL": 0.3
+        },
+        "rowFactor": 1,
+        "relationships": [
+          "CONTACT_TO_COMPANY",
+          "COMPANY_TO_DEAL"
+        ],
+        "customFields": 0,
+        "categoricalValues": 8,
+        "maxTextBytes": 32
+      }
+    },
+    {
+      "id": "P7",
+      "title": "large categorical vocabulary",
+      "dimension": "CARDINALITY",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "CSV",
+        "objects": [
+          "CONTACT"
+        ],
+        "share": {
+          "CONTACT": 1
+        },
+        "rowFactor": 1,
+        "customFields": 0,
+        "categoricalValues": 50000,
+        "maxTextBytes": 32
+      }
+    },
+    {
+      "id": "P8",
+      "title": "large text values",
+      "dimension": "VALUE_SIZE",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "CSV",
+        "objects": [
+          "CONTACT"
+        ],
+        "share": {
+          "CONTACT": 1
+        },
+        "rowFactor": 0.2,
+        "customFields": 1,
+        "categoricalValues": 8,
+        "maxTextBytes": 8192
+      }
+    },
+    {
+      "id": "P9",
+      "title": "high exception density",
+      "dimension": "EXCEPTIONS",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "CSV",
+        "objects": [
+          "CONTACT"
+        ],
+        "share": {
+          "CONTACT": 1
+        },
+        "rowFactor": 0.5,
+        "blankRowRate": 0.25,
+        "shortRowRate": 0.25,
+        "customFields": 0,
+        "categoricalValues": 8,
+        "maxTextBytes": 32
+      }
+    },
+    {
+      "id": "P10",
+      "title": "mixed source bundle",
+      "dimension": "BUNDLE_SHAPE",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "MIXED",
+        "objects": [
+          "CONTACT",
+          "COMPANY",
+          "DEAL",
+          "LEAD"
+        ],
+        "share": {
+          "CONTACT": 0.4,
+          "COMPANY": 0.2,
+          "DEAL": 0.2,
+          "LEAD": 0.2
+        },
+        "rowFactor": 0.5,
+        "relationships": [
+          "CONTACT_TO_COMPANY"
+        ],
+        "customFields": 3,
+        "unicode": true,
+        "categoricalValues": 64,
+        "maxTextBytes": 256
+      }
+    },
+    {
+      "id": "P11",
+      "title": "target-heavy HubSpot",
+      "dimension": "TARGET_HUBSPOT",
+      "mode": "HUBSPOT",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "CSV",
+        "objects": [
+          "CONTACT",
+          "COMPANY",
+          "DEAL"
+        ],
+        "share": {
+          "CONTACT": 0.5,
+          "COMPANY": 0.2,
+          "DEAL": 0.3
+        },
+        "rowFactor": 1,
+        "relationships": [
+          "CONTACT_TO_COMPANY",
+          "COMPANY_TO_DEAL"
+        ],
+        "customFields": 6,
+        "categoricalValues": 32,
+        "maxTextBytes": 64
+      }
+    },
+    {
+      "id": "P12",
+      "title": "target-heavy Salesforce",
+      "dimension": "TARGET_SALESFORCE",
+      "mode": "SALESFORCE",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "CSV",
+        "objects": [
+          "CONTACT",
+          "COMPANY",
+          "DEAL",
+          "LEAD"
+        ],
+        "share": {
+          "CONTACT": 0.4,
+          "COMPANY": 0.2,
+          "DEAL": 0.2,
+          "LEAD": 0.2
+        },
+        "rowFactor": 1,
+        "relationships": [
+          "CONTACT_TO_COMPANY",
+          "COMPANY_TO_DEAL"
+        ],
+        "customFields": 6,
+        "categoricalValues": 32,
+        "maxTextBytes": 64
+      }
+    },
+    {
+      "id": "P13",
+      "title": "one giant merge cluster",
+      "dimension": "GIANT_CLUSTER",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "CSV",
+        "objects": [
+          "CONTACT"
+        ],
+        "share": {
+          "CONTACT": 1
+        },
+        "rowFactor": 1,
+        "giantClusterShare": 0.25,
+        "customFields": 0,
+        "categoricalValues": 8,
+        "maxTextBytes": 32
+      }
+    },
+    {
+      "id": "P14",
+      "title": "skewed join: most children name one parent",
+      "dimension": "SKEWED_JOIN",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "CSV",
+        "objects": [
+          "CONTACT",
+          "COMPANY"
+        ],
+        "share": {
+          "CONTACT": 0.9,
+          "COMPANY": 0.1
+        },
+        "rowFactor": 1,
+        "relationships": [
+          "CONTACT_TO_COMPANY"
+        ],
+        "hotKeyShare": 0.9,
+        "customFields": 0,
+        "categoricalValues": 8,
+        "maxTextBytes": 32
+      }
+    },
+    {
+      "id": "FOUNDING-CLEAN-ONLY-1M",
+      "title": "one integral CLEAN_ONLY bundle at a million rows",
+      "dimension": "INTEGRAL_CLEAN_ONLY",
+      "mode": "CLEAN_ONLY",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "MIXED",
+        "objects": [
+          "CONTACT",
+          "COMPANY",
+          "DEAL",
+          "LEAD"
+        ],
+        "share": {
+          "CONTACT": 0.4,
+          "COMPANY": 0.2,
+          "DEAL": 0.2,
+          "LEAD": 0.2
+        },
+        "rowFactor": 1,
+        "relationships": [
+          "CONTACT_TO_COMPANY",
+          "COMPANY_TO_DEAL"
+        ],
+        "duplicatePairRate": 0.04,
+        "provenMergeRate": 0.05,
+        "blankRowRate": 0.005,
+        "shortRowRate": 0.0025,
+        "quotedValues": true,
+        "customFields": 6,
+        "unicode": true,
+        "categoricalValues": 512,
+        "maxTextBytes": 64
+      }
+    },
+    {
+      "id": "FOUNDING-HUBSPOT-1M",
+      "title": "one integral HubSpot bundle at a million rows",
+      "dimension": "INTEGRAL_HUBSPOT",
+      "mode": "HUBSPOT",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "MIXED",
+        "objects": [
+          "CONTACT",
+          "COMPANY",
+          "DEAL"
+        ],
+        "share": {
+          "CONTACT": 0.5,
+          "COMPANY": 0.2,
+          "DEAL": 0.3
+        },
+        "rowFactor": 1,
+        "relationships": [
+          "CONTACT_TO_COMPANY",
+          "COMPANY_TO_DEAL"
+        ],
+        "duplicatePairRate": 0.04,
+        "provenMergeRate": 0.05,
+        "blankRowRate": 0.005,
+        "shortRowRate": 0.0025,
+        "quotedValues": true,
+        "customFields": 6,
+        "unicode": true,
+        "categoricalValues": 512,
+        "maxTextBytes": 64
+      }
+    },
+    {
+      "id": "FOUNDING-SALESFORCE-1M",
+      "title": "one integral Salesforce bundle at a million rows",
+      "dimension": "INTEGRAL_SALESFORCE",
+      "mode": "SALESFORCE",
+      "expectedComplexity": "O(n log n)",
+      "shape": {
+        "format": "MIXED",
+        "objects": [
+          "CONTACT",
+          "COMPANY",
+          "DEAL",
+          "LEAD"
+        ],
+        "share": {
+          "CONTACT": 0.4,
+          "COMPANY": 0.2,
+          "DEAL": 0.2,
+          "LEAD": 0.2
+        },
+        "rowFactor": 1,
+        "relationships": [
+          "CONTACT_TO_COMPANY",
+          "COMPANY_TO_DEAL"
+        ],
+        "duplicatePairRate": 0.04,
+        "provenMergeRate": 0.05,
+        "blankRowRate": 0.005,
+        "shortRowRate": 0.0025,
+        "quotedValues": true,
+        "customFields": 6,
+        "unicode": true,
+        "categoricalValues": 512,
+        "maxTextBytes": 64
+      }
+    }
+  ]
+}

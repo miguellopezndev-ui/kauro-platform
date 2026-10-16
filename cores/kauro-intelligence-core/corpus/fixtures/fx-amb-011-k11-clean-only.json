@@ -1,0 +1,173 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-011-k11-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-011-k11-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2fee2558759b88fedc6c4341151952e1c01a9d596e58cea4dcc6b9ff3ea1675d",
+      "candidateSetHash": "61fe24baed4ae9529a6135ae93ba18d14f2b9db8e91aa92ad76a21d1c0bfd0b2",
+      "targetContractHash": null,
+      "projectRevisionHash": "68f331b262d6304714e906b1efb75dae44a84b2c89f5bc0260d376997ab1ef28"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_2b4421edb7b27c5c",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Statut",
+        "sourceFieldRef": "fld_01faf6be257ac2b8",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_c3b36689fb0ac1bb",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lifecycleStage",
+      "contact.state",
+      "deal.stage",
+      "lead.status"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "844dccd2ad4cac49a32db69e612c1dd585667197d70936ef0a6d7146f9146fa1"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "tula.beldell0@sample.invalid",
+          "sovek.halunda1@corp.example.test",
+          "quelel.yanrane2@sample.invalid",
+          "jora.pelquist3@example.test",
+          "pelek.vexenko4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Statut",
+        "fieldRef": "src:Statut",
+        "valueClass": "MIXED",
+        "values": [
+          "Central",
+          "activo",
+          "Central",
+          "cerrado",
+          "Central"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-38",
+          "R-53",
+          "R-21",
+          "R-16",
+          "R-54"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:homograph-header"
+    ]
+  },
+  "canaries": [
+    "kc_67d5f7fa6f8ee08119da050c",
+    "kc_2e20a46abf1da66a2b929776"
+  ]
+}

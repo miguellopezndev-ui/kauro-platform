@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "1.0.0",
+  "artifactKind": "MIGRATION_CORE_CANDIDATE_PREFLIGHT",
+  "gate": "RELEASE-CANDIDATE-01",
+  "digestSerialisationVersion": "2.0.0",
+  "manifestDigest": "3c39cf5f8c18c88e6f09cb8d1934b751a415774c01017f61440a76157108acda",
+  "codeDigest": "8cea942d6bdb602b29a680867bbece25003576e1107371d181ab33b4c0f4f4f5",
+  "versions": {
+    "coreVersion": "3.0.0",
+    "packageFormatVersion": "2.1.0",
+    "sourceRegistryVersion": "2026-09-06",
+    "packageVersion": "3.0.0"
+  },
+  "treeClean": true,
+  "treeCleanExcludes": [
+    "qualification/candidate/preflight.json"
+  ],
+  "decidedElsewhere": [
+    {
+      "fact": "cross_platform_reproducibility_passed",
+      "by": "tools/receipt-verify.mjs, from a receipt written outside this tree"
+    }
+  ],
+  "facts": {
+    "architecture_closed": {
+      "value": true,
+      "by": "EXECUTED"
+    },
+    "offline_release_universe_passed": {
+      "value": true,
+      "by": "EVIDENCE_VERIFIED"
+    },
+    "spec_and_document_drift_absent": {
+      "value": true,
+      "by": "EXECUTED"
+    },
+    "source_registry_current": {
+      "value": true,
+      "by": "EVIDENCE_VERIFIED"
+    },
+    "declared_versions_at_or_above_floor": {
+      "value": true,
+      "by": "EXECUTED"
+    },
+    "hubspot_target_current": {
+      "value": true,
+      "by": "EVIDENCE_VERIFIED"
+    },
+    "salesforce_target_current": {
+      "value": true,
+      "by": "EVIDENCE_VERIFIED"
+    },
+    "salesforce_ocr_disposition_current": {
+      "value": true,
+      "by": "EVIDENCE_VERIFIED"
+    },
+    "crm_attestation_required_by_default": {
+      "value": true,
+      "by": "EXECUTED"
+    },
+    "capacity_hubspot_1m_representative": {
+      "value": true,
+      "by": "EVIDENCE_VERIFIED"
+    },
+    "capacity_salesforce_1m_representative": {
+      "value": true,
+      "by": "EVIDENCE_VERIFIED"
+    },
+    "capacity_clean_only_1m_representative": {
+      "value": true,
+      "by": "EVIDENCE_VERIFIED"
+    },
+    "capacity_profiles_matrix_complete": {
+      "value": true,
+      "by": "EVIDENCE_VERIFIED"
+    },
+    "memory_budget_passed": {
+      "value": true,
+      "by": "MEASURED"
+    },
+    "scratch_budget_passed": {
+      "value": true,
+      "by": "MEASURED"
+    },
+    "scratch_amplification_explained": {
+      "value": true,
+      "by": "INSTRUMENTED"
+    },
+    "wall_clock_passed": {
+      "value": true,
+      "by": "MEASURED"
+    },
+    "candidate_bytes_deterministic": {
+      "value": true,
+      "by": "MEASURED"
+    },
+    "package_verify_and_attest_passed": {
+      "value": true,
+      "by": "EVIDENCE_VERIFIED"
+    },
+    "evidence_bound_to_exact_candidate": {
+      "value": true,
+      "by": "EVIDENCE_VERIFIED"
+    },
+    "secrets_and_customer_data_absent": {
+      "value": true,
+      "by": "EXECUTED"
+    },
+    "candidate_provenance_valid": {
+      "value": true,
+      "by": "EVIDENCE_VERIFIED"
+    }
+  },
+  "MIGRATION_CORE_CANDIDATE_PREFLIGHT": "TRUE"
+}

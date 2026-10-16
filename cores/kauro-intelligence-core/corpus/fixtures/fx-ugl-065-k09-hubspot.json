@@ -1,0 +1,131 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-065-k09-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-065-k09-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e046a1e22653a58392bcef6e30266a794cab541786f4ba0ff0111ad60f4b9b24",
+      "candidateSetHash": "b0ea0f27ad04de8714decfadf8a9dfcf396bcf375e0f0d4a3cca66f24e04a313",
+      "targetContractHash": "tc_a213961e8e3e861e4ce50150ad02162cb052739a681a2df42554f108d5c0eeae",
+      "projectRevisionHash": "b3700c0e6842ac6d357f0db3fd399fe504db0d596e5bfc92ddfbd0d04fb6975f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_c2f7070cc5cf5a13",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.employeeCount",
+      "company.state",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "34bd67f8c0ea40db6b38d6e81f8a33c46c7880ee1afd3f75a240392dbfed34cc"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "MIXED",
+        "values": [
+          "６５８０９",
+          "６４１８５",
+          "７１０００",
+          "８９６０４",
+          "６３８０９"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:cjk-fullwidth",
+      "lang:zh",
+      "ugly:encoding"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_80e79a0637d5",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Employees",
+        "targetField": "company.employeeCount"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_fb33d217170e4cf68cd6f729",
+    "kc_b05a758775a04b2771403a4b"
+  ]
+}

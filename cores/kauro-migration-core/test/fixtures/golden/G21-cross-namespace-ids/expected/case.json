@@ -1,0 +1,33 @@
+{
+  "id": "G21",
+  "title": "The same record id in two source systems",
+  "intent": "Two exports both contain a record numbered 1001. They describe different people. Record ids only mean something inside one system and namespace, so the two stay separate, and the coincidence is reported so a reviewer can see the engine noticed it and deliberately did nothing.",
+  "expect": {
+    "rows": { "total": 2, "OUTPUT": 2, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 2, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 1,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "duplicateClusters": [
+    {
+      "signal": "SOURCE_ID_ACROSS_NAMESPACES",
+      "signalValue": "1001",
+      "members": 2,
+      "reasonCode": "IDENTITY_CROSS_NAMESPACE_ID_COLLISION",
+      "notMergedReasonCode": "IDENTITY_CROSS_NAMESPACE_ID_COLLISION"
+    }
+  ],
+  "delivered": [
+    { "sourceRecordId": "1001", "values": { "contact.email": "ada@example.com" } },
+    { "sourceRecordId": "1001", "values": { "contact.email": "alan@example.org" } }
+  ]
+}

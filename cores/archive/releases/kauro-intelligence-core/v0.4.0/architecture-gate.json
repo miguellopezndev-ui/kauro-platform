@@ -1,0 +1,216 @@
+{
+  "artifactKind": "INTELLIGENCE_CORE_ARCHITECTURE_GATE",
+  "gate": "INTELLIGENCE-ARCHITECTURE-01",
+  "decidedAt": "2026-09-29T20:37:54Z",
+  "subject": {
+    "commit": "1c97fa69ba9d5758df8854579341d8c5dab8f8d3",
+    "tree": "635a18615d202534e9932cfbc25f269e8938e824",
+    "dirty": false
+  },
+  "node": "v24.21.0",
+  "platform": "linux-x64",
+  "producers": {
+    "tools/architecture-gate.mjs": "6e5c032c38010d61c1e99ea9e22eeb63c096859d42545b87161811703c261fb3",
+    "tools/sabotage.mjs": "25fc190454591dd5669b3b2264c6467cf01e5cb6a831516b9469c1dafa5153d7",
+    "tools/run-tests.mjs": "6ab53f6c8ace191381f1d824b870ef436eaf248b27e51a445af762c7b4aab7a3",
+    "tools/contracts-check.mjs": "e2fcb3d7daa0ba6206f3ab9706a2aabbb5e4ae485702aa48dcce18491ac3d7c0",
+    "tools/consumer-check.mjs": "dbde3646c2e565e50617bba85b3d0c5ff7733ea6d75b3ef59cf540faf6d21103",
+    "tools/behavioural-probes.mjs": "d98bb65c08a9813d5ae9e3c9459400d2a9a6e70d09023d75b761c6d61a9999b2",
+    "tools/lib/verify-sabotage-report.mjs": "96230606caf6d2d8364cd3a8cdc03fdd8eab8b5b165713163f3367b221908ea8",
+    "package-lock.json": "92a6d6131fba0ac7f25e684f882fd16368cd25f098e1b15d2f455ae43bc08661",
+    "tsconfig.json": "f2f92142f54240417c8de838a03d84f542665a2634a66046b1bed5eb9b6de986",
+    "vendor/MANIFEST.json": "7dbda86b94849ce2ff609648e12eb6da778a0ab78c002cd5c0f3a917d40ff1b6"
+  },
+  "dependencyClosure": [
+    {
+      "name": "@types/node",
+      "version": "24.13.3",
+      "resolved": "https://registry.npmjs.org/@types/node/-/node-24.13.3.tgz",
+      "integrity": "sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q=="
+    },
+    {
+      "name": "fflate",
+      "version": "0.8.3",
+      "resolved": "https://registry.npmjs.org/fflate/-/fflate-0.8.3.tgz",
+      "integrity": "sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA=="
+    },
+    {
+      "name": "kavo-migration-core",
+      "version": "2.0.1",
+      "resolved": "file:vendor/kavo-migration-core-2.0.1.tgz",
+      "integrity": "sha512-rp2abBSyVCIPrAx5fTlEH+SEyZ4wRewWFM0V373YTacEwuygI7P3f9Nb929l6WAoV4j4KpbeU/jw8tryKaetbA=="
+    },
+    {
+      "name": "libphonenumber-js",
+      "version": "1.13.12",
+      "resolved": "https://registry.npmjs.org/libphonenumber-js/-/libphonenumber-js-1.13.12.tgz",
+      "integrity": "sha512-uLVeV1c9OTk6qkdqnj+mpMD+ZdnZ0szVyWu58HwMmpwkHA1gCEkyjd3veZQXDnuw9KEwSRjcc9B1pS9XKIN1fA=="
+    },
+    {
+      "name": "typescript",
+      "version": "5.9.3",
+      "resolved": "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz",
+      "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="
+    },
+    {
+      "name": "undici-types",
+      "version": "7.18.2",
+      "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-7.18.2.tgz",
+      "integrity": "sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w=="
+    }
+  ],
+  "sabotage": {
+    "reportSha256": "8a1c6a961368ba68c3bd5acfeed743da071b4a6888034cc2c486315e698afeb7",
+    "mode": "QUALIFICATION",
+    "subject": {
+      "commit": "1c97fa69ba9d5758df8854579341d8c5dab8f8d3",
+      "tree": "635a18615d202534e9932cfbc25f269e8938e824",
+      "dirty": false,
+      "dirtyPaths": [],
+      "resolved": true
+    },
+    "counts": {
+      "inventory": 175,
+      "reached": 175,
+      "killed": 175,
+      "survived": 0,
+      "didNotCompile": 0,
+      "infraError": 0,
+      "notReached": 0
+    },
+    "problems": []
+  },
+  "consumer": {
+    "tarball": "kauro-intelligence-core-0.4.0.tgz",
+    "tarballSha256": "af3d603e84887fd091a57eb49304a79f80cf99e543d7e47967292839786784eb",
+    "migrationCoreTarball": "vendor/kavo-migration-core-2.0.1.tgz",
+    "migrationCoreTarballSha256": "787f0b80a906d31605e3946ad00df86d2a131e3e89d78855c1c4f327b37fa000",
+    "observed": {
+      "version": "0.4.0",
+      "state": "PROPOSAL_READY",
+      "draft": "SYSTEM_DRAFT",
+      "fields": 4,
+      "rows": 2,
+      "calls": 1,
+      "invocations": 1,
+      "packageDigest": "4128c74163948fe74437e7892529381703c8a5880d366ecba79336394052a5df",
+      "maxTasks": 32,
+      "mcCore": "2.0.1",
+      "runDir": "/tmp/kauro-ic-consumer-run-1t7UpW"
+    }
+  },
+  "facts": [
+    {
+      "name": "subject_bound",
+      "value": true,
+      "by": "MEASURED",
+      "detail": "commit 1c97fa69ba9d5758df8854579341d8c5dab8f8d3 tree 635a18615d202534e9932cfbc25f269e8938e824, clean"
+    },
+    {
+      "name": "typechecks_strict",
+      "value": true,
+      "by": "EXECUTED",
+      "detail": "tsc -p tsconfig.json exit 0 under strict, exactOptionalPropertyTypes, noUncheckedIndexedAccess"
+    },
+    {
+      "name": "frozen_contracts_verified",
+      "value": true,
+      "by": "EXECUTED",
+      "detail": "CONTRACTS-01 PASS: tarball digest, lockfile, exported versions inside declared ranges, every imported name present"
+    },
+    {
+      "name": "tests_pass",
+      "value": true,
+      "by": "EXECUTED",
+      "detail": "464 tests, 0 failed, exit 0"
+    },
+    {
+      "name": "components_exported",
+      "value": true,
+      "by": "MEASURED",
+      "detail": "33 component names present on the built public entry"
+    },
+    {
+      "name": "no_stub_or_io_on_production_path",
+      "value": true,
+      "by": "MEASURED",
+      "detail": "25 source files: no TODO, stub, SDK, network, filesystem or shell"
+    },
+    {
+      "name": "budget_bounds_as_canon",
+      "value": true,
+      "by": "MEASURED",
+      "detail": "eight bounds of canon §61 on the built BUDGET_LIMITS, frozen, no ninth"
+    },
+    {
+      "name": "model_policy_pinned",
+      "value": true,
+      "by": "MEASURED",
+      "detail": "canon §52 policy pinned on the built MODEL_POLICY_V1 (12 pins); secondary NONE"
+    },
+    {
+      "name": "probe_egress_binding",
+      "value": true,
+      "by": "EXECUTED",
+      "detail": "same envelope accepted; modified refused (EGRESS_BLOCKED: the envelope changed after its egress decision); forged token refused (EGRESS_BLOCKED: the egress decision was not issued by this run)"
+    },
+    {
+      "name": "probe_budget_per_request_ceiling",
+      "value": true,
+      "by": "EXECUTED",
+      "detail": "200000 reserved; 200001 refused (BUDGET_EXHAUSTED: the request asks for 200001 input tokens against a ceiling of 200000)"
+    },
+    {
+      "name": "probe_run_transitions_closed",
+      "value": true,
+      "by": "EXECUTED",
+      "detail": "CREATED → ENVELOPE_VALIDATED applied; CREATED → PROPOSAL_READY refused (INVALID_TRANSITION: CREATED → PROPOSAL_READY is not a transition of the run state machine); 15 states have rows"
+    },
+    {
+      "name": "probe_classifier_email_not_safe",
+      "value": true,
+      "by": "EXECUTED",
+      "detail": "email → POTENTIAL_PII; status word → SAFE_LOW_CARDINALITY_SEMANTICS"
+    },
+    {
+      "name": "probe_compiler_target_outside_envelope",
+      "value": true,
+      "by": "EXECUTED",
+      "detail": "offered target → PROPOSED; outside target → FORBIDDEN_PROPOSAL [TARGET_OUTSIDE_ENVELOPE]"
+    },
+    {
+      "name": "sabotage_all_killed",
+      "value": true,
+      "by": "EXECUTED",
+      "detail": "175 killed of 175 (recomputed from 175 records); survived 0, did not compile 0, infra 0, not reached 0; runner exit 0"
+    },
+    {
+      "name": "sabotage_report_bound_to_subject",
+      "value": true,
+      "by": "MEASURED",
+      "detail": "QUALIFICATION report on commit 1c97fa69ba9d5758df8854579341d8c5dab8f8d3, clean; inventory benchmark.mjs=11e3c8f6cea5,compiler.mjs=683929962641,core.mjs=8b3dceb5f940,kernel.mjs=c6f1698738df,privacy.mjs=c01b2d451aa9,transport.mjs=75097a41e28e; producers and production files hash as in the tree"
+    },
+    {
+      "name": "public_consumer_compiles_and_runs",
+      "value": true,
+      "by": "EXECUTED",
+      "detail": "INTELLIGENCE-CONSUMER-01 = PASS: {\"version\":\"0.4.0\",\"state\":\"PROPOSAL_READY\",\"draft\":\"SYSTEM_DRAFT\",\"fields\":4,\"rows\":2,\"calls\":1,\"invocations\":1,\"packageDigest\":\"4128c74163948fe74437e7892529381703c8a5880d366ecba79336394052a5df\",\"maxTasks\":32,\"mcCore\":\"2.0.1\",\"runDir\":\"/tmp/kauro-ic-consumer-run-1t7UpW\"}"
+    },
+    {
+      "name": "consumer_report_bound",
+      "value": true,
+      "by": "MEASURED",
+      "detail": "tarball kauro-intelligence-core-0.4.0.tgz sha256 af3d603e84887fd0…; Migration Core 2.0.1 sha256 787f0b80a906d316…; consumer observed {\"version\":\"0.4.0\",\"state\":\"PROPOSAL_READY\",\"draft\":\"SYSTEM_DRAFT\",\"fields\":4,\"rows\":2,\"calls\":1,\"invocations\":1,\"packageDigest\":\"4128c74163948fe74437e7892529381703c8a5880d366ecba79336394052a5df\",\"maxTasks\":32,\"mcCore\":\"2.0.1\",\"runDir\":\"/tmp/kauro-ic-consumer-run-1t7UpW\"}"
+    },
+    {
+      "name": "documents_present",
+      "value": true,
+      "by": "MEASURED",
+      "detail": "6 documents"
+    }
+  ],
+  "INTELLIGENCE_CORE_ARCHITECTURE_CLOSED": "TRUE",
+  "INTELLIGENCE_CORE_RELEASE_CANDIDATE": "FALSE",
+  "INTELLIGENCE_CORE_V1_FROZEN": "FALSE",
+  "note": "RELEASE_CANDIDATE and V1_FROZEN are FALSE by construction in IC-1: they need OPUS-Q1, AI-BUDGET-01 and the independent freeze of IC-2/IC-3. Sabotage evidence is executed by this gate and never reused from disk."
+}

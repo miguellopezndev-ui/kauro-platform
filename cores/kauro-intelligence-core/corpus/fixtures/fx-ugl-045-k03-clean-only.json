@@ -1,0 +1,193 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-045-k03-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-045-k03-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "43f8ef0dd96b3750759bdf7229156882c024dda1410e7fb20d38f727f720efb0",
+      "candidateSetHash": "9055c7b781bb6e073f5ab3afe1bba2ac78f2d3f06bce7332d449f32051be16e7",
+      "targetContractHash": null,
+      "projectRevisionHash": "2dbe50fc5f5b11ddcb6a8960602e17c5fa2c55dd45b04f304d37bb0aead8712a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-mail",
+        "sourceFieldRef": "fld_fdf62ac684576d9e",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "﻿First name",
+        "sourceFieldRef": "fld_6850f4a935b659fe",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name​",
+        "sourceFieldRef": "fld_13979e76a4652767",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Ｎａｍｅ pt",
+        "sourceFieldRef": "fld_65b7f306ebad8b11",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_f4510d6dc41344e4",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Ｎａｍｅ pt",
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "eaa237ea976ab37471fc5e41ff95b7eaab5449cd7a912410e5dd90bc5d9ddffd"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-mail",
+        "fieldRef": "src:E-mail",
+        "valueClass": "EMAIL",
+        "values": [
+          "yanel.vexenko0@sample.invalid",
+          "daris.orvrane1@example.test",
+          "daris.zerell2@sample.invalid",
+          "belan.lumaly3@example.test",
+          "quelo.belath4@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "﻿First name",
+        "fieldRef": "src:bom-pt",
+        "valueClass": "TEXT",
+        "values": [
+          "Pelek",
+          "Vexis",
+          "Tulel",
+          "Quelo",
+          "Sovan"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name​",
+        "fieldRef": "src:zw-pt",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumrane​",
+          "Tuldell​",
+          "Belmar​",
+          "Mesova​",
+          "Finunda​"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Ｎａｍｅ pt",
+        "fieldRef": "src:Ｎａｍｅ pt",
+        "valueClass": "TEXT",
+        "values": [
+          "Wilanth Labs B.V.",
+          "Tavvik Systems S.A.",
+          "Yansorin Studio Inc.",
+          "Sovero Studio GmbH",
+          "Vexell Logistics S.L."
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-37",
+          "R-45",
+          "R-28",
+          "R-54",
+          "R-10"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:encoding",
+      "lang:pt"
+    ]
+  },
+  "canaries": [
+    "kc_ad688a85241160c876504dfc",
+    "kc_25f79a51a492ee06d7e615f4"
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-155-cap12-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-155-cap12-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "428120e16f67e327c72acb2cb938c6dc3ebeea2824e0d0390abff5a89fe09293",
+      "candidateSetHash": "c46fcc6daa155e419dc6e6fd4316af5dee77651ca4719386f3da6d0e260036ac",
+      "targetContractHash": null,
+      "projectRevisionHash": "bb860cca41b133fed11eaf5422d00fb17eb7eebeb4a683bab1376932d8f96aa4"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Cognome",
+        "sourceFieldRef": "fld_789cf56cfce80e81",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Info",
+        "sourceFieldRef": "fld_1651504f6b9f8b2d",
+        "decision": "MAP",
+        "destinationField": "lead.email",
+        "requiredEvidenceRefs": [
+          "ev_d5a5b6f841d98404"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.doNotEmail",
+      "lead.email",
+      "lead.lastName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "185c4551ddfbcda601c12fefca67fac89e943fc5d5fa0a81f3cbc36f03d284e7"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Cognome",
+        "fieldRef": "src:Cognome",
+        "valueClass": "TEXT",
+        "values": [
+          "Vexquist",
+          "Sovaly",
+          "Joraly",
+          "Tavvik",
+          "Zerquist"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Info",
+        "fieldRef": "src:Info",
+        "valueClass": "EMAIL",
+        "values": [
+          "yana.sovorin0@sample.invalid",
+          "lumel.halunda1@example.test",
+          "noro.yanrane2@sample.invalid",
+          "meso.mesero3@example.test",
+          "sovia.quelorin4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "lead.email",
+        "evidence": [
+          "ev:self"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_e5c0463f41a2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cognome",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_f15c0f86b4f83012263eb846",
+    "kc_be72ef4dbc4892b22de7f22e"
+  ]
+}

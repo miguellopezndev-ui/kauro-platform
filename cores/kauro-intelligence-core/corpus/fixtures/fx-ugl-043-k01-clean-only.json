@@ -1,0 +1,109 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-043-k01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-043-k01-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "a335d0281e44d1d453f0064c9fb39ef4e78200db592927d2fdf319984339e1ee",
+      "candidateSetHash": "f5139a1a39b494d46814f83a9b726b449292507996a155a9dbdfb02168f7ab1d",
+      "targetContractHash": null,
+      "projectRevisionHash": "85b2ded6429d6827f1882a53b8990ab0b2c9378b20d7503d0a51f93a267af524"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Close date",
+        "sourceFieldRef": "fld_dcde9a3a9bc43d9f",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.closeDate",
+      "deal.description"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "95270bce961295a2dc5108b75ee7d138ff935560c7c8beef8dccbf1a20ab3493"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Close date",
+        "fieldRef": "src:Close date",
+        "valueClass": "MIXED",
+        "values": [
+          "21-06-2019",
+          "15.01.2022",
+          "27-03-2026",
+          "23.05.2025",
+          "14-08-2018"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:mixed-dates",
+      "lang:ru",
+      "ugly:mixed-date-formats"
+    ]
+  },
+  "canaries": [
+    "kc_39df5d86b922c3a9035b1f8c",
+    "kc_af1a9a1977c4058e0937a602"
+  ]
+}

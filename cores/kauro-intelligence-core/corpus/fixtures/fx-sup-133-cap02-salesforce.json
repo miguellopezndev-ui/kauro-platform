@@ -1,0 +1,275 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-133-cap02-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-133-cap02-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "74393f2d434dc23ca6746ab17a1c9216bdf774e843f6510d71fb15457cecfb6b",
+      "candidateSetHash": "f355ee27925fdc69302dc2aa5400a1be7753fa12f8f37de5d669979c48fe6bda",
+      "targetContractHash": "tc_6abe8c73d0ce3b40b12c0ef16f918219d9b7711da56c19aeb04df9504423c678",
+      "projectRevisionHash": "94e432e594d5670292e4f4be119ba064d03c726bf7861c09eac7a8d278bf29c6"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Adresse courriel",
+        "sourceFieldRef": "fld_99728d17ca99dc5f",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Téléphone",
+        "sourceFieldRef": "fld_8b176384059b8006",
+        "decision": "MAP",
+        "destinationField": "contact.phone",
+        "allowedDestinationFields": [
+          "contact.phone",
+          "contact.mobilePhone"
+        ]
+      },
+      {
+        "sourceHeader": "Nom de famille",
+        "sourceFieldRef": "fld_7f7965d9943774ab",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Fonction",
+        "sourceFieldRef": "fld_71909415c37ea1d2",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Pays",
+        "sourceFieldRef": "fld_b8981ce37eaa13db",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Prénom",
+        "sourceFieldRef": "fld_d092acd717747e90",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.mobilePhone",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "7d28003c6a864c0b1e5e49e6d440e8068e89eff31da496c50f56e4df4fc93c1a"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Adresse courriel",
+        "fieldRef": "src:Adresse courriel",
+        "valueClass": "EMAIL",
+        "values": [
+          "kesis.queliko0@sample.invalid",
+          "mesis.finunda1@sample.invalid",
+          "noran.sovunda2@corp.example.test",
+          "halis.halath3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Téléphone",
+        "fieldRef": "src:Téléphone",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550185",
+          "+12025550100",
+          "+447700900985",
+          "+12025550180"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone",
+        "alternatives": [
+          "contact.mobilePhone"
+        ]
+      },
+      {
+        "header": "Nom de famille",
+        "fieldRef": "src:Nom de famille",
+        "valueClass": "TEXT",
+        "values": [
+          "Nororin",
+          "Vexath",
+          "Zervik",
+          "Jorquist"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Fonction",
+        "fieldRef": "src:Fonction",
+        "valueClass": "TEXT",
+        "values": [
+          "Operations lead",
+          "Account manager",
+          "Controller",
+          "Account manager"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Pays",
+        "fieldRef": "src:Pays",
+        "valueClass": "TEXT",
+        "values": [
+          "Kelland",
+          "Estmark",
+          "Valdoria",
+          "Norvania"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Prénom",
+        "fieldRef": "src:Prénom",
+        "valueClass": "TEXT",
+        "values": [
+          "Vexia",
+          "Quelel",
+          "Halan",
+          "Risis"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_71a7442ef40c",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nom de famille",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_2a9fbef86104",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Fonction",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_6a71d55920a6",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Pays",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_86e8ed9244fc",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Prénom",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_c60ab643bb44fcd50707c8ac",
+    "kc_f59ead21229bf6d1246486e1"
+  ]
+}

@@ -1,0 +1,145 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-amb-103-k13-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-103-k13-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5c6382b80c33adf0545215098da7be47be0fca58074e94a5c5d78e03d67c4298",
+      "candidateSetHash": "6a763b8193905dccec2b7ba42f0eceb36984bf227dd1f331f2197a809384ab0d",
+      "targetContractHash": null,
+      "projectRevisionHash": "d94bea37cdd003f70fff806d333f770e2db98a74e9408df5665142ab78685c64"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_71d6b8a1e6c7810c",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Amount + Währung",
+        "sourceFieldRef": "fld_41f1d1a19d1ace76",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.currency",
+      "deal.name",
+      "deal.pipeline"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "2737f6979c2d53e1d2dcf3c4192685e66c07cd00da380c9a87d9958fc4875718"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Deal name",
+        "fieldRef": "src:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Pilot 2026 Risquist",
+          "Onboarding 2027 Risrane",
+          "Pilot 2026 Risaly",
+          "Renewal 2024 Finunda",
+          "Onboarding 2024 Vexell",
+          "Expansion 2027 Mesorin"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Amount + Währung",
+        "fieldRef": "src:Amount + Währung",
+        "valueClass": "MIXED",
+        "values": [
+          "€9,167",
+          "$1,490",
+          "£7,560",
+          "€3,826",
+          "$8,745",
+          "£8,212"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:mixed-currency"
+    ]
+  },
+  "canaries": [
+    "kc_9dd2b8d630c82bacb2a9a0b6",
+    "kc_2423d3434db0ed35e7ec4e0e"
+  ]
+}

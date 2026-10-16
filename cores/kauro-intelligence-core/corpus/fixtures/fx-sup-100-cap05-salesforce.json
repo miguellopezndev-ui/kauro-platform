@@ -1,0 +1,220 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-100-cap05-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-100-cap05-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "8dd2abdd92aa553924a36ed607cacf84035477f3b91fe5f6a26969cbe99b5c80",
+      "candidateSetHash": "0808efe2628b9393f4a46efd266d07cf276c924eef26f1e2687f7a4f36be38a2",
+      "targetContractHash": "tc_c9748e207b82d6c5c180f155a15986b8b7f5f6a7ebd892b48fb0f6fe8edf54bb",
+      "projectRevisionHash": "47d2e3291e90c3aab006038d26c11ef782dab9c2fdf938d723386cb4530bd57b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Sobrenome",
+        "sourceFieldRef": "fld_039e9c244073e7ef",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Lead Status",
+        "sourceFieldRef": "fld_a891f7d8fa322758",
+        "decision": "MAP",
+        "destinationField": "lead.status",
+        "valueMap": [
+          {
+            "from": "inactive",
+            "to": "Closed - Not Converted"
+          },
+          {
+            "from": "new",
+            "to": "Open - Not Contacted"
+          },
+          {
+            "from": "qualified",
+            "to": "Working - Contacted"
+          },
+          {
+            "from": "open",
+            "to": "Open - Not Contacted"
+          }
+        ],
+        "requiredEvidenceRefs": [
+          "ev_cee45a4417b4c933"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.addressLine1",
+      "lead.annualRevenue",
+      "lead.company",
+      "lead.lastName",
+      "lead.state",
+      "lead.status",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [
+      "VALUE_MAP"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "508fc53e1396ed85d75c833afead6c73b7670aed5010458fc2ef86a1ae784619"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false,
+            "label": "Lead Status",
+            "options": [
+              "Open - Not Contacted",
+              "Working - Contacted",
+              "Closed - Converted",
+              "Closed - Not Converted"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Sobrenome",
+        "fieldRef": "src:Sobrenome",
+        "valueClass": "TEXT",
+        "values": [
+          "Belenko",
+          "Sovorin",
+          "Tulath",
+          "Wilorin",
+          "Orviko"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Lead Status",
+        "fieldRef": "src:Lead Status",
+        "valueClass": "ENUM",
+        "values": [
+          "inactive",
+          "new",
+          "qualified",
+          "open",
+          "inactive",
+          "new",
+          "qualified"
+        ],
+        "decision": "MAP",
+        "destination": "lead.status",
+        "evidence": [
+          "ev:self"
+        ],
+        "valueMap": [
+          {
+            "from": "inactive",
+            "to": "Closed - Not Converted"
+          },
+          {
+            "from": "new",
+            "to": "Open - Not Contacted"
+          },
+          {
+            "from": "qualified",
+            "to": "Working - Contacted"
+          },
+          {
+            "from": "open",
+            "to": "Open - Not Contacted"
+          }
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "VALUE_MAP"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_2e3678159e25",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Sobrenome",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b54be356d372772d124236a2",
+    "kc_4f512c4268cacce913695de5"
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-189-cap10-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-189-cap10-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "fab65dead0960a70f211652768295d070911744b84cb3e9f6a7ab9b40b306a4a",
+      "candidateSetHash": "fd7462a69f49114881220f244b8fd5b9bc424acc8b118c1885ae5271e9e29018",
+      "targetContractHash": null,
+      "projectRevisionHash": "71791754165bb203b3d0cec21f66fd507c7c69f81cfecf96fceee978b4a24c06"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Indirizzo email",
+        "sourceFieldRef": "fld_454ace165a54767a",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Città",
+        "sourceFieldRef": "fld_5b7b1f41e45a3742",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Ruolo",
+        "sourceFieldRef": "fld_b0070f0c4c9a7ef8",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_2f8483f2a08ce470",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.doNotCall",
+      "contact.email",
+      "contact.jobTitle"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c209072e18473177c9aeb5e0ac59b8db657fd315c84b0f6cfc4c5fcdb2a357b0"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Indirizzo email",
+        "fieldRef": "src:Indirizzo email",
+        "valueClass": "EMAIL",
+        "values": [
+          "quelia.pelrane0@sample.invalid",
+          "lumel.finell1@corp.example.test",
+          "halis.finunda2@sample.invalid",
+          "vexia.orvrane3@corp.example.test",
+          "zeris.lumenko4@sample.invalid",
+          "quelan.orvrane5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Città",
+        "fieldRef": "src:Città",
+        "valueClass": "TEXT",
+        "values": [
+          "  Valmora",
+          "Quenby ",
+          "  Kelmar",
+          "Kelmar ",
+          "  Orvale",
+          "Kelmar "
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Ruolo",
+        "fieldRef": "src:Ruolo",
+        "valueClass": "TEXT",
+        "values": [
+          "Operations lead",
+          "Operations lead",
+          "Controller",
+          "Buyer",
+          "Account manager",
+          "Operations lead"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-9",
+          "R-11",
+          "R-54",
+          "R-18",
+          "R-11",
+          "R-14"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_bb81c1808b74",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Città",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_851e0b1d82d5",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ruolo",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_96c4c19793891e55f3b6023c",
+    "kc_dae6a2be62567c7395ec09ce"
+  ]
+}

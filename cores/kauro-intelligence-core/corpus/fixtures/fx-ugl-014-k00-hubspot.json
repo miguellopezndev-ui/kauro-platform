@@ -1,0 +1,186 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-014-k00-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-014-k00-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "90fdd3a910f93dd275b83083bda3bbdd3d2d0c07dce4cc397adc2e6f227e663c",
+      "candidateSetHash": "f2b62e36fbf164a50887392b07b7e7361474ec2b41a66dfeefcb1693220ba530",
+      "targetContractHash": "tc_1d875b3d9f61404d8b01d9eca91ccae044c81fa9585f4628d3e1999e9c6a05ec",
+      "projectRevisionHash": "dba0a4f99be47f25b93e59040bd1b1269424ebdfaa8709aad6fec723a2dfd872"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_4fabcbd7ec66ffb2",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "País",
+        "sourceFieldRef": "fld_42d18d87acd52c63",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Nombre",
+        "sourceFieldRef": "fld_5a2152d8809bad1e",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "61611a25914e3c73cfdc25bbed7c8f1b81db436b57a593980dd962df1b88c456"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "pelia.sovquist0@corp.example.test",
+          "luman.vexiko1@example.test",
+          "orvia.norvik2@corp.example.test",
+          "orvek.yanenko3@corp.example.test",
+          "yanek.vexenko4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "País",
+        "fieldRef": "src:País",
+        "valueClass": "TEXT",
+        "values": [
+          "Valdoria",
+          "Norvania",
+          "Estmark",
+          "Estmark",
+          "Norvania"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Nombre",
+        "fieldRef": "src:Nombre",
+        "valueClass": "TEXT",
+        "values": [
+          "Pelia",
+          "Keso",
+          "Lumel",
+          "Daris",
+          "Halel"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:multilingual",
+      "lang:es"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_8b3abde946d1",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Correo electrónico",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_378d4033b214",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "País",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_bf46428950e1",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nombre",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_a72b123f05b704bb31fec987",
+    "kc_c5db68577bf842c45295edb9"
+  ]
+}

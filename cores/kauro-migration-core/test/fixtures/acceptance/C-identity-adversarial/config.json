@@ -1,0 +1,105 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "legacy_crm",
+    "namespace": "unused-default"
+  },
+  "target": {
+    "mode": "HUBSPOT",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "crma",
+      "path": "crm-a.csv",
+      "format": "CSV",
+      "sourceSystem": "crm_a",
+      "sourceNamespace": "acme-crm-a"
+    },
+    {
+      "id": "crmb",
+      "path": "crm-b.csv",
+      "format": "CSV",
+      "sourceSystem": "crm_b",
+      "sourceNamespace": "acme-crm-b"
+    }
+  ],
+  "records": [
+    {
+      "id": "contacts-a",
+      "fileId": "crma",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        {
+          "column": {
+            "header": "Job Title"
+          },
+          "destinationField": "contact.jobTitle",
+          "semanticType": "TEXT"
+        }
+      ]
+    },
+    {
+      "id": "contacts-b",
+      "fileId": "crmb",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        {
+          "column": {
+            "header": "Job Title"
+          },
+          "destinationField": "contact.jobTitle",
+          "semanticType": "TEXT"
+        }
+      ]
+    }
+  ]
+}

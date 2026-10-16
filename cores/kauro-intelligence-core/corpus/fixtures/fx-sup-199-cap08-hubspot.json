@@ -1,0 +1,334 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-199-cap08-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-199-cap08-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "c91d0922a64be69cf335c75021499d3dec2926c561ba5eae2caad4cba5c35265",
+      "candidateSetHash": "32f9ab4dfd70734733e77c02bb91b91bd00f6fa16d0063a8bd430f40d1c43f10",
+      "targetContractHash": "tc_f47bf47972faa6284b4f8fb1325309c431fd8e1a741863a33c3e42c33015a416",
+      "projectRevisionHash": "c25f471f6962a4c01ab09210e8f23be8e7048546e7f390d46ee920a8815fa25e"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_d29d9eccac8bd0b0",
+        "decision": "PRESERVE",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_7527d467f77cd0ad",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Job title",
+        "sourceFieldRef": "fld_b4176ad4761c2e66",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_8a3243d5dca328af",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_f2c576a6f2806663",
+        "decision": "PRESERVE",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Deal reference",
+        "sourceFieldRef": "fld_ac8843c3b5ff3b8a",
+        "decision": "PRESERVE",
+        "filePath": "people.csv",
+        "associatesWith": "deals.csv"
+      },
+      {
+        "sourceHeader": "Deal ID",
+        "sourceFieldRef": "fld_28325548be6bf468",
+        "decision": "PRESERVE",
+        "filePath": "deals.csv"
+      },
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_26889723f3c8687f",
+        "decision": "MAP",
+        "destinationField": "deal.name",
+        "filePath": "deals.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.website",
+      "contact.source_id",
+      "deal.name",
+      "deal.ownerEmail",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Legacy system id",
+      "Deal reference",
+      "Deal ID"
+    ],
+    "expectedTaskTypes": [
+      "ASSOCIATION_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "29d588e8429a9c7dbe0b1bb1710faaeb4862ea20658d28cd56a46b4c76ac0f4f"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "people.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "deals.csv": {
+          "object": "DEAL",
+          "recordIdColumn": "Deal ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:people.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-283",
+          "P-284",
+          "P-285",
+          "P-286",
+          "P-287"
+        ],
+        "decision": "PRESERVE",
+        "file": "people.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:people.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "vexia.lumorin0@example.test",
+          "lumo.tuldell1@corp.example.test",
+          "vexek.wilunda2@example.test",
+          "lumel.kesenko3@sample.invalid",
+          "sovan.noraly4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "people.csv"
+      },
+      {
+        "header": "Job title",
+        "fieldRef": "src:people.csv:Job title",
+        "valueClass": "TEXT",
+        "values": [
+          "Operations lead",
+          "Account manager",
+          "Account manager",
+          "Account manager",
+          "Operations lead"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "file": "people.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:people.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Kesunda",
+          "Finiko",
+          "Halaly",
+          "Vexath",
+          "Halsorin"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "people.csv"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:people.csv:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L26858",
+          "L92584",
+          "L20813",
+          "L86541",
+          "L29475"
+        ],
+        "decision": "PRESERVE",
+        "file": "people.csv"
+      },
+      {
+        "header": "Deal reference",
+        "fieldRef": "src:people.csv:Deal reference",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "D-122",
+          "D-120",
+          "D-121",
+          "D-120",
+          "D-121"
+        ],
+        "decision": "PRESERVE",
+        "associatesWith": "deals.csv",
+        "file": "people.csv"
+      },
+      {
+        "header": "Deal ID",
+        "fieldRef": "src:deals.csv:Deal ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "D-120",
+          "D-121",
+          "D-122",
+          "D-123"
+        ],
+        "decision": "PRESERVE",
+        "file": "deals.csv"
+      },
+      {
+        "header": "Deal name",
+        "fieldRef": "src:deals.csv:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Pilot 2024 Peldell",
+          "Expansion 2027 Yananth",
+          "Supply contract 2027 Tavova",
+          "Expansion 2024 Mesath"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name",
+        "file": "deals.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "ASSOCIATION_MAPPING"
+    ]
+  },
+  "canaries": [
+    "kc_b0e22a02ab18896522607561",
+    "kc_c2afa8066caf06936ba5b1a8"
+  ]
+}

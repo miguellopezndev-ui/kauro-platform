@@ -1,0 +1,198 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-004-cap05-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-004-cap05-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "8a4ddad4a4159347184d3cbf91e80031048d8bb4ce1773ddc637a17367fac427",
+      "candidateSetHash": "c8c5bd8cd9247f14675a259934e671efe9ab8e42668930969edccfa5ba5ccfda",
+      "targetContractHash": null,
+      "projectRevisionHash": "9a46663e533fde0dd642b7b7876458ee5f43e8cacad887f8936fa2a4b5e51b44"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name - src",
+        "sourceFieldRef": "fld_d3ae3782a5bb1578",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Rating",
+        "sourceFieldRef": "fld_38d12a2d84f294dc",
+        "decision": "MAP",
+        "destinationField": "lead.rating",
+        "requiredEvidenceRefs": [
+          "ev_a042071241f18295"
+        ]
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_c3c6c9f2cd670215",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_1cd080942494dbfb",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.addressLine1",
+      "lead.createdAt",
+      "lead.description",
+      "lead.lastName",
+      "lead.rating"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref",
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "028e8910aef9f42c9963ea32c4908b2c7daa6500f4b19f18bcfa8622974a5871"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "rating",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name - src",
+        "fieldRef": "src:Last name - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumero",
+          "Yanunda",
+          "Messorin",
+          "Yanero"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Rating",
+        "fieldRef": "src:Rating",
+        "valueClass": "ENUM",
+        "values": [
+          "hot",
+          "warm",
+          "cold",
+          "hot",
+          "warm",
+          "cold",
+          "hot",
+          "warm",
+          "cold"
+        ],
+        "decision": "MAP",
+        "destination": "lead.rating",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-9507",
+          "TKT-2482",
+          "TKT-5038",
+          "TKT-9744"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-82",
+          "A-79",
+          "C-47",
+          "C-92"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_85666a5607b1",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Last name - src",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_95f1cb372dc827504e479c07",
+    "kc_c26177ecf6a60d1e649d47a4"
+  ]
+}

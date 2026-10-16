@@ -1,0 +1,206 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-093-k03-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-093-k03-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "8210a63b01eafc592d1158725bfa4990eae2f7fea6a19b4d0b6a343e6778989d",
+      "candidateSetHash": "c9fbda1dd171baa9daa5f1c0513483c3bc0a22903e5ae35322a5016fd1dfb89e",
+      "targetContractHash": null,
+      "projectRevisionHash": "8f167015db31391f53c0d351a5dbc1f07673c7c658576cfe41cedfcc201a578a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_1af9b7e36809c2f0",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Campo 1",
+        "sourceFieldRef": "fld_745f10bf05f9edf8",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Info",
+        "sourceFieldRef": "fld_8817497fd4eb06f1",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_68b3354ea100883a",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lastName",
+      "contact.website",
+      "lead.doNotEmail",
+      "lead.jobTitle",
+      "lead.rating",
+      "lead.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "9e1c2793b9a15b853135887e1b75e401fc34c3e529c3969f1d8c7e798d4502ad"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "rating",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "finan.kesath0@example.test",
+          "finan.sovmar1@corp.example.test",
+          "sovis.risunda2@example.test",
+          "orvel.vexenko3@corp.example.test",
+          "wilel.norquist4@sample.invalid",
+          "keso.jorell5@corp.example.test",
+          "zera.darmar6@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Campo 1",
+        "fieldRef": "src:Campo 1",
+        "valueClass": "MIXED",
+        "values": [
+          "tavia.tuliko0@sample.invalid",
+          "+12025550160",
+          "Vexova Group Ltd",
+          "142",
+          "lumis.queliko4@corp.example.test",
+          "+12025550182",
+          "Quelaly Partners SAS"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Info",
+        "fieldRef": "src:Info",
+        "valueClass": "MIXED",
+        "values": [
+          "lumis.halunda0@corp.example.test",
+          "+447700900893",
+          "Vexsorin Partners LLC",
+          "587",
+          "belel.jorrane4@example.test",
+          "+447700900591",
+          "Tuliko Foods Ltd"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "3c812a96",
+          "dce686e6",
+          "70da7406",
+          "1c5996f0",
+          "1b5a360e",
+          "f8165c11",
+          "a95d7f6d"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:generic-header"
+    ]
+  },
+  "canaries": [
+    "kc_f796e336affea1c4f3266864",
+    "kc_5388d3419fdc4f7b45cb148b"
+  ]
+}

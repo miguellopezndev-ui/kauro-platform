@@ -1,0 +1,186 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-038-k10-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-038-k10-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "8348e2f84cbe8edc7328a0cccef51abe9a48f0cf0d99990e92f6e9170c1923e8",
+      "candidateSetHash": "50ec0087952fb2816552c7b88ba423b31aedc6137d7bd4ad7fe6781897122f75",
+      "targetContractHash": "tc_60dffe7221182119109ce86369b47b30180cc46d5964716fdb7b6d3685cc4649",
+      "projectRevisionHash": "d099cccc1587f1cd8788e07262408e53a73b3b967bea434b1130d0710ebacf5b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Calc",
+        "sourceFieldRef": "fld_ae901bed54df3da7",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "דוא״ל",
+        "sourceFieldRef": "fld_e982dafa8d75e12a",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "שם פרטי",
+        "sourceFieldRef": "fld_ef98bc80639aaf9d",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.description",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Calc"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "d34a4cde0786b485d7615f24a522dd9ea5119ab41d427e1446ad6e809c68d770"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Calc",
+        "fieldRef": "src:Calc",
+        "valueClass": "MIXED",
+        "values": [
+          "=SUM(B2:B9)",
+          "#REF!",
+          "(blank)",
+          "null",
+          "N/A",
+          "0",
+          "#VALUE!"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "דוא״ל",
+        "fieldRef": "src:דוא״ל",
+        "valueClass": "MIXED",
+        "values": [
+          "norel.halenko0@sample.invalid",
+          "#N/A",
+          "kesek.mesquist2@sample.invalid",
+          "",
+          "quela.orvath4@sample.invalid",
+          "halek.halrane5@sample.invalid",
+          "quelel.finiko6@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "שם פרטי",
+        "fieldRef": "src:שם פרטי",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelek",
+          "Halel",
+          "Halel",
+          "Yano",
+          "Wilan"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:spreadsheet-artefacts",
+      "lang:he"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_41de6f2e80d6",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "שם פרטי",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_ccd61da6662d6ccec64d5129",
+    "kc_9077a4a1e1bc3fab077cf512"
+  ]
+}

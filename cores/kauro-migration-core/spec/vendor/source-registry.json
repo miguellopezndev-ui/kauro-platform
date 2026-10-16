@@ -1,0 +1,1332 @@
+{
+  "adapters": [
+    {
+      "adapterVersion": "1.0.0",
+      "associationKeyHeader": "association_key",
+      "booleanText": {
+        "falseText": "false",
+        "trueText": "true"
+      },
+      "fileConstraints": {
+        "delimiter": ",",
+        "encoding": "UTF-8",
+        "headerRowRequired": true,
+        "lineEnding": "LF",
+        "maxColumnsPerFile": 1000,
+        "maxFieldBytes": null,
+        "maxFieldCharacters": null,
+        "maxFileBytes": 1073741824,
+        "maxHeaderRowCharacters": null,
+        "maxRowsPerFile": 5000000
+      },
+      "instanceVerification": [],
+      "objects": [
+        {
+          "destinationMatchingKeys": [],
+          "fields": [
+            {
+              "canonicalField": "contact.addressLine1",
+              "header": "contact.addressLine1",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.city",
+              "header": "contact.city",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.companyName",
+              "header": "contact.companyName",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.country",
+              "header": "contact.country",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.createdAt",
+              "header": "contact.createdAt",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.description",
+              "header": "contact.description",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.doNotCall",
+              "header": "contact.doNotCall",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.doNotEmail",
+              "header": "contact.doNotEmail",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.email",
+              "header": "contact.email",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.firstName",
+              "header": "contact.firstName",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.jobTitle",
+              "header": "contact.jobTitle",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.lastName",
+              "header": "contact.lastName",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.lifecycleStage",
+              "header": "contact.lifecycleStage",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.marketingConsent",
+              "header": "contact.marketingConsent",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.mobilePhone",
+              "header": "contact.mobilePhone",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.ownerEmail",
+              "header": "contact.ownerEmail",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.phone",
+              "header": "contact.phone",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.phoneExtension",
+              "header": "contact.phoneExtension",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.postalCode",
+              "header": "contact.postalCode",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.state",
+              "header": "contact.state",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.website",
+              "header": "contact.website",
+              "maxLength": null
+            }
+          ],
+          "fileName": "contacts.csv",
+          "notes": [
+            "Vendor-neutral output. There is no destination instance, so no destination-side matching happens."
+          ],
+          "object": "CONTACT",
+          "requiredAnyOf": [],
+          "requiredForCreate": [],
+          "supportedModes": [
+            "CREATE_ONLY",
+            "UPDATE_ONLY",
+            "UPSERT"
+          ]
+        },
+        {
+          "destinationMatchingKeys": [],
+          "fields": [
+            {
+              "canonicalField": "company.addressLine1",
+              "header": "company.addressLine1",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.annualRevenue",
+              "header": "company.annualRevenue",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.city",
+              "header": "company.city",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.country",
+              "header": "company.country",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.description",
+              "header": "company.description",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.domain",
+              "header": "company.domain",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.employeeCount",
+              "header": "company.employeeCount",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.industry",
+              "header": "company.industry",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.name",
+              "header": "company.name",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.ownerEmail",
+              "header": "company.ownerEmail",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.phone",
+              "header": "company.phone",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.postalCode",
+              "header": "company.postalCode",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.state",
+              "header": "company.state",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.website",
+              "header": "company.website",
+              "maxLength": null
+            }
+          ],
+          "fileName": "companies.csv",
+          "notes": [
+            "Vendor-neutral output. There is no destination instance, so no destination-side matching happens."
+          ],
+          "object": "COMPANY",
+          "requiredAnyOf": [],
+          "requiredForCreate": [],
+          "supportedModes": [
+            "CREATE_ONLY",
+            "UPDATE_ONLY",
+            "UPSERT"
+          ]
+        },
+        {
+          "destinationMatchingKeys": [],
+          "fields": [
+            {
+              "canonicalField": "deal.amount",
+              "header": "deal.amount",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.closeDate",
+              "header": "deal.closeDate",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.currency",
+              "header": "deal.currency",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.description",
+              "header": "deal.description",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.name",
+              "header": "deal.name",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.ownerEmail",
+              "header": "deal.ownerEmail",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.pipeline",
+              "header": "deal.pipeline",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.stage",
+              "header": "deal.stage",
+              "maxLength": null
+            }
+          ],
+          "fileName": "deals.csv",
+          "notes": [
+            "Vendor-neutral output. There is no destination instance, so no destination-side matching happens."
+          ],
+          "object": "DEAL",
+          "requiredAnyOf": [],
+          "requiredForCreate": [],
+          "supportedModes": [
+            "CREATE_ONLY",
+            "UPDATE_ONLY",
+            "UPSERT"
+          ]
+        },
+        {
+          "destinationMatchingKeys": [],
+          "fields": [
+            {
+              "canonicalField": "lead.addressLine1",
+              "header": "lead.addressLine1",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.annualRevenue",
+              "header": "lead.annualRevenue",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.city",
+              "header": "lead.city",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.company",
+              "header": "lead.company",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.country",
+              "header": "lead.country",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.createdAt",
+              "header": "lead.createdAt",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.description",
+              "header": "lead.description",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.doNotCall",
+              "header": "lead.doNotCall",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.doNotEmail",
+              "header": "lead.doNotEmail",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.email",
+              "header": "lead.email",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.employeeCount",
+              "header": "lead.employeeCount",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.firstName",
+              "header": "lead.firstName",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.industry",
+              "header": "lead.industry",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.jobTitle",
+              "header": "lead.jobTitle",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.lastName",
+              "header": "lead.lastName",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.leadSource",
+              "header": "lead.leadSource",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.mobilePhone",
+              "header": "lead.mobilePhone",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.ownerEmail",
+              "header": "lead.ownerEmail",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.phone",
+              "header": "lead.phone",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.postalCode",
+              "header": "lead.postalCode",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.rating",
+              "header": "lead.rating",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.state",
+              "header": "lead.state",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.status",
+              "header": "lead.status",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.website",
+              "header": "lead.website",
+              "maxLength": null
+            }
+          ],
+          "fileName": "leads.csv",
+          "notes": [
+            "Vendor-neutral output. There is no destination instance, so no destination-side matching happens."
+          ],
+          "object": "LEAD",
+          "requiredAnyOf": [],
+          "requiredForCreate": [],
+          "supportedModes": [
+            "CREATE_ONLY",
+            "UPDATE_ONLY",
+            "UPSERT"
+          ]
+        }
+      ],
+      "relationships": {
+        "COMPANY_TO_DEAL": {
+          "kind": "SUPPORTED",
+          "operatorInstructions": "Each association file lists one row per relationship, addressed by the association key on both sides. The same key appears in the object files, so the two can be joined without either of them carrying Kauro trace identity. Nothing is imported anywhere; the pair is the delivered representation of the edge.",
+          "strategy": "TRACE_KEY_PAIR"
+        },
+        "CONTACT_TO_COMPANY": {
+          "kind": "SUPPORTED",
+          "operatorInstructions": "Each association file lists one row per relationship, addressed by the association key on both sides. The same key appears in the object files, so the two can be joined without either of them carrying Kauro trace identity. Nothing is imported anywhere; the pair is the delivered representation of the edge.",
+          "strategy": "TRACE_KEY_PAIR"
+        },
+        "CONTACT_TO_DEAL": {
+          "kind": "SUPPORTED",
+          "operatorInstructions": "Each association file lists one row per relationship, addressed by the association key on both sides. The same key appears in the object files, so the two can be joined without either of them carrying Kauro trace identity. Nothing is imported anywhere; the pair is the delivered representation of the edge.",
+          "strategy": "TRACE_KEY_PAIR"
+        }
+      },
+      "sources": [
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Vendor-neutral output. Not a CRM import format; used for cleaning without a destination and for cross-target comparison.",
+          "url": "internal://clean-only-target"
+        }
+      ],
+      "vendor": "CLEAN_ONLY"
+    },
+    {
+      "adapterVersion": "2.0.0",
+      "associationKeyHeader": "Association Key",
+      "booleanText": {
+        "falseText": "False",
+        "trueText": "True"
+      },
+      "fileConstraints": {
+        "delimiter": ",",
+        "encoding": "UTF-8",
+        "headerRowRequired": true,
+        "lineEnding": "LF",
+        "maxColumnsPerFile": 999,
+        "maxFieldBytes": 1048576,
+        "maxFieldCharacters": null,
+        "maxFileBytes": 536870912,
+        "maxHeaderRowCharacters": null,
+        "maxRowsPerFile": 1048576
+      },
+      "instanceVerification": [
+        {
+          "detail": "Values for enumeration properties such as Lifecycle stage and Industry must match an option that already exists in the portal, by label or by internal value.",
+          "scope": "ENUMERATIONS",
+          "sourceUrl": "https://knowledge.hubspot.com/import-and-export/set-up-your-import-file"
+        },
+        {
+          "detail": "The deal Currency property only appears once more than one currency is configured, and needs a Starter, Professional or Enterprise subscription.",
+          "scope": "MULTI_CURRENCY",
+          "sourceUrl": "https://knowledge.hubspot.com/import-and-export/set-up-your-import-file"
+        },
+        {
+          "detail": "Every column header must correspond to a property that already exists in the portal. Kauro does not create properties and does not require the portal to carry a Kauro-specific one.",
+          "scope": "PROPERTIES",
+          "sourceUrl": "https://knowledge.hubspot.com/import-and-export/set-up-your-import-file"
+        },
+        {
+          "detail": "Deal Pipeline and Deal Stage values must match existing options, and the stage must belong to the named pipeline. No default pipeline or stage is assumed.",
+          "scope": "PIPELINES",
+          "sourceUrl": "https://knowledge.hubspot.com/import-and-export/set-up-your-import-file"
+        },
+        {
+          "detail": "Owner values must resolve to exactly one active HubSpot user.",
+          "scope": "OWNERS",
+          "sourceUrl": "https://knowledge.hubspot.com/import-and-export/troubleshoot-import-errors"
+        },
+        {
+          "detail": "File size, rows per day and rows per file depend on the portal subscription tier.",
+          "scope": "SUBSCRIPTION",
+          "sourceUrl": "https://knowledge.hubspot.com/import-and-export/set-up-your-import-file"
+        },
+        {
+          "detail": "Whether an email or company domain already exists in the portal, and whether it exists more than once, cannot be seen from files alone.",
+          "scope": "EXISTING_RECORDS",
+          "sourceUrl": "https://knowledge.hubspot.com/records/deduplication-of-records"
+        },
+        {
+          "detail": "The mode (create only, update only, create and update), the date format and the column-header language are chosen by the operator in the import wizard and cannot be declared by the file.",
+          "scope": "IMPORT_MODE",
+          "sourceUrl": "https://knowledge.hubspot.com/import-and-export/import-records-for-a-single-object"
+        },
+        {
+          "detail": "The CRM Imports API requires every column in the file to map to an existing property; unlike the import wizard, it has no \"Don't import column\". The Association Key column must therefore be removed before importing through the API, which also means the API path cannot associate two files. It is never mapped to a property: the association key is a join key for one import, not data belonging in the portal.",
+          "scope": "IMPORT_API",
+          "sourceUrl": "https://developers.hubspot.com/docs/api/crm/imports"
+        },
+        {
+          "detail": "The portal validates email addresses and company domains and refuses the reserved test top-level domains .example, .test, .invalid and .localhost. Source data using them imports as an error per row, not as a stored value.",
+          "scope": "EMAIL_AND_DOMAIN_VALIDATION",
+          "sourceUrl": "https://knowledge.hubspot.com/import-and-export/troubleshoot-import-errors"
+        }
+      ],
+      "objects": [
+        {
+          "destinationMatchingKeys": [
+            "contact.email"
+          ],
+          "fields": [
+            {
+              "canonicalField": "contact.email",
+              "header": "Email",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.firstName",
+              "header": "First name",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.lastName",
+              "header": "Last name",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.phone",
+              "header": "Phone number",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.mobilePhone",
+              "header": "Mobile phone number",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.jobTitle",
+              "header": "Job title",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.companyName",
+              "header": "Company name",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.website",
+              "header": "Website URL",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.addressLine1",
+              "header": "Street address",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.city",
+              "header": "City",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.state",
+              "header": "State/Region",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.postalCode",
+              "header": "Postal code",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.country",
+              "header": "Country/Region",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.ownerEmail",
+              "header": "Contact owner",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.lifecycleStage",
+              "header": "Lifecycle stage",
+              "maxLength": null
+            }
+          ],
+          "fileName": "contacts.csv",
+          "notes": [
+            "HubSpot deduplicates contacts by email address on import regardless of the selected mode, so two different people sharing an address would be merged by the destination.",
+            "Select the import mode in the import wizard; the file cannot declare it."
+          ],
+          "object": "CONTACT",
+          "requiredAnyOf": [],
+          "requiredForCreate": [
+            "contact.email"
+          ],
+          "supportedModes": [
+            "CREATE_ONLY",
+            "UPDATE_ONLY",
+            "UPSERT"
+          ]
+        },
+        {
+          "destinationMatchingKeys": [
+            "company.domain"
+          ],
+          "fields": [
+            {
+              "canonicalField": "company.name",
+              "header": "Name",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.domain",
+              "header": "Company domain name",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.phone",
+              "header": "Phone number",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.website",
+              "header": "Website URL",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.addressLine1",
+              "header": "Street address",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.city",
+              "header": "City",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.state",
+              "header": "State/Region",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.postalCode",
+              "header": "Postal code",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.country",
+              "header": "Country/Region",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.industry",
+              "header": "Industry",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.employeeCount",
+              "header": "Number of employees",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.annualRevenue",
+              "header": "Annual revenue",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.description",
+              "header": "Description",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.ownerEmail",
+              "header": "Company owner",
+              "maxLength": null
+            }
+          ],
+          "fileName": "companies.csv",
+          "notes": [
+            "Companies require at least one of Name or Company domain name.",
+            "Primary and secondary company domain values are used to deduplicate companies on import."
+          ],
+          "object": "COMPANY",
+          "requiredAnyOf": [
+            [
+              "company.name",
+              "company.domain"
+            ]
+          ],
+          "requiredForCreate": [],
+          "supportedModes": [
+            "CREATE_ONLY",
+            "UPDATE_ONLY",
+            "UPSERT"
+          ]
+        },
+        {
+          "destinationMatchingKeys": [],
+          "fields": [
+            {
+              "canonicalField": "deal.name",
+              "header": "Deal name",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.amount",
+              "header": "Amount",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.currency",
+              "header": "Currency",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.closeDate",
+              "header": "Close date",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.stage",
+              "header": "Deal stage",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.pipeline",
+              "header": "Pipeline",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.ownerEmail",
+              "header": "Deal owner",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.description",
+              "header": "Deal description",
+              "maxLength": null
+            }
+          ],
+          "fileName": "deals.csv",
+          "notes": [
+            "Pipeline and Deal stage must match options that already exist in the portal, and the stage must belong to that pipeline. Neither is ever assumed: both come from the captured pipeline artifact."
+          ],
+          "object": "DEAL",
+          "requiredAnyOf": [],
+          "requiredForCreate": [
+            "deal.name",
+            "deal.pipeline",
+            "deal.stage"
+          ],
+          "supportedModes": [
+            "CREATE_ONLY",
+            "UPDATE_ONLY",
+            "UPSERT"
+          ]
+        }
+      ],
+      "relationships": {
+        "COMPANY_TO_DEAL": {
+          "kind": "SUPPORTED",
+          "operatorInstructions": "Run a multiple-object import. Add the key column from the association file to both object files as a common column, then select it in the \"Common column headers found in your files\" menu. Association labels are outside the V1 support envelope, so a two-file import without labels is what this package expects.",
+          "strategy": "TWO_FILE_COMMON_COLUMN"
+        },
+        "CONTACT_TO_COMPANY": {
+          "kind": "SUPPORTED",
+          "operatorInstructions": "Run a multiple-object import. Add the key column from the association file to both object files as a common column, then select it in the \"Common column headers found in your files\" menu. Association labels are outside the V1 support envelope, so a two-file import without labels is what this package expects.",
+          "strategy": "TWO_FILE_COMMON_COLUMN"
+        },
+        "CONTACT_TO_DEAL": {
+          "kind": "SUPPORTED",
+          "operatorInstructions": "Run a multiple-object import. Add the key column from the association file to both object files as a common column, then select it in the \"Common column headers found in your files\" menu. Association labels are outside the V1 support envelope, so a two-file import without labels is what this package expects.",
+          "strategy": "TWO_FILE_COMMON_COLUMN"
+        }
+      },
+      "sources": [
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "File format, sheet and column limits, required properties per object, value formatting, association files.",
+          "url": "https://knowledge.hubspot.com/import-and-export/set-up-your-import-file"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Which objects can be created and which can be updated; unique identifier precedence.",
+          "url": "https://knowledge.hubspot.com/import-and-export/understand-the-import-tool"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Multiple-object import and common column selection.",
+          "url": "https://knowledge.hubspot.com/import-and-export/import-objects"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Documented import error classes, including duplicate identifier handling.",
+          "url": "https://knowledge.hubspot.com/import-and-export/troubleshoot-import-errors"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Destination-side deduplication by email and company domain.",
+          "url": "https://knowledge.hubspot.com/records/deduplication-of-records"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Two-file association imports and the common-column requirement.",
+          "url": "https://knowledge.hubspot.com/import-and-export/sample-import-files"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "The exact labels of the default contact properties this adapter writes as column headers.",
+          "url": "https://knowledge.hubspot.com/properties/hubspots-default-contact-properties"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "The exact labels of the default company properties this adapter writes as column headers.",
+          "url": "https://knowledge.hubspot.com/properties/hubspot-crm-default-company-properties"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "The exact labels of the default deal properties this adapter writes as column headers.",
+          "url": "https://knowledge.hubspot.com/properties/hubspots-default-deal-properties"
+        }
+      ],
+      "vendor": "HUBSPOT"
+    },
+    {
+      "adapterVersion": "2.0.0",
+      "associationKeyHeader": "Kauro_Association_Key__c",
+      "booleanText": {
+        "falseText": "false",
+        "trueText": "true"
+      },
+      "fileConstraints": {
+        "delimiter": ",",
+        "encoding": "UTF-8",
+        "headerRowRequired": true,
+        "lineEnding": "LF",
+        "maxColumnsPerFile": 5000,
+        "maxFieldBytes": null,
+        "maxFieldCharacters": 131072,
+        "maxFileBytes": 104857600,
+        "maxHeaderRowCharacters": 32000,
+        "maxRowsPerFile": null
+      },
+      "instanceVerification": [
+        {
+          "detail": "Update and upsert need a Salesforce Record ID or a field the org already carries with the External ID attribute. Whether such a field exists, and whether it is also marked Unique and case-insensitive, is org configuration. Kauro does not create it.",
+          "scope": "MATCH_FIELD",
+          "sourceUrl": "https://developer.salesforce.com/docs/atlas.en-us.api.meta/api/sforce_api_calls_upsert.htm"
+        },
+        {
+          "detail": "StageName, Lead Status, Lead Source, Rating and other picklist values must exist in the org, and a restricted picklist rejects anything outside its value set.",
+          "scope": "PICKLISTS",
+          "sourceUrl": "https://developer.salesforce.com/docs/atlas.en-us.api.meta/api/field_types.htm"
+        },
+        {
+          "detail": "Where an object has record types, the record type decides which picklist values are available. Which record types exist is org configuration.",
+          "scope": "RECORD_TYPES",
+          "sourceUrl": "https://developer.salesforce.com/docs/atlas.en-us.object_reference.meta/object_reference/sforce_api_objects_recordtype.htm"
+        },
+        {
+          "detail": "Org duplicate rules run on create, update and upsert. Whether a record is blocked or merely flagged is org configuration.",
+          "scope": "DUPLICATE_RULES",
+          "sourceUrl": "https://developer.salesforce.com/docs/atlas.en-us.api.meta/api/sforce_api_header_duplicateruleheader.htm"
+        },
+        {
+          "detail": "Insert Null Values, European date format, field truncation and the time zone are Data Loader settings chosen by the operator. Files are emitted as UTF-8 with ISO 8601 dates so the result does not depend on them.",
+          "scope": "LOADER_SETTINGS",
+          "sourceUrl": "https://developer.salesforce.com/docs/atlas.en-us.dataLoader.meta/dataLoader/loader_params.htm"
+        },
+        {
+          "detail": "Data Loader and the Bulk API are available in Enterprise, Performance, Unlimited and Developer editions; Professional edition needs the API add-on.",
+          "scope": "API_AVAILABILITY",
+          "sourceUrl": "https://developer.salesforce.com/docs/atlas.en-us.dataLoader.meta/dataLoader/data_loader.htm"
+        },
+        {
+          "detail": "CurrencyIsoCode only exists in multi-currency orgs.",
+          "scope": "MULTI_CURRENCY",
+          "sourceUrl": "https://developer.salesforce.com/docs/atlas.en-us.api.meta/api/field_types.htm"
+        }
+      ],
+      "objects": [
+        {
+          "destinationMatchingKeys": [],
+          "fields": [
+            {
+              "canonicalField": "contact.firstName",
+              "header": "FirstName",
+              "maxLength": 40
+            },
+            {
+              "canonicalField": "contact.lastName",
+              "header": "LastName",
+              "maxLength": 80
+            },
+            {
+              "canonicalField": "contact.email",
+              "header": "Email",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.phone",
+              "header": "Phone",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.mobilePhone",
+              "header": "MobilePhone",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.jobTitle",
+              "header": "Title",
+              "maxLength": 50
+            },
+            {
+              "canonicalField": "contact.addressLine1",
+              "header": "MailingStreet",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.city",
+              "header": "MailingCity",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.state",
+              "header": "MailingState",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.postalCode",
+              "header": "MailingPostalCode",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.country",
+              "header": "MailingCountry",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "contact.description",
+              "header": "Description",
+              "maxLength": null
+            }
+          ],
+          "fileName": "Contact.csv",
+          "notes": [
+            "LastName is the only non-nillable Contact field.",
+            "Email carries the idLookup property, so it can serve as a relationship match key, but Salesforce does not deduplicate contacts by email unless the org configures a duplicate rule."
+          ],
+          "object": "CONTACT",
+          "requiredAnyOf": [],
+          "requiredForCreate": [
+            "contact.lastName"
+          ],
+          "supportedModes": [
+            "CREATE_ONLY",
+            "UPDATE_ONLY",
+            "UPSERT"
+          ]
+        },
+        {
+          "destinationMatchingKeys": [],
+          "fields": [
+            {
+              "canonicalField": "company.name",
+              "header": "Name",
+              "maxLength": 255
+            },
+            {
+              "canonicalField": "company.website",
+              "header": "Website",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.phone",
+              "header": "Phone",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.addressLine1",
+              "header": "BillingStreet",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.city",
+              "header": "BillingCity",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.state",
+              "header": "BillingState",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.postalCode",
+              "header": "BillingPostalCode",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.country",
+              "header": "BillingCountry",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.industry",
+              "header": "Industry",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.employeeCount",
+              "header": "NumberOfEmployees",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.annualRevenue",
+              "header": "AnnualRevenue",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "company.description",
+              "header": "Description",
+              "maxLength": null
+            }
+          ],
+          "fileName": "Account.csv",
+          "notes": [
+            "Name is the only non-nillable Account field."
+          ],
+          "object": "COMPANY",
+          "requiredAnyOf": [],
+          "requiredForCreate": [
+            "company.name"
+          ],
+          "supportedModes": [
+            "CREATE_ONLY",
+            "UPDATE_ONLY",
+            "UPSERT"
+          ]
+        },
+        {
+          "destinationMatchingKeys": [],
+          "fields": [
+            {
+              "canonicalField": "lead.firstName",
+              "header": "FirstName",
+              "maxLength": 40
+            },
+            {
+              "canonicalField": "lead.lastName",
+              "header": "LastName",
+              "maxLength": 80
+            },
+            {
+              "canonicalField": "lead.company",
+              "header": "Company",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.email",
+              "header": "Email",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.phone",
+              "header": "Phone",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.mobilePhone",
+              "header": "MobilePhone",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.jobTitle",
+              "header": "Title",
+              "maxLength": 128
+            },
+            {
+              "canonicalField": "lead.website",
+              "header": "Website",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.addressLine1",
+              "header": "Street",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.city",
+              "header": "City",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.state",
+              "header": "State",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.postalCode",
+              "header": "PostalCode",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.country",
+              "header": "Country",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.status",
+              "header": "Status",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.leadSource",
+              "header": "LeadSource",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.rating",
+              "header": "Rating",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.industry",
+              "header": "Industry",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.employeeCount",
+              "header": "NumberOfEmployees",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.annualRevenue",
+              "header": "AnnualRevenue",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.description",
+              "header": "Description",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.doNotCall",
+              "header": "DoNotCall",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "lead.doNotEmail",
+              "header": "HasOptedOutOfEmail",
+              "maxLength": null
+            }
+          ],
+          "fileName": "Lead.csv",
+          "notes": [
+            "LastName is the only Lead field that is both required and not defaulted on create, so it is the only one every row must carry.",
+            "Company is treated as required here even though the field properties mark it nillable, because the field description says Required and because a null Company converts the lead to a person account where person account record types are enabled. Person accounts are outside this envelope, so the safe reading is the stricter one.",
+            "Status is required but defaulted on create, so a row without one still loads. Its values are org-defined and are never assumed here.",
+            "Status, LeadSource, Rating and Industry are advisory picklists rather than restricted ones. Salesforce does not reject an unknown value on load: it silently records an inactive picklist entry. A wrong value therefore fails quietly rather than loudly, which is why these values are checked against the target contract rather than trusted.",
+            "Email is the only Lead field carrying idLookup, so it is the only standard Lead field usable as an upsert match key.",
+            "Street is a textarea rather than a string; the address is written as components, never as the read-only compound Address field.",
+            "Title accepts 128 characters. Lead conversion truncates at 80, but conversion is outside this envelope.",
+            "A Lead is not a Contact. It has its own identity space, so a Lead and a Contact sharing an email address are two records, not one.",
+            "Lead conversion is outside the V1 support envelope. This adapter loads leads; it does not convert them."
+          ],
+          "object": "LEAD",
+          "requiredAnyOf": [],
+          "requiredForCreate": [
+            "lead.lastName",
+            "lead.company"
+          ],
+          "supportedModes": [
+            "CREATE_ONLY",
+            "UPDATE_ONLY",
+            "UPSERT"
+          ]
+        },
+        {
+          "destinationMatchingKeys": [],
+          "fields": [
+            {
+              "canonicalField": "deal.name",
+              "header": "Name",
+              "maxLength": 120
+            },
+            {
+              "canonicalField": "deal.amount",
+              "header": "Amount",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.currency",
+              "header": "CurrencyIsoCode",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.closeDate",
+              "header": "CloseDate",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.stage",
+              "header": "StageName",
+              "maxLength": null
+            },
+            {
+              "canonicalField": "deal.description",
+              "header": "Description",
+              "maxLength": null
+            }
+          ],
+          "fileName": "Opportunity.csv",
+          "notes": [
+            "Name, CloseDate and StageName are the only three non-nillable Opportunity fields.",
+            "Opportunity cannot be loaded with the Data Import Wizard; use Data Loader.",
+            "CurrencyIsoCode only exists in multi-currency orgs.",
+            "A contact on an opportunity is an OpportunityContactRole, a separate object under its own gate. Opportunity does carry a ContactId, and it is not a relationship a migration can use: a real org reports it createable but NOT updateable and carrying no relationship name, so it can be set once at insert, never corrected afterwards, and never resolved by an external id the way a parent lookup is. Writing to it would deliver a link this engine could not later put right."
+          ],
+          "object": "DEAL",
+          "requiredAnyOf": [],
+          "requiredForCreate": [
+            "deal.name",
+            "deal.closeDate",
+            "deal.stage"
+          ],
+          "supportedModes": [
+            "CREATE_ONLY",
+            "UPDATE_ONLY",
+            "UPSERT"
+          ]
+        }
+      ],
+      "relationships": {
+        "COMPANY_TO_DEAL": {
+          "kind": "SUPPORTED",
+          "operatorInstructions": "Load the parent object first, then load the child addressing the parent by an indexed field rather than by Id. Contact-to-Account and Opportunity-to-Account are standard relationships named Account, so the parent is addressed as Account plus the field; the __r form applies only to custom-object relationships. The two supported import paths spell that differently, and getting it wrong is refused rather than ignored: a Bulk API CSV uses a dot, \"Account.Kauro_Key__c\", while Data Loader's mapping file uses a colon, \"Account:Kauro_Key__c\", and rejects the dotted form as an invalid mapping. Data Loader is the qualified path for this envelope. The named field must already exist on the parent and carry the attributes the lookup needs; Kauro does not create it.",
+          "strategy": "RELATIONSHIP_HEADER_BY_DECLARED_MATCH_FIELD"
+        },
+        "CONTACT_TO_COMPANY": {
+          "kind": "SUPPORTED",
+          "operatorInstructions": "Load the parent object first, then load the child addressing the parent by an indexed field rather than by Id. Contact-to-Account and Opportunity-to-Account are standard relationships named Account, so the parent is addressed as Account plus the field; the __r form applies only to custom-object relationships. The two supported import paths spell that differently, and getting it wrong is refused rather than ignored: a Bulk API CSV uses a dot, \"Account.Kauro_Key__c\", while Data Loader's mapping file uses a colon, \"Account:Kauro_Key__c\", and rejects the dotted form as an invalid mapping. Data Loader is the qualified path for this envelope. The named field must already exist on the parent and carry the attributes the lookup needs; Kauro does not create it.",
+          "strategy": "RELATIONSHIP_HEADER_BY_DECLARED_MATCH_FIELD"
+        },
+        "CONTACT_TO_DEAL": {
+          "kind": "UNSUPPORTED",
+          "reason": "Salesforce represents a contact on an opportunity as OpportunityContactRole, a separate object with its own qualification gate. There is no Contact lookup on Opportunity to write to."
+        }
+      },
+      "sources": [
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "What \"required\" means for create and update.",
+          "url": "https://developer.salesforce.com/docs/atlas.en-us.object_reference.meta/object_reference/required_fields.htm"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Account fields, required Name, 255-character limit.",
+          "url": "https://developer.salesforce.com/docs/atlas.en-us.object_reference.meta/object_reference/sforce_api_objects_account.htm"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Contact fields, required LastName, field lengths, Email idLookup.",
+          "url": "https://developer.salesforce.com/docs/atlas.en-us.object_reference.meta/object_reference/sforce_api_objects_contact.htm"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Lead fields, required LastName and Company, field lengths, Status and Rating picklists, DoNotCall and HasOptedOutOfEmail.",
+          "url": "https://developer.salesforce.com/docs/atlas.en-us.object_reference.meta/object_reference/sforce_api_objects_lead.htm"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Opportunity fields, required Name, CloseDate and StageName.",
+          "url": "https://developer.salesforce.com/docs/atlas.en-us.object_reference.meta/object_reference/sforce_api_objects_opportunity.htm"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Accepted date and datetime formats.",
+          "url": "https://developer.salesforce.com/docs/atlas.en-us.api_asynch.meta/api_asynch/datafiles_date_format.htm"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "CSV structure, UTF-8 requirement, header row limit, null sentinel.",
+          "url": "https://developer.salesforce.com/docs/atlas.en-us.api_asynch.meta/api_asynch/datafiles_prepare_csv.htm"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Relationship header syntax for matching parents by an indexed field.",
+          "url": "https://developer.salesforce.com/docs/atlas.en-us.api_asynch.meta/api_asynch/datafiles_csv_rel_field_header_row.htm"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Upsert matching, case sensitivity, duplicate keys within a batch.",
+          "url": "https://developer.salesforce.com/docs/atlas.en-us.api.meta/api/sforce_api_calls_upsert.htm"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Boolean spellings, id lengths, numeric formats, the 1700-4000 date range.",
+          "url": "https://developer.salesforce.com/docs/atlas.en-us.dataLoader.meta/dataLoader/supported_data_types.htm"
+        },
+        {
+          "reviewedOn": "2026-09-01",
+          "scope": "Bulk API limits: 131,072 characters per field, 5,000 fields per record, the daily record allowance.",
+          "url": "https://developer.salesforce.com/docs/atlas.en-us.salesforce_app_limits_cheatsheet.meta/salesforce_app_limits_cheatsheet/salesforce_app_limits_platform_bulkapi.htm"
+        }
+      ],
+      "vendor": "SALESFORCE"
+    }
+  ],
+  "sourceRegistryVersion": "2026-09-06"
+}

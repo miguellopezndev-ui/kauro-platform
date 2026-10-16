@@ -1,0 +1,451 @@
+{
+  "gate": "HSP-TARGET-01 (target contract)",
+  "portalId": "51872453",
+  "portalIdSource": "the captured bundle this gate read; it performs no writes and holds no credential",
+  "route": "API",
+  "contractHash": "tc_8c4767ffc7dda6614910e37bf76913bab738d0f1473aad1bcdbdb2764ad1dc2e",
+  "capturedAt": "2026-09-12T14:02:28Z",
+  "artifacts": [
+    {
+      "path": "access-grant.json",
+      "sha256": "d91abc17361f2fcc99ba8903c0eee5e4b1b1490360aca85584c5248b7cc00011",
+      "byteLength": 649,
+      "kind": "HUBSPOT_ACCESS_GRANT"
+    },
+    {
+      "path": "hubspot-supplement.json",
+      "sha256": "ab35637f94ee987c044dbc2816b855f2c946815b37d3a11a672b74fc0427938f",
+      "byteLength": 351,
+      "kind": "HUBSPOT_SUPPLEMENT"
+    },
+    {
+      "path": "pipelines.csv",
+      "sha256": "686e53b5161b29f049f09d864db70b3d315d8d7124e0113b0e97cd42cc7a7b19",
+      "byteLength": 845,
+      "kind": "HUBSPOT_PIPELINE_ARTIFACT"
+    },
+    {
+      "path": "properties-companies.json",
+      "sha256": "abd0076c706dcfe5008d90f13083b7bad39c9db8affc59f4d4294207d2eb3f14",
+      "byteLength": 576036,
+      "kind": "HUBSPOT_PROPERTY_API"
+    },
+    {
+      "path": "properties-contacts.json",
+      "sha256": "9486184cd872436ac57959d00e7d7479b5799913b557e709a1a6311f423193a1",
+      "byteLength": 553160,
+      "kind": "HUBSPOT_PROPERTY_API"
+    },
+    {
+      "path": "properties-deals.json",
+      "sha256": "bfc1cff79976c5d9d18e23ccc6c56f15342aa19dd437751d6aad4d9b0e51f46e",
+      "byteLength": 201299,
+      "kind": "HUBSPOT_PROPERTY_API"
+    }
+  ],
+  "objects": [
+    {
+      "apiName": "COMPANY",
+      "fields": 244,
+      "uniqueProperties": [
+        "hs_unique_creation_key"
+      ]
+    },
+    {
+      "apiName": "CONTACT",
+      "fields": 402,
+      "uniqueProperties": [
+        "email",
+        "hs_additional_emails",
+        "hs_unique_creation_key"
+      ]
+    },
+    {
+      "apiName": "DEAL",
+      "fields": 206,
+      "uniqueProperties": [
+        "hs_submission_idempotent_id",
+        "hs_unique_creation_key"
+      ]
+    }
+  ],
+  "pipelines": [
+    {
+      "objectApiName": "DEAL",
+      "pipelineInternalName": "default",
+      "stages": [
+        "appointmentscheduled",
+        "qualifiedtobuy",
+        "presentationscheduled",
+        "decisionmakerboughtin",
+        "contractsent",
+        "closedwon",
+        "closedlost"
+      ]
+    }
+  ],
+  "observedAt": "2026-10-02T12:30:31Z",
+  "observedInstance": {
+    "vendor": "hubspot",
+    "instanceId": "51872453",
+    "instancePseudonym": "i_85d7849b12c37767",
+    "observedBy": "the capture manifest of the bundle this gate parsed; this gate holds no credential and performs no writes",
+    "detail": "DEVELOPER_TEST"
+  },
+  "checks": [
+    {
+      "id": "api.CONTACT.everyPropertyRead",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.CONTACT.captureIsCredible",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.CONTACT.everyFieldIsArtifactEvidence",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.CONTACT.uniquenessIsStated",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.CONTACT.portalIsStated",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.CONTACT.ignoredKeysAreRecorded",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.COMPANY.everyPropertyRead",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.COMPANY.captureIsCredible",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.COMPANY.everyFieldIsArtifactEvidence",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.COMPANY.uniquenessIsStated",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.COMPANY.portalIsStated",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.COMPANY.ignoredKeysAreRecorded",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.DEAL.everyPropertyRead",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.DEAL.captureIsCredible",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.DEAL.everyFieldIsArtifactEvidence",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.DEAL.uniquenessIsStated",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.DEAL.portalIsStated",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.DEAL.ignoredKeysAreRecorded",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "api.everyObjectCaptured",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "pipelines.oneDealPipeline",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "pipelines.stageInternalNames",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.portal",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.mode",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.objects",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "grant.captured",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "grant.portalIsStated",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "grant.writeScopesGranted",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.objectsWriteableFromTheGrant",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.flagsUnknownWithoutTheGrant",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "stages.resolveByInternalIdentity",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "stages.unknownLabelResolvesToNothing",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.digestIsStable",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.tamperedTextRefused",
+      "ok": true,
+      "expected": "no failure recorded",
+      "observed": "no failure recorded",
+      "detail": null
+    },
+    {
+      "id": "fields.emailIsCaptured",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "fields.emailUniquenessFromThePortal",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "fields.firstNameIsNotUnique",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "fields.noExternalIdIsClaimed",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "matching.uniquePropertyAccepted",
+      "ok": true,
+      "expected": "no failure recorded",
+      "observed": "no failure recorded",
+      "detail": null
+    },
+    {
+      "id": "matching.recordIdAccepted",
+      "ok": true,
+      "expected": "no failure recorded",
+      "observed": "no failure recorded",
+      "detail": null
+    },
+    {
+      "id": "matching.nonUniquePropertyRefused",
+      "ok": true,
+      "expected": "REFUSED: REQUIRES_AGENCY_DECISION",
+      "observed": "REFUSED: REQUIRES_AGENCY_DECISION",
+      "detail": null
+    },
+    {
+      "id": "matching.uncapturedPropertyRefused",
+      "ok": true,
+      "expected": "REFUSED: REQUIRES_AGENCY_DECISION",
+      "observed": "REFUSED: REQUIRES_AGENCY_DECISION",
+      "detail": null
+    },
+    {
+      "id": "matching.associationKeyRefused",
+      "ok": true,
+      "expected": "REFUSED: association key",
+      "observed": "REFUSED: association key",
+      "detail": null
+    },
+    {
+      "id": "matching.externalIdRefusedForHubSpot",
+      "ok": true,
+      "expected": "REFUSED: EXTERNAL_ID",
+      "observed": "REFUSED: EXTERNAL_ID",
+      "detail": null
+    },
+    {
+      "id": "matching.traceKeyRefused[Kauro Trace Key]",
+      "ok": true,
+      "expected": "REFUSED: trace key",
+      "observed": "REFUSED: trace key",
+      "detail": null
+    },
+    {
+      "id": "matching.traceKeyRefused[kauro_trace_key]",
+      "ok": true,
+      "expected": "REFUSED: trace key",
+      "observed": "REFUSED: trace key",
+      "detail": null
+    },
+    {
+      "id": "matching.traceKeyRefused[KAURO TRACE KEY]",
+      "ok": true,
+      "expected": "REFUSED: trace key",
+      "observed": "REFUSED: trace key",
+      "detail": null
+    },
+    {
+      "id": "matching.traceKeyRefused[kauro trace key]",
+      "ok": true,
+      "expected": "REFUSED: trace key",
+      "observed": "REFUSED: trace key",
+      "detail": null
+    }
+  ],
+  "checksRun": 47,
+  "failures": [],
+  "result": "PASS",
+  "capture": {
+    "captureVersion": "2.0.0",
+    "producer": "qualification/hubspot/run-target-qualification.mjs",
+    "producerFingerprint": "82f85f6bb0605eba30ae6c79e03fb98755de45045da6bca92a48c3f6a979f18e",
+    "producerFiles": 89,
+    "campaignId": "c_c87b11a87f0014e3",
+    "subjectDigestAtStart": "045214ef4302d902047cc4e94652109ef63279cce28315280bb88e7f30759505",
+    "startedAt": "2026-10-02T12:30:31Z",
+    "environment": {
+      "node": "v24.14.1",
+      "platform": "win32",
+      "arch": "x64",
+      "osRelease": "10.0.26300",
+      "cpuCount": 12,
+      "totalMemoryBytes": 14893805568
+    },
+    "producerFingerprintAtEnd": "82f85f6bb0605eba30ae6c79e03fb98755de45045da6bca92a48c3f6a979f18e",
+    "subjectDigestAtEnd": "045214ef4302d902047cc4e94652109ef63279cce28315280bb88e7f30759505",
+    "endedAt": "2026-10-02T12:30:32Z",
+    "valid": true,
+    "invalidation": null
+  }
+}

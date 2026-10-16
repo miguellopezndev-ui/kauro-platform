@@ -1,0 +1,34 @@
+{
+  "id": "G11",
+  "title": "Contacts, companies, deals and their relationships",
+  "intent": "Three relationship shapes at once: a contact pointing at its company, a deal pointing at its company, and a separate file listing contact-to-deal pairs. Every relationship resolves and is delivered exactly once.",
+  "expect": {
+    "rows": { "total": 10, "OUTPUT": 10, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 3, "COMPANY": 2, "DEAL": 2, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 8, "OUTPUT": 8, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "edgeDetails": [
+    { "row": "contacts.csv#2", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "C1", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "contacts.csv#3", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "C2", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "contacts.csv#4", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "C1", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "deals.csv#2", "relationshipType": "COMPANY_TO_DEAL", "fromKeyRaw": "C1", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "deals.csv#3", "relationshipType": "COMPANY_TO_DEAL", "fromKeyRaw": "C2", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "contact-deals.csv#2", "relationshipType": "CONTACT_TO_DEAL", "fromKeyRaw": "1", "toKeyRaw": "D1", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "contact-deals.csv#3", "relationshipType": "CONTACT_TO_DEAL", "fromKeyRaw": "3", "toKeyRaw": "D1", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "contact-deals.csv#4", "relationshipType": "CONTACT_TO_DEAL", "fromKeyRaw": "2", "toKeyRaw": "D2", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" }
+  ],
+  "dispositions": [
+    { "row": "contact-deals.csv#2", "disposition": "OUTPUT", "contributionKind": "ASSOCIATION" },
+    { "row": "contacts.csv#2", "disposition": "OUTPUT", "contributionKind": "RECORD" }
+  ]
+}

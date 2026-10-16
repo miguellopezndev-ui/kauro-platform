@@ -1,0 +1,157 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-032-k04-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-032-k04-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "32ef2790f76421a05d36b63e8d9fa35fbe2280d7d50c854056c0ed12dca6ee28",
+      "candidateSetHash": "7e15cb09e0ddec72e9b90ec83a6e100b1dcccfe0bc117d04918e56fe7308599a",
+      "targetContractHash": "tc_11cafee22e33db42ac896072e47f6245619fd9cb2c38e28aed1cd22807b98517",
+      "projectRevisionHash": "6554dbc8a30fcb57e9f656ff2a524b1740afb70f04309eb662e853c7eb599af2"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrÃĳnico",
+        "sourceFieldRef": "fld_695f68eb0f46bdf0",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "TelÃĩfono mÃĳvil",
+        "sourceFieldRef": "fld_c2d76ce03f7891e3",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "DirecciÃĳn",
+        "sourceFieldRef": "fld_cc074cacf102fa3a",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lastName",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "TelÃĩfono mÃĳvil",
+      "DirecciÃĳn"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "548b57a9a9b76931d130019198761602a6b23ae0dc05d2e743dedb733187920b"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrÃĳnico",
+        "fieldRef": "src:Correo electrÃĳnico",
+        "valueClass": "EMAIL",
+        "values": [
+          "meso.zerunda0@example.test",
+          "vexel.finquist1@sample.invalid",
+          "wilel.mesova2@corp.example.test",
+          "belel.haldell3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "TelÃĩfono mÃĳvil",
+        "fieldRef": "src:TelÃĩfono mÃĳvil",
+        "valueClass": "TEXT",
+        "values": [
+          "+12025550195",
+          "+12025550119",
+          "+447700900643",
+          "+12025550160"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "DirecciÃĳn",
+        "fieldRef": "src:DirecciÃĳn",
+        "valueClass": "TEXT",
+        "values": [
+          "Avenida CaÃıÃĳn 58",
+          "Plaza EspaÃıa 58",
+          "Plaza EspaÃıa 16",
+          "Plaza EspaÃıa 41"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:mojibake",
+      "lang:es",
+      "ugly:encoding"
+    ]
+  },
+  "canaries": [
+    "kc_875f6e8179550639aad6a3d7",
+    "kc_21c0144f9893166e0b258c85"
+  ]
+}

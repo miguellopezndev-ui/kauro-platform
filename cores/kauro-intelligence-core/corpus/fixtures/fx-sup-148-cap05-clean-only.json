@@ -1,0 +1,184 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-148-cap05-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-148-cap05-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5b0db9eb6479468dab70942b403ca36a2aa0317e3fee17303198fe71eeb0d1bf",
+      "candidateSetHash": "1ab47f8d7ab57c933db7f875dbe4f18c6ccf5619bb79222f9567ee4672a9c440",
+      "targetContractHash": null,
+      "projectRevisionHash": "1d74ec2af1e042c9b8d2e5a344811b604b3a6821ee9ff2bba40b24a4ed68ae40"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Nachname",
+        "sourceFieldRef": "fld_18c47e71f27eb05b",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Rating",
+        "sourceFieldRef": "fld_5c2faa6ad6f5175c",
+        "decision": "MAP",
+        "destinationField": "lead.rating",
+        "requiredEvidenceRefs": [
+          "ev_7222772f65f9974b"
+        ]
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_b443a2a155058754",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_bd7a9ac55c4a2ece",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.employeeCount",
+      "lead.lastName",
+      "lead.rating"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag",
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "164b3608f2dbf19b0a4cf388ed023195c89cd79697c6d8b3ae2a0011b2df8ad5"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "rating",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Nachname",
+        "fieldRef": "src:Nachname",
+        "valueClass": "TEXT",
+        "values": [
+          "Risaly",
+          "Lummar",
+          "Wilunda",
+          "Tavrane"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Rating",
+        "fieldRef": "src:Rating",
+        "valueClass": "ENUM",
+        "values": [
+          "hot",
+          "warm",
+          "cold",
+          "hot",
+          "warm",
+          "cold",
+          "hot"
+        ],
+        "decision": "MAP",
+        "destination": "lead.rating",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "red",
+          "green",
+          "amber",
+          "amber"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "592ce41d",
+          "7a184ae8",
+          "6de20ece",
+          "9008ca11"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_6f8adc1bab8f",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nachname",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_ae9e1f471fdba203d5e0da5a",
+    "kc_d4e61cfbdffe6b4a82af1ffa"
+  ]
+}

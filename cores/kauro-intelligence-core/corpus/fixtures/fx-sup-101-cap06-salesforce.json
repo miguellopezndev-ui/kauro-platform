@@ -1,0 +1,181 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-101-cap06-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-101-cap06-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "609da16be28f83122cec171491e8d9abc28588b1af72a6d3899466fc297723e4",
+      "candidateSetHash": "d22be7ec4286b8c9e1b83d70eb9aa34e4d8248c374690181fb0023f1858dfadb",
+      "targetContractHash": "tc_e43c36753b253e74ca7716ecee261908fe5248655189587ef20a5c9cfb971c01",
+      "projectRevisionHash": "a811c6a44e1bb33414987ae10d5fdab89a8f2d024403d3160be566907b80148c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_f2f4cf5cbd3457a1",
+        "decision": "MAP",
+        "destinationField": "lead.email",
+        "requiredEvidenceRefs": [
+          "ev_4f5776893b7645c4"
+        ]
+      },
+      {
+        "sourceHeader": "Apellidos",
+        "sourceFieldRef": "fld_236070af762fa3ae",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_7065c889003bfa7f",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.city",
+      "lead.company",
+      "lead.email",
+      "lead.lastName",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "cea85ceb05012f77c9edf2b25ff6085b44f9840c4f726b43c0f24a1fbe43a307"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "orvis.mesaly0@corp.example.test",
+          "risek.tavdell1@example.test",
+          "tulis.finsorin2@example.test",
+          "jorek.vexsorin3@corp.example.test",
+          "nora.kesunda4@sample.invalid",
+          "lumia.quelaly5@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "lead.email",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Apellidos",
+        "fieldRef": "src:Apellidos",
+        "valueClass": "TEXT",
+        "values": [
+          "Daraly",
+          "Belsorin",
+          "Belell",
+          "Mesquist",
+          "Jordell",
+          "Finiko"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-19",
+          "batch-33",
+          "batch-8",
+          "batch-33",
+          "batch-34",
+          "batch-32"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_fc74842885fa",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Apellidos",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_20ffdb1f3653ea61bf17def0",
+    "kc_19363bd076e4a97d9fabede3"
+  ]
+}

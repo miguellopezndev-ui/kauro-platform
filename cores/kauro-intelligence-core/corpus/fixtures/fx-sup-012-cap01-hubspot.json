@@ -1,0 +1,251 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-012-cap01-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-012-cap01-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "fd3c3adde2d2c6c42db09308d7c1b87f4463de59579623c6c6ed6020649e2026",
+      "candidateSetHash": "c1f9aa90a783a9e7035d0389dbddf123db0b44ab41eb53e4f532b6c2d3f30f26",
+      "targetContractHash": "tc_bb14da9c467036de650c45b59512f2ded16c16d4c91afdd405ca515df9fe8569",
+      "projectRevisionHash": "d0ed1804693bc4eae3a20afcf6ed3353a775b14666a5b3dc283ac0dee6dbc15f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Cargo - src",
+        "sourceFieldRef": "fld_351a1b168288a02b",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Correo electrónico (export)",
+        "sourceFieldRef": "fld_57450d8c4ac8b600",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "País (CRM)",
+        "sourceFieldRef": "fld_82ce8de286e71fc3",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "company.country"
+    ],
+    "expectedTargetUniverse": [
+      "company.country",
+      "company.name",
+      "company.postalCode",
+      "company.source_id",
+      "contact.country",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.source_id",
+      "deal.name",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "fb48134d8da46b9296953b5e67fde9fd042ca42205424e50e295e1439ac2a324"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Cargo - src",
+        "fieldRef": "src:Cargo - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Operations lead",
+          "Operations lead",
+          "Controller"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Correo electrónico (export)",
+        "fieldRef": "src:Correo electrónico (export)",
+        "valueClass": "EMAIL",
+        "values": [
+          "luma.tavunda0@sample.invalid",
+          "quelek.tavero1@corp.example.test",
+          "zerel.mesiko2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "País (CRM)",
+        "fieldRef": "src:País (CRM)",
+        "valueClass": "TEXT",
+        "values": [
+          "Estmark",
+          "Norvania",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      }
+    ],
+    "forbiddenDestinations": [
+      "company.country"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_0e91b6f67e70",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cargo - src",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_d5487c2fc912",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Correo electrónico (export)",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_4e3264b7313e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "País (CRM)",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_76215908532f1f540ff6d90a",
+    "kc_2a8e8f594de7f41d40d1c6e4"
+  ]
+}

@@ -1,0 +1,257 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-208-cap05-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-208-cap05-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "118971111fd2da0c570e176408b905238f7231f625e980f8e30d8f75820dcbbb",
+      "candidateSetHash": "300226563c85636e5dd19f5a76202c7066365576975011eee3f818f56a386555",
+      "targetContractHash": "tc_f0c5f4a39e0d38367ea71ab204dd2b9cced7215ff0c6310362cae9110ccf76c1",
+      "projectRevisionHash": "fe230c61ce0596ab16e551d33744bd4d391cba8ca0b7d551307bad216a319ea8"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Oportunidad",
+        "sourceFieldRef": "fld_a55d451af9e6a436",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Stage",
+        "sourceFieldRef": "fld_b12aba6841e92431",
+        "decision": "MAP",
+        "destinationField": "deal.stage",
+        "valueMap": [
+          {
+            "from": "new",
+            "to": "Prospecting"
+          },
+          {
+            "from": "inactive",
+            "to": "Closed Lost"
+          },
+          {
+            "from": "active",
+            "to": "Negotiation"
+          }
+        ],
+        "requiredEvidenceRefs": [
+          "ev_4628789174b82585"
+        ]
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_62ce362ab7000e2e",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_aa8bce79b017c951",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.currency",
+      "deal.description",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin",
+      "Folder code"
+    ],
+    "expectedTaskTypes": [
+      "VALUE_MAP"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "d3d59809716d9680ac1e7e731b87702c249cf2faf754d90084abecb8f4a8e911"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": true,
+            "label": "Stage",
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Oportunidad",
+        "fieldRef": "src:Oportunidad",
+        "valueClass": "TEXT",
+        "values": [
+          "Expansion 2027 Belvik",
+          "Pilot 2024 Finiko",
+          "Expansion 2027 Finunda",
+          "Expansion 2024 Halvik",
+          "Pilot 2024 Sovell"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Stage",
+        "fieldRef": "src:Stage",
+        "valueClass": "ENUM",
+        "values": [
+          "new",
+          "inactive",
+          "active",
+          "new",
+          "inactive",
+          "active",
+          "new",
+          "inactive",
+          "active",
+          "new",
+          "inactive"
+        ],
+        "decision": "MAP",
+        "destination": "deal.stage",
+        "evidence": [
+          "ev:self"
+        ],
+        "valueMap": [
+          {
+            "from": "new",
+            "to": "Prospecting"
+          },
+          {
+            "from": "inactive",
+            "to": "Closed Lost"
+          },
+          {
+            "from": "active",
+            "to": "Negotiation"
+          }
+        ]
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "B-69",
+          "A-63",
+          "A-29",
+          "C-15",
+          "A-98"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F550",
+          "F749",
+          "F282",
+          "F354",
+          "F756"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "VALUE_MAP"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_6d181bdc3849",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Oportunidad",
+        "targetField": "deal.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_5da3a8f70c9d20c5e4157039",
+    "kc_086c447645c6b6941c7781c4"
+  ]
+}

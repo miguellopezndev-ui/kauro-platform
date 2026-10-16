@@ -1,0 +1,126 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-051-k09-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-051-k09-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "f2f782b534cd839a07c231efc34b2e085706742b94e96da52442a95d914232d9",
+      "candidateSetHash": "933710b798b53406116bf6d993a4a34b243ad1b64dc36abc6d7a0e1533a126ec",
+      "targetContractHash": null,
+      "projectRevisionHash": "83bcf220778bcdd5b629283be1447966aeab89e47d7e220eef11e04a8c551106"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_34d93830b3646287",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.employeeCount",
+      "company.ownerEmail",
+      "company.phone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "5f2bb095c9a7e6562cc79da016a952c828cdc4c83c82937c790816078b8f2cce"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "MIXED",
+        "values": [
+          "３５３８４",
+          "４５９４６",
+          "５５３４６",
+          "７６２４１",
+          "６７４７６",
+          "３８５６"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:cjk-fullwidth",
+      "lang:ja",
+      "ugly:encoding"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_a0d005333e59",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Employees",
+        "targetField": "company.employeeCount"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_586656a99e141dfb6912bae4",
+    "kc_699e15cbd5f30a2bdac537be"
+  ]
+}

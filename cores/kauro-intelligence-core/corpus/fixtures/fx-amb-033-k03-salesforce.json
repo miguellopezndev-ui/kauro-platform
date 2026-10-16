@@ -1,0 +1,219 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-033-k03-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-033-k03-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "4cfc7ba1c8134409ae38673bcd34cf90bf4628bb781f5314a7427b180f83430b",
+      "candidateSetHash": "e397bbf92a3f0c770d6b344ba0e0b6981856d7d9230f31141e5e27e69bb4bb16",
+      "targetContractHash": "tc_00b6a89f5eaa118771c5eda36973dfe1bd177ebe59bc2fc810c8bb2d61083959",
+      "projectRevisionHash": "b3aa1bda242f09fc9701037d6ff886ff9b96cee187d79b084349975df206570f"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Info",
+        "sourceFieldRef": "fld_cc55cbc72a55d621",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Champ A",
+        "sourceFieldRef": "fld_a34d7ba26a143395",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_10c6da3b33def5e2",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.name",
+      "company.source_id",
+      "contact.country",
+      "contact.lastName",
+      "contact.state",
+      "contact.source_id",
+      "lead.company",
+      "lead.country",
+      "lead.doNotEmail",
+      "lead.lastName",
+      "lead.website",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "15d521d672226955e224ce04692bf86ccf727f8cf3458cd98b5d95b82abe8dd8"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Info",
+        "fieldRef": "src:Info",
+        "valueClass": "MIXED",
+        "values": [
+          "tavan.sovaly0@example.test",
+          "+447700900157",
+          "Mesenko Labs Inc.",
+          "651",
+          "sovan.yanero4@corp.example.test"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Champ A",
+        "fieldRef": "src:Champ A",
+        "valueClass": "MIXED",
+        "values": [
+          "zeris.yanunda0@example.test",
+          "+447700900774",
+          "Haliko Partners SAS",
+          "213",
+          "norel.kesenko4@example.test"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "HD",
+          "BG",
+          "GB",
+          "LF",
+          "DN"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:generic-header"
+    ]
+  },
+  "canaries": [
+    "kc_93bfb24f1e0531666db126d2",
+    "kc_fa23c077fcbae1439f686f49"
+  ]
+}

@@ -1,0 +1,172 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-084-k00-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-084-k00-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "d0d5ee1968387eb89991be3727dac83429fb628fbb62ab8d33769a3eb96b10ae",
+      "candidateSetHash": "25b8bd1396406906257343c00bdd32f4faac5b54d7f0df28d98996c1044ffb90",
+      "targetContractHash": null,
+      "projectRevisionHash": "758eea6c764004bbd4bb5343d9495d78f763176847d5572ef23dabadd12fb729"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-mailadres",
+        "sourceFieldRef": "fld_58d5b0737681e28c",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Stad",
+        "sourceFieldRef": "fld_59136d58d6082937",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Functie",
+        "sourceFieldRef": "fld_4f2af32648943377",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.jobTitle"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "50541e8fcae58a7913c91194350fb777837830228f544cf27547fc349cf85a10"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-mailadres",
+        "fieldRef": "src:E-mailadres",
+        "valueClass": "EMAIL",
+        "values": [
+          "pelek.vexova0@corp.example.test",
+          "finel.jorath1@corp.example.test",
+          "pelia.yanrane2@example.test",
+          "daris.darmar3@sample.invalid",
+          "finan.noraly4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Stad",
+        "fieldRef": "src:Stad",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "Nuvia",
+          "Brandel",
+          "Valmora",
+          "Orvale"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Functie",
+        "fieldRef": "src:Functie",
+        "valueClass": "TEXT",
+        "values": [
+          "Controller",
+          "Controller",
+          "Account manager",
+          "Operations lead",
+          "Buyer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:multilingual",
+      "lang:nl"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_c6327e43c858",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Stad",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_aefa9f18fb4e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Functie",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_25557af768e2cdae6d971994",
+    "kc_9d24e8843394d2712c9a937e"
+  ]
+}

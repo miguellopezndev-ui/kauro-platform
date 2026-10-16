@@ -1,0 +1,218 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-ugl-106-k08-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-106-k08-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "993b3e098454b40b175e90ec6b87618cba2ba7ba3443f206e9ac62d5de4a3f7e",
+      "candidateSetHash": "b6dc55c13b85d858d2557946fffef4c9d2230612ac80fc955aece05812591b1f",
+      "targetContractHash": "tc_994edc045d188f997efed3542f20e10e33e15a9788285a49955cfbd9a2d1a946",
+      "projectRevisionHash": "3ec3d62000b43db3489324ad045e7d8eb68022146d78574b5fda2689178e59ee"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "שם פרטי",
+        "sourceFieldRef": "fld_8e2f5b4b67adfb8d",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "דוא״ל",
+        "sourceFieldRef": "fld_27e5441baada26fd",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "מדינה",
+        "sourceFieldRef": "fld_54a9e475b7996c5b",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "עיר / כתובת",
+        "sourceFieldRef": "fld_72379d9c18e0f197",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.companyName",
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "עיר / כתובת"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c7500b9182bb89f7b09f62a29c7b8b4aa14b57db1167f99458802f2c3a2084e3"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "שם פרטי",
+        "fieldRef": "src:שם פרטי",
+        "valueClass": "TEXT",
+        "values": [
+          "Luma",
+          "Tulel",
+          "Pelek",
+          "Wilel",
+          "Joro"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "דוא״ל",
+        "fieldRef": "src:דוא״ל",
+        "valueClass": "EMAIL",
+        "values": [
+          "finek.wilrane0@example.test",
+          "tulo.wilero1@sample.invalid",
+          "yano.yanaly2@example.test",
+          "kesel.norvik3@example.test",
+          "belo.orvell4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "מדינה",
+        "fieldRef": "src:מדינה",
+        "valueClass": "TEXT",
+        "values": [
+          "Norvania",
+          "Valdoria",
+          "Estmark",
+          "Valdoria",
+          "Norvania"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "עיר / כתובת",
+        "fieldRef": "src:עיר / כתובת",
+        "valueClass": "TEXT",
+        "values": [
+          "القاهرة 7",
+          "القاهرة 7",
+          "ירושלים 12",
+          "Valmora القاهرة",
+          "القاهرة 7"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:rtl",
+      "lang:he"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_f385b367bda1",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "שם פרטי",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_4281659b78a3",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "דוא״ל",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_589966a29a2c",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "מדינה",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_55b45c4cdd892287bf8ebca8",
+    "kc_724014b33b6fa1e33deebf23"
+  ]
+}

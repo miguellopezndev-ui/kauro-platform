@@ -1,0 +1,128 @@
+{
+  "partition": "FINAL",
+  "fileName": "seed-cap09-unmapped.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "seed-cap09-unmapped",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "14047fb53e9c674196ecb938d264f8d35081f672b818df668bc4512d2c08c1c2",
+      "candidateSetHash": "a0350ac560185e1e85fdb08effb3788a4dbce76e359570f7369939274b4207ef",
+      "targetContractHash": null,
+      "projectRevisionHash": "c9bb778811885f348345d56d300aefcc161b4b41cbae6670bf0d6864d3aaa3f1"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_6e0f7cedbbcf3cab",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "備考",
+        "sourceFieldRef": "fld_c66da0745036ad10",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Notas internas (2019)",
+        "sourceFieldRef": "fld_b5880579a2f2a12e",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "備考",
+      "Notas internas (2019)"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "cc62dd56827365d40210d2454cff5ac24d203cd8a271757ca78a7c06e4262952"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "marta@example.test",
+          "pablo@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "備考",
+        "fieldRef": "src:備考",
+        "valueClass": "FREE_TEXT",
+        "values": [
+          " 古い情報",
+          "n/a"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Notas internas (2019)",
+        "fieldRef": "src:Notas internas (2019)",
+        "valueClass": "FREE_TEXT",
+        "values": [
+          "obsoleto",
+          "revisar"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_8caedaa457a01353bb2c7ef9",
+    "kc_519549c4047b2c751c7e952a"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g32-absorbed-flag"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "policies": {
+    "mergeFieldConflict": "PREFER_SURVIVOR",
+    "mergeFieldConflictJustification": "the operator confirmed the first row of each duplicate pair is the current one"
+  },
+  "files": [
+    {
+      "id": "contacts",
+      "path": "contacts.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Phone"
+          },
+          "destinationField": "contact.phone",
+          "semanticType": "PHONE"
+        }
+      ]
+    }
+  ]
+}

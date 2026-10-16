@@ -1,0 +1,441 @@
+{
+  "associations": [],
+  "configVersion": "3.0.0",
+  "destinationMatching": [],
+  "files": [
+    {
+      "delimiter": null,
+      "encoding": null,
+      "format": "CSV",
+      "id": "crma",
+      "path": "crm-a.csv",
+      "sheets": null,
+      "sourceNamespace": "acme-crm-a",
+      "sourceSystem": "crm_a"
+    },
+    {
+      "delimiter": null,
+      "encoding": null,
+      "format": "CSV",
+      "id": "crmb",
+      "path": "crm-b.csv",
+      "sheets": null,
+      "sourceNamespace": "acme-crm-b",
+      "sourceSystem": "crm_b"
+    }
+  ],
+  "limits": {
+    "maxBytesPerFile": 104857600,
+    "maxCellLength": 65536,
+    "maxColumnsPerSheet": 1000,
+    "maxFiles": 50,
+    "maxRecordBytes": 1048576,
+    "maxRowsPerSheet": 250000,
+    "maxSheetsPerFile": 25,
+    "maxTotalBytes": 524288000,
+    "maxWorkbookPartUncompressedBytes": 134217728,
+    "maxWorkbookUncompressedBytes": 268435456
+  },
+  "localeEvidence": {
+    "dateFormat": null,
+    "decimalSeparator": null,
+    "phoneCountry": null,
+    "thousandsSeparator": null
+  },
+  "occurrences": [],
+  "policies": {
+    "blankRow": "REJECT_ROW",
+    "destinationKeyConflict": "ISOLATE",
+    "formulaCachedValues": "ISOLATE_ROW",
+    "mergeFieldConflict": "ISOLATE_RECORD",
+    "mergeFieldConflictJustification": null,
+    "rowShapeMismatch": "REJECT_ROW"
+  },
+  "records": [
+    {
+      "authoritativeExternalIdColumns": [],
+      "fields": [
+        {
+          "column": {
+            "header": "First Name",
+            "index": null,
+            "occurrence": null
+          },
+          "destinationField": "contact.firstName",
+          "onAmbiguous": "PRESERVE",
+          "onInvalid": "PRESERVE",
+          "options": {
+            "allowedValues": null,
+            "caseTransform": "PRESERVE",
+            "clearWhenMatches": [],
+            "dateFormat": null,
+            "decimalSeparator": null,
+            "destructiveAuthorization": false,
+            "extensionDestinationField": null,
+            "falseValues": [
+              "false",
+              "no",
+              "n",
+              "0"
+            ],
+            "lowercaseDomain": true,
+            "phoneCountry": null,
+            "phoneCountryColumn": null,
+            "thousandsSeparator": null,
+            "timezone": null,
+            "timezoneOffset": null,
+            "trim": false,
+            "trueValues": [
+              "true",
+              "yes",
+              "y",
+              "1"
+            ],
+            "unicodeNormalization": "PRESERVE",
+            "valueMap": []
+          },
+          "required": false,
+          "semanticType": "TEXT",
+          "semanticsClass": null
+        },
+        {
+          "column": {
+            "header": "Last Name",
+            "index": null,
+            "occurrence": null
+          },
+          "destinationField": "contact.lastName",
+          "onAmbiguous": "PRESERVE",
+          "onInvalid": "PRESERVE",
+          "options": {
+            "allowedValues": null,
+            "caseTransform": "PRESERVE",
+            "clearWhenMatches": [],
+            "dateFormat": null,
+            "decimalSeparator": null,
+            "destructiveAuthorization": false,
+            "extensionDestinationField": null,
+            "falseValues": [
+              "false",
+              "no",
+              "n",
+              "0"
+            ],
+            "lowercaseDomain": true,
+            "phoneCountry": null,
+            "phoneCountryColumn": null,
+            "thousandsSeparator": null,
+            "timezone": null,
+            "timezoneOffset": null,
+            "trim": false,
+            "trueValues": [
+              "true",
+              "yes",
+              "y",
+              "1"
+            ],
+            "unicodeNormalization": "PRESERVE",
+            "valueMap": []
+          },
+          "required": false,
+          "semanticType": "TEXT",
+          "semanticsClass": null
+        },
+        {
+          "column": {
+            "header": "Email",
+            "index": null,
+            "occurrence": null
+          },
+          "destinationField": "contact.email",
+          "onAmbiguous": "PRESERVE",
+          "onInvalid": "PRESERVE",
+          "options": {
+            "allowedValues": null,
+            "caseTransform": "PRESERVE",
+            "clearWhenMatches": [],
+            "dateFormat": null,
+            "decimalSeparator": null,
+            "destructiveAuthorization": false,
+            "extensionDestinationField": null,
+            "falseValues": [
+              "false",
+              "no",
+              "n",
+              "0"
+            ],
+            "lowercaseDomain": true,
+            "phoneCountry": null,
+            "phoneCountryColumn": null,
+            "thousandsSeparator": null,
+            "timezone": null,
+            "timezoneOffset": null,
+            "trim": false,
+            "trueValues": [
+              "true",
+              "yes",
+              "y",
+              "1"
+            ],
+            "unicodeNormalization": "PRESERVE",
+            "valueMap": []
+          },
+          "required": false,
+          "semanticType": "EMAIL",
+          "semanticsClass": null
+        },
+        {
+          "column": {
+            "header": "Job Title",
+            "index": null,
+            "occurrence": null
+          },
+          "destinationField": "contact.jobTitle",
+          "onAmbiguous": "PRESERVE",
+          "onInvalid": "PRESERVE",
+          "options": {
+            "allowedValues": null,
+            "caseTransform": "PRESERVE",
+            "clearWhenMatches": [],
+            "dateFormat": null,
+            "decimalSeparator": null,
+            "destructiveAuthorization": false,
+            "extensionDestinationField": null,
+            "falseValues": [
+              "false",
+              "no",
+              "n",
+              "0"
+            ],
+            "lowercaseDomain": true,
+            "phoneCountry": null,
+            "phoneCountryColumn": null,
+            "thousandsSeparator": null,
+            "timezone": null,
+            "timezoneOffset": null,
+            "trim": false,
+            "trueValues": [
+              "true",
+              "yes",
+              "y",
+              "1"
+            ],
+            "unicodeNormalization": "PRESERVE",
+            "valueMap": []
+          },
+          "required": false,
+          "semanticType": "TEXT",
+          "semanticsClass": null
+        }
+      ],
+      "fileId": "crma",
+      "id": "contacts-a",
+      "identitySpace": null,
+      "object": "CONTACT",
+      "sheet": null,
+      "sourceRecordIdColumn": {
+        "header": "Contact ID",
+        "identityNormalization": null,
+        "index": null,
+        "occurrence": null
+      }
+    },
+    {
+      "authoritativeExternalIdColumns": [],
+      "fields": [
+        {
+          "column": {
+            "header": "First Name",
+            "index": null,
+            "occurrence": null
+          },
+          "destinationField": "contact.firstName",
+          "onAmbiguous": "PRESERVE",
+          "onInvalid": "PRESERVE",
+          "options": {
+            "allowedValues": null,
+            "caseTransform": "PRESERVE",
+            "clearWhenMatches": [],
+            "dateFormat": null,
+            "decimalSeparator": null,
+            "destructiveAuthorization": false,
+            "extensionDestinationField": null,
+            "falseValues": [
+              "false",
+              "no",
+              "n",
+              "0"
+            ],
+            "lowercaseDomain": true,
+            "phoneCountry": null,
+            "phoneCountryColumn": null,
+            "thousandsSeparator": null,
+            "timezone": null,
+            "timezoneOffset": null,
+            "trim": false,
+            "trueValues": [
+              "true",
+              "yes",
+              "y",
+              "1"
+            ],
+            "unicodeNormalization": "PRESERVE",
+            "valueMap": []
+          },
+          "required": false,
+          "semanticType": "TEXT",
+          "semanticsClass": null
+        },
+        {
+          "column": {
+            "header": "Last Name",
+            "index": null,
+            "occurrence": null
+          },
+          "destinationField": "contact.lastName",
+          "onAmbiguous": "PRESERVE",
+          "onInvalid": "PRESERVE",
+          "options": {
+            "allowedValues": null,
+            "caseTransform": "PRESERVE",
+            "clearWhenMatches": [],
+            "dateFormat": null,
+            "decimalSeparator": null,
+            "destructiveAuthorization": false,
+            "extensionDestinationField": null,
+            "falseValues": [
+              "false",
+              "no",
+              "n",
+              "0"
+            ],
+            "lowercaseDomain": true,
+            "phoneCountry": null,
+            "phoneCountryColumn": null,
+            "thousandsSeparator": null,
+            "timezone": null,
+            "timezoneOffset": null,
+            "trim": false,
+            "trueValues": [
+              "true",
+              "yes",
+              "y",
+              "1"
+            ],
+            "unicodeNormalization": "PRESERVE",
+            "valueMap": []
+          },
+          "required": false,
+          "semanticType": "TEXT",
+          "semanticsClass": null
+        },
+        {
+          "column": {
+            "header": "Email",
+            "index": null,
+            "occurrence": null
+          },
+          "destinationField": "contact.email",
+          "onAmbiguous": "PRESERVE",
+          "onInvalid": "PRESERVE",
+          "options": {
+            "allowedValues": null,
+            "caseTransform": "PRESERVE",
+            "clearWhenMatches": [],
+            "dateFormat": null,
+            "decimalSeparator": null,
+            "destructiveAuthorization": false,
+            "extensionDestinationField": null,
+            "falseValues": [
+              "false",
+              "no",
+              "n",
+              "0"
+            ],
+            "lowercaseDomain": true,
+            "phoneCountry": null,
+            "phoneCountryColumn": null,
+            "thousandsSeparator": null,
+            "timezone": null,
+            "timezoneOffset": null,
+            "trim": false,
+            "trueValues": [
+              "true",
+              "yes",
+              "y",
+              "1"
+            ],
+            "unicodeNormalization": "PRESERVE",
+            "valueMap": []
+          },
+          "required": false,
+          "semanticType": "EMAIL",
+          "semanticsClass": null
+        },
+        {
+          "column": {
+            "header": "Job Title",
+            "index": null,
+            "occurrence": null
+          },
+          "destinationField": "contact.jobTitle",
+          "onAmbiguous": "PRESERVE",
+          "onInvalid": "PRESERVE",
+          "options": {
+            "allowedValues": null,
+            "caseTransform": "PRESERVE",
+            "clearWhenMatches": [],
+            "dateFormat": null,
+            "decimalSeparator": null,
+            "destructiveAuthorization": false,
+            "extensionDestinationField": null,
+            "falseValues": [
+              "false",
+              "no",
+              "n",
+              "0"
+            ],
+            "lowercaseDomain": true,
+            "phoneCountry": null,
+            "phoneCountryColumn": null,
+            "thousandsSeparator": null,
+            "timezone": null,
+            "timezoneOffset": null,
+            "trim": false,
+            "trueValues": [
+              "true",
+              "yes",
+              "y",
+              "1"
+            ],
+            "unicodeNormalization": "PRESERVE",
+            "valueMap": []
+          },
+          "required": false,
+          "semanticType": "TEXT",
+          "semanticsClass": null
+        }
+      ],
+      "fileId": "crmb",
+      "id": "contacts-b",
+      "identitySpace": null,
+      "object": "CONTACT",
+      "sheet": null,
+      "sourceRecordIdColumn": {
+        "header": "Contact ID",
+        "identityNormalization": null,
+        "index": null,
+        "occurrence": null
+      }
+    }
+  ],
+  "source": {
+    "encoding": null,
+    "namespace": "unused-default",
+    "system": "legacy_crm"
+  },
+  "target": {
+    "importMode": "CREATE_ONLY",
+    "mode": "HUBSPOT"
+  }
+}

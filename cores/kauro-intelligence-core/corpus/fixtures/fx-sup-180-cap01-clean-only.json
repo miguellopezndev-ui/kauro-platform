@@ -1,0 +1,219 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-180-cap01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-180-cap01-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "680c5b8c186c3d933d88b3822f44bb362725d0c3c9db014e8fce4a8b8cc15e38",
+      "candidateSetHash": "c3e014684fa0a224e4c2df55ce98f5736591788e74b616943f248dc997a9b98e",
+      "targetContractHash": null,
+      "projectRevisionHash": "c104458effc9e34a186e5a56e6615100df7c8096fa31595a6e2b0de1d9ef8446"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name (CRM)",
+        "sourceFieldRef": "fld_b6841fb423e37dc9",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Phone (export)",
+        "sourceFieldRef": "fld_ad93fc5e6a7e42b1",
+        "decision": "MAP",
+        "destinationField": "lead.phone"
+      },
+      {
+        "sourceHeader": "Lead source (CRM)",
+        "sourceFieldRef": "fld_94b2f656fdc67512",
+        "decision": "MAP",
+        "destinationField": "lead.leadSource"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.lastName"
+    ],
+    "expectedTargetUniverse": [
+      "contact.lastName",
+      "contact.phone",
+      "deal.closeDate",
+      "lead.lastName",
+      "lead.leadSource",
+      "lead.mobilePhone",
+      "lead.phone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "9a060f3ef4d4febe49b47429d4f129f33d8933209bc0992883dd8e62d1b65c37"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "leadSource",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name (CRM)",
+        "fieldRef": "src:Last name (CRM)",
+        "valueClass": "TEXT",
+        "values": [
+          "Tulunda",
+          "Pelmar",
+          "Soviko",
+          "Mesdell",
+          "Lumvik"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Phone (export)",
+        "fieldRef": "src:Phone (export)",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550142",
+          "+447700900826",
+          "+447700900343",
+          "+12025550181",
+          "+447700900875"
+        ],
+        "decision": "MAP",
+        "destination": "lead.phone"
+      },
+      {
+        "header": "Lead source (CRM)",
+        "fieldRef": "src:Lead source (CRM)",
+        "valueClass": "ENUM",
+        "values": [
+          "partner",
+          "cold call",
+          "web form",
+          "partner",
+          "cold call"
+        ],
+        "decision": "MAP",
+        "destination": "lead.leadSource"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.lastName"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_04617e9f342e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Last name (CRM)",
+        "targetField": "lead.lastName"
+      },
+      {
+        "memoryId": "memconv_7091b911d595",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Phone (export)",
+        "targetField": "lead.phone"
+      },
+      {
+        "memoryId": "memconv_bbd0f830f7b6",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Lead source (CRM)",
+        "targetField": "lead.leadSource"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_9313696018a784870561fa21",
+    "kc_72e778ba6867968a8195e9f4"
+  ]
+}

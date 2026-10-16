@@ -1,0 +1,148 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-039-k09-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-039-k09-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5dc6a0db2cd660ba69ce0b5aeae1467809a91307168d39fc8551ffb2ca350456",
+      "candidateSetHash": "843850afd055cec63cad5a15d8aa8dcf036742b875301b91f1e7ab51d84fe40d",
+      "targetContractHash": "tc_58d2dbe2ccd4423fdfa003bd7fecf6153e4f63df8f4df2d77a7cc5efae48a816",
+      "projectRevisionHash": "1ecf7eeada4932dd7fa68c97a6430b694396a16388e20757cb2b0741bfb5b934"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Nombre",
+        "sourceFieldRef": "fld_a23e98b46e66ca8a",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Ciudad",
+        "sourceFieldRef": "fld_beb8b30d6b8b316a",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.description",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c376d8bfe8ae54ce6c248c7d2884ce83c57b757d355e9b250910c11b00c48582"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP07",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Nombre",
+        "fieldRef": "src:Nombre",
+        "valueClass": "TEXT",
+        "values": [
+          "D. Mesero",
+          "Dara Mesero",
+          "L. Belvik",
+          "Luman Belvik",
+          "Q. Belrane",
+          "Quelan Belrane"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Ciudad",
+        "fieldRef": "src:Ciudad",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "valmora",
+          "Valmora",
+          "valmora",
+          "Valmora",
+          "valmora"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "alternativeOutcomes": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "tags": [
+      "ambig:duplicate-people"
+    ]
+  },
+  "canaries": [
+    "kc_f9a9ef57b83b2e42629e54d3",
+    "kc_5ed28de54848a07886b8a7ea"
+  ]
+}

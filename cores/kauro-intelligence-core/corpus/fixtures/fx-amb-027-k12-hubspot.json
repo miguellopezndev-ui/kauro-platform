@@ -1,0 +1,168 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-027-k12-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-027-k12-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "ab54e438bd11fd3fcb9341384832e8d708869186653cd94a76b66a9973d17444",
+      "candidateSetHash": "453bb91bbc5c4bfd4cceab2e9c02dd7395548b01553b6f6e6064da1089c665fb",
+      "targetContractHash": "tc_b3c31fa63b8da55e7e933e1919917adce9a02f06eaea289c63e776214a55fe66",
+      "projectRevisionHash": "96b9b9f8c44bddd3b5fd98139a571058f23ff3f13acc904d0109308355ca00cb"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_99d556b86802c35e",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_b7effbe8fb1b71e7",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Marca",
+        "sourceFieldRef": "fld_e012149f9a355fd0",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lastName",
+      "contact.lifecycleStage",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "2e1fa8b8c9105d1bce50318440dc597a07122e9c7ce91e0e22528965d0074134"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelenko",
+          "Tavenko",
+          "Sovquist",
+          "Belova",
+          "Sovsorin"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "orvan.mesmar0@example.test",
+          "tula.quelvik1@corp.example.test",
+          "kesan.vexaly2@corp.example.test",
+          "halan.yanell3@corp.example.test",
+          "yania.tulquist4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Marca",
+        "fieldRef": "src:Marca",
+        "valueClass": "BOOLEAN",
+        "values": [
+          "Y",
+          "N",
+          "?",
+          "Y",
+          "N",
+          "?"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:unknown-flag"
+    ]
+  },
+  "canaries": [
+    "kc_ce05cac0b5ee3a166e5acdfe",
+    "kc_61c7c4febe6f324e62b442ea"
+  ]
+}

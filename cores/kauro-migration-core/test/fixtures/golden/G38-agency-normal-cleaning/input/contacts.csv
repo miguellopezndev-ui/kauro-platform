@@ -1,0 +1,7 @@
+Contact ID,Legacy CRM ID,First Name,Last Name,Email,Alt Email,Phone,Mobile,Job Title,City,Signup Date,Newsletter,Segment,Company ID,Internal Note
+1,LEG-1001, MIGUEL ,LOPEZ,  MIGUEL.LOPEZ@ACME.EXAMPLE  , invalid@@mail.com ,3011234567,+44 20 7946 0958,Diseñadora Sénior,Bogota,07/03/2024,yes,cliente,K1,legacy tier bronze
+2,,MIGUEL,LOPEZ,miguel.lopez@bletchley.example,,,,Operations Lead,Medellin,15/06/2023,no,prospecto,K1,
+3,LEG-1004,SIOBHAN,O'NEILL,siobhan.oneill@bletchley.example,,,,Data Steward,Dublin,02/11/2022,yes,partner,K2,
+4,LEG-1005,RONALD,MCDONALD,ronald@mcdonald.example,,,,Franchise Owner,Chicago,20/09/2021,no,cliente viejo,K2,archived in 2024
+5,LEG-2002,ADA,LOVELACE,ada@analytical.example,,,,Analyst,London,12/01/2023,yes,prospecto,K2,
+6,LEG-2002,ADA,LOVELACE,ada@analytical.example,,+34 612 345 678,,,,,,,,

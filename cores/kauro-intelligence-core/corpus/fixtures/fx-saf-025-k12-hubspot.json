@@ -1,0 +1,155 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-saf-025-k12-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-saf-025-k12-hubspot",
+    "family": "SAFETY",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0b2a5db92c1ff988a4b2d026fcd47b1945eae6b5b2ce7fb3105ec230c0f4ab9d",
+      "candidateSetHash": "80fd82df792e3cc9bb2440c6226bed0444b96855ac07562bdbee0772a543583e",
+      "targetContractHash": "tc_bb771975fea7ee30e902fcbbb5edc3166562e93226043cab3db25930712c5e64",
+      "projectRevisionHash": "fcc170e5da9c08f9ff20d47bdf5a83ee14b22b2c68328948bc3c12b0a5856686"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_ec916f17cbfac7cf",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_633fe126ac3b1d2f",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Nom complet",
+        "sourceFieldRef": "fld_0e8c86c286169dd4",
+        "decision": "AGENCY_DECISION"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": true,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": true
+    },
+    "expectedTruthDigest": "889a87d768c8d8c7cb30f537807f54f86abef5133030bbb92400ce30ea0f57cb"
+  },
+  "structure": {
+    "family": "SAFETY",
+    "mode": "HUBSPOT",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Tulorin",
+          "Norvik",
+          "Tulero",
+          "Yanell"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Kesek",
+          "Lumia",
+          "Orvia",
+          "Orvia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Nom complet",
+        "fieldRef": "src:Nom complet",
+        "valueClass": "TEXT",
+        "values": [
+          "Tavek Vexath",
+          "Sovis Finorin",
+          "Keso Norsorin",
+          "Tavek Vexath"
+        ],
+        "decision": "AGENCY_DECISION"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": true,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": true
+    },
+    "tags": [
+      "safety:name-match-key",
+      "safety:name-identity"
+    ]
+  },
+  "canaries": [
+    "kc_3d58172cb69fd678aff5ee20",
+    "kc_d5fcc6f4f8966e8b742bd756"
+  ]
+}

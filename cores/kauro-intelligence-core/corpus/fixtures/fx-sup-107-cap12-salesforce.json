@@ -1,0 +1,166 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-107-cap12-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-107-cap12-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "4f25d2f1b39cc91a217359b79c583fe90068ab036a67f9ba8de2323f63533585",
+      "candidateSetHash": "f7e70435feddd7d0662ccaf155fe7a402a8834a6a5f148ff25eeb4f6cc16db68",
+      "targetContractHash": "tc_e7d0bc54319cc98e54662918e7f0a85067d0ea1f9f8c9af63b7871c16336000c",
+      "projectRevisionHash": "6f4d3fa157cf8b4c7d9a2a07fb3bf92182e00eb5abcc2c5a27a3de5c04ba75f3"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Apellidos",
+        "sourceFieldRef": "fld_429650a3f11e5cd3",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Misc",
+        "sourceFieldRef": "fld_b412a4cd95589c41",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "requiredEvidenceRefs": [
+          "ev_7cd37443ab95c036"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.description",
+      "contact.email",
+      "contact.lastName",
+      "contact.postalCode",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0a0a5519bf9c29817454dce6ce1735b0b71e6a86153e6aa966da3d371e45682d"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Apellidos",
+        "fieldRef": "src:Apellidos",
+        "valueClass": "TEXT",
+        "values": [
+          "Belero",
+          "Finova",
+          "Sovell"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Misc",
+        "fieldRef": "src:Misc",
+        "valueClass": "EMAIL",
+        "values": [
+          "lumek.pelaly0@corp.example.test",
+          "pelo.jorrane1@corp.example.test",
+          "luma.finero2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "evidence": [
+          "ev:self"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_6b5791a6fab8",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Apellidos",
+        "targetField": "contact.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_528a6fd0279317659188acfb",
+    "kc_3b1cb53a54dfcdfd5653f3e5"
+  ]
+}

@@ -27,6 +27,7 @@
   "packages/persistence/src/*",
   "packages/persistence/src/testing/**",
   "vendor/**",
+  "cores/**",
   "packages/migration-core/src/**",
   "packages/intelligence-core/src/**",
   "packages/intelligence-core/wrapper-additions.json",

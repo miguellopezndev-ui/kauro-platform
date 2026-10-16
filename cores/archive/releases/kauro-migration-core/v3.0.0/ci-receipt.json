@@ -1,0 +1,170 @@
+{
+  "schemaVersion": "1.1.0",
+  "artifactKind": "MIGRATION_CORE_CI_RECEIPT",
+  "generator": "tools/receipt-verify.mjs --emit",
+  "repository": "miguellopezndev-ui/kauro-migration-core",
+  "sha": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+  "gitTree": "85dead07ca6776b0e6fd217080189377ec91c222",
+  "ref": "refs/heads/main",
+  "branch": "main",
+  "eventName": "push",
+  "workflow": "core gate",
+  "runId": "37361074080",
+  "runNumber": "169",
+  "runAttempt": "1",
+  "manifestDigest": "3c39cf5f8c18c88e6f09cb8d1934b751a415774c01017f61440a76157108acda",
+  "codeDigest": "8cea942d6bdb602b29a680867bbece25003576e1107371d181ab33b4c0f4f4f5",
+  "digestSerialisationVersion": "2.0.0",
+  "exclusionRuleVersion": "1.4.0",
+  "versions": {
+    "coreVersion": "3.0.0",
+    "packageFormatVersion": "2.1.0",
+    "sourceRegistryVersion": "2026-09-06",
+    "packageVersion": "3.0.0"
+  },
+  "node": "v24.21.0",
+  "runnerOs": "Linux",
+  "requiredJobs": [
+    {
+      "name": "core-gate",
+      "result": "success"
+    },
+    {
+      "name": "architecture",
+      "result": "success"
+    },
+    {
+      "name": "sabotage",
+      "result": "success"
+    },
+    {
+      "name": "dependencies",
+      "result": "success"
+    },
+    {
+      "name": "drift",
+      "result": "success"
+    },
+    {
+      "name": "evidence-rules",
+      "result": "success"
+    },
+    {
+      "name": "candidate-preflight",
+      "result": "success"
+    }
+  ],
+  "checkRuns": [
+    {
+      "checkRunId": 111935515954,
+      "name": "architecture closure (ARCHITECTURE-01)",
+      "conclusion": "success",
+      "headSha": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+      "startedAt": "2026-10-05T19:07:20Z",
+      "completedAt": "2026-10-05T19:13:42Z",
+      "app": "github-actions",
+      "checkSuiteId": 101197879448
+    },
+    {
+      "checkRunId": 111935515387,
+      "name": "candidate preflight (RELEASE-CANDIDATE-01)",
+      "conclusion": "success",
+      "headSha": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+      "startedAt": "2026-10-05T19:07:22Z",
+      "completedAt": "2026-10-05T19:09:34Z",
+      "app": "github-actions",
+      "checkSuiteId": 101197879448
+    },
+    {
+      "checkRunId": 111935515759,
+      "name": "dependency audit",
+      "conclusion": "success",
+      "headSha": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+      "startedAt": "2026-10-05T19:07:23Z",
+      "completedAt": "2026-10-05T19:07:42Z",
+      "app": "github-actions",
+      "checkSuiteId": 101197879448
+    },
+    {
+      "checkRunId": 111935515780,
+      "name": "document drift (DRIFT-01)",
+      "conclusion": "success",
+      "headSha": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+      "startedAt": "2026-10-05T19:07:23Z",
+      "completedAt": "2026-10-05T19:07:40Z",
+      "app": "github-actions",
+      "checkSuiteId": 101197879448
+    },
+    {
+      "checkRunId": 111935515776,
+      "name": "evidence rules (EVIDENCE-RULES-01)",
+      "conclusion": "success",
+      "headSha": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+      "startedAt": "2026-10-05T19:07:25Z",
+      "completedAt": "2026-10-05T19:09:48Z",
+      "app": "github-actions",
+      "checkSuiteId": 101197879448
+    },
+    {
+      "checkRunId": 111935515863,
+      "name": "gate (ubuntu-latest, node 22)",
+      "conclusion": "success",
+      "headSha": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+      "startedAt": "2026-10-05T19:07:20Z",
+      "completedAt": "2026-10-05T19:09:56Z",
+      "app": "github-actions",
+      "checkSuiteId": 101197879448
+    },
+    {
+      "checkRunId": 111935515959,
+      "name": "gate (ubuntu-latest, node 24)",
+      "conclusion": "success",
+      "headSha": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+      "startedAt": "2026-10-05T19:07:23Z",
+      "completedAt": "2026-10-05T19:10:03Z",
+      "app": "github-actions",
+      "checkSuiteId": 101197879448
+    },
+    {
+      "checkRunId": 111935515813,
+      "name": "gate (windows-latest, node 22)",
+      "conclusion": "success",
+      "headSha": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+      "startedAt": "2026-10-05T19:07:29Z",
+      "completedAt": "2026-10-05T19:12:59Z",
+      "app": "github-actions",
+      "checkSuiteId": 101197879448
+    },
+    {
+      "checkRunId": 111935515805,
+      "name": "gate (windows-latest, node 24)",
+      "conclusion": "success",
+      "headSha": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+      "startedAt": "2026-10-05T19:07:17Z",
+      "completedAt": "2026-10-05T19:11:06Z",
+      "app": "github-actions",
+      "checkSuiteId": 101197879448
+    },
+    {
+      "checkRunId": 111987754577,
+      "name": "release receipt (RECEIPT-01)",
+      "conclusion": "in_progress (not concluded)",
+      "headSha": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+      "startedAt": "2026-10-05T21:35:00Z",
+      "completedAt": null,
+      "app": "github-actions",
+      "checkSuiteId": 101197879448
+    },
+    {
+      "checkRunId": 111935516436,
+      "name": "sabotage",
+      "conclusion": "success",
+      "headSha": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
+      "startedAt": "2026-10-05T19:07:19Z",
+      "completedAt": "2026-10-05T21:34:54Z",
+      "app": "github-actions",
+      "checkSuiteId": 101197879448
+    }
+  ],
+  "reruns": []
+}

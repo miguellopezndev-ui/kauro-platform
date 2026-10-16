@@ -15,7 +15,9 @@
         "repository": "miguellopezndev-ui/kauro-migration-core",
         "tag": "v3.0.0",
         "commit": "3b4b0aea4f1879ffb4189a55a16f22f4520787d4",
-        "releaseId": 404110602
+        "releaseId": 404110602,
+        "sourceTree": "cores/kauro-migration-core",
+        "archive": "cores/archive/kauro-migration-core.bundle"
       },
       "note": "published release asset copied verbatim (GET /releases/assets/613670143); vendor/SHA256SUMS.mc-3.0.0 is the release's SHA256SUMS asset; never packed from a tree"
     },
@@ -32,7 +34,9 @@
         "repository": "miguellopezndev-ui/kauro-intelligence-core",
         "commit": "4fee8d1bd5045552326f022837525b247f0e1a21",
         "branchHead": "ic-b04",
-        "builtFrom": "clean clone of the commit: npm ci && npm run build && npm pack (file list holds dist/src/index.js)"
+        "builtFrom": "clean clone of the commit: npm ci && npm run build && npm pack (file list holds dist/src/index.js)",
+        "sourceTree": "cores/kauro-intelligence-core",
+        "archive": "cores/archive/kauro-intelligence-core.bundle"
       },
       "note": "provisional pin until the IC 0.6.0 release; B05 L4 swaps it for the release asset (vendor-cores check --release refuses it)"
     }

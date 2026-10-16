@@ -1,0 +1,212 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-154-cap11-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-154-cap11-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "699cc793e2301d20b9405d55ff5d2c9caa12e915816dee6da19bb0e630f611ed",
+      "candidateSetHash": "74f17bfd92d757c430817d0080eda73221777e18691588a6670e0cc796a9ec1e",
+      "targetContractHash": null,
+      "projectRevisionHash": "0810a8f6d3241ff5f0bc785956fa583c3e6e7faca9ac350e2022128e0f7c3b23"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_5f127eb1a9e66ebe",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Street address",
+        "sourceFieldRef": "fld_91bcdfa59e8825ee",
+        "decision": "MAP",
+        "destinationField": "company.addressLine1"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_43c3aab7a44af6a0",
+        "decision": "MAP",
+        "destinationField": "company.country"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_bc95ca45d9ab7933",
+        "decision": "MAP",
+        "destinationField": "company.city"
+      },
+      {
+        "sourceHeader": "Postal code",
+        "sourceFieldRef": "fld_2930baad90bf57fa",
+        "decision": "MAP",
+        "destinationField": "company.postalCode"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.city",
+      "company.country",
+      "company.name",
+      "company.postalCode"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "82c3862014a1996c72f3cb21a19177fa16d76c924bb4985ab19ace1d92d074d4"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Halaly Group B.V.",
+          "Risova Systems Inc.",
+          "Norero Foods LLC",
+          "Yanell Works B.V.",
+          "Halvik Foods Inc."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Street address",
+        "fieldRef": "src:Street address",
+        "valueClass": "TEXT",
+        "values": [
+          "6 Wilmar Street",
+          "28 Sovsorin Street",
+          "45 Quelrane Street",
+          "139 Kesmar Street",
+          "195 Mesaly Street"
+        ],
+        "decision": "MAP",
+        "destination": "company.addressLine1"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "Valdoria",
+          "Norvania",
+          "Estmark",
+          "Norvania",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "company.country"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvale",
+          "Orvale",
+          "Brandel",
+          "Kelmar",
+          "Quenby"
+        ],
+        "decision": "MAP",
+        "destination": "company.city"
+      },
+      {
+        "header": "Postal code",
+        "fieldRef": "src:Postal code",
+        "valueClass": "TEXT",
+        "values": [
+          "83734",
+          "30084",
+          "50113",
+          "46746",
+          "97494"
+        ],
+        "decision": "MAP",
+        "destination": "company.postalCode"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_dd4b2ef48591",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_8bf2e221a6ee5368ab2b5aad",
+    "kc_b78872ec412be85c5a014946"
+  ]
+}

@@ -1,0 +1,226 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-188-cap09-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-188-cap09-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e9b0a7c0776dcee8570f420884eb312276fd6f385af9934fee79e9596b1332ac",
+      "candidateSetHash": "85aa6f917d952054587c6618fa0aec33d0a4a106e69e835fa133f26b7d4db8ca",
+      "targetContractHash": null,
+      "projectRevisionHash": "d72ccc4c1b2a9e48d2d59bdc59258d346b3a454ded703459e0b12b8a002c5770"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Société",
+        "sourceFieldRef": "fld_2c4caa0f6d4215c3",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Site web",
+        "sourceFieldRef": "fld_c9d96f9cb94ea0de",
+        "decision": "MAP",
+        "destinationField": "company.website",
+        "allowedDestinationFields": [
+          "company.website",
+          "company.domain"
+        ]
+      },
+      {
+        "sourceHeader": "Employés",
+        "sourceFieldRef": "fld_16f7c2ae1054b8af",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_c57edde73e0b1207",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_38c5bb0277af007d",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.domain",
+      "company.employeeCount",
+      "company.name",
+      "company.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials",
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "ee7375d3dda6305d14b0b7413b853ce4904a31a3e11fe0e6b75f5b083a1b3e6f"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Société",
+        "fieldRef": "src:Société",
+        "valueClass": "TEXT",
+        "values": [
+          "Halenko Studio S.L.",
+          "Yansorin Foods S.A.",
+          "Yanero Works Ltd",
+          "Orvova Logistics GmbH",
+          "Finiko Works S.A."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Site web",
+        "fieldRef": "src:Site web",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.vexova-partners.test",
+          "https://www.belova-systems.test",
+          "https://www.jorquist-labs.test",
+          "https://www.darunda-logistics.test",
+          "https://www.quelvik-partners.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website",
+        "alternatives": [
+          "company.domain"
+        ]
+      },
+      {
+        "header": "Employés",
+        "fieldRef": "src:Employés",
+        "valueClass": "NUMBER",
+        "values": [
+          "51000",
+          "32591",
+          "53893",
+          "76083",
+          "57994"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "GF",
+          "SM",
+          "FM",
+          "WA",
+          "EP"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "c9a9ec97",
+          "af39e4d4",
+          "2ece4ed6",
+          "670948b",
+          "57dbbbd7"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_a2b296b8d8a5",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Société",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_c0439615191a",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Employés",
+        "targetField": "company.employeeCount"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_277721abb4acca13d960c06a",
+    "kc_355224c7f51c5a69f4ab68e7"
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "id": "G30",
+  "title": "A delivered value that contains a line break",
+  "intent": "A multi-line street address typed on Windows is ordinary CRM data. It travels as one quoted field, and the delivered value keeps the line breaks exactly as the source wrote them, CRLF and LF alike. A package check that scanned the whole file for CRLF matched inside such a value and aborted the run after the package had already been written to disk.",
+  "expect": {
+    "rows": {
+      "total": 2,
+      "OUTPUT": 2,
+      "MERGED_PROVEN": 0,
+      "ISOLATED": 0,
+      "LEFTOVER": 0,
+      "REJECTED_INPUT": 0
+    },
+    "records": {
+      "CONTACT": 2,
+      "COMPANY": 0,
+      "DEAL": 0,
+      "LEAD": 0
+    },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": {
+      "total": 0,
+      "OUTPUT": 0,
+      "DEDUPLICATED": 0,
+      "UNRESOLVED": 0,
+      "LEFTOVER": 0
+    }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    {
+      "row": "contacts.csv#2",
+      "disposition": "OUTPUT"
+    },
+    {
+      "row": "contacts.csv#3",
+      "disposition": "OUTPUT"
+    }
+  ],
+  "delivered": [
+    {
+      "sourceRecordId": "1",
+      "values": {
+        "contact.firstName": "Ada",
+        "contact.addressLine1": "221B Baker Street\r\nLondon\r\nNW1 6XE"
+      }
+    },
+    {
+      "sourceRecordId": "2",
+      "values": {
+        "contact.firstName": "Alan",
+        "contact.addressLine1": "Sherborne\nDorset"
+      }
+    }
+  ]
+}

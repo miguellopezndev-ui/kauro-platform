@@ -1,0 +1,191 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-098-cap03-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-098-cap03-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "19bc51dc7a0445d8bb1b122052fa7c8406bf72be33ced0638af31f053ca5757d",
+      "candidateSetHash": "f687a357e18a08feb506f6145606f6abb5ceb1766d701eb5e8413555730437c9",
+      "targetContractHash": "tc_341b8ecbb383328273f6c253620a5695fe63b3f6e42dfe40d36ae73df4c23994",
+      "projectRevisionHash": "71425fd257f1e75155d90bdc8790985292d14478257c06ef5fcbfa875b386b3b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Empresa",
+        "sourceFieldRef": "fld_9f9b2b0b01cb637f",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Facturación anual",
+        "sourceFieldRef": "fld_a0553088faa541fd",
+        "decision": "MAP",
+        "destinationField": "company.annualRevenue",
+        "semanticType": "NUMBER"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_cf2de51844234aec",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_5390e27fd0a7808c",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.name",
+      "company.postalCode",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Row checksum",
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "32e7741cf13f30d79656959f908146a4e78d43bac94a77157c3db2babd250c24"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Empresa",
+        "fieldRef": "src:Empresa",
+        "valueClass": "TEXT",
+        "values": [
+          "Tulova Foods Inc.",
+          "Halsorin Partners S.A.",
+          "Yanero Studio Inc.",
+          "Jormar Works Inc.",
+          "Yanorin Systems LLC",
+          "Rismar Systems S.L."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Facturación anual",
+        "fieldRef": "src:Facturación anual",
+        "valueClass": "MIXED",
+        "values": [
+          "46176",
+          "13550",
+          "21,910.53",
+          "65446",
+          "64225",
+          "57,576.59"
+        ],
+        "decision": "MAP",
+        "destination": "company.annualRevenue",
+        "semanticType": "NUMBER"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "9ad9ac85",
+          "24eeb190",
+          "fe890740",
+          "40ece949",
+          "9a9de9a1",
+          "73c0b682"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-56",
+          "R-3",
+          "R-16",
+          "R-50",
+          "R-38",
+          "R-59"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_f6d9c815595a",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Empresa",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_0ee59ffc4139eb40169083f8",
+    "kc_e00d023151c00d2860fd5c25"
+  ]
+}

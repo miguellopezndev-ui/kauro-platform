@@ -1,0 +1,252 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-069-k13-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-069-k13-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "a2b3df8f172c140107aa222717252f2d4e6906a71f070af373e749149944a683",
+      "candidateSetHash": "ad73b7217a964c94bdc1c2a84dd9698d0ebdb0d330dbff46977c94852f656cba",
+      "targetContractHash": "tc_9debef23b173935653bc779aa6e42ebbdded4778ed9b396bfff61ca2517b126d",
+      "projectRevisionHash": "38e018bf92286a1b240591c52374f5a7784f806a493386bee1e1bedf86e81940"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_5230b3c2724e98da",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "email ",
+        "sourceFieldRef": "fld_4d8e24027661ceed",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "EMAIL 2",
+        "sourceFieldRef": "fld_d51ed1e3959e42d6",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Επώνυμο",
+        "sourceFieldRef": "fld_918251ba4d0e6056",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Όνομα",
+        "sourceFieldRef": "fld_adff8c3e8c0b0781",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_9552bc5971198210",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.lifecycleStage",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "email ",
+      "EMAIL 2",
+      "Internal ticket ref"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "bf1b749d3a2c0b88eb14399eaddb798947600438c308c438ac63874e5e805979"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "wilan.jororin0@sample.invalid",
+          "wila.belunda1@corp.example.test",
+          "joris.noriko2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "email ",
+        "fieldRef": "src:email ",
+        "valueClass": "EMAIL",
+        "values": [
+          "quelel.pelvik50@corp.example.test",
+          "",
+          ""
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "EMAIL 2",
+        "fieldRef": "src:EMAIL 2",
+        "valueClass": "EMAIL",
+        "values": [
+          "",
+          "",
+          "kesis.dardell60@example.test"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Επώνυμο",
+        "fieldRef": "src:Επώνυμο",
+        "valueClass": "TEXT",
+        "values": [
+          "Mesunda",
+          "Tulvik",
+          "Wilorin"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Όνομα",
+        "fieldRef": "src:Όνομα",
+        "valueClass": "TEXT",
+        "values": [
+          "Risa",
+          "Tavel",
+          "Risan"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-6736",
+          "TKT-4284",
+          "TKT-9242"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:near-duplicate-headers",
+      "lang:el"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_8b5d618dddea",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Επώνυμο",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_6f7c8a84ab5a",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Όνομα",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_0aaf13e4c25e44efebfb1364",
+    "kc_8d921f79f9831845688b9561"
+  ]
+}

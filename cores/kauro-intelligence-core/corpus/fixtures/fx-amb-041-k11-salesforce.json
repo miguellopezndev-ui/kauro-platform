@@ -1,0 +1,219 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-041-k11-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-041-k11-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "de1118c402f39dabefb40834d0e31b4ec3c0685478e21fe2239494f1c2944d85",
+      "candidateSetHash": "a4a19b3d16264d5223b2c0d6ba393a8a3cf9a8a3ab4618180cee5aaca29f1483",
+      "targetContractHash": "tc_29fe93c2241ea865698ae66cac32ec68fdb055a7162334dc1534085140b6b24a",
+      "projectRevisionHash": "757e53bfcfcfee98b69806237f4c8313c762e1eb11edc9e6b8dfa0494e851042"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Estado",
+        "sourceFieldRef": "fld_efcb2a4d3972f9c5",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_3c3cb4d6c273c577",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.lastName",
+      "contact.state",
+      "contact.source_id",
+      "deal.closeDate",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id",
+      "lead.company",
+      "lead.lastName",
+      "lead.leadSource",
+      "lead.postalCode",
+      "lead.rating",
+      "lead.status",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Folder code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "fd396415097ffaea6d86e972450c66fc6462c1e9d977dd9848745eb1a128c276"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP03",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "leadSource",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "rating",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Open - Not Contacted",
+              "Working - Contacted",
+              "Closed - Converted",
+              "Closed - Not Converted"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Estado",
+        "fieldRef": "src:Estado",
+        "valueClass": "MIXED",
+        "values": [
+          "Costa",
+          "pendiente",
+          "Costa",
+          "activo"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F902",
+          "F222",
+          "F493",
+          "F383"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:homograph-header"
+    ]
+  },
+  "canaries": [
+    "kc_b4ea449444f77184200f6329",
+    "kc_8f6dbe92e9c65910c94cc2e6"
+  ]
+}

@@ -1,0 +1,255 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-193-cap02-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-193-cap02-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "06a646b70fea3c055dcf1a04280fd993af25fc825c6cf53a0111557766db93d3",
+      "candidateSetHash": "70a97dbf5ff1a74c478ab4a65ad0fdfea2a208f16c85ec1ddc085a9c41e469d3",
+      "targetContractHash": "tc_620cd525a1cbe2ea9dfa8fbc20b80b6ef26cc0766a3ede83b9ad0d4fb33b16b4",
+      "projectRevisionHash": "fd51e31e9e6b98bbca0324ef5e1734cf6fe6e961099b9617bb976ad477b69396"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_2e381b933ef81f92",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_6116f2725d69eff6",
+        "decision": "MAP",
+        "destinationField": "company.country"
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_5cac723239fb6344",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_7232554e8a549a4e",
+        "decision": "MAP",
+        "destinationField": "company.website",
+        "allowedDestinationFields": [
+          "company.website",
+          "company.domain"
+        ]
+      },
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_3f35da2a30734a3b",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.city",
+      "company.country",
+      "company.domain",
+      "company.employeeCount",
+      "company.industry",
+      "company.name",
+      "company.postalCode",
+      "company.state",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "964fece76c978c84dfbee0f4c0b2b1d0dffead6f94c98de1f777ba49ae4053f5"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Zerenko Group Inc.",
+          "Mesova Studio B.V.",
+          "Orvmar Labs S.A.",
+          "Belenko Works Inc.",
+          "Findell Systems SAS"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "Estmark",
+          "Norvania",
+          "Norvania",
+          "Valdoria",
+          "Norvania"
+        ],
+        "decision": "MAP",
+        "destination": "company.country"
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Software",
+          "Textiles",
+          "Packaging",
+          "Logistics",
+          "Software"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.vexenko-foods.test",
+          "https://www.yanell-labs.test",
+          "https://www.pelrane-labs.test",
+          "https://www.orvova-group.test",
+          "https://www.wilsorin-labs.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website",
+        "alternatives": [
+          "company.domain"
+        ]
+      },
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "NUMBER",
+        "values": [
+          "4747",
+          "10575",
+          "46837",
+          "22354",
+          "10414"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_c41076b27c4e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b39f2baa9c27cbf6f1885d80",
+    "kc_2d39d5a3c8714f22ac56b204"
+  ]
+}

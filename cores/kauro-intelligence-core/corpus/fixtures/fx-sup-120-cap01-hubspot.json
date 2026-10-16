@@ -1,0 +1,305 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-120-cap01-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-120-cap01-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "21ace2ff9641f0d5415f718a11614f29f4524ebfef79702a1c3b05539b5cc5db",
+      "candidateSetHash": "5cd99edb526e93dc1090c2835cff5c69f4342216b8854b9572897245051684e3",
+      "targetContractHash": "tc_da6062528f3780894eb5a82643c3f0bc61b3092b362763b3854c7aefe00b204c",
+      "projectRevisionHash": "1d9bb01b93f375f6ba312dd33521ccf4168a78c91890c9bea45cfdead30ded06"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_3023301a2a86adb5",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Empresa (legacy)",
+        "sourceFieldRef": "fld_cc7c879b2fc62afc",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Telefone [v2]",
+        "sourceFieldRef": "fld_48ff4bf0241bf00e",
+        "decision": "MAP",
+        "destinationField": "company.phone"
+      },
+      {
+        "sourceHeader": "País (legacy)",
+        "sourceFieldRef": "fld_4f440659a849feb9",
+        "decision": "MAP",
+        "destinationField": "company.country"
+      },
+      {
+        "sourceHeader": "Setor [v2]",
+        "sourceFieldRef": "fld_320f9e37dae81e51",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_d3eff50603b08512",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.phone"
+    ],
+    "expectedTargetUniverse": [
+      "company.country",
+      "company.description",
+      "company.industry",
+      "company.name",
+      "company.phone",
+      "company.source_id",
+      "contact.companyName",
+      "contact.country",
+      "contact.email",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch",
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "09a166ef52c46b84b4ccc7c63121d7ae6e11fd3d8078dbb84d2779b5e2fbd383"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-38",
+          "batch-39",
+          "batch-25",
+          "batch-34",
+          "batch-16"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Empresa (legacy)",
+        "fieldRef": "src:Empresa (legacy)",
+        "valueClass": "TEXT",
+        "values": [
+          "Risova Foods Ltd",
+          "Risvik Partners Ltd",
+          "Wildell Works B.V.",
+          "Darrane Works LLC",
+          "Zerero Labs SAS"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Telefone [v2]",
+        "fieldRef": "src:Telefone [v2]",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550186",
+          "+447700900670",
+          "+12025550187",
+          "+12025550113",
+          "+12025550165"
+        ],
+        "decision": "MAP",
+        "destination": "company.phone"
+      },
+      {
+        "header": "País (legacy)",
+        "fieldRef": "src:País (legacy)",
+        "valueClass": "TEXT",
+        "values": [
+          "Estmark",
+          "Estmark",
+          "Valdoria",
+          "Estmark",
+          "Estmark"
+        ],
+        "decision": "MAP",
+        "destination": "company.country"
+      },
+      {
+        "header": "Setor [v2]",
+        "fieldRef": "src:Setor [v2]",
+        "valueClass": "TEXT",
+        "values": [
+          "  Software",
+          "Packaging ",
+          "  Software",
+          "Packaging ",
+          "  Food service"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L35662",
+          "L87300",
+          "L65114",
+          "L26180",
+          "L59614"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.phone"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_e71032e2df40",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Empresa (legacy)",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_eb7ced2d75aa",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Telefone [v2]",
+        "targetField": "company.phone"
+      },
+      {
+        "memoryId": "memconv_a9d9a7e2db84",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "País (legacy)",
+        "targetField": "company.country"
+      },
+      {
+        "memoryId": "memconv_788346503383",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Setor [v2]",
+        "targetField": "company.industry"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_d306d95178564fa6d49f8946",
+    "kc_0bf0a435201db47853002b44"
+  ]
+}

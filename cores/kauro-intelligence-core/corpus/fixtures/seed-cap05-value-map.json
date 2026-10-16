@@ -1,0 +1,158 @@
+{
+  "partition": "FINAL",
+  "fileName": "seed-cap05-value-map.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "seed-cap05-value-map",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2a9d8ae68b394952b44d7c674a13c9742a6a2ffc2a9049f42fdf16c658bfd899",
+      "candidateSetHash": "f61fc2cc3a4691979d010b34710011b4e73fb5ca9a64b038f4fadaf35d484f17",
+      "targetContractHash": "tc_a3f914938c75e52b438b682e3ddd99969b3af87aa9926bcc1642087a80a57594",
+      "projectRevisionHash": "58c2f4b30090372c0d9e5b126e09139e57b9d76cd6389e7f53dea1acd0e02c7e"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email - src",
+        "sourceFieldRef": "fld_4975f04116cc7998",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Lifecycle stage",
+        "sourceFieldRef": "fld_33a74d32768bea86",
+        "decision": "MAP",
+        "destinationField": "contact.lifecycleStage",
+        "requiredEvidenceRefs": [
+          "ev_f7a81bedab9d3ade"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lifecycleStage",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [
+      "VALUE_MAP"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6e64b506cc8513a5e5aac04fae909f268da9e04b9c9445186d2697bff5137609"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "label": "Lifecycle stage",
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email - src",
+        "fieldRef": "src:Email - src",
+        "valueClass": "EMAIL",
+        "values": [
+          "ana@example.test",
+          "luis@example.test",
+          "marta@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Lifecycle stage",
+        "fieldRef": "src:Lifecycle stage",
+        "valueClass": "ENUM",
+        "values": [
+          "new",
+          "open",
+          "won"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lifecycleStage",
+        "evidence": [
+          "ev:stage-distinct-values"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "VALUE_MAP"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_a604ed8e8189",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Email - src",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_8984084c5d8802e083ab4fe7",
+    "kc_8b18bfa72529c6ec4979c0d0"
+  ]
+}

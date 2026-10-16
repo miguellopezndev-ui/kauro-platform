@@ -1,0 +1,147 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-017-k02-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-017-k02-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "20df41d90aba3ac51837831490157dfcb8496bf480054c20beb737f98fc16876",
+      "candidateSetHash": "d7770ccd749af67f139b34bb709fa50ea55675cad4baad3fb2a61bb5133b11a5",
+      "targetContractHash": "tc_a9c32cbf5eafa27c0495afd031e7ca7d4411318fb2f703ff14e4845de58f4f79",
+      "projectRevisionHash": "8688d116e7234937566d91606a51d4aeb1dd86dbe727d55dc28a353f722f473e"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_e3e0ba395ad0dbd5",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Chiffre d'affaires",
+        "sourceFieldRef": "fld_dfe0f915cb2b35d8",
+        "decision": "MAP",
+        "destinationField": "company.annualRevenue"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.city",
+      "company.name",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "ef49dddc734e2ae77433fd7f8daf31e8ab37b1f9979443f6382adc8b13547395"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Name",
+        "fieldRef": "src:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Pelquist Logistics LLC",
+          "Quelunda Labs S.L.",
+          "Halorin Group Ltd",
+          "Vexorin Labs B.V.",
+          "Kesdell Systems LLC",
+          "Jordell Studio SAS"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Chiffre d'affaires",
+        "fieldRef": "src:Chiffre d'affaires",
+        "valueClass": "NUMBER",
+        "values": [
+          "8.900",
+          "16.600",
+          "27.300",
+          "42.500",
+          "53.600",
+          "44.600"
+        ],
+        "decision": "MAP",
+        "destination": "company.annualRevenue"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:decimal-separator"
+    ]
+  },
+  "canaries": [
+    "kc_56c0af3274c6373c88caa360",
+    "kc_7a4d61f8dfc2b7994116b7b8"
+  ]
+}

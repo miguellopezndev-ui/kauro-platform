@@ -1,0 +1,207 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-044-cap09-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-044-cap09-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "f189467e1d137f6e3eeccb583b712057d55253e5f2cb614458941671805c8f88",
+      "candidateSetHash": "3981efe1bd2f7455d4f4b09d0ba95c00279c5fb5a570e105206877d3330b673d",
+      "targetContractHash": null,
+      "projectRevisionHash": "8a6581babd5ac4e8702c367efa6374c2bef8d024ce12947f4478de7a3ebeb66e"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Nom de famille",
+        "sourceFieldRef": "fld_0fa03b8251bce21c",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Statut du contact",
+        "sourceFieldRef": "fld_212e040224768a2c",
+        "decision": "MAP",
+        "destinationField": "lead.status"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_f02c3dc0e1e32605",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_2a6ede2b9341a3c1",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_399892b951e7f0a1",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.lastName",
+      "lead.leadSource",
+      "lead.rating",
+      "lead.status"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code",
+      "Warehouse bin",
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "26581bfbc2c10f64f8adb635c2518acfcbe682341bc59a5138cea4fdc94828d5"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "leadSource",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "rating",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Nom de famille",
+        "fieldRef": "src:Nom de famille",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvero",
+          "Zeranth",
+          "Tavquist",
+          "Zervik"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Statut du contact",
+        "fieldRef": "src:Statut du contact",
+        "valueClass": "ENUM",
+        "values": [
+          "Dead",
+          "Working",
+          "Converted",
+          "Dead"
+        ],
+        "decision": "MAP",
+        "destination": "lead.status"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-54",
+          "R-22",
+          "R-16",
+          "R-5"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "A-2",
+          "A-66",
+          "B-16",
+          "B-71"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-10",
+          "batch-32",
+          "batch-25",
+          "batch-16"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_c4969ee8593a",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nom de famille",
+        "targetField": "lead.lastName"
+      },
+      {
+        "memoryId": "memconv_58ba90ffb23b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Statut du contact",
+        "targetField": "lead.status"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_f1a7948da2d20d01fe4b3bb5",
+    "kc_725be102cf12a2a6ed51ccc2"
+  ]
+}

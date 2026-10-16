@@ -1,0 +1,203 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-047-k05-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-047-k05-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "bac626ca3c8b9ca6ec44a250baff8d56238b87261931a4437bcd7cf5555ba99a",
+      "candidateSetHash": "490eed86297cd1a04df6c3db7f5acee8fb79b6abed4fb5944f4aa90f61da8708",
+      "targetContractHash": null,
+      "projectRevisionHash": "f353646c970dbd7d29df318bdbc594ecd4e8cdd56bdf8630f101edf844088d4f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-postadress",
+        "sourceFieldRef": "fld_8270af260640e008",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Email - DEPRECATED",
+        "sourceFieldRef": "fld_1c9ee97bbaaff381",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Förnamn",
+        "sourceFieldRef": "fld_fc56b9f0dc64e570",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Land",
+        "sourceFieldRef": "fld_ca279e7097f17bbd",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.firstName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Email - DEPRECATED"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "abf34e32d3b9d22641e7edf59985c1ef6fa8a54294ae0f829c03c1a4c4596b9f"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-postadress",
+        "fieldRef": "src:E-postadress",
+        "valueClass": "EMAIL",
+        "values": [
+          "belo.zerova0@sample.invalid",
+          "tavel.quelunda1@corp.example.test",
+          "yanis.finiko2@corp.example.test",
+          "pelis.tavquist3@corp.example.test",
+          "quela.kesquist4@corp.example.test",
+          "mesek.quelenko5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Email - DEPRECATED",
+        "fieldRef": "src:Email - DEPRECATED",
+        "valueClass": "EMAIL",
+        "values": [
+          "tulel.tavunda40@corp.example.test",
+          "tulia.kesova41@corp.example.test",
+          "risa.jorenko42@corp.example.test",
+          "tula.vexiko43@sample.invalid",
+          "finel.zerath44@corp.example.test",
+          "finia.kesell45@example.test"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Förnamn",
+        "fieldRef": "src:Förnamn",
+        "valueClass": "TEXT",
+        "values": [
+          "Luman",
+          "Jorel",
+          "Joran",
+          "Wilan",
+          "Quela",
+          "Yano"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Land",
+        "fieldRef": "src:Land",
+        "valueClass": "TEXT",
+        "values": [
+          "Kelland",
+          "Valdoria",
+          "Estmark",
+          "Valdoria",
+          "Norvania",
+          "Norvania"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-headers",
+      "lang:sv",
+      "ugly:stale-header"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_d1e3da072ac2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Förnamn",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_53dc53c4e1cf",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Land",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_0f66e34e13f9b1687ab6f42b",
+    "kc_45f62e28b7188f12be86d1bf"
+  ]
+}

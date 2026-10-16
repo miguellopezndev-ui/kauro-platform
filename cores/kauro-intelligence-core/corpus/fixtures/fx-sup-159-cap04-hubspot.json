@@ -1,0 +1,257 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-159-cap04-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-159-cap04-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "ec83455206a9acbd3bd290c0f244f7d1572c515dbc7574c094c72f91e7a46974",
+      "candidateSetHash": "561187036082d9299038431f53505ade54b4d42d0681a61d24cdafe0fd5762ff",
+      "targetContractHash": "tc_fc9a6accd5da380b9fdc705b815add27f2b61e22b48b0e596d2918f26db49c8a",
+      "projectRevisionHash": "f41b85d2812cabc23c07ffe3fa6650054a8daeda1b98a0eb1e67242cbc2b11b1"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo - src",
+        "sourceFieldRef": "fld_07a6774afd968058",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "transformPrimitive": "NORMALISE_EMAIL_CASE"
+      },
+      {
+        "sourceHeader": "Value [v2]",
+        "sourceFieldRef": "fld_795f1c9e3d07d880",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Telefono",
+        "sourceFieldRef": "fld_cf213718bca2ccc8",
+        "decision": "MAP",
+        "destinationField": "contact.phone",
+        "transformPrimitive": "PARSE_PHONE_E164",
+        "typedTransformParams": {
+          "defaultRegion": "US"
+        }
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_e1c5e50c1a077cd8",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_312c231bd3b7cc8f",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lifecycleStage",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Folder code",
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c19356828023053be983996459f7e130ff7fbc11baf621f0bcf6bca19ab2bd5a"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "locale": {
+        "defaultRegion": "US"
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo - src",
+        "fieldRef": "src:Correo - src",
+        "valueClass": "EMAIL",
+        "values": [
+          "BELAN.LUMORIN0@sample.invalid",
+          "risel.orvova1@example.test",
+          "RISO.KESATH2@corp.example.test",
+          "yanel.sovsorin3@sample.invalid",
+          "NORA.YANANTH4@corp.example.test",
+          "pelia.finenko5@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "transform": "NORMALISE_EMAIL_CASE"
+      },
+      {
+        "header": "Value [v2]",
+        "fieldRef": "src:Value [v2]",
+        "valueClass": "TEXT",
+        "values": [
+          "  Sova",
+          "Orvek ",
+          "  Mesa",
+          "Tulis ",
+          "  Riso",
+          "Halek "
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Telefono",
+        "fieldRef": "src:Telefono",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0145",
+          "202-555-0149",
+          "202-555-0136",
+          "202-555-0128",
+          "202-555-0195",
+          "202-555-0179"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone",
+        "transform": "PARSE_PHONE_E164",
+        "params": {
+          "defaultRegion": "US"
+        }
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F230",
+          "F499",
+          "F344",
+          "F456",
+          "F540",
+          "F795"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "28ed8c0b",
+          "6a958186",
+          "971abf6a",
+          "d43e0af7",
+          "4429787",
+          "fce9e119"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_b90d96d2621e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Correo - src",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_3ce9a59fd69f",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Value [v2]",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_6f93919564da",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Telefono",
+        "targetField": "contact.phone"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_f6127125b91433eb52e17c2b",
+    "kc_d17237f9c3a009ddf2c799d5"
+  ]
+}

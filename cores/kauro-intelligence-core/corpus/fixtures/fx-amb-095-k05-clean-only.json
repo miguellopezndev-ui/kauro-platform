@@ -1,0 +1,193 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-095-k05-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-095-k05-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "035f2b9b976e29b52f763eabdcf975b9282b204781c8c3d8cda5df5965816366",
+      "candidateSetHash": "80fdf9be1977eb6bdd65e3b8531195fc5a4d08d226db01183d2e04aaf90db706",
+      "targetContractHash": null,
+      "projectRevisionHash": "6712dd298745b753360436c1801f9d18f31fa7d4e91f36502eb3a18d48b08ef5"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_83ec65033049c8fe",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_dff2d2471d1c7204",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Correo B",
+        "sourceFieldRef": "fld_321de26ade40c1ec",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Email 1",
+        "sourceFieldRef": "fld_f16bcfd1697c1fd4",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Email (work)",
+        "sourceFieldRef": "fld_e0c6b18d73fc8a18",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.marketingConsent"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "2027554992f59d78c29caca19ff0c220ad86e976e28abf448357ffb4c353ec9f"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "marketingConsent",
+            "valueClass": "BOOLEAN",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelo",
+          "Kesis",
+          "Zero",
+          "Luma",
+          "Wilo"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Wilero",
+          "Darsorin",
+          "Risiko",
+          "Yaniko",
+          "Wilsorin"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Correo B",
+        "fieldRef": "src:Correo B",
+        "valueClass": "EMAIL",
+        "values": [
+          "noran.kesova0@corp.example.test",
+          "bela.zeranth1@sample.invalid",
+          "orvis.sovova2@example.test",
+          "sovel.tavdell3@corp.example.test",
+          "finia.belenko4@example.test"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Email 1",
+        "fieldRef": "src:Email 1",
+        "valueClass": "EMAIL",
+        "values": [
+          "mesa.vexrane0@sample.invalid",
+          "vexel.tulrane1@sample.invalid",
+          "kesa.kesanth2@example.test",
+          "tula.tavmar3@sample.invalid",
+          "daran.halrane4@corp.example.test"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Email (work)",
+        "fieldRef": "src:Email (work)",
+        "valueClass": "EMAIL",
+        "values": [
+          "risel.finenko0@example.test",
+          "orvis.quelanth1@sample.invalid",
+          "risek.yananth2@example.test",
+          "joran.kesero3@sample.invalid",
+          "pelel.risorin4@corp.example.test"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:two-primary-emails"
+    ]
+  },
+  "canaries": [
+    "kc_f0b722454a50aabc4aab404d",
+    "kc_4085454682880eff3fa9dc06"
+  ]
+}

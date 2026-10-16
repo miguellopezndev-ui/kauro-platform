@@ -1,0 +1,198 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-010-k10-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-010-k10-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e927e30722cece6b4bd8441ef32bdf49fdfcb407fdcd4037000fa33846ca3397",
+      "candidateSetHash": "0ffd56e415989257f05478a53af1f2fdd370b28399adf6d4e31038c0a2f28a15",
+      "targetContractHash": null,
+      "projectRevisionHash": "a5f83b83bf62499ab0e1cb3f8d1c70c29fa457fb584c21fe32018ed2205843df"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_603c3c52e5263dbc",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_23deb242e191f58e",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Standort",
+        "sourceFieldRef": "fld_2cc83974c8994d7a",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.country",
+      "company.industry",
+      "contact.city",
+      "contact.country",
+      "contact.doNotCall",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.phone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "80ff78cfea28425500147e003e285375412b27780a35a3528600410467f5b07d"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Halath",
+          "Darova",
+          "Mesorin",
+          "Quelquist",
+          "Sovunda",
+          "Vexunda",
+          "Tavrane"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Joro",
+          "Pelis",
+          "Risa",
+          "Zera",
+          "Tavis",
+          "Kesia",
+          "Yanan"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Standort",
+        "fieldRef": "src:Standort",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora, Valdoria",
+          "Tessin, Valdoria",
+          "Orvale, Valdoria",
+          "Valmora, Estmark",
+          "Valmora, Norvania",
+          "Orvale, Estmark",
+          "Tessin, Norvania"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:composite-value"
+    ]
+  },
+  "canaries": [
+    "kc_a451ebf1c67e8b3ca1c22966",
+    "kc_94753f151746feb4dabd52ce"
+  ]
+}

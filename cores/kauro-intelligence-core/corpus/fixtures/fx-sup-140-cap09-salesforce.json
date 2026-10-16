@@ -1,0 +1,220 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-140-cap09-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-140-cap09-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "25bb52f167d8bae14172216ff98ba6706bc4cfd4443715548e557254830146bb",
+      "candidateSetHash": "419e60f8a00812079d37cec1e26bb6568927e1a7b77fdffd3f462612999f2095",
+      "targetContractHash": "tc_d00670cc27881b52b8abd33d9496dbcbb9711e2142797eca713129bc8ea094a4",
+      "projectRevisionHash": "2e57697ab69e5d67669926cd549b33d3802535c1b93eed24c5d87f4f773ec0cc"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Cognome",
+        "sourceFieldRef": "fld_f168448bdde2b333",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Settore",
+        "sourceFieldRef": "fld_35eb34133c5a897a",
+        "decision": "MAP",
+        "destinationField": "lead.industry"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_0723651cbaf1d0b8",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_a162460ddf20df23",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_e08caa1f9df90223",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.annualRevenue",
+      "lead.company",
+      "lead.industry",
+      "lead.lastName",
+      "lead.leadSource",
+      "lead.state",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run",
+      "Sales rep initials",
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "2fa7daf552f8b39f8b94d8343d45da24e648afe3a1cd08ec600a338baef2bbe4"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "leadSource",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Cognome",
+        "fieldRef": "src:Cognome",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelunda",
+          "Lumanth",
+          "Quelvik"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Settore",
+        "fieldRef": "src:Settore",
+        "valueClass": "TEXT",
+        "values": [
+          "Textiles",
+          "Logistics",
+          "Software"
+        ],
+        "decision": "MAP",
+        "destination": "lead.industry"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "2",
+          "9",
+          "4"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "PS",
+          "WT",
+          "MM"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "green",
+          "red",
+          "green"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_f242f1987e80",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cognome",
+        "targetField": "lead.lastName"
+      },
+      {
+        "memoryId": "memconv_f2efd7fe02a2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Settore",
+        "targetField": "lead.industry"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_93e0e692e1b3d8f972096b23",
+    "kc_47839af68de32dafc87c4d81"
+  ]
+}

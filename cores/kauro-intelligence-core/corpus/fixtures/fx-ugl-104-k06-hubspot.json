@@ -1,0 +1,245 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-ugl-104-k06-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-104-k06-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "1958959d854202ae4a6411b87bfb6c871119b7f20768683d475b4220890a883a",
+      "candidateSetHash": "b7b3f843e9acea3f02896c7ab94508fb931f4c9da328fd65c999eef559a5d91d",
+      "targetContractHash": "tc_24928b7c10f8cdcc45f92d7a0e10f4aca7ae529f3cd2b88777892262622df3c4",
+      "projectRevisionHash": "0654ac81655578d20566e202b3f61427cb5e3ae1f7209768b3390939ff88fed7"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "이메일",
+        "sourceFieldRef": "fld_ae11437574f17c47",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "직책",
+        "sourceFieldRef": "fld_3f38ada8c663fdf4",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "도시",
+        "sourceFieldRef": "fld_22487ba4d165a50d",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_8b6a28865dd091f4",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "company.name"
+    ],
+    "expectedTargetUniverse": [
+      "company.country",
+      "company.name",
+      "company.source_id",
+      "contact.city",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "7e21faaf33218e8600372429189d5d312aa298e5ae6a5497afcdd4faa4b7be6e"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "이메일",
+        "fieldRef": "src:이메일",
+        "valueClass": "EMAIL",
+        "values": [
+          "yana.quelanth0@corp.example.test",
+          "sovis.rismar1@sample.invalid",
+          "darel.halquist2@example.test",
+          "vexis.sovdell3@example.test",
+          "quela.messorin4@corp.example.test",
+          "pelel.yanmar5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "직책",
+        "fieldRef": "src:직책",
+        "valueClass": "TEXT",
+        "values": [
+          "Buyer",
+          "Buyer",
+          "Site engineer",
+          "Operations lead",
+          "Site engineer",
+          "Operations lead"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "도시",
+        "fieldRef": "src:도시",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "Tessin",
+          "Kelmar",
+          "Quenby",
+          "Orvale",
+          "Quenby"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "green",
+          "green",
+          "blue",
+          "amber",
+          "amber",
+          "red"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "company.name"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-memory",
+      "lang:ko"
+    ],
+    "memory": [
+      {
+        "memoryId": "mem_a8cd1cce7e52",
+        "scope": "AGENCY",
+        "owner": "SAME_AGENCY",
+        "state": "STALE",
+        "sourceHeaderPattern": "이메일",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_85d74fd4d593",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "이메일",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_f58f4d9d66da",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "직책",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_ecc38cd2d4b7",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "도시",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_7e202ef537d24feb68117bad",
+    "kc_76dabfaae890b048ec4cc7a2"
+  ]
+}

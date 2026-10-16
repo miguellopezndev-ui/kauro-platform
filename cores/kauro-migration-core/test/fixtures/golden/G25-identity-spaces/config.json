@@ -1,0 +1,139 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g25-spaces"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "contactsa",
+      "path": "contacts-a.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "contactsb",
+      "path": "contacts-b.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "leads",
+      "path": "leads.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "contacts-a",
+      "fileId": "contactsa",
+      "object": "CONTACT",
+      "identitySpace": "customer-export",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        {
+          "column": {
+            "header": "Phone"
+          },
+          "destinationField": "contact.phone",
+          "semanticType": "PHONE"
+        }
+      ]
+    },
+    {
+      "id": "contacts-b",
+      "fileId": "contactsb",
+      "object": "CONTACT",
+      "identitySpace": "customer-export",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        {
+          "column": {
+            "header": "Phone"
+          },
+          "destinationField": "contact.phone",
+          "semanticType": "PHONE"
+        }
+      ]
+    },
+    {
+      "id": "leads",
+      "fileId": "leads",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Lead ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "id": "G32",
+  "title": "A flag raised on a row that was absorbed by a merge",
+  "intent": "Two rows are proven to be one record. The survivor's phone is already in international form; the absorbed row's is a bare national number with no country evidence, so it is preserved and flagged. The record delivers the survivor's value, which is what PREFER_SURVIVOR says. A package check that compared every flag's preserved value against the delivered value of the record its row belongs to therefore compared the absorbed row's flag against the survivor's number, and refused a package that is correct. The two rows disagree on the phone, so the merge records a conflict and the policy resolves it; that is the conflict PREFER_SURVIVOR exists for.",
+  "expect": {
+    "rows": {
+      "total": 2,
+      "OUTPUT": 1,
+      "MERGED_PROVEN": 1,
+      "ISOLATED": 0,
+      "LEFTOVER": 0,
+      "REJECTED_INPUT": 0
+    },
+    "records": {
+      "CONTACT": 1,
+      "COMPANY": 0,
+      "DEAL": 0,
+      "LEAD": 0
+    },
+    "changedCells": 0,
+    "flags": 1,
+    "unmappedFields": 0,
+    "merges": 1,
+    "mergeConflicts": 1,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 1,
+    "edges": {
+      "total": 0,
+      "OUTPUT": 0,
+      "DEDUPLICATED": 0,
+      "UNRESOLVED": 0,
+      "LEFTOVER": 0
+    }
+  },
+  "changes": [],
+  "flagDetails": [
+    {
+      "row": "contacts.csv#3",
+      "field": "contact.phone",
+      "outcome": "AMBIGUOUS",
+      "preserved": "3021234567",
+      "reasonCode": "TRANSFORM_PHONE_NO_COUNTRY_EVIDENCE",
+      "blockedDelivery": false
+    }
+  ],
+  "dispositions": [
+    {
+      "row": "contacts.csv#2",
+      "disposition": "OUTPUT"
+    },
+    {
+      "row": "contacts.csv#3",
+      "disposition": "MERGED_PROVEN",
+      "reasonCode": "IDENTITY_ROW_ABSORBED_BY_PROVEN_MERGE"
+    }
+  ],
+  "delivered": [
+    {
+      "sourceRecordId": "C-1",
+      "values": {
+        "contact.firstName": "Ada",
+        "contact.phone": "+442079460958"
+      }
+    }
+  ]
+}

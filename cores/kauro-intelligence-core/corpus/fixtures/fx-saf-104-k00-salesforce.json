@@ -1,0 +1,147 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-saf-104-k00-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-saf-104-k00-salesforce",
+    "family": "SAFETY",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5c42ae0c6b72e9a38eb24fb7366e6cdb06a4f69d9771c62cb8e148af2ca621ba",
+      "candidateSetHash": "52dc3c8340632e3ca432e5c64c27858b268bbc4cefe9d3fb04660d42e6269778",
+      "targetContractHash": "tc_587935731d25c7d428ed6a223d5db7b99299855e788a7a400301bf2b7d907477",
+      "projectRevisionHash": "60ecd4a6f6e4a9e358f4eda33f5a68a02b7aca23cae9c6f579cc889e9f9b0418"
+    },
+    "expectedOutcomeClass": "REQUIRES_AGENCY_DECISION",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Referencia",
+        "sourceFieldRef": "fld_4a4abdf2bea20c58",
+        "decision": "AGENCY_DECISION"
+      },
+      {
+        "sourceHeader": "Reference",
+        "sourceFieldRef": "fld_9491903f7144925d",
+        "decision": "AGENCY_DECISION"
+      },
+      {
+        "sourceHeader": "Client ref",
+        "sourceFieldRef": "fld_bdd02a26f9c0e23c",
+        "decision": "AGENCY_DECISION"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": true,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": true
+    },
+    "expectedTruthDigest": "513520ad63f426140c0b90be60ef3dae2b20466dd28641fc59b5d47f652fb881"
+  },
+  "structure": {
+    "family": "SAFETY",
+    "mode": "SALESFORCE",
+    "capability": "CAP06",
+    "outcomeClass": "REQUIRES_AGENCY_DECISION",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Referencia",
+        "fieldRef": "src:Referencia",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-1",
+          "A-2",
+          "C-3",
+          "A-1",
+          "A-2"
+        ],
+        "decision": "AGENCY_DECISION"
+      },
+      {
+        "header": "Reference",
+        "fieldRef": "src:Reference",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-1",
+          "B-2",
+          "A-3",
+          "B-1",
+          "C-2"
+        ],
+        "decision": "AGENCY_DECISION"
+      },
+      {
+        "header": "Client ref",
+        "fieldRef": "src:Client ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "B-1",
+          "A-2",
+          "B-3",
+          "A-1",
+          "C-2"
+        ],
+        "decision": "AGENCY_DECISION"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": true,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": true
+    },
+    "tags": [
+      "safety:duplicate-key"
+    ]
+  },
+  "canaries": [
+    "kc_b8a025ce3d980c85ba833054",
+    "kc_f69a70c5062572d4ff39c8e7"
+  ]
+}

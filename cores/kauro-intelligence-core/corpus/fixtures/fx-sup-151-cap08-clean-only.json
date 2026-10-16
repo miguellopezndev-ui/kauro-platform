@@ -1,0 +1,247 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-151-cap08-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-151-cap08-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "bd2b1d47c6328416b36e7488d2654e1e80ae2e1363f258a7571029358e7d218d",
+      "candidateSetHash": "c0879b0075b790e69125a97f74632339e7838f731d51155e72e883633a1abb78",
+      "targetContractHash": null,
+      "projectRevisionHash": "264facf1a4eacb82e88824d00cae1802a1df4d90a401b52e8ae57d1c63fed0bb"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-Mail-Adresse",
+        "sourceFieldRef": "fld_1b60d1016c47d6cd",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Firma",
+        "sourceFieldRef": "fld_ade2a3a4a5b24a78",
+        "decision": "MAP",
+        "destinationField": "contact.companyName"
+      },
+      {
+        "sourceHeader": "Vorname",
+        "sourceFieldRef": "fld_576527dcca4b3cf5",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Webseite",
+        "sourceFieldRef": "fld_d4d8adbf88551ca6",
+        "decision": "MAP",
+        "destinationField": "contact.website"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_979462384a802903",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_d1b81f68801e8124",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.employeeCount",
+      "company.state",
+      "contact.companyName",
+      "contact.email",
+      "contact.firstName",
+      "contact.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials",
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c2b63b63aa92094960626b1ab7541a6348869a835932b4e046d177ecc9ca4fc6"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-Mail-Adresse",
+        "fieldRef": "src:E-Mail-Adresse",
+        "valueClass": "EMAIL",
+        "values": [
+          "tulek.noraly0@example.test",
+          "zero.orvaly1@corp.example.test",
+          "sovel.joraly2@corp.example.test",
+          "kesa.sovath3@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Firma",
+        "fieldRef": "src:Firma",
+        "valueClass": "TEXT",
+        "values": [
+          "gamma",
+          "delta",
+          "alpha",
+          "delta"
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName"
+      },
+      {
+        "header": "Vorname",
+        "fieldRef": "src:Vorname",
+        "valueClass": "TEXT",
+        "values": [
+          "Kesan",
+          "Yana",
+          "Norel",
+          "Sova"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Webseite",
+        "fieldRef": "src:Webseite",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.kesdell-logistics.test",
+          "https://www.halath-foods.test",
+          "https://www.tuldell-systems.test",
+          "https://www.yanenko-logistics.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.website"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "AD",
+          "SF",
+          "KN",
+          "HA"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-51",
+          "R-37",
+          "R-11",
+          "R-56"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "link:on-record"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_8e793b372f43",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Firma",
+        "targetField": "contact.companyName"
+      },
+      {
+        "memoryId": "memconv_bc38dafbef86",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Vorname",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_4baff9e036c2f8184d4f245d",
+    "kc_233404fcdf19c3d569e3f790"
+  ]
+}

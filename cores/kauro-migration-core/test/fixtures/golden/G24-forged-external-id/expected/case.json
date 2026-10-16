@@ -1,0 +1,28 @@
+{
+  "id": "G24",
+  "title": "A record id spelled to look like an external-id key",
+  "intent": "Alice's record id is literally \"ext:SAP ID:900\" and Bob's SAP ID is 900. An earlier design built the external-id key by concatenating text inside one key segment, so these two rendered the same key and two unrelated people were merged with the audit trail claiming an external identifier neither of them had. Identity keys are now built from separate escaped segments, so the two cannot collide.",
+  "expect": {
+    "rows": { "total": 2, "OUTPUT": 2, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 2, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    { "row": "contacts.csv#2", "disposition": "OUTPUT" },
+    { "row": "contacts.csv#3", "disposition": "OUTPUT" }
+  ],
+  "delivered": [
+    { "sourceRecordId": "ext:SAP ID:900", "values": { "contact.firstName": "Alice", "contact.email": "alice@alpha.example" } },
+    { "sourceRecordId": "C-2", "values": { "contact.firstName": "Bob", "contact.email": "bob@beta.example" } }
+  ]
+}

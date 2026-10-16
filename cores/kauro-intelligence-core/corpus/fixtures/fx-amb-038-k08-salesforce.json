@@ -1,0 +1,176 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-038-k08-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-038-k08-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "441841c4fb3742c8b9adf51291843ef8f84d3ecf437a12babb9416dbb5ce0ff6",
+      "candidateSetHash": "99fda70567cd5b7694f2003f6f79ada56c4279b89b7c41664e5a120e6c321889",
+      "targetContractHash": "tc_22e9031e94c1042c2f2c175c2f4bb834eae3db59e014922eda1e2613d24801a2",
+      "projectRevisionHash": "aad29792489d95cb54db2f4c3a0d6567d44ff70ae2589737298efdbb42c1eb82"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_f847d1fc0a50d458",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Correo o teléfono",
+        "sourceFieldRef": "fld_ce5fdad8d7af7ca6",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lastName",
+      "contact.source_id",
+      "lead.company",
+      "lead.email",
+      "lead.jobTitle",
+      "lead.lastName",
+      "lead.phone",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "51ec855eff711f164e5a41a6e16ae1e1485685b7beb4c0087aa55bc9ce5a6427"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "finis.belero0@corp.example.test",
+          "belek.wilrane1@corp.example.test",
+          "tulis.messorin2@example.test",
+          "norel.jorath3@example.test",
+          "joro.halero4@sample.invalid",
+          "orvo.belaly5@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Correo o teléfono",
+        "fieldRef": "src:Correo o teléfono",
+        "valueClass": "MIXED",
+        "values": [
+          "vexis.dardell0@example.test",
+          "Tavek Jordell",
+          "fina.quelvik2@corp.example.test",
+          "+12025550197",
+          "tula.tavath4@example.test",
+          "Lumia Halunda",
+          "wilel.nororin6@sample.invalid",
+          "+12025550163"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:header-values-conflict"
+    ]
+  },
+  "canaries": [
+    "kc_29f8cdae50534cd9acd1965b",
+    "kc_08743477cdd178b3502a7632"
+  ]
+}

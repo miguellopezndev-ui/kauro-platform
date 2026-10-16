@@ -1,0 +1,191 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-050-cap03-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-050-cap03-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9a61c45cd369f2cd52b42b4281353f200ffa887e5e1405c21425f14fe765e39a",
+      "candidateSetHash": "267562bd37fa4d169efc794cb3fa968c4a4edda78d9d0c18bc81c8dea252ba58",
+      "targetContractHash": "tc_a25d2a2bee58a7f9146ff6b7c3063b283e4bbf734c317313f9d9f73b3735f899",
+      "projectRevisionHash": "6ce8f7258d22d647360834a07c0e1e841950d2d600bee4668d1a025137b30fe0"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Firma",
+        "sourceFieldRef": "fld_eead3331e8e3f0cb",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Mitarbeiter",
+        "sourceFieldRef": "fld_0833aec6bfdc048a",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount",
+        "semanticType": "NUMBER"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_0ff65cfc19733069",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_03fb8f1c2fe52d69",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.employeeCount",
+      "company.name",
+      "company.phone",
+      "company.postalCode",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch",
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "f83456612822763c66c9028292545b7bd041a626f945945775cab1470d3ba590"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Firma",
+        "fieldRef": "src:Firma",
+        "valueClass": "TEXT",
+        "values": [
+          "Vexmar Studio B.V.",
+          "Orvaly Works Ltd",
+          "Sovrane Systems S.L."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Mitarbeiter",
+        "fieldRef": "src:Mitarbeiter",
+        "valueClass": "MIXED",
+        "values": [
+          "86531",
+          "91606",
+          "21,909.54"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount",
+        "semanticType": "NUMBER"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-37",
+          "batch-27",
+          "batch-11"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "6",
+          "2",
+          "1"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_fb20245cda64",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Firma",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_35673149bf065b6f26753e7f",
+    "kc_51262b3c397944c4b2231d2a"
+  ]
+}

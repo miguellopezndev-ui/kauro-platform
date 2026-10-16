@@ -1,0 +1,258 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-034-cap11-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-034-cap11-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "4bc167f03287363579131cea6ece17a7bb0792de2cc6c497aa85b92024eb69df",
+      "candidateSetHash": "4c0e4a2e35e43b42293d189d2e7894f96ecafc2699f47f76ecbc1adcbc7518c1",
+      "targetContractHash": "tc_92083fd981593b93893000fde8f6e6b155e9bf17343720b5059bc12c59ab0d24",
+      "projectRevisionHash": "8a98fc2f2490d8cad27549fdb13ebc8b220f6938120e3380f2d9d011a16b9e37"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Sobrenome",
+        "sourceFieldRef": "fld_b5ad7cbf10de2b41",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Cidade",
+        "sourceFieldRef": "fld_ba2e08cd2ea38b9f",
+        "decision": "MAP",
+        "destinationField": "lead.city"
+      },
+      {
+        "sourceHeader": "Endereço",
+        "sourceFieldRef": "fld_856c7d293d10e3c8",
+        "decision": "MAP",
+        "destinationField": "lead.addressLine1"
+      },
+      {
+        "sourceHeader": "Estado",
+        "sourceFieldRef": "fld_0ca3d3ac8b82074c",
+        "decision": "MAP",
+        "destinationField": "lead.state"
+      },
+      {
+        "sourceHeader": "CEP",
+        "sourceFieldRef": "fld_48542f8ca1e4dda0",
+        "decision": "MAP",
+        "destinationField": "lead.postalCode"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.addressLine1",
+      "lead.city",
+      "lead.company",
+      "lead.lastName",
+      "lead.postalCode",
+      "lead.state",
+      "lead.status",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e69407511da8f5660c45f82f7bd554794afe525d22975c3d62b5b731d18ca57c"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Open - Not Contacted",
+              "Working - Contacted",
+              "Closed - Converted",
+              "Closed - Not Converted"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Sobrenome",
+        "fieldRef": "src:Sobrenome",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelell",
+          "Vexiko",
+          "Darsorin"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Cidade",
+        "fieldRef": "src:Cidade",
+        "valueClass": "TEXT",
+        "values": [
+          "Quenby",
+          "Valmora",
+          "Brandel"
+        ],
+        "decision": "MAP",
+        "destination": "lead.city"
+      },
+      {
+        "header": "Endereço",
+        "fieldRef": "src:Endereço",
+        "valueClass": "TEXT",
+        "values": [
+          "160 Tavell Street",
+          "100 Kesvik Street",
+          "123 Darrane Street"
+        ],
+        "decision": "MAP",
+        "destination": "lead.addressLine1"
+      },
+      {
+        "header": "Estado",
+        "fieldRef": "src:Estado",
+        "valueClass": "TEXT",
+        "values": [
+          "Upland",
+          "Coastal",
+          "Coastal"
+        ],
+        "decision": "MAP",
+        "destination": "lead.state"
+      },
+      {
+        "header": "CEP",
+        "fieldRef": "src:CEP",
+        "valueClass": "TEXT",
+        "values": [
+          "76407",
+          "19803",
+          "76605"
+        ],
+        "decision": "MAP",
+        "destination": "lead.postalCode"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_9870d2574356",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Sobrenome",
+        "targetField": "lead.lastName"
+      },
+      {
+        "memoryId": "memconv_bf2df86d8966",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cidade",
+        "targetField": "lead.city"
+      },
+      {
+        "memoryId": "memconv_f3844b2cfe91",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Endereço",
+        "targetField": "lead.addressLine1"
+      },
+      {
+        "memoryId": "memconv_0e166807b632",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Estado",
+        "targetField": "lead.state"
+      },
+      {
+        "memoryId": "memconv_fb3e82d898f2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "CEP",
+        "targetField": "lead.postalCode"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_52936d1521d3f692de5b7097",
+    "kc_121334bf82cda88e16d15320"
+  ]
+}

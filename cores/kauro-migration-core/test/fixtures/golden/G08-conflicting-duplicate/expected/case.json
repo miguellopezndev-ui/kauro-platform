@@ -1,0 +1,37 @@
+{
+  "id": "G08",
+  "title": "A proven duplicate that disagrees with itself",
+  "intent": "Two rows carry the same source record id but disagree on email address and job title. The rows are one record, but no value wins: the record is set aside and both conflicts are written out in full.",
+  "expect": {
+    "rows": { "total": 2, "OUTPUT": 0, "MERGED_PROVEN": 1, "ISOLATED": 1, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 0, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 1,
+    "mergeConflicts": 2,
+    "mergeFieldDecisions": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    { "row": "contacts.csv#2", "disposition": "ISOLATED", "reasonCode": "ISOLATED_IDENTITY_CONFLICT" },
+    { "row": "contacts.csv#3", "disposition": "MERGED_PROVEN", "reasonCode": "IDENTITY_ROW_ABSORBED_BY_PROVEN_MERGE" }
+  ],
+  "merges": [
+    {
+      "survivorRow": "contacts.csv#2",
+      "absorbedRows": ["contacts.csv#3"],
+      "identityEvidenceKinds": ["SOURCE_RECORD_ID"],
+      "conflicts": [
+        { "field": "contact.email", "values": ["ada@example.com", "ada.lovelace@example.com"], "reasonCode": "IDENTITY_MERGE_FIELD_CONFLICT" },
+        { "field": "contact.jobTitle", "values": ["Engineer", "Analyst"], "reasonCode": "IDENTITY_MERGE_FIELD_CONFLICT" }
+      ],
+      "fieldDecisions": []
+    }
+  ]
+}

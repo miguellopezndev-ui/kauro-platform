@@ -1,0 +1,36 @@
+{
+  "id": "G26",
+  "title": "A consent conflict inside a proven merge",
+  "intent": "Two rows are provably one record and disagree on a do-not-email flag carried in a destination-specific column. The configuration declares that column to carry consent meaning, so it is protected exactly as a canonical consent field is: the record is set aside and the conflict is written out, rather than one of the two answers being chosen.",
+  "expect": {
+    "rows": { "total": 2, "OUTPUT": 0, "MERGED_PROVEN": 1, "ISOLATED": 1, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 0, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 1,
+    "mergeConflicts": 1,
+    "mergeFieldDecisions": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    { "row": "contacts.csv#2", "disposition": "ISOLATED", "reasonCode": "ISOLATED_IDENTITY_CONFLICT" },
+    { "row": "contacts.csv#3", "disposition": "MERGED_PROVEN", "reasonCode": "IDENTITY_ROW_ABSORBED_BY_PROVEN_MERGE" }
+  ],
+  "merges": [
+    {
+      "survivorRow": "contacts.csv#2",
+      "absorbedRows": ["contacts.csv#3"],
+      "identityEvidenceKinds": ["SOURCE_RECORD_ID"],
+      "conflicts": [
+        { "field": "custom:Do Not Email", "values": ["false", "true"], "reasonCode": "IDENTITY_MERGE_CONSENT_CONFLICT" }
+      ],
+      "fieldDecisions": []
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-091-k01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-091-k01-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "318ec38847a2831c67c726ef86f8ba9e7e0c14e4c4db7b2538a5bc443cf1cde8",
+      "candidateSetHash": "f3a08c9789b43c453180659aa96dbda6de0d73c93986bdb6fa17a600e9c83205",
+      "targetContractHash": null,
+      "projectRevisionHash": "449d284c9867d1a29198d043247142fac2ef617be6097812eaf568809bef3ce5"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Mobile",
+        "sourceFieldRef": "fld_f476c76589bec0a3",
+        "decision": "MAP",
+        "destinationField": "contact.mobilePhone"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.mobilePhone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "55198d23514aba9ad52aa6be797f87e8abe738cf31b44d36c1b3615183170be3"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Mobile",
+        "fieldRef": "src:Mobile",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0118",
+          "202-555-0160",
+          "202-555-0146",
+          "202-555-0129",
+          "202-555-0135"
+        ],
+        "decision": "MAP",
+        "destination": "contact.mobilePhone"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:phone-region"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_9e152e62504d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Mobile",
+        "targetField": "contact.mobilePhone"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_086d0e1f59eee933c52259c1",
+    "kc_951fb3bbb0cc7b77b5e37fec"
+  ]
+}

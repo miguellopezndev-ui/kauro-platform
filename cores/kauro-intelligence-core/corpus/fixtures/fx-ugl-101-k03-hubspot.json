@@ -1,0 +1,190 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-ugl-101-k03-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-101-k03-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2ea490fa5e62763f972ce7bfc5ba758a1803345b39425e5205e08619957ebebd",
+      "candidateSetHash": "117b5aef3ec2a16c4390e5abbf9aac052d7423079f5e7b619bc368c395951e44",
+      "targetContractHash": "tc_127e9892fbe6bdf5f65b1254fac7e71a4b72045841289d7a14c3f0e30cec3586",
+      "projectRevisionHash": "092bbc1c2d2e2da37a4d46c2c6a509299f3b62c800c5ff14b56801db4b76de9c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "电子邮件",
+        "sourceFieldRef": "fld_45eed2075d8a7268",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "﻿First name",
+        "sourceFieldRef": "fld_1d3cb783c83ce42e",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name​",
+        "sourceFieldRef": "fld_814a734ee27e3665",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Ｎａｍｅ zh",
+        "sourceFieldRef": "fld_c956c819ef7d18c9",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Ｎａｍｅ zh"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6b010778751fe681ed0002d8667f0b9cfccfae8aa24abf243282f39aa14f8823"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "电子邮件",
+        "fieldRef": "src:电子邮件",
+        "valueClass": "EMAIL",
+        "values": [
+          "vexo.jorunda0@example.test",
+          "mesel.yanunda1@example.test",
+          "jora.tulova2@example.test",
+          "orvek.wildell3@example.test",
+          "jora.kesaly4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "﻿First name",
+        "fieldRef": "src:bom-zh",
+        "valueClass": "TEXT",
+        "values": [
+          "Norel",
+          "Yanis",
+          "Sovek",
+          "Lumia",
+          "Tulis"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name​",
+        "fieldRef": "src:zw-zh",
+        "valueClass": "TEXT",
+        "values": [
+          "Darell​",
+          "Orvova​",
+          "Yanath​",
+          "Finquist​",
+          "Yanrane​"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Ｎａｍｅ zh",
+        "fieldRef": "src:Ｎａｍｅ zh",
+        "valueClass": "TEXT",
+        "values": [
+          "Kesvik Partners S.A.",
+          "Yanrane Logistics Inc.",
+          "Finrane Labs GmbH",
+          "Peliko Logistics SAS",
+          "Orvunda Works Ltd"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:encoding",
+      "lang:zh"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_2a7cc76dd601",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "电子邮件",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_2f2608a104ba0e255a00a008",
+    "kc_9998c294c99fa78260781fcd"
+  ]
+}

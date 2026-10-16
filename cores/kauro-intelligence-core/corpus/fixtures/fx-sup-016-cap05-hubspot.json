@@ -1,0 +1,192 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-016-cap05-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-016-cap05-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "becebb5a2240f873a33dc7e279b86fa3c6aa3e30f3bb8c6f724ef141f17f0708",
+      "candidateSetHash": "32c30fd15507eb181501e9592e2c6844e5c9d228612dc7002b552b07986a5805",
+      "targetContractHash": "tc_60cd357e71fe0e712251f9382e64d58a77a9f90fc78fd7672634bdff835f5a16",
+      "projectRevisionHash": "f9a16c2d8714421fcc3b1ef53bdd013724e1423002a5152120711e40f0a5cc88"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Deal name - src",
+        "sourceFieldRef": "fld_40db963aed620d1a",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Stage",
+        "sourceFieldRef": "fld_3b918ff4380405b4",
+        "decision": "MAP",
+        "destinationField": "deal.stage",
+        "valueMap": [
+          {
+            "from": "open",
+            "to": "Prospecting"
+          },
+          {
+            "from": "pending",
+            "to": "Negotiation"
+          }
+        ],
+        "requiredEvidenceRefs": [
+          "ev_a5cde8700cece9b2"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.closeDate",
+      "deal.name",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [
+      "VALUE_MAP"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "14f8e487e6de50188f9a696b787f30b9d124f54c37549a05b15b5e0f7d081f93"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": true,
+            "label": "Stage",
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Deal name - src",
+        "fieldRef": "src:Deal name - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Onboarding 2026 Yanmar",
+          "Pilot 2026 Dariko",
+          "Onboarding 2027 Vexenko",
+          "Renewal 2026 Darath"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Stage",
+        "fieldRef": "src:Stage",
+        "valueClass": "ENUM",
+        "values": [
+          "open",
+          "pending",
+          "open",
+          "pending",
+          "open",
+          "pending"
+        ],
+        "decision": "MAP",
+        "destination": "deal.stage",
+        "evidence": [
+          "ev:self"
+        ],
+        "valueMap": [
+          {
+            "from": "open",
+            "to": "Prospecting"
+          },
+          {
+            "from": "pending",
+            "to": "Negotiation"
+          }
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "VALUE_MAP"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_e0b41dd3f70a",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Deal name - src",
+        "targetField": "deal.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_ef9c279b288adabdcb660c99",
+    "kc_a5eb2ac62a183f5169751794"
+  ]
+}

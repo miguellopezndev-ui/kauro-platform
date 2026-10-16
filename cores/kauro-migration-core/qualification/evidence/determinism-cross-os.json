@@ -1,0 +1,96 @@
+{
+  "gate": "DETERMINISM-CROSS-OS-01",
+  "observedAt": "2026-10-02T12:37:03Z",
+  "subject": {
+    "commit": "ed2759dee52db8301924c3984029a1d227b19dd7",
+    "clean": true,
+    "statedBy": "PROBE",
+    "engineDigest": "47fee1d7bf5ef149d6a6189843235b1551045dab30a159567d0ec87bc4d9bac4"
+  },
+  "canonical": {
+    "packageDigest": "85e5fd7f57958ad9ae51eeae5e630371722cfecae38c1ba608cc8d5d5965987a",
+    "artifactCount": 22
+  },
+  "variableMetadata": {
+    "a": {
+      "platform": "win32",
+      "arch": "x64",
+      "node": "v24.14.1",
+      "tzdata": "2025c",
+      "icu": "78.2",
+      "tz": "America/Los_Angeles",
+      "lang": "en_US.UTF-8",
+      "lcAll": "en_US.UTF-8",
+      "resolvedTimeZone": "America/Los_Angeles",
+      "resolvedLocale": "en-US",
+      "hostSha256": "af9c05534f968f48f5c9d339b4cd41ccda5f3fa68e732d7e33bb6cdc9393d4b6",
+      "observedAt": "2026-10-02T12:36:43Z"
+    },
+    "b": {
+      "platform": "linux",
+      "arch": "x64",
+      "node": "v24.21.0",
+      "tzdata": "2026c",
+      "icu": "78.3",
+      "tz": "Asia/Kolkata",
+      "lang": "de_DE.UTF-8",
+      "lcAll": "de_DE.UTF-8",
+      "resolvedTimeZone": "Asia/Calcutta",
+      "resolvedLocale": "de-DE",
+      "hostSha256": "21617677f7822faf65da16dc183070f2b5ea819893090e75c8c666b3cbfced4a",
+      "observedAt": "2026-10-02T12:37:09Z"
+    }
+  },
+  "checks": [
+    {
+      "id": "probes.differInOperatingSystem",
+      "ok": true,
+      "expected": "the two probes ran on different operating systems",
+      "observed": "win32 and linux"
+    },
+    {
+      "id": "probes.differInTimeZone",
+      "ok": true,
+      "expected": "the two probes ran in different time zones",
+      "observed": "America/Los_Angeles and Asia/Calcutta"
+    },
+    {
+      "id": "probes.differInLocale",
+      "ok": true,
+      "expected": "the two probes ran in different locales",
+      "observed": "en-US and de-DE"
+    },
+    {
+      "id": "subject.sameCommit",
+      "ok": true,
+      "expected": "both probes ran the same commit",
+      "observed": "ed2759dee52db8301924c3984029a1d227b19dd7 and ed2759dee52db8301924c3984029a1d227b19dd7"
+    },
+    {
+      "id": "subject.clean",
+      "ok": true,
+      "expected": "the checkout was clean for both",
+      "observed": "true and true"
+    },
+    {
+      "id": "subject.sameEngine",
+      "ok": true,
+      "expected": "both probes ran the same built engine (line endings normalised)",
+      "observed": "47fee1d7bf5ef149 and 47fee1d7bf5ef149"
+    },
+    {
+      "id": "canonical.sameArtifacts",
+      "ok": true,
+      "expected": "every artifact has the same path and digest on both",
+      "observed": "22 artifacts equal"
+    },
+    {
+      "id": "canonical.samePackageDigest",
+      "ok": true,
+      "expected": "the canonical package digest is equal",
+      "observed": "85e5fd7f57958ad9 and 85e5fd7f57958ad9"
+    }
+  ],
+  "problems": [],
+  "result": "PASS"
+}

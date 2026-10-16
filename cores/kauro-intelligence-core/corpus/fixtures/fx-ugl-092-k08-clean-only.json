@@ -1,0 +1,228 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-092-k08-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-092-k08-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2a5694a61a866fa160b9b6b3f379deef6e5c40242fea4902fdd0945e99f3a644",
+      "candidateSetHash": "4f6919ea5a54c452cbcc7a8cca1df802c9f216f1d708147da276213484aa0adf",
+      "targetContractHash": null,
+      "projectRevisionHash": "3cafaee5088964ba24182c6c2d358bc149bb26b49ce0086dfa13f7e48d0d2c6b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "البريد الإلكتروني",
+        "sourceFieldRef": "fld_127de9a2f0588341",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "اسم العائلة",
+        "sourceFieldRef": "fld_ae397884fdcc3b74",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "المسمى الوظيفي",
+        "sourceFieldRef": "fld_32d4492bc888cf34",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "المدينة / العنوان",
+        "sourceFieldRef": "fld_e18214648b63d7ba",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_3679cbf6f90987ab",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.postalCode",
+      "contact.state"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "المدينة / العنوان",
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "ad03b2ca4304cd10f86bdd42a4c66c9cf365d9995ffbeaea757b2bade18f8e92"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "البريد الإلكتروني",
+        "fieldRef": "src:البريد الإلكتروني",
+        "valueClass": "EMAIL",
+        "values": [
+          "daran.jorunda0@sample.invalid",
+          "finis.joraly1@sample.invalid",
+          "norel.daranth2@corp.example.test",
+          "vexek.tavenko3@corp.example.test",
+          "orva.kesrane4@example.test",
+          "norel.risero5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "اسم العائلة",
+        "fieldRef": "src:اسم العائلة",
+        "valueClass": "TEXT",
+        "values": [
+          "Wilquist",
+          "Wilenko",
+          "Belrane",
+          "Tulvik",
+          "Finova",
+          "Belaly"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "المسمى الوظيفي",
+        "fieldRef": "src:المسمى الوظيفي",
+        "valueClass": "TEXT",
+        "values": [
+          "Controller",
+          "Account manager",
+          "Controller",
+          "Buyer",
+          "Buyer",
+          "Buyer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "المدينة / العنوان",
+        "fieldRef": "src:المدينة / العنوان",
+        "valueClass": "TEXT",
+        "values": [
+          "القاهرة 7",
+          "القاهرة 7",
+          "ירושלים 12",
+          "القاهرة 7",
+          "Valmora القاهرة",
+          "القاهرة 7"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "1",
+          "2",
+          "2",
+          "9",
+          "6",
+          "1"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:rtl",
+      "lang:ar"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_8bdc6a2eade1",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "اسم العائلة",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_21a33b97016d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "المسمى الوظيفي",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_e6468320e248815266a69997",
+    "kc_bbf33de7729caa158228eb95"
+  ]
+}

@@ -1,0 +1,395 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-211-cap08-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-211-cap08-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "814c29862d4744188ae2909739973768bea9dfafe02de0029810673e467affef",
+      "candidateSetHash": "b3e215e2867310e47b7b4a801e36e509955ae7f3d81158cfc85ec70b5ea795a6",
+      "targetContractHash": "tc_2fbec6e84dc0ac92b1437eb2b94cf9a57617ca20965e7475e5e329105320ee2f",
+      "projectRevisionHash": "d5057d7227699fc4d862b24d6dd2e9bb28fb67d874bc8d49494303885e1d5088"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_ef333bf2456f5685",
+        "decision": "PRESERVE",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_be55e305acb3ac88",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "MailingCity",
+        "sourceFieldRef": "fld_2b6429440a11221d",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Title",
+        "sourceFieldRef": "fld_845619526f254d07",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_c730f751d2436a9a",
+        "decision": "PRESERVE",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_57f6fb409b52cb2a",
+        "decision": "PRESERVE",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Organisation ref",
+        "sourceFieldRef": "fld_ea019fce11a5466b",
+        "decision": "PRESERVE",
+        "filePath": "contact-export.csv",
+        "associatesWith": "companies.csv"
+      },
+      {
+        "sourceHeader": "Company ID",
+        "sourceFieldRef": "fld_71c05d7d9c19290a",
+        "decision": "PRESERVE",
+        "filePath": "companies.csv"
+      },
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_60981c56848755b4",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "filePath": "companies.csv"
+      },
+      {
+        "sourceHeader": "BillingCity",
+        "sourceFieldRef": "fld_a79ffb3f4becd7ec",
+        "decision": "MAP",
+        "destinationField": "company.city",
+        "filePath": "companies.csv"
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_2bdb192005e9a430",
+        "decision": "MAP",
+        "destinationField": "company.industry",
+        "filePath": "companies.csv"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_4aecfc5dced7c684",
+        "decision": "PRESERVE",
+        "filePath": "companies.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.industry",
+      "company.name",
+      "company.source_id",
+      "contact.city",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Row checksum",
+      "Folder code",
+      "Organisation ref",
+      "Company ID",
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [
+      "ASSOCIATION_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "266689fb29b510fef57d17606d42dca915bbcac83af6dd389f0f1b5d39201d87"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "contact-export.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "companies.csv": {
+          "object": "COMPANY",
+          "recordIdColumn": "Company ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:contact-export.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-266",
+          "P-267",
+          "P-268"
+        ],
+        "decision": "PRESERVE",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contact-export.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "noris.vexunda0@example.test",
+          "noran.risero1@sample.invalid",
+          "quelel.yandell2@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "MailingCity",
+        "fieldRef": "src:contact-export.csv:MailingCity",
+        "valueClass": "TEXT",
+        "values": [
+          "Quenby",
+          "Nuvia",
+          "Tessin"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Title",
+        "fieldRef": "src:contact-export.csv:Title",
+        "valueClass": "TEXT",
+        "values": [
+          "Operations lead",
+          "Buyer",
+          "Controller"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:contact-export.csv:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "7f283e0c",
+          "e730b949",
+          "d3e45a4c"
+        ],
+        "decision": "PRESERVE",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:contact-export.csv:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F121",
+          "F774",
+          "F706"
+        ],
+        "decision": "PRESERVE",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Organisation ref",
+        "fieldRef": "src:contact-export.csv:Organisation ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-429",
+          "C-429",
+          "C-429"
+        ],
+        "decision": "PRESERVE",
+        "associatesWith": "companies.csv",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Company ID",
+        "fieldRef": "src:companies.csv:Company ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-429",
+          "C-430",
+          "C-431",
+          "C-432"
+        ],
+        "decision": "PRESERVE",
+        "file": "companies.csv"
+      },
+      {
+        "header": "Name",
+        "fieldRef": "src:companies.csv:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Halmar Studio S.A.",
+          "Pelrane Group B.V.",
+          "Jorenko Foods LLC",
+          "Norell Systems B.V."
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "file": "companies.csv"
+      },
+      {
+        "header": "BillingCity",
+        "fieldRef": "src:companies.csv:BillingCity",
+        "valueClass": "TEXT",
+        "values": [
+          "Nuvia",
+          "Valmora",
+          "Orvale",
+          "Tessin"
+        ],
+        "decision": "MAP",
+        "destination": "company.city",
+        "file": "companies.csv"
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:companies.csv:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Logistics",
+          "Packaging",
+          "Food service",
+          "Food service"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry",
+        "file": "companies.csv"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:companies.csv:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L56757",
+          "L11414",
+          "L89047",
+          "L49694"
+        ],
+        "decision": "PRESERVE",
+        "file": "companies.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "ASSOCIATION_MAPPING"
+    ]
+  },
+  "canaries": [
+    "kc_4b947e8d85d7ea499efe2d6d",
+    "kc_eca7007e67821ec9c204f9eb"
+  ]
+}

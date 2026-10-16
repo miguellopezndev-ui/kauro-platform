@@ -1,0 +1,47 @@
+{
+  "id": "G36",
+  "title": "An export placeholder in a column declared an authoritative identifier",
+  "intent": "The operator declared this column authoritative, and one row holds #REF! instead of an identifier. The value proves nothing about identity and is not used as a key — and the row is flagged, so the operator learns that the identifier they declared authoritative was discarded. Discarding it silently left them with a record keyed by its row address and no way to know why.",
+  "expect": {
+    "rows": {
+      "total": 2,
+      "OUTPUT": 2,
+      "MERGED_PROVEN": 0,
+      "ISOLATED": 0,
+      "LEFTOVER": 0,
+      "REJECTED_INPUT": 0
+    },
+    "records": {
+      "CONTACT": 2,
+      "COMPANY": 0,
+      "DEAL": 0,
+      "LEAD": 0
+    },
+    "changedCells": 0,
+    "flags": 1,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": {
+      "total": 0,
+      "OUTPUT": 0,
+      "DEDUPLICATED": 0,
+      "UNRESOLVED": 0,
+      "LEFTOVER": 0
+    }
+  },
+  "changes": [],
+  "flagDetails": [
+    {
+      "row": "contacts.csv#2",
+      "field": "authoritative external id",
+      "outcome": "UNSUPPORTED",
+      "preserved": "#REF!",
+      "reasonCode": "IDENTITY_DISTINCT_NO_PROVING_EVIDENCE",
+      "blockedDelivery": false
+    }
+  ]
+}

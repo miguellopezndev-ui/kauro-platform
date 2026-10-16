@@ -1,0 +1,161 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-096-k06-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-096-k06-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e227434a8691fc130f7c8d870a325156486e1cbb1976981b7a5d488c6ad3287c",
+      "candidateSetHash": "e574e58bf393ab476d190a234d86063ab1010c9f45be8eb104fed7c687303249",
+      "targetContractHash": null,
+      "projectRevisionHash": "11d1c8f87064238956ab2da420b707f085df4b6de7f33b12bf3698bd89757960"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Tipo",
+        "sourceFieldRef": "fld_1d6c6e68a30710f3",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Tipo 2",
+        "sourceFieldRef": "fld_cd023d4d3a1350a4",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_3f129a1904229f0e",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.jobTitle",
+      "contact.lifecycleStage",
+      "deal.stage"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "f3c7130240adb1fe670a5ead64f5e906f9222232d7866bfe6d86f718070edf00"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP05",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Tipo",
+        "fieldRef": "src:Tipo",
+        "valueClass": "ENUM",
+        "values": [
+          "X1",
+          "X2",
+          "P7",
+          "K",
+          "A",
+          "X1",
+          "X2",
+          "P7"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Tipo 2",
+        "fieldRef": "src:Tipo 2",
+        "valueClass": "ENUM",
+        "values": [
+          "B",
+          "P7",
+          "K",
+          "X1",
+          "C",
+          "B",
+          "P7",
+          "K"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "A-13",
+          "C-90",
+          "C-89",
+          "A-90",
+          "A-10",
+          "A-23"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:enum-codes"
+    ]
+  },
+  "canaries": [
+    "kc_efa697d9b061ed5bbc16bd96",
+    "kc_8774cf41f7366206cfeedae8"
+  ]
+}

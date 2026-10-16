@@ -1,0 +1,190 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-amb-104-k14-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-104-k14-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0227e18681aac8826a2aa07dbda7a1e7d1183011971db7fcac20c814fce66f2a",
+      "candidateSetHash": "5dcb5c216b0b8dadb6838ebdcd368d0a936f19bdf26c5923552596a47ed0599a",
+      "targetContractHash": null,
+      "projectRevisionHash": "3b629ae0f1a87283cd8778ae606d0fa9f85091803e6e163ecf92525217a5260f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_bf842eddf36cc23a",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_155841a3f93d3e3e",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Otros",
+        "sourceFieldRef": "fld_b8fb84c3b04c2af5",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_95938d97374d30c0",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.firstName",
+      "contact.lastName",
+      "lead.rating",
+      "lead.state"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "a6a8afe7a26b4bb2a291c50c6e342fa03fb76965c2688b0df112187ea7779240"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "rating",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Orva",
+          "Vexan",
+          "Halis",
+          "Halis",
+          "Zeris",
+          "Lumia",
+          "Joro"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvdell",
+          "Belorin",
+          "Orvdell",
+          "Finrane",
+          "Joranth",
+          "Yanunda",
+          "Halquist"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Otros",
+        "fieldRef": "src:Otros",
+        "valueClass": "MIXED",
+        "values": [
+          "",
+          "see attached",
+          "",
+          "",
+          "91",
+          "",
+          ""
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "5",
+          "8",
+          "3",
+          "6",
+          "4",
+          "3",
+          "3"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:sparse-column"
+    ]
+  },
+  "canaries": [
+    "kc_97441b1b48fe575ae0c54494",
+    "kc_812a8ee052833ad2e542fe31"
+  ]
+}

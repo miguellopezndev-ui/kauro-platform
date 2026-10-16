@@ -1,0 +1,26 @@
+{
+  "configVersion": "3.0.0",
+  "source": { "system": "legacy_crm", "namespace": "value-intent" },
+  "target": { "mode": "SALESFORCE", "importMode": "UPDATE_ONLY" },
+  "destinationMatching": [{"recordMappingId":"contacts","matchAuthority":"TARGET_UNIQUE_FIELD","targetField":"email","sourceField":"contact.email","onMissingMatch":"ISOLATE","onMatchConflict":"ISOLATE"}],
+  "files": [{ "id": "contacts", "path": "contacts.csv", "format": "CSV" }],
+  "records": [
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": { "header": "Contact ID" },
+      "fields": [
+        { "column": { "header": "First Name" }, "destinationField": "contact.firstName", "semanticType": "TEXT" },
+        { "column": { "header": "Last Name" }, "destinationField": "contact.lastName", "semanticType": "TEXT" },
+        { "column": { "header": "Email" }, "destinationField": "contact.email", "semanticType": "EMAIL" },
+        {
+          "column": { "header": "Job Title" },
+          "destinationField": "contact.jobTitle",
+          "semanticType": "TEXT",
+          "options": { "clearWhenMatches": ["n/a"], "destructiveAuthorization": true }
+        }
+      ]
+    }
+  ]
+}

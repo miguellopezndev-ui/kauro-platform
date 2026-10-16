@@ -1,0 +1,66 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g28-boolean"
+  },
+  "target": {
+    "mode": "HUBSPOT",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "contacts",
+      "path": "contacts.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        {
+          "column": {
+            "header": "Opted In"
+          },
+          "destinationField": "custom:Opted In",
+          "semanticType": "BOOLEAN",
+          "options": {
+            "trueValues": [
+              "Y"
+            ],
+            "falseValues": [
+              "N"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+ "label": "SIMULATED: hand-written from the documented AWS Bedrock InvokeModel shape (API_runtime_InvokeModel, Errors); not a recording of a live call",
+ "status": 200,
+ "headers": {
+  "content-type": "application/json",
+  "x-amzn-requestid": "5e1f0c3a-0000-4000-8000-00000000b001",
+  "x-amzn-bedrock-input-token-count": "12",
+  "x-amzn-bedrock-output-token-count": "5",
+  "x-amzn-bedrock-invocation-latency": "812",
+  "date": "Thu, 01 Oct 2026 12:00:01 GMT",
+  "set-cookie": "SIMULATED_SECRET=1"
+ },
+ "body": {
+  "id": "msg_bdrk_01SIMULATED0001",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-5-5",
+  "content": [
+   {
+    "type": "text",
+    "text": "Ñandú € 😀 listo"
+   }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+   "input_tokens": 12,
+   "output_tokens": 5
+  }
+ }
+}

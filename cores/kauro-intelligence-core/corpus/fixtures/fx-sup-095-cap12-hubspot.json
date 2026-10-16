@@ -1,0 +1,160 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-095-cap12-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-095-cap12-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5d4eec8c583a63084c93d9a9d04230a7d9928c9bc81403f2a24380da7add107b",
+      "candidateSetHash": "31a64ac39d1a8695c9e725d60772be7c454c9b0d89bfbc6a0c8115024cebd059",
+      "targetContractHash": "tc_00d23488f8f2563625ac7c126a220a860dc808895ffbad001526fb2c3ab4f005",
+      "projectRevisionHash": "328a6224a9db9284a41b1d9aa1b682b789613a9237b579fed7459dc9bfd8c976"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Azienda",
+        "sourceFieldRef": "fld_4ba05a679084004d",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Value",
+        "sourceFieldRef": "fld_5d911f018a15778f",
+        "decision": "MAP",
+        "destinationField": "company.annualRevenue",
+        "requiredEvidenceRefs": [
+          "ev_938ddb077e3a73f5"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.annualRevenue",
+      "company.name",
+      "company.postalCode",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "16313cc97757eb8b8a779a56e40edc5dbac26ba9d71f482b77dda3517924878a"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Azienda",
+        "fieldRef": "src:Azienda",
+        "valueClass": "TEXT",
+        "values": [
+          "Finanth Logistics S.A.",
+          "Mesmar Group LLC",
+          "Norquist Systems Ltd",
+          "Orvero Systems Ltd",
+          "Kesvik Works S.A.",
+          "Vexanth Systems Ltd"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Value",
+        "fieldRef": "src:Value",
+        "valueClass": "NUMBER",
+        "values": [
+          "66130",
+          "54165",
+          "72595",
+          "17579",
+          "40233",
+          "95691"
+        ],
+        "decision": "MAP",
+        "destination": "company.annualRevenue",
+        "evidence": [
+          "ev:self"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_6aba5f2a896f",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Azienda",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_fd5772702b6ff43480519e18",
+    "kc_291fb42bfc12ff08f7af891c"
+  ]
+}

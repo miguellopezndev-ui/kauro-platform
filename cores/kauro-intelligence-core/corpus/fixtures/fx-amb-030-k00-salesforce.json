@@ -1,0 +1,182 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-030-k00-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-030-k00-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "985c2134fe757e55b829c4ac68466d06a228d92381d0353ada62850f74bf26e2",
+      "candidateSetHash": "5176df35ea763a2820c9793fe931ce8a9f4d8c7c0ad5b6c011df124d54562899",
+      "targetContractHash": "tc_0c3783a59d6b1ea577e0905d50f68bdb1fed9ddfd5369f7cde6325841687f4b0",
+      "projectRevisionHash": "290a0a938e86e13bba730a5c0a5d0707f1d766888c24db8bc477d87c6afacbc1"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_97e816cf71cc5a68",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Date de clôture",
+        "sourceFieldRef": "fld_cbe14df8b276abbc",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_13b283ff7c067887",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.currency",
+      "deal.description",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "914401d419a0a6b4fdaaf4c2bc99c15a762e852bf4954d3a8431ef31f8fc3bea"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": true
+          },
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Name",
+        "fieldRef": "src:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Expansion 2026 Mesorin",
+          "Supply contract 2026 Vexath",
+          "Renewal 2025 Orvanth",
+          "Pilot 2026 Lumova"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Date de clôture",
+        "fieldRef": "src:Date de clôture",
+        "valueClass": "DATE",
+        "values": [
+          "02/11/2024",
+          "11/04/2021",
+          "02/07/2024",
+          "04/12/2026"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "4",
+          "3",
+          "8",
+          "8"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:date-order"
+    ]
+  },
+  "canaries": [
+    "kc_b4ac5226154fddc5ea8d323b",
+    "kc_661a7710422b2983a4764922"
+  ]
+}

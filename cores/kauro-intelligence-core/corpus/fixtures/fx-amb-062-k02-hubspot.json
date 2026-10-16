@@ -1,0 +1,150 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-062-k02-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-062-k02-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "597afd7cdda8f2c5b96cf22b5dbb8112964173cf3d3caea5cae9b44f2ec3db47",
+      "candidateSetHash": "1894bbcd0ff875a6f736e83f96400462280092f6aa836c8d063494b7c3fa875f",
+      "targetContractHash": "tc_9f11d4297bd34a68426a4f3c4bcb4dd3fcbbac186dc370a98c54bf2c53dd4a31",
+      "projectRevisionHash": "cc1d0256cd849634bd2f72c40c8fd7703b27d601088211ac18d528e2c4a8234b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Importe",
+        "sourceFieldRef": "fld_1ae049af0533d244",
+        "decision": "MAP",
+        "destinationField": "deal.amount"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.currency",
+      "deal.name",
+      "deal.ownerEmail",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "ef040bb208666fbb05b399328c4f12cc4dc3013ad5d29184ca4b6644639eaf2b"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Importe",
+        "fieldRef": "src:Importe",
+        "valueClass": "NUMBER",
+        "values": [
+          "85.800",
+          "54.500",
+          "38.500",
+          "8.300"
+        ],
+        "decision": "MAP",
+        "destination": "deal.amount"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:decimal-separator"
+    ]
+  },
+  "canaries": [
+    "kc_ebb350eefd0ee5d32b6812b3",
+    "kc_e9fdcf74a089971616043797"
+  ]
+}

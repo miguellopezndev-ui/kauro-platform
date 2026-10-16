@@ -1,0 +1,327 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-209-cap06-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-209-cap06-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "520157d72d375a67460dcbf0f75ad352924942cd8a825ce3895a5335005e359f",
+      "candidateSetHash": "46f97a621238357fe2d798b64a1acaf0bbaf1fee1d9ab88d667a85d4a6efdd10",
+      "targetContractHash": "tc_a34ae3ace1874ab7e7206d320c3e0bfb8b7abcec88e3f9c6da4cc29087ebc30e",
+      "projectRevisionHash": "925bfbc98bac429c83c6d815eb9499f4b943cbf4f77a559aa516b69fbe23c203"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_62e0b40e1a54a63a",
+        "decision": "PRESERVE",
+        "filePath": "crm-contacts.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_5d97b119778bda93",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "crm-contacts.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_4767bcacf531f0ad",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "crm-contacts.csv"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_6fae7743f85c94de",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "filePath": "crm-contacts.csv"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_7bd70a79a71dcf45",
+        "decision": "PRESERVE",
+        "filePath": "crm-contacts.csv"
+      },
+      {
+        "sourceHeader": "Customer Number",
+        "sourceFieldRef": "fld_845d6c0cf5bc582a",
+        "decision": "PRESERVE",
+        "filePath": "crm-contacts.csv",
+        "adoptsIdentity": true
+      },
+      {
+        "sourceHeader": "Customer Number",
+        "sourceFieldRef": "fld_7a41ea5f60cb8deb",
+        "decision": "PRESERVE",
+        "filePath": "contacts-2024.csv",
+        "adoptsIdentity": true
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_da8c66fd8c69945f",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "filePath": "contacts-2024.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_5956a04fcd4d83a0",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "contacts-2024.csv"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_8fd8e89a5411ea83",
+        "decision": "PRESERVE",
+        "filePath": "contacts-2024.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.Customer_Number__c",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Folder code",
+      "Customer Number",
+      "Customer Number",
+      "Internal ticket ref"
+    ],
+    "expectedTaskTypes": [
+      "IDENTITY_STRATEGY"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "055739577beae3b8dc58407261874783aede01fad56472dbd5fee9f250002e41"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "crm-contacts.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "contacts-2024.csv": {
+          "object": "CONTACT"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "Customer_Number__c",
+            "valueClass": "TEXT",
+            "required": false,
+            "label": "Customer Number",
+            "externalId": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:crm-contacts.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-702",
+          "P-703",
+          "P-704"
+        ],
+        "decision": "PRESERVE",
+        "file": "crm-contacts.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:crm-contacts.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "luma.haliko0@sample.invalid",
+          "tavia.wilaly1@sample.invalid",
+          "risek.soviko2@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "crm-contacts.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:crm-contacts.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Tulmar",
+          "Kesmar",
+          "Yanell"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "crm-contacts.csv"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:crm-contacts.csv:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Meso",
+          "Luman",
+          "Vexo"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "file": "crm-contacts.csv"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:crm-contacts.csv:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F514",
+          "F490",
+          "F444"
+        ],
+        "decision": "PRESERVE",
+        "file": "crm-contacts.csv"
+      },
+      {
+        "header": "Customer Number",
+        "fieldRef": "src:crm-contacts.csv:Customer Number",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "CU-9486",
+          "CU-9487",
+          "CU-9488"
+        ],
+        "decision": "PRESERVE",
+        "adoptsIdentity": true,
+        "file": "crm-contacts.csv"
+      },
+      {
+        "header": "Customer Number",
+        "fieldRef": "src:contacts-2024.csv:Customer Number",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "CU-9488",
+          "CU-9882",
+          "CU-9883",
+          "CU-9884",
+          "CU-9885"
+        ],
+        "decision": "PRESERVE",
+        "adoptsIdentity": true,
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:contacts-2024.csv:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Daro",
+          "Tavek",
+          "Halis",
+          "Keso",
+          "Orvo"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:contacts-2024.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Norsorin",
+          "Zeranth",
+          "Jorell",
+          "Tavero",
+          "Orvenko"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:contacts-2024.csv:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-9442",
+          "TKT-9013",
+          "TKT-7781",
+          "TKT-3182",
+          "TKT-7999"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts-2024.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "IDENTITY_STRATEGY"
+    ]
+  },
+  "canaries": [
+    "kc_4feecc5032ae9c14634e3ddc",
+    "kc_576f12d2e60f4c6f74dede58"
+  ]
+}

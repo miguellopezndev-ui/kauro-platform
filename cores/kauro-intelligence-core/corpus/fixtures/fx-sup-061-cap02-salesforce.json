@@ -1,0 +1,225 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-061-cap02-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-061-cap02-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "7a34f5cba079562dafd93e2d133379cef78c27b608b0ee920aa043171da6730b",
+      "candidateSetHash": "dc23726ef26ddf9f48bb654e83e471aa42ef98a7061f0ee017693baebdc4f524",
+      "targetContractHash": "tc_34394241a4387bdcb128a921430941d897b6041a1cc494f1fe4b9e672dd1a711",
+      "projectRevisionHash": "e547ef7a52fb3c67a07a959f0af2f11be4d3bdf809e13696b44ebaf42a6f8f6a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Nom de famille",
+        "sourceFieldRef": "fld_8debdbb5090cf0c3",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Statut du contact",
+        "sourceFieldRef": "fld_2b795ec530e0102b",
+        "decision": "MAP",
+        "destinationField": "lead.status"
+      },
+      {
+        "sourceHeader": "Prénom",
+        "sourceFieldRef": "fld_824e2d49d62db301",
+        "decision": "MAP",
+        "destinationField": "lead.firstName"
+      },
+      {
+        "sourceHeader": "Téléphone",
+        "sourceFieldRef": "fld_dfe6b88db6eb7c70",
+        "decision": "MAP",
+        "destinationField": "lead.phone",
+        "allowedDestinationFields": [
+          "lead.phone",
+          "lead.mobilePhone"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.company",
+      "lead.firstName",
+      "lead.lastName",
+      "lead.mobilePhone",
+      "lead.phone",
+      "lead.status",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "f707878f439fb75d50e7cafe53ab18d02308ea66aafe0c9f4449c4bd62f203d1"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Open - Not Contacted",
+              "Working - Contacted",
+              "Closed - Converted",
+              "Closed - Not Converted"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Nom de famille",
+        "fieldRef": "src:Nom de famille",
+        "valueClass": "TEXT",
+        "values": [
+          "Wilunda",
+          "Finrane",
+          "Wilova"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Statut du contact",
+        "fieldRef": "src:Statut du contact",
+        "valueClass": "ENUM",
+        "values": [
+          "Working",
+          "Open",
+          "Converted"
+        ],
+        "decision": "MAP",
+        "destination": "lead.status"
+      },
+      {
+        "header": "Prénom",
+        "fieldRef": "src:Prénom",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumek",
+          "Keso",
+          "Quelis"
+        ],
+        "decision": "MAP",
+        "destination": "lead.firstName"
+      },
+      {
+        "header": "Téléphone",
+        "fieldRef": "src:Téléphone",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550183",
+          "+12025550156",
+          "+447700900614"
+        ],
+        "decision": "MAP",
+        "destination": "lead.phone",
+        "alternatives": [
+          "lead.mobilePhone"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_92215ee0bb3d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nom de famille",
+        "targetField": "lead.lastName"
+      },
+      {
+        "memoryId": "memconv_f7c3e737372e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Statut du contact",
+        "targetField": "lead.status"
+      },
+      {
+        "memoryId": "memconv_07639f231ee0",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Prénom",
+        "targetField": "lead.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_667d15f7f5034624a42184e0",
+    "kc_a26a286a8549e7cc43c97041"
+  ]
+}

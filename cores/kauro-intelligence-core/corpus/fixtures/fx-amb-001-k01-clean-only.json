@@ -1,0 +1,159 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-001-k01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-001-k01-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "7f9986da25eb0b4105faf2c78284248d0256472f4c3a86432277d5020e3a85ef",
+      "candidateSetHash": "6c3e89bb7250d54773201567ee2d8c935ddff6ff111b911f79d046e90e804019",
+      "targetContractHash": null,
+      "projectRevisionHash": "428ba43bc07660c4944ab57f34c285fdf5a45b6df906ad2aa6d5b0b849f0bd2e"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_fd6f021ea6dd02a0",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_cb9c475ca27e66b7",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Téléphone",
+        "sourceFieldRef": "fld_01609fb7323db857",
+        "decision": "MAP",
+        "destinationField": "contact.phone"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.phone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e365bca528bd5c59fbe04775dd6e505073d4a68a7da71a475fbfaa55b51fe954"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "risia.nororin0@corp.example.test",
+          "joris.finaly1@sample.invalid",
+          "sovis.haliko2@example.test",
+          "zera.zerdell3@sample.invalid",
+          "pela.belenko4@example.test",
+          "vexo.vexquist5@example.test",
+          "tulis.jorrane6@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Tavel",
+          "Quela",
+          "Finek",
+          "Pelia",
+          "Jorek",
+          "Halek",
+          "Yanek"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Téléphone",
+        "fieldRef": "src:Téléphone",
+        "valueClass": "PHONE",
+        "values": [
+          "7700 900540",
+          "7700 900776",
+          "7700 900276",
+          "7700 900324",
+          "7700 900542",
+          "202-555-0122",
+          "202-555-0178"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:phone-region"
+    ]
+  },
+  "canaries": [
+    "kc_5ff16d29770c454982777834",
+    "kc_fb718536fb050a1e6174c807"
+  ]
+}

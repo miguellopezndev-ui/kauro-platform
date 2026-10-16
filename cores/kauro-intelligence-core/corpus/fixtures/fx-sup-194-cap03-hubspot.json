@@ -1,0 +1,144 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-194-cap03-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-194-cap03-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2132f089f87110eb2a7a1628d7d748fa8877b236680b11a3d88cad0beae83d42",
+      "candidateSetHash": "7ee21c2fdf7c618214a0df44f8020a2b2446b457e01570afca539f8143f8a317",
+      "targetContractHash": "tc_7e25b10a7abc1dfc0876a7d1ac10d615b157456eb097a55b64c571877c4b1f57",
+      "projectRevisionHash": "7bc58a2e5a22cd06076ec6b5a9f08ab0d1a5350dea8bc65db585b213b9326c27"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email - src",
+        "sourceFieldRef": "fld_371bba6d17e00580",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Phone",
+        "sourceFieldRef": "fld_7cbfb5945801d0c3",
+        "decision": "MAP",
+        "destinationField": "contact.phone",
+        "semanticType": "PHONE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "081df9c7a8c6f96f59b06ecad220d16e18d1869e0bb37902cacdcbd32e0c1574"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email - src",
+        "fieldRef": "src:Email - src",
+        "valueClass": "EMAIL",
+        "values": [
+          "sovo.darquist0@sample.invalid",
+          "tulo.tulsorin1@corp.example.test",
+          "finan.kesaly2@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Phone",
+        "fieldRef": "src:Phone",
+        "valueClass": "MIXED",
+        "values": [
+          "+447700900898",
+          "+12025550186",
+          "202.555.0103"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone",
+        "semanticType": "PHONE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_a4ecfdc121aa",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Email - src",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_62a0e6c5c1b42827d42b7327",
+    "kc_55b223adaa33a8904ca9e079"
+  ]
+}

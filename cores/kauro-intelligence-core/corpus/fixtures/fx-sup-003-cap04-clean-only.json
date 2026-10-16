@@ -1,0 +1,192 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-003-cap04-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-003-cap04-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "6b91ff31312c10eebac98c882e44e15a960e3eb21e0017d3fa55cc0327accc22",
+      "candidateSetHash": "fda3f864adbda53610686d9c2a593dd1654c74a11ca61231c8544c1ef5be1e67",
+      "targetContractHash": null,
+      "projectRevisionHash": "cae2637b19a2334085333885dae789bb6741b1a774785c1e1410e2142c32782c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_199f66848e7aa4ba",
+        "decision": "MAP",
+        "destinationField": "lead.employeeCount"
+      },
+      {
+        "sourceHeader": "Correo - src",
+        "sourceFieldRef": "fld_cf938fe2e612b880",
+        "decision": "MAP",
+        "destinationField": "lead.email"
+      },
+      {
+        "sourceHeader": "Created",
+        "sourceFieldRef": "fld_67aff38f90597d9f",
+        "decision": "MAP",
+        "destinationField": "lead.createdAt"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.createdAt",
+      "lead.doNotCall",
+      "lead.email",
+      "lead.employeeCount",
+      "lead.postalCode",
+      "lead.state"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "aecde8be04ddc2a4aee58d3e991180c67ad152b029a4a040ab24094b2efa22fd"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD",
+      "locale": {
+        "dateFormat": "DD/MM/YYYY"
+      }
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "NUMBER",
+        "values": [
+          "62705,82",
+          "18401,44",
+          "20844,18",
+          "59039,81",
+          "79028,60",
+          "70149,42"
+        ],
+        "decision": "MAP",
+        "destination": "lead.employeeCount"
+      },
+      {
+        "header": "Correo - src",
+        "fieldRef": "src:Correo - src",
+        "valueClass": "EMAIL",
+        "values": [
+          "BELA.BELSORIN0@sample.invalid",
+          "daris.belsorin1@example.test",
+          "ORVA.VEXQUIST2@sample.invalid",
+          "zeris.norrane3@sample.invalid",
+          "ORVAN.FINVIK4@corp.example.test",
+          "tulo.darsorin5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "lead.email"
+      },
+      {
+        "header": "Created",
+        "fieldRef": "src:Created",
+        "valueClass": "DATE",
+        "values": [
+          "22/06/2021",
+          "26/03/2024",
+          "24/09/2022",
+          "18/07/2021",
+          "27/06/2020",
+          "19/03/2021"
+        ],
+        "decision": "MAP",
+        "destination": "lead.createdAt"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_41bb21960813",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Employees",
+        "targetField": "lead.employeeCount"
+      },
+      {
+        "memoryId": "memconv_20ade63ed365",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Created",
+        "targetField": "lead.createdAt"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_234b8d64436b941fcf2cc345",
+    "kc_8206772540d6e141f33de276"
+  ]
+}

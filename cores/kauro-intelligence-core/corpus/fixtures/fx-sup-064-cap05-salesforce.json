@@ -1,0 +1,238 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-064-cap05-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-064-cap05-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "ae7de1bc98d62510d222c78c9c73c3ffea0f88d6617ff1ad6f7d98cf91b9df8e",
+      "candidateSetHash": "ebcaea35ef12a7947132b98ed2477faa16f6c1c11b00da287a80994713034619",
+      "targetContractHash": "tc_8c0ef0cc52114e2836abe7eba6f7d2a0f3c042bb4a2c9b66111609da100bf5e6",
+      "projectRevisionHash": "69b87da7ae04cab2dfe1513b08ee4df121c3ea67ce739751138292e7922e1958"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_a2575dfedad29d54",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Stage",
+        "sourceFieldRef": "fld_1e044d7e9551901d",
+        "decision": "MAP",
+        "destinationField": "deal.stage",
+        "valueMap": [
+          {
+            "from": "active",
+            "to": "Negotiation"
+          },
+          {
+            "from": "pending",
+            "to": "Negotiation"
+          },
+          {
+            "from": "open",
+            "to": "Prospecting"
+          },
+          {
+            "from": "qualified",
+            "to": "Qualification"
+          }
+        ],
+        "requiredEvidenceRefs": [
+          "ev_1f2ca00a8033f85d"
+        ]
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_d89ef18da5f3909c",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.closeDate",
+      "deal.currency",
+      "deal.description",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [
+      "VALUE_MAP"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e76be6051c9b68164530ecedfd3302d95e69370647d345ccd650c4810104b2a1"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": true,
+            "label": "Stage",
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Deal name",
+        "fieldRef": "src:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Supply contract 2026 Lumanth",
+          "Supply contract 2027 Vexdell",
+          "Renewal 2026 Orvero",
+          "Renewal 2024 Halorin"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Stage",
+        "fieldRef": "src:Stage",
+        "valueClass": "ENUM",
+        "values": [
+          "active",
+          "pending",
+          "open",
+          "qualified",
+          "active",
+          "pending",
+          "open",
+          "qualified",
+          "active",
+          "pending",
+          "open"
+        ],
+        "decision": "MAP",
+        "destination": "deal.stage",
+        "evidence": [
+          "ev:self"
+        ],
+        "valueMap": [
+          {
+            "from": "active",
+            "to": "Negotiation"
+          },
+          {
+            "from": "pending",
+            "to": "Negotiation"
+          },
+          {
+            "from": "open",
+            "to": "Prospecting"
+          },
+          {
+            "from": "qualified",
+            "to": "Qualification"
+          }
+        ]
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "B-85",
+          "C-77",
+          "B-19",
+          "B-33"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "VALUE_MAP"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_5f0cf8ccd53a",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Deal name",
+        "targetField": "deal.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_df35023178de53da145bd5ee",
+    "kc_ea1b90157ba514a6a455001e"
+  ]
+}

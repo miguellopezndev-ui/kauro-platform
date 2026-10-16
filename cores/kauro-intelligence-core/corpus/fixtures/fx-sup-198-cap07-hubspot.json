@@ -1,0 +1,413 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-198-cap07-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-198-cap07-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9270b70c9d3fa44ecc0654bc68d13a2e7c09beaa361a210c4490c1d710b49204",
+      "candidateSetHash": "7603da49da355ff96c22c42374e0fde85a4ddb8830a8d8ba21622894891ceb02",
+      "targetContractHash": "tc_ee7926f5a944bd35c1b8d497f592886bfbccf5b286dbcea6e41f1c32147363ec",
+      "projectRevisionHash": "676c2f3fdfb399243257f765e9028328ef2aec2005a8b5f04417a8202487bd37"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_080b496c0404a0d5",
+        "decision": "PRESERVE",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_6f74f36dc134991d",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "people.csv",
+        "inDuplicateReview": true
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_ce6cbd07daad5ece",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Job title",
+        "sourceFieldRef": "fld_13f5017bd48b2469",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_58f706a5dfbaf145",
+        "decision": "PRESERVE",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Submission ID",
+        "sourceFieldRef": "fld_4e0b4d5802955ade",
+        "decision": "PRESERVE",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_035b4490b8aa7942",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_f14a1e35b3a5208d",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_2c0013ad06fcfdd4",
+        "decision": "PRESERVE",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Company ID",
+        "sourceFieldRef": "fld_6c3d195d9e6e8c57",
+        "decision": "PRESERVE",
+        "filePath": "organisations.csv"
+      },
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_b88f49bd76ff84b4",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "filePath": "organisations.csv"
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_102479e84317bcd6",
+        "decision": "MAP",
+        "destinationField": "company.industry",
+        "filePath": "organisations.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.industry",
+      "company.name",
+      "company.ownerEmail",
+      "company.source_id",
+      "contact.city",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Import batch",
+      "Submission ID",
+      "Folder code",
+      "Company ID"
+    ],
+    "expectedTaskTypes": [
+      "DUPLICATE_SIGNAL_STRATEGY"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "09464cd70563d51c1750233f4ffe10de8f109d72f994ccb0617adc7b2062b5be"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "people.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "webform-signups.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Submission ID"
+        },
+        "organisations.csv": {
+          "object": "COMPANY",
+          "recordIdColumn": "Company ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:people.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-643",
+          "P-644",
+          "P-645",
+          "P-646"
+        ],
+        "decision": "PRESERVE",
+        "file": "people.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:people.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "dara.vexsorin0@example.test",
+          "finia.belanth1@sample.invalid",
+          "yano.sovath2@corp.example.test",
+          "dara.vexsorin0@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "read": {
+          "destination": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        "inDuplicateReview": true,
+        "file": "people.csv"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:people.csv:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Nuvia",
+          "Orvale",
+          "Nuvia",
+          "Nuvia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "people.csv"
+      },
+      {
+        "header": "Job title",
+        "fieldRef": "src:people.csv:Job title",
+        "valueClass": "TEXT",
+        "values": [
+          "Account manager",
+          "Site engineer",
+          "Site engineer",
+          "Operations lead"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "file": "people.csv"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:people.csv:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-32",
+          "batch-8",
+          "batch-10",
+          "batch-40"
+        ],
+        "decision": "PRESERVE",
+        "file": "people.csv"
+      },
+      {
+        "header": "Submission ID",
+        "fieldRef": "src:webform-signups.csv:Submission ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "S-785",
+          "S-786",
+          "S-787",
+          "S-788",
+          "S-789"
+        ],
+        "decision": "PRESERVE",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:webform-signups.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "wilia.jorero0@example.test",
+          "noran.sovsorin1@sample.invalid",
+          "lumia.lumorin2@example.test",
+          "wilia.quelero3@example.test",
+          "daran.joriko4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "read": {
+          "destination": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:webform-signups.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvero",
+          "Tavdell",
+          "Yansorin",
+          "Pelero",
+          "Risdell"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:webform-signups.csv:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F102",
+          "F483",
+          "F562",
+          "F911",
+          "F402"
+        ],
+        "decision": "PRESERVE",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Company ID",
+        "fieldRef": "src:organisations.csv:Company ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-161",
+          "C-162"
+        ],
+        "decision": "PRESERVE",
+        "file": "organisations.csv"
+      },
+      {
+        "header": "Name",
+        "fieldRef": "src:organisations.csv:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Sovath Studio GmbH",
+          "Sovova Studio S.A."
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "file": "organisations.csv"
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:organisations.csv:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Food service",
+          "Food service"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry",
+        "file": "organisations.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "DUPLICATE_SIGNAL_STRATEGY"
+    ]
+  },
+  "canaries": [
+    "kc_e8886d10f93e11f32cbb589a",
+    "kc_fb2f1a7bdab5dcacfe8ec996"
+  ]
+}

@@ -1,0 +1,337 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-042-cap07-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-042-cap07-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "907d82713f61f796bf5f0c13d5268fb7c0f41cec17b030c12b74c4f8d988edc7",
+      "candidateSetHash": "1c7d58bd6fae66954e846f4e548fa1126cb2dcdf40ec22b4609a3e2c19b1885f",
+      "targetContractHash": null,
+      "projectRevisionHash": "9783bf277c5692299db5c5f10ef0fd3a2ce2795615c5a70590d6ef8ccf12f344"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_e515bb90d07d4953",
+        "decision": "PRESERVE",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_7e1c1e82b06aeac9",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contact-export.csv",
+        "inDuplicateReview": true
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_eacdfbd0b001697c",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_4b8bedfa6897d0c0",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Submission ID",
+        "sourceFieldRef": "fld_4d4785faab571fe6",
+        "decision": "PRESERVE",
+        "filePath": "contacts-2024.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_353827005258560e",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contacts-2024.csv",
+        "inDuplicateReview": true
+      },
+      {
+        "sourceHeader": "Job title",
+        "sourceFieldRef": "fld_d495ee63ecdfb452",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "filePath": "contacts-2024.csv"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_0e3e63afc245db31",
+        "decision": "PRESERVE",
+        "filePath": "contacts-2024.csv"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_8092a42f6e8b0b23",
+        "decision": "PRESERVE",
+        "filePath": "contacts-2024.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.lifecycleStage",
+      "contact.mobilePhone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Submission ID",
+      "Row checksum",
+      "Import batch"
+    ],
+    "expectedTaskTypes": [
+      "DUPLICATE_SIGNAL_STRATEGY"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3e6c7f4e9c6326a4c6cb044b2b040a19318fd3d2704c243b7a967861aeebd1a6"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "contact-export.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "contacts-2024.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Submission ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:contact-export.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-339",
+          "P-340",
+          "P-341",
+          "P-342",
+          "P-343"
+        ],
+        "decision": "PRESERVE",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contact-export.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "sovia.risiko0@sample.invalid",
+          "yania.tavanth1@sample.invalid",
+          "orvel.mesmar2@corp.example.test",
+          "tavis.zerero3@corp.example.test",
+          "lumis.norquist4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "read": {
+          "destination": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        "inDuplicateReview": true,
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:contact-export.csv:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "Nuvia",
+          "Brandel",
+          "Valmora",
+          "Quenby"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:contact-export.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Yanquist",
+          "Tulunda",
+          "Quelell",
+          "Yansorin",
+          "Zerell"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Submission ID",
+        "fieldRef": "src:contacts-2024.csv:Submission ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "S-471",
+          "S-472",
+          "S-473",
+          "S-474",
+          "S-475"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contacts-2024.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "lumis.norquist4@corp.example.test",
+          "tavis.zerero3@corp.example.test",
+          "darel.orvero2@corp.example.test",
+          "finis.sovdell3@sample.invalid",
+          "yano.tulrane4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "read": {
+          "destination": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        "inDuplicateReview": true,
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "Job title",
+        "fieldRef": "src:contacts-2024.csv:Job title",
+        "valueClass": "TEXT",
+        "values": [
+          "Controller",
+          "Controller",
+          "Controller",
+          "Operations lead",
+          "Operations lead"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:contacts-2024.csv:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "a45c9cc5",
+          "373e4f13",
+          "15e4827f",
+          "bc12e7f9",
+          "9cf52285"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:contacts-2024.csv:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-10",
+          "batch-15",
+          "batch-17",
+          "batch-35",
+          "batch-33"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts-2024.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "DUPLICATE_SIGNAL_STRATEGY"
+    ]
+  },
+  "canaries": [
+    "kc_91ccf0049735fe0cda908347",
+    "kc_7b3bb0d0dc4ba1c0f415223c"
+  ]
+}

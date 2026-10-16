@@ -1,0 +1,137 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:6206e04b-cb71-42f1-9b06-0bb2ba08b31b",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-09-11T13:25:12.348Z",
+    "lifecycles": [
+      {
+        "phase": "build"
+      }
+    ],
+    "tools": [
+      {
+        "vendor": "npm",
+        "name": "cli",
+        "version": "11.11.0"
+      }
+    ],
+    "component": {
+      "bom-ref": "kavo-migration-core@2.0.1",
+      "type": "library",
+      "name": "kavo-mc3",
+      "version": "2.0.1",
+      "scope": "required",
+      "description": "Clean-room deterministic CRM migration core.",
+      "purl": "pkg:npm/kavo-migration-core@2.0.1",
+      "properties": [
+        {
+          "name": "cdx:npm:package:private",
+          "value": "true"
+        }
+      ],
+      "externalReferences": []
+    }
+  },
+  "components": [
+    {
+      "bom-ref": "fflate@0.8.3",
+      "type": "library",
+      "name": "fflate",
+      "version": "0.8.3",
+      "scope": "required",
+      "author": "Arjun Barrett <arjunbarrett@gmail.com>",
+      "description": "High performance (de)compression in an 8kB package",
+      "purl": "pkg:npm/fflate@0.8.3",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/fflate/-/fflate-0.8.3.tgz"
+        },
+        {
+          "type": "website",
+          "url": "https://101arrowz.github.io/fflate"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/101arrowz/fflate/issues"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "b5b64db89acbc06529df3b2106d772e16f8e47166e221f1ae629722044030b9ad8d5fdd4db424caf2d0b977581cd4e7c1192ac12e2455e16f9830bfc0ac3ef80"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "libphonenumber-js@1.13.12",
+      "type": "library",
+      "name": "libphonenumber-js",
+      "version": "1.13.12",
+      "scope": "required",
+      "author": "catamphetamine <purecatamphetamine@gmail.com>",
+      "description": "A simpler (and smaller) rewrite of Google Android's libphonenumber library in javascript",
+      "purl": "pkg:npm/libphonenumber-js@1.13.12",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/libphonenumber-js/-/libphonenumber-js-1.13.12.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "git+https://gitlab.com/catamphetamine/libphonenumber-js.git"
+        },
+        {
+          "type": "website",
+          "url": "https://gitlab.com/catamphetamine/libphonenumber-js#readme"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://gitlab.com/catamphetamine/libphonenumber-js/issues"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "b8b55e57573d39393aaa476a9e3fa6a4c0fe65d9d9d2ccd5c96bb9f07c0c9a9c241c0d600849328dddef7994170e7bb0f4a1304918dc73d075a52f572883757c"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "kavo-migration-core@2.0.1",
+      "dependsOn": [
+        "fflate@0.8.3",
+        "libphonenumber-js@1.13.12"
+      ]
+    },
+    {
+      "ref": "fflate@0.8.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "libphonenumber-js@1.13.12",
+      "dependsOn": []
+    }
+  ]
+}

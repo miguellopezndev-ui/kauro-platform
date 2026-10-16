@@ -1,0 +1,220 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-022-cap11-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-022-cap11-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "bd6437ae67bf025bd4664d83fbe4372082710987689109d424d4914bba926fcb",
+      "candidateSetHash": "27bfa0c002db4e538c864f7e0ed592e8d80bf429817c81e1a9939b7a372504ff",
+      "targetContractHash": "tc_3ccfdde959df15e17e9e02436cb883e735a5afa40dd7f908c36bf7cf6f62227e",
+      "projectRevisionHash": "98c135a3e243b20ea1b44796e388c93adcfbc92f52c4f8bf182adbf0337f1540"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_eb07d3540ecce12f",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_797bbab9fd1a02f0",
+        "decision": "MAP",
+        "destinationField": "company.country"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_1393bbec46f00a15",
+        "decision": "MAP",
+        "destinationField": "company.city"
+      },
+      {
+        "sourceHeader": "Postal code",
+        "sourceFieldRef": "fld_d1d6b0a1126d64c6",
+        "decision": "MAP",
+        "destinationField": "company.postalCode"
+      },
+      {
+        "sourceHeader": "Street address",
+        "sourceFieldRef": "fld_7d01232d64a42e56",
+        "decision": "MAP",
+        "destinationField": "company.addressLine1"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.city",
+      "company.country",
+      "company.domain",
+      "company.employeeCount",
+      "company.name",
+      "company.postalCode",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "60038cb26144d2ca1812bcce460cfc12c2c0cb231c954f31ee3c92ddf1a49978"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Zerell Group GmbH",
+          "Sovvik Group SAS",
+          "Zeranth Logistics LLC"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "Kelland",
+          "Kelland",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "company.country"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Brandel",
+          "Kelmar",
+          "Tessin"
+        ],
+        "decision": "MAP",
+        "destination": "company.city"
+      },
+      {
+        "header": "Postal code",
+        "fieldRef": "src:Postal code",
+        "valueClass": "TEXT",
+        "values": [
+          "82009",
+          "86783",
+          "92111"
+        ],
+        "decision": "MAP",
+        "destination": "company.postalCode"
+      },
+      {
+        "header": "Street address",
+        "fieldRef": "src:Street address",
+        "valueClass": "TEXT",
+        "values": [
+          "79 Vexanth Street",
+          "94 Jorell Street",
+          "125 Normar Street"
+        ],
+        "decision": "MAP",
+        "destination": "company.addressLine1"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_f5ee9441618c",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b44c06ef02019dc19946466c",
+    "kc_117f070b66323a76ca5169fe"
+  ]
+}

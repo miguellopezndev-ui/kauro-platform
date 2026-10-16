@@ -1,0 +1,183 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-038-cap03-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-038-cap03-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "65826f20586af1ed9e0b237c270384c3f9371ab3e0968c9b05a455656a0392b5",
+      "candidateSetHash": "b5e1ac55d8a4179214975c576b19a3ff4f5764ae7af4622024f45980a4c0bd2e",
+      "targetContractHash": null,
+      "projectRevisionHash": "fb1c1f282c3066446ca6f13001f8f6d6edf34a20e1d8ccd524783873bbab6295"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Nachname",
+        "sourceFieldRef": "fld_e1370215c4974486",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Erstellt am",
+        "sourceFieldRef": "fld_c065dc9f61e873d8",
+        "decision": "MAP",
+        "destinationField": "lead.createdAt"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_3919ccdb6e812d77",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.createdAt",
+      "lead.jobTitle",
+      "lead.lastName",
+      "lead.mobilePhone",
+      "lead.state",
+      "lead.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "69ab8d1764efe0d2165531f7959393b97cdfe398b791b2eecb347576a46b5e2d"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Nachname",
+        "fieldRef": "src:Nachname",
+        "valueClass": "TEXT",
+        "values": [
+          "Zeraly",
+          "Yanaly",
+          "Zeraly",
+          "Vexvik"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Erstellt am",
+        "fieldRef": "src:Erstellt am",
+        "valueClass": "MIXED",
+        "values": [
+          "2020-09-22",
+          "2019-06-28",
+          "08/24/2021",
+          "2019-07-28"
+        ],
+        "decision": "MAP",
+        "destination": "lead.createdAt"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "a1db97da",
+          "5cc35d7c",
+          "122b3d44",
+          "6a1f4274"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_a6483aa20d8c",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nachname",
+        "targetField": "lead.lastName"
+      },
+      {
+        "memoryId": "memconv_f4989ba95cac",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Erstellt am",
+        "targetField": "lead.createdAt"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_4b1422005b1ce0f605907a27",
+    "kc_84ce2494bf2ce988663ffdae"
+  ]
+}

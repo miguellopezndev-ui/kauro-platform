@@ -1,0 +1,214 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-185-cap06-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-185-cap06-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "35e967435df0efd7c1bffc75dbfdf62308c93cc34036a998d6edb2b635b31a99",
+      "candidateSetHash": "51d0fe1fe3c7220699822439464c7248a63e53a5e84267d21e7a4601d0c6bf71",
+      "targetContractHash": null,
+      "projectRevisionHash": "2b370cba45ebe632a4fbe676bb3f1c49730f34bcf8f854b7093859b6a8f826eb"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_365f748d66bf698f",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "requiredEvidenceRefs": [
+          "ev_c2a10eeef393bd2a"
+        ]
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_97816738440404a2",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_aecae02dc92a9676",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Website - src",
+        "sourceFieldRef": "fld_c13c7dd55ad9eb55",
+        "decision": "MAP",
+        "destinationField": "contact.website"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_393475323997273b",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.doNotEmail",
+      "contact.email",
+      "contact.firstName",
+      "contact.phoneExtension",
+      "contact.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "96ab71336b4da0309a6c7ea627798a1a520ce8549bb593e6d9cded07e9675167"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phoneExtension",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "norek.mesvik0@sample.invalid",
+          "vexa.rissorin1@sample.invalid",
+          "lumo.haliko2@corp.example.test",
+          "kesis.lumorin3@sample.invalid",
+          "pelek.tavorin4@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Vexa",
+          "Risa",
+          "Nora",
+          "Tava",
+          "Wilan"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "Valdoria",
+          "Norvania",
+          "Kelland",
+          "Kelland",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Website - src",
+        "fieldRef": "src:Website - src",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.vexenko-foods.test",
+          "https://www.yananth-studio.test",
+          "https://www.vexenko-labs.test",
+          "https://www.pelell-systems.test",
+          "https://www.pelrane-systems.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.website"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "151dd70c",
+          "d4a500f9",
+          "7d6db91d",
+          "3115c3c8",
+          "fae1065"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_049d5fd10b64cad505a1de7a",
+    "kc_ba99e08e0798aca9bd5a0908"
+  ]
+}

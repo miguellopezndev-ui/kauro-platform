@@ -4,3 +4,6 @@
 *.mjs text eol=lf
 *.md text eol=lf
 *.yaml text eol=lf
+# The cores' sources and archive are kept byte-exact, as in their original repositories (`* -text` there): their
+# determinism proofs hash fixture bytes, and their tarballs rebuild byte-identical only from unconverted files.
+cores/** -text -eol

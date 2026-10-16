@@ -1,0 +1,163 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-amb-105-k00-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-105-k00-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9026d23e154368f2eaae40b4ffa3bbf24752990510848a7c9dec9744c54fe08f",
+      "candidateSetHash": "fe87df35ba6cfec683e8f97ff1f3314edbf5782065e2915a1df9101b29b436c0",
+      "targetContractHash": "tc_a40d83f41210b5b7c8217f7446c450733daacac460af8af202a39c1887ec961b",
+      "projectRevisionHash": "3e9f37c38dc388a3e9f63925529c505f37cfbd8ad242d642b0bbf154b492f8bb"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Close date",
+        "sourceFieldRef": "fld_72c14a725f12dc2c",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_3c85bcbf767d0588",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.closeDate",
+      "deal.description",
+      "deal.name",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Folder code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "8e52dd903d15791784222a45c28a604098f92d29183794ef55ce1dce70edaabf"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Close date",
+        "fieldRef": "src:Close date",
+        "valueClass": "DATE",
+        "values": [
+          "09/01/2026",
+          "07/11/2020",
+          "05/08/2022",
+          "04/01/2020",
+          "01/10/2026",
+          "09/12/2020",
+          "09/02/2024"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F674",
+          "F763",
+          "F440",
+          "F151",
+          "F490",
+          "F122",
+          "F786"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:date-order"
+    ]
+  },
+  "canaries": [
+    "kc_875796bddb684fcd0f7b5ba0",
+    "kc_ca3251ea36bab471a2f0f6c5"
+  ]
+}

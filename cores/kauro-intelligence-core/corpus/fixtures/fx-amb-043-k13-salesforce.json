@@ -1,0 +1,172 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-043-k13-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-043-k13-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "f0228d40c009daefa4a3db8243cbce4a2eb8ca5acccac5da1a812790ccc78a34",
+      "candidateSetHash": "fb7ac710cf2bd1eb8868402e7e8607ef0ac7e5daf058e5c5cf06fa3e721f90ae",
+      "targetContractHash": "tc_45fbe71de1ce8e6c476ddcb0a3e79b469b9e62bf9e886f9d8100563c0899bf10",
+      "projectRevisionHash": "a0f5e4ae7d9d59926118e72b989817c6da7cbb40e9cee49c3493af879cd3e67a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_3f8aed0f88a25460",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_1e548aa6389e263e",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Annual revenue + moneda",
+        "sourceFieldRef": "fld_438fb60bb0b8aaad",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.country",
+      "company.employeeCount",
+      "company.industry",
+      "company.name",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e3e39f97475e6288bb4699254afdaf58d4c5183553180bc9e77fedd6b41539f5"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Name",
+        "fieldRef": "src:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvdell Logistics Inc.",
+          "Mesanth Labs Inc.",
+          "Queliko Logistics S.A.",
+          "Vexanth Studio LLC"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Logistics",
+          "Textiles",
+          "Food service",
+          "Software"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Annual revenue + moneda",
+        "fieldRef": "src:Annual revenue + moneda",
+        "valueClass": "MIXED",
+        "values": [
+          "€1,459",
+          "$8,607",
+          "£6,865",
+          "€3,697"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:mixed-currency"
+    ]
+  },
+  "canaries": [
+    "kc_346358dd8e19ba725fea5f84",
+    "kc_d0bfecf0f5973909bda89e99"
+  ]
+}

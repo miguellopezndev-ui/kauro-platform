@@ -1,0 +1,138 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-066-k10-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-066-k10-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e8ab2a631c8c16490021da602eb28be20bbe475534a47faa59a67e92c265b904",
+      "candidateSetHash": "fe16c52f333ed934d64b7dc2e5549b07fd62ac546cd8a6e2823613432e83c843",
+      "targetContractHash": "tc_b9ece8b9ff4fbf704f9b92b7970c782036173cc5d6f38b5bc4b4ad0e21440eef",
+      "projectRevisionHash": "00ecae9ba8bf90890c65103a3e2b76d2dc33b555de0db6392b13757918739adb"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Adres e-mail",
+        "sourceFieldRef": "fld_bca33b4e227cc2ef",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Cálculo",
+        "sourceFieldRef": "fld_8756fe4e6a0ae323",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Cálculo"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "ff0a18c0721d0e6f7e573cbc8d549db890f74164da661b97e3777f9dfe7892a3"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Adres e-mail",
+        "fieldRef": "src:Adres e-mail",
+        "valueClass": "MIXED",
+        "values": [
+          "wilis.kesell0@example.test",
+          "#N/A",
+          "daris.tavova2@corp.example.test",
+          "",
+          "tulis.risorin4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Cálculo",
+        "fieldRef": "src:Cálculo",
+        "valueClass": "MIXED",
+        "values": [
+          "=SUM(B2:B9)",
+          "#REF!",
+          "(blank)",
+          "null",
+          "N/A"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:spreadsheet-artefacts",
+      "lang:pl"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_3519a58282ba",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Adres e-mail",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_405c3d2724c0da0f628dd461",
+    "kc_88a43f40c5739ab39efcc651"
+  ]
+}

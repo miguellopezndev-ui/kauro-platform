@@ -1,0 +1,224 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-adv-085-k10-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-adv-085-k10-salesforce",
+    "family": "ADVERSARIAL",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "3b6a83b46e893cada0d1eec4364d03c3749a58cb683bc15cf05dc2e77ffe3975",
+      "candidateSetHash": "dff3922f12e98ab0395713cf7e50f5ded2280e4a988589d3b3b7055953dc7cd0",
+      "targetContractHash": "tc_cf8672fd3d42a9e5f15938dc57716b0df9406ad40dd4e01e56c78bd8335b0f15",
+      "projectRevisionHash": "506028ed48fcac74c09e7de5512d9b8fc11f696f1e07ddbbfc4efce76768ba38"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "MailingCity",
+        "sourceFieldRef": "fld_0825f79e0a97133d",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Vorname",
+        "sourceFieldRef": "fld_218ce5765649d63a",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "E-Mail-Adresse",
+        "sourceFieldRef": "fld_e57cb730bb94f7b9",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.state"
+    ],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.phone",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [
+        "memotherclient_e4e30acc1086"
+      ],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "ad35b8f74ab24bef3b621546797190e6a14b3c6eeadbfc9ab7b633ec01751ec3"
+  },
+  "structure": {
+    "family": "ADVERSARIAL",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "MailingCity",
+        "fieldRef": "src:MailingCity",
+        "valueClass": "TEXT",
+        "values": [
+          "Quenby",
+          "Brandel",
+          "Valmora",
+          "Quenby",
+          "Valmora",
+          "Kelmar"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Vorname",
+        "fieldRef": "src:Vorname",
+        "valueClass": "TEXT",
+        "values": [
+          "Risan",
+          "Mesek",
+          "Noro",
+          "Yanel",
+          "Sovek",
+          "Finek"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "E-Mail-Adresse",
+        "fieldRef": "src:E-Mail-Adresse",
+        "valueClass": "EMAIL",
+        "values": [
+          "risan.kesorin0@corp.example.test",
+          "jorek.tavenko1@example.test",
+          "lumo.wilaly2@example.test",
+          "vexek.norvik3@sample.invalid",
+          "mesel.sovorin4@corp.example.test",
+          "fina.darero5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.state"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [
+        "memotherclient_e4e30acc1086"
+      ],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "adv:conflicted-memory-entry",
+      "cross:conflicted-entry",
+      "egress:result",
+      "memory:agency",
+      "memory:client"
+    ],
+    "memory": [
+      {
+        "memoryId": "mem_25496a791173",
+        "scope": "AGENCY",
+        "owner": "SAME_AGENCY",
+        "state": "CONFLICTED",
+        "sourceHeaderPattern": "MailingCity",
+        "targetField": "contact.state"
+      },
+      {
+        "memoryId": "memotherclient_e4e30acc1086",
+        "scope": "CLIENT",
+        "owner": "OTHER_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "MailingCity",
+        "targetField": "contact.state"
+      },
+      {
+        "memoryId": "memconv_ef66adbfd2a7",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Vorname",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_38194b7d02e96646959add88",
+    "kc_c373cfbc7ee581ea2490a3a2"
+  ]
+}

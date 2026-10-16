@@ -1,0 +1,268 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-118-cap11-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-118-cap11-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "293ba8b48f350254dd9c034031b699998ab4cf9f411c143400e7f12732ad30bb",
+      "candidateSetHash": "68c8fefe4cdf903f377b8d4211c028504705f48ea2957335ddc56672738b66bb",
+      "targetContractHash": null,
+      "projectRevisionHash": "3be597e5a8c8e7ba459aa386fe683ddcae51d00b0b4cff7379f4a75ad3f7244c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_ec3d0692b9277160",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_914acab072b68c83",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_014648e1631148ec",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Company name",
+        "sourceFieldRef": "fld_1c2166068a48b78e",
+        "decision": "MAP",
+        "destinationField": "contact.companyName",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "company.name",
+        "sourceFieldRef": "fld_9b017b9aa81543cd",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "filePath": "organisations.csv"
+      },
+      {
+        "sourceHeader": "Domain",
+        "sourceFieldRef": "fld_d8e02633feac655f",
+        "decision": "MAP",
+        "destinationField": "company.domain",
+        "filePath": "organisations.csv"
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_cfbd9d57b601b505",
+        "decision": "MAP",
+        "destinationField": "company.industry",
+        "filePath": "organisations.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.domain",
+      "company.industry",
+      "company.name",
+      "contact.companyName",
+      "contact.email",
+      "contact.lastName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [
+      "CONSISTENCY_REVIEW"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "546a15a6cbf421d2c491527e690801e98a151168afd4a0c23559dce7f155fd87"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "customers.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "organisations.csv": {
+          "object": "COMPANY",
+          "recordIdColumn": "company.name"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:customers.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-429",
+          "P-430",
+          "P-431"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:customers.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "belo.wilorin0@corp.example.test",
+          "yanis.darrane1@sample.invalid",
+          "noran.quelorin2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:customers.csv:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-40",
+          "B-18",
+          "B-34"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Company name",
+        "fieldRef": "src:customers.csv:Company name",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvrane Labs LLC",
+          "Finorin Labs S.L.",
+          "Finorin Labs S.L."
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName",
+        "file": "customers.csv"
+      },
+      {
+        "header": "company.name",
+        "fieldRef": "src:organisations.csv:company.name",
+        "valueClass": "TEXT",
+        "values": [
+          "Finorin Labs S.L.",
+          "Jorvik Partners Inc.",
+          "Orvrane Labs LLC"
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "file": "organisations.csv"
+      },
+      {
+        "header": "Domain",
+        "fieldRef": "src:organisations.csv:Domain",
+        "valueClass": "TEXT",
+        "values": [
+          "beldell-foods.test",
+          "pelath-partners.test",
+          "norquist-logistics.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.domain",
+        "file": "organisations.csv"
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:organisations.csv:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Logistics",
+          "Logistics",
+          "Packaging"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry",
+        "file": "organisations.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "CONSISTENCY_REVIEW"
+    ]
+  },
+  "canaries": [
+    "kc_dd95c1010847c24b2cd96029",
+    "kc_405b4c04361b0053ebe45cf0"
+  ]
+}

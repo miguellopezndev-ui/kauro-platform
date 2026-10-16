@@ -1,0 +1,170 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-170-cap03-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-170-cap03-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "692b62262a22435ec60d5826ec866254437e094c1e06cd08bd807ac3f5dd050a",
+      "candidateSetHash": "8dc12bd57826e23f5f7beaece3843c3f1e1b35415662358d15871ef025845bd2",
+      "targetContractHash": "tc_8b84547c9c18b704e01e94c17e77a5444c33011027a9e9c9fedcb463d9fda0a2",
+      "projectRevisionHash": "51d091084bd0a69fddf53e2cbccca61448915855316bdd2384a58d3b140aa18e"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_2381f59ef0bcb473",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_ab01756f81abbdc8",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount",
+        "semanticType": "NUMBER"
+      },
+      {
+        "sourceHeader": "Annual revenue",
+        "sourceFieldRef": "fld_cfd4817a455e73d2",
+        "decision": "MAP",
+        "destinationField": "company.annualRevenue",
+        "semanticType": "NUMBER"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.city",
+      "company.employeeCount",
+      "company.name",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c372019584b0389f06b831b0f61bffbf6a028898241841ba73c19865799e349a"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Zerunda Foods Inc.",
+          "Rissorin Foods Inc.",
+          "Halell Systems Ltd"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "MIXED",
+        "values": [
+          "34380",
+          "60361",
+          "69.957,46"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount",
+        "semanticType": "NUMBER"
+      },
+      {
+        "header": "Annual revenue",
+        "fieldRef": "src:Annual revenue",
+        "valueClass": "MIXED",
+        "values": [
+          "78204",
+          "53582",
+          "50,158.58"
+        ],
+        "decision": "MAP",
+        "destination": "company.annualRevenue",
+        "semanticType": "NUMBER"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_9ace20156289",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_d79d0421fdced91f264455dd",
+    "kc_636cb36770e1d76d6d3458fe"
+  ]
+}

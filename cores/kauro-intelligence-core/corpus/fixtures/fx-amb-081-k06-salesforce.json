@@ -1,0 +1,203 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-081-k06-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-081-k06-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "ea17c3a1f91c7a8b2c31dd1d3c3f4be31f4905b2b444ccd6d9427ff7c9aaa688",
+      "candidateSetHash": "0a8849317a756493e367bbbca8fc5578ff6c74c12e8aa234ea1ed69f586f590e",
+      "targetContractHash": "tc_4a137532bbb80f30ff0fa7c560f9b0e2856e579eff387bafd4f685cd93017b6b",
+      "projectRevisionHash": "fbb0a65cffc6df1c91923e85b076a952c985e65b4330917d6de7927d0e8713f1"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Code",
+        "sourceFieldRef": "fld_5ccf6d56fa0c8a79",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Class",
+        "sourceFieldRef": "fld_2f6b6b05a9dbb4ed",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.lastName",
+      "contact.source_id",
+      "deal.closeDate",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id",
+      "lead.company",
+      "lead.lastName",
+      "lead.status",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "042f61918eb6055f335aa7bf66b54c175f9a9a7fae017eabc95dce84e9048dc3"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP05",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Open - Not Contacted",
+              "Working - Contacted",
+              "Closed - Converted",
+              "Closed - Not Converted"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Code",
+        "fieldRef": "src:Code",
+        "valueClass": "ENUM",
+        "values": [
+          "Q",
+          "X2",
+          "K",
+          "B",
+          "Q",
+          "X2",
+          "K",
+          "B",
+          "Q"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Class",
+        "fieldRef": "src:Class",
+        "valueClass": "ENUM",
+        "values": [
+          "X1",
+          "X2",
+          "P7",
+          "B",
+          "X1",
+          "X2",
+          "P7",
+          "B",
+          "X1"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:enum-codes"
+    ]
+  },
+  "canaries": [
+    "kc_541e99032d8b0e5b463f2e2d",
+    "kc_62235ec64864e8970d758e99"
+  ]
+}

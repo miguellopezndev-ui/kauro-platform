@@ -1,0 +1,201 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-072-cap01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-072-cap01-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "4070c65a506490ef7582cd342f056b743db86324506015b6cfe80cac88d56b05",
+      "candidateSetHash": "ef50f5077439dd5687e451b3ab52180929872ea6f52c372be5999044506be44f",
+      "targetContractHash": null,
+      "projectRevisionHash": "a0082cd819fed8695e4df7041fd3ca056be6257261ab99d666a4d63bb631c5bc"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "City - src",
+        "sourceFieldRef": "fld_49a1dcfb69e4f4e9",
+        "decision": "MAP",
+        "destinationField": "company.city"
+      },
+      {
+        "sourceHeader": "Company (CRM)",
+        "sourceFieldRef": "fld_c63d61166fe7fbd5",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_1121c5d0de9cbe35",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "deal.name",
+      "contact.city"
+    ],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.name",
+      "contact.city",
+      "contact.lifecycleStage",
+      "contact.marketingConsent",
+      "deal.name"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0a95eeb5e3857e8a0c8ba5036a58899dae96ee3d757fb04ef13959ac53ad5b82"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "marketingConsent",
+            "valueClass": "BOOLEAN",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "City - src",
+        "fieldRef": "src:City - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Tessin",
+          "Tessin",
+          "Quenby"
+        ],
+        "decision": "MAP",
+        "destination": "company.city"
+      },
+      {
+        "header": "Company (CRM)",
+        "fieldRef": "src:Company (CRM)",
+        "valueClass": "TEXT",
+        "values": [
+          "Yanova Partners S.L.",
+          "Yanath Works GmbH",
+          "Halanth Group S.A."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "A-64",
+          "C-16",
+          "C-28"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "deal.name",
+      "contact.city"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_55b3a524e950",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "City - src",
+        "targetField": "company.city"
+      },
+      {
+        "memoryId": "memconv_93b34b8eaa08",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company (CRM)",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_6bfaf719b90c63f751391793",
+    "kc_5f905c851c2c63c5fb886fe8"
+  ]
+}

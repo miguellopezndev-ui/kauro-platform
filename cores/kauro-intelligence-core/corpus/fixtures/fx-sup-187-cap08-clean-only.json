@@ -1,0 +1,259 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-187-cap08-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-187-cap08-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e145038d9a638acfcd52df65ae55cb25b2db1f1b8bab97f397260cfbc3f79654",
+      "candidateSetHash": "6ca8cf6c891229edf1cbc22501728ec9210375a5237fe934b24212f3f0177023",
+      "targetContractHash": null,
+      "projectRevisionHash": "c0f83fadf8b772d55421d28abb9003b64d33938006818164c8f2a1b6b3053e82"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_b9dd7ec85ffe51dd",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_060b436a1802a1dc",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_f05bc2e61bdddae5",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_2aebe27bbb814886",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Opportunity ref",
+        "sourceFieldRef": "fld_aabe2993fdf3414b",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv",
+        "associatesWith": "opportunities.csv"
+      },
+      {
+        "sourceHeader": "Deal ID",
+        "sourceFieldRef": "fld_da96dd9ecfc1590a",
+        "decision": "PRESERVE",
+        "filePath": "opportunities.csv"
+      },
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_bf47e5cbdd904e8c",
+        "decision": "MAP",
+        "destinationField": "deal.name",
+        "filePath": "opportunities.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "deal.closeDate",
+      "deal.name"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Row checksum",
+      "Warehouse bin",
+      "Opportunity ref",
+      "Deal ID"
+    ],
+    "expectedTaskTypes": [
+      "ASSOCIATION_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0f12c5c7a6cf02297f5638ed5d3cc8dc772b643127244be7cdda36269f09a9b5"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "contacts.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "opportunities.csv": {
+          "object": "DEAL",
+          "recordIdColumn": "Deal ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:contacts.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-865",
+          "P-866",
+          "P-867",
+          "P-868",
+          "P-869"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contacts.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "risek.haldell0@example.test",
+          "yana.darsorin1@corp.example.test",
+          "vexan.jorell2@sample.invalid",
+          "keso.wilunda3@example.test",
+          "vexek.vexero4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:contacts.csv:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "3dbd074a",
+          "cec9a80d",
+          "7dd92e94",
+          "da8d57dc",
+          "6a931d42"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:contacts.csv:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "B-39",
+          "C-47",
+          "C-40",
+          "B-53",
+          "C-86"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Opportunity ref",
+        "fieldRef": "src:contacts.csv:Opportunity ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "D-784",
+          "D-782",
+          "D-784",
+          "D-782",
+          "D-783"
+        ],
+        "decision": "PRESERVE",
+        "associatesWith": "opportunities.csv",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Deal ID",
+        "fieldRef": "src:opportunities.csv:Deal ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "D-782",
+          "D-783",
+          "D-784"
+        ],
+        "decision": "PRESERVE",
+        "file": "opportunities.csv"
+      },
+      {
+        "header": "Deal name",
+        "fieldRef": "src:opportunities.csv:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Renewal 2025 Finenko",
+          "Expansion 2027 Rissorin",
+          "Supply contract 2024 Belorin"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name",
+        "file": "opportunities.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "ASSOCIATION_MAPPING"
+    ]
+  },
+  "canaries": [
+    "kc_59de640082c93ed8fe9d1fab",
+    "kc_36f3087be421a9c24f9cdc68"
+  ]
+}

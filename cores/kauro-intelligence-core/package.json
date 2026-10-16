@@ -1,0 +1,39 @@
+{
+  "name": "kauro-intelligence-core",
+  "version": "0.6.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Kauro Intelligence Core — interprets and proposes; Migration Core executes and proves; the agency decides.",
+  "type": "module",
+  "engines": {
+    "node": "24.x",
+    "npm": ">=11"
+  },
+  "exports": {
+    ".": "./dist/src/index.js",
+    "./benchmark": "./dist/src/benchmark/campaign-surface.js"
+  },
+  "files": [
+    "dist/src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node tools/run-tests.mjs",
+    "contracts:check": "node tools/contracts-check.mjs",
+    "architecture": "node tools/architecture-gate.mjs",
+    "sabotage": "node tools/sabotage.mjs",
+    "consumer:check": "node tools/consumer-check.mjs",
+    "campaign": "node tools/campaign/run.mjs",
+    "design:check": "node --test tools/test/b03-case-map.test.mjs tools/test/b04-case-map.test.mjs",
+    "gate": "npm run build && npm run typecheck && npm run contracts:check && npm run design:check && npm run test && npm run consumer:check && npm run architecture"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "kauro-migration-core": "file:vendor/kauro-migration-core-3.0.0.tgz",
+    "typescript": "5.9.3"
+  },
+  "peerDependencies": {
+    "kauro-migration-core": "3.0.0"
+  }
+}

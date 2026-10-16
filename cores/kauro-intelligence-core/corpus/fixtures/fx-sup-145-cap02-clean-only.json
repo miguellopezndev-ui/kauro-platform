@@ -1,0 +1,308 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-145-cap02-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-145-cap02-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "dfc0a41d52777a4a48faef385a4f9d62deb132cfbffac78a7054a2d9f9441fef",
+      "candidateSetHash": "58c50be1003d11382b323b93cd5cb4172fbb6dbc11b8f8ba6041a6c893e2b1ec",
+      "targetContractHash": null,
+      "projectRevisionHash": "22f991ca4ad62fa58ca0f31eae2c092d9dc290dc26d33c371351ca91b5f5a612"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Apellidos",
+        "sourceFieldRef": "fld_8bea8205d4f1e146",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Sector",
+        "sourceFieldRef": "fld_c36db3c2d2950708",
+        "decision": "MAP",
+        "destinationField": "lead.industry"
+      },
+      {
+        "sourceHeader": "Origen del contacto",
+        "sourceFieldRef": "fld_b5ec1c16d74d6edf",
+        "decision": "MAP",
+        "destinationField": "lead.leadSource"
+      },
+      {
+        "sourceHeader": "Estado del contacto",
+        "sourceFieldRef": "fld_114cb61e415f65cb",
+        "decision": "MAP",
+        "destinationField": "lead.status"
+      },
+      {
+        "sourceHeader": "Teléfono",
+        "sourceFieldRef": "fld_48afa0fb46273fdd",
+        "decision": "MAP",
+        "destinationField": "lead.phone",
+        "allowedDestinationFields": [
+          "lead.phone",
+          "lead.mobilePhone"
+        ]
+      },
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_af6a2019330d3cf6",
+        "decision": "MAP",
+        "destinationField": "lead.email"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_c0946aaf6b4aa0e6",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.email",
+      "lead.industry",
+      "lead.lastName",
+      "lead.leadSource",
+      "lead.mobilePhone",
+      "lead.phone",
+      "lead.status",
+      "lead.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "db9526e4fd7181ab97466bbcc9eb579524ff0d45706be052dadadbd34b7ef256"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "leadSource",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Apellidos",
+        "fieldRef": "src:Apellidos",
+        "valueClass": "TEXT",
+        "values": [
+          "Norvik",
+          "Tulquist",
+          "Wilova",
+          "Darorin",
+          "Kessorin",
+          "Tavanth"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Sector",
+        "fieldRef": "src:Sector",
+        "valueClass": "TEXT",
+        "values": [
+          "  Packaging",
+          "Packaging ",
+          "  Food service",
+          "Software ",
+          "  Packaging",
+          "Software "
+        ],
+        "decision": "MAP",
+        "destination": "lead.industry"
+      },
+      {
+        "header": "Origen del contacto",
+        "fieldRef": "src:Origen del contacto",
+        "valueClass": "ENUM",
+        "values": [
+          "cold call",
+          "partner",
+          "referral",
+          "cold call",
+          "partner",
+          "referral"
+        ],
+        "decision": "MAP",
+        "destination": "lead.leadSource"
+      },
+      {
+        "header": "Estado del contacto",
+        "fieldRef": "src:Estado del contacto",
+        "valueClass": "ENUM",
+        "values": [
+          "Working",
+          "Converted",
+          "Open",
+          "Working",
+          "Converted",
+          "Open"
+        ],
+        "decision": "MAP",
+        "destination": "lead.status"
+      },
+      {
+        "header": "Teléfono",
+        "fieldRef": "src:Teléfono",
+        "valueClass": "PHONE",
+        "values": [
+          "+447700900755",
+          "+447700900973",
+          "+12025550169",
+          "+447700900732",
+          "+12025550187",
+          "+12025550166"
+        ],
+        "decision": "MAP",
+        "destination": "lead.phone",
+        "alternatives": [
+          "lead.mobilePhone"
+        ]
+      },
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "sovek.norero0@example.test",
+          "luman.tavanth1@corp.example.test",
+          "joro.zerova2@example.test",
+          "lumis.quelrane3@sample.invalid",
+          "fino.tavsorin4@sample.invalid",
+          "darel.kesath5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "lead.email"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L29408",
+          "L37843",
+          "L47557",
+          "L13986",
+          "L75132",
+          "L92294"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_85c52514bf53",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Apellidos",
+        "targetField": "lead.lastName"
+      },
+      {
+        "memoryId": "memconv_822c79618249",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Sector",
+        "targetField": "lead.industry"
+      },
+      {
+        "memoryId": "memconv_c1d5b55f8a02",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Origen del contacto",
+        "targetField": "lead.leadSource"
+      },
+      {
+        "memoryId": "memconv_223572978ae4",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Estado del contacto",
+        "targetField": "lead.status"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b0cb43a14fce0ae336dcf4ee",
+    "kc_dc6a5c4fb9f89c98adca8334"
+  ]
+}

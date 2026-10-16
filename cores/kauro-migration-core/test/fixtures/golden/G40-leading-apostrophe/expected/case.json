@@ -1,0 +1,74 @@
+{
+  "id": "G40",
+  "title": "Values that begin with an apostrophe are data, not escaping",
+  "intent": "A leading apostrophe is ordinary CRM data: the Irish and Scottish surnames, the Dutch 's-Hertogenbosch and 't Veld, an elided year like '85, and every value a legacy exporter text-forced on its way out of somebody else's spreadsheet. The package verifier failed any delivered value beginning with one, calling it evidence that spreadsheet escaping had been applied to a machine import file — so a European name file failed a package that was correct, twice, under two different check names. It could not have been a true positive either: no code path in this engine prefixes an apostrophe, and where one is introduced the package says so in changes.csv, which carries the original value beside the final one. The third row also carries a value a spreadsheet would read as a formula, so the risk declaration and the delivered cells are counted against each other on the same corpus.",
+  "expect": {
+    "rows": {
+      "total": 3,
+      "OUTPUT": 3,
+      "MERGED_PROVEN": 0,
+      "ISOLATED": 0,
+      "LEFTOVER": 0,
+      "REJECTED_INPUT": 0
+    },
+    "records": {
+      "CONTACT": 3,
+      "COMPANY": 0,
+      "DEAL": 0,
+      "LEAD": 0
+    },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 1,
+    "edges": {
+      "total": 0,
+      "OUTPUT": 0,
+      "DEDUPLICATED": 0,
+      "UNRESOLVED": 0,
+      "LEFTOVER": 0
+    }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    {
+      "row": "contacts.csv#2",
+      "disposition": "OUTPUT"
+    },
+    {
+      "row": "contacts.csv#3",
+      "disposition": "OUTPUT"
+    },
+    {
+      "row": "contacts.csv#4",
+      "disposition": "OUTPUT"
+    }
+  ],
+  "delivered": [
+    {
+      "sourceRecordId": "1",
+      "values": {
+        "contact.firstName": "'Ada",
+        "contact.lastName": "Lovelace"
+      }
+    },
+    {
+      "sourceRecordId": "2",
+      "values": {
+        "contact.lastName": "O'Brien",
+        "contact.addressLine1": "'s-Hertogenbosch"
+      }
+    },
+    {
+      "sourceRecordId": "3",
+      "values": {
+        "contact.addressLine1": "= see attached"
+      }
+    }
+  ]
+}

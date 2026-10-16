@@ -1,0 +1,29 @@
+{
+  "artifactKind": "KAURO_AUTHORIZED_QUALIFICATION_INSTANCES",
+  "version": "1.0.0",
+  "note": "The only vendor instances a qualification runner may write to. A runner establishes the instance it is talking to by live observation (GET /account-info/v3/details; GET /services/oauth2/userinfo + the Organization record) and refuses to write unless the observed identity is listed here. This is an allowlist, not a hardcoded authority: the observation decides which instance was touched, the list decides whether touching it was permitted.",
+  "hubspot": [
+    {
+      "portalId": "51872453",
+      "accountType": "DEVELOPER_TEST",
+      "authorisedOn": "2026-09-04",
+      "reason": "isolated developer test account created for this qualification; holds synthetic records only"
+    }
+  ],
+  "salesforce": [
+    {
+      "orgId": "00Dak000018tvSeEAI",
+      "organizationType": "Developer Edition",
+      "isSandbox": false,
+      "authorisedOn": "2026-09-06",
+      "reason": "disposable Developer Edition org created for this qualification; holds the sample dataset and synthetic records only"
+    }
+  ],
+  "excluded": [
+    {
+      "vendor": "hubspot",
+      "portalId": "51050101",
+      "reason": "STANDARD account holding real customer records; written once on 2026-09-02 (see qualification/evidence/HUBSPOT_SCOPE_BLOCKER.md); out of scope for every qualification from MC-3 on, and its evidence is historical only. A blocklist needs the identifier and nothing else: the census of what that account holds was here too, and it is somebody's data described in a file this repository publishes."
+    }
+  ]
+}

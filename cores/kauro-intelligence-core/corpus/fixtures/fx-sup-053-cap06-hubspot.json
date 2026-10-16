@@ -1,0 +1,294 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-053-cap06-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-053-cap06-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "221639a99dbbbef5013c9c6188fac103390538975466f03e752d5d39480ad42a",
+      "candidateSetHash": "aa05813bd957de0c22526461fa781e51af4e358f19c96af62fad7ef21d96078d",
+      "targetContractHash": "tc_0a387a5f202c92624fd5b3a01423f4fdb498c3e70c291bcecac348619ea3a14f",
+      "projectRevisionHash": "4908faab5bb68e124bd6bab27d81e93795c171e57a38bf22dc845218b9562aa6"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_a8a04650b3c16100",
+        "decision": "PRESERVE",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_20e7c1ecb14d664d",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Client Code",
+        "sourceFieldRef": "fld_c35fa311619d2f6b",
+        "decision": "PRESERVE",
+        "filePath": "contact-export.csv",
+        "adoptsIdentity": true
+      },
+      {
+        "sourceHeader": "Client Code",
+        "sourceFieldRef": "fld_58551808ba51c922",
+        "decision": "PRESERVE",
+        "filePath": "webform-signups.csv",
+        "adoptsIdentity": true
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_42e600b084bd3cab",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_11af602696ba32cd",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_bd882bea40a90cc8",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_02021207f3771bc0",
+        "decision": "PRESERVE",
+        "filePath": "webform-signups.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.client_code",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Client Code",
+      "Client Code",
+      "Sales rep initials"
+    ],
+    "expectedTaskTypes": [
+      "IDENTITY_STRATEGY"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "75d0be10095a078ed0688ab6f140263cdb9dcb927bf01d8aa7899f3d6543fe85"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "contact-export.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "webform-signups.csv": {
+          "object": "CONTACT"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "client_code",
+            "valueClass": "TEXT",
+            "required": false,
+            "label": "Client Code",
+            "externalId": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:contact-export.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-113",
+          "P-114",
+          "P-115",
+          "P-116"
+        ],
+        "decision": "PRESERVE",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contact-export.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "tavia.belvik0@corp.example.test",
+          "luma.kesell1@example.test",
+          "orvia.risenko2@example.test",
+          "riso.wilrane3@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Client Code",
+        "fieldRef": "src:contact-export.csv:Client Code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "CL-9145",
+          "CL-9146",
+          "CL-9147",
+          "CL-9148"
+        ],
+        "decision": "PRESERVE",
+        "adoptsIdentity": true,
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Client Code",
+        "fieldRef": "src:webform-signups.csv:Client Code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "CL-9148",
+          "CL-9744",
+          "CL-9745",
+          "CL-9746"
+        ],
+        "decision": "PRESERVE",
+        "adoptsIdentity": true,
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:webform-signups.csv:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Risel",
+          "Sovek",
+          "Mesan",
+          "Pelo"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:webform-signups.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "finek.yanorin0@example.test",
+          "halia.vexenko1@sample.invalid",
+          "tulis.kesmar2@example.test",
+          "zeran.orvunda3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:webform-signups.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Zermar",
+          "Zerunda",
+          "Mesquist",
+          "Risorin"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:webform-signups.csv:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "AA",
+          "ES",
+          "KA",
+          "BR"
+        ],
+        "decision": "PRESERVE",
+        "file": "webform-signups.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "IDENTITY_STRATEGY"
+    ]
+  },
+  "canaries": [
+    "kc_80c3d55fbd60c5c36e55b320",
+    "kc_1a0e42adb02c0d199acc2f3f"
+  ]
+}

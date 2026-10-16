@@ -1,0 +1,180 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-076-cap05-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-076-cap05-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "da4bd92b7539c23b68168a353f87ac541ad820c50acb5585f8ee6e52e474b05a",
+      "candidateSetHash": "1cf807da8b3c724d78c8f915f2d57ff35c377603c8628f3548a9cc9a12bd602e",
+      "targetContractHash": null,
+      "projectRevisionHash": "d767cc0bd071e0e9c141a7febf41bf62251c72ef8660307f8f8d6b2de0f2f516"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name - src",
+        "sourceFieldRef": "fld_6687841961d2987d",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Rating",
+        "sourceFieldRef": "fld_bdd55c3f77f54cfd",
+        "decision": "MAP",
+        "destinationField": "lead.rating",
+        "requiredEvidenceRefs": [
+          "ev_4a0859e220f8c94b"
+        ]
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_90be4f1651db9fbf",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.createdAt",
+      "lead.employeeCount",
+      "lead.lastName",
+      "lead.phone",
+      "lead.rating"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "49441b8da21edffa561a0fd57527478f9f51e28f6b232e010c560a66bb8e128a"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "rating",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name - src",
+        "fieldRef": "src:Last name - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Finquist",
+          "Tavaly",
+          "Halaly",
+          "Orvell",
+          "Yanova"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Rating",
+        "fieldRef": "src:Rating",
+        "valueClass": "ENUM",
+        "values": [
+          "hot",
+          "warm",
+          "cold",
+          "hot",
+          "warm",
+          "cold",
+          "hot"
+        ],
+        "decision": "MAP",
+        "destination": "lead.rating",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-28",
+          "R-8",
+          "R-8",
+          "R-53",
+          "R-17"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_cfa22b365ee0",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Last name - src",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b7e7b767e4aaa3597c0bc523",
+    "kc_c0e5c6ce680833e364280aa5"
+  ]
+}

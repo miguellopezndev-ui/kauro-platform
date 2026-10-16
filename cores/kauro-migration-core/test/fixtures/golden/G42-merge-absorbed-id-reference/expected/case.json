@@ -1,0 +1,47 @@
+{
+  "id": "G42",
+  "title": "A reference to an id a merge absorbed still reaches the record that survived",
+  "intent": "Rows X1 and 9 of a.csv are proven to be one contact by their shared legacy id L1, so row 9 is absorbed into X1. The company in b.csv names the contact by the raw id 9. That id was the contact's before the merge and is the contact's after it: the relationship must resolve to the surviving contact, and it must not be reported as a source record that could not be found.",
+  "expect": {
+    "rows": {
+      "total": 3,
+      "OUTPUT": 2,
+      "MERGED_PROVEN": 1,
+      "ISOLATED": 0,
+      "LEFTOVER": 0,
+      "REJECTED_INPUT": 0
+    },
+    "records": {
+      "CONTACT": 1,
+      "COMPANY": 1,
+      "DEAL": 0,
+      "LEAD": 0
+    },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 1,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": {
+      "total": 1,
+      "OUTPUT": 1,
+      "DEDUPLICATED": 0,
+      "UNRESOLVED": 0,
+      "LEFTOVER": 0
+    }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "edgeDetails": [
+    {
+      "row": "b.csv#2",
+      "relationshipType": "CONTACT_TO_COMPANY",
+      "fromKeyRaw": "9",
+      "disposition": "OUTPUT",
+      "reasonCode": "ASSOCIATION_RESOLVED"
+    }
+  ]
+}

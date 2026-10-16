@@ -1,0 +1,236 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-066-k06-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-066-k06-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "ae9e1974891dfde9c9d38e0c42a9d8ed10d8bfbabb3b1e0acb7c9cde155a73e0",
+      "candidateSetHash": "581170b87eef4efafe20bda2f8bc018655a8c5a7b5b3972edf121f60f51594b1",
+      "targetContractHash": "tc_8a51a3650f184fe9820b56b5530cbbf56a55d645bcd392ccb8321983acedcb71",
+      "projectRevisionHash": "a2f00a43f81fd48065b725e1f3ca2f9de9e872f97af82fcb90b054915d0c9e56"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_6d739932be756792",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_f6232979702c904a",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Type",
+        "sourceFieldRef": "fld_6e985d8977dc1cda",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Code",
+        "sourceFieldRef": "fld_0724736c39fac451",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.lifecycleStage",
+      "contact.source_id",
+      "deal.name",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "da37f6fb084d957abafd5c726baaf256c552139724264d9bcc1a2cd705eeeafc"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Daris",
+          "Zero",
+          "Orva",
+          "Daria",
+          "Daran",
+          "Pelel"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Mesvik",
+          "Zerath",
+          "Lumiko",
+          "Pelaly",
+          "Finiko",
+          "Mesova"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Type",
+        "fieldRef": "src:Type",
+        "valueClass": "ENUM",
+        "values": [
+          "C",
+          "X2",
+          "X1",
+          "Q",
+          "P7",
+          "C",
+          "X2",
+          "X1"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Code",
+        "fieldRef": "src:Code",
+        "valueClass": "ENUM",
+        "values": [
+          "A",
+          "X1",
+          "K",
+          "X2",
+          "A",
+          "X1",
+          "K",
+          "X2"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:enum-codes"
+    ]
+  },
+  "canaries": [
+    "kc_722b3be6831b8bb45020bdca",
+    "kc_261345d39dd1a80b9e11292e"
+  ]
+}

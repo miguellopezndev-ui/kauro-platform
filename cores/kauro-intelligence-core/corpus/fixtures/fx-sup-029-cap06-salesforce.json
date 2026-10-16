@@ -1,0 +1,228 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-029-cap06-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-029-cap06-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "6dcd56600b2f5dfbc9f27c699fc3e24d5cfaa1fcbd551bfac9aa5b5610fa7319",
+      "candidateSetHash": "3cc29455fe590a8da1367a61329f17140ea9698ca7a49cd82aaba28edff8a62c",
+      "targetContractHash": "tc_b3e21707859702ac0370c6477d3365d6123e541f1bbcf59dd8355c5edc01e66d",
+      "projectRevisionHash": "538c034da94a676832bd7a2843fe35ff0c68225255ed712f6538963e3dcdab1a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_82eeb31143af30b2",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "requiredEvidenceRefs": [
+          "ev_f6584e6368d53882"
+        ]
+      },
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_a9f66d8ea411fde5",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_76ba0d960f46fd7a",
+        "decision": "MAP",
+        "destinationField": "company.website"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_e36899d9bd23241b",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_cccc09cc8d32a5a9",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.annualRevenue",
+      "company.city",
+      "company.description",
+      "company.employeeCount",
+      "company.name",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Folder code",
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "de2fed8020164ae8d9b38837662183a68628da2bc23df98b8a29235eb1f84b39"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelorin Works B.V.",
+          "Mesmar Foods S.L.",
+          "Yananth Partners Ltd",
+          "Normar Logistics LLC"
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "NUMBER",
+        "values": [
+          "10644",
+          "83232",
+          "18580",
+          "87539"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.quelmar-labs.test",
+          "https://www.tavero-works.test",
+          "https://www.orvero-foods.test",
+          "https://www.tavunda-group.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F102",
+          "F249",
+          "F487"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L72831",
+          "L79940",
+          "L42825"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_03ade4c89fc9",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_158e53f77a06e146bdc3fffd",
+    "kc_1bf853864ccb741168f6921b"
+  ]
+}

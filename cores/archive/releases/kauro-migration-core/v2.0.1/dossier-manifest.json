@@ -1,0 +1,95 @@
+{
+  "artifactKind": "MIGRATION_CORE_RELEASE_DOSSIER",
+  "dossierInventoryVersion": "1.0.0",
+  "repository": "miguellopezndev-ui/kavo-migration-core",
+  "sha": "a2a549031de85d95be8645dd9c5156dfff2050a0",
+  "gitTree": "fe22fb0274b407cd1a2bc8596343b8890aba88f7",
+  "tag": "v2.0.1",
+  "versions": {
+    "coreVersion": "2.0.1",
+    "packageFormatVersion": "2.0.0"
+  },
+  "codeDigest": "9b7acad83b6998ba68852e9385d50206ac0f43e42842793063c54ccec3d98c24",
+  "manifestDigest": "f0213b0e49ae2fe853c4db5628dc4f22f5e84d0e78bcb3ea8bfca0f3bff89a77",
+  "subjectDigest": "f37271f7cea90a8b96c87e8d5bff49f853c8ea23d17c5cc30e4a45588aa52ad5",
+  "campaignId": "c_53d6b2453fe15386",
+  "producers": {
+    "tools/capacity.mjs": "ceca5003330eacd5c1d008d59314f91fbcc2863d42c6395a5c6d891640e47c00",
+    "qualification/hubspot/run-target-qualification.mjs": "dbd372db8925ea3fd83f466e3d9d992ebcb830d58d88a49122b31df516894148",
+    "qualification/hubspot/run-import-qualification.mjs": "ecc828567c45c49ac2220493cea662b27a8aa51431371dfb21a2adb517a5e875",
+    "qualification/salesforce/run-target-qualification.mjs": "da12a751e7b0985e9b6c527b0d6706ef5b9e5e64525d85f1356d2fee624eba65",
+    "qualification/salesforce/run-dataloader-qualification.mjs": "81f098f22f7f7672b8253eae61f46f27d21ca9d695dab3046a77eb65ffbe4925",
+    "qualification/salesforce/run-ocr-qualification.mjs": "a7488224c5cf709ca738d1fe46e827a887b4b0b7bb28465c90ef3ca9e522673d",
+    "tools/universe.mjs": "c82b4f0a29cb22a893a52fb86f7c70f6f58a41c3774209eb79ff44e14b51d648"
+  },
+  "assets": [
+    {
+      "name": "campaign.json",
+      "role": "CAMPAIGN",
+      "bytes": 3727,
+      "sha256": "873f56a7be451ef6874ccc85b83c964dd04e87a56e813d472c2c1a98a0092f87"
+    },
+    {
+      "name": "ci-receipt.json",
+      "role": "CI_RECEIPT",
+      "bytes": 5250,
+      "sha256": "76b05c7b563d4c8b11882a851dae5cbbd8512b67ee8b5e7b3663a0e3ef9b6178"
+    },
+    {
+      "name": "evidence.tar.gz",
+      "role": "EVIDENCE",
+      "bytes": 74878,
+      "sha256": "883dd20b9f1b8e80748ddacdd9956b36960096599c4d5f0875c1dc0b0ac1c18b"
+    },
+    {
+      "name": "kavo-migration-core-2.0.1.tgz",
+      "role": "PACKAGE",
+      "bytes": 813057,
+      "sha256": "787f0b80a906d31605e3946ad00df86d2a131e3e89d78855c1c4f327b37fa000"
+    },
+    {
+      "name": "manifest.json",
+      "role": "CANDIDATE_MANIFEST",
+      "bytes": 107129,
+      "sha256": "a1e79648d1dfdc571dacba53114f927818a197010ba4c5788e3213c6cc9c0e41"
+    },
+    {
+      "name": "migration-core-provenance.json",
+      "role": "RELEASE_PROVENANCE",
+      "bytes": 12073,
+      "sha256": "7b87f67c780690f730330697c66db83ae049602e482882d548cc5153e022257f"
+    },
+    {
+      "name": "preflight.json",
+      "role": "PREFLIGHT",
+      "bytes": 2921,
+      "sha256": "289455fa3a6307a20e02040725f1405a1a5031a25e4fdaa09b1f62b8946f8c54"
+    },
+    {
+      "name": "provenance.json",
+      "role": "CANDIDATE_PROVENANCE",
+      "bytes": 7923,
+      "sha256": "4083d7ad7904416f560379939aa6d4e7a4ce93257bfcf04ce12e66c5746c0476"
+    },
+    {
+      "name": "sbom.cdx.json",
+      "role": "SBOM",
+      "bytes": 3631,
+      "sha256": "caf8114b2a45ff26d0438e18d6bd2b3dfb22bca11f17a8ffbf0b3af7d0ff670d"
+    },
+    {
+      "name": "source-a2a549031de85d95be8645dd9c5156dfff2050a0.tar.gz",
+      "role": "SOURCE",
+      "bytes": 1480485,
+      "sha256": "7cb7e4978ee34812cb3daef2507e8b823cf73e75cb78948b0ec62a7a7115b3a8"
+    },
+    {
+      "name": "universe.json",
+      "role": "UNIVERSE",
+      "bytes": 10314,
+      "sha256": "010d11935da263d9e4f4d449637cb7c28016c30f474409d1604b4b87a09a5e0c"
+    }
+  ],
+  "builtAt": "2026-09-11T13:25:12Z",
+  "builtBy": "tools/release-dossier.mjs"
+}

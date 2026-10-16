@@ -1,0 +1,183 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-077-k02-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-077-k02-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5fc0793abbc47febebbcaa9f2b401af5258b80e29aac818d0835861d582cb6c5",
+      "candidateSetHash": "4d7aff3aa455c6acf9155b6ffa586c2e9f543ab8d0b008620f95a8057da5cfc9",
+      "targetContractHash": "tc_d5b5e9ae8a8ea8f5a65ec5bb422e5d605bcfc4f7d31a82f9b8f0a90a6e67229c",
+      "projectRevisionHash": "bbe51f777b89ccb68fda26ed613dd8f26262a9477d6f9b85028bc7ec4609f25c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_11497642ba71379f",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_761bb9675eac1526",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Annual revenue",
+        "sourceFieldRef": "fld_de480130f40fc520",
+        "decision": "MAP",
+        "destinationField": "company.annualRevenue"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.annualRevenue",
+      "company.employeeCount",
+      "company.industry",
+      "company.name",
+      "company.postalCode",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "fd56021020cf9d696f0e7c5e78b48b3bada588ddc70544ed101dd0c8c6f8f834"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Industry",
+        "fieldRef": "src:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Logistics",
+          "Packaging",
+          "Logistics",
+          "Packaging",
+          "Logistics",
+          "Food service",
+          "Food service"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Name",
+        "fieldRef": "src:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Vexmar Studio GmbH",
+          "Joraly Works S.A.",
+          "Kesunda Group SAS",
+          "Mesenko Works LLC",
+          "Mesmar Foods LLC",
+          "Zeriko Foods GmbH",
+          "Tavrane Labs SAS"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Annual revenue",
+        "fieldRef": "src:Annual revenue",
+        "valueClass": "NUMBER",
+        "values": [
+          "28.800",
+          "3.200",
+          "79.900",
+          "31.500",
+          "74.500",
+          "15.200",
+          "38.700"
+        ],
+        "decision": "MAP",
+        "destination": "company.annualRevenue"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:decimal-separator"
+    ]
+  },
+  "canaries": [
+    "kc_4b122afd74e43ab9f4549b0c",
+    "kc_795f37be07cb9facd1b9d385"
+  ]
+}

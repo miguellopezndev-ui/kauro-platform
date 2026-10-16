@@ -1,0 +1,37 @@
+{
+  "id": "G27",
+  "title": "Prefer-the-survivor when the survivor has nothing to prefer",
+  "intent": "The configuration says the surviving row is authoritative, with a written justification. Here the surviving row's job title is empty, so the policy has nothing to apply. Falling through to the first absorbed row would be \"first wins\" wearing the policy's name, and reordering the file would change the answer. The record is set aside instead.",
+  "expect": {
+    "rows": { "total": 3, "OUTPUT": 0, "MERGED_PROVEN": 2, "ISOLATED": 1, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 0, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 1,
+    "mergeConflicts": 1,
+    "mergeFieldDecisions": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    { "row": "contacts.csv#2", "disposition": "ISOLATED", "reasonCode": "ISOLATED_IDENTITY_CONFLICT" },
+    { "row": "contacts.csv#3", "disposition": "MERGED_PROVEN" },
+    { "row": "contacts.csv#4", "disposition": "MERGED_PROVEN" }
+  ],
+  "merges": [
+    {
+      "survivorRow": "contacts.csv#2",
+      "absorbedRows": ["contacts.csv#3", "contacts.csv#4"],
+      "identityEvidenceKinds": ["SOURCE_RECORD_ID"],
+      "conflicts": [
+        { "field": "contact.jobTitle", "values": ["Janitor", "VP Engineering"], "reasonCode": "IDENTITY_MERGE_FIELD_CONFLICT" }
+      ],
+      "fieldDecisions": []
+    }
+  ]
+}

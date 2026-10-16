@@ -1,0 +1,188 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-025-k11-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-025-k11-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5b21d5a372c5f0f9a729eeaf0f39638797819fa07a76f2c84827c094db63f739",
+      "candidateSetHash": "09e94532e68338db3646389d1298beff0603b0fcc3db034fc4df3c180ef87d28",
+      "targetContractHash": "tc_4f3b011a8bc4b6ac6c04021f951f1f10892f456a1c958f82167d40dc35aeeff1",
+      "projectRevisionHash": "1110fe5cb8d7a3c20f9aeaee6e893c37ba8f741ea20107b1920d283c920548bf"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "FIRST_NAME",
+        "sourceFieldRef": "fld_17e795caeeb4799a",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "E-MAIL ",
+        "sourceFieldRef": "fld_48af1680bb35d630",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "phone#",
+        "sourceFieldRef": "fld_674b6f0996d98e46",
+        "decision": "MAP",
+        "destinationField": "contact.phone"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_b50668881fd131d1",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.ownerEmail",
+      "contact.phone",
+      "contact.website",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "7486f7803366fd171f6a2c441ffbb0ea273687ed503d0c4c452a9163ec4ff52a"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "FIRST_NAME",
+        "fieldRef": "src:FIRST_NAME",
+        "valueClass": "TEXT",
+        "values": [
+          "Mesis",
+          "Halia",
+          "Mesia",
+          "Hala"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "E-MAIL ",
+        "fieldRef": "src:E-MAIL ",
+        "valueClass": "EMAIL",
+        "values": [
+          "sovo.sovaly0@corp.example.test",
+          "quelis.tulell1@example.test",
+          "norek.pelsorin2@sample.invalid",
+          "vexia.belmar3@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "phone#",
+        "fieldRef": "src:phone#",
+        "valueClass": "PHONE",
+        "values": [
+          "202.555.0171",
+          "(202) 555-0104",
+          "+44-7700-900-982",
+          "+44-7700-900-892"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-34",
+          "batch-29",
+          "batch-9",
+          "batch-17"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:header-variants",
+      "lang:sv"
+    ]
+  },
+  "canaries": [
+    "kc_436ca9d0eb23bc472d0a6322",
+    "kc_7e6c9b8642eed2fbcf7c2464"
+  ]
+}

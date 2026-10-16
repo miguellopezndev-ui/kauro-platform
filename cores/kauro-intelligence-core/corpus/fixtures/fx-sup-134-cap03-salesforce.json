@@ -1,0 +1,208 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-134-cap03-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-134-cap03-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "f4287963cfdb6658a2516c63e6c591246cbb515e13da3db232e96ad2fd0793f9",
+      "candidateSetHash": "68fb356d1da9406824d8650c9f6924cdfd42a910cabdad376909c1e3cfccbbf4",
+      "targetContractHash": "tc_26ae8799a0411dc3bd6bcad84c922914a9376147c21b556a89da8087967e686b",
+      "projectRevisionHash": "d6cdb8a0cdc577d5b123d874de1a13da1540d0951064ea7a6f88f09bf9323d0b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_c7b8316a96f92ae4",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Phone",
+        "sourceFieldRef": "fld_7a455d4d7869405b",
+        "decision": "MAP",
+        "destinationField": "contact.phone",
+        "semanticType": "PHONE"
+      },
+      {
+        "sourceHeader": "Mobile",
+        "sourceFieldRef": "fld_3caa6592c434b00c",
+        "decision": "MAP",
+        "destinationField": "contact.mobilePhone",
+        "semanticType": "PHONE"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_668603ec31b9cad0",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.mobilePhone",
+      "contact.phone",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "fe321095830da4702dee140de40be728ac39a090c5c6af32db839474a030cb68"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "meso.lumero0@example.test",
+          "wila.lumova1@corp.example.test",
+          "daro.sovath2@sample.invalid",
+          "mesek.orvmar3@corp.example.test",
+          "finel.pelvik4@sample.invalid",
+          "tulo.quelaly5@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Phone",
+        "fieldRef": "src:Phone",
+        "valueClass": "MIXED",
+        "values": [
+          "+12025550142",
+          "+12025550119",
+          "+44 7700 900515",
+          "+447700900847",
+          "+12025550113",
+          "+44-7700-900-646"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone",
+        "semanticType": "PHONE"
+      },
+      {
+        "header": "Mobile",
+        "fieldRef": "src:Mobile",
+        "valueClass": "MIXED",
+        "values": [
+          "+12025550161",
+          "+447700900267",
+          "+1 202 555 0156",
+          "+12025550169",
+          "+447700900380",
+          "202.555.0193"
+        ],
+        "decision": "MAP",
+        "destination": "contact.mobilePhone",
+        "semanticType": "PHONE"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-1495",
+          "TKT-3755",
+          "TKT-5813",
+          "TKT-3660",
+          "TKT-4445",
+          "TKT-7299"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_d8fce460c73c5b5768e9a87b",
+    "kc_b8c5f6fdc16f753486ae81b6"
+  ]
+}

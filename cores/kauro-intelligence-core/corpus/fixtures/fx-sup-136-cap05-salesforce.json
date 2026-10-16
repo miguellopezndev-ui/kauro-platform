@@ -1,0 +1,260 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-136-cap05-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-136-cap05-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "6ebf13f38cf977405d32086a219e4f68cc45ea153b7c9fa470b48ab05e6402df",
+      "candidateSetHash": "02f5589dbfd890236ea9574be9e2b417d714e1bb896d62a4ee73f157a8d1dec1",
+      "targetContractHash": "tc_99e1bc3ab3a3201192c365395fee25d969dccae72c422dcf151c56ae3f297c73",
+      "projectRevisionHash": "80780a7c0441677de046da09360958bfe62a631362325c86c22cff63b6eadab2"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Cognome",
+        "sourceFieldRef": "fld_162cb1b829c2b13e",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Lead Status",
+        "sourceFieldRef": "fld_8436b64f715271de",
+        "decision": "MAP",
+        "destinationField": "lead.status",
+        "valueMap": [
+          {
+            "from": "active",
+            "to": "Working - Contacted"
+          },
+          {
+            "from": "pending",
+            "to": "Working - Contacted"
+          },
+          {
+            "from": "new",
+            "to": "Open - Not Contacted"
+          }
+        ],
+        "requiredEvidenceRefs": [
+          "ev_6e3cee13aefa0872"
+        ]
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_edfb696b6a23fcdb",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_893036a4253defc1",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.company",
+      "lead.country",
+      "lead.description",
+      "lead.employeeCount",
+      "lead.lastName",
+      "lead.status",
+      "lead.website",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch",
+      "Print run"
+    ],
+    "expectedTaskTypes": [
+      "VALUE_MAP"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "53f0ff517156467240ad44fa1105bd2346825559ba6a04fb5d280f68ebbddeeb"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false,
+            "label": "Lead Status",
+            "options": [
+              "Open - Not Contacted",
+              "Working - Contacted",
+              "Closed - Converted",
+              "Closed - Not Converted"
+            ]
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Cognome",
+        "fieldRef": "src:Cognome",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumdell",
+          "Rissorin",
+          "Tulell",
+          "Noranth",
+          "Risell",
+          "Tavsorin"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Lead Status",
+        "fieldRef": "src:Lead Status",
+        "valueClass": "ENUM",
+        "values": [
+          "active",
+          "pending",
+          "new",
+          "active",
+          "pending",
+          "new",
+          "active"
+        ],
+        "decision": "MAP",
+        "destination": "lead.status",
+        "evidence": [
+          "ev:self"
+        ],
+        "valueMap": [
+          {
+            "from": "active",
+            "to": "Working - Contacted"
+          },
+          {
+            "from": "pending",
+            "to": "Working - Contacted"
+          },
+          {
+            "from": "new",
+            "to": "Open - Not Contacted"
+          }
+        ]
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-34",
+          "batch-9",
+          "batch-24",
+          "batch-35",
+          "batch-25",
+          "batch-2"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "3",
+          "1",
+          "6",
+          "9",
+          "4",
+          "2"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "VALUE_MAP"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_964701522784",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cognome",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_18a1829ba5fbe294b8dd3565",
+    "kc_6ae5b13ddf64d3231566e274"
+  ]
+}

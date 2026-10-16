@@ -1,0 +1,223 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-152-cap09-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-152-cap09-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "fdf93189110ba3dc22a70a08b43e07c06055f7f3ce2988876cac9159bba2b5ea",
+      "candidateSetHash": "8110eef07bd653d693f9a9cde32723177dd765bed31ad6550b185c8d14346174",
+      "targetContractHash": null,
+      "projectRevisionHash": "4409b2be2ea1d49ccc049a338d7520b3e5b9f8a11883fb1a01b463bb85931f95"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_ee5b67a4a90b1930",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Lead source - src",
+        "sourceFieldRef": "fld_50845ca96caa8fd6",
+        "decision": "MAP",
+        "destinationField": "lead.leadSource"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_d8aa38055e0a7216",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_328559ac2a836d98",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_ede1d29767fb6c8b",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_b1d1981d845dc31a",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.jobTitle",
+      "lead.lastName",
+      "lead.leadSource"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Folder code",
+      "Legacy system id",
+      "Audit remark code",
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "4f2ff2bdcd5c769cfb091a5995cdd21bcc5700a797f609a4d8b66b9c5b4b31b1"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "leadSource",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Halunda",
+          "Orvath",
+          "Kessorin",
+          "Wilrane",
+          "Risaly",
+          "Pelmar"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Lead source - src",
+        "fieldRef": "src:Lead source - src",
+        "valueClass": "ENUM",
+        "values": [
+          "web form",
+          "referral",
+          "partner",
+          "web form",
+          "referral",
+          "partner"
+        ],
+        "decision": "MAP",
+        "destination": "lead.leadSource"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F393",
+          "F285",
+          "F149",
+          "F646",
+          "F202",
+          "F646"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L23110",
+          "L67121",
+          "L99063",
+          "L57387",
+          "L51844",
+          "L85760"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-25",
+          "R-20",
+          "R-34",
+          "R-34",
+          "R-27",
+          "R-44"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-24",
+          "batch-29",
+          "batch-4",
+          "batch-27",
+          "batch-10",
+          "batch-30"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_d411e6724d11",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Lead source - src",
+        "targetField": "lead.leadSource"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b2556f43cb3c283103196375",
+    "kc_089ae1f2ebf5fb765ee5238f"
+  ]
+}

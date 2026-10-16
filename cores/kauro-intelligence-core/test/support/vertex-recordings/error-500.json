@@ -1,0 +1,6 @@
+{
+  "label": "SIMULATED: hand-written from the documented Google API error shape; the message echoes the request prompt, as providers do ({{PROMPT}} is replaced by the replayed request text)",
+  "status": 500,
+  "headers": { "content-type": "application/json", "x-goog-request-id": "simulated-goog-err-500" },
+  "body": { "error": { "code": 500, "message": "request failed: {{PROMPT}}", "status": "INTERNAL" } }
+}

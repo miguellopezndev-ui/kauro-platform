@@ -1,0 +1,166 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-111-cap04-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-111-cap04-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "268f09dd4c23b3e6e36892cf496c8eced8689672973302f1276d5cfbe20b9a38",
+      "candidateSetHash": "3abc17befae5b62e79cd44654121db1919158eb08e7d4bb145ac999528ed92a2",
+      "targetContractHash": null,
+      "projectRevisionHash": "e2cf7d064d5edfe33a53cd371dcb24a77c1ed7921436f7a270c1524212bbf934"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Mitarbeiter",
+        "sourceFieldRef": "fld_4a4ff16fa2a02446",
+        "decision": "MAP",
+        "destinationField": "lead.employeeCount"
+      },
+      {
+        "sourceHeader": "Label [v2]",
+        "sourceFieldRef": "fld_e927992b409811c4",
+        "decision": "MAP",
+        "destinationField": "lead.firstName",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.createdAt",
+      "lead.doNotCall",
+      "lead.employeeCount",
+      "lead.firstName",
+      "lead.lastName",
+      "lead.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3ed35c1f45647fbde156daec4e9feb5d4d886d49dceaaa6c74d93e730e274622"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Mitarbeiter",
+        "fieldRef": "src:Mitarbeiter",
+        "valueClass": "NUMBER",
+        "values": [
+          "26576,69",
+          "53007,89",
+          "13603,80",
+          "43252,96"
+        ],
+        "decision": "MAP",
+        "destination": "lead.employeeCount"
+      },
+      {
+        "header": "Label [v2]",
+        "fieldRef": "src:Label [v2]",
+        "valueClass": "TEXT",
+        "values": [
+          "  Finis",
+          "Sovia ",
+          "  Yanan",
+          "Pelan "
+        ],
+        "decision": "MAP",
+        "destination": "lead.firstName",
+        "transform": "TRIM_WHITESPACE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_7b5de6cdef0d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Mitarbeiter",
+        "targetField": "lead.employeeCount"
+      },
+      {
+        "memoryId": "memconv_41a3f7613a0a",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Label [v2]",
+        "targetField": "lead.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_1f81185654df71ffa364a575",
+    "kc_f3499148fea493d011715128"
+  ]
+}

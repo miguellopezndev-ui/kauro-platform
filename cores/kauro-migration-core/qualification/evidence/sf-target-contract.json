@@ -1,0 +1,265 @@
+{
+  "gate": "SF-TARGET-01 (target contract)",
+  "orgId": "00Dak000018tvSeEAI",
+  "orgIdSource": "the captured bundle this gate read; this gate performs no writes and holds no credential",
+  "observedAt": "2026-10-02T12:33:05Z",
+  "observedInstance": {
+    "vendor": "salesforce",
+    "instanceId": "00Dak000018tvSeEAI",
+    "instancePseudonym": "i_fba18c99c632ea0d",
+    "observedBy": "the capture manifest of the bundle this gate parsed; this gate holds no credential and performs no writes",
+    "detail": "https://orgfarm-e7aa04ef83-dev-ed.develop.my.salesforce.com/"
+  },
+  "instanceUrl": "https://orgfarm-e7aa04ef83-dev-ed.develop.my.salesforce.com/",
+  "contractHash": "tc_99cf9bb51a51a5de6897f480cba53673dc05082cfd0ad1fb9c7afc0e8ea0a9a6",
+  "capturedAt": "2026-09-29T19:03:10Z",
+  "artifacts": [
+    {
+      "path": "attestation.json",
+      "sha256": "94f90935cce32bb08c159508928b6a15c265aa2db471db501b626ca16a70dff2",
+      "byteLength": 139,
+      "kind": "SALESFORCE_ATTESTATION"
+    },
+    {
+      "path": "describe/Account.json",
+      "sha256": "a5666b6cc1c17d687cf81e56c4c4a49cd62cab8327695bf7e4fa5edf19b0d7dc",
+      "byteLength": 410716,
+      "kind": "SALESFORCE_DESCRIBE"
+    },
+    {
+      "path": "describe/Contact.json",
+      "sha256": "cc80725122117b1cdca130c3bbfea162f5cafc5e0fedfb6343ed8ff1f581fea0",
+      "byteLength": 384156,
+      "kind": "SALESFORCE_DESCRIBE"
+    },
+    {
+      "path": "describe/Lead.json",
+      "sha256": "81f0bc48d02baa65aa34683892437c00648eb5ef57dc05f4f099cbd8930ae05c",
+      "byteLength": 256447,
+      "kind": "SALESFORCE_DESCRIBE"
+    },
+    {
+      "path": "describe/Opportunity.json",
+      "sha256": "107047bc4add865db895b2fd927441420879c2e0f0388ea2657adb50beecd063",
+      "byteLength": 111122,
+      "kind": "SALESFORCE_DESCRIBE"
+    },
+    {
+      "path": "describe/OpportunityContactRole.json",
+      "sha256": "b2eb7a2fac6a9533ea516151a28a8b3a187a1cdda3f4fcdae682aca3ee91ea04",
+      "byteLength": 23497,
+      "kind": "SALESFORCE_DESCRIBE"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "21483dd458518c848f902de8ffce5649da2120701db915d7505b8e6f67262099",
+      "byteLength": 858,
+      "kind": "SALESFORCE_BUNDLE_MANIFEST"
+    },
+    {
+      "path": "org-summary.json",
+      "sha256": "24f5ae054d44ea935a78aae2ebd70009a87a78e72835741cb5cc07c1d18f8662",
+      "byteLength": 216,
+      "kind": "SALESFORCE_ORG_SUMMARY"
+    }
+  ],
+  "objects": [
+    {
+      "apiName": "Account",
+      "fields": 76,
+      "recordTypes": [
+        "Master"
+      ],
+      "qualificationFields": [
+        {
+          "apiName": "Kauro_Nonunique_Ext__c",
+          "externalId": "TRUE",
+          "unique": "FALSE",
+          "idLookup": "TRUE",
+          "restrictedPicklist": "FALSE",
+          "picklistValues": []
+        },
+        {
+          "apiName": "Kauro_Qualification_Key__c",
+          "externalId": "TRUE",
+          "unique": "TRUE",
+          "idLookup": "TRUE",
+          "restrictedPicklist": "FALSE",
+          "picklistValues": []
+        },
+        {
+          "apiName": "Kauro_Qualification_Status__c",
+          "externalId": "FALSE",
+          "unique": "FALSE",
+          "idLookup": "FALSE",
+          "restrictedPicklist": "TRUE",
+          "picklistValues": [
+            "READY",
+            "BLOCKED"
+          ]
+        }
+      ]
+    },
+    {
+      "apiName": "Contact",
+      "fields": 70,
+      "recordTypes": [
+        "Master"
+      ],
+      "qualificationFields": [
+        {
+          "apiName": "Kauro_Qualification_Key__c",
+          "externalId": "TRUE",
+          "unique": "TRUE",
+          "idLookup": "TRUE",
+          "restrictedPicklist": "FALSE",
+          "picklistValues": []
+        }
+      ]
+    },
+    {
+      "apiName": "Lead",
+      "fields": 64,
+      "recordTypes": [
+        "Master"
+      ],
+      "qualificationFields": [
+        {
+          "apiName": "Kauro_Qualification_Key__c",
+          "externalId": "TRUE",
+          "unique": "TRUE",
+          "idLookup": "TRUE",
+          "restrictedPicklist": "FALSE",
+          "picklistValues": []
+        }
+      ]
+    },
+    {
+      "apiName": "Opportunity",
+      "fields": 48,
+      "recordTypes": [
+        "Master"
+      ],
+      "qualificationFields": [
+        {
+          "apiName": "Kauro_Qualification_Key__c",
+          "externalId": "TRUE",
+          "unique": "TRUE",
+          "idLookup": "TRUE",
+          "restrictedPicklist": "FALSE",
+          "picklistValues": []
+        }
+      ]
+    },
+    {
+      "apiName": "OpportunityContactRole",
+      "fields": 11,
+      "recordTypes": [],
+      "qualificationFields": []
+    }
+  ],
+  "checks": [
+    {
+      "id": "contract.instanceIsSalesforce",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.objectsCaptured",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.externalIdUniqueField",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.externalIdWithoutUnique",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.restrictedPicklist",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.recordTypesCaptured",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "contract.dependentPicklistRepeatsSurvive",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "matching.evidencedExternalIdAccepted",
+      "ok": true,
+      "expected": "no failure recorded",
+      "observed": "no failure recorded",
+      "detail": null
+    },
+    {
+      "id": "matching.externalIdWithoutUniqueRefused",
+      "ok": true,
+      "expected": "REFUSED: REQUIRES_AGENCY_DECISION",
+      "observed": "REFUSED: REQUIRES_AGENCY_DECISION",
+      "detail": null
+    },
+    {
+      "id": "matching.associationKeyRefused",
+      "ok": true,
+      "expected": "REFUSED: association key",
+      "observed": "REFUSED: association key",
+      "detail": null
+    },
+    {
+      "id": "matching.uncapturedFieldRefused",
+      "ok": true,
+      "expected": "REFUSED: REQUIRES_AGENCY_DECISION",
+      "observed": "REFUSED: REQUIRES_AGENCY_DECISION",
+      "detail": null
+    }
+  ],
+  "checksRun": 11,
+  "failures": [],
+  "result": "PASS",
+  "capture": {
+    "captureVersion": "2.0.0",
+    "producer": "qualification/salesforce/run-target-qualification.mjs",
+    "producerFingerprint": "c5bba1363e7229f5b2be345854bc19d85fbfa1cb280f0cba4ca8b9bea0390688",
+    "producerFiles": 89,
+    "campaignId": "c_c87b11a87f0014e3",
+    "subjectDigestAtStart": "045214ef4302d902047cc4e94652109ef63279cce28315280bb88e7f30759505",
+    "startedAt": "2026-10-02T12:33:05Z",
+    "environment": {
+      "node": "v24.14.1",
+      "platform": "win32",
+      "arch": "x64",
+      "osRelease": "10.0.26300",
+      "cpuCount": 12,
+      "totalMemoryBytes": 14893805568
+    },
+    "producerFingerprintAtEnd": "c5bba1363e7229f5b2be345854bc19d85fbfa1cb280f0cba4ca8b9bea0390688",
+    "subjectDigestAtEnd": "045214ef4302d902047cc4e94652109ef63279cce28315280bb88e7f30759505",
+    "endedAt": "2026-10-02T12:33:06Z",
+    "valid": true,
+    "invalidation": null
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "G13",
+  "title": "Relationships follow a proven merge exactly once",
+  "intent": "Two rows proven to be one contact both say the contact works at C1. After the merge the relationship exists once. The second assertion is recorded as deduplicated and points at the one that was delivered, so nothing disappears and nothing is doubled.",
+  "expect": {
+    "rows": { "total": 4, "OUTPUT": 3, "MERGED_PROVEN": 1, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 2, "COMPANY": 1, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 1,
+    "mergeConflicts": 0,
+    "mergeFieldDecisions": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 3, "OUTPUT": 2, "DEDUPLICATED": 1, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    { "row": "contacts.csv#2", "disposition": "OUTPUT" },
+    { "row": "contacts.csv#3", "disposition": "MERGED_PROVEN", "reasonCode": "IDENTITY_ROW_ABSORBED_BY_PROVEN_MERGE" },
+    { "row": "contacts.csv#4", "disposition": "OUTPUT" }
+  ],
+  "edgeDetails": [
+    { "row": "contacts.csv#2", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "C1", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "contacts.csv#3", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "C1", "disposition": "DEDUPLICATED", "reasonCode": "ASSOCIATION_DEDUPLICATED_AFTER_MERGE" },
+    { "row": "contacts.csv#4", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "C1", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" }
+  ]
+}

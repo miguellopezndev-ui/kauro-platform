@@ -1,0 +1,171 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-037-k07-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-037-k07-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9cfc155e3059ec8cf5faeecf296040c1e0948a51f60254667ec692573f820d60",
+      "candidateSetHash": "cd9d7177ca36deea673303a8ebc95380d1d68895c906d595f885c7fb96058acc",
+      "targetContractHash": "tc_3126b2ea14645d492e7076dc25160d72109db9db25fc5603e1e9094d2f352f19",
+      "projectRevisionHash": "f6c938190e68a3f492e3faff4720c23e4c87ac289b46a17039460c6b20eb9e9d"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_d0857aaed9cadcdc",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_a4c32402a07364da",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_6bec4d5530536454",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_c0cebb721e5dfc4b",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.website"
+    ],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "33695869a52ccb9b5d45af2cfa112970f204cd56f30eb0586e85124ce86fef00"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Wilvik",
+          "Finiko",
+          "Belell",
+          "Finanth"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "finan.belmar0@corp.example.test",
+          "yania.darova1@corp.example.test",
+          "pelan.halenko2@corp.example.test",
+          "belo.sovsorin3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.orvmar-partners.test",
+          "https://www.kesunda-labs.test",
+          "https://www.kesquist-labs.test",
+          "https://www.joriko-partners.test"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-36",
+          "batch-29",
+          "batch-37",
+          "batch-31"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.website"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:missing-target"
+    ]
+  },
+  "canaries": [
+    "kc_03e67e554612182d7280ec21",
+    "kc_965f2edcdf042c926f3f36ad"
+  ]
+}

@@ -1,0 +1,204 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-014-cap03-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-014-cap03-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "37339b44d761538c7ad670f01e726105f1f2ef040a27a7f6a02622e79096cbae",
+      "candidateSetHash": "18e58cfb6b0c4f564d0980e15c27b1db76d66089f95bb1d19e833df9f70b8cb5",
+      "targetContractHash": "tc_119bb486ae99b4fc27c9963c59cefed61071d5cbae3f3aa351226fe267c69ada",
+      "projectRevisionHash": "e8d603691319cc3150ba5cbd3d30fae3578be94ffcc374659e56e77ff4c2e201"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Empresa",
+        "sourceFieldRef": "fld_86ecade2cc864f40",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Facturación anual",
+        "sourceFieldRef": "fld_a308b1c775a1f31a",
+        "decision": "MAP",
+        "destinationField": "company.annualRevenue",
+        "semanticType": "NUMBER"
+      },
+      {
+        "sourceHeader": "Teléfono",
+        "sourceFieldRef": "fld_a22df34ade95ffc8",
+        "decision": "MAP",
+        "destinationField": "company.phone",
+        "semanticType": "PHONE"
+      },
+      {
+        "sourceHeader": "Empleados",
+        "sourceFieldRef": "fld_3ca9a380b5226d41",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount",
+        "semanticType": "NUMBER"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.country",
+      "company.employeeCount",
+      "company.name",
+      "company.phone",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "b7997df276431783bfd5b096ae596e8662c769b590ef81c767279dd1703ccd9a"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Empresa",
+        "fieldRef": "src:Empresa",
+        "valueClass": "TEXT",
+        "values": [
+          "Tavath Logistics SAS",
+          "Zermar Works GmbH",
+          "Quelell Works LLC"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Facturación anual",
+        "fieldRef": "src:Facturación anual",
+        "valueClass": "MIXED",
+        "values": [
+          "41401",
+          "21842",
+          "89.901,64"
+        ],
+        "decision": "MAP",
+        "destination": "company.annualRevenue",
+        "semanticType": "NUMBER"
+      },
+      {
+        "header": "Teléfono",
+        "fieldRef": "src:Teléfono",
+        "valueClass": "MIXED",
+        "values": [
+          "+12025550171",
+          "+12025550187",
+          "+44 7700 900194"
+        ],
+        "decision": "MAP",
+        "destination": "company.phone",
+        "semanticType": "PHONE"
+      },
+      {
+        "header": "Empleados",
+        "fieldRef": "src:Empleados",
+        "valueClass": "MIXED",
+        "values": [
+          "16980",
+          "34991",
+          "26.758,60"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount",
+        "semanticType": "NUMBER"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_4c3b58df65f9",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Empresa",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_f84189473f42",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Teléfono",
+        "targetField": "company.phone"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_a2a5d7832637efc25832a1aa",
+    "kc_a8e0a04187b2d5bfa1e5b36e"
+  ]
+}

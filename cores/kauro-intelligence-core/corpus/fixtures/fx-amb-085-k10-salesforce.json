@@ -1,0 +1,148 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-085-k10-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-085-k10-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e07ade7dd23e498f0cb237d6ad31c9800f32bfdcf6b349b22eb760bc74aa4560",
+      "candidateSetHash": "9cf6bf0e648fd46efc43c643ccd423350f258e4cdc84e1b3ca1073284cbd340b",
+      "targetContractHash": "tc_b57bc03c3e1e7f948f269c3b08ccf40ca90442aa6b268980d4835f67b482516e",
+      "projectRevisionHash": "1f491583570cb77ca6bb5dd4670a98673f4a8425d3766dfa04b3d9f8af2511d1"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Where",
+        "sourceFieldRef": "fld_59c9241817d21320",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.country",
+      "company.name",
+      "company.source_id",
+      "contact.city",
+      "contact.country",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "20b5c34f040803dc2d8d2b80ed5ae14cbc0702d2a954ff02b0000bdfe5a5b527"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP11",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Where",
+        "fieldRef": "src:Where",
+        "valueClass": "TEXT",
+        "values": [
+          "Tessin, Estmark",
+          "Valmora, Norvania",
+          "Tessin, Estmark",
+          "Orvale, Norvania",
+          "Orvale, Estmark",
+          "Tessin, Norvania",
+          "Valmora, Norvania"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:composite-value"
+    ]
+  },
+  "canaries": [
+    "kc_51c3407884af58a6826b2e30",
+    "kc_218ab2a8feef4f8f829caa0b"
+  ]
+}

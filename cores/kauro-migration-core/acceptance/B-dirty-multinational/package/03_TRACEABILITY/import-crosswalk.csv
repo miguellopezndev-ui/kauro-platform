@@ -1,0 +1,9 @@
+import_path,import_row_number,association_key,migration_key,object,survivor_row_locator_id
+01_IMPORT/clean-only/contacts.csv,1,,mk_contact_0feaa60ce6c6501cf844,CONTACT,F-0db063383513:S0:R9
+01_IMPORT/clean-only/contacts.csv,2,,mk_contact_1c53846a20ee27617ecf,CONTACT,F-0db063383513:S0:R7
+01_IMPORT/clean-only/contacts.csv,3,,mk_contact_320cc73f9c2b738ae3f8,CONTACT,F-0db063383513:S0:R6
+01_IMPORT/clean-only/contacts.csv,4,,mk_contact_468b5901e4c9e184b153,CONTACT,F-0db063383513:S0:R5
+01_IMPORT/clean-only/contacts.csv,5,,mk_contact_546f3793e6dfb98b7c4b,CONTACT,F-0db063383513:S0:R8
+01_IMPORT/clean-only/contacts.csv,6,,mk_contact_6223d1c0c78687c404bf,CONTACT,F-0db063383513:S0:R2
+01_IMPORT/clean-only/contacts.csv,7,,mk_contact_b34a16abdfc4d62c62e3,CONTACT,F-0db063383513:S0:R3
+01_IMPORT/clean-only/contacts.csv,8,,mk_contact_dbcf8cf2b48f72138816,CONTACT,F-0db063383513:S0:R4

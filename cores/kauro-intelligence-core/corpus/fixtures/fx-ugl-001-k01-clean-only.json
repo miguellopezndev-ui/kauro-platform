@@ -1,0 +1,128 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-001-k01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-001-k01-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "08c811f21fad3152a048682a0c20d0404fcb44a2c16314053833db83be307e63",
+      "candidateSetHash": "176963b77c64fe953ac8b69dbb7ff9e849a08c07b60d8074a1c96baa19c6377a",
+      "targetContractHash": null,
+      "projectRevisionHash": "91f263cf11105c1498bb403a0888c875c0c5568a28adaf0ac67184ae4cb7d48f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "登録日",
+        "sourceFieldRef": "fld_dad1bcfa19f67352",
+        "decision": "MAP",
+        "destinationField": "lead.createdAt"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.createdAt",
+      "lead.email",
+      "lead.employeeCount"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6f28f7b285d573e40ea998e0a11a355503374a6aea7208f028edddef63856072"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "登録日",
+        "fieldRef": "src:登録日",
+        "valueClass": "MIXED",
+        "values": [
+          "2021-06-23",
+          "26.09.2026",
+          "2021-01-23",
+          "22.01.2020",
+          "2019-07-22",
+          "23.05.2025",
+          "2018-02-28",
+          "19.07.2025"
+        ],
+        "decision": "MAP",
+        "destination": "lead.createdAt"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:mixed-dates",
+      "lang:ja",
+      "ugly:mixed-date-formats"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_3cdc3bcb3f70",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "登録日",
+        "targetField": "lead.createdAt"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_702a11d753d31568e8647f28",
+    "kc_46ade07002af33d633ba8245"
+  ]
+}

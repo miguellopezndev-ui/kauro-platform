@@ -1,0 +1,170 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-084-cap01-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-084-cap01-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "18d2218f1aa19580360708b7e0dd2491b083f7593b3bc488d9953124c31dc3cc",
+      "candidateSetHash": "46525e16c0a0474e29e6afad9a32cf7ba2014c26d65cc42f4c9517d32d0f9b95",
+      "targetContractHash": "tc_3981c73a2bce80baa0f35d9ed29cbeffe64e95e7fa092bdbdd903b1e049a17ab",
+      "projectRevisionHash": "7f08a8404077997c7987ad9e695504a358d48b1e27ae152e9ee7ea0e5d5bc2f0"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico (CRM)",
+        "sourceFieldRef": "fld_db172124ff562b0b",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Ciudad [v2]",
+        "sourceFieldRef": "fld_930197059d623d59",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "company.city"
+    ],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.source_id",
+      "contact.city",
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "7951c10fd6dd1bf5ac44af855b56ebd94600ee3650482c783b29c9a0a7ea65a6"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico (CRM)",
+        "fieldRef": "src:Correo electrónico (CRM)",
+        "valueClass": "EMAIL",
+        "values": [
+          "kesis.belorin0@sample.invalid",
+          "tulan.tulvik1@sample.invalid",
+          "sovan.risenko2@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Ciudad [v2]",
+        "fieldRef": "src:Ciudad [v2]",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvale",
+          "Orvale",
+          "Orvale"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      }
+    ],
+    "forbiddenDestinations": [
+      "company.city"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_86307b4d1be1",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Correo electrónico (CRM)",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_ac77153aabad",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ciudad [v2]",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_cd7fa446be2bfdced3362bf0",
+    "kc_d482dfc9c04cb49af442136a"
+  ]
+}

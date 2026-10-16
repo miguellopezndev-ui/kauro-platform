@@ -1,0 +1,182 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-026-cap03-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-026-cap03-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "75a63a672d9f8b5fc69f00a0a4cc509aab63f62fc072ec30703c3209080147e7",
+      "candidateSetHash": "add318f5ecab78f2df2a8eab4e36753f8566e530ef100e35c8925b4baaa5281b",
+      "targetContractHash": "tc_3c23b0ac7d6a7d44116d610e2ee19f0a4bbdd084cb49edf716576784d510136d",
+      "projectRevisionHash": "0eb3e0bad29035b84d71ea594ab1ad6bf00ea8ec1313c6b72bfc4c7d3a57dfc1"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name - src",
+        "sourceFieldRef": "fld_d22b5cea32efb1a6",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Phone",
+        "sourceFieldRef": "fld_b0ed60335abf1b81",
+        "decision": "MAP",
+        "destinationField": "lead.phone",
+        "semanticType": "PHONE"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_481c6aeddf5e8f60",
+        "decision": "MAP",
+        "destinationField": "lead.email",
+        "semanticType": "EMAIL"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.company",
+      "lead.email",
+      "lead.lastName",
+      "lead.phone",
+      "lead.rating",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e06c56ba1dcaafae15364739f70ff9ff7c275da31881c588424bdc0353ab0992"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "rating",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name - src",
+        "fieldRef": "src:Last name - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvorin",
+          "Halath",
+          "Mesova",
+          "Risath",
+          "Belunda"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Phone",
+        "fieldRef": "src:Phone",
+        "valueClass": "MIXED",
+        "values": [
+          "+447700900176",
+          "+447700900520",
+          "+1-202-555-0110",
+          "+447700900858",
+          "+447700900718"
+        ],
+        "decision": "MAP",
+        "destination": "lead.phone",
+        "semanticType": "PHONE"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "KESAN.JORERO0@sample.invalid",
+          "zerek.mesiko1@example.test",
+          "PELAN.FINATH2@sample.invalid",
+          "tava.pelaly3@sample.invalid",
+          "TAVIA.QUELVIK4@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "lead.email",
+        "semanticType": "EMAIL"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_01c616729596",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Last name - src",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_1d0088fc70631cf12df18c98",
+    "kc_5eae71d6a4d675256342a3d3"
+  ]
+}

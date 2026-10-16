@@ -1,0 +1,216 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-006-k06-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-006-k06-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "22f027a944c85c42923ced0065f06ae26017073b10aebd001a9896cacd1d85d6",
+      "candidateSetHash": "ebee4a3d2401e137cff274b7294177e07ec1e4f97c588de9a4ce060a7c873bc1",
+      "targetContractHash": null,
+      "projectRevisionHash": "3dcb5c84a32fc064921171ec57762b4ff2ec1b243ba6d74ee086886b6f8a77e2"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Stadt",
+        "sourceFieldRef": "fld_fdeb26f5c1696149",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Vorname",
+        "sourceFieldRef": "fld_33f7501c5bfbdb32",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "E-Mail-Adresse",
+        "sourceFieldRef": "fld_f29842e9dca7ed37",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_db940471fe767e51",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.country"
+    ],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.phone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c3b9d6d01e4faa2015a42c1b59f82b88f2b28a1dcb2bfd845744fdaba218b5ed"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Stadt",
+        "fieldRef": "src:Stadt",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "Orvale",
+          "Valmora"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Vorname",
+        "fieldRef": "src:Vorname",
+        "valueClass": "TEXT",
+        "values": [
+          "Tulel",
+          "Risel",
+          "Tulek"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "E-Mail-Adresse",
+        "fieldRef": "src:E-Mail-Adresse",
+        "valueClass": "EMAIL",
+        "values": [
+          "risis.norath0@corp.example.test",
+          "risel.kesrane1@example.test",
+          "mesek.yandell2@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-34",
+          "R-49",
+          "R-42"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.country"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-memory",
+      "lang:de"
+    ],
+    "memory": [
+      {
+        "memoryId": "mem_c625f0f66c86",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "STALE",
+        "sourceHeaderPattern": "Stadt",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "mem_2ad42fa0cfcc",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "CONFLICTED",
+        "sourceHeaderPattern": "Stadt",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_6627609ee9a2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Stadt",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_9a25bce52a07",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Vorname",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_cfe251cd398c35bed4d0af63",
+    "kc_c6868922694127f0b5a1c9c5"
+  ]
+}

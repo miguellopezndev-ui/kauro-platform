@@ -1,0 +1,263 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-057-cap10-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-057-cap10-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "1ce9c1f142917412e592704eab436cbfec08694f5cbf1ea6bc3abab8c8b3af7e",
+      "candidateSetHash": "b184805ef3df39e6ef0199f602fe1f8408b04c59dcb6d99223dfb1b86b7f8b70",
+      "targetContractHash": "tc_5f8a1844e56574cf49cff47029b6f8a661a5d01f94554baf06d9d950055f2a6a",
+      "projectRevisionHash": "e8bfeccaf41fd0776b52999f685d6b5a7f65453c86f14ea1cdc3e89a34b3c6f8"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_087c7de6219b5a30",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Street address",
+        "sourceFieldRef": "fld_34cc81c9e7f20498",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_cffcb48b9e5423b0",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_d4b28c8f9b04d704",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Website - src",
+        "sourceFieldRef": "fld_e18b1696b9a2b918",
+        "decision": "MAP",
+        "destinationField": "contact.website"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_89393e99b242fcc6",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_1da1243c713ea6d3",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.email",
+      "contact.firstName",
+      "contact.ownerEmail",
+      "contact.website",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Row checksum",
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "b6c0eb7825cf6bbe890f28c845146f6e649d5c02ec4138fec2e12fdf07a80fc7"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "tavel.belath0@example.test",
+          "finel.risero1@example.test",
+          "halek.mesanth2@sample.invalid",
+          "wilia.finvik3@example.test",
+          "wilek.sovaly4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Street address",
+        "fieldRef": "src:Street address",
+        "valueClass": "TEXT",
+        "values": [
+          "30 Sovrane Street",
+          "52 Orviko Street",
+          "133 Mesdell Street",
+          "87 Wilorin Street",
+          "40 Tulunda Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvale",
+          "Kelmar",
+          "Tessin",
+          "Valmora",
+          "Quenby"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "  Tulo",
+          "Norek ",
+          "  Lumo",
+          "Sovel ",
+          "  Tulia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Website - src",
+        "fieldRef": "src:Website - src",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.mesero-foods.test",
+          "https://www.jordell-partners.test",
+          "https://www.orvova-labs.test",
+          "https://www.quelath-systems.test",
+          "https://www.orvunda-group.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.website"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "11c14c5f",
+          "fc10c239",
+          "31fd2390",
+          "982da0e9",
+          "573ff4a"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L30831",
+          "L20742",
+          "L91600",
+          "L24379",
+          "L14820"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_84f4a14021b2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Website - src",
+        "targetField": "contact.website"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_fdccd70ee36432300ef75d20",
+    "kc_00cf8b432aceaa34be1360d1"
+  ]
+}

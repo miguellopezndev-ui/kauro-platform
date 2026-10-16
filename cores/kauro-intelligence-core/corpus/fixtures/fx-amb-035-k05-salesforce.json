@@ -1,0 +1,189 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-035-k05-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-035-k05-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "998f0974f214d075ae5a3d01937f59e60e0eaeeba52993a975b701f2308196bd",
+      "candidateSetHash": "c0ee10ab9dbea56ccfcfe59dbc15596e7dd8b1143716ffbb7a41beb215b05ed9",
+      "targetContractHash": "tc_7b4134e03665a2405d05c530f15cfd7ca97511cb71ff6a4abe8c251e3ef5c684",
+      "projectRevisionHash": "f09cabdb1840e7e99f380daea8343754be0a15cbec46b89a666b957733cf11df"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_dfac2a8c0916206b",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_6f674b6a4ee58f31",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Correo B",
+        "sourceFieldRef": "fld_4e9e21f8b97a26db",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Correo A",
+        "sourceFieldRef": "fld_971158d88ca8ac25",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "fbd3424b05fd40bcb4b3cbfd5d17d34d7c96d82fcd027bc19a648888fa0af876"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Wilel",
+          "Daria",
+          "Joris",
+          "Luman",
+          "Daris",
+          "Quelan",
+          "Risa"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "joria.belsorin0@corp.example.test",
+          "sovo.darell1@sample.invalid",
+          "sovel.finsorin2@corp.example.test",
+          "wila.orvunda3@sample.invalid",
+          "yana.orvunda4@corp.example.test",
+          "tulo.quelanth5@corp.example.test",
+          "tavan.lummar6@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Correo B",
+        "fieldRef": "src:Correo B",
+        "valueClass": "EMAIL",
+        "values": [
+          "finis.pelenko0@corp.example.test",
+          "zero.sovova1@corp.example.test",
+          "halel.belova2@sample.invalid",
+          "kesis.sovenko3@sample.invalid",
+          "darel.lumsorin4@example.test",
+          "sovia.sovath5@example.test",
+          "wila.zeraly6@example.test"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Correo A",
+        "fieldRef": "src:Correo A",
+        "valueClass": "EMAIL",
+        "values": [
+          "darek.orvaly0@corp.example.test",
+          "tula.norero1@corp.example.test",
+          "noria.zerdell2@example.test",
+          "orvo.mesunda3@corp.example.test",
+          "vexo.dariko4@sample.invalid",
+          "kesek.risunda5@example.test",
+          "tavan.finiko6@corp.example.test"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:two-primary-emails"
+    ]
+  },
+  "canaries": [
+    "kc_ebde0a821c30a971f1bfb804",
+    "kc_147268b27ca7950a4399ef2c"
+  ]
+}

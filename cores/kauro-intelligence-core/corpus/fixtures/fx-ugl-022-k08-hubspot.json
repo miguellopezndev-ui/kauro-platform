@@ -1,0 +1,202 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-022-k08-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-022-k08-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0b942cb8cf4a2230677f90370e093b71361646d3efeb9e40cc96b5c44c33102a",
+      "candidateSetHash": "6a3956f44b51ca6d75153eab13b328f692e405505b95bf0b54a89f1bd7163ae4",
+      "targetContractHash": "tc_ec065b414a90b1708483e46e16ba4aa6ece5db89ebc9610bec0db084fcfb78f8",
+      "projectRevisionHash": "5785c77d72867c062249346cbc937e9f1969d9eaf7addda0bea8dad68d650fc3"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "מדינה",
+        "sourceFieldRef": "fld_b5f2b03ec19583fb",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "דוא״ל",
+        "sourceFieldRef": "fld_59b47b00a6425d74",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "תפקיד",
+        "sourceFieldRef": "fld_a808ede1ed35b5a3",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "עיר / כתובת",
+        "sourceFieldRef": "fld_50439580f58912af",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "עיר / כתובת"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0d95d46cf6fe97dc0880af16a6f844186833fad1d11f1d09dc08df6bae6f1eb3"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "מדינה",
+        "fieldRef": "src:מדינה",
+        "valueClass": "TEXT",
+        "values": [
+          "Estmark",
+          "Norvania",
+          "Kelland",
+          "Kelland"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "דוא״ל",
+        "fieldRef": "src:דוא״ל",
+        "valueClass": "EMAIL",
+        "values": [
+          "vexia.zerenko0@sample.invalid",
+          "luman.risaly1@example.test",
+          "wilan.orvrane2@corp.example.test",
+          "norek.finanth3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "תפקיד",
+        "fieldRef": "src:תפקיד",
+        "valueClass": "TEXT",
+        "values": [
+          "Account manager",
+          "Buyer",
+          "Controller",
+          "Operations lead"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "עיר / כתובת",
+        "fieldRef": "src:עיר / כתובת",
+        "valueClass": "TEXT",
+        "values": [
+          "ירושלים 12",
+          "القاهرة 7",
+          "ירושלים 12",
+          "ירושלים 12"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:rtl",
+      "lang:he"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_0f8cee6a31f5",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "מדינה",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_cd50dd728742",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "דוא״ל",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_11d645b5a3ed",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "תפקיד",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_7c093da9a2d382270b493194",
+    "kc_b6a0c14e7eef4b6e7afbdb0c"
+  ]
+}

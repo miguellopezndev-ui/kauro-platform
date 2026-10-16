@@ -1,0 +1,174 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-068-k08-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-068-k08-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "205b7623294ade7cbf100cee89fbb373f52622db398d8957d914e5bbfd1a0f27",
+      "candidateSetHash": "8e516c7b08c8edbb10a6c1addf0fa1f0d075a882b0c6fe800581602e7991ff24",
+      "targetContractHash": "tc_5e366a2cfa5ceef9ce790e18fde1a147f018cdfff87c5ea36bbee617a20f756a",
+      "projectRevisionHash": "487d4502ded501cff7640a579726916fc32ed5482b6f202d972d78f023bc17ab"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_991deec00182cfab",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Email or phone",
+        "sourceFieldRef": "fld_856aa4d5f50fc2dd",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_208155c4c7e6b164",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.phone",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0e1379cedfd00fe7579cde59bf5f6a337d43ed9afed38102440d5c85c3a3c840"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelorin",
+          "Jorova",
+          "Tulsorin",
+          "Pelenko",
+          "Finvik",
+          "Halenko"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Email or phone",
+        "fieldRef": "src:Email or phone",
+        "valueClass": "MIXED",
+        "values": [
+          "lumis.kesell0@sample.invalid",
+          "Risa Halrane",
+          "quelia.orvell2@corp.example.test",
+          "+12025550177",
+          "quelis.risell4@example.test",
+          "+12025550139",
+          "mesis.jorero6@example.test",
+          "7999"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-17",
+          "batch-10",
+          "batch-37",
+          "batch-12",
+          "batch-11",
+          "batch-32"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:header-values-conflict"
+    ]
+  },
+  "canaries": [
+    "kc_0b67d418def114a2bc4ab638",
+    "kc_6e260ee11b69e9a21b71b1fc"
+  ]
+}

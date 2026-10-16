@@ -1,0 +1,159 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-002-k02-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-002-k02-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5927912661a220df2cc66c60f92a74f501f41998cf89a325419681ab9023a465",
+      "candidateSetHash": "fd2551dc4932b3d09f575aa8cf2113069cacf53ec2701029024c3c8f3f6a7393",
+      "targetContractHash": null,
+      "projectRevisionHash": "cf8a3bb7cf7ac6220935b4c6d376db48f6fe9774e7ff6f792d91a940db5f1e5a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_86bc6d84c571b312",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Amount",
+        "sourceFieldRef": "fld_9c84030b3838d731",
+        "decision": "MAP",
+        "destinationField": "deal.amount"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_f0131b6ca5131e7b",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.name",
+      "deal.ownerEmail",
+      "deal.stage"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0b1d881f064516bcb1ddc57864bd864e47816b52f174682cb5bf4d9f7757a6f9"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Deal name",
+        "fieldRef": "src:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Pilot 2024 Risova",
+          "Pilot 2024 Pelero",
+          "Supply contract 2025 Vexvik",
+          "Expansion 2026 Quelaly",
+          "Onboarding 2027 Wilunda"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Amount",
+        "fieldRef": "src:Amount",
+        "valueClass": "NUMBER",
+        "values": [
+          "60.700",
+          "9.700",
+          "32.800",
+          "71.700",
+          "60.300"
+        ],
+        "decision": "MAP",
+        "destination": "deal.amount"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L58864",
+          "L50540",
+          "L39954",
+          "L12692",
+          "L10742"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:decimal-separator"
+    ]
+  },
+  "canaries": [
+    "kc_e192f09647345ea3a718e8dc",
+    "kc_3560c6810d153e5d378cc9dc"
+  ]
+}

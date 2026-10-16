@@ -1,0 +1,601 @@
+name: core gate
+
+# One run per commit, not two.
+#
+# `push` on every branch and `pull_request` together meant a branch with an open
+# pull request built twice for the same commit: two runs, two sets of check
+# runs under the same names, twice the machine time, and a required check that
+# could be green on one run and red on the other. Which one the merge button
+# consulted was whichever GitHub reported last.
+#
+# So the pull request is where a branch is checked, and `main` is checked on the
+# push that lands there — which is also the only event a receipt can be about,
+# because on a `pull_request` event GITHUB_SHA is the synthetic merge commit and
+# GitHub attaches the check runs to the head instead.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # The receipt job reads the conclusions of the check runs on this commit. It
+  # reads them; it never writes one. A gate that could write its own check run
+  # could write itself green.
+  checks: read
+  # And it reads the workflow run itself, by run id, together with that run's
+  # jobs: which commit GitHub recorded the run against, which workflow file it
+  # ran, each job's conclusion, and the runner labels each job was dispatched to.
+  # That is the only part of the receipt a laptop cannot produce, so it is the
+  # part the fact rests on. Read, never write: `actions: write` would let this
+  # job re-run or cancel the jobs it is supposed to be reporting on.
+  actions: read
+
+# A cancelled run leaves the receipt job skipped, and a skipped receipt is
+# indistinguishable from one that was never asked for. On a branch that is the
+# right trade -- pushes come fast and the last one is the one that matters. On
+# the default branch it is not: the receipt is the candidate's last fact, and
+# losing it to a second push means re-running everything to get it back.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
+
+jobs:
+  core-gate:
+    name: gate (${{ matrix.os }}, node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['22', '24']
+    steps:
+      # Third-party actions are pinned to immutable commit SHAs.
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Contract lint
+        run: npm run lint
+
+      - name: Specification files match the code
+        run: npm run spec:check
+
+      # The support envelope is a commercial promise. This step fails if the
+      # repository claims anything V1 does not sell.
+      - name: Support envelope (CORE-CONSTITUTION-01)
+        run: npm run constitution
+
+      # Matching a destination record needs evidence about that destination.
+      # This step fails if the engine will match on anything it cannot show.
+      - name: Destination match authority (TARGET-CONTRACT-01)
+        run: npm run target-contract
+
+      - name: Tests
+        run: npm run test
+
+      - name: Source-backed verification
+        run: npm run strong
+
+      # One bounded adversarial pass, aimed at the code most recently changed.
+      # It found the trace-key guard accepting another destination's spelling.
+      - name: Adversarial pass (FINAL-ADV-01)
+        run: npm run adversarial
+
+      # The provenance is generated, so it cannot be edited into agreement
+      # with a repository it no longer describes.
+      - name: Provenance is current
+        run: npm run provenance:check
+
+      - name: Determinism replay
+        run: npm run determinism
+
+      - name: Rebuild the acceptance packages
+        run: npm run acceptance
+
+      # The acceptance packages and the generated specification files are
+      # committed. If either differs from what this platform produces, the
+      # output is not reproducible and the gate fails.
+      # `shell: bash` because this job runs on windows-latest too, where the
+      # default shell is PowerShell. Every other step here is a bare `npm run`,
+      # which both shells run the same way; this one is the only shell script in
+      # the job, and without the declaration pwsh parsed it as its own language
+      # and Git-for-Windows' `test` was handed an empty argument:
+      #
+      #   /usr/bin/test: '': binary operator expected
+      #
+      # Both Windows legs went red on `main` for that and nothing else — the
+      # `git diff` above it had already passed, so the artifacts were
+      # reproducible and the check reporting on them was not. A step that fails
+      # for its own syntax says nothing about the thing it exists to check, and
+      # it says it in the same colour as a real failure.
+      - name: Committed artifacts are reproducible on this platform
+        shell: bash
+        run: |
+          git diff --exit-code -- acceptance spec
+          test -z "$(git status --porcelain -uall -- acceptance spec)" \
+            || { git status --porcelain -uall -- acceptance spec; exit 1; }
+
+  # Is the bounded, deterministic architecture the canonical document specifies
+  # actually in this tree?
+  #
+  # Deliberately a separate job from the correctness gate above, because the two
+  # answer different questions and conflating them destroys the signal. The gate
+  # asks whether the engine is correct. This asks whether the architecture is
+  # closed — and answers it by executing or measuring every fact, never by
+  # reading a claim this repository makes about itself. A false fact fails the
+  # job and names how it was measured; it is not softened to a warning anywhere.
+  #
+  # It takes longer than the correctness gate because it migrates a quarter of a
+  # million rows under a heap limit, verifies a package under another, and
+  # generates and migrates all twelve capacity profiles. That is the point: none
+  # of those numbers can be asserted.
+  architecture:
+    name: architecture closure (ARCHITECTURE-01)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      # A gate that cannot say FALSE is not a gate. This breaks a material
+      # invariant, checks the gate notices, checks the closure condition
+      # actually consults the fact that broke, and puts the tree back.
+      - name: The gate responds to a broken invariant
+        run: npm run architecture:self-test
+
+      - name: The working tree is unchanged after the self-test
+        shell: bash
+        run: |
+          # Not git diff alone: it cannot see an untracked file, so a step that
+          # left one behind reported the tree unchanged. A sabotage run has left
+          # something behind in this repository twice, and the first time it
+          # shipped real row loss to main.
+          git diff --exit-code
+          test -z "$(git status --porcelain -uall)" || { git status --porcelain -uall; exit 1; }
+
+      # Every fact is derived by executing or measuring something. None is read
+      # from a claim this repository makes about itself.
+      - name: MIGRATION_CORE_ARCHITECTURE_CLOSED
+        run: npm run architecture
+
+  sabotage:
+    name: sabotage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      # Every mutation is rebuilt and run against the whole suite. A
+      # mutation that survives means the suite is not checking that behaviour.
+      - name: Sabotage gate
+        run: npm run sabotage
+
+      - name: The working tree is unchanged after sabotage
+        shell: bash
+        run: |
+          # Not git diff alone: it cannot see an untracked file, so a step that
+          # left one behind reported the tree unchanged. A sabotage run has left
+          # something behind in this repository twice, and the first time it
+          # shipped real row loss to main.
+          git diff --exit-code
+          test -z "$(git status --porcelain -uall)" || { git status --porcelain -uall; exit 1; }
+
+  dependencies:
+    name: dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Audit
+        run: npm audit --audit-level=moderate
+
+      # Two runtime dependencies is a deliberate constraint, not an accident.
+      - name: Runtime dependency budget
+        shell: bash
+        run: |
+          node -e "const p = require('./package.json'); const n = Object.keys(p.dependencies || {}).length; process.stdout.write('runtime dependencies ' + n + String.fromCharCode(10)); if (n > 4) process.exit(1);"
+
+  # Does the repository still say only true things about itself?
+  #
+  # Every rule takes a constant the code actually uses and looks for prose that
+  # disagrees with it; the newest of them pins the candidate digest
+  # serialisation against its golden, because that constant is what every digest
+  # in the repository means. The count is on the gate's own output, where it is
+  # derived — a number written here would be a claim this workflow cannot check.
+  #
+  # Separate from the correctness gate because a stale sentence is not a broken
+  # engine, and the two failures want different people reading them.
+  drift:
+    name: document drift (DRIFT-01)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      - name: DRIFT-01
+        run: node tools/drift-gate.mjs
+
+  # The shapes every gate reads a record through, each proved to fire.
+  #
+  # tools/evidence-schema.mjs, tools/universe-inventory.mjs,
+  # qualification/oracles.mjs, tools/invalidation-policy.mjs and
+  # tools/version-floors.mjs decide what a piece of evidence is. They are
+  # therefore exactly the code whose failure would be silent: a rule that never
+  # fires looks identical to a rule with nothing to find. Each is exercised on a
+  # well-formed record and on one with a single thing wrong, and the case fails
+  # unless the broken one is refused for the stated reason.
+  #
+  # A minute, no network, no vendor, no campaign — which is why it is its own job
+  # rather than folded into the release gate's self-test.
+  evidence-rules:
+    name: evidence rules (EVIDENCE-RULES-01)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      - name: EVIDENCE-RULES-01
+        run: node tools/evidence-selftest.mjs
+
+      # The launcher that runs those gates before the universe stops on the
+      # first non-zero exit, proved on a gate that prints PASS and exits 7.
+      - name: The launcher stops on a failed gate (LAUNCHER-STOPS-01)
+        run: bash bench/prepare-universe-selftest.sh
+
+      # The release dossier verifier the freeze verdict calls: a foreign dossier
+      # with correct sums, a mutable release, a tampered package, each refused.
+      - name: The dossier verifier refuses what is not this candidate (RELEASE-DOSSIER-01)
+        run: node tools/release-dossier-selftest.mjs
+
+      - name: Pack and check the installed consumer
+        shell: bash
+        run: |
+          node tools/pack.mjs --out "$RUNNER_TEMP/consumer-pack" > "$RUNNER_TEMP/consumer-pack.json"
+          tarball=$(node --input-type=module -e 'import { readFileSync } from "node:fs"; console.log(JSON.parse(readFileSync(process.argv[1], "utf8")).path)' "$RUNNER_TEMP/consumer-pack.json")
+          node tools/consumer-check.mjs --tarball "$tarball" --out "$RUNNER_TEMP/consumer-check.json"
+
+      - name: Rehearse every release chain scenario
+        shell: bash
+        run: |
+          for s in ok ci-red tag-exists mutable merge-405 gate-fails; do KAURO_CHAIN_ROOT=$RUNNER_TEMP/chain-$s node tools/chain.mjs --rehearse --scenario $s || exit 1; done
+
+  # Everything the tree can answer about itself, and the proof that each answer
+  # can be FALSE.
+  #
+  # Two jobs' worth of subject in one job on purpose: the self-test mutates real
+  # files and puts them back, and it must not run beside anything else in the
+  # same checkout. `git status` after it is not decoration — a sabotage run has
+  # left a mutation behind in this repository twice, and the first time it
+  # shipped real row loss to main.
+  candidate-preflight:
+    name: candidate preflight (RELEASE-CANDIDATE-01)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      # The manifest and the provenance are generated, so they cannot be edited
+      # into agreement with a tree they no longer describe.
+      #
+      # This step was unsatisfiable by construction until the provenance stopped
+      # recording a `runtime` section. `--check` is a byte-exact comparison, and
+      # the record carried `node: process.version` and `platform: "win32 x64"`:
+      # regenerated on Windows it failed here for ever, regenerated here it
+      # failed for every developer on Windows, and either way it would have
+      # failed the day setup-node's '24' resolved to a different patch release.
+      # There was no value of the artifact that satisfied it. The runtime is
+      # gone; what decides the verdict — digests, counts, versions — is what is
+      # compared.
+      - name: The candidate manifest and provenance are current
+        run: node tools/candidate-provenance.mjs --check
+
+      # A gate that cannot say FALSE is not a gate. Each scenario breaks one
+      # thing — a byte of evidence, the manifest digest, a vendor code digest, an
+      # instance, a corpus digest that hashes nothing, a binding written by a
+      # README, a receipt's SHA, a required check, a check run GitHub never saw,
+      # a matrix collapsed to one platform, and a receipt nobody asked GitHub
+      # about — and requires the owning fact to go FALSE for that reason and
+      # release_candidate with it.
+      #
+      # The last three are the ones the previous revision could not have run: a
+      # receipt was believed because it was a file, so there was no refusal to
+      # prove.
+      - name: The gate responds to each defect it exists to catch
+        run: node tools/release-candidate-gate.mjs --self-test
+
+      - name: The working tree is unchanged after the self-test
+        shell: bash
+        run: |
+          # Not git diff alone: it cannot see an untracked file, so a step that
+          # left one behind reported the tree unchanged. A sabotage run has left
+          # something behind in this repository twice, and the first time it
+          # shipped real row loss to main.
+          git diff --exit-code
+          test -z "$(git status --porcelain -uall)" || { git status --porcelain -uall; exit 1; }
+
+      # Every internal fact, byte for byte the same record on every platform that
+      # reaches the same verdict. The receipt fact is deliberately not in it: a
+      # file inside a tree cannot name the commit that contains it.
+      #
+      # The vendor credentials are read-only and they are here because the three
+      # vendor facts cannot be computed without them. The gate refuses to infer
+      # them from committed evidence, and says why in its own words: "The binding
+      # in a committed file is not an answer to that question: every field of it
+      # is derivable from the tree, which is how this fact was made TRUE on
+      # evidence about the wrong portal." So the record this job compares against
+      # can only be reproduced where something can ask HubSpot and Salesforce
+      # which instance this candidate was qualified against.
+      #
+      # What they are for is one HTTP call each: `GET /account-info/v3/details`
+      # on HubSpot, and a client-credentials token exchange on Salesforce, both
+      # of which answer with an instance id and nothing else. Nothing in this job
+      # writes to either vendor, and the ids reach the record pseudonymously --
+      # the digest of the identifier, never the identifier.
+      #
+      # A fork's pull request gets none of these, and this job is then FALSE for
+      # a reason it states rather than passing on a fallback.
+      - name: MIGRATION_CORE_CANDIDATE_PREFLIGHT
+        env:
+          HUBSPOT_TOKEN: ${{ secrets.HUBSPOT_TOKEN }}
+          SF_CLIENT_ID: ${{ secrets.SF_CLIENT_ID }}
+          SF_CLIENT_SECRET: ${{ secrets.SF_CLIENT_SECRET }}
+          SF_LOGIN_URL: ${{ secrets.SF_LOGIN_URL }}
+        run: node tools/release-candidate-gate.mjs --preflight --check
+
+  # The receipt: the only layer that can name this commit, because it is not in
+  # it.
+  #
+  # `needs` is the whole point. This job runs only after every other job in the
+  # workflow is green, and tools/receipt-verify.mjs derives what it must require
+  # from the workflow file itself — so adding a job above makes it required here
+  # with no edit, and a receipt that omits one is refused.
+  receipt:
+    name: release receipt (RECEIPT-01)
+    runs-on: ubuntu-latest
+    # A receipt names one commit, and on a pull_request event GITHUB_SHA is the
+    # synthetic refs/pull/N/merge commit rather than the head of the branch.
+    # GitHub attaches a run's check runs to the head, so the merge commit carries
+    # none — measured on this repository: total_count 0 — and every step after
+    # the read then fails on an empty list. The push leg runs on the real commit,
+    # which is the only commit a receipt can be about.
+    if: github.event_name == 'push'
+    needs: [core-gate, architecture, sabotage, dependencies, drift, evidence-rules, candidate-preflight]
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      # The conclusions of every check run on this exact commit, read from the
+      # API rather than assumed from this job having started. Written outside the
+      # repository, because anything written inside it would change the tree the
+      # receipt is about.
+      #
+      # `--paginate` emits one JSON object per page, which is not a JSON
+      # document; `--jq` streams the runs and `jq -s` collects them back into
+      # one. Piping the pages straight to a file produced something no parser
+      # would accept, and a parse failure here has to stay a failure rather than
+      # become an empty list of problems.
+      - name: Read the check runs for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -o pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?per_page=100" \
+            --paginate --jq '.check_runs[]' | jq -s '{check_runs: .}' > "${RUNNER_TEMP}/check-runs.json"
+          # Not `test -s`. A file holding {"check_runs": []} is eighteen bytes and
+          # satisfies it, so the guard passed having read nothing and the failure
+          # surfaced two steps later as "no check runs were supplied or could be
+          # read" — a message that cannot tell an empty answer from a failed call.
+          # Assert the content instead, and let pipefail catch a gh or a jq that
+          # died in the middle of the pipe rather than at the end of it.
+          jq -e '.check_runs | length > 0' "${RUNNER_TEMP}/check-runs.json" > /dev/null \
+            || { echo "::error::the check-runs read returned no entries for ${GITHUB_SHA}"; exit 1; }
+
+      - name: Write the receipt
+        env:
+          # Each required job's own conclusion, from the workflow engine. The
+          # check-run list says what ran; this says what this job waited for.
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          node tools/receipt-verify.mjs --emit --out "${RUNNER_TEMP}/ci-receipt.json" --check-runs "${RUNNER_TEMP}/check-runs.json"
+
+      # Written and then verified against GitHub, not against itself.
+      #
+      # `--from-api` is gone because it was optional, and an optional check is
+      # the check that is off by default. The verifier now always reads the run
+      # back by its own run id — the commit it ran on, the tree of that commit,
+      # every matrix leg's conclusion and the runner labels GitHub dispatched
+      # them to — and refuses when it cannot. A receipt assembled offline
+      # reproduces every field a checkout can compute, which was demonstrated in
+      # thirty lines; it cannot reproduce the run.
+      - name: Verify the receipt against this commit, and the run against GitHub
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/receipt-verify.mjs --receipt "${RUNNER_TEMP}/ci-receipt.json"
+
+      # The candidate's final fact, decided by the run GitHub recorded rather
+      # than by a file somebody committed or a file somebody wrote.
+      #
+      # The token is passed because the gate makes the same API calls: without
+      # it, `cross_platform_reproducibility_passed` is FALSE and says the run
+      # could not be read back. That is the intended behaviour everywhere the
+      # API is unreachable, here included — it does not fall back to the file.
+      # The vendor credentials are here for the same reason they are on the
+      # preflight job: this step runs the WHOLE gate, and three of its facts ask
+      # HubSpot and Salesforce which instance this candidate was qualified
+      # against. Without them the step fails on three facts that have nothing to
+      # do with the receipt -- which is what it did the first time it was ever
+      # reached, with the receipt written and verified in the two steps above.
+      - name: MIGRATION_CORE_RELEASE_CANDIDATE
+        env:
+          KAURO_RECEIPT_PATH: ${{ runner.temp }}/ci-receipt.json
+          GITHUB_TOKEN: ${{ github.token }}
+          HUBSPOT_TOKEN: ${{ secrets.HUBSPOT_TOKEN }}
+          SF_CLIENT_ID: ${{ secrets.SF_CLIENT_ID }}
+          SF_CLIENT_SECRET: ${{ secrets.SF_CLIENT_SECRET }}
+          SF_LOGIN_URL: ${{ secrets.SF_LOGIN_URL }}
+        run: node tools/release-candidate-gate.mjs
+
+      # The receipt, kept where something outside this run can fetch it.
+      #
+      # It was not uploaded at all: the note here said an upload needed a third
+      # party action and no SHA had been read from that action's history, so the
+      # receipt was recoverable only by scrolling this job's log. A log is not
+      # durable evidence — it expires with the run's retention and cannot be
+      # hashed by anybody who was not looking at the time.
+      #
+      # actions/upload-artifact is GitHub's own, and the SHA below is v4.6.2
+      # resolved from the API rather than copied from a README:
+      # GET /repos/actions/upload-artifact/git/ref/tags/v4.6.2 answers
+      # ea165f8d65b6e75b540449e92b4886f43607fa02. The retention is stated rather
+      # than inherited, so how long this evidence lives is a decision in the file
+      # instead of a repository setting somebody can change without touching it.
+      - name: Upload the provisional receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-receipt-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+
+      # Its digest, in this job's log, so the artifact that is downloaded later
+      # can be shown to be the bytes this job wrote.
+      - name: The receipt's digest
+        shell: bash
+        run: |
+          node -e "const{createHash}=require('node:crypto');const{readFileSync}=require('node:fs');process.stdout.write('receipt sha256 '+createHash('sha256').update(readFileSync(process.env.RECEIPT)).digest('hex')+String.fromCharCode(10));"
+        env:
+          RECEIPT: ${{ runner.temp }}/ci-receipt.json
+
+      # WHAT THIS JOB DOES NOT ESTABLISH.
+      #
+      # It cannot attest its own conclusion. Every check above is about the other
+      # jobs of this run; this job's own check run is still in progress while it
+      # reads, and asking GitHub whether the run finished green from inside it is
+      # asking a question that cannot yet have an answer.
+      #
+      # So the receipt this job writes is provisional, and the final one is
+      # emitted by an observer outside the run: it downloads the artifact above,
+      # checks the bytes against the digest, reads the whole run back by its id
+      # — including this job's conclusion — and only then emits a receipt.
+      #
+      #   gh run download <run-id> --name ci-receipt-<sha> --dir <outside the tree>
+      #   node tools/receipt-verify.mjs --observe --receipt <that file>
+      #
+      # An observer that cannot reach the API, or that reads an incomplete page
+      # of check runs, reports NOT_VERIFIED. It does not fall back to the file.

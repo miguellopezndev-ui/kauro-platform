@@ -1,0 +1,168 @@
+{
+  "schemaVersion": "1.2.0",
+  "artifactKind": "MIGRATION_CORE_CANDIDATE_PROVENANCE",
+  "generator": "tools/candidate-provenance.mjs",
+  "coreVersion": "3.0.0",
+  "packageVersion": "3.0.0",
+  "packageFormatVersion": "2.1.0",
+  "sourceRegistryVersion": "2026-09-06",
+  "manifestDigest": "3c39cf5f8c18c88e6f09cb8d1934b751a415774c01017f61440a76157108acda",
+  "codeDigest": "8cea942d6bdb602b29a680867bbece25003576e1107371d181ab33b4c0f4f4f5",
+  "manifestFileCount": 632,
+  "digestSerialisationVersion": "2.0.0",
+  "exclusionRuleVersion": "1.4.0",
+  "dependencies": {
+    "runtime": {
+      "fflate": "0.8.3",
+      "libphonenumber-js": "1.13.12"
+    },
+    "development": {
+      "@types/node": "24.13.3",
+      "fast-check": "4.9.0",
+      "typescript": "5.9.3"
+    },
+    "lockfileSha256": "fda1e1dda7707a1e5da8948887d0b0c5bd0f268488e219478b0d9cbc79521891"
+  },
+  "authorities": [
+    "KAURO_PRODUCT_CONSTITUTION_V1",
+    "KAURO_MIGRATION_CORE_CANONICO_V1",
+    "KAURO_MIGRATION_CORE_HOJA_DE_RUTA_CIERRE_V1",
+    "KAURO_CUALIFICACION_INTEGRAL_CANONICO_V1"
+  ],
+  "researchSnapshot": {
+    "sourceRegistryVersion": "2026-09-06",
+    "note": "docs/SOURCE_REGISTRY.md carries the per-section review dates and what each fact is based on."
+  },
+  "capacityEvidence": [
+    {
+      "path": "qualification/capacity/clean-only.json",
+      "mode": "CLEAN_ONLY",
+      "profile": "FOUNDING-CLEAN-ONLY-1M",
+      "sourceRows": 1003000,
+      "result": "PASS",
+      "sha256": "c18e8d9ac1022bd93a7a621acc2580da6e13379279435db5b85c158540b69e24"
+    },
+    {
+      "path": "qualification/capacity/hubspot.json",
+      "mode": "HUBSPOT",
+      "profile": "FOUNDING-HUBSPOT-1M",
+      "sourceRows": 1003750,
+      "result": "PASS",
+      "sha256": "a8a111c1d59d59be37f8a4a852b6dc314b7637a7b37c6b2de11c24942158b191"
+    },
+    {
+      "path": "qualification/capacity/salesforce.json",
+      "mode": "SALESFORCE",
+      "profile": "FOUNDING-SALESFORCE-1M",
+      "sourceRows": 1003000,
+      "result": "PASS",
+      "sha256": "170550391a599a5a637af2f8873305fef5d0273c1ed064c49441f2e069122f12"
+    }
+  ],
+  "vendorEvidence": [
+    {
+      "path": "qualification/evidence/HUBSPOT_SCOPE_BLOCKER.md",
+      "gate": null,
+      "instance": null,
+      "boundTo": null,
+      "writtenBy": null,
+      "result": null,
+      "sha256": "2f54cb91630f8c41400f31dfd467a246b6c34a80ed79a256f82fe175f56ccd12"
+    },
+    {
+      "path": "qualification/evidence/SF_DATALOADER_AUTH.md",
+      "gate": null,
+      "instance": null,
+      "boundTo": null,
+      "writtenBy": null,
+      "result": null,
+      "sha256": "e8eb1c20e9ea66073a163262e601cece803f6402e358ab8e83adfb0986e5a819"
+    },
+    {
+      "path": "qualification/evidence/TENANT_SAFETY.md",
+      "gate": null,
+      "instance": null,
+      "boundTo": null,
+      "writtenBy": null,
+      "result": null,
+      "sha256": "4428b9c5b9ca47febb36d0ab18d029c2f9d5cf9c27f4392b640fdd0c1980c440"
+    },
+    {
+      "path": "qualification/evidence/determinism-cross-os.json",
+      "gate": "DETERMINISM-CROSS-OS-01",
+      "instance": null,
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "65f637670c3fff53c9eb312b11d7beaa138687781e8673b0cbb0b650f8b000a3"
+    },
+    {
+      "path": "qualification/evidence/final-adversarial.json",
+      "gate": "FINAL-ADV-01",
+      "instance": null,
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "c5a16adfdb21b4dcbd20589aa9d96f0acfd2639ec197b589478bff858759fa39"
+    },
+    {
+      "path": "qualification/evidence/hs-import.json",
+      "gate": "HSP-TARGET-01 (import)",
+      "instance": "i_85d7849b12c37767",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "9b31ec127c057500efd636874f4b4d0bb376d755d113534522d6351d02742718"
+    },
+    {
+      "path": "qualification/evidence/hs-target-contract.json",
+      "gate": "HSP-TARGET-01 (target contract)",
+      "instance": "i_85d7849b12c37767",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "24d14958a053318ed5901944fad4e55b2e4ed7c15f2a0bc97141d0549251077c"
+    },
+    {
+      "path": "qualification/evidence/sf-dataloader.json",
+      "gate": "SF-TARGET-01 (Data Loader operations)",
+      "instance": "i_fba18c99c632ea0d",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "5c8deb4cd5296347de3ab0d9cf3e1924b31a5009938ae1e6f138fff1f8156024"
+    },
+    {
+      "path": "qualification/evidence/sf-ocr.json",
+      "gate": "SF-OCR-01",
+      "instance": "i_fba18c99c632ea0d",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "ecbe76157c42580372c8ecb437fc1cce3c5d2c7292bce39e9a961211704e3cae"
+    },
+    {
+      "path": "qualification/evidence/sf-target-contract.json",
+      "gate": "SF-TARGET-01 (target contract)",
+      "instance": "i_fba18c99c632ea0d",
+      "boundTo": null,
+      "writtenBy": null,
+      "result": "PASS",
+      "sha256": "aafd3c8e093fd6346abe072bf5aecec30feb6b0740d4c7c6f725eae5fff3fb16"
+    }
+  ],
+  "supersedes": "migration-core-v1-provenance.json",
+  "knownExclusions": [
+    "No tag or release is created by this record. It identifies a candidate, and publishing one is a separate decision.",
+    "The full-stack CAPACITY-FOUNDING traversal named by KAURO_CUALIFICACION_INTEGRAL_CANONICO_V1 section 83 — upload authorization, object storage read-back, malware preflight, outbox — is not Migration Core’s and is not discharged here. What is discharged is the Migration-Core-shaped subset: a million representative source rows end to end in each mode, inside the founding budgets.",
+    "No external signature. A provenance signed with a key the same process generated would attest that the process ran, which nobody doubts. The post-merge receipt is written by CI, which is a different party.",
+    "No commit SHA and no git tree hash. Neither can be stated from inside the tree that contains this file; both are the receipt’s, and tools/receipt-verify.mjs is what checks them.",
+    "No runtime. This record is compared byte for byte across platforms, so the node version and the operating system it happened to be generated on cannot be in it: they differ between checkouts for reasons that are not the verdict, and a comparison that fails for reasons nobody can act on is a comparison somebody deletes. The platform claim belongs to the CI matrix and is carried by the receipt.",
+    "No freeze flag. This record used to carry MIGRATION_CORE_IMPLEMENTATION_FROZEN as a boolean literal, which made the flag a sentence in a file this same tree produces — and the architecture gate read it back as a fact. It is computed instead, outside the tree, by tools/freeze-verdict.mjs, from the merged commit, the external CI receipt, the branch protection actually in force, the tag, and the release assets as downloaded."
+  ],
+  "freezeDecision": {
+    "decidedBy": "tools/freeze-verdict.mjs",
+    "outsideTree": true,
+    "note": "A flag written here would be this tree describing itself as finished. The verdict is derived from the merged SHA, the external receipt, the ruleset, the tag and the downloaded release assets, and is published as a release asset beside them."
+  }
+}

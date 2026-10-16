@@ -1,0 +1,226 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-044-k02-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-044-k02-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "888ac4f10d8bdb04f188602bf24cacb2b01233fc7a73b2e4e469432af1f2a0b4",
+      "candidateSetHash": "ee7a883bafb09d7669094751c053c3ccc3f516ff54e59a23a0b7f0be7cd4e1f7",
+      "targetContractHash": null,
+      "projectRevisionHash": "0d1f9df77a20e8445c3a188f4c9829d321ea0e7066f4b2b8884d8b14ab0157b1"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_d1a861eaec396e75",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "ชื่อ",
+        "sourceFieldRef": "fld_4301692d885e14f3",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "เมือง",
+        "sourceFieldRef": "fld_310979889b1bd96f",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "อีเมล",
+        "sourceFieldRef": "fld_07b7bce65f168b63",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Colour tag ",
+        "sourceFieldRef": "fld_a33c0bf2d9ff5774",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.firstName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials",
+      "Colour tag "
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3ccbb0e425b7101e36e73a2a4fa4138e57c17d9eb4677d7ffb1b0751f7339add"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "KH",
+          "BW",
+          "FE",
+          "CP"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "ชื่อ",
+        "fieldRef": "src:ชื่อ",
+        "valueClass": "TEXT",
+        "values": [
+          " Hala  ",
+          " Norel ",
+          " Joria  ",
+          "\tTavia "
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "เมือง",
+        "fieldRef": "src:เมือง",
+        "valueClass": "TEXT",
+        "values": [
+          "\tNuvia  ",
+          " Quenby ",
+          "\tQuenby  ",
+          " Brandel "
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "อีเมล",
+        "fieldRef": "src:อีเมล",
+        "valueClass": "EMAIL",
+        "values": [
+          " tulis.kesell0@corp.example.test  ",
+          "\ttulia.soviko1@example.test ",
+          " sovel.mesenko2@sample.invalid  ",
+          " fino.risquist3@corp.example.test "
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Colour tag ",
+        "fieldRef": "src:Colour tag ",
+        "valueClass": "TEXT",
+        "values": [
+          " B2 ",
+          " A1 ",
+          " B4 ",
+          " B4 "
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:whitespace",
+      "lang:th"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_aff545be5cfc",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "ชื่อ",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_9086381e9e14",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "เมือง",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_9534da47dfe8",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "อีเมล",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_ad8edec9a0b09253a67e06ab",
+    "kc_b223688972ae3c5b9a034bc9"
+  ]
+}

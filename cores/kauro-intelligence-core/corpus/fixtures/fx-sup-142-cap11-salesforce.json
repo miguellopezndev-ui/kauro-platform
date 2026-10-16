@@ -1,0 +1,262 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-142-cap11-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-142-cap11-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5b427b036cc271acc1b49a7b99572fe0e4115c80b327cfe30669c7e18875aaa0",
+      "candidateSetHash": "e5f2418e48fd9d0d706f88ad828db4db06e36db9cd13508d841295d8be41317d",
+      "targetContractHash": "tc_53d5433ae725fb34eacb3518d844987cc953244d8e8dceb285a46fbd6d8c867d",
+      "projectRevisionHash": "225c7204b3111c453dd839cb4d29ae4cc06590b22ea8e53b98532addddaede3e"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_cc905f2922aa2ccf",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "State",
+        "sourceFieldRef": "fld_e8a4ce498e244241",
+        "decision": "MAP",
+        "destinationField": "lead.state"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_a97f533dfa696aef",
+        "decision": "MAP",
+        "destinationField": "lead.country"
+      },
+      {
+        "sourceHeader": "Postal code",
+        "sourceFieldRef": "fld_86ca321dcbbb92ba",
+        "decision": "MAP",
+        "destinationField": "lead.postalCode"
+      },
+      {
+        "sourceHeader": "City - src",
+        "sourceFieldRef": "fld_2319454167755b73",
+        "decision": "MAP",
+        "destinationField": "lead.city"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_f7f6bf47b1b09051",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.city",
+      "lead.company",
+      "lead.country",
+      "lead.email",
+      "lead.lastName",
+      "lead.mobilePhone",
+      "lead.postalCode",
+      "lead.state",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "f93f5ed9612f249208f203798e670ed8dd0bc10a164e75d6ce34f9672f19d64b"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Yanova",
+          "Wilmar",
+          "Norero",
+          "Kesenko",
+          "Vexmar",
+          "Darunda"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "State",
+        "fieldRef": "src:State",
+        "valueClass": "TEXT",
+        "values": [
+          "Central",
+          "Central",
+          "North",
+          "Upland",
+          "Coastal",
+          "North"
+        ],
+        "decision": "MAP",
+        "destination": "lead.state"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "Valdoria",
+          "Estmark",
+          "Valdoria",
+          "Valdoria",
+          "Norvania",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "lead.country"
+      },
+      {
+        "header": "Postal code",
+        "fieldRef": "src:Postal code",
+        "valueClass": "TEXT",
+        "values": [
+          "90140",
+          "38863",
+          "23755",
+          "73502",
+          "18541",
+          "45864"
+        ],
+        "decision": "MAP",
+        "destination": "lead.postalCode"
+      },
+      {
+        "header": "City - src",
+        "fieldRef": "src:City - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Kelmar",
+          "Quenby",
+          "Valmora",
+          "Kelmar",
+          "Brandel",
+          "Tessin"
+        ],
+        "decision": "MAP",
+        "destination": "lead.city"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-24",
+          "batch-21",
+          "batch-2",
+          "batch-1",
+          "batch-24",
+          "batch-32"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_1311169fc44d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "City - src",
+        "targetField": "lead.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_1eea214b54088e899a59f2a0",
+    "kc_c0549bab0e4f2cd5e559b1d2"
+  ]
+}

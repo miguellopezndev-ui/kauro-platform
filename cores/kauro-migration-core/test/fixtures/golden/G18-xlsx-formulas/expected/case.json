@@ -1,0 +1,32 @@
+{
+  "id": "G18",
+  "title": "Workbook formulas and date serials",
+  "intent": "One row's Display Name is a formula. The engine never evaluates it, and the configuration has not authorised delivering the value the spreadsheet cached, so the row is set aside with the formula recorded as provenance. Both rows' date serials are read from the workbook's own date formatting, which is evidence the file itself carries.",
+  "expect": {
+    "rows": { "total": 2, "OUTPUT": 1, "MERGED_PROVEN": 0, "ISOLATED": 1, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 1, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 2,
+    "flags": 1,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [
+    { "row": "contacts.xlsx#2", "field": "contact.createdAt", "from": "45001", "to": "2023-03-16", "reasonCode": "TRANSFORM_DATE_FROM_SPREADSHEET_SERIAL" },
+    { "row": "contacts.xlsx#3", "field": "contact.createdAt", "from": "45002", "to": "2023-03-17", "reasonCode": "TRANSFORM_DATE_FROM_SPREADSHEET_SERIAL" }
+  ],
+  "flagDetails": [
+    { "row": "contacts.xlsx#2", "field": "custom:Display Name", "outcome": "UNSUPPORTED", "preserved": "Ada Lovelace", "reasonCode": "TRANSFORM_FORMULA_CACHED_VALUE_NOT_AUTHORIZED", "blockedDelivery": true }
+  ],
+  "dispositions": [
+    { "row": "contacts.xlsx#2", "disposition": "ISOLATED", "reasonCode": "ISOLATED_FORMULA_CACHED_VALUE" },
+    { "row": "contacts.xlsx#3", "disposition": "OUTPUT" }
+  ],
+  "delivered": [
+    { "sourceRecordId": "2", "values": { "contact.createdAt": "2023-03-17", "custom:Display Name": "Alan Turing" } }
+  ]
+}

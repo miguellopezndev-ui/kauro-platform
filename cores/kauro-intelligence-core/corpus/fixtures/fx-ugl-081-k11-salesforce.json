@@ -1,0 +1,182 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-081-k11-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-081-k11-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0a6196f6a909d57e32ed0b1581792e7b0bb25222f729ecaac3a425f741305513",
+      "candidateSetHash": "1298b9a52657dfbf6eeab06d3c95ad1383f1a7ab0d081af1e59481d639ef5c90",
+      "targetContractHash": "tc_b40d38f22044aff7016b7d1a2dbc2c629adaf17a13e57b6f146aa4b7c50ab2bd",
+      "projectRevisionHash": "d1c3393663bdb0ee0a0c8582932b9ab7ff70f313a2dd2437580ce31d4106c2af"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "TELEFONO",
+        "sourceFieldRef": "fld_d9827863fea9bd78",
+        "decision": "MAP",
+        "destinationField": "contact.phone"
+      },
+      {
+        "sourceHeader": "eMail (principal)",
+        "sourceFieldRef": "fld_dba3f68213887f54",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Prénom*",
+        "sourceFieldRef": "fld_0a70abcb3629c85f",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "8c33a09119f74a76bf4f9a5f655ca856b7f2bb1b19e25438e752bf06edbecf55"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "TELEFONO",
+        "fieldRef": "src:TELEFONO",
+        "valueClass": "PHONE",
+        "values": [
+          "(202) 555-0166",
+          "(202) 555-0174",
+          "+1-202-555-0124"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone"
+      },
+      {
+        "header": "eMail (principal)",
+        "fieldRef": "src:eMail (principal)",
+        "valueClass": "EMAIL",
+        "values": [
+          "kesan.jorquist0@sample.invalid",
+          "tavan.dardell1@corp.example.test",
+          "zerel.sovsorin2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Prénom*",
+        "fieldRef": "src:Prénom*",
+        "valueClass": "TEXT",
+        "values": [
+          "Risia",
+          "Wilan",
+          "Yano"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:header-variants",
+      "lang:de"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_35b5ed6f3100",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Prénom*",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_aab83e62dde6bf5ee10ed17e",
+    "kc_39e7a3a313c22839f899905e"
+  ]
+}

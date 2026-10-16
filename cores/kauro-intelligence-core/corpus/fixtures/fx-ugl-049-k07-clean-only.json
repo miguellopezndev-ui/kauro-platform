@@ -1,0 +1,139 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-049-k07-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-049-k07-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "24705e43ca9ea5c7875c5f5e04d3f0be64852e04174286c14198f2387c9e8cc3",
+      "candidateSetHash": "7273bbc3e8fe33240adc9bf26bc4d7e25f431fe330cf2567784ed8a37c8c9e1e",
+      "targetContractHash": null,
+      "projectRevisionHash": "c955ac81fcc3d5bfd9b409aebbcfd3c7c2ca8c3533c4d751c8a08162690a06c6"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_a0effbfb1520c394",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "דוא״ל",
+        "sourceFieldRef": "fld_e00b51ac18f6d8a1",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Lifecycle (old CRM)",
+        "sourceFieldRef": "fld_3448b75554b2ce02",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.legacyScore"
+    ],
+    "expectedTargetUniverse": [
+      "contact.email"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "9688fb97a73473fb28eed697e38a9cda3e805a6c4af1fbac81fbcfc763e5d3da"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "B-77",
+          "C-2",
+          "A-49"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "דוא״ל",
+        "fieldRef": "src:דוא״ל",
+        "valueClass": "EMAIL",
+        "values": [
+          "orvis.darenko0@sample.invalid",
+          "belis.tavaly1@corp.example.test",
+          "orvo.finanth2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Lifecycle (old CRM)",
+        "fieldRef": "src:Lifecycle (old CRM)",
+        "valueClass": "MIXED",
+        "values": [
+          "38",
+          "13",
+          "48"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.legacyScore"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-target",
+      "lang:he",
+      "ugly:stale-header"
+    ]
+  },
+  "canaries": [
+    "kc_32f13173012babafd8d9e3cb",
+    "kc_ad3b1145fc6bcf2f8a87c18a"
+  ]
+}

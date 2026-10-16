@@ -1,0 +1,184 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-040-cap05-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-040-cap05-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "c32807691a721cf724052a5b9664480b49d6e9b09ff399904ff0a8b517292fe1",
+      "candidateSetHash": "3f076a11fa45d4e76870ad29ed817bd00c380805ea9379a641569aa13af0e523",
+      "targetContractHash": null,
+      "projectRevisionHash": "b58e53721d6fc9231f2d43a1aa285eafd6a0d7247480e2a0ef63c7e6ff43dff8"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Nachname",
+        "sourceFieldRef": "fld_f865bf703bc2529d",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Kontaktstatus",
+        "sourceFieldRef": "fld_83de478f57d2dc53",
+        "decision": "MAP",
+        "destinationField": "lead.status",
+        "requiredEvidenceRefs": [
+          "ev_598f6c9764540a58"
+        ]
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_b1ed19f5cd0e4a91",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_140158cf9855544a",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.lastName",
+      "lead.status"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run",
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "be4eaaf380208c0739b72596310dd737f75365d309055ddf0ff4928b88432f95"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Nachname",
+        "fieldRef": "src:Nachname",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelsorin",
+          "Darvik",
+          "Norquist"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Kontaktstatus",
+        "fieldRef": "src:Kontaktstatus",
+        "valueClass": "ENUM",
+        "values": [
+          "Dead",
+          "Working",
+          "Open",
+          "Dead",
+          "Working",
+          "Open",
+          "Dead",
+          "Working"
+        ],
+        "decision": "MAP",
+        "destination": "lead.status",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "6",
+          "1",
+          "9"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-17",
+          "batch-16",
+          "batch-30"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_4b81eb8c973d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nachname",
+        "targetField": "lead.lastName"
+      },
+      {
+        "memoryId": "memconv_129c8660fe3d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Kontaktstatus",
+        "targetField": "lead.status"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_4f7556dea9ea78394f4322c4",
+    "kc_3dd37407e98102e1b55d67ce"
+  ]
+}

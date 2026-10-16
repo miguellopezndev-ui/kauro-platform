@@ -1,0 +1,118 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-046-k01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-046-k01-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0b639a8d13b351fad34cb2ad0239768d4b2a27c778f8da8269aff503b3152c79",
+      "candidateSetHash": "6e9916440ca74603f6ab3d300203b3fad2b8be0da4a9d22ceef8161ea16d5f77",
+      "targetContractHash": null,
+      "projectRevisionHash": "4f1a8fcf18b7ddfdbc767c68e4fe166fa78308ae60af29b732950a0af51910d0"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Cellulare",
+        "sourceFieldRef": "fld_3d72fcd1cf1ad356",
+        "decision": "MAP",
+        "destinationField": "contact.mobilePhone"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.companyName",
+      "contact.mobilePhone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "5f97eb77a2510eeab47efbfdbc5f8b73b49d673c0196535ea5e5873720cc2e32"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Cellulare",
+        "fieldRef": "src:Cellulare",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0167",
+          "202-555-0144",
+          "202-555-0146",
+          "202-555-0171",
+          "7700 900235",
+          "7700 900421"
+        ],
+        "decision": "MAP",
+        "destination": "contact.mobilePhone"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:phone-region"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_70cb8e977848",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cellulare",
+        "targetField": "contact.mobilePhone"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_49abb65a73a1b647f6c55683",
+    "kc_4698b01c97f7c4e038373e67"
+  ]
+}

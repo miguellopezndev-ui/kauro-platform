@@ -1,0 +1,178 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-123-cap04-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-123-cap04-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9e729a3642b01514478569db581afcb0b4496da6de8a3e74b14724e6f8381f38",
+      "candidateSetHash": "f5ad30b2fc1e21c863903fa7f92ab7bffafbdc4d7c5e520ebcf65c421d4c65be",
+      "targetContractHash": "tc_31875416f34ebd060f89002c624e0a1c1ba6a9f3579ad98ed0b44d6ff8336e5c",
+      "projectRevisionHash": "800ab3890c5cc5f4907107215ace156b5be496767843bda61113f7768685300c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_129ce87e0e52a11c",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount",
+        "transformPrimitive": "NORMALISE_NUMBER",
+        "typedTransformParams": {
+          "decimalSeparator": ","
+        }
+      },
+      {
+        "sourceHeader": "Phone",
+        "sourceFieldRef": "fld_54199f84cf816cdd",
+        "decision": "MAP",
+        "destinationField": "company.phone",
+        "transformPrimitive": "PARSE_PHONE_E164",
+        "typedTransformParams": {
+          "defaultRegion": "US"
+        }
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_94017dffe8f8fc4f",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.employeeCount",
+      "company.industry",
+      "company.phone",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "5baa10f7530873494088acb939d7f7892d2212a851a79ca9707bb3d37bd03649"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY",
+      "locale": {
+        "defaultRegion": "US"
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "NUMBER",
+        "values": [
+          "33065,11",
+          "51170,86",
+          "46305,79",
+          "13680,35"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount",
+        "transform": "NORMALISE_NUMBER",
+        "params": {
+          "decimalSeparator": ","
+        }
+      },
+      {
+        "header": "Phone",
+        "fieldRef": "src:Phone",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0181",
+          "202-555-0138",
+          "202-555-0139",
+          "202-555-0145"
+        ],
+        "decision": "MAP",
+        "destination": "company.phone",
+        "transform": "PARSE_PHONE_E164",
+        "params": {
+          "defaultRegion": "US"
+        }
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "CK",
+          "HC",
+          "LG",
+          "JW"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_6379a22aeec03854f11526cf",
+    "kc_cca52c1f059c2699549149f8"
+  ]
+}

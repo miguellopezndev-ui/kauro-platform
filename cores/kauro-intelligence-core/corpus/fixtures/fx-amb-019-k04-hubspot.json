@@ -1,0 +1,171 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-019-k04-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-019-k04-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "fe4639a889991202cd99b74ca5b3f1f32e69da7137f205dc7aea64fdf82957a0",
+      "candidateSetHash": "89c6299d6b7bd0f2820bc409ab8051fcf860669cac385324b889909dcfe46985",
+      "targetContractHash": "tc_fff20aba3f1a1610a8493c39011152ab897643094daf04cd74025fc291ab21cc",
+      "projectRevisionHash": "97eab31610d0ad155aca15a3e09cdbbb8d15b7d77ee8a30911d01b9ba68f3ebd"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_9e3473317060cbbd",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_52f15d53d98711e6",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Naam/bedrijf",
+        "sourceFieldRef": "fld_e7f9a3cdcd699d1f",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.name",
+      "company.source_id",
+      "contact.email",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "05d65e374faa3fd4c57ebc6a729406e85c13c5ae4ec8b0262ca2a2a1ac4f518c"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Kesenko",
+          "Jorquist",
+          "Kesquist",
+          "Vexunda",
+          "Risell",
+          "Quelaly"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "risek.wildell0@example.test",
+          "wilel.mesrane1@example.test",
+          "joran.halsorin2@corp.example.test",
+          "finan.sovrane3@sample.invalid",
+          "orvo.orvell4@example.test",
+          "noro.darquist5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Naam/bedrijf",
+        "fieldRef": "src:Naam/bedrijf",
+        "valueClass": "TEXT",
+        "values": [
+          "Mesa Darova",
+          "Zerath Partners LLC",
+          "Vexis Finenko",
+          "Vexorin Logistics SAS",
+          "Zerel Sovdell",
+          "Tulorin Studio Ltd"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:person-or-company"
+    ]
+  },
+  "canaries": [
+    "kc_25a1cdfa40346ece089719ff",
+    "kc_cfd6534a731ff6462928432c"
+  ]
+}

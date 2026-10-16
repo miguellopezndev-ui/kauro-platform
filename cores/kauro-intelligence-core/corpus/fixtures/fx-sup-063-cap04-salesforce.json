@@ -1,0 +1,208 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-063-cap04-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-063-cap04-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "648f01ba3e4f86fe68618eddaf0c62c640ee4f665168971f8dd80cb5f03e5e00",
+      "candidateSetHash": "6170ea996d714ecb82a5d8e6aca28ba94a7a26994d741bdf1e9cc09bae6f17d5",
+      "targetContractHash": "tc_2e82f0a5b93f649706c0aa82705a60f6aa2fa336c1bf242ed3479fcacf2e5086",
+      "projectRevisionHash": "235250ad434d1257e1b08835dda95becfabcacd49906837cf616236dd3b7243c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Teléfono",
+        "sourceFieldRef": "fld_20f3a1e529d69b9a",
+        "decision": "MAP",
+        "destinationField": "company.phone",
+        "transformPrimitive": "PARSE_PHONE_E164",
+        "typedTransformParams": {
+          "defaultRegion": "US"
+        }
+      },
+      {
+        "sourceHeader": "Label (CRM)",
+        "sourceFieldRef": "fld_a54edc869c768142",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Empleados",
+        "sourceFieldRef": "fld_a5178f3d8d76df8f",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount",
+        "transformPrimitive": "NORMALISE_NUMBER",
+        "typedTransformParams": {
+          "decimalSeparator": ","
+        }
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.country",
+      "company.description",
+      "company.employeeCount",
+      "company.name",
+      "company.phone",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "f6b53690a26d98413d671fde23a71d30bd1feadb030fb7f5b92dd1bee918a32d"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY",
+      "locale": {
+        "defaultRegion": "US"
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Teléfono",
+        "fieldRef": "src:Teléfono",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0173",
+          "202-555-0172",
+          "202-555-0193",
+          "202-555-0186",
+          "202-555-0127",
+          "202-555-0129"
+        ],
+        "decision": "MAP",
+        "destination": "company.phone",
+        "transform": "PARSE_PHONE_E164",
+        "params": {
+          "defaultRegion": "US"
+        }
+      },
+      {
+        "header": "Label (CRM)",
+        "fieldRef": "src:Label (CRM)",
+        "valueClass": "TEXT",
+        "values": [
+          "  Lumaly Systems S.L.",
+          "Joraly Systems B.V. ",
+          "  Zerova Works Ltd",
+          "Jorrane Works Inc. ",
+          "  Orvmar Studio GmbH",
+          "Lumorin Foods SAS "
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Empleados",
+        "fieldRef": "src:Empleados",
+        "valueClass": "NUMBER",
+        "values": [
+          "35982,93",
+          "41574,33",
+          "97359,58",
+          "69911,13",
+          "52028,80",
+          "19194,77"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount",
+        "transform": "NORMALISE_NUMBER",
+        "params": {
+          "decimalSeparator": ","
+        }
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_54d5bb615584",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Label (CRM)",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_27a0e49eebda27bc34134c13",
+    "kc_eefa43b0fbad63ac515b9baa"
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-058-k13-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-058-k13-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2d2e68a3903c080fa4a107ec4004407150d0386979e142e4cf38c9e5f0fbeac4",
+      "candidateSetHash": "d2fd8bd676da23d45a2522ddc66151abfe344f6d127ca0c64f717dbec33d2b73",
+      "targetContractHash": null,
+      "projectRevisionHash": "858b68b070000aadf54e5319810f0a488c6c77bfdbcf8da511c50c102d5de83c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_0ff171fd17bd8edc",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Chiffre d'affaires + currency",
+        "sourceFieldRef": "fld_09d82e37d58b5da9",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.country",
+      "company.employeeCount",
+      "company.industry",
+      "company.state"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "dbbba08244fa1efb61b3947683e547a96fb3140923ff5f70bfdf3c2a957ce6e7"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Industry",
+        "fieldRef": "src:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Logistics",
+          "Packaging",
+          "Textiles",
+          "Logistics",
+          "Textiles"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Chiffre d'affaires + currency",
+        "fieldRef": "src:Chiffre d'affaires + currency",
+        "valueClass": "MIXED",
+        "values": [
+          "€9,875",
+          "$6,121",
+          "£8,320",
+          "€2,860",
+          "$5,516"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:mixed-currency"
+    ]
+  },
+  "canaries": [
+    "kc_243d06aca2df8b6deeba3f20",
+    "kc_d86b5d31e9a6c05dc45fced3"
+  ]
+}

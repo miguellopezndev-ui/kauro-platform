@@ -1,0 +1,139 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-085-k01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-085-k01-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "c0546905787b280c99e3e2b3a43238ec321db4aabb67be225d78d6d0f60a0753",
+      "candidateSetHash": "67e36675d5497bf72b54c50a6358a8aff112ef1ac01f71981ad82e94ec4cc30d",
+      "targetContractHash": null,
+      "projectRevisionHash": "f6b5d5b8664a7959a8b79185e21a9791db6a2409bf50c162e620500535f242c1"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Close date",
+        "sourceFieldRef": "fld_4d0aa2e93d210379",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_4bc631f50896a363",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.currency"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "11b16b84fb67b21c342fe1110722dafd9b530d490a80d38947b39282743ce7a5"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Close date",
+        "fieldRef": "src:Close date",
+        "valueClass": "MIXED",
+        "values": [
+          "2025-05-15",
+          "23-02-2019",
+          "01/13/2022",
+          "2019-07-22",
+          "24-05-2018",
+          "04/16/2024",
+          "2025-07-26",
+          "28-08-2022"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L37300",
+          "L10154",
+          "L96071",
+          "L75076",
+          "L72600",
+          "L31792"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:mixed-dates",
+      "lang:tr",
+      "ugly:mixed-date-formats"
+    ]
+  },
+  "canaries": [
+    "kc_049e500d8715b4b63d3df620",
+    "kc_0f16880cf0bbcdf4cf1e9be8"
+  ]
+}

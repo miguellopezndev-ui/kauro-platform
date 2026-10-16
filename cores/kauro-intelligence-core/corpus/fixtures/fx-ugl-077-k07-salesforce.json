@@ -1,0 +1,182 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-077-k07-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-077-k07-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "b2798f8bf6ffff3a1900907e35da33c2b007ef6a1004519280d621b0bfa693f1",
+      "candidateSetHash": "17458b9d23a95070bc506cf0fb9b65d1e8763185fc429d66b9bb7d4324837308",
+      "targetContractHash": "tc_1371c47c853d152aaab0a7b9128dc54deec6f135ca3fde8d6a09ee27057ee4ab",
+      "projectRevisionHash": "38082c0a925614bdaa5e48ea10c1bcb0ab360ee4f4323a90252ad04e23a63ea3"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Miasto",
+        "sourceFieldRef": "fld_43ce5283084bd9af",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Legacy score",
+        "sourceFieldRef": "fld_66806ae889aa5384",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_cfbde1a7e69a500d",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "deal.pipeline"
+    ],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.lastName",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "4c746b65392b4af4c18bd402c83b73c97d0a46525c3aa9deef54c5012db2751d"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Miasto",
+        "fieldRef": "src:Miasto",
+        "valueClass": "TEXT",
+        "values": [
+          "Quenby",
+          "Kelmar",
+          "Nuvia",
+          "Orvale",
+          "Tessin",
+          "Nuvia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Legacy score",
+        "fieldRef": "src:Legacy score",
+        "valueClass": "MIXED",
+        "values": [
+          "58",
+          "13",
+          "76",
+          "33",
+          "89",
+          "30"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L29015",
+          "L97130",
+          "L11685",
+          "L40872",
+          "L23452",
+          "L26448"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "deal.pipeline"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-target",
+      "lang:pl",
+      "ugly:stale-header"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_ad3e13bdb924",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Miasto",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_5e39283f1995f21c3aa791aa",
+    "kc_e49fdc6041d6e3392c3ffee1"
+  ]
+}

@@ -1,0 +1,172 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-036-cap01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-036-cap01-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "8a7711aaf8248c39191c76bd41a7e840dd71b9548253e75107e5eee6cd5bfffc",
+      "candidateSetHash": "bd3e2847f944a3e8ca335d7340f7d3f73eaad2c114dcf8c3f2ec4deedf1ac95a",
+      "targetContractHash": null,
+      "projectRevisionHash": "eeb140077423156c310483988e6c1dc52d6c4b0721e1d8b6e46c2b413d40f6b3"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Cognome (CRM)",
+        "sourceFieldRef": "fld_4d0fa24c4bfdba60",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Stato del contatto [v2]",
+        "sourceFieldRef": "fld_a9754bea9b17aa2d",
+        "decision": "MAP",
+        "destinationField": "lead.status"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.ownerEmail",
+      "deal.pipeline",
+      "deal.stage",
+      "lead.lastName",
+      "lead.status"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "12c00dceec3e265528e957ee2407553ae9dc1ce220662ed7e5aa7e2eaa5a8b75"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Cognome (CRM)",
+        "fieldRef": "src:Cognome (CRM)",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumvik",
+          "Sovanth",
+          "Darunda",
+          "Tulsorin",
+          "Kesrane",
+          "Tavorin"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Stato del contatto [v2]",
+        "fieldRef": "src:Stato del contatto [v2]",
+        "valueClass": "ENUM",
+        "values": [
+          "Working",
+          "Open",
+          "Dead",
+          "Working",
+          "Open",
+          "Dead"
+        ],
+        "decision": "MAP",
+        "destination": "lead.status"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_1c907980a3f5",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cognome (CRM)",
+        "targetField": "lead.lastName"
+      },
+      {
+        "memoryId": "memconv_ef87a4fc02f4",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Stato del contatto [v2]",
+        "targetField": "lead.status"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_f657cd3e52613c9873f31479",
+    "kc_0a1ccc031a07512ce9633160"
+  ]
+}

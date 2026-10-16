@@ -1,0 +1,347 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-037-cap02-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-037-cap02-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "43b822ee9fa7b0ff4f7325e38f3dbbd20cb1e1c9d9172f22f5eb1b02916a3c73",
+      "candidateSetHash": "02256a094d63a3101a6d6dac15875e8c60073da1b61c0d73ce01888ce6ed3cc1",
+      "targetContractHash": null,
+      "projectRevisionHash": "430a957a06f7439349824775ad8f4b3758f0452da702a2137bcb55230dc4b0c1"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Indirizzo email",
+        "sourceFieldRef": "fld_8f0b8f9d1edbc1ec",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Nome",
+        "sourceFieldRef": "fld_a2b326a32d570c22",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Indirizzo",
+        "sourceFieldRef": "fld_1dccd78503213d90",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "Ruolo",
+        "sourceFieldRef": "fld_f699fb6dac6cf8d4",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Sito web",
+        "sourceFieldRef": "fld_33e6d58349c91729",
+        "decision": "MAP",
+        "destinationField": "contact.website"
+      },
+      {
+        "sourceHeader": "CAP",
+        "sourceFieldRef": "fld_e058c07d6267a06a",
+        "decision": "MAP",
+        "destinationField": "contact.postalCode"
+      },
+      {
+        "sourceHeader": "Telefono",
+        "sourceFieldRef": "fld_e81a5c49ed4a362e",
+        "decision": "MAP",
+        "destinationField": "contact.phone",
+        "allowedDestinationFields": [
+          "contact.phone",
+          "contact.mobilePhone"
+        ]
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_83883e1eadf2629e",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.marketingConsent",
+      "contact.mobilePhone",
+      "contact.ownerEmail",
+      "contact.phone",
+      "contact.postalCode",
+      "contact.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "dd3fdcaaf63d889e795039299ae14c1854e3d6f9fe3f8bb94926306aeb6f3f91"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "marketingConsent",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Indirizzo email",
+        "fieldRef": "src:Indirizzo email",
+        "valueClass": "EMAIL",
+        "values": [
+          "yanek.tavanth0@sample.invalid",
+          "tulel.sovsorin1@sample.invalid",
+          "zera.yanvik2@sample.invalid",
+          "tulia.quelath3@example.test",
+          "vexis.pelenko4@sample.invalid",
+          "tulia.messorin5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Nome",
+        "fieldRef": "src:Nome",
+        "valueClass": "TEXT",
+        "values": [
+          "Kesek",
+          "Joro",
+          "Vexia",
+          "Daro",
+          "Yano",
+          "Dara"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Indirizzo",
+        "fieldRef": "src:Indirizzo",
+        "valueClass": "TEXT",
+        "values": [
+          "191 Mesunda Street",
+          "117 Jorath Street",
+          "159 Queldell Street",
+          "161 Wilaly Street",
+          "57 Quelath Street",
+          "90 Zerrane Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "Ruolo",
+        "fieldRef": "src:Ruolo",
+        "valueClass": "TEXT",
+        "values": [
+          "Controller",
+          "Account manager",
+          "Operations lead",
+          "Site engineer",
+          "Site engineer",
+          "Buyer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Sito web",
+        "fieldRef": "src:Sito web",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.sovquist-works.test",
+          "https://www.norenko-group.test",
+          "https://www.norrane-labs.test",
+          "https://www.risenko-foods.test",
+          "https://www.norath-logistics.test",
+          "https://www.mesanth-group.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.website"
+      },
+      {
+        "header": "CAP",
+        "fieldRef": "src:CAP",
+        "valueClass": "TEXT",
+        "values": [
+          "  23156",
+          "61395 ",
+          "  60370",
+          "18603 ",
+          "  30590",
+          "32268 "
+        ],
+        "decision": "MAP",
+        "destination": "contact.postalCode"
+      },
+      {
+        "header": "Telefono",
+        "fieldRef": "src:Telefono",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550162",
+          "+12025550148",
+          "+12025550176",
+          "+12025550190",
+          "+12025550153",
+          "+12025550187"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone",
+        "alternatives": [
+          "contact.mobilePhone"
+        ]
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "A-74",
+          "A-86",
+          "C-4",
+          "A-8",
+          "B-27",
+          "B-83"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_3b9893904590",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nome",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_244b169931ea",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Indirizzo",
+        "targetField": "contact.addressLine1"
+      },
+      {
+        "memoryId": "memconv_8c41b807fc7b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ruolo",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_0c647644e934",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "CAP",
+        "targetField": "contact.postalCode"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_6dd6cf775cd1c5bb1001f6e3",
+    "kc_f5b117bce3edfa102db4bb90"
+  ]
+}

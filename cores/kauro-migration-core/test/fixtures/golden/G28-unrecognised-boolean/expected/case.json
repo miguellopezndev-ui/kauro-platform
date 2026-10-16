@@ -1,0 +1,30 @@
+{
+  "id": "G28",
+  "title": "A boolean spelling the configuration does not recognise",
+  "intent": "The column declares Y and N as its true and false spellings. The third row holds the literal word \"true\", which is not one of them, so the value could not be read and is preserved exactly. It must not be rewritten into the destination's spelling afterwards: the whole point of preserving it was that the engine did not know what it meant.",
+  "expect": {
+    "rows": { "total": 3, "OUTPUT": 3, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 3, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 2,
+    "flags": 1,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [
+    { "row": "contacts.csv#2", "field": "custom:Opted In", "from": "Y", "to": "True", "reasonCode": "TRANSFORM_BOOLEAN_PARSED" },
+    { "row": "contacts.csv#3", "field": "custom:Opted In", "from": "N", "to": "False", "reasonCode": "TRANSFORM_BOOLEAN_PARSED" }
+  ],
+  "flagDetails": [
+    { "row": "contacts.csv#4", "field": "custom:Opted In", "outcome": "INVALID", "preserved": "true", "reasonCode": "TRANSFORM_BOOLEAN_UNRECOGNIZED", "blockedDelivery": false }
+  ],
+  "delivered": [
+    { "sourceRecordId": "C-1", "values": { "custom:Opted In": "True" } },
+    { "sourceRecordId": "C-2", "values": { "custom:Opted In": "False" } },
+    { "sourceRecordId": "C-3", "values": { "custom:Opted In": "true" } }
+  ]
+}

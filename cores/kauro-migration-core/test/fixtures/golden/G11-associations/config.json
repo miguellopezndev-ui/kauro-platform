@@ -1,0 +1,157 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g11-associations"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "contacts",
+      "path": "contacts.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "companies",
+      "path": "companies.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "deals",
+      "path": "deals.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "contactdeals",
+      "path": "contact-deals.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL"
+        }
+      ]
+    },
+    {
+      "id": "companies",
+      "fileId": "companies",
+      "object": "COMPANY",
+      "sourceRecordIdColumn": {
+        "header": "Company ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "Name"
+          },
+          "destinationField": "company.name",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Domain"
+          },
+          "destinationField": "company.domain",
+          "semanticType": "TEXT"
+        }
+      ]
+    },
+    {
+      "id": "deals",
+      "fileId": "deals",
+      "object": "DEAL",
+      "sourceRecordIdColumn": {
+        "header": "Deal ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "Deal Name"
+          },
+          "destinationField": "deal.name",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Amount"
+          },
+          "destinationField": "deal.amount",
+          "semanticType": "NUMBER",
+          "options": {
+            "decimalSeparator": ".",
+            "thousandsSeparator": "NONE"
+          }
+        }
+      ]
+    }
+  ],
+  "associations": [
+    {
+      "id": "contact-company",
+      "kind": "COLUMN_REFERENCE",
+      "recordMappingId": "contacts",
+      "relationshipType": "CONTACT_TO_COMPANY",
+      "keyColumn": {
+        "header": "Company ID"
+      },
+      "targetRecordMappingId": "companies",
+      "targetMatchKey": "SOURCE_RECORD_ID"
+    },
+    {
+      "id": "company-deal",
+      "kind": "COLUMN_REFERENCE",
+      "recordMappingId": "deals",
+      "relationshipType": "COMPANY_TO_DEAL",
+      "ownerSide": "TO",
+      "keyColumn": {
+        "header": "Company ID"
+      },
+      "targetRecordMappingId": "companies",
+      "targetMatchKey": "SOURCE_RECORD_ID"
+    },
+    {
+      "id": "contact-deal",
+      "kind": "EDGE_FILE",
+      "fileId": "contactdeals",
+      "relationshipType": "CONTACT_TO_DEAL",
+      "fromRecordMappingId": "contacts",
+      "fromKeyColumn": {
+        "header": "Contact ID"
+      },
+      "toRecordMappingId": "deals",
+      "toKeyColumn": {
+        "header": "Deal ID"
+      }
+    }
+  ]
+}

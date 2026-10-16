@@ -1,0 +1,354 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-055-cap08-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-055-cap08-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "65415747f5e376607f8879ebb9d51acd13e8060012445d12749f3c2835653e30",
+      "candidateSetHash": "5bd6efafa019256211516885c4d935b6352d4ee08cd2677d754df9badb7e5032",
+      "targetContractHash": "tc_47535b0a0f3ca75aa15baceccacf32fa68299bbccb15bc02a604c0f2c9c18491",
+      "projectRevisionHash": "0e502e101b7577e69649c37a705cfefc9a1778e9a908f3bf6760b7646f8ecf20"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_44d256ae592f5bfb",
+        "decision": "PRESERVE",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_3a384da8ce6378b2",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_2c7b711a7c255b39",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Job title",
+        "sourceFieldRef": "fld_9046e6410d955e23",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_6b5841d8debe8bef",
+        "decision": "PRESERVE",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_8d3a8425234c6212",
+        "decision": "PRESERVE",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Deal reference",
+        "sourceFieldRef": "fld_3b4caf668a50e7cb",
+        "decision": "PRESERVE",
+        "filePath": "contact-export.csv",
+        "associatesWith": "opportunities.csv"
+      },
+      {
+        "sourceHeader": "Deal ID",
+        "sourceFieldRef": "fld_a22d13288fe2d334",
+        "decision": "PRESERVE",
+        "filePath": "opportunities.csv"
+      },
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_0ec8bcb2dc2fcba8",
+        "decision": "MAP",
+        "destinationField": "deal.name",
+        "filePath": "opportunities.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.ownerEmail",
+      "contact.postalCode",
+      "contact.website",
+      "contact.source_id",
+      "deal.name",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Sales rep initials",
+      "Audit remark code",
+      "Deal reference",
+      "Deal ID"
+    ],
+    "expectedTaskTypes": [
+      "ASSOCIATION_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "19c307e0dea4ebf399e351064a81b08d1ed63d892ec1f99663feaf6549971bef"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "contact-export.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "opportunities.csv": {
+          "object": "DEAL",
+          "recordIdColumn": "Deal ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:contact-export.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-645",
+          "P-646",
+          "P-647",
+          "P-648"
+        ],
+        "decision": "PRESERVE",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contact-export.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "norel.darenko0@example.test",
+          "risek.joriko1@sample.invalid",
+          "tulia.halrane2@sample.invalid",
+          "risan.norova3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:contact-export.csv:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Quenby",
+          "Nuvia",
+          "Nuvia",
+          "Quenby"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Job title",
+        "fieldRef": "src:contact-export.csv:Job title",
+        "valueClass": "TEXT",
+        "values": [
+          "Operations lead",
+          "Buyer",
+          "Account manager",
+          "Site engineer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:contact-export.csv:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "CR",
+          "PP",
+          "FL",
+          "VD"
+        ],
+        "decision": "PRESERVE",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:contact-export.csv:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-34",
+          "R-3",
+          "R-40",
+          "R-51"
+        ],
+        "decision": "PRESERVE",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Deal reference",
+        "fieldRef": "src:contact-export.csv:Deal reference",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "D-789",
+          "D-791",
+          "D-790",
+          "D-791"
+        ],
+        "decision": "PRESERVE",
+        "associatesWith": "opportunities.csv",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Deal ID",
+        "fieldRef": "src:opportunities.csv:Deal ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "D-789",
+          "D-790",
+          "D-791",
+          "D-792"
+        ],
+        "decision": "PRESERVE",
+        "file": "opportunities.csv"
+      },
+      {
+        "header": "Deal name",
+        "fieldRef": "src:opportunities.csv:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Onboarding 2027 Vexanth",
+          "Expansion 2026 Vexova",
+          "Supply contract 2027 Jorrane",
+          "Expansion 2026 Lumsorin"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name",
+        "file": "opportunities.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "ASSOCIATION_MAPPING"
+    ]
+  },
+  "canaries": [
+    "kc_1855bd060f2a02e7b70fb874",
+    "kc_b23c059468f215b419117dd5"
+  ]
+}

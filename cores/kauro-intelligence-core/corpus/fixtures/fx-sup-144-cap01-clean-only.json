@@ -1,0 +1,219 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-144-cap01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-144-cap01-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "6fc6baf65410a75dd35c4d1f9f212b46d7c3cc202a732182e0893f27f4d9be45",
+      "candidateSetHash": "2f401cf5c15dcfd1ca327a262687a2d77c005178d324aa2419b301c0a022c8ae",
+      "targetContractHash": null,
+      "projectRevisionHash": "76a3592cdba0f0a9aaef163548d5d4ee123bc2e50492d5037b65362fde8eefad"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Website - src",
+        "sourceFieldRef": "fld_a4ec9ea17607c2f5",
+        "decision": "MAP",
+        "destinationField": "contact.website"
+      },
+      {
+        "sourceHeader": "Email [v2]",
+        "sourceFieldRef": "fld_bd0c38b563efb3b0",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_8df595b966ac3bbb",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_eeac5ef8bb23c936",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "lead.email",
+      "lead.website"
+    ],
+    "expectedTargetUniverse": [
+      "contact.createdAt",
+      "contact.email",
+      "contact.marketingConsent",
+      "contact.website",
+      "lead.company",
+      "lead.email",
+      "lead.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Row checksum",
+      "Import batch"
+    ],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0b3b6f5ffa52ad19c6a7d5aa6eecb0a1d1b3e794a8ec0e6f99e645e5fbe84364"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "marketingConsent",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Website - src",
+        "fieldRef": "src:Website - src",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.halell-labs.test",
+          "https://www.beliko-partners.test",
+          "https://www.tavell-studio.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.website"
+      },
+      {
+        "header": "Email [v2]",
+        "fieldRef": "src:Email [v2]",
+        "valueClass": "EMAIL",
+        "values": [
+          "keso.vexenko0@sample.invalid",
+          "lumo.norova1@example.test",
+          "belan.darorin2@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "f5d1dfaf",
+          "7dd7ad6c",
+          "a74c6c3f"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-32",
+          "batch-29",
+          "batch-35"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "lead.email",
+      "lead.website"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_0f5525e2ccd7",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Website - src",
+        "targetField": "contact.website"
+      },
+      {
+        "memoryId": "memconv_2ae24bea84fb",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Email [v2]",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_42f093ceb2143a6b61506c33",
+    "kc_8c38c0013b8b2524ff79e0d7"
+  ]
+}

@@ -1,0 +1,219 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-089-cap06-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-089-cap06-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "67cc540fd1c2efa8bbbd200e3425375ee9dbca2f5e5c24e1bdf6d7f94928eec5",
+      "candidateSetHash": "725c712790e0eef01f370066fc9219c5b0a1c29316466f7d3c8e3abd33f19e27",
+      "targetContractHash": "tc_a4fad123eabe03c293e60483c5c00bf7f88e321c0b5774649759ee2b4b91e915",
+      "projectRevisionHash": "d182517afb57a9bee64fdf428dbe40b74a16cd52897efd6b6300ea65080320cf"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Domain",
+        "sourceFieldRef": "fld_ce2ee4b21b9df851",
+        "decision": "MAP",
+        "destinationField": "company.domain",
+        "requiredEvidenceRefs": [
+          "ev_83c7b0a01bd59098"
+        ]
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_bc68e2c796e8cb15",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_3c82869c257b524a",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_30d780bcc617e059",
+        "decision": "MAP",
+        "destinationField": "company.website"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_b4408fcbbd95876e",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_e8a396343f9dcfb4",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.domain",
+      "company.employeeCount",
+      "company.industry",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials",
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "054571449387ce7213d3918f1dfd39b0499cebad2274290dc54bf544b2151504"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Domain",
+        "fieldRef": "src:Domain",
+        "valueClass": "TEXT",
+        "values": [
+          "soviko-systems.test",
+          "risrane-labs.test",
+          "quelsorin-logistics.test",
+          "yanaly-works.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.domain",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Software",
+          "Textiles",
+          "Logistics",
+          "Logistics"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "NUMBER",
+        "values": [
+          "86172",
+          "72689",
+          "4037",
+          "92465"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.kesorin-logistics.test",
+          "https://www.halquist-systems.test",
+          "https://www.kesdell-studio.test",
+          "https://www.halrane-works.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "MH",
+          "WJ",
+          "AW"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "1",
+          "1",
+          "3"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_a228a2b4c2fe1b1746587cc6",
+    "kc_5ff908cf747ac1603058ff75"
+  ]
+}

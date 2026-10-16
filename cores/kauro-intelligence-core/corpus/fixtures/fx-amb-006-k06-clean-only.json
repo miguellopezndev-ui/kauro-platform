@@ -1,0 +1,198 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-006-k06-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-006-k06-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "d63c1895d6241092bc0a346006d393aae2e8801d9c63a8d954034ccb3fb04c00",
+      "candidateSetHash": "903a3756fd4c55b709cb4fe3c038fa6cca570ce7cabfb625b438e2f1ce0cf331",
+      "targetContractHash": null,
+      "projectRevisionHash": "a63c38fb799a312b3182f92e0f70b1f0cf6af0ce28856b589acb793d0c988f76"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_0dbd56213ee7e347",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Code",
+        "sourceFieldRef": "fld_e855c7096cc519ad",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Type",
+        "sourceFieldRef": "fld_ed0bbf3195b83dc8",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_299368cbedb336db",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.firstName",
+      "contact.lifecycleStage",
+      "contact.phoneExtension",
+      "deal.pipeline",
+      "deal.stage"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "2a98c19823a79d0b1f9f12cacc185cc29d0f7b4ee1d66c4f23c43a06c387e5bf"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "phoneExtension",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Risek",
+          "Mesia",
+          "Quelo",
+          "Halan",
+          "Lumek",
+          "Tulia",
+          "Sovo"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Code",
+        "fieldRef": "src:Code",
+        "valueClass": "ENUM",
+        "values": [
+          "X2",
+          "X1",
+          "Q",
+          "A",
+          "X2",
+          "X1",
+          "Q",
+          "A",
+          "X2"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Type",
+        "fieldRef": "src:Type",
+        "valueClass": "ENUM",
+        "values": [
+          "C",
+          "P7",
+          "A",
+          "B",
+          "C",
+          "P7",
+          "A",
+          "B",
+          "C"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "9",
+          "5",
+          "6",
+          "2",
+          "4",
+          "6",
+          "9"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:enum-codes"
+    ]
+  },
+  "canaries": [
+    "kc_1d81bd707a76eea50d3562e9",
+    "kc_7bef99ee59dc929aae667035"
+  ]
+}

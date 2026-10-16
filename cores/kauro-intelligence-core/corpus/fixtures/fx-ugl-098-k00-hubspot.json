@@ -1,0 +1,280 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-098-k00-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-098-k00-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "70162200d88489918b11a9aa2125ff10d62ad7ae213d322fad602e6f11e49662",
+      "candidateSetHash": "9dca63428d1eb6fe040033a38b7fa9969503e101c1a1528300495eef34e04cfc",
+      "targetContractHash": "tc_036c1b338f5e51e18b1be8316f09844790e5b99f9edb987e9d60474f2805c47b",
+      "projectRevisionHash": "edb98df434a41a5dc597bc58c260c409057bd94b67901a2c4fa78d896ff1cdde"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "メールアドレス",
+        "sourceFieldRef": "fld_3dee421e9120d442",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "名",
+        "sourceFieldRef": "fld_c884c8dc11b56321",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "国",
+        "sourceFieldRef": "fld_dc9b5c53ac2d44ad",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "役職",
+        "sourceFieldRef": "fld_1b4cb302c7a5397f",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "姓",
+        "sourceFieldRef": "fld_c781bc3d1698dfe9",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_84d6aeb7e174fb9d",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.ownerEmail",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "39b37be5ae9b3fe69226b0298031b500b0db7b4a470f8eed4f5d12c7d316f657"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "メールアドレス",
+        "fieldRef": "src:メールアドレス",
+        "valueClass": "EMAIL",
+        "values": [
+          "belis.tulmar0@example.test",
+          "norel.wilsorin1@corp.example.test",
+          "quelis.noranth2@example.test",
+          "risan.yanath3@example.test",
+          "wilek.wilsorin4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "名",
+        "fieldRef": "src:名",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelel",
+          "Wilo",
+          "Orva",
+          "Vexek",
+          "Daro"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "国",
+        "fieldRef": "src:国",
+        "valueClass": "TEXT",
+        "values": [
+          "Valdoria",
+          "Norvania",
+          "Estmark",
+          "Valdoria",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "役職",
+        "fieldRef": "src:役職",
+        "valueClass": "TEXT",
+        "values": [
+          "Account manager",
+          "Buyer",
+          "Buyer",
+          "Site engineer",
+          "Account manager"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "姓",
+        "fieldRef": "src:姓",
+        "valueClass": "TEXT",
+        "values": [
+          "Finell",
+          "Yanaly",
+          "Jorenko",
+          "Noriko",
+          "Orvaly"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "6",
+          "5",
+          "1",
+          "3",
+          "4"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:multilingual",
+      "lang:ja"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_01c93cc44869",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "メールアドレス",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_d085c13554ec",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "名",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_fa590922907b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "国",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_4b6b614eb8de",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "役職",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_121690e9ddf6",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "姓",
+        "targetField": "contact.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b361de12bf5f4803e7c35550",
+    "kc_27d3c50b0a81244c2a278c2a"
+  ]
+}

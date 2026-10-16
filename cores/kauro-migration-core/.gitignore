@@ -1,0 +1,46 @@
+# Build output
+dist/
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# Test / benchmark scratch output (generated packages are written here)
+tmp/
+coverage/
+bench/out/
+bench/capacity/
+# The campaign runner writes its logs here. They are working output: what the
+# campaign established lives in qualification/, and the logs are kept on the
+# machine that ran it.
+bench/campaign/
+
+# The offline universe writes one log per step here, and the report names each
+# by path and digest. They are working output of the run, not part of the
+# candidate — and until they were ignored the universe dirtied the tree it then
+# required to be clean, so the sabotage step refused itself.
+qualification/candidate/universe-logs/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# Never commit environment material
+.env
+.env.*
+*.pem
+*.key
+
+# Scratch a run spills into, wherever a host puts it.
+#
+# Named for every shape it takes: the acceptance builder's directory beside each
+# case, the CLI's directory beside its output, the staging directory a package is
+# built in before it is published, and the run directory a store creates inside
+# whatever root it was given. Scratch holds customer data; a copy of it that
+# survives the run is a copy nothing later knows to delete, and one inside a
+# repository is one that gets committed by the next `git add -A`.
+acceptance/*/work/
+*.kauro-work/
+*.kauro-staging/
+kauro-scratch-*/

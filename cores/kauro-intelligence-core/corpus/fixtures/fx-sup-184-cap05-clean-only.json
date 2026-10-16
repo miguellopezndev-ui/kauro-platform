@@ -1,0 +1,155 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-184-cap05-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-184-cap05-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "eee8a6ed0f064474aac78e473c47f085044dac0671ff87febb2f7e84d812baa0",
+      "candidateSetHash": "f9b451d8d6337e7c5648c1efe7b714d2b4f47da3ecb2773206c8705574079186",
+      "targetContractHash": null,
+      "projectRevisionHash": "1f75a59eddf4e17221e3b1eec0c3157e7710354570df7a884855383484691c25"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name - src",
+        "sourceFieldRef": "fld_d96f6f15c8d335ff",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Rating",
+        "sourceFieldRef": "fld_4261ce0f2c6efe3d",
+        "decision": "MAP",
+        "destinationField": "lead.rating",
+        "requiredEvidenceRefs": [
+          "ev_d5cbc911c5cebdd2"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.jobTitle",
+      "lead.lastName",
+      "lead.rating",
+      "lead.status"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "bd20e4c9101a388edc68a20f57ce403d752f1b70420b24b20127649f05d20767"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "rating",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name - src",
+        "fieldRef": "src:Last name - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Vexaly",
+          "Halath",
+          "Nororin",
+          "Sovaly",
+          "Risdell"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Rating",
+        "fieldRef": "src:Rating",
+        "valueClass": "ENUM",
+        "values": [
+          "hot",
+          "warm",
+          "cold",
+          "hot",
+          "warm",
+          "cold",
+          "hot",
+          "warm"
+        ],
+        "decision": "MAP",
+        "destination": "lead.rating",
+        "evidence": [
+          "ev:self"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_7c2dc16cad22",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Last name - src",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_9c76cc98f13f79b06ff2429a",
+    "kc_09dc5e113e60f0e899de7d1b"
+  ]
+}

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+tmp/
+*.log
+.env
+.env.*
+*.pem
+*.key
+*.tgz
+!vendor/*.tgz
+.DS_Store
+Thumbs.db
+/campaign/
