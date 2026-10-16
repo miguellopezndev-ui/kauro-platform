@@ -79,6 +79,11 @@ export const AGENCY_LESS_NOTIFICATION_EVENT_TYPES: ReadonlyArray<string> = Objec
   "bank_credit.review_required.v1",
   "bank_credit.applied.v1",
   "statement_import.recorded.v1",
+  // PV1-SETTLE (0062, 0079): the settlement observation and the owner's settlement request are agency-less bank aggregates too
+  "settlement.recorded.v1",
+  "settlement_request.recorded.v1",
+  "settlement_request.applied.v1",
+  "settlement_request.refused.v1",
   "bank_route.configured.v1",
   "bank_route.verified.v1",
   "bank_route.enabled.v1",

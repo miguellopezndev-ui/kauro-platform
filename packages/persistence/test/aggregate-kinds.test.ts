@@ -300,7 +300,7 @@ test("for every kind: another agency's aggregate, an aggregate the writer's poli
 });
 
 test("only the migration owner writes the registry: every runtime login is refused INSERT, UPDATE, DELETE and TRUNCATE, only the event inserters (the request handlers, since B07 the control plane, and package B09's payment service) read it, and the owner can register but never rewrite or remove a kind", async () => {
-  const registry = (await h.oracle.query<{ aggregate_kind: string; table_name: string; id_column: string; owner_package: string }>("SELECT * FROM kauro.aggregate_kinds ORDER BY aggregate_kind")).rows;
+  const registry = (await h.oracle.query<{ aggregate_kind: string; table_name: string; id_column: string; owner_package: string; agency_scoped: boolean }>("SELECT * FROM kauro.aggregate_kinds ORDER BY aggregate_kind")).rows;
   for (const login of RUNTIME_LOGINS) {
     const c = await h.pg.connect(login);
     try {
@@ -313,7 +313,7 @@ test("only the migration owner writes the registry: every runtime login is refus
         // (B07 D-CTRL-2), and so does package B09's payment service (its read policy aggregate_kinds_read_b09_payment,
         // FOUNDATION §4) and package B10's commission service (aggregate_kinds_read_b10_commission: a quote's expiry and the agency's
         // first designation), so the binding (SECURITY INVOKER) reads the registry as any of them
-        const seen = await c.query("SELECT aggregate_kind, table_name, id_column, owner_package FROM kauro.aggregate_kinds ORDER BY aggregate_kind");
+        const seen = await c.query("SELECT aggregate_kind, table_name, id_column, owner_package, agency_scoped FROM kauro.aggregate_kinds ORDER BY aggregate_kind");
         assert.deepEqual(seen.rows, registry);
       } else {
         await assert.rejects(c.query("SELECT aggregate_kind FROM kauro.aggregate_kinds"), refusedWith("42501"), `${login} SELECT`);

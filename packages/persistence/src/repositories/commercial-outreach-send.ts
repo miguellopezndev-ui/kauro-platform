@@ -587,12 +587,6 @@ ${seed}`, "utf8").digest("hex");
     return "SEND_UNCERTAIN";
   }
 
-  /** The outbox record of an intent's event (the dispatcher settles it); null when none. */
-  async intentOfEvent(eventId: string): Promise<string | null> {
-    const r = await execute<{ aggregate_id: string }>(this.db, "SELECT aggregate_id FROM kauro.domain_events WHERE event_id = $1 AND event_type = 'outreach.send_intended.v1'", [eventId]);
-    return r.rows[0]?.aggregate_id ?? null;
-  }
-
   /** The state of an intent (D6 settles the outbox record by it); null when none. */
   async stateOf(intentId: string): Promise<string | null> {
     const r = await execute<{ state: string }>(this.db, "SELECT state FROM kauro.outreach_send_intents WHERE intent_id = $1", [intentId]);

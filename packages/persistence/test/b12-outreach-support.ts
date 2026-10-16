@@ -382,7 +382,10 @@ export async function prospectIn(w: B12World, by: Seller, domain: string, jurisd
   const prospectId = ids.next();
   const organizationKey = sha(`organization:${domain}`);
   const contactId = ids.next();
-  const contactKey = sha(`contact:${domain}:${contactId}`);
+  // the contact's address (RecordProspectContact stores it beside the contact) and its key, which the address must derive (KA095 f)
+  const address = `operations@${domain}`;
+  const contactKey = sha(`KAURO_PROSPECT_CONTACT_V1
+${address}`);
   const evidenceHash = sha(`source-evidence-${prospectId}`);
   await within(w.app, personOf(by.userId), async (c) => {
     await c.query(
@@ -390,6 +393,7 @@ export async function prospectIn(w: B12World, by: Seller, domain: string, jurisd
       [ids.next(), by.userId, by.sellerId, evidenceHash, sha(`https://${domain}/`)],
     );
     await c.query("INSERT INTO kauro.prospect_contacts (contact_id, recorded_by_user_id, contact_key, contact_label, role_label, channel, created_at) VALUES ($1, $2, $3, 'Operations lead', 'Head of operations', 'EMAIL', now())", [contactId, by.userId, contactKey]);
+    await c.query("INSERT INTO kauro.prospect_contact_addresses (contact_id, recorded_by_user_id, address) VALUES ($1, $2, $3)", [contactId, by.userId, address]);
     await c.query(
       `INSERT INTO kauro.prospects (prospect_id, organization_label, organization_key, business_contact_id, source_evidence_hash, jurisdiction, registered_by_user_id, registered_by_seller_id, owner_seller_id, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, now(), now())`,

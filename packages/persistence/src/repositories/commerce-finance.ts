@@ -193,7 +193,7 @@ export class PgTaxDocumentRepository implements TaxDocumentRepository {
   }
 
   async lock(documentId: TaxDocumentId): Promise<TaxDocumentRecord | null> {
-    const r = await execute<DocumentRow>(this.ctx.db, `SELECT ${DOCUMENT_COLUMNS} FROM kauro.tax_documents WHERE document_id = $1 FOR UPDATE`, [documentId]);
+    const r = await execute<DocumentRow>(this.ctx.db, `SELECT ${DOCUMENT_COLUMNS} FROM kauro.tax_documents WHERE document_id = $1 FOR NO KEY UPDATE`, [documentId]);
     return r.rows[0] ? documentRecord(r.rows[0]) : null;
   }
 

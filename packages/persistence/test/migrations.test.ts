@@ -190,6 +190,13 @@ test("every migration applied once, in order, with its checksum recorded; a seco
     // B17 L4: the importer tool a capability claims, compared with the tool a vendor qualification tested (S078; provisional number)
     "0087_b17_capability_importer_tool.sql",
     "0088_b12_outreach.sql",
+    // B12 L-HOME (seller scope on prospect-data reads), L-ACT (opt-out misses), B17 L7 (target repair terms), B12 L-OWNER (the owner tools)
+    "0089_b12_seller_scope.sql",
+    "0090_b12_opt_out_misses.sql",
+    "0091_b17_target_repair_terms.sql",
+    "0092_b12_owner_tools.sql",
+    // order 4: the catalogue census (FOR ALL policies, policies naming a relation, PUBLIC trigger functions) of the migrations merged by batches B..D
+    "0093_sec_policy_hygiene.sql",
   ]);
   assert.deepEqual(files.map((f) => f.version), files.map((_, i) => i + 1));
   assert.deepEqual(pg.migrations.applied.map((f) => f.version), files.map((f) => f.version));

@@ -238,8 +238,8 @@ test("D-PRIV-1: an observer is told of every classified answer without changing 
 
 test("D-GEN-1: every generated descriptor lists exactly the parameters of its path template, and every journaled command declares its Idempotency-Key", () => {
   // the commands that are not journaled by the api (sign-in and logout, the step-up, the public inquiry, the two document intakes, the owner's
-  // content-addressed bank evidence upload, B12 D-B12S-2): a closed list
-  const NOT_JOURNALED = ["SubmitDecisionArtifact", "SubmitSelectionManifest", "createInquiry", "createStepUp", "openSession", "revokeCurrentSession", "uploadBankEvidenceArtifact"];
+  // content-addressed bank evidence upload, B12 D-B12S-2, and the public one-click opt-out a mail client posts without a key, B12 L-ACT): a closed list
+  const NOT_JOURNALED = ["SubmitDecisionArtifact", "SubmitSelectionManifest", "createInquiry", "createStepUp", "openSession", "postOutreachOptOut", "revokeCurrentSession", "uploadBankEvidenceArtifact"];
   const journalless: string[] = [];
   for (const descriptor of Object.values(OPERATIONS)) {
     const templated = [...descriptor.path.matchAll(/\{([A-Za-z]+)\}/g)].map((match) => match[1]);

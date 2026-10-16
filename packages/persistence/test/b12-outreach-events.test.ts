@@ -50,9 +50,10 @@ async function refusedIn(c: Client, probe: () => Promise<unknown>, code: string,
   }
 }
 
-/** A seller-session transaction at the TEST CLOCK instant that queues an intent WITHOUT its event, then runs `fn` with it. */
-async function bareIntent<T>(instant: string, fn: (c: Client, intent: Awaited<ReturnType<typeof queueIn>>) => Promise<T>): Promise<T | undefined> {
-  const { d, authorizationId } = await granted();
+/** A seller-session transaction at the TEST CLOCK instant `after` seconds after the grant's slot that queues an intent WITHOUT its event, then runs `fn` with it. */
+async function bareIntent<T>(after: number, fn: (c: Client, intent: Awaited<ReturnType<typeof queueIn>>) => Promise<T>): Promise<T | undefined> {
+  const { d, authorizationId, slot } = await granted();
+  const instant = plus(slot, after);
   let out: T | undefined;
   await assert.rejects(
     at(w.app, personCtx(w, d.personUserId), instant, async (c) => {
@@ -96,6 +97,9 @@ describe("B12 K1b: the agency-less aggregate kind (registry, binding, event-per-
       // the two legitimate registrations still commit
       await reg("k1b_d", "k1b_probe", false);
       await reg("k1b_e", "k1b_probe_scoped", true);
+      // the owner may register a kind but never read the registry (FORCE ROW LEVEL SECURITY, an INSERT policy only): this transaction's own
+      // probe policy, rolled back with it, lets the owner see the two rows it just registered
+      await owner.query("CREATE POLICY k1b_probe_read ON kauro.aggregate_kinds FOR SELECT TO CURRENT_USER USING (true)");
       const seen = await owner.query<{ aggregate_kind: string; agency_scoped: boolean }>("SELECT aggregate_kind, agency_scoped FROM kauro.aggregate_kinds WHERE aggregate_kind LIKE 'k1b\\_%' ORDER BY 1");
       assert.deepEqual(seen.rows, [{ aggregate_kind: "k1b_d", agency_scoped: false }, { aggregate_kind: "k1b_e", agency_scoped: true }]);
     } finally {
@@ -145,7 +149,7 @@ describe("B12 K1b: the agency-less aggregate kind (registry, binding, event-per-
   });
 
   test("binding (KA006): an unknown intent id and an unregistered kind are refused; an event ahead of the intent's version is KA002", async () => {
-    await bareIntent(plus(await nextSlot(w), 2), async (c, intent) => {
+    await bareIntent(2, async (c, intent) => {
       await refusedIn(c, () => sendIntendedIn(c, intent, { aggregateId: ids.next(), noOutbox: true }), "KA006", "unknown aggregate id");
       await refusedIn(c, () => sendIntendedIn(c, intent, { kind: "outreach_nothing", noOutbox: true }), "KA006", "unregistered kind");
       await refusedIn(c, () => sendIntendedIn(c, intent, { version: 2, noOutbox: true }), "KA002", "ahead of the aggregate");
@@ -195,7 +199,7 @@ describe("B12 K1b: who may write and read the event and its outbox record (RLS)"
   });
 
   test("outbox: only OUTREACH_SENDER, only for an agency-less outreach event; an agency event's record and another consumer are refused", async () => {
-    await bareIntent(plus(await nextSlot(w), 2), async (c, intent) => {
+    await bareIntent(2, async (c, intent) => {
       await refusedIn(c, () => sendIntendedIn(c, intent, { consumer: "NOTIFICATIONS" }), "42501", "another consumer");
       const eventId = await sendIntendedIn(c, intent, { noOutbox: true });
       // a record for an event of another kind (an agency event) is no outreach record
@@ -211,8 +215,19 @@ describe("B12 K1b: who may write and read the event and its outbox record (RLS)"
   test("reads: the seller's session sees its own intent's event and no outbox record (the records are the control plane's), kauro_control dispatches them, kauro_outreach holds no privilege on either table", async () => {
     const { d, authorizationId, slot } = await granted();
     const i = await at(w.app, personCtx(w, d.personUserId), plus(slot, 2), (c) => queueIn(c, d, authorizationId));
+    // another person's intent and event exist beside the session's own (earlier tests of this world queued intents of the same person too)
+    const snd2 = await sender(w, w.s2.userId);
+    const slot2 = await nextSlot(w);
+    const d2 = await draft(w, snd2, await prospectIn(w, w.s2, freshDomain("events-other")));
+    const g2 = await grant(w, snd2, [d2], slot2);
+    const other = await at(w.app, personCtx(w, d2.personUserId), plus(slot2, 2), (c) => queueIn(c, d2, g2.authorizationId));
+    const eventsOf = async (userId: string): Promise<number> =>
+      Number((await w.h.oracle.query<{ n: string }>("SELECT count(*) AS n FROM kauro.domain_events e JOIN kauro.outreach_send_intents s ON s.intent_id = e.aggregate_id WHERE e.aggregate_kind = 'outreach_send_intent' AND s.person_user_id = $1", [userId])).rows[0]!.n);
+    const mine = await eventsOf(d.personUserId);
+    assert.ok(mine >= 1 && (await eventsOf(d2.personUserId)) === 1);
     await at(w.app, personCtx(w, d.personUserId), plus(slot, 3), async (c) => {
-      assert.equal((await c.query("SELECT 1 FROM kauro.domain_events WHERE aggregate_kind = 'outreach_send_intent'")).rowCount, 1, "its own event, and no other");
+      assert.equal((await c.query("SELECT 1 FROM kauro.domain_events WHERE aggregate_kind = 'outreach_send_intent'")).rowCount, mine, "its own events, and no other person's");
+      assert.equal((await c.query("SELECT 1 FROM kauro.domain_events WHERE aggregate_id = $1", [other.intentId])).rowCount, 0, "the other person's event is invisible");
       assert.equal((await c.query("SELECT 1 FROM kauro.outbox_records WHERE consumer = 'OUTREACH_SENDER'")).rowCount, 0, "records");
     });
     const ctl = await w.control.query("SELECT e.event_id FROM kauro.domain_events e JOIN kauro.outbox_records o ON o.event_id = e.event_id WHERE e.aggregate_id = $1 AND o.consumer = 'OUTREACH_SENDER'", [i.intentId]);

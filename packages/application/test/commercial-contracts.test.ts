@@ -38,7 +38,9 @@ import { commerceWorld, type CommerceWorld } from "./commerce-support.js";
 const B10_COMMANDS = ["CMD002", "CMD027", "CMD043", "CMD045", "CMD046", "CMD047", "CMD048", "CMD049", "CMD050", "CMD051", "CMD052", "CMD053"] as const;
 const B12_COMMANDS = ["CMD061", "CMD062", "CMD063", "CMD064", "PutOutreachContent", "PublishSalesResource", "RegisterSenderIdentity", "VerifySenderIdentity", "RecordSenderRevocation", "PrepareOutreachReview", "RecordOutreachDiagnosis", "RevokeOutreachAuthorization", "WithdrawOutreachChannelPolicy", "RecordProspectSource", "RecordProspectContact"] as const;
 const B12_READS = ["GetOutreachDraft", "GetOutreachReview", "ListSalesActivities", "GetOutreachMetrics", "GetSalesResource"] as const;
-const ALL_COMMANDS = [...B10_COMMANDS, "CMD054", "CMD055", "CMD056", "CMD057", "CMD058", "CMD059", ...B12_COMMANDS] as const;
+// B12 L-OWNER (companion §P): the fifteen producer operations, which the registry does not name
+const B12_OWNER_TOOLS = ["RegisterSellerCandidate", "RecordSellerLegalReview", "PrepareSellerAgreement", "RecordAgreementSignature", "RecordSellerAssessment", "RecordConfidentialityAcceptance", "RecordSellerTaxDocument", "ChangePayoutDestination", "VerifyPayoutDestination", "PrepareServiceAssignment", "RecordAssistanceAgreement", "PrepareTerminationTerms", "PrepareTerminationManifest", "RecordClaimEvidence", "PrepareAttributionAllocation"] as const;
+const ALL_COMMANDS = [...B10_COMMANDS, "CMD054", "CMD055", "CMD056", "CMD057", "CMD058", "CMD059", ...B12_COMMANDS, ...B12_OWNER_TOOLS] as const;
 const require = createRequire(import.meta.url);
 const bundle = JSON.parse(readFileSync(require.resolve("@kauro/contracts/schemas.json"), "utf8")) as RegistryBundle;
 
@@ -60,7 +62,7 @@ test("every B10 command spec matches its catalogue entry: name, method, path, ro
     else assert.ok(spec.path.includes(`{${spec.aggregateParam}}`), id);
     assert.equal(spec.expectedVersionRequired, catalogue.fields.some((f) => f.name === "expectedVersion"), id);
   }
-  assert.deepEqual(Object.keys(COMMERCIAL_COMMANDS), [...ALL_COMMANDS], "B10 twelve, the two breakglass commands, the two operations commands, B18 two capability commands and B12 fifteen (K2)");
+  assert.deepEqual(Object.keys(COMMERCIAL_COMMANDS), [...ALL_COMMANDS], "B10 twelve, the two breakglass commands, the two operations commands, B18 two capability commands, B12 fifteen (K2) and the fifteen owner tools (L-OWNER)");
   assert.equal(COMMERCIAL_COMMANDS.CMD045.aggregateParam, null, "a prospect is registered before it has an identity");
 });
 
@@ -167,7 +169,12 @@ test("the commercial contracts: every request schema carries exactly the registr
     }
     requestRoots[id] = s;
   }
-  assert.ok(Object.values(COMMERCIAL_REQUEST_SCHEMAS).every((s) => !s.properties["amountCents"] && !s.properties["destinationDigest"] && !s.properties["sellerId"] === (s.$id !== `${REQUEST_SCHEMA_PREFIX}CMD048`)), "no request carries an amount, a destination digest or, but for the assignment, a seller identity");
+  // no request carries an amount; the destination digest is the destination change's alone (the seller names the destination it asks to change);
+  // a seller identity travels in a body only in CMD048 (the assignment of a seller to a service)
+  const carrying = (member: string): string[] => Object.values(COMMERCIAL_REQUEST_SCHEMAS).filter((s) => s.properties[member] !== undefined).map((s) => s.$id.slice(REQUEST_SCHEMA_PREFIX.length));
+  assert.deepEqual(carrying("amountCents"), [], "no request carries an amount");
+  assert.deepEqual(carrying("destinationDigest"), ["ChangePayoutDestination"], "only the destination change carries a destination digest");
+  assert.deepEqual(carrying("sellerId"), ["CMD048"], "only the assignment carries a seller identity");
   const requestsCompiled = compileSchemaBundle({ defs: {}, roots: requestRoots });
   const requestCodes = (id: string, body: unknown) => requestsCompiled.validate(id, body).map((e) => `${e.field}:${e.code}`);
   for (const id of B10_COMMANDS) assert.deepEqual(requestsCompiled.validate(id, requests[id]), [], `${id} ${JSON.stringify(requests[id])}`);
@@ -192,7 +199,7 @@ test("the commercial contracts: every request schema carries exactly the registr
   assert.deepEqual(Object.keys(defs), viewNames);
   assert.ok(viewNames.every((n) => !(n in bundle.$defs) && !(n in shared)), "no B10 view shadows a registry or an earlier package's definition");
   assert.deepEqual(Object.keys(COMMERCIAL_COMMAND_RESPONSES), [...ALL_COMMANDS]);
-  assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.status), [200, 201, 200, 201, 201, 200, 200, 200, 200, 200, 200, 200, 201, 200, 201, 200, 200, 200, 201, 201, 200, 201, 201, 201, 201, 200, 200, 201, 201, 200, 200, 201, 201]);
+  assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.status), [200, 201, 200, 201, 201, 200, 200, 200, 200, 200, 200, 200, 201, 200, 201, 200, 200, 200, 201, 201, 200, 201, 201, 201, 201, 200, 200, 201, 201, 200, 200, 201, 201, /* owner tools */ 201, 201, 201, 200, 201, 201, 201, 201, 200, 201, 201, 201, 201, 201, 201]);
   assert.deepEqual(Object.values(COMMERCIAL_COMMAND_RESPONSES).map((r) => r.accepted), ALL_COMMANDS.map((c) => c === "CMD027"));
   assert.deepEqual(Object.keys(roots).sort(), [...ALL_COMMANDS.map((c) => commercialCommandResponseSchemaId(c)), ...(["GetCommissionStatement", "PreviewTableUnderBreakglass", "GetSellerHome", ...B12_READS] as const).map((r) => commercialReadResponseSchemaId(r))].sort());
   assert.deepEqual(COMMERCIAL_READ_ROUTES.GetCommissionStatement, {
@@ -272,7 +279,7 @@ test("the commercial contracts: every request schema carries exactly the registr
   for (const view of COMMERCIAL_VIEW_DEFINITIONS) {
     // "rows": the breakglass preview's bounded sample of ONE table of the project the holder's own live grant covers (B16 L4, S071)
     const arrays = Object.entries(view.members).filter(([, m]) => m.kind === "platform" && (m.schema as { type?: string }).type === "array").map(([name]) => name);
-    for (const name of arrays) assert.ok(["offeredModes", "items", "balanceItems", "lineIds", "affectedScopeRefs", "openResponsibilities", "rows", /* B12 (K2): the grant's sealed content hashes and a resource's capability ids, never a list of sellers */ "allowedContentHashes", "capabilityIds"].includes(name), `${view.name}.${name}: a list in a commercial view is the caller's own`);
+    for (const name of arrays) assert.ok(["offeredModes", "items", "balanceItems", "lineIds", "affectedScopeRefs", "openResponsibilities", "rows", /* B12 (K2): the grant's sealed content hashes and a resource's capability ids, never a list of sellers */ "allowedContentHashes", "capabilityIds", /* B12 (L-HOME): the actions the seller's own home offers the caller, never a list of sellers */ "permittedActions", /* the caller's own statements: GetSellerHome selects by the authorized seller (R2-066) */ "statements"].includes(name), `${view.name}.${name}: a list in a commercial view is the caller's own`);
   }
 
   // injected definitions are refused by the same builder (a start-up check, not a convention)

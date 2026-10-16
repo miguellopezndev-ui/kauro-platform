@@ -77,7 +77,7 @@ test("DENY (the policies themselves): every kauro_app policy on kauro.outbox_rec
   );
   assert.deepEqual(
     policies.rows.map((p) => `${p.policyname} ${p.cmd}`),
-    ["outbox_records_owner_bank_read SELECT", "outbox_records_owner_bank_record INSERT", "outbox_records_owner_route_read SELECT", "outbox_records_owner_route_record INSERT"],
+    ["outbox_records_owner_bank_read SELECT", "outbox_records_owner_bank_record INSERT", "outbox_records_owner_route_read SELECT", "outbox_records_owner_route_record INSERT", "outbox_records_owner_settlement_request_read SELECT", "outbox_records_owner_settlement_request_record INSERT"],
     "the owner's outbox policies are SELECT and INSERT only (0063:188 and 0046:256 were FOR ALL)",
   );
   for (const p of policies.rows) {

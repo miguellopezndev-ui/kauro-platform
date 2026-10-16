@@ -47,11 +47,22 @@ describe("B12 L-AUTH adapter (plan §L, §2 CMD062)", () => {
     const d = await freshDraft();
     const slot = await nextSlot(w);
     const rv = await review(w, snd, [d], slot);
-    const expiresAt = (await w.h.oracle.query<{ e: string }>("SELECT to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS e FROM kauro.outreach_reviews WHERE review_id = $1", [rv.reviewId])).rows[0]!.e;
-    const before1us = new Date(Date.parse(expiresAt) - 1).toISOString().replace("Z", "999Z");
+    // kauro.effect_now() is the test clock plus the time the transaction has run (0038), so the instant a statement judges at can only be
+    // placed within the few milliseconds between the clock being set and the statement: "just before" is a 250 ms margin that covers
+    // them, and "at the boundary" is exact because effect_now() never reads earlier than the instant the clock was set to. The review's
+    // expiry carries microseconds (stamped at the database instant of the issue): both instants are computed by the database, never
+    // through a JavaScript Date (which keeps milliseconds only).
+    const fmt = "'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'";
+    const bounds = (
+      await w.h.oracle.query<{ e: string; before1us: string }>(
+        `SELECT to_char(expires_at AT TIME ZONE 'UTC', ${fmt}) AS e, to_char((expires_at - interval '250 milliseconds') AT TIME ZONE 'UTC', ${fmt}) AS before1us FROM kauro.outreach_reviews WHERE review_id = $1`,
+        [rv.reviewId],
+      )
+    ).rows[0]!;
+    const { e: expiresAt, before1us } = bounds;
     const q = { reviewId: rv.reviewId, draftIds: [d.draftId], senderId: snd.senderId, validFrom: slot, expiresAt: plus(slot, 3600) };
     const early = await at(w.app, ownerOf(w), before1us, (c) => new PgOutreachAuth(c).grantFacts(q));
-    assert.equal(early.reviewLive, true, "one microsecond before the boundary is live");
+    assert.equal(early.reviewLive, true, "just before the boundary (a margin that covers the statement's own elapsed time) the review is live");
     const onTime = await at(w.app, ownerOf(w), expiresAt, (c) => new PgOutreachAuth(c).grantFacts(q));
     assert.equal(onTime.reviewLive, false, "at the boundary the review is expired");
   });

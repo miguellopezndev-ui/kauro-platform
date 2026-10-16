@@ -190,8 +190,16 @@ test("RACE 11a (no defect): the row locks that stay FOR UPDATE — commission po
     for (const m of text.matchAll(/(?:try_)?await_transition\(\s*'(kauro\.[a-z_]+)'/g)) awaited.add(m[1] as string);
     for (const m of text.matchAll(/(?:awaitTransition|await)\((?:uow, |this\.db, |db, )?"(kauro\.[a-z_]+)"/g)) awaited.add(m[1] as string);
   }
-  for (const subject of ["commission_pools", "commission_periods", "commission_statements", "attribution_claims", "founding_slot_reservations", "upload_sessions", "processing_jobs", "refunds", "payment_orders", "payment_attempts", "tax_documents"]) {
+  for (const subject of ["commission_pools", "commission_periods", "commission_statements", "attribution_claims", "founding_slot_reservations", "upload_sessions", "processing_jobs", "refunds", "payment_orders", "payment_attempts"]) {
     assert.ok(!awaited.has(`kauro.${subject}`), `kauro.${subject} is awaited by a shared half: it needs a RACE cell and FOR NO KEY UPDATE`);
+  }
+  // tax documents are a transition subject since B15 (0085: the document's state takes the exclusive half; CMD035 and the correction path await
+  // the shared half), so their row lock is FOR NO KEY UPDATE like the other awaited subjects, and their race cells are CMD035-RACE
+  // (apps/api/test/b15-fiscal-issuance.test.ts); no FOR UPDATE on kauro.tax_documents remains in any repository
+  assert.ok(awaited.has("kauro.tax_documents"), "tax_documents is an awaited subject");
+  for (const f of sourcesUnder(SRC)) {
+    const text = readFileSync(f, "utf8");
+    assert.ok(!/FROM kauro\.tax_documents[^`"]*FOR UPDATE/.test(text), `${f}: a row lock on kauro.tax_documents must be FOR NO KEY UPDATE`);
   }
   // the one reader of a commission line's shared half is the payout intent's insert (payout_lines_unpayable), which has no line to key-share
   const refs = await h.oracle.query<{ n: number }>("SELECT count(*)::int AS n FROM pg_constraint WHERE contype = 'f' AND conrelid = 'kauro.payout_intents'::regclass AND confrelid = 'kauro.commission_lines'::regclass");
