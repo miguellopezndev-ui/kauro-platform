@@ -58,7 +58,7 @@ export const OUTCOME = {
   JURISDICTION: "409 PRECONDITION_FAILED OUTREACH_JURISDICTION_UNREVIEWED",
   /** plan §M M13 order 1 ("409 SENDER_REVOKED"); L-SEND asserts the same reason (it is not yet in K1's OUTREACH_FAILURE_REASONS). */
   SENDER_REVOKED: "409 PRECONDITION_FAILED SENDER_REVOKED",
-  KEY_REUSED: "409 IDEMPOTENCY_CONFLICT -",
+  KEY_REUSED: "409 IDEMPOTENCY_CONFLICT REQUEST_DIGEST_DIFFERS",
   TIMEOUT: "503 CAPACITY_UNAVAILABLE -",
 } as const;
 /** "<status> <code>" of a problem reply (the reason left out: a refusal whose reason the plan does not name). */

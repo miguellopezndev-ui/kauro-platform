@@ -13,6 +13,7 @@ import type { ReadRequest, ReadResult } from "../../queries/reads.js";
 import type { Sha256Hex, UtcInstant } from "@kauro/contracts";
 import type { CommercialReadHandler } from "../statements/get-statement.js";
 import type { OutreachDraftView } from "../views.js";
+import { COMMERCIAL_READ_ROUTES } from "../response-schemas.js";
 import { draftReadAdmission, sellerOrOwner } from "./draft-access.js";
 import type { OutreachDraftCollaborators } from "./draft-store.js";
 
@@ -54,7 +55,7 @@ export function getDraftHandler(runtime: CommerceRequestRuntime, co: OutreachDra
         return { kind: "READ", view };
       } catch (e) {
         if (!(e instanceof DomainFailure) || e.code === "INTERNAL_ERROR") throw e;
-        if (denied) await recordOperatorDenial(runtime, context, GET_OUTREACH_DRAFT_OPERATION, e, e instanceof CommerceAccessDenied ? e.policyVersion : "", null);
+        if (denied) await recordOperatorDenial(runtime, context, COMMERCIAL_READ_ROUTES.GetOutreachDraft.action, e, e instanceof CommerceAccessDenied ? e.policyVersion : "", null);
         return { kind: "PROBLEM", problem: problemOf(e, request.correlationId) as Problem };
       }
     },

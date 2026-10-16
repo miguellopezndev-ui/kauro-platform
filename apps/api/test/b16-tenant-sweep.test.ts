@@ -45,6 +45,14 @@ const UNSWEPT: ReadonlySet<string> = new Set([
   "/api/v1/operations/bank-credits/{creditId}",
   "/api/v1/operations/bank-orders/{orderId}/match-keys",
   "/api/v1/operations/bank-routes/{routeId}",
+  // B16 L4 (CMD055): a corporate-owner read under a break-glass grant whose scope the grant itself names (S071 in cmd054-cmd055-breakglass.test.ts)
+  "/api/v1/operations/breakglass-grants/{grantId}/tables/{tableId}/preview",
+  // B12 seller and owner screens (agency-less: a seller's own rows, the corporate owner's): this sweep's world has no second seller to own the
+  // foreign draft, review, activity list or resource, so only the nonexistent half is asked (gap R2-B16-S048-UNSWEPT, carried to the B12 close)
+  "/api/v1/ops/outreach/drafts/{draftId}",
+  "/api/v1/ops/outreach/reviews/{reviewId}",
+  "/api/v1/ops/sales/prospects/{prospectId}/activities",
+  "/api/v1/ops/sales/resources/{resourceId}",
   "/api/v1/operations/refunds/{refundId}",
   "/api/v1/payment-orders/{orderId}/transfer-instructions",
   "/api/v1/sales/statements/{statementId}",

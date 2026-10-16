@@ -85,7 +85,8 @@ export async function raceAtWrite<A, B>(race: RaceAtWrite<A, B>): Promise<RaceRe
   try {
     const firstPid = await race.first.pid();
     let secondDone = false;
-    second = settle(startSecond(race, firstPid, limitMs)).then((r) => {
+    const observation = { credited: false };
+    second = settle(startSecond(race, firstPid, limitMs, observation)).then((r) => {
       secondDone = true;
       return r;
     });
@@ -97,7 +98,9 @@ export async function raceAtWrite<A, B>(race: RaceAtWrite<A, B>): Promise<RaceRe
       }
       const secondPid = await race.second.pid();
       const seen = await race.oracle.query<{ blocked: boolean }>("SELECT $1::int = ANY(pg_blocking_pids($2::int)) AS blocked", [firstPid, secondPid]);
-      if (seen.rows[0]?.blocked === true) {
+      // with credit the first is held until the harness's own observation (mustWait polls every 10 ms) has credited the wait: releasing on
+      // this loop's faster sighting would let the second finish before mustWait looks, and the cell would end FaultNotInjected
+      if (seen.rows[0]?.blocked === true && (race.credit === undefined || observation.credited)) {
         outcome = "blocked";
         break;
       }
@@ -120,7 +123,7 @@ export async function raceAtWrite<A, B>(race: RaceAtWrite<A, B>): Promise<RaceRe
  * the wait on the first's backend (and counts it); if the second settles without waiting, mustWait throws InterleavingNotObserved, which is
  * swallowed here — the second's own answer is the outcome and nothing is credited, so the cell goes red at the harness's check, not here.
  */
-async function startSecond<A, B>(race: RaceAtWrite<A, B>, firstPid: number, limitMs: number): Promise<B> {
+async function startSecond<A, B>(race: RaceAtWrite<A, B>, firstPid: number, limitMs: number, observation: { credited: boolean }): Promise<B> {
   if (race.credit === undefined) return race.second.run();
   const { waiter, runOn } = race.second;
   if (waiter === undefined || runOn === undefined) throw new TypeError("raceAtWrite with credit: the second names its waiter connection and runOn (the operation mustWait hands the connection to)");
@@ -128,6 +131,7 @@ async function startSecond<A, B>(race: RaceAtWrite<A, B>, firstPid: number, limi
   const what = race.what ?? "the second waits on the first";
   try {
     const waiting = await race.credit.mustWait(race.oracle, { waiter, holder: firstPid }, (client) => (started = runOn.call(race.second, client)), what, limitMs);
+    observation.credited = true;
     const settled = await waiting.pending;
     if (settled.status === "rejected") throw settled.reason;
     return settled.value;

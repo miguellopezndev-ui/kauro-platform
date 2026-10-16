@@ -71,11 +71,12 @@ function instrumented<F extends object>(inner: F): F {
 /** The payment service's SERVICE unit with its authorization and re-binding repositories instrumented as `pay.<port>`. */
 function paymentUnit<U extends object>(uow: U): U {
   const commerce = (uow as unknown as { readonly commerce: Record<string, unknown> }).commerce;
-  const wrapped = new Proxy(commerce, {
-    get(target, prop) {
-      const value: unknown = Reflect.get(target, prop, target);
+  // over an empty target: the unit's `commerce` is frozen, and a proxy may not answer a frozen target's property with anything but its own value
+  const wrapped = new Proxy({} as Record<string, unknown>, {
+    get(_target, prop) {
+      const value: unknown = Reflect.get(commerce, prop, commerce);
       if ((prop === "authorizations" || prop === "rebindings") && typeof value === "object" && value !== null) return instrumentPort(value, points, `pay.${prop}`);
-      return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+      return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(commerce) : value;
     },
   });
   return new Proxy(uow, {

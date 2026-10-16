@@ -8,7 +8,8 @@ import { ContractFakeBuyerTypeReader } from "@kauro/application/testing";
 import type { UserId } from "@kauro/domain";
 import { organizationKeyOf } from "@kauro/domain";
 import { recordActiveSeller, type Harness, type RecordedSeller } from "@kauro/persistence/testing";
-import { clock, ids, sha, world, type Person, type World, type WorldOptions } from "./support.js";
+import { call, clock, completed, freshKey, ids, sha, world, type Person, type World, type WorldOptions } from "./support.js";
+import { prepareManifest, prepareTerminationTerms } from "./sellers-support.js";
 
 export interface Seller extends RecordedSeller {
   readonly person: Person;
@@ -137,4 +138,26 @@ export async function prepareAllocation(
     }
   });
   return allocationId;
+}
+
+/**
+ * The owner's CMD050 TerminateSeller of an ACTIVE seller (nothing handed over): a seller is TERMINATED only at the effective instant of its
+ * recorded termination (0029 sellers_termination_guard), so a fixture that needs a terminated seller records the termination through the route.
+ */
+export async function terminateSeller(sw: SalesWorld, seller: Seller): Promise<void> {
+  const version = Number((await sw.w.h.oracle.query<{ version: string }>("SELECT version::text FROM kauro.sellers WHERE seller_id = $1", [seller.sellerId])).rows[0]!.version);
+  completed(
+    await call(sw.w, {
+      url: `/api/v1/sales/sellers/${seller.sellerId}/terminate`,
+      token: sw.owner.token,
+      agency: null,
+      key: freshKey("terminate"),
+      body: {
+        expectedVersion: version,
+        terminationTermsRef: await prepareTerminationTerms(sw.w.h, sw.owner.userId as UserId, seller.sellerId),
+        activeOpportunityManifestRef: await prepareManifest(sw.w.h, sw.owner.userId as UserId, seller.sellerId, []),
+      },
+    }),
+    200,
+  );
 }
