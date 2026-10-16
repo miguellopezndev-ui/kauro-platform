@@ -74,12 +74,28 @@ const D33_LITERAL = /(["'`])(AGENCY|COMPANY)\1/;
 const RANKING_TERM = /\b(segment|buyer|score|rank|ranking|priority|tier)\b/i;
 const ID_OR_CREATED = /^(\w+\.)?(\w*_id|created_at)(\s+(ASC|DESC))?$/i;
 
+/**
+ * The only lines that may name `segment`: CMD045's evidence datum, recorded and returned as the contract defines it. RecordProspectSource
+ * checks the value is a member of the closed vocabulary (it admits both segments alike), stores it and echoes it; no rule, cap, copy,
+ * query or ordering of B12 branches on it. The list is exact (file and trimmed line): any other line, or any change to these, is a read.
+ */
+const D33_EVIDENCE_DATUM = {
+  "packages/application/src/commercial/prospects/record-source.ts": new Set([
+    "const SEGMENTS: ReadonlySet<string> = new Set(COMMERCIAL_VOCABULARY.prospectSegments);",
+    "if (!SEGMENTS.has(body.segment) || !isCalendarDate(body.observedOn) || body.observedOn > now.slice(0, 10)) {",
+    "segment: body.segment as ProspectSegment,",
+    "if (stored !== null && (stored.sourceUrlDigest !== body.sourceUrlDigest || stored.observedOn !== body.observedOn || stored.lawfulBasis !== body.lawfulBasis || stored.segment !== body.segment)) {",
+    "view: { evidenceId: evidence.evidenceId, evidenceHash: evidence.evidenceHash, observedOn: evidence.observedOn, segment: evidence.segment, createdAt: evidence.recordedAt } as ProspectSourceView,",
+  ]),
+};
+
 /** D-33 problems of one source (TypeScript or SQL): a segment or buyer-type read, an AGENCY/COMPANY literal, an ordering by an attribute. */
 export function d33Problems(file, text) {
   const code = file.endsWith(".sql") ? stripSqlComments(text) : stripTsComments(text);
   const problems = [];
+  const datum = D33_EVIDENCE_DATUM[file];
   code.split("\n").forEach((line, n) => {
-    if (D33_IDENT.test(line)) problems.push(`${file}:${n + 1} reads a segment or buyer type: ${line.trim()}`);
+    if (D33_IDENT.test(line) && !datum?.has(line.trim())) problems.push(`${file}:${n + 1} reads a segment or buyer type: ${line.trim()}`);
     if (D33_LITERAL.test(line)) problems.push(`${file}:${n + 1} names an AGENCY/COMPANY literal: ${line.trim()}`);
   });
   for (const stmt of code.split(";")) {
@@ -106,7 +122,11 @@ export function importProblems(file, text) {
   const code = stripTsComments(text);
   const problems = [];
   const specs = [];
-  for (const m of code.matchAll(/\b(?:import|export)\s+(?:type\s+)?(?:[\w*{}\s,]+?\s+from\s+)?(["'])([^"']+)\1/g)) specs.push(m[2]);
+  for (const m of code.matchAll(/\b(?:import|export)\s+(type\s+)?(?:[\w*{}\s,]+?\s+from\s+)?(["'])([^"']+)\2/g)) {
+    // the api's outreach routes type their Fastify instance (a type-only import erases at compile time: no runtime dependency)
+    if (m[1] !== undefined && m[3] === "fastify" && file.startsWith("apps/api/src/outreach/")) continue;
+    specs.push(m[3]);
+  }
   for (const m of code.matchAll(/\bimport\s*\(([^)]*)\)/g)) {
     const lit = /^\s*(["'])([^"']+)\1\s*$/.exec(m[1]);
     if (lit === null) problems.push(`${file}: a dynamic import whose specifier is not a literal (${m[1].trim()})`);
@@ -207,6 +227,11 @@ export function awaitProblems(file, text) {
   const calls = /\.(queueIntent|claimIntent|refuseQueued|answerIntent|acceptUncertain|observeUncertain|recordServiceActivity|recordPersonActivity|recordSuppression)\(|\.submit\(/.test(code);
   const marked = /\/\*b12:(judge|gate)\*\//.test(code);
   if (calls && !marked) problems.push(`${file}: writes or submits without b12:judge/b12:write (b12:gate/b12:submit) markers`);
+  // a submit is marked where it is made, not elsewhere in the file: a port submit on a line without b12:submit fails closed (the unit's
+  // own `self.submit` / `this.submit` delegates to the marked call and is not a port call)
+  for (const [n, line] of code.split("\n").entries()) {
+    if (/\.submit\(/.test(line) && !/\b(?:self|this)\.submit\(/.test(line) && !/\/\*b12:submit\*\//.test(line)) problems.push(`${file}:${n + 1} submits without the b12:submit marker on the call`);
+  }
   for (const [from, to] of pairs) {
     const re = new RegExp(`\\/\\*b12:${from}\\*\\/([\\s\\S]*?)\\n([^\\n]*\\/\\*b12:${to}\\*\\/)`, "g");
     const opened = [...code.matchAll(new RegExp(`\\/\\*b12:${from}\\*\\/`, "g"))].length;

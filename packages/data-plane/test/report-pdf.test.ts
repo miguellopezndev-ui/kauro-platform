@@ -1,10 +1,14 @@
 // The report PDF (B13; design docs/design/B13-report-pdf.md): real Chromium prints the real report HTML; the bytes are read back
 // with pdf.js. Needs a Chromium-family browser (KAURO_PDF_BROWSER, or Chrome/Edge/Chromium at the usual path); without one the
-// engine tests are reported as skipped, with the reason, and the port tests (fake engines) still run.
+// engine tests are reported as skipped, with the reason, and the port tests (fake engines) still run. CI sets
+// KAURO_REQUIRE_PDF_ENGINE=1: there a missing browser is a FAILURE (never a skip), and the evidence of the run (browser version,
+// sandbox state, page sizes, hashes) is written under KAURO_PDF_EVIDENCE_DIR.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 import { generateReportPdf, renderReportHtml, ReportModelError, ReportPdfError } from "@kauro/reports";
 import type { PdfEngine, VerifiedReport } from "@kauro/reports";
@@ -13,13 +17,35 @@ import { reportOf } from "./support/report-fixtures.js";
 import { readPdf, squash } from "./support/pdf-reader.js";
 
 const browser = findChromiumExecutable(process.env["KAURO_PDF_BROWSER"] ?? null);
-const needsBrowser = browser === null ? "no Chromium-family browser found (set KAURO_PDF_BROWSER)" : false;
+const required = process.env["KAURO_REQUIRE_PDF_ENGINE"] === "1";
+// when CI requires the engine, nothing is skipped: the suite runs and the first test below fails if there is no browser
+const needsBrowser = browser === null && !required ? "no Chromium-family browser found (set KAURO_PDF_BROWSER)" : false;
+const evidenceDir = process.env["KAURO_PDF_EVIDENCE_DIR"] ?? null;
+const evidence = (name: string, value: unknown): void => {
+  if (evidenceDir === null) return;
+  mkdirSync(evidenceDir, { recursive: true });
+  writeFileSync(join(evidenceDir, name), `${JSON.stringify(value, null, 2)}
+`);
+};
 const engine = (): ChromiumPdfEngine => new ChromiumPdfEngine({ executablePath: browser as string }, "chromium/test");
 const sha256 = (b: Uint8Array): string => createHash("sha256").update(b).digest("hex");
 const PAGE_POINTS = { LETTER: [612, 792], A4: [595.28, 841.89] } as const;
 const LETTER = { pageSize: "LETTER" as const, locale: "en-US", logo: null };
 
 describe("report PDF — real engine", { skip: needsBrowser }, () => {
+  it("has a Chromium to run on, and the browser really sandboxes its processes", async () => {
+    assert.ok(browser !== null, "KAURO_REQUIRE_PDF_ENGINE=1 but no Chromium-family browser was found (set KAURO_PDF_BROWSER)");
+    const probe = await ChromiumPdfEngine.probe(browser);
+    evidence("browser.json", { executable: browser, ...probe, uid: process.platform === "win32" ? null : process.getuid?.() });
+    assert.match(probe.version, /^chromium\/\d+\.\d+\.\d+\.\d+$/);
+    if (process.platform !== "linux") return; // the process-level sandbox facts below are read from /proc
+    assert.notEqual(process.getuid?.(), 0, "the browser must not run as root");
+    assert.equal(probe.sandboxDisabledFlag, false, "no process of the browser carries a flag that disables a sandbox layer");
+    const renderers = (probe.processes ?? []).filter((p) => p.type === "renderer");
+    assert.ok(renderers.length >= 1, `a renderer process was observed (${JSON.stringify(probe.processes)})`);
+    for (const r of renderers) assert.deepEqual({ seccomp: r.seccomp, noNewPrivs: r.noNewPrivs }, { seccomp: 2, noNewPrivs: 1 }, "the renderer runs under seccomp-bpf with no_new_privs (sandboxed)");
+  });
+
   for (const pageSize of ["LETTER", "A4"] as const) {
     it(`prints a verified report as a ${pageSize} PDF whose text, figures and hash check out`, async () => {
       const report = reportOf("A-clean-multi-object");
@@ -44,6 +70,11 @@ describe("report PDF — real engine", { skip: needsBrowser }, () => {
       for (const page of read.pages) {
         assert.ok(Math.abs(page.width - w) < 0.5 && Math.abs(page.height - h) < 0.5, `page is ${page.width}x${page.height}, expected ${w}x${h}`);
       }
+      if (evidenceDir !== null) {
+        mkdirSync(evidenceDir, { recursive: true });
+        writeFileSync(join(evidenceDir, `report-${pageSize}.pdf`), pdf.bytes);
+      }
+      evidence(`report-${pageSize}.json`, { pageSize, pdfSha256: pdf.identity.pdfSha256, byteLength: pdf.identity.byteLength, engineId: pdf.identity.engineId, pages: read.pages.map((p) => ({ width: p.width, height: p.height })), expectedPoints: [w, h] });
       const text = read.pages.map((p) => p.text).join(" ");
       const flat = squash(text);
       for (const needle of ["Northwind Data Partners", "Kauro Data S.A.S.", "Colombia", "terms-2026-10-01"]) assert.ok(text.includes(needle), `missing ${needle}`);

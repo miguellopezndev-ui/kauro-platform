@@ -765,7 +765,10 @@ export async function registeredRoutes() {
       capabilities: new persistence.PgCapabilityPublication(pool),
       hashKey: new Uint8Array(32),
     };
-    const app = api.assembleApi({ environment: "LOCAL", unitOfWork, database, authenticator: api.createBearerTokenAuthenticator(new Map()), sessions, publicApi });
+    // the public one-click opt-out (B12 L-ACT) bound as a deployment binds it: a token key and the outreach units; the never-connected
+    // runtime pool stands in for the kauro_outreach pool, and registering the routes mints and reads no token
+    const optOut = { keys: [{ version: "inv", secret: new Uint8Array(32) }], units: unitOfWork };
+    const app = api.assembleApi({ environment: "LOCAL", unitOfWork, database, authenticator: api.createBearerTokenAuthenticator(new Map()), sessions, publicApi, optOut });
     await app.ready();
     const inventory = api.routeInventoryOf(app);
     await app.close();

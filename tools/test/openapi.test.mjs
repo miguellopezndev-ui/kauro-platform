@@ -37,6 +37,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
   assert.deepEqual(
     inventory.map((r) => `${r.method} ${openApiPath(r.url)} ${r.responses.operationId}`).sort(),
     [
+
       "GET /api/v1/agencies ListAgencies",
       "GET /api/v1/agencies/{agencyId} GetAgency",
       "GET /api/v1/agencies/{agencyId}/buyer-type GetBuyerType",
@@ -65,6 +66,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "GET /api/v1/projects/{projectId}/support-cases ListSupportCases",
       "GET /api/v1/public/capability-publication getCapabilityPublication",
       "GET /api/v1/public/identity-config getIdentityConfig",
+      "GET /api/v1/public/outreach/opt-out/{token} getOutreachOptOut",
       "GET /api/v1/quotes/{quoteId} GetQuote",
       "GET /api/v1/refunds/{refundId} GetRefund",
       "GET /api/v1/revisions/{revisionId} GetRevision",
@@ -134,7 +136,22 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/ops/prospects/{prospectId}/contacts RecordProspectContact",
       "POST /api/v1/ops/prospects/{prospectId}/sources RecordProspectSource",
       "POST /api/v1/ops/sales/activities RecordSalesActivity",
+      "POST /api/v1/ops/sales/agreements/{agreementId}/signature RecordAgreementSignature",
+      "POST /api/v1/ops/sales/payout-destinations ChangePayoutDestination",
+      "POST /api/v1/ops/sales/payout-destinations/{destinationId}/verify VerifyPayoutDestination",
+      "POST /api/v1/ops/sales/prospects/{prospectId}/allocations PrepareAttributionAllocation",
+      "POST /api/v1/ops/sales/prospects/{prospectId}/claim-evidence RecordClaimEvidence",
       "POST /api/v1/ops/sales/resources PublishSalesResource",
+      "POST /api/v1/ops/sales/sellers RegisterSellerCandidate",
+      "POST /api/v1/ops/sales/sellers/{sellerId}/agreements PrepareSellerAgreement",
+      "POST /api/v1/ops/sales/sellers/{sellerId}/assessments RecordSellerAssessment",
+      "POST /api/v1/ops/sales/sellers/{sellerId}/assistance-agreements RecordAssistanceAgreement",
+      "POST /api/v1/ops/sales/sellers/{sellerId}/confidentiality-acceptances RecordConfidentialityAcceptance",
+      "POST /api/v1/ops/sales/sellers/{sellerId}/legal-reviews RecordSellerLegalReview",
+      "POST /api/v1/ops/sales/sellers/{sellerId}/service-assignments PrepareServiceAssignment",
+      "POST /api/v1/ops/sales/sellers/{sellerId}/tax-documents RecordSellerTaxDocument",
+      "POST /api/v1/ops/sales/sellers/{sellerId}/termination-manifests PrepareTerminationManifest",
+      "POST /api/v1/ops/sales/sellers/{sellerId}/termination-terms PrepareTerminationTerms",
       "POST /api/v1/packages/{packageId}/download-authorizations AuthorizeDownload",
       "POST /api/v1/payment-orders/{orderId}/capture CapturePayment",
       "POST /api/v1/payment-orders/{orderId}/reconcile ReconcilePayment",
@@ -155,6 +172,7 @@ test("the committed document is the generated one, byte for byte, and matches ev
       "POST /api/v1/projects/{projectId}/support-cases CreateSupportCase",
       "POST /api/v1/projects/{projectId}/target-contracts CreateTargetContract",
       "POST /api/v1/public/inquiries createInquiry",
+      "POST /api/v1/public/outreach/opt-out/{token} postOutreachOptOut",
       "POST /api/v1/quotes/{quoteId}/payment-orders CreatePaymentOrder",
       "POST /api/v1/refunds/{refundId}/approve ApproveRefund",
       "POST /api/v1/refunds/{refundId}/execute ExecuteRefund",
@@ -248,6 +266,8 @@ test("the committed document is the generated one, byte for byte, and matches ev
     "POST /api/v1/operations/bank-accounts/{accountRef}/evidence-artifacts uploadBankEvidenceArtifact",
     "GET /api/v1/operations/bank-credits listBankCredits",
     "POST /api/v1/agencies/{agencyId}/buyer-type setBuyerType",
+    "GET /api/v1/public/outreach/opt-out/{token} getOutreachOptOut",
+    "POST /api/v1/public/outreach/opt-out/{token} postOutreachOptOut",
   ]);
   // the public routes take no credential (an explicit empty security requirement) and the inquiry names the Origin it demands
   for (const [path, method] of [["/api/v1/public/capability-publication", "get"], ["/api/v1/public/inquiries", "post"]]) assert.deepEqual(expected.paths[path][method].security, [], path);

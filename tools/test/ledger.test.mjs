@@ -456,7 +456,15 @@ test("PR18-9: a snapshot whose commit, path or packages differ from its pin in i
  */
 function titleIn(source, title) {
   const call = /(?<![\w.$])(?:test|it|describe|suite|context)(?:\.\w+)*\s*\(\s*(["'`])((?:\\[\s\S]|(?!\1)[^\\])*)\1/g;
-  for (const m of source.matchAll(call)) if (m[2].replace(/\\([\s\S])/g, "$1") === title) return true;
+  for (const m of source.matchAll(call)) {
+    if (m[2].replace(/\\([\s\S])/g, "$1") === title) return true;
+    // a template title with interpolations (a test written once per table row) is cited by one of its expansions: the literal text
+    // around every `${...}` must be there, in order, around a non-empty expansion
+    if (m[1] === "`" && m[2].includes("${")) {
+      const escape = (text) => text.replace(/\\([\s\S])/g, "$1").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (new RegExp(`^${m[2].split(/\$\{[^}]*\}/).map(escape).join("[^\\n]+")}$`).test(title)) return true;
+    }
+  }
   return false;
 }
 

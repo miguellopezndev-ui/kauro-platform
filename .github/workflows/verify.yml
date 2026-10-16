@@ -107,6 +107,66 @@ jobs:
           Expand-Archive -Path $env:RUNNER_TEMP\pg17.zip -DestinationPath C:\pgsql17
           & "$env:PGBIN/postgres.exe" --version
 
+      # The report PDF tests (packages/data-plane/test/report-pdf.test.ts) run a real, SANDBOXED Chromium; with
+      # KAURO_REQUIRE_PDF_ENGINE=1 a missing browser fails the suite instead of skipping it. The sandbox is never turned off. Ubuntu 24.04
+      # restricts unprivileged user namespaces through AppArmor (kernel.apparmor_restrict_unprivileged_userns=1), which stops a browser
+      # without an AppArmor profile from creating its namespace sandbox. This step first records what the host does, then (only if the
+      # sandboxed browser really cannot start) installs a profile that grants `userns` to that one browser binary — the confinement
+      # Ubuntu documents for Chrome — and probes again. If the sandboxed browser still cannot start, the job fails with the evidence.
+      - name: Chromium for the PDF tests (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -u
+          chrome=$(command -v google-chrome-stable || command -v google-chrome || true)
+          [ -n "$chrome" ] || { echo "::error::no Google Chrome on the runner"; exit 1; }
+          real=$(readlink -f "$chrome"); bin=/opt/google/chrome/chrome
+          { echo "## Chromium for the PDF tests"; echo; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          report() { echo "$*" | tee -a "$GITHUB_STEP_SUMMARY"; }
+          report "runner: $(. /etc/os-release; echo "$PRETTY_NAME"), kernel $(uname -r), user $(id -un) (uid $(id -u))"
+          report "executable: $chrome -> $real; binary $bin"
+          report "version: $("$chrome" --version)"
+          report "kernel.apparmor_restrict_unprivileged_userns=$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>&1)"
+          report "kernel.unprivileged_userns_clone=$(sysctl -n kernel.unprivileged_userns_clone 2>&1)"
+          report "unshare -U (plain user): $(unshare -U true 2>&1 && echo allowed || echo refused)"
+          report "apparmor profiles naming chrome: $(sudo aa-status 2>/dev/null | grep -i chrome | tr '
+' ' ' || true)"
+          probe() {
+            # the browser's own sandbox is on (no --no-sandbox); a refusal prints "No usable sandbox"
+            timeout 60 "$chrome" --headless=new --disable-gpu --dump-dom about:blank > "$RUNNER_TEMP/chrome-probe.out" 2> "$RUNNER_TEMP/chrome-probe.err"
+          }
+          if probe; then
+            report "sandboxed launch before any change: OK"
+          else
+            report "sandboxed launch before any change: REFUSED"; head -c 1500 "$RUNNER_TEMP/chrome-probe.err" | tee -a "$GITHUB_STEP_SUMMARY"
+            # `userns` for this one binary only; the global restriction stays on for everything else
+            sudo tee /etc/apparmor.d/kauro-chrome > /dev/null <<EOF
+          abi <abi/4.0>,
+          include <tunables/global>
+          profile kauro-chrome $bin flags=(unconfined) {
+            userns,
+            include if exists <local/kauro-chrome>
+          }
+          EOF
+            sudo apparmor_parser -r /etc/apparmor.d/kauro-chrome
+            report "installed an AppArmor profile granting userns to $bin only"
+            if probe; then report "sandboxed launch with the profile: OK"
+            else
+              report "sandboxed launch with the profile: REFUSED"; head -c 1500 "$RUNNER_TEMP/chrome-probe.err" | tee -a "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"; echo "::error::the sandboxed Chromium cannot start on this runner; the sandbox is not disabled"; exit 1
+            fi
+          fi
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          { echo "KAURO_PDF_BROWSER=$chrome"; echo "KAURO_REQUIRE_PDF_ENGINE=1"; echo "KAURO_PDF_EVIDENCE_DIR=$GITHUB_WORKSPACE/pdf-evidence"; } >> "$GITHUB_ENV"
+
+      - name: Chromium for the PDF tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          set -eu
+          chrome="C:/Program Files/Google/Chrome/Application/chrome.exe"
+          [ -f "$chrome" ] || { echo "::error::no Google Chrome on the runner"; exit 1; }
+          echo "version: $(powershell -NoProfile -Command "(Get-Item '$chrome').VersionInfo.ProductVersion")"
+          { echo "KAURO_PDF_BROWSER=$chrome"; echo "KAURO_REQUIRE_PDF_ENGINE=1"; echo "KAURO_PDF_EVIDENCE_DIR=$GITHUB_WORKSPACE/pdf-evidence"; } >> "$GITHUB_ENV"
+
       - name: Install from the lockfile
         run: pnpm install --frozen-lockfile
 
@@ -123,6 +183,7 @@ jobs:
           path: |
             verify.log
             apps/api/openapi.json
+            pdf-evidence/
             apps/web/src/api/generated.ts
             docs/design/B06-state-command-event-matrix.md
           if-no-files-found: warn
