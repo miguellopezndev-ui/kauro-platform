@@ -18,3 +18,5 @@ export { renderReportHtml, escapeHtml, LOGO_MAX_BYTES, LOGO_MAX_PIXELS } from ".
 export type { RenderOptions, RenderedReport, PageSize } from "./html.js";
 export { REPORT_COPY, copyText, resolveLocale } from "./copy.js";
 export type { ReportLocale, CopyKey } from "./copy.js";
+export { generateReportPdf, ReportPdfError, PDF_ERROR_CODES } from "./pdf.js";
+export type { PdfEngine, PdfPrintRequest, PdfErrorCode, ReportPdf, ReportPdfIdentity, ReportPdfPublisher } from "./pdf.js";

@@ -56,3 +56,9 @@ export {
 } from "./cores/migration-core-adapter.js";
 export { CoreFullDatasetValidation, type CoreFullDatasetValidationOptions } from "./cores/full-dataset-validation.js";
 export { coreTimersOf, type CoreTimers } from "./cores/operation.js";
+
+/**
+ * The report PDF engine (B13; docs/design/B13-report-pdf.md): the adapter of @kauro/reports' PdfEngine port. Chromium with its own
+ * sandbox on, JavaScript off, network off; the caller supplies the executable.
+ */
+export { ChromiumPdfEngine, findChromiumExecutable, PDF_HTML_MAX_BYTES, type ChromiumPdfEngineOptions } from "./pdf/chromium-pdf-engine.js";
