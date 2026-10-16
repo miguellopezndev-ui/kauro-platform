@@ -245,6 +245,8 @@ export interface SendWorld {
   standAt(at: string | null): void;
   /** The cell operation's step clock: every unit positions its transaction on it while set (fault-support FaultRouting.clock). */
   bindClock(clock: StepClock | null): void;
+  /** The dispatcher that holds the lease claims it again at the instant the bound clock stands on (see the world). */
+  renewLease(): Promise<void>;
   /** Sets or removes the deployment compliance configuration (postal address, opt-out origin); returns the restore. */
   setCompliance(config: ComplianceConfig | null): () => void;
   /** An ACTIVE seller with its verified GMAIL_API identity (owner routes RegisterSenderIdentity + VerifySenderIdentity). */
@@ -563,6 +565,7 @@ export async function onEffectClock<T>(ctx: FaultContext, w: SendWorld, what: st
   return ctx.operation(what, async (op) => {
     w.bindClock(op.clock);
     try {
+      await w.renewLease();
       return await fn();
     } finally {
       w.bindClock(null);

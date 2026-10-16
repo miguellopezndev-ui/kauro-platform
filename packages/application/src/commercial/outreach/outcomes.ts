@@ -98,12 +98,14 @@ export const REGISTER_SENDER_IDENTITY_OUTCOMES: ReadonlyArray<ProblemOutcome> = 
   ...STEP_UP,
   NOT_FOUND("the person"),
   PRE("OUTREACH_ROUTE_FORBIDDEN", "the route needs the person consent evidence it lacks, or may not be registered for this person (KC028)"),
+  PRE("SELLER_NOT_ACTIVE", "the person's seller is terminated: a terminated seller gets no sender identity"),
+  outcome("COMMAND", "IDEMPOTENCY_CONFLICT", null, "a sender identity of this address and route is already recorded (the second of two registrations answers like the replay of the first)"),
 ]);
 
 /** VerifySenderIdentity: the sender. */
 export const VERIFY_SENDER_IDENTITY_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
   NOT_FOUND("the sender identity"),
-  PRE("SENDER_REVOKED", "the sender identity was revoked and cannot be verified", "ALWAYS"),
+  PRE("SENDER_REVOKED", "the sender identity was revoked and cannot be verified"),
 ]);
 
 /** RecordSenderRevocation: the sender; revoking a revoked sender is a replay. */

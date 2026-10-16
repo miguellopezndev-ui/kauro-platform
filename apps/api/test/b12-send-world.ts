@@ -261,6 +261,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
   let statementTimeout: number | null = null;
   const dispatchers = new Map<string, Dispatcher>();
   let leaseHolder: string | null = null;
+  const renewers = new Map<string, () => Promise<number>>();
 
   /** One transaction of a runtime role under a person's OPERATOR context on the TEST CLOCK at `at` (a fixture standing in for a lane's route). */
   const within = async <T>(userId: string, at: string, fn: (c: Client) => Promise<T>): Promise<T> => {
@@ -355,6 +356,18 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
     gmail,
     resend,
     gmailContract: gmail.contract,
+    async renewLease() {
+      // the lease of the dispatcher that holds it, claimed again at the instant the bound clock stands on (a dispatcher heartbeats; a cell that moves the
+      // effect clock days ahead of the lease would otherwise judge it expired before the interleaving it stages)
+      const renew = leaseHolder === null ? undefined : renewers.get(leaseHolder);
+      if (renew === undefined || boundClock === null) return;
+      sw.clock.standAt?.(boundClock.now());
+      try {
+        await renew();
+      } finally {
+        sw.clock.standAt?.(null);
+      }
+    },
     async beginCell() {
       dispatchers.clear();
       leaseHolder = null;
@@ -504,6 +517,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       let fence: number | null = null;
       const admitted = new Map<string, Parameters<OutreachDispatcher["submit"]>[0]>();
       let leasedAt: string | null = null;
+      let explicit = false;
       // the lease is claimed again only once it ran out on the clock the world stands at (a lease still valid keeps its fence: the old owner of a
       // takeover cell must not renew the lease the new owner is about to claim)
       const leaseExpiredAt = (standing: string | null, since: string | null): boolean => standing !== null && since !== null && Date.parse(standing) >= Date.parse(since) + 120_000;
@@ -518,7 +532,9 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       const lease = async (): Promise<OutreachLeaseRef> => {
         // a lease lives 120 s on the clock the world stands at: standing somewhere else, the dispatcher's own lease is claimed again
         // an owner another dispatcher took the lease from keeps its stale fence (its late answers are fenced, never re-leased)
-        if (fence === null || (boundClock === null && (leaseHolder === null || leaseHolder === name) && leaseExpiredAt(state.standing, leasedAt))) await takeOver();
+        // a dispatcher the cell took over explicitly keeps its fence until the lease ran out; one that leases implicitly claims again wherever the world stands
+        const again = explicit ? leaseExpiredAt(state.standing, leasedAt) : state.standing !== leasedAt;
+        if (fence === null || (boundClock === null && (leaseHolder === null || leaseHolder === name) && again)) await takeOver();
         return { resourceId: d.resourceId, ownerId: d.ownerId, fence: fence as number };
       };
       const adapter: Dispatcher = {
@@ -552,7 +568,8 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
         async submit(intentId): Promise<ClassifiedAnswer> {
           const claimed = admitted.get(intentId);
           if (claimed === undefined) throw new Error(`${name}: intent ${intentId} was not admitted by this dispatcher's claim`);
-          return d.call(claimed, await lease());
+          // D3 follows its own D2 under the lease reference that claim used (dispatch passes one reference through claim and submit)
+          return d.call(claimed, { resourceId: d.resourceId, ownerId: d.ownerId, fence: claimed.fence });
         },
         async record(intentId, answer) {
           return d.record(intentId, await lease(), answer);
@@ -563,9 +580,13 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
         get fence() {
           return fence;
         },
-        takeOver,
+        takeOver: async () => {
+          explicit = true;
+          return takeOver();
+        },
       };
       dispatchers.set(name, adapter);
+      renewers.set(name, takeOver);
       return adapter;
     },
     async open(login) {

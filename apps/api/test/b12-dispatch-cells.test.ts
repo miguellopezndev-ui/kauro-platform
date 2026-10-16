@@ -844,6 +844,7 @@ cell("GAP-DI-4 CRASH: after the SUBMITTING UPDATE, before COMMIT: QUEUED, redeli
   w.standAt(T0);
   const s = await staged(w, "di4");
   const id = await queued(w, s);
+  await D().takeOver(); // the lease unit is not the target: unit 1 of the invocation is the claim
   const crash = ctx.points.crash("target.before-commit");
   const conn = await w.open("kauro_outreach_test");
   try {
@@ -935,20 +936,23 @@ cell("GAP-DI-8 TIMEOUT: the outcome COMMIT times out once: D4 retries and record
     await conn.query("SELECT pg_advisory_xact_lock(kauro.transition_key('kauro.outreach_drafts', $1))", [draftId]);
     return { conn, release: async () => { await conn.query("ROLLBACK"); await conn.end(); } };
   };
+  // D2 and D3 run as the dispatcher runs them (claim, then the call the fake holds open); D4, the unit that waits, is the observed operation
+  assert.equal(await disp.claim(id), "ADMITTED", "D2 committed SUBMITTING");
   const held = w.gmail.holdNext();
+  const call = disp.submit(id);
+  await held.reached; // D3 is in the call
+  const hold = await lockDraft(s.draft.draftId);
+  held.answer({ kind: "ACCEPTED", ref: "gmail-di8" });
+  const answer = await call;
   const conn = await w.open("kauro_outreach_test");
   w.setStatementTimeout(1_000);
   try {
-    const running = w.on(conn, "kauro_outreach", ctx, [W.draftLock], () => disp.dispatch(id));
-    await held.reached; // D2 committed SUBMITTING; D3 is in the call
-    const hold = await lockDraft(s.draft.draftId);
-    held.answer({ kind: "ACCEPTED", ref: "gmail-di8" });
-    const waited = await ctx.mustWait(w.oracle, { waiter: conn, holder: connectionPid(hold.conn) }, () => running, "D4 attempt 1 waits at L10");
+    const waiting = await ctx.mustWait(w.oracle, { waiter: conn, holder: connectionPid(hold.conn) }, () => w.on(conn, "kauro_outreach", ctx, [W.draftLock], () => disp.record(id, answer)), "D4 attempt 1 waits at L10");
     const second = ctx.points.pause("db.draft_lock.before");
     await second.reached;
     await hold.release();
     second.release();
-    await waited.pending;
+    await waiting.pending;
   } finally {
     w.setStatementTimeout(null);
     await conn.end().catch(() => undefined);

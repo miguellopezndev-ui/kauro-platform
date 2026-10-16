@@ -100,7 +100,16 @@ const JUDGE_MARKER = "/* b12:judge */";
 function routedClient(route: Route): PoolClient {
   const instrumented = new Map<string, (...a: unknown[]) => Promise<unknown>>();
   const holder: Record<string, (...a: unknown[]) => Promise<unknown>> = {};
-  for (const step of route.steps) holder[step.label] = (...a: unknown[]) => (route.conn.query as (...x: unknown[]) => Promise<unknown>)(...a);
+  // an instrumented judgment statement reads the clock at ITS moment: after its `.before` point (a cell pauses there, then moves the clock), not before it
+  for (const step of route.steps) {
+    holder[step.label] = async (...a: unknown[]) => {
+      const first = a[0];
+      const text = typeof first === "string" ? first : (first as { text?: string } | undefined)?.text ?? "";
+      const judge = route.judgeClock?.() ?? null;
+      if (judge !== null && text.includes(JUDGE_MARKER)) await judge.onServer(route.conn as unknown as SqlSession);
+      return (route.conn.query as (...x: unknown[]) => Promise<unknown>)(...a);
+    };
+  }
   const wrapped = instrumentPort(holder, route.points, "db");
   for (const step of route.steps) instrumented.set(step.label, wrapped[step.label] as never);
   return new Proxy(route.conn, {
@@ -127,7 +136,7 @@ function routedClient(route: Route): PoolClient {
           const send = (): unknown => (hit !== null ? instrumented.get(hit.label)!(...args) : (target.query as (...x: unknown[]) => unknown)(...args));
           // a judgment statement reads the clock at ITS moment: a crossing the cell made while the unit waited is consumed by it (§W)
           const judge = route.judgeClock?.() ?? null;
-          const answer = (): unknown => (judge !== null && text.includes(JUDGE_MARKER) ? Promise.resolve(judge.onServer(target as unknown as SqlSession)).then(send) : send());
+          const answer = (): unknown => (hit === null && judge !== null && text.includes(JUDGE_MARKER) ? Promise.resolve(judge.onServer(target as unknown as SqlSession)).then(send) : send());
           const unit = route.unit;
           if (unit === undefined) return answer();
           const params = ((args[1] as ReadonlyArray<unknown> | undefined) ?? (first as { values?: ReadonlyArray<unknown> } | undefined)?.values ?? []) as ReadonlyArray<unknown>;

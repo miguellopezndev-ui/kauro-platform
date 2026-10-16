@@ -98,8 +98,9 @@ export class PgPlanRepository implements PlanRepository {
     return r.rows[0] ? planRecord(r.rows[0]) : null;
   }
 
+  /** FOR NO KEY UPDATE: the plan row serializes the plan's writers without blocking the FOR KEY SHARE that a child row's foreign key takes (CreateQuote holds the approval half, then inserts a row that references the plan: FOR UPDATE here deadlocked with WithdrawApproval). */
   async lock(planId: PlanId): Promise<PlanRecord | null> {
-    const r = await execute<PlanRow>(this.db, `SELECT ${PLAN_COLUMNS} FROM kauro.plans WHERE plan_id = $1 FOR UPDATE`, [planId]);
+    const r = await execute<PlanRow>(this.db, `SELECT ${PLAN_COLUMNS} FROM kauro.plans WHERE plan_id = $1 FOR NO KEY UPDATE`, [planId]);
     return r.rows[0] ? planRecord(r.rows[0]) : null;
   }
 

@@ -3228,6 +3228,8 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
 | 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
 | 409 | PRECONDITION_FAILED | OUTREACH_ROUTE_FORBIDDEN | — | — | COMMAND | the route needs the person consent evidence it lacks, or may not be registered for this person (KC028) |
+| 409 | PRECONDITION_FAILED | SELLER_NOT_ACTIVE | — | — | COMMAND | the person's seller is terminated: a terminated seller gets no sender identity |
+| 409 | IDEMPOTENCY_CONFLICT | — | — | — | COMMAND | a sender identity of this address and route is already recorded (the second of two registrations answers like the replay of the first) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |
@@ -3260,7 +3262,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 404 | NOT_FOUND | — | — | — | COMMAND | the sender identity is unknown, or a row the caller may not see: a foreign and a nonexistent row answer alike |
 | 409 | IDEMPOTENCY_CONFLICT | REQUEST_DIGEST_DIFFERS | — | — | IDEMPOTENCY | the key was used with another request: nothing was executed again |
 | 409 | PRECONDITION_FAILED | OPERATION_PENDING | — | — | IDEMPOTENCY | the first request under this key is still in flight; retry with the same key |
-| 409 | PRECONDITION_FAILED | SENDER_REVOKED | — | always | COMMAND | the sender identity was revoked and cannot be verified |
+| 409 | PRECONDITION_FAILED | SENDER_REVOKED | — | — | COMMAND | the sender identity was revoked and cannot be verified |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |
 | 422 | INTEGRITY_FAILURE | RESPONSE_CONTRACT_VIOLATION | — | — | PLATFORM | the reply its route's contract refused was not sent (R23, N13) |
 | 500 | INTERNAL_ERROR | — | — | — | PLATFORM | an unexpected exception, recorded under the correlation id; retry with the same key |

@@ -18998,7 +18998,7 @@
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 3 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 5 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -19032,6 +19032,18 @@
                 "reason": "OUTREACH_ROUTE_FORBIDDEN",
                 "layer": "COMMAND",
                 "meaning": "the route needs the person consent evidence it lacks, or may not be registered for this person (KC028)"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "SELLER_NOT_ACTIVE",
+                "layer": "COMMAND",
+                "meaning": "the person's seller is terminated: a terminated seller gets no sender identity"
+              },
+              {
+                "code": "IDEMPOTENCY_CONFLICT",
+                "reason": null,
+                "layer": "COMMAND",
+                "meaning": "a sender identity of this address and route is already recorded (the second of two registrations answers like the replay of the first)"
               }
             ]
           },
@@ -19842,7 +19854,6 @@
               {
                 "code": "PRECONDITION_FAILED",
                 "reason": "SENDER_REVOKED",
-                "current": "ALWAYS",
                 "layer": "COMMAND",
                 "meaning": "the sender identity was revoked and cannot be verified"
               }

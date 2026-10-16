@@ -446,7 +446,7 @@ export class PgOutreachSend {
     const r = (
       await execute<{ state: string; claim_fence: string | null; open: boolean }>(
         this.db,
-        "SELECT state, claim_fence, (kauro.effect_now() <= submitted_at + interval '5 seconds') AS open FROM kauro.outreach_send_intents WHERE intent_id = $1",
+        "/* b12:judge */ SELECT state, claim_fence, (kauro.effect_now() <= submitted_at + interval '5 seconds') AS open FROM kauro.outreach_send_intents WHERE intent_id = $1",
         [intentId],
       )
     ).rows[0];
@@ -534,6 +534,9 @@ ${seed}`, "utf8").digest("hex");
   async #evidence(intentId: string, fence: number, answer: OutcomeAnswer, at: string, locks: OutreachLocks, f: Facts): Promise<string> {
     const status = answer.kind === "UNCERTAIN" ? "UNKNOWN" : answer.kind === "REJECTED_DEFINITIVE" ? "REJECTED_DEFINITIVE" : answer.kind;
     requireHeld(locks, "D4b evidence", [["L10", f.draft_id, "X"]]);
+    // a late 403/429 writes its warning in the same unit, ahead of the evidence row (one per intent, ON CONFLICT DO NOTHING: a replay adds nothing): a
+    // failure at the evidence INSERT rolls the warning back with it (GAP-DI-22)
+    if (answer.kind === "REJECTED_DEFINITIVE" && (answer.status === 403 || answer.status === 429)) await this.#warning(f, answer.status, at);
     const inserted = await execute(
       this.db,
       `/* b12:write */ INSERT INTO kauro.outreach_send_evidence (evidence_id, intent_id, fence, status, provider_ref, http_status, recorded_by_service, received_at)
@@ -541,7 +544,6 @@ ${seed}`, "utf8").digest("hex");
       [this.#id(), intentId, fence, status, answer.kind === "ACCEPTED" ? answer.ref : "NONE", answer.kind === "REJECTED_DEFINITIVE" ? answer.status : null, at],
     );
     if (inserted.rowCount !== 1) return "NOOP";
-    if (answer.kind === "REJECTED_DEFINITIVE" && (answer.status === 403 || answer.status === 429)) await this.#warning(f, answer.status, at);
     if (answer.kind !== "ACCEPTED") return `EVIDENCE(${status})`;
     const state = (await execute<{ state: string }>(this.db, "SELECT state FROM kauro.outreach_send_intents WHERE intent_id = $1", [intentId])).rows[0]?.state;
     const keys = keysOf(f);
@@ -563,11 +565,15 @@ ${seed}`, "utf8").digest("hex");
 
   // ---- D5 -----------------------------------------------------------------------------------------------------------------------------
 
-  /** The intents D5 recovers: SUBMITTING with uncertain_after passed at the database's instant (no lock; the unit re-judges). */
+  /**
+   * The intents D5 visits: every SUBMITTING one that carries its uncertain_after, earliest first (no lock). Whether one is due is judged by its own unit, after
+   * its lease statement and at that statement's instant (plan section W: D5's last await before its judgment is the L13 FOR SHARE); a listing that filtered on
+   * the instant it ran at would miss an intent whose uncertain_after the effect clock crosses while the unit waits at the lease.
+   */
   async dueForRecovery(limit: number): Promise<ReadonlyArray<string>> {
     const r = await execute<{ intent_id: string }>(
       this.db,
-      "SELECT intent_id FROM kauro.outreach_send_intents WHERE state = 'SUBMITTING' AND uncertain_after <= kauro.effect_now() ORDER BY uncertain_after, intent_id LIMIT $1",
+      "SELECT intent_id FROM kauro.outreach_send_intents WHERE state = 'SUBMITTING' AND uncertain_after IS NOT NULL ORDER BY uncertain_after, intent_id LIMIT $1",
       [limit],
     );
     return r.rows.map((x) => x.intent_id);
@@ -598,6 +604,12 @@ ${seed}`, "utf8").digest("hex");
   }
 
   /** The state of an intent (D6 settles the outbox record by it); null when none. */
+  /** D4's retry window: effect_now is still before uncertain_after + d4Grace (60 s, the claim of a repeat waits for the same instant, GAP-DI-25). */
+  async d4WindowOpen(intentId: string): Promise<boolean> {
+    const r = await execute<{ open: boolean }>(this.db, "SELECT (uncertain_after IS NOT NULL AND kauro.effect_now() < uncertain_after + interval '60 seconds') AS open FROM kauro.outreach_send_intents WHERE intent_id = $1", [intentId]);
+    return r.rows[0]?.open === true;
+  }
+
   async stateOf(intentId: string): Promise<string | null> {
     const r = await execute<{ state: string }>(this.db, "SELECT state FROM kauro.outreach_send_intents WHERE intent_id = $1", [intentId]);
     return r.rows[0]?.state ?? null;
