@@ -502,7 +502,7 @@ test("R2-026: RACE (revocation) CMD026 withdraws the re-check plan approval whil
   const { sale, recheck } = await repairable("t7-revocation-quote");
   const quotes = await quotesOf(sale.projectId);
   // CMD026 holds the plan row and the approval's exclusive half; CreateQuote waits on the approval's shared half, then reads it withdrawn
-  const held = await hold("approvals.withdraw", () => withdraw(recheck));
+  const held = await hold("plans.lock", () => withdraw(recheck));
   const cq = tracked(quoteOn(recheck));
   await waiterOn(held.pid, cq.settled, "CreateQuote behind the withdrawal");
   held.release();

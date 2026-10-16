@@ -136,7 +136,7 @@ test("CMD035-DENY: RACE (expiry) the profile valid_until passes while CMD035 wai
     await s.query(DOC_S_HALF, [inv.document_id]);
     const waiting = tracked(issue(fw, request(inv, key)));
     await seenWaiting(fw, DOC_X_WAIT, "CMD035 waits on the document's half", { holderPid: s.pid, settled: waiting.settled });
-    await dbPast(fw, until);
+    await dbPast(fw, until, 20_000); // the version ends 12 s after the re-review: a quick setup leaves more than the default 10 s to wait
     await s.rollback();
     refused = brief(await waiting.promise);
   } finally {

@@ -1339,9 +1339,9 @@ d2Deny("health", "NOT_SENT(PAUSED)", "DRAFT", async (label) => {
   return x;
 });
 d2Deny("business day", "NOT_SENT(OUTSIDE_BUSINESS_DAY)", "DRAFT", async (label) => {
-  w.standAt("2026-10-16T20:00:00.000000Z"); // Friday
+  w.standAt(plusMs(T0, 29 * 3_600_000)); // Friday 20:00Z (T0 is a Thursday 15:00Z)
   const x = await admitted(label);
-  w.standAt("2026-10-17T15:00:00.000000Z"); // Saturday
+  w.standAt(plusMs(T0, 2 * DAY_MS)); // Saturday 15:00Z
   return x;
 });
 d2Deny("seller", "CANCELLED(SELLER_NOT_ACTIVE)", "CANCELLED", async (label) => {
