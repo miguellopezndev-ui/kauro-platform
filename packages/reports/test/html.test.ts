@@ -212,6 +212,17 @@ describe("print layout and identity (S070)", () => {
   });
 });
 
+describe("the footer names every input it promises (regression: a placeholder with a digit was printed unreplaced)", () => {
+  it("prints the package digest, the manifest SHA-256 and the model hash, and no unreplaced placeholder", () => {
+    const r = report("D-salesforce");
+    const { html } = renderReportHtml(r, { pageSize: "LETTER", locale: "en-US", logo: null });
+    const footer = html.slice(html.indexOf("<footer>"), html.indexOf("</footer>"));
+    for (const ref of [r.model.package.packageDigest, r.model.package.manifestSha256, r.modelHash]) assert.ok(footer.includes(ref));
+    assert.ok(!/[{}]/.test(html.slice(html.indexOf("<body>"))), "an unreplaced {placeholder} was rendered");
+    assert.equal(copyText("en-US", "footer.identity", { packageDigest: "a", manifestSha256: "b", coreVersion: "c", modelHash: "d", rendererVersion: "e" }), "Package a, manifest b, core c, report model d, renderer e.");
+  });
+});
+
 describe("R-E3: English by default from a catalog keyed by locale", () => {
   it("an unknown locale falls back to English, key by key", () => {
     const r = report("B-dirty-multinational");
@@ -234,7 +245,7 @@ describe("R-E3: English by default from a catalog keyed by locale", () => {
     const catalog = Object.values(REPORT_COPY["en-US"]);
     const modelText = JSON.stringify(r.model);
     for (const t of texts) {
-      const fromCatalog = catalog.some((c) => c === t || c.includes("{") && new RegExp(`^${c.replace(/[.*+?^$()|[\]\\]/g, "\\$&").replace(/\{[a-zA-Z]+\}/g, ".+")}$`).test(t));
+      const fromCatalog = catalog.some((c) => c === t || c.includes("{") && new RegExp(`^${c.replace(/[.*+?^$()|[\]\\]/g, "\\$&").replace(/\{[a-zA-Z][a-zA-Z0-9]*\}/g, ".+")}$`).test(t));
       const fromModel = modelText.includes(t.replace(/,/g, "")) || /^[0-9,]+$/.test(t);
       assert.ok(fromCatalog || fromModel, `hard-coded text: ${t}`);
     }

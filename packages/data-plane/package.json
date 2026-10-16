@@ -37,10 +37,13 @@
     "@kauro/contracts": "workspace:*",
     "@kauro/domain": "workspace:*",
     "@kauro/intelligence-core": "workspace:*",
-    "@kauro/migration-core": "workspace:*"
+    "@kauro/migration-core": "workspace:*",
+    "@kauro/reports": "workspace:*",
+    "playwright-core": "1.63.0"
   },
   "devDependencies": {
     "@types/node": "24.3.1",
+    "pdfjs-dist": "5.6.205",
     "typescript": "5.9.2"
   }
 }
