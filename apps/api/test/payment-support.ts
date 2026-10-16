@@ -135,7 +135,7 @@ export interface PaymentWorld {
   stop(): Promise<void>;
 }
 
-export async function paymentWorld(options: { readonly clock?: Clock; readonly requestSide?: boolean; readonly sessions?: boolean; readonly commissions?: WorldOptions["commissions"]; readonly commercial?: WorldOptions["commercial"]; readonly wrapUnitOfWork?: WorldOptions["wrapUnitOfWork"]; readonly wrapCommerce?: <F extends object>(inner: F) => F } = {}): Promise<PaymentWorld> {
+export async function paymentWorld(options: { readonly clock?: Clock; readonly requestSide?: boolean; readonly sessions?: boolean; readonly commissions?: WorldOptions["commissions"]; readonly commercial?: WorldOptions["commercial"]; readonly optOut?: WorldOptions["optOut"]; readonly wrapUnitOfWork?: WorldOptions["wrapUnitOfWork"]; readonly wrapCommerce?: <F extends object>(inner: F) => F } = {}): Promise<PaymentWorld> {
   const clock: Clock = options.clock ?? processClock;
   const providerClock = movableClock();
   const paypal = createPayPalContractFake({ clock: providerClock });
@@ -173,6 +173,7 @@ export async function paymentWorld(options: { readonly clock?: Clock; readonly r
           },
           ...(options.commissions !== undefined ? { commissions: options.commissions } : {}),
           ...(options.commercial !== undefined ? { commercial: options.commercial } : {}),
+          ...(options.optOut !== undefined ? { optOut: options.optOut } : {}),
           ...(options.wrapUnitOfWork !== undefined ? { wrapUnitOfWork: options.wrapUnitOfWork } : {}),
           // opt-in (PV1 L-ROUTE r1, RR-4): the B11 session boundary; absent, the world is built exactly as before
           ...(options.sessions === true ? { sessions: true } : {}),

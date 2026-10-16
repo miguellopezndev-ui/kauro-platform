@@ -8,7 +8,7 @@
 // Providers are K1's labelled contract fakes (SIMULATED). Written FIRST: every title fails until the lane builds the dispatcher; every §M cell
 // fails under its control (KAURO_B12_CONTROL=<M>) at its forbidden-effect assertion, which each body asserts before the observed block.
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
+import { after, before, beforeEach, test } from "node:test";
 import { connectionPid, type FaultContext } from "@kauro/persistence/testing";
 import {
   activate, activityKinds, answerOf, callsOf, cell, D4_GRACE_MS, DAY_MS, draftRow, draftState, evidenceOf, firstContacts, firstContacts24h, grantReserved, holdLease,
@@ -19,6 +19,9 @@ import {
 import type { Reply } from "./support.js";
 
 let w: SendWorld;
+beforeEach(async () => {
+  await w.beginCell();
+});
 before(async () => {
   w = await sendWorld("b12-dispatch");
 });
@@ -210,7 +213,7 @@ cell("R2-130 (cross-seller): the public opt-out through the token of P1's submit
     const sellerC = await w.seller(`m21-${order}-c`);
     const p3 = await staged(w, `m21-${order}-c`, { seller: sellerC, prospect: await w.prospect(sellerC, { contact }) });
     const i3 = await queued(w, p3);
-    const O: RaceActor<unknown> = { name: "public opt-out", role: "kauro_app", run: () => w.routes.optOut(token), at: W.suppressionInsert };
+    const O: RaceActor<unknown> = { name: "public opt-out", role: "kauro_outreach", run: () => w.routes.optOut(token), at: W.suppressionInsert };
     const C = d2Actor("D2 of P2", D(), i2);
     runs.push({ order, p2, i2, i3, r: await raceAtWrite(ctx, "M21", order === 1 ? O : C, order === 1 ? C : O) });
   }
@@ -239,7 +242,7 @@ cell("R2-130 (same prospect): the public opt-out through the FIRST message's tok
     const g = await w.grant([f]);
     const follow = intentIdOf(await send(w, s.seller, f, g));
     if (order === 1) assert.throws(() => tokenOf(w, follow), "the support refuses a token of an intent never submitted");
-    const O: RaceActor<unknown> = { name: "public opt-out", role: "kauro_app", run: () => w.routes.optOut(token), at: W.suppressionInsert };
+    const O: RaceActor<unknown> = { name: "public opt-out", role: "kauro_outreach", run: () => w.routes.optOut(token), at: W.suppressionInsert };
     const C = d2Actor("D2 of the follow-up", D(), follow);
     runs.push({ order, s, follow, g, r: await raceAtWrite(ctx, "M22", order === 1 ? O : C, order === 1 ? C : O) });
   }

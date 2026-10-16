@@ -114,3 +114,31 @@ REVOKE ALL ON FUNCTION kauro.seller_payout_destinations_step_up_at_commit() FROM
 -- (all of Payments V1's F1/F2/G1..G4 commands). 0080's own reads of identities and proofs name CURRENT_USER; the grants get the same, read only.
 DROP POLICY IF EXISTS corporate_roles_bank_owner_read ON kauro.corporate_roles;
 CREATE POLICY corporate_roles_bank_owner_read ON kauro.corporate_roles FOR SELECT TO CURRENT_USER USING (true);
+
+-- --- 5. a follow-up is judged on an outreach business instant too (plan A10, GAP-SE-20) ---------------------------------------------------
+-- 0088 admits a first contact only on an outreach business instant and judges a follow-up by its window alone ([first + 5 business days, first +
+-- 14 days)); the plan's cell GAP-SE-20 refuses "a Saturday follow-up inside its window too" (D-B12O-6a: never looser than any reading). The same
+-- calendar answers at CMD063 (the intent's insert) and at the claim (D2's re-stamp): KC037 outside the covered years, KC032 OUTSIDE_BUSINESS_DAY.
+CREATE OR REPLACE FUNCTION kauro.outreach_send_intents_followup_calendar() RETURNS trigger
+  LANGUAGE plpgsql SET search_path = pg_catalog AS
+$$
+DECLARE
+  judged timestamptz := kauro.effect_now();
+  b boolean := kauro.outreach_business_instant(kauro.effect_now());
+BEGIN
+  IF b IS NULL THEN
+    RAISE EXCEPTION 'OUTREACH_CALENDAR_UNAVAILABLE: no calendar row for %', judged USING ERRCODE = 'KC037';
+  END IF;
+  IF NOT b THEN
+    RAISE EXCEPTION 'OUTREACH_CAP_REACHED: OUTSIDE_BUSINESS_DAY at %', judged USING ERRCODE = 'KC032';
+  END IF;
+  RETURN NEW;
+END
+$$;
+REVOKE ALL ON FUNCTION kauro.outreach_send_intents_followup_calendar() FROM PUBLIC;
+DROP TRIGGER IF EXISTS outreach_send_intents_c_followup_calendar ON kauro.outreach_send_intents;
+CREATE TRIGGER outreach_send_intents_c_followup_calendar BEFORE INSERT ON kauro.outreach_send_intents
+  FOR EACH ROW WHEN (NEW.purpose = 'FOLLOW_UP') EXECUTE FUNCTION kauro.outreach_send_intents_followup_calendar();
+DROP TRIGGER IF EXISTS outreach_send_intents_g_followup_calendar ON kauro.outreach_send_intents;
+CREATE TRIGGER outreach_send_intents_g_followup_calendar BEFORE UPDATE OF state ON kauro.outreach_send_intents
+  FOR EACH ROW WHEN (OLD.state = 'QUEUED' AND NEW.state = 'SUBMITTING' AND NEW.purpose = 'FOLLOW_UP') EXECUTE FUNCTION kauro.outreach_send_intents_followup_calendar();

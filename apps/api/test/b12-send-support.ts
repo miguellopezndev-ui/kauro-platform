@@ -69,7 +69,8 @@ export const T0 = ((): string => {
       const weekday = day.getUTCDay() !== 0 && day.getUTCDay() !== 6;
       if (weekday && isOutreachBusinessInstant(day) !== true) clean = false;
     }
-    if (clean) return `${d.toISOString().slice(0, 19)}.000000Z`;
+    // GAP-SE-19 places a new sequence at T0 + 90 days (a Wednesday): a business instant in both zones too
+    if (clean && isOutreachBusinessInstant(new Date(d.getTime() + 90 * DAY)) === true) return `${d.toISOString().slice(0, 19)}.000000Z`;
   }
   throw new Error("no clean business Thursday in the outreach calendar's years: the calendar needs its next edition");
 })();
@@ -280,6 +281,10 @@ export interface SendWorld {
   contentOf(d: DraftP): Promise<{ readonly subject: string; readonly body: string }>;
   /** The ContractFakeGmailSend instance (K1) behind `gmail` (tokenOf reads its recorded MIME). */
   readonly gmailContract: ContractFakeGmailSend;
+  /** The start of a cell: no dispatcher of an earlier cell stays known and the dispatch lease row is free (a second owner would find it HELD). */
+  beginCell(): Promise<void>;
+  /** The internal errors the api recorded (a routed unit that failed at a fault point answers 500; ctx.partial needs the error itself). */
+  readonly internalErrors: ReadonlyArray<{ readonly error: unknown }>;
   /**
    * The §M control (rule 24a/24c): fn with the cell's WHOLE serializer set removed from both actors (each lock's acquisition and its T2
    * assertion) and every listed co-guard dropped (K1 withoutGuards, b12-outreach-support.ts:421), everything else unchanged.
@@ -377,7 +382,15 @@ export async function holdLease(w: SendWorld): Promise<Hold> {
 export async function waitingBehind<T>(ctx: FaultContext, w: SendWorld, holder: Hold, role: "kauro_app" | "kauro_outreach", what: string, fn: () => Promise<T>, steps: ReadonlyArray<SqlStep> = []): Promise<{ readonly pending: Promise<T> }> {
   const conn = await w.open(role === "kauro_app" ? "kauro_app_test" : "kauro_outreach_test");
   const waiting = await ctx.mustWait(w.oracle, { waiter: conn, holder: connectionPid(holder.conn) }, () => w.on(conn, role, ctx, steps, fn), what);
-  return { pending: (waiting.pending as Promise<T>).finally(() => conn.end()) };
+  // mustWait settles to a PromiseSettledResult: the operation's own answer (or its failure) is what the cell awaits
+  return {
+    pending: (waiting.pending as Promise<PromiseSettledResult<T>>)
+      .then((r) => {
+        if (r.status === "rejected") throw r.reason;
+        return r.value;
+      })
+      .finally(() => conn.end()),
+  };
 }
 
 // --- locks and co-guards (§L) -----------------------------------------------------------------------------------------------------------

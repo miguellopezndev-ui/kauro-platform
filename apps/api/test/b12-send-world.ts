@@ -12,9 +12,9 @@ import { randomBytes } from "node:crypto";
 import type { Client } from "pg";
 import { ContractFakeGmailSend, ContractFakeResend } from "@kauro/application/testing";
 import type { OutreachPorts, OutreachSendPort, OutreachSubmission, OutreachSubmitAnswer } from "@kauro/application";
-import { toUtcInstant, type CorrelationId, type ExecutionContext, type UserId } from "@kauro/domain";
+import { toUtcInstant, type CommerceUnitOfWorkFactory, type CorrelationId, type ExecutionContext, type UserId } from "@kauro/domain";
 import { PgCommercialUnitOfWorkFactory, type PgCommercialUnitOfWork } from "@kauro/persistence";
-import { ROLES, TEST_EFFECT_FROZEN_SETTING, controlledClock, raceStatementTimeoutMs, recordActiveSeller, openConnection, TEST_CLOCK_OFFSET_SETTING, type RecordedSeller, type HarnessConnection, type FaultContext, type StepClock } from "@kauro/persistence/testing";
+import { ROLES, TEST_EFFECT_FROZEN_SETTING, raceStatementTimeoutMs, recordActiveSeller, openConnection, TEST_CLOCK_OFFSET_SETTING, type RecordedSeller, type HarnessConnection, type FaultContext, type StepClock } from "@kauro/persistence/testing";
 import { createOutreachDispatcher, outreachLeaseResource, type OutreachDispatcher, type OutreachLeaseRef } from "../src/outreach/dispatcher.js";
 import { outreachSealerOf } from "../src/outreach/routes.js";
 import type { OptOutKey, OutreachCompliance } from "../src/outreach/mime.js";
@@ -197,7 +197,18 @@ class OutreachUnits extends PgCommercialUnitOfWorkFactory {
 // --- the world --------------------------------------------------------------------------------------------------------------------------
 
 export async function sendWorldOf(_label: string): Promise<SendWorld> {
+  // the public opt-out runs its SERVICE units on the same (routed) outreach units as the dispatcher; they exist once the world's pools do
+  let optOutUnits: CommerceUnitOfWorkFactory | null = null;
   const sw = await statementsWorld({
+    optOut: {
+      keys: [OPT_OUT_KEY],
+      units: {
+        run: (context: ExecutionContext, work: never, options?: never) => {
+          if (optOutUnits === null) throw new Error("the opt-out units are used before the world was built");
+          return (optOutUnits as { run(...a: unknown[]): Promise<never> }).run(context, work, options);
+        },
+      } as unknown as CommerceUnitOfWorkFactory,
+    },
     commercial: {
       outreachSealer: {
         seal: (facts) => outreachSealerOf({ compliance: state.compliance, optOutKey: OPT_OUT_KEY }).seal(facts),
@@ -208,19 +219,24 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
   // the cells judge the user commands (CMD063, the owner's and seller's routes) at stated instants: every unit's transaction stands on the clock
   sw.faults.positionEveryUnit = true;
   const state: { compliance: OutreachCompliance | null; standing: string | null } = { compliance: { ...DEFAULT_COMPLIANCE }, standing: null };
-  let standClock: StepClock | null = null;
+  /** Fixtures stand an hour before the instant the world stands at (so their rows precede the instants the cells judge at), else before T0. */
+  const fixtureAt = (): string => (state.standing === null ? FIXTURE_AT : plusMs(state.standing, -3_600_000));
+  let standClock: StepClockOf | null = null;
   let boundClock: StepClock | null = null;
   /** The clock the units are positioned on, with the effect clock frozen on it: kauro.effect_now() reads the controlled instant exactly (the test cluster's TEST_EFFECT_FUNCTION). */
-  const frozenOf = (c: StepClock | null): StepClockOf | null =>
-    c === null
-      ? null
-      : {
-          async onServer(session) {
-            const placed = await c.onServer(session);
-            await session.query(`SELECT set_config('${TEST_EFFECT_FROZEN_SETTING}', 'on', true)`);
-            return placed;
-          },
-        };
+  const frozenOf = (c: StepClock): StepClockOf => ({
+    async onServer(session) {
+      const placed = await c.onServer(session);
+      await session.query(`SELECT set_config('${TEST_EFFECT_FROZEN_SETTING}', 'on', true)`);
+      return placed;
+    },
+  });
+  /** The clock a unit stands on while the world stands at `at`: the instant to the microsecond (the cells judge boundaries 1 us apart), the effect clock frozen on it. */
+  const stoodAt = (at: string): StepClockOf => ({
+    async onServer(session) {
+      await session.query(`SELECT set_config('${TEST_CLOCK_OFFSET_SETTING}', extract(epoch FROM ($1::timestamptz - transaction_timestamp()))::text, true), set_config('${TEST_EFFECT_FROZEN_SETTING}', 'on', true)`, [at]);
+    },
+  });
   /** A fresh step-up of the person at the instant the world stands at (a proof minted at the real clock is stale for a unit standing days ahead). */
   const stepUp = (person: Parameters<typeof w.stepUp>[0]): Promise<string> =>
     state.standing === null ? w.stepUp(person) : h.recordStepUp(person.userId as UserId, { issuedAt: toUtcInstant(Date.parse(state.standing) - 1000) });
@@ -228,6 +244,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
   const resend = new WorldResend();
   const ports: OutreachPorts = { gmail, resend };
   const units = sw.faults.wrap(new OutreachUnits({ app: h.appPool, outreach: h.outreachPool, control: h.controlPool }, () => state.standing));
+  optOutUnits = units as unknown as CommerceUnitOfWorkFactory;
   const background: Array<{ correlationId: string; error: unknown }> = [];
   const runtime = {
     units,
@@ -243,6 +260,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
   };
   let statementTimeout: number | null = null;
   const dispatchers = new Map<string, Dispatcher>();
+  let leaseHolder: string | null = null;
 
   /** One transaction of a runtime role under a person's OPERATOR context on the TEST CLOCK at `at` (a fixture standing in for a lane's route). */
   const within = async <T>(userId: string, at: string, fn: (c: Client) => Promise<T>): Promise<T> => {
@@ -274,14 +292,14 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
     const subject = `Data migration help ${label}`;
     const body = `Hello, we move CRM data safely. ${label}`;
     const id = createHash("sha256").update(`KAURO_OUTREACH_CONTENT_V1\n${subject}\n${body}`, "utf8").digest("hex");
-    await within(userId, FIXTURE_AT, (c) => c.query("INSERT INTO kauro.outreach_contents (content_id, subject, body, recorded_by_user_id) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", [id, subject, body, userId]));
+    await within(userId, fixtureAt(), (c) => c.query("INSERT INTO kauro.outreach_contents (content_id, subject, body, recorded_by_user_id) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", [id, subject, body, userId]));
     return { id, subject, body };
   };
 
   const publish = async (family: string, capabilityId: string, label: string): Promise<ResourceP> => {
     const resourceId = ids.next();
     const cref = await content(owner.userId, `resource-${label}`);
-    await within(owner.userId, FIXTURE_AT, async (c) => {
+    await within(owner.userId, fixtureAt(), async (c) => {
       await lock(c, "kauro.sales_resources", family);
       await c.query("INSERT INTO kauro.sales_resources (resource_id, family_id, version, content_id, published_by_user_id) VALUES ($1, $2, 1, $3, $4)", [resourceId, family, cref.id, owner.userId]);
       await c.query("INSERT INTO kauro.sales_resource_capabilities (resource_id, capability_id) VALUES ($1, $2)", [resourceId, capabilityId]);
@@ -337,6 +355,14 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
     gmail,
     resend,
     gmailContract: gmail.contract,
+    async beginCell() {
+      dispatchers.clear();
+      leaseHolder = null;
+      await h.oracle.query("DELETE FROM kauro.leases WHERE resource_kind = 'OUTBOX_DISPATCH' AND resource_id = $1", [outreachLeaseResource()]);
+    },
+    get internalErrors() {
+      return sw.w.internalErrors;
+    },
     get compliance(): ComplianceConfig {
       return state.compliance ?? DEFAULT_COMPLIANCE;
     },
@@ -349,12 +375,12 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       sw.clock.standAt?.(at);
       // "every unit's effect clock stands at the instant": the commission and outreach services' units stand through `standing`; the api's own
       // units (CMD063 and the owner and seller routes) are positioned on a clock held still at the instant, unless a cell's step clock is bound
-      standClock = at === null ? null : controlledClock(at);
-      sw.faults.clock = frozenOf(boundClock ?? standClock);
+      standClock = at === null ? null : stoodAt(at);
+      sw.faults.clock = boundClock !== null ? frozenOf(boundClock) : standClock;
     },
     bindClock(c: StepClock | null) {
       boundClock = c;
-      sw.faults.clock = frozenOf(boundClock ?? standClock);
+      sw.faults.clock = boundClock !== null ? frozenOf(boundClock) : standClock;
     },
     setCompliance(config) {
       const before = state.compliance;
@@ -384,7 +410,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       const contactKey = sha(`KAURO_PROSPECT_CONTACT_V1\n${address}`);
       const organizationKey = sha(`organization:${domain}`);
       const evidenceHash = sha(`source-evidence-${prospectId}`);
-      await within(seller.userId, FIXTURE_AT, async (c) => {
+      await within(seller.userId, fixtureAt(), async (c) => {
         await c.query(
           "INSERT INTO kauro.prospect_source_evidence (evidence_id, recorded_by_user_id, seller_id, evidence_hash, source_url_digest, observed_on, lawful_basis, segment, created_at) VALUES ($1, $2, $3, $4, $5, current_date, 'LEGITIMATE_INTEREST', 'AGENCY', now())",
           [ids.next(), seller.userId, seller.sellerId, evidenceHash, sha(`https://${domain}/`)],
@@ -407,7 +433,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       const draftId = ids.next();
       const contentHash = createHash("sha256").update(["KAURO_OUTREACH_BINDING_V1", prospect.prospectId, prospect.contactKey, snd.senderId, purpose, cref].join("\n"), "utf8").digest("hex");
       const resource = options.resource ?? defaultResource;
-      await within(author.userId, FIXTURE_AT, async (c) => {
+      await within(author.userId, fixtureAt(), async (c) => {
         await c.query(
           "INSERT INTO kauro.outreach_drafts (draft_id, prospect_id, sender_id, author_user_id, purpose, content_ref, contact_key, content_hash, provenance_evidence_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
           [draftId, prospect.prospectId, snd.senderId, author.userId, purpose, cref, prospect.contactKey, contentHash, sha(`provenance-${prospect.prospectId}`)],
@@ -425,8 +451,13 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       );
       return publish(ids.next(), capabilityId, label);
     },
-    async metrics() {
-      return notBuilt("world.metrics", "GetOutreachMetrics is an L-ACT route: not merged (use the route at batch)");
+    async metrics(actor) {
+      // GetOutreachMetrics answers the caller's own policies: the person asks for itself; the pause rule is a bounce among its counted sends
+      const r = await api({ method: "GET", url: "/api/v1/ops/outreach/metrics", token: actor.token, key: null });
+      if (r.status !== 200) throw new Error(`GetOutreachMetrics answered ${r.status}: ${r.text}`);
+      const v = r.json<{ data: Record<string, number> }>();
+      const m = v.data;
+      return { accepted: m["accepted"]!, uncertain: m["uncertain"]!, bounced: m["bounced"]!, pauseNumerator: m["pauseNumerator"]!, pauseDenominator: m["pauseDenominator"]!, paused: m["pauseNumerator"]! > 0 };
     },
     async grant(drafts, options = {}) {
       const first = drafts[0];
@@ -434,15 +465,16 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       const reviewId = ids.next();
       const proofId = await stepUp(owner);
       const authorizationId = ids.next();
-      const validFrom = options.validFrom ?? FIXTURE_AT;
-      const expiresAt = options.expiresAt ?? plusMs(FIXTURE_AT, 13 * 86_400_000);
+      const expiresAt = options.expiresAt ?? plusMs(fixtureAt(), 13 * 86_400_000);
+      // a grant lives at most 14 days from its start (KC030): a window that ends later than that from the fixture instant starts 14 days before its end
+      const validFrom = options.validFrom ?? (Date.parse(expiresAt) - Date.parse(fixtureAt()) > 14 * 86_400_000 ? plusMs(expiresAt, -14 * 86_400_000) : fixtureAt());
       // PrepareOutreachReview and CMD062 are L-AUTH routes: the same rows by SQL under the owner's own context until they merge
-      await within(owner.userId, FIXTURE_AT, async (c) => {
+      await within(owner.userId, fixtureAt(), async (c) => {
         await c.query("INSERT INTO kauro.outreach_reviews (review_id, owner_user_id, proof_id, sender_id, digest, issued_at, expires_at) VALUES ($1, $2, $3, $4, $5, now(), now() + interval '15 minutes')", [reviewId, owner.userId, proofId, first.sender.senderId, sha(`review-${reviewId}`)]);
         for (const d of drafts) await c.query("INSERT INTO kauro.outreach_review_items (review_id, draft_id, draft_version, content_hash, contact_label) VALUES ($1, $2, 1, $3, 'Operations lead')", [reviewId, d.draftId, d.contentHash]);
       });
       const maximumSends = options.maximumSends ?? drafts.length;
-      await within(owner.userId, plusMs(FIXTURE_AT, 1000), async (c) => {
+      await within(owner.userId, plusMs(fixtureAt(), 1000), async (c) => {
         await c.query(
           "INSERT INTO kauro.outreach_authorizations (authorization_id, review_id, granting_user_id, sender_id, proof_id, valid_from, expires_at, maximum_sends, permission_evidence_hash, policy_version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'outreach-v1')",
           [authorizationId, reviewId, owner.userId, first.sender.senderId, proofId, validFrom, expiresAt, maximumSends, sha(`permission-${authorizationId}`)],
@@ -473,19 +505,28 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
         if (r.kind === "HELD") throw new Error(`${name}: another dispatcher holds the OUTBOX_DISPATCH lease`);
         fence = r.fence;
         leasedAt = state.standing;
+        leaseHolder = name;
         return r.fence;
       };
       const lease = async (): Promise<OutreachLeaseRef> => {
         // a lease lives 120 s on the clock the world stands at: standing somewhere else, the dispatcher's own lease is claimed again
-        if (fence === null || (state.standing !== leasedAt && boundClock === null)) await takeOver();
+        // an owner another dispatcher took the lease from keeps its stale fence (its late answers are fenced, never re-leased)
+        if (fence === null || (state.standing !== leasedAt && boundClock === null && (leaseHolder === null || leaseHolder === name))) await takeOver();
         return { resourceId: d.resourceId, ownerId: d.ownerId, fence: fence as number };
       };
       const adapter: Dispatcher = {
         name,
         async pass() {
-          const r = await d.pass();
-          if (r.fence !== null) fence = r.fence;
-          return r.deliveries.map((x): DispatchReport => ({ intentId: x.intentId, outcome: x.intentState ?? x.outcome }));
+          // "every due record": the dispatcher claims 25 per pass, so a world holding more due records than that (the QUEUED intents earlier cells of a
+          // file leave) is passed again until a pass fills less than its batch
+          const reports: DispatchReport[] = [];
+          for (let round = 0; round < 40; round++) {
+            const r = await d.pass();
+            if (r.fence !== null) fence = r.fence;
+            reports.push(...r.deliveries.map((x): DispatchReport => ({ intentId: x.intentId, outcome: x.intentState ?? x.outcome })));
+            if (r.deliveries.length < 25) break;
+          }
+          return reports;
         },
         async dispatch(intentId) {
           const r = await d.dispatch(intentId, await lease());
@@ -524,7 +565,23 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       return openConnection(h.pg.clientConfig(login === "superuser" ? "postgres" : login));
     },
     on<T>(conn: HarnessConnection, role: "kauro_app" | "kauro_outreach" | "kauro_control", ctx: FaultContext, steps: ReadonlyArray<SqlStep>, fn: () => Promise<T>, routing?: { readonly target?: number }): Promise<T> {
-      return sw.faults.on(conn, role, ctx.points, steps, fn, routing ?? {});
+      // a command crosses roles (the dispatcher takes its lease as kauro_control, then claims as kauro_outreach; an api route may read as
+      // kauro_app): every other role of the world gets its own connection, as in production, and only `role` is the cell's
+      return (async () => {
+        const extras: Partial<Record<"kauro_app" | "kauro_outreach" | "kauro_control", HarnessConnection>> = {};
+        const opened: HarnessConnection[] = [];
+        try {
+          for (const other of ["kauro_app", "kauro_outreach", "kauro_control"] as const) {
+            if (other === role) continue;
+            const c = await world.open(`${other}_test`);
+            opened.push(c);
+            extras[other] = c;
+          }
+          return await sw.faults.onRoles({ [role]: conn, ...extras }, ctx.points, steps, fn, routing ?? {});
+        } finally {
+          for (const c of opened) await c.end().catch(() => undefined);
+        }
+      })();
     },
     setStatementTimeout(ms) {
       statementTimeout = ms;
