@@ -1,0 +1,302 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-021-cap10-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-021-cap10-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "21192044b8e8765447b3902504ada070171ba5eb6e68b2c3ab44d88bc7bca1b6",
+      "candidateSetHash": "50b437c39c2c6a2510214dd907f1d29ec3771313b3e37f4d0e174daa53512b60",
+      "targetContractHash": "tc_b0a437f02edf1adb564538b88d519b77cd918a81fee3e535dcf5da473457acd5",
+      "projectRevisionHash": "f9e12410c5fde315f068cb129b4de9b2ba708d31f8c7175af370a82785004d2a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Adresse courriel",
+        "sourceFieldRef": "fld_b8ed8305122ffa43",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Pays",
+        "sourceFieldRef": "fld_18e4341f0de0aebf",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Prénom",
+        "sourceFieldRef": "fld_1422ca7361750494",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Téléphone",
+        "sourceFieldRef": "fld_7d709980c9e562d8",
+        "decision": "MAP",
+        "destinationField": "contact.phone",
+        "allowedDestinationFields": [
+          "contact.phone",
+          "contact.mobilePhone"
+        ]
+      },
+      {
+        "sourceHeader": "Code postal",
+        "sourceFieldRef": "fld_0645584fc3b961fd",
+        "decision": "MAP",
+        "destinationField": "contact.postalCode"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lifecycleStage",
+      "contact.mobilePhone",
+      "contact.phone",
+      "contact.postalCode",
+      "contact.website",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e110922b7ddfdfe49ff838fe81c8f735fe5c8924b51636875c01216e5f85a3c9"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Adresse courriel",
+        "fieldRef": "src:Adresse courriel",
+        "valueClass": "EMAIL",
+        "values": [
+          "kesek.yananth0@sample.invalid",
+          "zerel.norero1@sample.invalid",
+          "orvia.beldell2@corp.example.test",
+          "pelo.quelquist3@sample.invalid",
+          "yanan.belrane4@example.test",
+          "pelek.vexaly5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Pays",
+        "fieldRef": "src:Pays",
+        "valueClass": "TEXT",
+        "values": [
+          "  Kelland",
+          "Estmark ",
+          "  Estmark",
+          "Estmark ",
+          "  Kelland",
+          "Kelland "
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Prénom",
+        "fieldRef": "src:Prénom",
+        "valueClass": "TEXT",
+        "values": [
+          "Tavis",
+          "Mesel",
+          "Mesia",
+          "Pelis",
+          "Vexan",
+          "Dara"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Téléphone",
+        "fieldRef": "src:Téléphone",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550182",
+          "+447700900151",
+          "+447700900302",
+          "+12025550109",
+          "+447700900465",
+          "+447700900107"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone",
+        "alternatives": [
+          "contact.mobilePhone"
+        ]
+      },
+      {
+        "header": "Code postal",
+        "fieldRef": "src:Code postal",
+        "valueClass": "TEXT",
+        "values": [
+          "51287",
+          "50756",
+          "76136",
+          "32714",
+          "79820",
+          "60710"
+        ],
+        "decision": "MAP",
+        "destination": "contact.postalCode"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_9337eaf304ea",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Adresse courriel",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_33bb91d4300d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Pays",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_7e06456f9b52",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Prénom",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_39c73b2d5a2d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Téléphone",
+        "targetField": "contact.phone"
+      },
+      {
+        "memoryId": "memconv_cfd0ca086687",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Code postal",
+        "targetField": "contact.postalCode"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_83d6f4757bb744a38a00de64",
+    "kc_0f2a2fe7d710ca1c2480470f"
+  ]
+}

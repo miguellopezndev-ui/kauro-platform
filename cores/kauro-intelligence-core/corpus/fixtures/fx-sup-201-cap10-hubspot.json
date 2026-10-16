@@ -1,0 +1,310 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-201-cap10-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-201-cap10-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "fa787e6fe71792fda4eee92031cb3231d20bca6aaf37ed9a6712f349fd9a3ebd",
+      "candidateSetHash": "ad84e02928c5e3730a6e96371699cea8f1bdff98115990a43f14e37a5f3404e9",
+      "targetContractHash": "tc_1227c0d3685b29a6f4110fb4c6bf42e6905ba1fa21dc871c2270222bd028ba1a",
+      "projectRevisionHash": "62efc632ce08e4175a04b158f8d2850cf50d4e20a9ef9f6337ea7a49e847c3bc"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Indirizzo email",
+        "sourceFieldRef": "fld_5ffcb0caed20c584",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "CAP",
+        "sourceFieldRef": "fld_ed19100561873192",
+        "decision": "MAP",
+        "destinationField": "contact.postalCode"
+      },
+      {
+        "sourceHeader": "Ruolo",
+        "sourceFieldRef": "fld_b50256c1fcdee913",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Nome",
+        "sourceFieldRef": "fld_ec50f452a9b545a5",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Cognome",
+        "sourceFieldRef": "fld_fbc075594e40113a",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_04d5bda88cc1cad4",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.lifecycleStage",
+      "contact.phone",
+      "contact.postalCode",
+      "contact.state",
+      "contact.website",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "70b4348ce991726ccceb106949ea50fda905e4dec86277387fc9693c212a2fac"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Indirizzo email",
+        "fieldRef": "src:Indirizzo email",
+        "valueClass": "EMAIL",
+        "values": [
+          "norel.lumero0@sample.invalid",
+          "zerel.mesanth1@sample.invalid",
+          "mesia.zerorin2@example.test",
+          "norel.sovunda3@sample.invalid",
+          "joria.sovdell4@example.test",
+          "tulia.jorath5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "CAP",
+        "fieldRef": "src:CAP",
+        "valueClass": "TEXT",
+        "values": [
+          "42969",
+          "60505",
+          "35540",
+          "13174",
+          "58383",
+          "92999"
+        ],
+        "decision": "MAP",
+        "destination": "contact.postalCode"
+      },
+      {
+        "header": "Ruolo",
+        "fieldRef": "src:Ruolo",
+        "valueClass": "TEXT",
+        "values": [
+          "Account manager",
+          "Site engineer",
+          "Site engineer",
+          "Account manager",
+          "Buyer",
+          "Buyer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Nome",
+        "fieldRef": "src:Nome",
+        "valueClass": "TEXT",
+        "values": [
+          "Daran",
+          "Orvia",
+          "Tavis",
+          "Zera",
+          "Mesis",
+          "Jorel"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Cognome",
+        "fieldRef": "src:Cognome",
+        "valueClass": "TEXT",
+        "values": [
+          "Wilquist",
+          "Noraly",
+          "Zerdell",
+          "Tulmar",
+          "Orvenko",
+          "Belmar"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "B-7",
+          "B-81",
+          "B-76",
+          "C-75",
+          "C-95",
+          "C-14"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_3a8b47078074",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Indirizzo email",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_7c5d11544dfe",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "CAP",
+        "targetField": "contact.postalCode"
+      },
+      {
+        "memoryId": "memconv_b26831807bce",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ruolo",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_d6eb260a7fe5",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nome",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_a248c49adb6c",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cognome",
+        "targetField": "contact.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_3afcd4739f7b9f1c40f7d4a5",
+    "kc_1f04ea06c777897e8795e2ed"
+  ]
+}

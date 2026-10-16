@@ -1,0 +1,768 @@
+name: intelligence gate
+
+# One run per commit: a pull request checks its branch, `main` is checked on
+# the push that lands there. On a pull_request event GITHUB_SHA is the synthetic
+# merge commit, so the receipt — which names one commit — is written only on
+# the push leg.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      sabotage:
+        description: 'Run the full sabotage (12 shards) after the cheap jobs pass'
+        type: boolean
+        default: false
+
+# Cheap first, expensive once (owner rule 2026-10-03, after ~8,150 billable minutes in a week):
+#   - the cheap jobs (gate, dependency audit, sabotage anchors, sabotage and architecture self-tests) run on every
+#     event and are exactly what tools/ci-local.mjs runs before a push;
+#   - the sabotage shards need every cheap job green, and run only when asked for: a pull request that carries the
+#     `run-sabotage` label when its run starts (opened/synchronize/reopened/ready_for_review; adding the label
+#     does NOT start a run, it takes effect on the next one: push, or dispatch on the branch), a manual dispatch with
+#     sabotage=true on the branch, or the push to main of a merged candidate. `labeled` is not a trigger;
+#     only the shards are skipped by the request predicate; the required evidence checks always run;
+#   - the shards run on the self-hosted WSL runner when the repository variable SABOTAGE_RUNNER is `self-hosted` AND the
+#     code is trusted (push to main, dispatch, or a pull request whose head repository is this one); a fork's code
+#     is rejected by the runner policy job with use workflow_dispatch, never executed on the persistent host.
+#     When self-hosted is selected, hosted shard fallback is disabled. Hosted runs otherwise bill minutes.
+#     That predicate is PR-controlled YAML, so it is not the trust boundary. The boundary is outside the YAML: this
+#     repository is private and user-owned (forks only by collaborators), and its Actions setting
+#     run_workflows_from_fork_pull_requests is false (checked 2026-10-04 via the API), so a fork pull request runs no
+#     workflow at all. Re-check that setting before ever making the repository public or adding collaborators.
+# Without a sabotage request the shards are skipped; both required evidence checks FAIL with NOT REQUESTED.
+# The `sabotage request` job also prints the request state. Requested checks require verified shard or same-tree reuse evidence.
+# A push to main always requests it: that is where the regression evidence lives. Sabotage runs once per candidate (rule A6):
+# on that push `sabotage reuse lookup` adopts, by tree, the report of the same-tree pull request head whose sabotage check succeeded
+# (the PR run checked out a merge commit; both commits are kept in reusedFrom) and the shards are skipped; if adopting fails for any
+# reason, or nothing is reusable, the shards run in the same run. The receipt embeds the report, whose `reusedFrom` names the reused run.
+
+# Read everything, write nothing. A gate that can write its own check run can
+# write itself green; the receipt is an artifact of the run, not a check.
+permissions:
+  contents: read
+  actions: read
+
+# The sabotage inventory runs in this many slices (jobs "sabotage shard N", matrix
+# below); the merge refuses anything but exactly these shards. Twelve slices of
+# the B03 inventory, four at a time on a four-vCPU runner, keep each job well
+# under two hours; the number is a throughput choice, not part of the evidence.
+env:
+  SABOTAGE_SHARDS: '12'
+
+# Requests are bound to the head and run, isolated from all other events. The
+# run id also prevents GitHub from replacing a pending request in the same
+# concurrency group. Only non-requested runs may cancel an older cheap run.
+concurrency:
+  group: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.sabotage) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-sabotage'))) && format('{0}-requested-{1}-{2}', github.workflow, github.event.pull_request.head.sha || github.sha, github.run_id) || format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: ${{ !(github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.sabotage) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-sabotage'))) && github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
+
+jobs:
+  gate:
+    name: gate (${{ matrix.os }}, node 24)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      # Third-party actions pinned to immutable commit SHAs.
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      # The only dependencies are TypeScript, the Node types and the vendored
+      # Migration Core release, installed from the bytes in vendor/.
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      - name: Typecheck (strict)
+        run: npm run typecheck
+
+      - name: Frozen contracts (CONTRACTS-01)
+        run: npm run contracts:check
+
+      # The B03 case map: every cited test exists under its exact title or is
+      # planned by exactly one mandate; statuses, mandates and plan agree.
+      - name: Case map (B03 design check)
+        run: npm run design:check
+
+      - name: Tests
+        run: npm run test
+
+      # The packed tarball, consumed by a TypeScript strict project outside the
+      # tree, with the vendored Migration Core, offline.
+      - name: Public consumer (INTELLIGENCE-CONSUMER-01)
+        run: npm run consumer:check
+
+      - name: The working tree is unchanged
+        shell: bash
+        run: |
+          git status --porcelain > "${RUNNER_TEMP}/status.txt"
+          if [ -s "${RUNNER_TEMP}/status.txt" ]; then
+            echo "::error::the gate modified the tree:"; cat "${RUNNER_TEMP}/status.txt"; exit 1
+          fi
+
+  # The sabotage evidence is produced in three kinds of job, and only the third
+  # carries the required check name:
+  #
+  #   sabotage self-test / architecture self-test   the runner's and the gate's
+  #                                                 own negatives (in parallel)
+  #   sabotage shard N                              the inventory, partitioned by
+  #                                                 position into SABOTAGE_SHARDS
+  #                                                 slices; every mutation still
+  #                                                 runs the whole suite on this
+  #                                                 commit and must be killed
+  #   sabotage (INTELLIGENCE-SABOTAGE-01)           merges the shards (all n, once
+  #                                                 each, same commit/tree/
+  #                                                 inventory/producers, union =
+  #                                                 inventory), verifies the merged
+  #                                                 report with the unchanged
+  #                                                 verifier, keeps it
+  #
+  # One shard on a four-vCPU runner runs four mutations at a time; the full
+  # inventory on one runner did not finish in 300 minutes. SABOTAGE_SHARDS and
+  # the matrix below must agree: a shard k/n with k > n is refused by the
+  # runner and a missing shard is refused by the merge.
+  sabotage-anchors:
+    name: sabotage anchors
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      # Every inventory mutation's text is in its file exactly once: a stale anchor is NOT_REACHED after hours of
+      # shards, and is found here in a second.
+      - name: Sabotage anchors
+        run: node tools/sabotage-anchors.mjs
+
+  sabotage-selftest:
+    name: sabotage self-test
+    timeout-minutes: 150
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: CI workflow policy self-test
+        run: node tools/ci-workflow-selftest.mjs
+
+      # The shard merge on the sets of shards it must refuse: missing, repeated,
+      # foreign commit or tree, tampered, mis-partitioned, other inventory.
+      - name: Sabotage merge self-test
+        run: node tools/sabotage-merge-selftest.mjs
+
+      # The runner's own negatives, in a disposable copy: an unknown or empty
+      # --only is refused, a diagnostic never qualifies, counts come from
+      # unique reached records. One mutation is run, never the inventory.
+      - name: Sabotage self-test
+        run: node tools/sabotage-selftest.mjs
+
+      - name: The working tree is unchanged after the sabotage self-test
+        shell: bash
+        run: |
+          git status --porcelain > "${RUNNER_TEMP}/status.txt"
+          if [ -s "${RUNNER_TEMP}/status.txt" ]; then
+            echo "::error::the sabotage self-test modified the tree:"; cat "${RUNNER_TEMP}/status.txt"; exit 1
+          fi
+
+  architecture-selftest:
+    name: architecture self-test
+    timeout-minutes: 150
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      # The gate's verifier on the evidence it must refuse: partial, edited,
+      # foreign, stale, flipped, dirty; and the gate end to end against a
+      # synthetic report, produced or supplied, both ways.
+      - name: Architecture self-test
+        run: node tools/architecture-selftest.mjs
+
+      - name: The working tree is unchanged after the architecture self-test
+        shell: bash
+        run: |
+          git status --porcelain > "${RUNNER_TEMP}/status.txt"
+          if [ -s "${RUNNER_TEMP}/status.txt" ]; then
+            echo "::error::the architecture self-test modified the tree:"; cat "${RUNNER_TEMP}/status.txt"; exit 1
+          fi
+
+  # Says, in the run, whether the full sabotage was requested. Always runs, never fails.
+  sabotage-request:
+    name: sabotage request
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Print the request state
+        shell: bash
+        env:
+          REQUESTED: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.sabotage) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-sabotage'))) && 'REQUESTED' || 'NOT REQUESTED' }}
+        run: |
+          if [ "${REQUESTED}" = "REQUESTED" ]; then
+            echo "sabotage: REQUESTED (push to main, dispatch with sabotage=true, or a pull request carrying run-sabotage): all 12 shards and the two evidence checks run." | tee -a "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "sabotage: NOT REQUESTED: the shards are skipped; the required sabotage and architecture checks FAIL (label the pull request run-sabotage and push, or dispatch with sabotage=true)." | tee -a "${GITHUB_STEP_SUMMARY}"
+          fi
+
+  # Owner rule A6: sabotage once per candidate. On the push to main, look for the pull request head with the same git tree
+  # whose sabotage check succeeded and reuse its report (tools/sabotage-reuse.mjs: same tree, completed success, github-actions
+  # app, this repository, unexpired report; any doubt or API error means "run the shards"). Always runs, never fails the run.
+  sabotage-reuse:
+    name: sabotage reuse lookup
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+      pull-requests: read
+    outputs:
+      reused: ${{ steps.adopt.outputs.reused == 'true' && 'true' || 'false' }}
+      run_id: ${{ steps.lookup.outputs.run_id }}
+      run_url: ${{ steps.lookup.outputs.run_url }}
+      run_commit: ${{ steps.lookup.outputs.run_commit }}
+      tree: ${{ steps.lookup.outputs.tree }}
+    steps:
+      - name: Check out
+        if: github.event_name == 'push'
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        if: github.event_name == 'push'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Look for a successful sabotage of this tree
+        id: lookup
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            node tools/sabotage-reuse.mjs lookup
+          else
+            printf 'candidate=false\n' >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Install from the lockfile
+        if: steps.lookup.outputs.candidate == 'true'
+        run: npm ci --ignore-scripts
+
+      # Reuse is decided HERE, before any shard: if fetching, adopting or verifying the report fails for any reason the
+      # shards simply run in this same run (continue-on-error; `reused` stays false). A failed reuse never fails the run.
+      - name: Fetch the candidate sabotage report
+        id: fetch
+        if: steps.lookup.outputs.candidate == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sabotage-report
+          path: ${{ runner.temp }}/candidate
+          run-id: ${{ steps.lookup.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      # The pull request run checked out the synthetic merge commit, so the report names that commit: it is accepted by
+      # TREE (the report's tree is this commit's tree, and the API shows its commit has that tree and the run's head as a
+      # parent), re-subjected to this commit with both commits kept in reusedFrom, and verified by the strict verifier.
+      - name: Adopt and verify the candidate report
+        id: adopt
+        if: steps.lookup.outputs.candidate == 'true' && steps.fetch.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.lookup.outputs.run_id }}
+          RUN_URL: ${{ steps.lookup.outputs.run_url }}
+          RUN_COMMIT: ${{ steps.lookup.outputs.run_commit }}
+          TREE: ${{ steps.lookup.outputs.tree }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/adopted"
+          node tools/sabotage-reuse.mjs adopt --report "${RUNNER_TEMP}/candidate/sabotage-report.json" --out "${RUNNER_TEMP}/adopted/sabotage-report.json" --run-id "${RUN_ID}" --run-url "${RUN_URL}" --run-commit "${RUN_COMMIT}"
+          REPORT="${RUNNER_TEMP}/adopted/sabotage-report.json" node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import { currentContext, verifySabotageReport } from "./tools/lib/verify-sabotage-report.mjs";
+            const report = JSON.parse(readFileSync(process.env.REPORT, "utf8"));
+            const verdict = verifySabotageReport(report, await currentContext(process.cwd()));
+            if (report.subject?.commit !== process.env.GITHUB_SHA) verdict.problems.push("the adopted report does not name this commit");
+            if (report.subject?.tree !== process.env.TREE) verdict.problems.push("the report tree is not the looked-up tree");
+            if (report.reusedFrom?.runId !== process.env.RUN_ID) verdict.problems.push("reusedFrom does not name the reused run");
+            if (report.merged?.shards !== Number(process.env.SABOTAGE_SHARDS)) verdict.problems.push("the reused report was merged from " + String(report.merged?.shards) + " shards, expected " + String(process.env.SABOTAGE_SHARDS));
+            console.log(JSON.stringify({ mode: report.mode, subject: report.subject, reusedFrom: report.reusedFrom, counts: verdict.recomputed, problems: verdict.problems }, null, 2));
+            if (verdict.problems.length > 0) { console.error("::error::the reused sabotage report does not verify: " + verdict.problems.join("; ")); process.exit(1); }
+          '
+          printf 'reused=true\n' >> "${GITHUB_OUTPUT}"
+
+      - name: Keep the adopted report for the sabotage job
+        if: steps.adopt.outputs.reused == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sabotage-reuse-report
+          path: ${{ runner.temp }}/adopted/sabotage-report.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Say what was decided
+        if: always() && github.event_name == 'push'
+        shell: bash
+        env:
+          CANDIDATE: ${{ steps.lookup.outputs.candidate }}
+          REUSED: ${{ steps.adopt.outputs.reused }}
+          RUN_URL: ${{ steps.lookup.outputs.run_url }}
+          TREE: ${{ steps.lookup.outputs.tree }}
+        run: |
+          if [ "${REUSED}" = "true" ]; then
+            echo "sabotage: REUSED from ${RUN_URL} (tree ${TREE})" | tee -a "${GITHUB_STEP_SUMMARY}"
+          elif [ "${CANDIDATE}" = "true" ]; then
+            echo "sabotage: reuse of ${RUN_URL} FAILED (fetch, adoption or verification); the shards run in this run" | tee -a "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "sabotage: nothing reusable; the shards run in this run" | tee -a "${GITHUB_STEP_SUMMARY}"
+          fi
+
+  # Static control job: rejects an untrusted request before scheduling any persistent runner.
+  # No checkout, installation, or execution of PR files occurs here.
+  sabotage-runner-policy:
+    name: sabotage runner eligibility
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require trusted code for the configured self-hosted runner
+        shell: bash
+        env:
+          RUNNER_KIND: ${{ vars.SABOTAGE_RUNNER }}
+          REQUESTED: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.sabotage) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-sabotage')) }}
+          TRUSTED: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
+        run: |
+          if [ "${RUNNER_KIND}" = "self-hosted" ] && [ "${REQUESTED}" = "true" ] && [ "${TRUSTED}" != "true" ]; then
+            echo "::error::Self-hosted sabotage is not eligible for this PR; use workflow_dispatch on a trusted branch with sabotage=true. Hosted shard fallback is disabled." | tee -a "${GITHUB_STEP_SUMMARY}"
+            exit 1
+          fi
+
+  sabotage-shard:
+    name: sabotage shard ${{ matrix.shard }}
+    needs: [gate, dependencies, sabotage-anchors, sabotage-selftest, architecture-selftest, sabotage-reuse, sabotage-runner-policy]
+    if: >-
+      needs.sabotage-reuse.outputs.reused != 'true' && (
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.sabotage) ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-sabotage'))
+      )
+    timeout-minutes: ${{ vars.SABOTAGE_RUNNER == 'self-hosted' && 45 || 120 }}
+    # The policy job must succeed before any shard is scheduled; forks never reach this runner.
+    # Selecting self-hosted has no hosted fallback, including on an ineligible request.
+    runs-on: ${{ vars.SABOTAGE_RUNNER == 'self-hosted' && fromJSON('["self-hosted","linux","kauro-sabotage"]') || 'ubuntu-24.04' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      # Every mutation of this slice must be killed by the whole suite; a
+      # mutation that does not compile, times out or is not reached is not a
+      # kill. The harness works on copies under tmp/ and the real tree must be
+      # untouched afterwards. QUALIFICATION-SHARD mode: no --only here, ever.
+      - name: Sabotage shard
+        run: node tools/sabotage.mjs --shard ${{ matrix.shard }}/${{ env.SABOTAGE_SHARDS }}
+
+      - name: The working tree is unchanged after sabotage
+        shell: bash
+        run: |
+          git status --porcelain > "${RUNNER_TEMP}/status.txt"
+          if [ -s "${RUNNER_TEMP}/status.txt" ]; then
+            echo "::error::sabotage modified the tree:"; cat "${RUNNER_TEMP}/status.txt"; exit 1
+          fi
+
+      # The shard report is kept even when a mutation survived, so the failure
+      # can be read; the merge refuses it either way.
+      - name: Keep the shard report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sabotage-shard-${{ matrix.shard }}
+          path: tmp/sabotage-shard-${{ matrix.shard }}-of-${{ env.SABOTAGE_SHARDS }}.json
+          if-no-files-found: error
+          retention-days: 90
+
+  # Required evidence checks always report a verdict, including when not requested.
+  sabotage:
+    name: sabotage (INTELLIGENCE-SABOTAGE-01)
+    needs: [sabotage-selftest, architecture-selftest, sabotage-anchors, sabotage-reuse, sabotage-shard, sabotage-runner-policy]
+    if: always()
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Sabotage evidence was requested
+        shell: bash
+        env:
+          REQUESTED: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.sabotage) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-sabotage'))) && 'true' || 'false' }}
+        run: |
+          if [ "${REQUESTED}" != "true" ]; then
+            echo "::error::NOT REQUESTED: label the pull request run-sabotage and push, or use workflow_dispatch with sabotage=true." | tee -a "${GITHUB_STEP_SUMMARY}"
+            exit 1
+          fi
+
+      - name: Every needed job succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          printf '%s' "${NEEDS_JSON}" | node -e '
+            const needs = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const reused = needs["sabotage-reuse"]?.outputs?.reused === "true";
+            const bad = Object.entries(needs).filter(([name, need]) => need.result !== (reused && name === "sabotage-shard" ? "skipped" : "success")).map(([name, need]) => name + "=" + need.result);
+            if (Object.keys(needs).length !== 6 || bad.length > 0) { console.error("::error::needed jobs did not all succeed: " + (bad.join(", ") || "unexpected needs")); process.exit(1); }
+          '
+
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Fetch the shard reports
+        if: needs.sabotage-reuse.outputs.reused != 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: sabotage-shard-*
+          path: ${{ runner.temp }}/shards
+          merge-multiple: true
+
+      # All n shards, once each, of this commit and tree, over this inventory
+      # and these producers, every inventory id in exactly one of them and
+      # killed; the merged report is then verified by the unchanged verifier.
+      - name: Merge the shards
+        if: needs.sabotage-reuse.outputs.reused != 'true'
+        run: node tools/sabotage-merge.mjs --shards "${{ env.SABOTAGE_SHARDS }}" --dir "${RUNNER_TEMP}/shards" --out tmp/sabotage-report.json --expect-commit "${GITHUB_SHA}"
+
+      - name: The working tree is unchanged after the merge
+        if: needs.sabotage-reuse.outputs.reused != 'true'
+        shell: bash
+        run: |
+          git status --porcelain > "${RUNNER_TEMP}/status.txt"
+          if [ -s "${RUNNER_TEMP}/status.txt" ]; then
+            echo "::error::the merge modified the tree:"; cat "${RUNNER_TEMP}/status.txt"; exit 1
+          fi
+
+      # The report the job is about to keep is verified the way the gate
+      # verifies it — mode, subject, inventory bytes, producers, recomputed
+      # counts — and its subject must be the commit this job checked out.
+      - name: The sabotage report is a QUALIFICATION of this commit
+        if: needs.sabotage-reuse.outputs.reused != 'true'
+        shell: bash
+        run: |
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import { currentContext, verifySabotageReport } from "./tools/lib/verify-sabotage-report.mjs";
+            const report = JSON.parse(readFileSync("tmp/sabotage-report.json", "utf8"));
+            const verdict = verifySabotageReport(report, await currentContext(process.cwd()));
+            if (report.subject?.commit !== process.env.GITHUB_SHA) verdict.problems.push(`subject ${String(report.subject?.commit)} is not GITHUB_SHA ${String(process.env.GITHUB_SHA)}`);
+            if (report.merged?.shards !== Number(process.env.SABOTAGE_SHARDS)) verdict.problems.push(`merged from ${String(report.merged?.shards)} shards, expected ${String(process.env.SABOTAGE_SHARDS)}`);
+            console.log(JSON.stringify({ mode: report.mode, subject: report.subject, merged: report.merged?.shards, counts: verdict.recomputed, problems: verdict.problems }, null, 2));
+            if (verdict.problems.length > 0) { console.error("::error::the sabotage report does not verify: " + verdict.problems.join("; ")); process.exit(1); }
+          '
+
+      # Reused: the report the lookup job adopted and verified (same tree, re-subjected to this commit, original run in
+      # reusedFrom). Verified once more here exactly as a merged report is; the gate and the receipt verify it again.
+      - name: Fetch the adopted sabotage report
+        if: needs.sabotage-reuse.outputs.reused == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sabotage-reuse-report
+          path: ${{ runner.temp }}/adopted
+
+      - name: The adopted report is a QUALIFICATION of this tree
+        if: needs.sabotage-reuse.outputs.reused == 'true'
+        shell: bash
+        env:
+          RUN_ID: ${{ needs.sabotage-reuse.outputs.run_id }}
+          RUN_URL: ${{ needs.sabotage-reuse.outputs.run_url }}
+          TREE: ${{ needs.sabotage-reuse.outputs.tree }}
+        run: |
+          mkdir -p tmp
+          cp "${RUNNER_TEMP}/adopted/sabotage-report.json" tmp/sabotage-report.json
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import { currentContext, verifySabotageReport } from "./tools/lib/verify-sabotage-report.mjs";
+            const report = JSON.parse(readFileSync("tmp/sabotage-report.json", "utf8"));
+            const verdict = verifySabotageReport(report, await currentContext(process.cwd()));
+            if (report.subject?.commit !== process.env.GITHUB_SHA) verdict.problems.push("subject " + String(report.subject?.commit) + " is not GITHUB_SHA");
+            if (report.subject?.tree !== process.env.TREE) verdict.problems.push("the report tree is not the looked-up tree");
+            if (report.reusedFrom?.runId !== process.env.RUN_ID) verdict.problems.push("reusedFrom does not name the reused run");
+            console.log(JSON.stringify({ subject: report.subject, reusedFrom: report.reusedFrom, counts: verdict.recomputed, problems: verdict.problems }, null, 2));
+            if (verdict.problems.length > 0) { console.error("::error::the reused sabotage report does not verify: " + verdict.problems.join("; ")); process.exit(1); }
+          '
+          echo "sabotage: REUSED from ${RUN_URL} (tree ${TREE})" | tee -a "${GITHUB_STEP_SUMMARY}"
+
+      - name: Keep the report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sabotage-report
+          path: tmp/sabotage-report.json
+          if-no-files-found: error
+          retention-days: 90
+
+  architecture:
+    name: architecture closure (INTELLIGENCE-ARCHITECTURE-01)
+    needs: [sabotage, sabotage-reuse]
+    if: always()
+    timeout-minutes: 150
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Sabotage evidence was requested
+        shell: bash
+        env:
+          REQUESTED: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.sabotage) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-sabotage'))) && 'true' || 'false' }}
+        run: |
+          if [ "${REQUESTED}" != "true" ]; then
+            echo "::error::NOT REQUESTED: label the pull request run-sabotage and push, or use workflow_dispatch with sabotage=true." | tee -a "${GITHUB_STEP_SUMMARY}"
+            exit 1
+          fi
+
+      - name: Say where the sabotage evidence came from
+        if: ${{ needs.sabotage-reuse.outputs.reused == 'true' }}
+        shell: bash
+        env:
+          RUN_URL: ${{ needs.sabotage-reuse.outputs.run_url }}
+          TREE: ${{ needs.sabotage-reuse.outputs.tree }}
+        run: |
+          echo "sabotage: REUSED from ${RUN_URL} (tree ${TREE})" | tee -a "${GITHUB_STEP_SUMMARY}"
+
+      # Runs even when sabotage failed, then fails: never a silent skip.
+      - name: The sabotage job succeeded
+        shell: bash
+        env:
+          SABOTAGE_RESULT: ${{ needs.sabotage.result }}
+        run: |
+          if [ "${SABOTAGE_RESULT}" != "success" ]; then
+            echo "::error::sabotage (INTELLIGENCE-SABOTAGE-01) is ${SABOTAGE_RESULT}; the gate has no sabotage evidence"; exit 1
+          fi
+
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Fetch the verified sabotage report
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sabotage-report
+          path: ${{ runner.temp }}/sabotage
+
+      # The whole gate on a bound subject: the tree must be clean; build,
+      # contracts, tests, behavioural probes and the packed consumer executed;
+      # sabotage NOT re-run but taken from the report the sabotage job merged
+      # and verified, and verified again here against this checkout (commit =
+      # GITHUB_SHA, inventory, producers, production files, records); exports,
+      # production-path purity, bounds, model policy and documents measured on
+      # the built module. The flag is the conjunction; RC and FROZEN are FALSE
+      # by construction in IC-1.
+      - name: INTELLIGENCE_CORE_ARCHITECTURE_CLOSED
+        run: node tools/architecture-gate.mjs --out "${RUNNER_TEMP}/architecture-gate.json" --sabotage-report "${RUNNER_TEMP}/sabotage/sabotage-report.json"
+
+      # The verdict names this commit, on a clean tree, or the job fails even
+      # if the gate's own exit code did not.
+      - name: The verdict is bound to this commit
+        if: always()
+        shell: bash
+        run: |
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const verdict = JSON.parse(readFileSync(process.env.RUNNER_TEMP + "/architecture-gate.json", "utf8"));
+            const problems = [];
+            if (verdict.subject?.commit !== process.env.GITHUB_SHA) problems.push(`verdict subject ${String(verdict.subject?.commit)} is not GITHUB_SHA ${String(process.env.GITHUB_SHA)}`);
+            if (verdict.subject?.dirty !== false) problems.push("the verdict was decided on a dirty tree");
+            if (verdict.sabotage?.subject?.commit !== process.env.GITHUB_SHA) problems.push("the sabotage the gate verified names another commit");
+            if (verdict.sabotage?.origin !== "SUPPLIED_AND_VERIFIED") problems.push("the gate did not verify a supplied sabotage report: " + String(verdict.sabotage?.origin));
+            if (verdict.INTELLIGENCE_CORE_ARCHITECTURE_CLOSED !== "TRUE") problems.push("INTELLIGENCE_CORE_ARCHITECTURE_CLOSED is " + String(verdict.INTELLIGENCE_CORE_ARCHITECTURE_CLOSED));
+            console.log(JSON.stringify({ subject: verdict.subject, closed: verdict.INTELLIGENCE_CORE_ARCHITECTURE_CLOSED, problems }, null, 2));
+            if (problems.length > 0) { console.error("::error::" + problems.join("; ")); process.exit(1); }
+          '
+
+      - name: The working tree is unchanged after the architecture gate
+        if: always()
+        shell: bash
+        run: |
+          git status --porcelain > "${RUNNER_TEMP}/status.txt"
+          if [ -s "${RUNNER_TEMP}/status.txt" ]; then
+            echo "::error::the architecture gate modified the tree:"; cat "${RUNNER_TEMP}/status.txt"; exit 1
+          fi
+
+      - name: Keep the verdict
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: architecture-gate
+          path: ${{ runner.temp }}/architecture-gate.json
+          if-no-files-found: error
+          retention-days: 90
+
+  dependencies:
+    name: dependency audit
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Audit
+        run: npm audit --audit-level=moderate
+
+      # The kernel has no runtime dependency: Migration Core is a peer the host
+      # supplies, and the lockfile holds exactly the dev toolchain plus the
+      # vendored release and its own two pinned dependencies.
+      - name: Runtime dependency budget
+        shell: bash
+        run: |
+          node -e '
+            const pkg = require("./package.json");
+            const runtime = Object.keys(pkg.dependencies ?? {});
+            if (runtime.length !== 0) { console.error("runtime dependencies present: " + runtime.join(", ")); process.exit(1); }
+            const peers = pkg.peerDependencies ?? {};
+            const vendored = require("./vendor/MANIFEST.json");
+            if (peers[vendored.name] !== vendored.version) { console.error("the Migration Core peer is not pinned to the vendored " + vendored.version); process.exit(1); }
+            const lock = require("./package-lock.json");
+            const names = Object.keys(lock.packages).filter((k) => k !== "").map((k) => k.replace(/^node_modules\//, ""));
+            const allowed = new Set(["typescript", "@types/node", "undici-types", vendored.name, "fflate", "libphonenumber-js"]);
+            const extra = names.filter((n) => !allowed.has(n));
+            if (extra.length !== 0) { console.error("unexpected packages in the lockfile: " + extra.join(", ")); process.exit(1); }
+            console.log("lockfile: " + names.sort().join(", "));
+          '
+
+  # The receipt: what this run decided about this commit, composed by
+  # tools/compose-receipt.mjs from the run's own artifacts — the architecture
+  # verdict and the sabotage qualification report embedded — and verified
+  # against the commit before it is kept. Push leg only, where GITHUB_SHA is
+  # the commit itself. The same composer runs in tools/chain-rehearsal.mjs.
+  receipt:
+    name: gate receipt
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push'
+    needs: [gate, sabotage, architecture, dependencies]
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '24'
+
+      - name: Fetch the architecture verdict
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: architecture-gate
+          path: ${{ runner.temp }}/verdict
+
+      - name: Fetch the sabotage report
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sabotage-report
+          path: ${{ runner.temp }}/sabotage
+
+      - name: Write and verify the receipt
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        shell: bash
+        run: |
+          printf '%s' "${NEEDS_JSON}" > "${RUNNER_TEMP}/needs.json"
+          node tools/compose-receipt.mjs \
+            --verdict "${RUNNER_TEMP}/verdict/architecture-gate.json" \
+            --sabotage "${RUNNER_TEMP}/sabotage/sabotage-report.json" \
+            --needs "${RUNNER_TEMP}/needs.json" \
+            --subject-label CI \
+            --out "${RUNNER_TEMP}/ic1-receipt.json"
+          cat "${RUNNER_TEMP}/ic1-receipt.json"
+
+      - name: Keep the receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ic1-receipt
+          path: ${{ runner.temp }}/ic1-receipt.json
+          if-no-files-found: error
+          retention-days: 90

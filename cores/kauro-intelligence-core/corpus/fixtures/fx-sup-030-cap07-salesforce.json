@@ -1,0 +1,212 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-030-cap07-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-030-cap07-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "6bffdbd2f724b5148d52c6b787f4db95c5672d51aa91c179351850cb5cf6a2c6",
+      "candidateSetHash": "47b79dd849109f27293f8804407e74419c09d00a618d6d01e5cd2b16c314f655",
+      "targetContractHash": "tc_95ed5936b1dd294a1113c1d15e709640dda070059981877d29776daa0ebca6a9",
+      "projectRevisionHash": "d562965154de25feb9e32ceb3fdec5c22e94b55aacf7e0ed76ea559244f28c1d"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-mail",
+        "sourceFieldRef": "fld_d4e4370165e77c5a",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "requiredEvidenceRefs": [
+          "ev_bf83ea62787a7a14"
+        ]
+      },
+      {
+        "sourceHeader": "Primeiro nome",
+        "sourceFieldRef": "fld_a4552e5a8adfc5b6",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "CEP",
+        "sourceFieldRef": "fld_780c0bfa31a5c48a",
+        "decision": "MAP",
+        "destinationField": "contact.postalCode"
+      },
+      {
+        "sourceHeader": "Telefone",
+        "sourceFieldRef": "fld_323413b3ed499df9",
+        "decision": "MAP",
+        "destinationField": "contact.phone"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.phone",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6da0ba7b54ebda97af2c65e964bc7308cf72199c33125c66d2292aefee8bb3e4"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-mail",
+        "fieldRef": "src:E-mail",
+        "valueClass": "EMAIL",
+        "values": [
+          "zera.joriko0@sample.invalid",
+          "darek.vexmar1@corp.example.test",
+          "fino.norell2@example.test",
+          "vexek.quelero3@sample.invalid",
+          "zera.joriko0@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Primeiro nome",
+        "fieldRef": "src:Primeiro nome",
+        "valueClass": "TEXT",
+        "values": [
+          "Belel",
+          "Halia",
+          "Zeris",
+          "Mesel",
+          "Zerel"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "CEP",
+        "fieldRef": "src:CEP",
+        "valueClass": "TEXT",
+        "values": [
+          "31747",
+          "35214",
+          "89238",
+          "84349",
+          "17532"
+        ],
+        "decision": "MAP",
+        "destination": "contact.postalCode"
+      },
+      {
+        "header": "Telefone",
+        "fieldRef": "src:Telefone",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550153",
+          "+447700900587",
+          "+12025550181",
+          "+447700900361",
+          "+12025550101"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_b297c98e98dd",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Primeiro nome",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_988664b6186b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "CEP",
+        "targetField": "contact.postalCode"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_8c6d11ec2b1a21f1a32d87d6",
+    "kc_ad3d383cbd953513364b4cd6"
+  ]
+}

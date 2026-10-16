@@ -1,0 +1,313 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-132-cap01-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-132-cap01-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "52dc612e7dd95b4a14936b3577e6456d1cfe7d6ca34aa385bb8b4e30859f46ad",
+      "candidateSetHash": "5ab7583d3f4e56f188eeb3c4578093831872e6f8ad248b15eff3986d1eff42f6",
+      "targetContractHash": "tc_ed4602b64bd2cd95235c30025fd77a927160db08edeaa131de00b77402f8a630",
+      "projectRevisionHash": "2e7a6bbb0c88d84affe2a62566a03860af4add02697d05d8043d2b0eba7c235c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Position - src",
+        "sourceFieldRef": "fld_077d93b4e71bdf85",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "E-Mail-Adresse (CRM)",
+        "sourceFieldRef": "fld_ff8866cd1c9d85e9",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Land (export)",
+        "sourceFieldRef": "fld_09dc657931972976",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_ef098ba63f0745a4",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "lead.email",
+      "company.country",
+      "lead.country"
+    ],
+    "expectedTargetUniverse": [
+      "company.country",
+      "company.industry",
+      "company.name",
+      "company.source_id",
+      "contact.country",
+      "contact.description",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id",
+      "lead.addressLine1",
+      "lead.annualRevenue",
+      "lead.company",
+      "lead.country",
+      "lead.email",
+      "lead.jobTitle",
+      "lead.lastName",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials"
+    ],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "28ffc6bb7d89f7b1a6ef56397dbbb5b6250fdfb730ffee0e627640c22d804e81"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Position - src",
+        "fieldRef": "src:Position - src",
+        "valueClass": "TEXT",
+        "values": [
+          "  Controller",
+          "Buyer ",
+          "  Buyer",
+          "Controller ",
+          "  Buyer",
+          "Account manager "
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "E-Mail-Adresse (CRM)",
+        "fieldRef": "src:E-Mail-Adresse (CRM)",
+        "valueClass": "EMAIL",
+        "values": [
+          "kesis.mesath0@corp.example.test",
+          "norel.noraly1@example.test",
+          "quelo.tulunda2@sample.invalid",
+          "vexek.finell3@corp.example.test",
+          "zeria.rismar4@corp.example.test",
+          "belo.mesero5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Land (export)",
+        "fieldRef": "src:Land (export)",
+        "valueClass": "TEXT",
+        "values": [
+          "Estmark",
+          "Valdoria",
+          "Valdoria",
+          "Valdoria",
+          "Valdoria",
+          "Kelland"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "DW",
+          "HS",
+          "TA",
+          "LL",
+          "NJ",
+          "FM"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "lead.email",
+      "company.country",
+      "lead.country"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_3bb19b814976",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Position - src",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_1d196e9edb38",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "E-Mail-Adresse (CRM)",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_92e0b466e672",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Land (export)",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_bf2e40ef56885d1fabe43ac4",
+    "kc_c595121c85196dfcef1b90a6"
+  ]
+}

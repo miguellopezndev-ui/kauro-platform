@@ -1,0 +1,183 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-064-k04-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-064-k04-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "8c5a925323e0cc406f3d984e39c44fac47a0ee34ab5c76d50bb15fea91b17241",
+      "candidateSetHash": "9008660e8d5450c77875ca1cac5b81fbe4bc1116b282c97530e1b59c4afa40c3",
+      "targetContractHash": "tc_28b17f9a86cecb4ae766ffaebc614170f5f42b16955effe64379ed06396cf3b5",
+      "projectRevisionHash": "10d30441290a5b95b25a35641ad6619cf27384680e2f5dd600ddae536da15d7f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_0ee00ea7da209213",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_b4f38f15e6a64195",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Nombre y empresa",
+        "sourceFieldRef": "fld_268bbc7e53c4e88a",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.name",
+      "company.state",
+      "company.website",
+      "company.source_id",
+      "contact.email",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "81897c048eec96e552ec800be0f887d92083509df8f7e4661bb278b6e920ac80"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "wilel.norath0@corp.example.test",
+          "kesa.nordell1@corp.example.test",
+          "daro.jororin2@example.test",
+          "vexia.pelmar3@sample.invalid",
+          "yania.normar4@corp.example.test",
+          "yano.halmar5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Kesmar",
+          "Orvova",
+          "Belmar",
+          "Joriko",
+          "Tulanth",
+          "Finath"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Nombre y empresa",
+        "fieldRef": "src:Nombre y empresa",
+        "valueClass": "TEXT",
+        "values": [
+          "Wilis Lumrane",
+          "Tavunda Systems B.V.",
+          "Fino Lumsorin",
+          "Norath Studio Inc.",
+          "Noris Noriko",
+          "Vexero Partners GmbH"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:person-or-company"
+    ]
+  },
+  "canaries": [
+    "kc_3e50f98f473c02eb99e8e7c6",
+    "kc_8a1e6768f651552eb63e8f1c"
+  ]
+}

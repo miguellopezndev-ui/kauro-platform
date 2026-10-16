@@ -1,0 +1,6 @@
+{
+  "label": "SIMULATED: hand-written from the documented Vertex Anthropic Messages response shape; not a recording of a live call",
+  "status": 200,
+  "headers": { "content-type": "application/json", "x-goog-request-id": "simulated-goog-0001", "set-cookie": "SIMULATED_SECRET=1" },
+  "body": { "id": "msg_vrtx_01SIMULATED0001", "type": "message", "role": "assistant", "model": "claude-sonnet-5-5", "content": [{ "type": "text", "text": "Ñandú € 😀 listo" }], "stop_reason": "end_turn", "stop_sequence": null, "usage": { "input_tokens": 12, "output_tokens": 5, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0 } }
+}

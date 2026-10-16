@@ -1,0 +1,184 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-015-cap04-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-015-cap04-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e37ee2f7366c0892f896e42d42354f6c51e5a12c8ad3ed6d82707f3a71da5f07",
+      "candidateSetHash": "1203eccc10b898f4784c2acfdcbb756f1490d8a531672d45edd7e3adee50dec8",
+      "targetContractHash": "tc_eb0a7c186072b699ae5e50aae45c57642604ac561e226bb788cd33d4b6900dbe",
+      "projectRevisionHash": "5f227102d403541f8b4af4d3ccc33ebff45154e081261c4bb19d606c590836d4"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_2bc069b2fef012f6",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount",
+        "transformPrimitive": "NORMALISE_NUMBER",
+        "typedTransformParams": {
+          "decimalSeparator": ","
+        }
+      },
+      {
+        "sourceHeader": "Phone",
+        "sourceFieldRef": "fld_9fce3727cd8fffdb",
+        "decision": "MAP",
+        "destinationField": "company.phone",
+        "transformPrimitive": "PARSE_PHONE_E164",
+        "typedTransformParams": {
+          "defaultRegion": "US"
+        }
+      },
+      {
+        "sourceHeader": "Name text [v2]",
+        "sourceFieldRef": "fld_9d1702da46b71e6f",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.employeeCount",
+      "company.name",
+      "company.phone",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e01e774d9c84c0810b606817252d2684462a4516492c671ab82e7a688ec25091"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY",
+      "locale": {
+        "defaultRegion": "US"
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "NUMBER",
+        "values": [
+          "90282,16",
+          "34702,68",
+          "95855,97",
+          "39654,36"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount",
+        "transform": "NORMALISE_NUMBER",
+        "params": {
+          "decimalSeparator": ","
+        }
+      },
+      {
+        "header": "Phone",
+        "fieldRef": "src:Phone",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0141",
+          "202-555-0119",
+          "202-555-0172",
+          "202-555-0115"
+        ],
+        "decision": "MAP",
+        "destination": "company.phone",
+        "transform": "PARSE_PHONE_E164",
+        "params": {
+          "defaultRegion": "US"
+        }
+      },
+      {
+        "header": "Name text [v2]",
+        "fieldRef": "src:Name text [v2]",
+        "valueClass": "TEXT",
+        "values": [
+          "  Mesenko Labs GmbH",
+          "Halell Foods S.L. ",
+          "  Finanth Group S.A.",
+          "Quelvik Partners GmbH "
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "transform": "TRIM_WHITESPACE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_9cbcd52cdae6",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Name text [v2]",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_0d1e2290ec43c7f5b9884b9d",
+    "kc_2f0eed7096734121a729b227"
+  ]
+}

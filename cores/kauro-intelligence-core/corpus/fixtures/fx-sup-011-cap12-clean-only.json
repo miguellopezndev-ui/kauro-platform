@@ -1,0 +1,201 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-011-cap12-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-011-cap12-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "a123996ce440ac148fb4b959b28a71bb4485b91a3063d4bb625493247b073f58",
+      "candidateSetHash": "0e841f345e00003786eb9a204825d835baf08cb480b2c5fffd1282954de75e21",
+      "targetContractHash": null,
+      "projectRevisionHash": "5fb5bd43d3ca3d3e49b05436fd6e996a504ededb03dd0718f70bbd6efcc727f6"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Nachname",
+        "sourceFieldRef": "fld_9a69f253828e6f02",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Column B",
+        "sourceFieldRef": "fld_3303aeb2a4ee1684",
+        "decision": "MAP",
+        "destinationField": "lead.phone",
+        "requiredEvidenceRefs": [
+          "ev_edeb77967d190395"
+        ]
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_f8ba4f2fa1591bfc",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_621cb3346da1e3ad",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.annualRevenue",
+      "lead.doNotEmail",
+      "lead.lastName",
+      "lead.phone",
+      "lead.rating"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials",
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "a3852e3d40940fa436d31f8fc413d04a806c29d7bce65d7571a26df23bee2bd4"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "rating",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Nachname",
+        "fieldRef": "src:Nachname",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumova",
+          "Darova",
+          "Zersorin",
+          "Belell",
+          "Pelero",
+          "Zerdell"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Column B",
+        "fieldRef": "src:Column B",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550140",
+          "+447700900944",
+          "+12025550110",
+          "+12025550141",
+          "+12025550147",
+          "+447700900307"
+        ],
+        "decision": "MAP",
+        "destination": "lead.phone",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "JW",
+          "GM",
+          "LG",
+          "ER",
+          "RC",
+          "CT"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "9dbd4df2",
+          "c975f43c",
+          "3c9f8b63",
+          "7a8591df",
+          "e99f787a",
+          "694c09c"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_76040af8b8b7",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nachname",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_8a7eefe706414d40f59656e4",
+    "kc_d88a755e0dbd1f988e49f5ad"
+  ]
+}

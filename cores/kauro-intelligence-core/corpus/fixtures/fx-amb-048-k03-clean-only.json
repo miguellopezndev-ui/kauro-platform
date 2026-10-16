@@ -1,0 +1,177 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-048-k03-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-048-k03-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9cddda84b9b78c58dcdb07f733fb60a4e1f44ad4c6c4de3ffec2e43a087c6b8a",
+      "candidateSetHash": "e901a22ca52c483cf51cbc7ff055c09de77f0ba384743101048d6eeac36bb1d7",
+      "targetContractHash": null,
+      "projectRevisionHash": "a1e33f76ad270ed6175a39f9fbcfe47efbf3c2ea4ede1fd344832786dd7b45ea"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_3699051d03bb9728",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Dato",
+        "sourceFieldRef": "fld_98aa7d466d6118a8",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Data",
+        "sourceFieldRef": "fld_75d04c5407f8516e",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.description",
+      "company.website",
+      "contact.companyName",
+      "contact.email",
+      "contact.phone",
+      "lead.mobilePhone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "5ca5ad8613b1d04188e72454c452bd5999fd45c3c99fc3c68c035adfbb771de2"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "zera.queliko0@corp.example.test",
+          "tulis.pelrane1@sample.invalid",
+          "tulek.norunda2@sample.invalid",
+          "quelek.belath3@corp.example.test",
+          "noris.lumvik4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Dato",
+        "fieldRef": "src:Dato",
+        "valueClass": "MIXED",
+        "values": [
+          "luman.tavaly0@sample.invalid",
+          "+12025550152",
+          "Finero Labs S.L.",
+          "329",
+          "kesia.sovunda4@example.test"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Data",
+        "fieldRef": "src:Data",
+        "valueClass": "MIXED",
+        "values": [
+          "sova.belrane0@corp.example.test",
+          "+12025550133",
+          "Orvell Logistics S.A.",
+          "107",
+          "halo.zerorin4@corp.example.test"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:generic-header"
+    ]
+  },
+  "canaries": [
+    "kc_65f085f3d849c5763b330bf4",
+    "kc_ad761f2268e5a0d70af94786"
+  ]
+}

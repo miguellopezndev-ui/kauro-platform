@@ -1,0 +1,24 @@
+{
+  "id": "G12",
+  "title": "A relationship endpoint that does not exist",
+  "intent": "Alan's row points at company C9, which is not in the source. No company is invented. The relationship is reported unresolved with the key that failed, and Alan's own record is still delivered.",
+  "expect": {
+    "rows": { "total": 3, "OUTPUT": 3, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 2, "COMPANY": 1, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 2, "OUTPUT": 1, "DEDUPLICATED": 0, "UNRESOLVED": 1, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "edgeDetails": [
+    { "row": "contacts.csv#2", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "C1", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "contacts.csv#3", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "C9", "disposition": "UNRESOLVED", "reasonCode": "ASSOCIATION_ENDPOINT_NOT_FOUND" }
+  ]
+}

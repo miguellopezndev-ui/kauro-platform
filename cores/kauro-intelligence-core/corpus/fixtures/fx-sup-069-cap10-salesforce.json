@@ -1,0 +1,224 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-069-cap10-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-069-cap10-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "07fecfa1e80ccd40236ff9d977fefc9ca1523b0fbb2be2b9ae1d6fcdd2b19901",
+      "candidateSetHash": "5486ff26152fdda51ea30eb046ca3ed52086436c1a72008cb65c0f16f83877f9",
+      "targetContractHash": "tc_9e304c53be471e611948d06406942f8d85cb7c91bbdab15b807f6654e9a21ae8",
+      "projectRevisionHash": "9707973c2ba78d7516579450a23a843f3b58439afb02a7fc19c4edb1efb33cc7"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Nachname",
+        "sourceFieldRef": "fld_e8e7d310323c26e4",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Position",
+        "sourceFieldRef": "fld_73b55cc46d8a948d",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Vorname",
+        "sourceFieldRef": "fld_8c91d30d6284948e",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Stadt",
+        "sourceFieldRef": "fld_f28c1ce6b9cdc1a4",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.description",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "bec036557f0b213f837c214461e70f9ce460247bcb49297122a626208ee845c4"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Nachname",
+        "fieldRef": "src:Nachname",
+        "valueClass": "TEXT",
+        "values": [
+          "Finrane",
+          "Wilath",
+          "Vexova",
+          "Norvik"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Position",
+        "fieldRef": "src:Position",
+        "valueClass": "TEXT",
+        "values": [
+          "Account manager",
+          "Operations lead",
+          "Site engineer",
+          "Operations lead"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Vorname",
+        "fieldRef": "src:Vorname",
+        "valueClass": "TEXT",
+        "values": [
+          "Kesek",
+          "Vexa",
+          "Vexan",
+          "Halek"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Stadt",
+        "fieldRef": "src:Stadt",
+        "valueClass": "TEXT",
+        "values": [
+          "Nuvia",
+          "Valmora",
+          "Valmora",
+          "Orvale"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_a627c087a713",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nachname",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_bf66303fff04",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Position",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_578a5abd290c",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Vorname",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_629fc493ac71",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Stadt",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_f920ad993649f859b8bc473a",
+    "kc_8a357466a763d386df1e3558"
+  ]
+}

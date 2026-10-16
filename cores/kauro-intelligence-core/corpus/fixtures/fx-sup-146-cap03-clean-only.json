@@ -1,0 +1,160 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-146-cap03-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-146-cap03-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "a842fc6820417790fa29372dc3d22e490a07b72995d5f66c8b59a9410465827f",
+      "candidateSetHash": "c7b880ed40c1c897443295395b2514e101afc42886ab9f93f99cd028180f533d",
+      "targetContractHash": null,
+      "projectRevisionHash": "143df3798c2c6565092c14e976811d04f12d1da474c365c90e107678d5976759"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Deal name - src",
+        "sourceFieldRef": "fld_16c42600435768d7",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Stage",
+        "sourceFieldRef": "fld_7c195b003c86babe",
+        "decision": "MAP",
+        "destinationField": "deal.stage"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_2b4cecbfcd232c71",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.name",
+      "deal.pipeline",
+      "deal.stage"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "d8f55c240b1805c3ac1d7fce5fd532ce4f093685b28d0ada9da0e672c52012f5"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Deal name - src",
+        "fieldRef": "src:Deal name - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Supply contract 2024 Lumath",
+          "Pilot 2026 Belanth",
+          "Onboarding 2024 Kesunda",
+          "Onboarding 2024 Yanaly",
+          "Supply contract 2026 Sovova"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Stage",
+        "fieldRef": "src:Stage",
+        "valueClass": "ENUM",
+        "values": [
+          "client",
+          "ex-client",
+          "partner",
+          "lead",
+          "client"
+        ],
+        "decision": "MAP",
+        "destination": "deal.stage"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "amber",
+          "red",
+          "blue",
+          "amber",
+          "blue"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_779884c05699",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Deal name - src",
+        "targetField": "deal.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_9b9f027d39a6bfd37a44cb7d",
+    "kc_23fb0ff9fcb2c08bbaccb0f5"
+  ]
+}

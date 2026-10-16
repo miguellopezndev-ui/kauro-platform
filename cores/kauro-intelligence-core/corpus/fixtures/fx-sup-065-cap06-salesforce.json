@@ -1,0 +1,330 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-065-cap06-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-065-cap06-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9fe6fbe862527a9c77ca691c3c52489f0b7fafc879068203fdb5edee5043f8c2",
+      "candidateSetHash": "d574362807eabe1459e011e97c31fa4ced1dcb444b1d325af43246ccf336465f",
+      "targetContractHash": "tc_2d3d5829978e223be117c362feff9002b64dd30fa4554c02bdc78cf4fd273f95",
+      "projectRevisionHash": "ac6c7d952ef0e9f2a9d0f3de85c4cc7344bcf2044638e351f0e0345cccb46a21"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_5bac7fd9f07f0657",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_4b12836e1b6979a9",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_ea972551f36dd28c",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_8abe81fcb182c1e9",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Customer Number",
+        "sourceFieldRef": "fld_3750caf12243f37f",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv",
+        "adoptsIdentity": true
+      },
+      {
+        "sourceHeader": "Customer Number",
+        "sourceFieldRef": "fld_ade6e538548c1b97",
+        "decision": "PRESERVE",
+        "filePath": "webform-signups.csv",
+        "adoptsIdentity": true
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_d5a3481a8a7f73aa",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_f5761ea8e2fafce2",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Title",
+        "sourceFieldRef": "fld_68bed7f0bf5cc79a",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_c70b11f7235e6549",
+        "decision": "PRESERVE",
+        "filePath": "webform-signups.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.Customer_Number__c",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Warehouse bin",
+      "Customer Number",
+      "Customer Number",
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [
+      "IDENTITY_STRATEGY"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e77483005d01a59218352a6f40a0d8b1b40d66614b1ec04c7db0f549cb34b92e"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "contacts.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "webform-signups.csv": {
+          "object": "CONTACT"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "Customer_Number__c",
+            "valueClass": "TEXT",
+            "required": false,
+            "label": "Customer Number",
+            "externalId": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:contacts.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-187",
+          "P-188",
+          "P-189",
+          "P-190"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contacts.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "sovo.lumero0@corp.example.test",
+          "vexo.tavero1@corp.example.test",
+          "belo.mesova2@example.test",
+          "pelel.tavero3@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:contacts.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Nororin",
+          "Tulmar",
+          "Kesdell",
+          "Halquist"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:contacts.csv:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "B-74",
+          "A-96",
+          "A-81",
+          "A-61"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Customer Number",
+        "fieldRef": "src:contacts.csv:Customer Number",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "CU-9462",
+          "CU-9463",
+          "CU-9464",
+          "CU-9465"
+        ],
+        "decision": "PRESERVE",
+        "adoptsIdentity": true,
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Customer Number",
+        "fieldRef": "src:webform-signups.csv:Customer Number",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "CU-9465",
+          "CU-9600",
+          "CU-9601"
+        ],
+        "decision": "PRESERVE",
+        "adoptsIdentity": true,
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:webform-signups.csv:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Wilia",
+          "Lumo",
+          "Halek"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:webform-signups.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Yaniko",
+          "Wilsorin",
+          "Sovova"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Title",
+        "fieldRef": "src:webform-signups.csv:Title",
+        "valueClass": "TEXT",
+        "values": [
+          "Site engineer",
+          "Site engineer",
+          "Site engineer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:webform-signups.csv:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-98",
+          "A-36",
+          "A-49"
+        ],
+        "decision": "PRESERVE",
+        "file": "webform-signups.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "IDENTITY_STRATEGY"
+    ]
+  },
+  "canaries": [
+    "kc_e7da9f716955eea173a618ca",
+    "kc_43b710726605bc7f51d3365b"
+  ]
+}

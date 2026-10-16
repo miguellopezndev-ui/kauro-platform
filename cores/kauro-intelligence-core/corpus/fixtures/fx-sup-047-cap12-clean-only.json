@@ -1,0 +1,150 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-047-cap12-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-047-cap12-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "7233e5d11e76e274850820cfa18e501aaa3380f6f959360693c1b1ce63c9cdbc",
+      "candidateSetHash": "19df5004f13f3f0eb04466179c23a2e18f856069370195b4028bd2065421df1c",
+      "targetContractHash": null,
+      "projectRevisionHash": "7ff4ee40ab3b3033ad7d17fe32964230c4f914e86d9125bcf7d5686ce8596820"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Phone",
+        "sourceFieldRef": "fld_883ee10f8fe3f0d5",
+        "decision": "MAP",
+        "destinationField": "contact.phone"
+      },
+      {
+        "sourceHeader": "Info",
+        "sourceFieldRef": "fld_943c5229490879c6",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "requiredEvidenceRefs": [
+          "ev_58f7c1270ef7f413"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.doNotCall",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.marketingConsent",
+      "contact.phone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "d23c498b9d7b9ff098642fd7eab21d1108c65e0b135d7b5b9f3352998a342a4c"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "marketingConsent",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Phone",
+        "fieldRef": "src:Phone",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550149",
+          "+447700900277",
+          "+12025550153",
+          "+12025550150",
+          "+12025550122",
+          "+447700900234"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone"
+      },
+      {
+        "header": "Info",
+        "fieldRef": "src:Info",
+        "valueClass": "EMAIL",
+        "values": [
+          "orvia.quelath0@sample.invalid",
+          "joria.tuldell1@corp.example.test",
+          "wilek.tulenko2@sample.invalid",
+          "quelia.zerova3@example.test",
+          "nora.halanth4@sample.invalid",
+          "zerel.quelero5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "evidence": [
+          "ev:self"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_abac571a4bd009329dfdbbaa",
+    "kc_9a5ff9dce4fc07f075ed5f21"
+  ]
+}

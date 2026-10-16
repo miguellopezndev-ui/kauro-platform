@@ -1,0 +1,173 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-013-cap02-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-013-cap02-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e9bf3d8c9cd7c34a33f542056d061f0fa2873d186bb0684d8fb559f664ddbf72",
+      "candidateSetHash": "5602f0f49447673b2e7712b2882bad438f419b2e7c14b61f5b41cb7aef19251a",
+      "targetContractHash": "tc_aa5e56779580282ffb16604781d4db75f7fd0850455efd9e612c64ab65b50f2a",
+      "projectRevisionHash": "7077401273fffc632d54c0784e6dbb042fe8d2d90486968cab1d8e0615c60398"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_2fd6d2642972319a",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_9a7a7ccadf3b40fd",
+        "decision": "MAP",
+        "destinationField": "company.website",
+        "allowedDestinationFields": [
+          "company.website",
+          "company.domain"
+        ]
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_afc63880a614062b",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.domain",
+      "company.industry",
+      "company.name",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "f3731f5dbf5f9159b3d64c570877b3cbb892e0da54c749f3cd4048f541cd6439"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelaly Systems GmbH",
+          "Halorin Systems S.A.",
+          "Belmar Group Inc."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.halell-systems.test",
+          "https://www.yanova-labs.test",
+          "https://www.daranth-foods.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website",
+        "alternatives": [
+          "company.domain"
+        ]
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Software",
+          "Textiles",
+          "Software"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_c11a049a1899",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b838b6999542273e874b8c69",
+    "kc_be6a4f08729dbfe805068688"
+  ]
+}

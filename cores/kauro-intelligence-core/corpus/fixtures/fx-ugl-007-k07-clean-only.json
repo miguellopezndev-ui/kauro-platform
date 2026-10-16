@@ -1,0 +1,149 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-007-k07-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-007-k07-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "a87d4ac69e929218ccda6f1522542fe5f91244fe930b17865346b12fadb85a66",
+      "candidateSetHash": "b0a597f1d10b3e312c488f4df14cc75677b68211122fb802f0085846d16a0d43",
+      "targetContractHash": null,
+      "projectRevisionHash": "aa8b3c8ebcd38ff8f103937c59a76509c8c60ab42a378344f82366a87aac14ec"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "이름",
+        "sourceFieldRef": "fld_af05a16797bf7a5d",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Lifecycle (old CRM)",
+        "sourceFieldRef": "fld_3c439ba790da961c",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_0b3ef6591102e555",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.legacyScore"
+    ],
+    "expectedTargetUniverse": [
+      "contact.firstName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Folder code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c01de96fef76e4443756e17f705d67482cbd12185df0da0f1fd82eb4262452a2"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "이름",
+        "fieldRef": "src:이름",
+        "valueClass": "TEXT",
+        "values": [
+          "Darek",
+          "Norel",
+          "Quelo"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Lifecycle (old CRM)",
+        "fieldRef": "src:Lifecycle (old CRM)",
+        "valueClass": "MIXED",
+        "values": [
+          "44",
+          "8",
+          "68"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F302",
+          "F368",
+          "F196"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.legacyScore"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-target",
+      "lang:ko",
+      "ugly:stale-header"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_2e2b298f9804",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "이름",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_2795b30a4c25d8fc9f2a0948",
+    "kc_205a30ef214d658d378b2b36"
+  ]
+}

@@ -1,0 +1,212 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-013-k13-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-013-k13-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "dd0b95d01263636a637ac44f11f38493631fe67f4c2b35cd4345f874baa0c55f",
+      "candidateSetHash": "c96851eb0b7da3a9b11adde19b708f06f42822049cc144bbc91cfac9b0284fef",
+      "targetContractHash": null,
+      "projectRevisionHash": "a438eb5c16b6695d269497b539da30f0d92b15a0eda928bf04740641517ebe00"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_9a48ccd3c1afd987",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "email ",
+        "sourceFieldRef": "fld_3a68f2d61804884b",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "EMAIL 2",
+        "sourceFieldRef": "fld_e56bfd2a5ad0fb6f",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "اسم العائلة",
+        "sourceFieldRef": "fld_13726acedae03f54",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "الدولة",
+        "sourceFieldRef": "fld_aafbc8c2cfea8845",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "email ",
+      "EMAIL 2"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "108dcc2eb860669a7a0d9101ebb00696e1bcafba23cc0128ac393574c1729269"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "zero.tavero0@sample.invalid",
+          "finis.sovorin1@sample.invalid",
+          "belis.zerquist2@corp.example.test",
+          "wilek.orvenko3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "email ",
+        "fieldRef": "src:email ",
+        "valueClass": "EMAIL",
+        "values": [
+          "quelek.zerdell50@corp.example.test",
+          "",
+          "",
+          ""
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "EMAIL 2",
+        "fieldRef": "src:EMAIL 2",
+        "valueClass": "EMAIL",
+        "values": [
+          "",
+          "",
+          "",
+          "lumis.yansorin60@corp.example.test"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "اسم العائلة",
+        "fieldRef": "src:اسم العائلة",
+        "valueClass": "TEXT",
+        "values": [
+          "Norrane",
+          "Darorin",
+          "Kesquist",
+          "Kesiko"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "الدولة",
+        "fieldRef": "src:الدولة",
+        "valueClass": "TEXT",
+        "values": [
+          "Norvania",
+          "Kelland",
+          "Norvania",
+          "Estmark"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:near-duplicate-headers",
+      "lang:ar"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_8efaecf39d55",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "اسم العائلة",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_ba031b12d783",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "الدولة",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_cdb3262a864b5e60edde0dae",
+    "kc_3920bfb7b1cd115f955252fe"
+  ]
+}

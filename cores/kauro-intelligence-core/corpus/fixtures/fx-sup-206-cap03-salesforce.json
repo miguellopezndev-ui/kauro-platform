@@ -1,0 +1,169 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-206-cap03-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-206-cap03-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2532004f9ab2f3023589c4f585e3c49efcce52b37e4b551bd040f13b6a509a77",
+      "candidateSetHash": "7b24c23c6473991b85e62e542e7e0decfb4a0a4a8812f4eb4e5e18a0c507a30d",
+      "targetContractHash": "tc_80bc30b9486e98a7d1aec674eecb881f9f56aaf28558161d181976b4dfcc1e56",
+      "projectRevisionHash": "7fab666d1ce0c0b1e1c51babdf4c8e97d31a3b1b070624a100fcbf263d957c84"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Adresse courriel",
+        "sourceFieldRef": "fld_8a1fa15ae8883234",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Portable",
+        "sourceFieldRef": "fld_1a05cf53cbc9957b",
+        "decision": "MAP",
+        "destinationField": "contact.mobilePhone",
+        "semanticType": "PHONE"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_d64a1643209b7a8b",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_fb035a35ce6d5a68",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lastName",
+      "contact.mobilePhone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Legacy system id",
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "a554e3522320f720569603d894ad63407cd14fd52f22ef1756ee3baf94d66b7a"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Adresse courriel",
+        "fieldRef": "src:Adresse courriel",
+        "valueClass": "EMAIL",
+        "values": [
+          "jorek.quelanth0@sample.invalid",
+          "orvek.pelova1@corp.example.test",
+          "tulel.norenko2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Portable",
+        "fieldRef": "src:Portable",
+        "valueClass": "MIXED",
+        "values": [
+          "+447700900613",
+          "+12025550174",
+          "+1-202-555-0184"
+        ],
+        "decision": "MAP",
+        "destination": "contact.mobilePhone",
+        "semanticType": "PHONE"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L26091",
+          "L50755",
+          "L43394"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-11",
+          "batch-27",
+          "batch-31"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_25bec62e53d9e26348b7a3d6",
+    "kc_19d4f245e9155e4624e18878"
+  ]
+}

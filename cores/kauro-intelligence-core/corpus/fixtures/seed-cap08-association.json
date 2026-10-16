@@ -1,0 +1,150 @@
+{
+  "partition": "FINAL",
+  "fileName": "seed-cap08-association.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "seed-cap08-association",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "cd596835d2e102dc4731119b20d3533c66e77078fe82269251aa0221ee4f53d7",
+      "candidateSetHash": "55c3d4092288c707579507caf2e1c5d5ebdeb1382fad0f979fbc7541883d2f34",
+      "targetContractHash": "tc_040043df0b9598032a7929bc3ebdde8aa249c111918154646971979c078667ad",
+      "projectRevisionHash": "1b579e3e00de0dc3a85d114187942075dc5fd9c568d81f1e289f394bca8e3d68"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_af39d881f0685086",
+        "decision": "MAP",
+        "destinationField": "lead.company"
+      },
+      {
+        "sourceHeader": "Contact email",
+        "sourceFieldRef": "fld_cb24a5670cd32b60",
+        "decision": "MAP",
+        "destinationField": "lead.email"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_6865ba8a62474e20",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.company",
+      "lead.email",
+      "lead.lastName",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6a1c08709bf67ac9586fb1892bb49c305c6f1815d62a99962d14315100cf49c4"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Acme",
+          "Globex"
+        ],
+        "decision": "MAP",
+        "destination": "lead.company"
+      },
+      {
+        "header": "Contact email",
+        "fieldRef": "src:Contact email",
+        "valueClass": "EMAIL",
+        "values": [
+          "x@example.test",
+          "y@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "lead.email"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Perez",
+          "Lopez"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "link:on-record"
+    ]
+  },
+  "canaries": [
+    "kc_f215d5419af8eeb3d82495c1",
+    "kc_68571cff1e817643781d31f6"
+  ]
+}

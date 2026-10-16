@@ -1,0 +1,304 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-093-cap10-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-093-cap10-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e2e541675ddef1b72d6a400f0c3d42967cfe90b16117dd143b5fbf3b8416a223",
+      "candidateSetHash": "44c8c1c979ed40be1bc7c2c13350bf0cd0147896daf7ac24eaaf629409a22e7b",
+      "targetContractHash": "tc_04d9c55235ecf490beeeaefd460e17dae4878f6889160b7942dab9f8e2480cae",
+      "projectRevisionHash": "916272f35f8a006d9670c11d1d598495a748a409e859c5792920dec74f8674e6"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Indirizzo email",
+        "sourceFieldRef": "fld_37316e2b60b338d6",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Paese",
+        "sourceFieldRef": "fld_3dc6f87ff3cef229",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Indirizzo",
+        "sourceFieldRef": "fld_7e7fb11fc4e9bb38",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "Città",
+        "sourceFieldRef": "fld_3fc9d02c407f4417",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Nome",
+        "sourceFieldRef": "fld_8914c37aa7c7088f",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_0bb8793d76aec60d",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.companyName",
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.lifecycleStage",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "1d385dd5222fcd9c858bd6d46cfc4ffdcca0fb70748fff14e0a2c9df66ee93e4"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Indirizzo email",
+        "fieldRef": "src:Indirizzo email",
+        "valueClass": "EMAIL",
+        "values": [
+          "lumo.mesath0@example.test",
+          "quelek.tulanth1@corp.example.test",
+          "pelel.belquist2@example.test",
+          "zero.nordell3@sample.invalid",
+          "daria.vexanth4@example.test",
+          "tulel.wildell5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Paese",
+        "fieldRef": "src:Paese",
+        "valueClass": "TEXT",
+        "values": [
+          "Valdoria",
+          "Kelland",
+          "Valdoria",
+          "Kelland",
+          "Estmark",
+          "Estmark"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Indirizzo",
+        "fieldRef": "src:Indirizzo",
+        "valueClass": "TEXT",
+        "values": [
+          "114 Finanth Street",
+          "64 Vexath Street",
+          "46 Soviko Street",
+          "91 Lummar Street",
+          "148 Tulvik Street",
+          "4 Mesiko Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "Città",
+        "fieldRef": "src:Città",
+        "valueClass": "TEXT",
+        "values": [
+          "Quenby",
+          "Nuvia",
+          "Tessin",
+          "Kelmar",
+          "Valmora",
+          "Nuvia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Nome",
+        "fieldRef": "src:Nome",
+        "valueClass": "TEXT",
+        "values": [
+          "Zerek",
+          "Zerel",
+          "Belel",
+          "Sovek",
+          "Mesek",
+          "Noria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-32",
+          "R-42",
+          "R-59",
+          "R-38",
+          "R-15",
+          "R-12"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_ccfa48048646",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Indirizzo email",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_8e312a82f254",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Paese",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_8868827e4451",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Indirizzo",
+        "targetField": "contact.addressLine1"
+      },
+      {
+        "memoryId": "memconv_3bdd6f7c0b13",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Città",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_52649d7b04c9",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nome",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_d2dd8874860ab603c347c074",
+    "kc_a963dbde33031ad4a84d10e6"
+  ]
+}

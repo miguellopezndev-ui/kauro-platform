@@ -1,0 +1,256 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-085-cap02-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-085-cap02-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5357a286323f8ec2a7fe5f7c75ea216337fb7f54267ff6de63da8d93f897f55a",
+      "candidateSetHash": "a6579211146c5f6597737c2e332c8780f9af6555b6dd44aaac9a19f4657c6875",
+      "targetContractHash": "tc_f5df6d5fef0f0d09d7dfdaacb0161be2e20fdc8ae7de0e5acd9cb2793eecb5f2",
+      "projectRevisionHash": "43dd0c835a98409b4e4a01dc8aaa468d325a60ce0664a0945b9fa54959349389"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_388da498fec4b818",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_51626d6d62288f15",
+        "decision": "MAP",
+        "destinationField": "company.country"
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_9b850eaa91d51436",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_9eb4805cd85ea3eb",
+        "decision": "MAP",
+        "destinationField": "company.website",
+        "allowedDestinationFields": [
+          "company.website",
+          "company.domain"
+        ]
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_12a118d59b4c854e",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_5eddf88491045c7b",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.country",
+      "company.domain",
+      "company.industry",
+      "company.name",
+      "company.ownerEmail",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag",
+      "Sales rep initials"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6ad95a9332f0f116813940885711f8f06bc6b156fc7af50cfe24d23a061f8878"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Tavero Works SAS",
+          "Mesova Studio GmbH",
+          "Risdell Group LLC",
+          "Dariko Studio LLC",
+          "Belmar Labs S.A."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "Kelland",
+          "Estmark",
+          "Estmark",
+          "Valdoria",
+          "Norvania"
+        ],
+        "decision": "MAP",
+        "destination": "company.country"
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Logistics",
+          "Textiles",
+          "Food service",
+          "Packaging",
+          "Software"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.pelvik-logistics.test",
+          "https://www.halrane-logistics.test",
+          "https://www.finquist-systems.test",
+          "https://www.wilanth-studio.test",
+          "https://www.pelorin-systems.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website",
+        "alternatives": [
+          "company.domain"
+        ]
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "amber",
+          "green",
+          "amber",
+          "amber",
+          "red"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "ER",
+          "BJ",
+          "AH",
+          "CH",
+          "ST"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_40de5208fa89",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_856f71fbb4da11fed3eb09d7",
+    "kc_4b71b1f50cbf1bcf5afee813"
+  ]
+}

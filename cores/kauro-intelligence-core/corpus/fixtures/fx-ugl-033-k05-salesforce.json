@@ -1,0 +1,192 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-033-k05-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-033-k05-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e0bce532a964f68d464cc85212429b779c6bdaa86d2211c5af020a6a198d9115",
+      "candidateSetHash": "0275fb871d3f369a6bebb74e590946139451073edcbd85fbdc5269f5e87bccc5",
+      "targetContractHash": "tc_7dbf3b5aaeace758ad25c5dfaba9f3136172a22f799e101a71384e66fbd2d048",
+      "projectRevisionHash": "734c3da9855f95b2604a2aa169174b95fcf8e25e117193df1e179e82be76beac"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_cd3671896503d7d5",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "อีเมล",
+        "sourceFieldRef": "fld_f35110e7c2040522",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "E-mail 2019 (outdated)",
+        "sourceFieldRef": "fld_346587aa5f7ae98c",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "ตำแหน่ง",
+        "sourceFieldRef": "fld_94713755a032e792",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref",
+      "E-mail 2019 (outdated)"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "9a1f956cc4c8c48f9ec539eda141abc4b54fdfa2ca89f123d4d1a3c45b2490fa"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-8789",
+          "TKT-9170",
+          "TKT-9532",
+          "TKT-5056"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "อีเมล",
+        "fieldRef": "src:อีเมล",
+        "valueClass": "EMAIL",
+        "values": [
+          "tavis.lumdell0@corp.example.test",
+          "finel.orvsorin1@sample.invalid",
+          "mesia.norvik2@sample.invalid",
+          "mesia.kessorin3@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "E-mail 2019 (outdated)",
+        "fieldRef": "src:E-mail 2019 (outdated)",
+        "valueClass": "EMAIL",
+        "values": [
+          "tavel.peliko40@corp.example.test",
+          "orva.peliko41@corp.example.test",
+          "tava.pelorin42@example.test",
+          "mesan.norunda43@corp.example.test"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "ตำแหน่ง",
+        "fieldRef": "src:ตำแหน่ง",
+        "valueClass": "TEXT",
+        "values": [
+          "Controller",
+          "Operations lead",
+          "Buyer",
+          "Site engineer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-headers",
+      "lang:th",
+      "ugly:stale-header"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_c4a1de669777",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "ตำแหน่ง",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_82c491a1d841a7b16720424a",
+    "kc_468426f4048cda136d828ee8"
+  ]
+}

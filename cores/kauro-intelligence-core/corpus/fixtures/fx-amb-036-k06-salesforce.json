@@ -1,0 +1,184 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-036-k06-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-036-k06-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "7495883f981a273648f295d44d5e43898d0cda7e6f6e4056c39dc12c3ef203ed",
+      "candidateSetHash": "68115b2d44b5a4c7dc80b610cb792bfa45286acc64c734fb28cfbf280f53404b",
+      "targetContractHash": "tc_7206d8050a67a1c5080fa66dfb8ccd0d9445a8fb0b5159e2e916ea69a9af124b",
+      "projectRevisionHash": "87a80ebfb677bf2d3a97f3d24387df0bdaf1aff5b9ebcfc9f580c2ab761247c3"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_7ed216d92d6a98c8",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Code",
+        "sourceFieldRef": "fld_7fd26dd5ea43ba49",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.firstName",
+      "contact.lastName",
+      "contact.state",
+      "contact.source_id",
+      "deal.closeDate",
+      "deal.description",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "2bb7a0bf334d2394b7badeeedd37bf611233a00469dc5fdef5a0e6b52d042d98"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Belis",
+          "Joro",
+          "Pelek",
+          "Riso",
+          "Yano",
+          "Belel"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Code",
+        "fieldRef": "src:Code",
+        "valueClass": "ENUM",
+        "values": [
+          "X1",
+          "Q",
+          "B",
+          "P7",
+          "X1",
+          "Q",
+          "B",
+          "P7"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:enum-codes"
+    ]
+  },
+  "canaries": [
+    "kc_241b9749d50e9b0e3420b787",
+    "kc_7a36f1f19042319687d93808"
+  ]
+}

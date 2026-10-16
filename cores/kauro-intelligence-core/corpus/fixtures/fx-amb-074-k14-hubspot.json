@@ -1,0 +1,149 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-074-k14-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-074-k14-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "b3ba77448b15415a28b337e8777fc312b2bfb289d3f1061bcff6a80792a4311d",
+      "candidateSetHash": "4365aa40123cc436f8df59722b8a03279676459187c9a5aa0ea9f7ba9d06575c",
+      "targetContractHash": "tc_6ff920db83f1ceceafe2548df5167e94626ff84035f18393a353c8e2aa561c52",
+      "projectRevisionHash": "f04cd9aba5fbdb8a3a0928a64e263f02d395ac098734b54990c8676f1fe8b414"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_0b51ca7254a33336",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Other",
+        "sourceFieldRef": "fld_b212cf3920134d98",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.companyName",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "a195295c0f3c44d6f275c838a8a09dc41ddbe81310d8a271c898d07cf8f83ef0"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Pelsorin",
+          "Quelorin",
+          "Tavdell",
+          "Mesmar",
+          "Norenko"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Other",
+        "fieldRef": "src:Other",
+        "valueClass": "MIXED",
+        "values": [
+          "",
+          "see attached",
+          "",
+          "",
+          "see attached"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:sparse-column"
+    ]
+  },
+  "canaries": [
+    "kc_c13ad043cbff8ae6a9c3aff2",
+    "kc_131c979ab318ae290b1caa57"
+  ]
+}

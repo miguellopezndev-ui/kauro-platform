@@ -1,0 +1,226 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-007-cap08-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-007-cap08-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "527246a7b229ce49d46e036b00589b1e773b8e6dc3d1a9130bd636aad3999975",
+      "candidateSetHash": "727a789e523d479639b79d965121fd6792c4ec5213f6c7f6ad037ea611052370",
+      "targetContractHash": null,
+      "projectRevisionHash": "063bd6bd83349e40bd5c57362a6469376f1beb085851a9103054df57265cafed"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-Mail-Adresse",
+        "sourceFieldRef": "fld_fd255a7665348556",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Firma",
+        "sourceFieldRef": "fld_e29b99fbdc0bc7e0",
+        "decision": "MAP",
+        "destinationField": "contact.companyName"
+      },
+      {
+        "sourceHeader": "PLZ",
+        "sourceFieldRef": "fld_6a6c6d7f54d2389f",
+        "decision": "MAP",
+        "destinationField": "contact.postalCode"
+      },
+      {
+        "sourceHeader": "Nachname",
+        "sourceFieldRef": "fld_54f41f25a1ed32bc",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.industry",
+      "contact.companyName",
+      "contact.doNotCall",
+      "contact.doNotEmail",
+      "contact.email",
+      "contact.lastName",
+      "contact.marketingConsent",
+      "contact.postalCode"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "2634297bb3e24e0b0bc7355f5218ea853dea640f4ddc9692358a3b1f58b5e74f"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "marketingConsent",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-Mail-Adresse",
+        "fieldRef": "src:E-Mail-Adresse",
+        "valueClass": "EMAIL",
+        "values": [
+          "pelan.halmar0@example.test",
+          "risis.vexiko1@sample.invalid",
+          "wilia.pelaly2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Firma",
+        "fieldRef": "src:Firma",
+        "valueClass": "TEXT",
+        "values": [
+          "delta",
+          "beta",
+          "alpha"
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName"
+      },
+      {
+        "header": "PLZ",
+        "fieldRef": "src:PLZ",
+        "valueClass": "TEXT",
+        "values": [
+          "68404",
+          "76316",
+          "50644"
+        ],
+        "decision": "MAP",
+        "destination": "contact.postalCode"
+      },
+      {
+        "header": "Nachname",
+        "fieldRef": "src:Nachname",
+        "valueClass": "TEXT",
+        "values": [
+          "Findell",
+          "Finenko",
+          "Belanth"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "link:on-record"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_ae42c6fdbaa4",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Firma",
+        "targetField": "contact.companyName"
+      },
+      {
+        "memoryId": "memconv_c0a4a34c45b7",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "PLZ",
+        "targetField": "contact.postalCode"
+      },
+      {
+        "memoryId": "memconv_c0dd787c2efb",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nachname",
+        "targetField": "contact.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_8110a871314f2bc28efcefe2",
+    "kc_b49555a9eb292028757410ab"
+  ]
+}

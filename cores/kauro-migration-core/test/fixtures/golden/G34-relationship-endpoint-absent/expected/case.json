@@ -1,0 +1,45 @@
+{
+  "id": "G34",
+  "title": "A relationship pointing at a record the export does not contain",
+  "intent": "An edge file naming a deal that is not in the deals export is ordinary: exports are taken at different moments, and a relationship can outlive one of its ends. The row feeds no record of its own, so it is set aside rather than delivered, and the relationship ledger says why. A package check that demanded a corroborator for every isolation reason, and did not know the association reasons, refused the whole migration instead — the run aborted after writing the package.",
+  "expect": {
+    "rows": {
+      "total": 11,
+      "OUTPUT": 10,
+      "MERGED_PROVEN": 0,
+      "ISOLATED": 1,
+      "LEFTOVER": 0,
+      "REJECTED_INPUT": 0
+    },
+    "records": {
+      "CONTACT": 3,
+      "COMPANY": 2,
+      "DEAL": 2,
+      "LEAD": 0
+    },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": {
+      "total": 9,
+      "OUTPUT": 8,
+      "DEDUPLICATED": 0,
+      "UNRESOLVED": 1,
+      "LEFTOVER": 0
+    }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    {
+      "row": "contact-deals.csv#5",
+      "disposition": "ISOLATED",
+      "reasonCode": "ASSOCIATION_ENDPOINT_NOT_FOUND"
+    }
+  ]
+}

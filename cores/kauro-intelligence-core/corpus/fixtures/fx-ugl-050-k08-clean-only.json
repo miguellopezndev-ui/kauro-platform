@@ -1,0 +1,214 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-050-k08-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-050-k08-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5c47900658cc4d18757d908afcabcc77ee6f52181886480dfb73f2fb324c830e",
+      "candidateSetHash": "18709e62900d34cadac7f5ec7fa489898d53b711cf61f82f92fa755584dbb52a",
+      "targetContractHash": null,
+      "projectRevisionHash": "b9af6022d02ec275169a62a7c60fe9cbefce303c77bef71fac190c40e07aa778"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "שם משפחה",
+        "sourceFieldRef": "fld_319d84f620c6c321",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "דוא״ל",
+        "sourceFieldRef": "fld_7862c2c671db636c",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "עיר",
+        "sourceFieldRef": "fld_884c788dc1c9fa14",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "עיר / כתובת",
+        "sourceFieldRef": "fld_2c76e72230deba15",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.doNotEmail",
+      "contact.email",
+      "contact.lastName",
+      "contact.mobilePhone",
+      "contact.ownerEmail"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "עיר / כתובת"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e7e55d8ed64b9c4ddcd710c3fd72a3f5740f5cf6d9cf63eec73b7577b2cd4585"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "שם משפחה",
+        "fieldRef": "src:שם משפחה",
+        "valueClass": "TEXT",
+        "values": [
+          "Belanth",
+          "Belrane",
+          "Sovvik",
+          "Soviko",
+          "Vexiko",
+          "Quelrane"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "דוא״ל",
+        "fieldRef": "src:דוא״ל",
+        "valueClass": "EMAIL",
+        "values": [
+          "zera.vexell0@corp.example.test",
+          "risek.wilrane1@example.test",
+          "joro.risova2@corp.example.test",
+          "jora.joriko3@example.test",
+          "zero.zerquist4@sample.invalid",
+          "mesis.finunda5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "עיר",
+        "fieldRef": "src:עיר",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "Orvale",
+          "Nuvia",
+          "Nuvia",
+          "Valmora",
+          "Tessin"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "עיר / כתובת",
+        "fieldRef": "src:עיר / כתובת",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora القاهرة",
+          "القاهرة 7",
+          "القاهرة 7",
+          "ירושלים 12",
+          "ירושלים 12",
+          "القاهرة 7"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:rtl",
+      "lang:he"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_178c4b9ad4c4",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "שם משפחה",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_db317f38a7d8",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "עיר",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_c68b42bcf97af63c5f9add61",
+    "kc_cdd68e6f0fdf54d6f3acd8f4"
+  ]
+}

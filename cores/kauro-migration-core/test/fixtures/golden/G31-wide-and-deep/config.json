@@ -1,0 +1,93 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g31-wide-and-deep"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "a",
+      "path": "a-contacts.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "b",
+      "path": "b-contacts.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "a-contacts",
+      "fileId": "a",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT",
+          "options": {
+            "trim": true
+          }
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL"
+        }
+      ]
+    },
+    {
+      "id": "b-contacts",
+      "fileId": "b",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT",
+          "options": {
+            "trim": true
+          }
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL"
+        }
+      ]
+    }
+  ]
+}

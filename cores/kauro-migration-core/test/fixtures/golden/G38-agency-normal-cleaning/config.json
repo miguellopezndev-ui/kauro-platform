@@ -1,0 +1,245 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g38-agency"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "localeEvidence": {
+    "dateFormat": null
+  },
+  "files": [
+    {
+      "id": "contacts",
+      "path": "contacts.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "companies",
+      "path": "companies.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "authoritativeExternalIdColumns": [
+        {
+          "header": "Legacy CRM ID"
+        }
+      ],
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT",
+          "options": {
+            "caseTransform": "TITLE_SIMPLE",
+            "trim": true
+          }
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT",
+          "options": {
+            "caseTransform": "TITLE_SIMPLE",
+            "valueMap": [
+              {
+                "from": "MCDONALD",
+                "to": "McDonald"
+              }
+            ]
+          }
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL",
+          "required": true,
+          "options": {
+            "trim": true
+          }
+        },
+        {
+          "column": {
+            "header": "Alt Email"
+          },
+          "destinationField": "custom:Alt Email",
+          "semanticType": "EMAIL",
+          "required": false,
+          "onInvalid": "PRESERVE",
+          "options": {
+            "trim": true
+          }
+        },
+        {
+          "column": {
+            "header": "Phone"
+          },
+          "destinationField": "contact.phone",
+          "semanticType": "PHONE",
+          "options": {
+            "phoneCountry": "CO"
+          }
+        },
+        {
+          "column": {
+            "header": "Mobile"
+          },
+          "destinationField": "contact.mobilePhone",
+          "semanticType": "PHONE"
+        },
+        {
+          "column": {
+            "header": "Job Title"
+          },
+          "destinationField": "contact.jobTitle",
+          "semanticType": "TEXT",
+          "options": {
+            "unicodeNormalization": "NFC"
+          }
+        },
+        {
+          "column": {
+            "header": "City"
+          },
+          "destinationField": "contact.city",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Signup Date"
+          },
+          "destinationField": "custom:Signup Date",
+          "semanticType": "DATE",
+          "options": {
+            "dateFormat": "DD/MM/YYYY"
+          }
+        },
+        {
+          "column": {
+            "header": "Newsletter"
+          },
+          "destinationField": "custom:Newsletter",
+          "semanticType": "BOOLEAN"
+        },
+        {
+          "column": {
+            "header": "Segment"
+          },
+          "destinationField": "custom:Segment",
+          "semanticType": "TEXT",
+          "options": {
+            "valueMap": [
+              {
+                "from": "cliente",
+                "to": "Customer"
+              },
+              {
+                "from": "cliente viejo",
+                "to": "Customer"
+              },
+              {
+                "from": "prospecto",
+                "to": "Lead"
+              },
+              {
+                "from": "partner",
+                "to": "Partner"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "companies",
+      "fileId": "companies",
+      "object": "COMPANY",
+      "sourceRecordIdColumn": {
+        "header": "Company ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "Company Name"
+          },
+          "destinationField": "company.name",
+          "semanticType": "TEXT",
+          "options": {
+            "caseTransform": "TITLE_SIMPLE"
+          }
+        },
+        {
+          "column": {
+            "header": "Industry"
+          },
+          "destinationField": "company.industry",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Website"
+          },
+          "destinationField": "company.website",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Segment"
+          },
+          "destinationField": "custom:Segment",
+          "semanticType": "TEXT",
+          "options": {
+            "valueMap": [
+              {
+                "from": "cliente",
+                "to": "Customer"
+              },
+              {
+                "from": "cliente viejo",
+                "to": "Customer"
+              },
+              {
+                "from": "prospecto",
+                "to": "Lead"
+              },
+              {
+                "from": "partner",
+                "to": "Partner"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "associations": [
+    {
+      "id": "contact-company",
+      "kind": "COLUMN_REFERENCE",
+      "recordMappingId": "contacts",
+      "relationshipType": "CONTACT_TO_COMPANY",
+      "keyColumn": {
+        "header": "Company ID"
+      },
+      "targetRecordMappingId": "companies",
+      "targetMatchKey": "SOURCE_RECORD_ID"
+    }
+  ]
+}

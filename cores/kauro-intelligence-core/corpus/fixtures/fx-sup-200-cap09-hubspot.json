@@ -1,0 +1,212 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-200-cap09-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-200-cap09-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "53b77fa9f37ac44578423e85820989fbdd3b01f2025491d16fe30a2bb01c944c",
+      "candidateSetHash": "0db0c9795480201df743aa28c0cd5e6d829925873afbea03449826b4d2ab11d1",
+      "targetContractHash": "tc_16272888bda8a13876084e3c3cf88fa15ca747b25e5a5176acf5ada1b4761b1e",
+      "projectRevisionHash": "841155e0e74d286330460ae288cf29d53ea72e208ceea587f21870b4612ca7d8"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Société",
+        "sourceFieldRef": "fld_e9befef09790d7cd",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Secteur",
+        "sourceFieldRef": "fld_48511afb19ae03ca",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_63770a5e4ec3f130",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_782fe1a050626809",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_eb785238eb899056",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.industry",
+      "company.name",
+      "company.phone",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code",
+      "Legacy system id",
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "906fb2be8b151503d4d399f3076acff53ed8684670d594c665951ca198da3327"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Société",
+        "fieldRef": "src:Société",
+        "valueClass": "TEXT",
+        "values": [
+          "Zerell Studio SAS",
+          "Sovenko Works Inc.",
+          "Kesunda Foods SAS",
+          "Lumsorin Labs S.A.",
+          "Jorenko Works Inc."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Secteur",
+        "fieldRef": "src:Secteur",
+        "valueClass": "TEXT",
+        "values": [
+          "Textiles",
+          "Software",
+          "Software",
+          "Food service",
+          "Food service"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-1",
+          "R-47",
+          "R-18",
+          "R-22",
+          "R-18"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L35183",
+          "L19890",
+          "L48761",
+          "L62877",
+          "L40961"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "red",
+          "red",
+          "green",
+          "green",
+          "red"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_c6bcd6e1d5f4",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Société",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_475e914791d7",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Secteur",
+        "targetField": "company.industry"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_941c05e48cec1075ac02c050",
+    "kc_a9c655c96d01b4a1a1d4fd7e"
+  ]
+}

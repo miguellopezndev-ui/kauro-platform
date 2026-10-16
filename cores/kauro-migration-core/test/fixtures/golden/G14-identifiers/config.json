@@ -1,0 +1,58 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g14-identifiers"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "contacts",
+      "path": "contacts.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Postal Code"
+          },
+          "destinationField": "contact.postalCode",
+          "semanticType": "IDENTIFIER"
+        },
+        {
+          "column": {
+            "header": "Account Number"
+          },
+          "destinationField": "custom:Account Number",
+          "semanticType": "IDENTIFIER"
+        }
+      ]
+    }
+  ]
+}

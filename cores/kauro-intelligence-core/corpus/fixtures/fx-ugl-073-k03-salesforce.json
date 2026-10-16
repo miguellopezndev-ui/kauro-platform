@@ -1,0 +1,190 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-073-k03-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-073-k03-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "3a9cb7b7eaed66ef8b68243f2a138ffe0a3731cd6797a1dd8fb4d15c403d895a",
+      "candidateSetHash": "732d256dab8b6ac3413f02e2a49f23c5f2c4026200b13c3e109bca140b31adc4",
+      "targetContractHash": "tc_1167dbac9f815370932d19883ed8044e603cd064408c9b8980d3f793274654d6",
+      "projectRevisionHash": "d24022bf8e78bf756532afcff5d5a357fb02d21423b606ecf38975ad1aa87b8b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-mailadres",
+        "sourceFieldRef": "fld_d7188fdc659452a9",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "﻿First name",
+        "sourceFieldRef": "fld_0f347116c525b6e7",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name​",
+        "sourceFieldRef": "fld_bd91eb7d87ab0102",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Ｎａｍｅ nl",
+        "sourceFieldRef": "fld_c9d91e9046e984f2",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.description",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.mobilePhone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Ｎａｍｅ nl"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "d06adabc1eebdc6675d46f84e344de797ae04b440339bd4c0547abd6a1b73bda"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-mailadres",
+        "fieldRef": "src:E-mailadres",
+        "valueClass": "EMAIL",
+        "values": [
+          "finan.wilell0@sample.invalid",
+          "luma.sovunda1@corp.example.test",
+          "belan.tulsorin2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "﻿First name",
+        "fieldRef": "src:bom-nl",
+        "valueClass": "TEXT",
+        "values": [
+          "Mesan",
+          "Zerel",
+          "Hala"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name​",
+        "fieldRef": "src:zw-nl",
+        "valueClass": "TEXT",
+        "values": [
+          "Sovrane​",
+          "Jorrane​",
+          "Lumiko​"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Ｎａｍｅ nl",
+        "fieldRef": "src:Ｎａｍｅ nl",
+        "valueClass": "TEXT",
+        "values": [
+          "Kessorin Logistics S.A.",
+          "Halvik Studio S.L.",
+          "Pelero Labs SAS"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:encoding",
+      "lang:nl"
+    ]
+  },
+  "canaries": [
+    "kc_63c9e6ab8054a89f1f508ce6",
+    "kc_b432bdd88e2823c523c25f19"
+  ]
+}

@@ -1,0 +1,177 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-068-cap09-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-068-cap09-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "dae32ecb847d10add8337b151875032ded2e6b79acde721c7e57d1b86e9d240b",
+      "candidateSetHash": "488a048b3ef2e94df3e784dbc34cc5247f99fbca26553be3158a7d9db2bf8a3a",
+      "targetContractHash": "tc_fbf4c20d8aa283bd9d82484074715dae70d999a6e27ba3402663bc7ab442d8b7",
+      "projectRevisionHash": "8708e25ca8c8eeb01c7456090c816006a98d7d8098610806bc4962527d798621"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-mail",
+        "sourceFieldRef": "fld_c46130e9a47510f8",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Primeiro nome",
+        "sourceFieldRef": "fld_b2cf6307f189204d",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_18f9a44d9bcb569e",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_73cd0bc32dfe99c8",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Legacy system id",
+      "Internal ticket ref"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "175e9d689e2df9016db96d87f76ea2c690382ff9593f79725fb919f3ef199b73"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-mail",
+        "fieldRef": "src:E-mail",
+        "valueClass": "EMAIL",
+        "values": [
+          "keso.jorath0@corp.example.test",
+          "vexel.belorin1@corp.example.test",
+          "luman.halorin2@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Primeiro nome",
+        "fieldRef": "src:Primeiro nome",
+        "valueClass": "TEXT",
+        "values": [
+          "Tavia",
+          "Mesel",
+          "Fino"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L77612",
+          "L15299",
+          "L83566"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-6637",
+          "TKT-4439",
+          "TKT-1864"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_45fc2494ec07",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Primeiro nome",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_32c13155ef0d78609920278e",
+    "kc_c781595e4c5287b4365533c8"
+  ]
+}

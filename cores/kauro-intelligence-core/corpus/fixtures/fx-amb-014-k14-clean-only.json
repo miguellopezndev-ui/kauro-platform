@@ -1,0 +1,142 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-014-k14-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-014-k14-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0e4716dda7693a22ba2bd9ceb60ae455e460ff8a156871fc766b6807a15affa0",
+      "candidateSetHash": "96cf34b074c9334899447805d846f0c5f8e72eaa6521ee49abc577315c342e09",
+      "targetContractHash": null,
+      "projectRevisionHash": "67e990bd6c3f5b062785aaf07182bcbda00dd5c1230b3c175ea121fa04624333"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_9136417591a6474a",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Sonstiges",
+        "sourceFieldRef": "fld_18ca6cc1c9a8c222",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.employeeCount",
+      "company.phone",
+      "contact.firstName",
+      "contact.state"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c4995a20a42bdc66bea3d0d1626bc1d5ef9475aa7a8a2c1d62bad22b6faef790"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Vexa",
+          "Mesek",
+          "Joran",
+          "Belo",
+          "Zero"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Sonstiges",
+        "fieldRef": "src:Sonstiges",
+        "valueClass": "MIXED",
+        "values": [
+          "",
+          "83",
+          "",
+          "",
+          "see attached"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:sparse-column"
+    ]
+  },
+  "canaries": [
+    "kc_9bae526f5fe87a58bbe37007",
+    "kc_972f9975bebc82cb835d6bd4"
+  ]
+}

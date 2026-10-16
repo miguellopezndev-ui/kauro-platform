@@ -1,0 +1,176 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-163-cap08-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-163-cap08-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "3d19e46c4b76b6c3e5ed41c1645cbf54d4d270dc06b2dfe13c901e593320392c",
+      "candidateSetHash": "801adf09808f5436d3a2ec1d6279140d6e0ac8baf703d933989b96ce3900856c",
+      "targetContractHash": "tc_45615fef94b50cee374b8ecfe94c8d6a6c2f4475afa33146f0d2c7e32fe540d7",
+      "projectRevisionHash": "385ce42d7baeb219e6c270a809ca1c469105e0419ce49449e114e269b2f38d0c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Adresse courriel",
+        "sourceFieldRef": "fld_396b91df7f64480c",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Société",
+        "sourceFieldRef": "fld_a5bf4f86adc4219c",
+        "decision": "MAP",
+        "destinationField": "contact.companyName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.phone",
+      "company.source_id",
+      "contact.companyName",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "72557c6c4fe4af565a20304f11686ca5962d76404ff6e818171ca6bc67fbf8a8"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Adresse courriel",
+        "fieldRef": "src:Adresse courriel",
+        "valueClass": "EMAIL",
+        "values": [
+          "zero.norenko0@example.test",
+          "finis.joraly1@example.test",
+          "zerek.quelath2@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Société",
+        "fieldRef": "src:Société",
+        "valueClass": "TEXT",
+        "values": [
+          "delta",
+          "alpha",
+          "gamma"
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "link:on-record"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_3a3f20aa469a",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Adresse courriel",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_ed82928bac4e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Société",
+        "targetField": "contact.companyName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_3141d3dd462b90f7b89eaa2e",
+    "kc_b3ce5f44e5ab66dbb7f37eb5"
+  ]
+}

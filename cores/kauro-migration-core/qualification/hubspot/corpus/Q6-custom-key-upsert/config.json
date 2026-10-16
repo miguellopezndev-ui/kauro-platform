@@ -1,0 +1,23 @@
+{
+  "configVersion": "3.0.0",
+  "source": { "system": "legacy_crm", "namespace": "kauro-qualification" },
+  "target": { "mode": "HUBSPOT", "importMode": "CREATE_ONLY" },
+  "files": [{ "id": "contacts", "path": "contacts.csv", "format": "CSV" }],
+  "records": [
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": { "header": "Contact ID" },
+      "fields": [
+        { "column": { "header": "First Name" }, "destinationField": "contact.firstName", "semanticType": "TEXT" },
+        { "column": { "header": "Last Name" }, "destinationField": "contact.lastName", "semanticType": "TEXT" },
+        { "column": { "header": "Email" }, "destinationField": "contact.email", "semanticType": "EMAIL" },
+        { "column": { "header": "Job Title" }, "destinationField": "contact.jobTitle", "semanticType": "TEXT" },
+        { "column": { "header": "Kauro Key" }, "destinationField": "custom:kauro_qualification_key", "semanticType": "TEXT" },
+        { "column": { "header": "Status" }, "destinationField": "custom:kauro_qualification_status", "semanticType": "TEXT" }
+      ]
+    }
+  ],
+  "associations": []
+}

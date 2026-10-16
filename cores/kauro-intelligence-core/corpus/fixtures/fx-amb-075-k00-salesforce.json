@@ -1,0 +1,155 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-075-k00-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-075-k00-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "b37cfc0dacc7e214c0de6cd3bf21815f5884d82902f1dc9ab519d43e54db232d",
+      "candidateSetHash": "84fd8258588a6d130211abad6b935d1de534f439ff545dc507359360c1ce8f10",
+      "targetContractHash": "tc_a0cdd00cc9159cb9c7780936f7cbd397adbb96654e202ecac9a33f3bdb82a705",
+      "projectRevisionHash": "ae38150df8a77caa7794e8077becedd43b4fe67a130876665295d2a02cbc36d6"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_a67bded4cdf20e90",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Close date",
+        "sourceFieldRef": "fld_e0150f1ce55281cb",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.closeDate",
+      "deal.description",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "af08c1b3635a8013770f20ffbe3ea1034efd0eb8dd243ed2b6407cc95d5e6397"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": true
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Name",
+        "fieldRef": "src:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Supply contract 2027 Zerero",
+          "Renewal 2025 Darsorin",
+          "Renewal 2025 Risorin",
+          "Onboarding 2027 Halquist",
+          "Expansion 2026 Belrane",
+          "Pilot 2025 Halunda"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Close date",
+        "fieldRef": "src:Close date",
+        "valueClass": "DATE",
+        "values": [
+          "10/10/2023",
+          "03/05/2021",
+          "09/04/2024",
+          "10/10/2023",
+          "05/12/2020",
+          "01/12/2021"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:date-order"
+    ]
+  },
+  "canaries": [
+    "kc_8479b336a1adad9d243018c8",
+    "kc_b108afbd043c1b429458fbb7"
+  ]
+}

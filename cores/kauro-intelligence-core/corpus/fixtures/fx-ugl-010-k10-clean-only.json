@@ -1,0 +1,128 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-010-k10-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-010-k10-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "912c0537ba7c76475e11c80b18ac42a54cd0e96863d7106aecf7d618d534a358",
+      "candidateSetHash": "2caf38511e300f0f7a6a5cdda9262975fb62bc999a91dd8e7df15c29fdd13966",
+      "targetContractHash": null,
+      "projectRevisionHash": "da93e4e1a04e4392bad96c814508e625a7fa50842104817d2b6c15b43fac4c2b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Электронная почта",
+        "sourceFieldRef": "fld_12ae2aa762c6490e",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Calc",
+        "sourceFieldRef": "fld_b4246d3ebefdc31b",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Calc"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "7ebfe3c3b1406403dec7f82fbfe50d89936c7b874e0a45a57ca702116a3ce574"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Электронная почта",
+        "fieldRef": "src:Электронная почта",
+        "valueClass": "MIXED",
+        "values": [
+          "belan.yanvik0@corp.example.test",
+          "#N/A",
+          "vexel.pelell2@example.test",
+          "",
+          "kesia.tulvik4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Calc",
+        "fieldRef": "src:Calc",
+        "valueClass": "MIXED",
+        "values": [
+          "=SUM(B2:B9)",
+          "#REF!",
+          "(blank)",
+          "null",
+          "N/A"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:spreadsheet-artefacts",
+      "lang:ru"
+    ]
+  },
+  "canaries": [
+    "kc_1cbeeb1d35cec7563cc778ed",
+    "kc_a8d0fa0a1650d3307335eb9f"
+  ]
+}

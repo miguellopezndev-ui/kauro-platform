@@ -1,0 +1,181 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-019-cap08-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-019-cap08-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2524f73bfc426a3910d49a15fdb4e674ff480f2970d9d7579c58687f89d9f2bc",
+      "candidateSetHash": "5312e255261939be3467d56cc3a6ebd968a05b61a3780cdca54e7da2609ed027",
+      "targetContractHash": "tc_59278a1a10a27f28dd573ed7b34b814fd46786e912dfbeaab94773d7489fe3b0",
+      "projectRevisionHash": "68f68fb78d1455eef7f37a181482f879e9fc715f61f3ea02281103c5e37f543d"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-mail",
+        "sourceFieldRef": "fld_77bea1a29a656e65",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Empresa",
+        "sourceFieldRef": "fld_930f15684fc0fb6d",
+        "decision": "MAP",
+        "destinationField": "contact.companyName"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_99c939517bcffd62",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.companyName",
+      "contact.email",
+      "contact.postalCode",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "dabef0528b0d0eb343de52566a6e40e310f0ebdc81c8bc6d30a69213a0f32e8f"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-mail",
+        "fieldRef": "src:E-mail",
+        "valueClass": "EMAIL",
+        "values": [
+          "finek.tavrane0@corp.example.test",
+          "wilia.darunda1@corp.example.test",
+          "finan.mesorin2@sample.invalid",
+          "yanel.finath3@example.test",
+          "tava.kesanth4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Empresa",
+        "fieldRef": "src:Empresa",
+        "valueClass": "TEXT",
+        "values": [
+          "gamma",
+          "alpha",
+          "gamma",
+          "gamma",
+          "gamma"
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L70422",
+          "L28985",
+          "L34626",
+          "L20368",
+          "L21220"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "link:on-record"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_3efd42e97664",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Empresa",
+        "targetField": "contact.companyName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_d8ef259b42c7b538aa6a4a60",
+    "kc_a2bf5b35324cfbfeea18fc92"
+  ]
+}

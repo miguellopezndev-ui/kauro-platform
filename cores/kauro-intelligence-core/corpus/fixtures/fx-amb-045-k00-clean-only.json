@@ -1,0 +1,125 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-045-k00-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-045-k00-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "b1781df0c2416b8d1e1efd4bfc9ba08bdb18fed4162b5798436be4b8ede56f4e",
+      "candidateSetHash": "1e3c65b165f9a4ea680bc2434185780636070da25e548f5bddee055585fe92cb",
+      "targetContractHash": null,
+      "projectRevisionHash": "b4e065c5735ade7384175ad4f2c2ea59b2c3ae3b4193d30934c4a52630ecc8dd"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Data di creazione",
+        "sourceFieldRef": "fld_6be26fd599c5ee5e",
+        "decision": "MAP",
+        "destinationField": "contact.createdAt"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.createdAt",
+      "contact.email"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "82be925b6bcefc6b870350e57de29fb5cd54933b6353fba56b9b1eb8cd3750f6"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Data di creazione",
+        "fieldRef": "src:Data di creazione",
+        "valueClass": "DATE",
+        "values": [
+          "04/12/2024",
+          "04/04/2020",
+          "09/08/2023",
+          "09/01/2026",
+          "09/12/2020",
+          "08/12/2023",
+          "10/09/2021"
+        ],
+        "decision": "MAP",
+        "destination": "contact.createdAt"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:date-order"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_ae0ee912e16e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Data di creazione",
+        "targetField": "contact.createdAt"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_0ee88eba14051088576a9f64",
+    "kc_eb5f206153484132c6b136a4"
+  ]
+}

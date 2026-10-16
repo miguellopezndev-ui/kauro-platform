@@ -1,0 +1,215 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-086-cap03-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-086-cap03-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "bb225d39fbc2aab5b33ba94e5546f89bd86e9b5fc0c6e95cba606c9618b6d053",
+      "candidateSetHash": "bf24c169ce85ca02b1e0900354f11ac647ff77d88e4a08c30013902fe25c859b",
+      "targetContractHash": "tc_3d41e5b85308fbead84a5f249487e48160488cd24902ff540a0d310649cc9a9c",
+      "projectRevisionHash": "7debd9db1d54a5770de36620cfbd101929ae9605f540fb4c0c50c1cb8ad63e35"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Adresse courriel",
+        "sourceFieldRef": "fld_f1af15d8f334a42d",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Étape",
+        "sourceFieldRef": "fld_61e837ca16ce0e01",
+        "decision": "MAP",
+        "destinationField": "contact.lifecycleStage",
+        "semanticType": "ENUM"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_0a8e83fb42cab793",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_5303e310b6f782e4",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lifecycleStage",
+      "contact.ownerEmail",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin",
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "25065f9d56f017f6c3f4b7592d3ac8017b81ede3c4abbfdb2ef9dc820b8ace55"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Adresse courriel",
+        "fieldRef": "src:Adresse courriel",
+        "valueClass": "EMAIL",
+        "values": [
+          "dara.pelrane0@corp.example.test",
+          "zerel.tulvik1@corp.example.test",
+          "sovia.yanquist2@corp.example.test",
+          "halan.belunda3@sample.invalid",
+          "wilan.tulath4@sample.invalid",
+          "daran.belenko5@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Étape",
+        "fieldRef": "src:Étape",
+        "valueClass": "ENUM",
+        "values": [
+          "perdu",
+          "contacté",
+          "gagné",
+          "nouveau",
+          "perdu",
+          "contacté"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lifecycleStage",
+        "semanticType": "ENUM"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-93",
+          "A-12",
+          "B-47",
+          "A-52",
+          "A-14",
+          "C-31"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "amber",
+          "amber",
+          "blue",
+          "green",
+          "red",
+          "green"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_feeac40a7cd4",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Adresse courriel",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_b5bca94318e5",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Étape",
+        "targetField": "contact.lifecycleStage"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_34ebdf84a44bf70b10a14a2b",
+    "kc_1d018b90084b77253b805413"
+  ]
+}

@@ -1,0 +1,318 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-125-cap06-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-125-cap06-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2cdb81b954964d56f9a4ce77d457267302bdf02ca3580f41a98f29d4ed0a8432",
+      "candidateSetHash": "76eeb16de7346186f9f44ce83099facf6e80f9f0b08a504653e3432a36dab18e",
+      "targetContractHash": "tc_3d4f0d8cb6f77af16b0d67522b25e975082ed287b6e504545d164763abe4d202",
+      "projectRevisionHash": "56ef64b18a31a363377c6c65397d4e0318c006eb6cddee38f9da73333e3b2bc4"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_26489205594be322",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_ad59ca2a7aa0e6df",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_e0edeb3d23fd068f",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Job title",
+        "sourceFieldRef": "fld_ddb15ed6f4e5cf82",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Member Number",
+        "sourceFieldRef": "fld_26bbf60c2d4c63ff",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv",
+        "adoptsIdentity": true
+      },
+      {
+        "sourceHeader": "Member Number",
+        "sourceFieldRef": "fld_77acedfff7c22437",
+        "decision": "PRESERVE",
+        "filePath": "newsletter.csv",
+        "adoptsIdentity": true
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_347e96d257626709",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "filePath": "newsletter.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_d0a1c1d6fd428c75",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "newsletter.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_268c1b211fd7c516",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "newsletter.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.ownerEmail",
+      "contact.member_number",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Member Number",
+      "Member Number"
+    ],
+    "expectedTaskTypes": [
+      "IDENTITY_STRATEGY"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e501bce4f948528ffb6b7ba7c0d9a5c7e8486fcda3721f55ad9f874daa5bf0ad"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "contacts.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "newsletter.csv": {
+          "object": "CONTACT"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "member_number",
+            "valueClass": "TEXT",
+            "required": false,
+            "label": "Member Number",
+            "externalId": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:contacts.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-646",
+          "P-647",
+          "P-648",
+          "P-649"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contacts.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "fino.halanth0@example.test",
+          "halek.peldell1@sample.invalid",
+          "joro.sovero2@example.test",
+          "halel.tavath3@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:contacts.csv:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumia",
+          "Vexan",
+          "Yanel",
+          "Quelis"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Job title",
+        "fieldRef": "src:contacts.csv:Job title",
+        "valueClass": "TEXT",
+        "values": [
+          "Buyer",
+          "Site engineer",
+          "Operations lead",
+          "Operations lead"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Member Number",
+        "fieldRef": "src:contacts.csv:Member Number",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "ME-9390",
+          "ME-9391",
+          "ME-9392",
+          "ME-9393"
+        ],
+        "decision": "PRESERVE",
+        "adoptsIdentity": true,
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Member Number",
+        "fieldRef": "src:newsletter.csv:Member Number",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "ME-9393",
+          "ME-9657",
+          "ME-9658"
+        ],
+        "decision": "PRESERVE",
+        "adoptsIdentity": true,
+        "file": "newsletter.csv"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:newsletter.csv:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Yanan",
+          "Mesia",
+          "Daris"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "file": "newsletter.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:newsletter.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "tava.tavquist0@example.test",
+          "kesan.risiko1@corp.example.test",
+          "vexel.vexaly2@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "newsletter.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:newsletter.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Darunda",
+          "Jorquist",
+          "Lumrane"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "newsletter.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "IDENTITY_STRATEGY"
+    ]
+  },
+  "canaries": [
+    "kc_590f28e4083943ebed971ff8",
+    "kc_447808be914b26d8bea16400"
+  ]
+}

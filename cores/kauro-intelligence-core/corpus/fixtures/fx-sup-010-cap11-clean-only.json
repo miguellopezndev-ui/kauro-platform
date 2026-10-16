@@ -1,0 +1,200 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-010-cap11-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-010-cap11-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "156320243e41121e776b76bb631c6acc14a4974fea16642c7104ac4ae8d7fa5f",
+      "candidateSetHash": "0297bc52c0a1a11f301f40e034a5f96aca812ef8a91e8b1fb43e342072873f7b",
+      "targetContractHash": null,
+      "projectRevisionHash": "4279e0c7a00b86705dcc8d211a3333712abcb3271034d51748bd8554ac472363"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_df107a3b107a2ec5",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "State",
+        "sourceFieldRef": "fld_4845e3cc5a0730ad",
+        "decision": "MAP",
+        "destinationField": "company.state"
+      },
+      {
+        "sourceHeader": "Postal code",
+        "sourceFieldRef": "fld_b4711a984ff823df",
+        "decision": "MAP",
+        "destinationField": "company.postalCode"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_751b05572994e451",
+        "decision": "MAP",
+        "destinationField": "company.country"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.city",
+      "company.country",
+      "company.employeeCount",
+      "company.name",
+      "company.postalCode",
+      "company.state"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "f45cb6b63d19d31b39a6ecb3a53a60b9c0357bc847f09c4c7a734e4f620f33b3"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Belova Logistics LLC",
+          "Jormar Foods Inc.",
+          "Finorin Labs GmbH",
+          "Nordell Systems GmbH"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "State",
+        "fieldRef": "src:State",
+        "valueClass": "TEXT",
+        "values": [
+          "Central",
+          "Coastal",
+          "Coastal",
+          "Central"
+        ],
+        "decision": "MAP",
+        "destination": "company.state"
+      },
+      {
+        "header": "Postal code",
+        "fieldRef": "src:Postal code",
+        "valueClass": "TEXT",
+        "values": [
+          "82739",
+          "97460",
+          "34478",
+          "30344"
+        ],
+        "decision": "MAP",
+        "destination": "company.postalCode"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "Estmark",
+          "Estmark",
+          "Valdoria",
+          "Norvania"
+        ],
+        "decision": "MAP",
+        "destination": "company.country"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_0a86d27c08d7",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_efe756db301ebf3d82e2e5bb",
+    "kc_5cab9f6118487c1b949791a3"
+  ]
+}

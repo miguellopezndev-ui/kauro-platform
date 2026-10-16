@@ -1,0 +1,225 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-034-k04-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-034-k04-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "ac6698e89a058664cb760e9d056e899d3ce0795c100e62eb5d73947373e9231a",
+      "candidateSetHash": "55bdd451fa57c07bcb0e3b72e968ad5d5a37bade22e29eb0bfbe2de111c43e94",
+      "targetContractHash": "tc_55703640338ff452c4e08e96570ef50730d702e35907346697d91cdf61c50015",
+      "projectRevisionHash": "5f7c621489bb0fbb564d878502792693735dd109c2bac3a391389a31899fcff0"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_f2e2d9113fce8b39",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_6f0d6698d296f351",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Nom ou société",
+        "sourceFieldRef": "fld_166dc8ca143c88ba",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_f3870f39bca4b910",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.name",
+      "company.source_id",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id",
+      "lead.company",
+      "lead.lastName",
+      "lead.postalCode",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "1e8ad016a6011409fc888bfe1423d01264204bfcaf3ccb4b1db271c2ffe8b26e"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Jora",
+          "Vexis",
+          "Tavia",
+          "Kesa"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "darel.orvvik0@corp.example.test",
+          "joro.finell1@sample.invalid",
+          "sovel.vexorin2@sample.invalid",
+          "orvis.wilath3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Nom ou société",
+        "fieldRef": "src:Nom ou société",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvia Yanquist",
+          "Risell Works GmbH",
+          "Joro Zerenko",
+          "Sovova Studio S.A."
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-28",
+          "batch-32",
+          "batch-12",
+          "batch-39"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:person-or-company"
+    ]
+  },
+  "canaries": [
+    "kc_7d1bda5d03696dfb97fe4799",
+    "kc_7c75c3dd61a2b7bd396c2303"
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "note": "Hand-authored expectations for the adversarial corpus. Every case must either fail closed with a named error code and an actionable message, or complete with every row accounted for. There is no third outcome.",
+  "cases": {
+    "A01-unterminated-quote": {
+      "title": "A quoted field that is never closed",
+      "intent": "The file ends inside a quote. The engine cannot know where the field stops, so it refuses the file rather than guessing at a boundary.",
+      "outcome": "FATAL",
+      "errorCode": "INPUT_CORRUPT",
+      "messageIncludes": "quoted field"
+    },
+    "A02-invalid-utf8": {
+      "title": "Bytes that are not valid UTF-8",
+      "intent": "Rather than substituting replacement characters and delivering mojibake, the run fails with the byte offset and tells the operator which encodings can be declared.",
+      "outcome": "FATAL",
+      "errorCode": "ENCODING_UNKNOWN",
+      "messageIncludes": "not valid UTF-8"
+    },
+    "A03-ragged-rows": {
+      "title": "Rows with the wrong number of columns",
+      "intent": "One row is short and one is long. Neither is silently padded or truncated: both are rejected input with a reason, and both still appear in the lineage.",
+      "outcome": "COMPLETES",
+      "rows": { "total": 4, "OUTPUT": 2, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 2 },
+      "rejectedReasonCodes": ["INGEST_ROW_COLUMN_COUNT_MISMATCH"]
+    },
+    "A04-blank-rows": {
+      "title": "A completely empty row",
+      "intent": "An empty row is not skipped into nothing. It is rejected input with its own line in the lineage, so the row count still adds up.",
+      "outcome": "COMPLETES",
+      "rows": { "total": 3, "OUTPUT": 2, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 1 },
+      "rejectedReasonCodes": ["INGEST_ROW_BLANK"]
+    },
+    "A05-corrupt-workbook": {
+      "title": "An archive that is not a workbook",
+      "intent": "A readable ZIP with no workbook part. Nothing is partially accepted.",
+      "outcome": "FATAL",
+      "errorCode": "INPUT_CORRUPT",
+      "messageIncludes": "workbook.xml"
+    },
+    "A06-encrypted-workbook": {
+      "title": "An encrypted or legacy binary workbook",
+      "intent": "An OLE compound file header means the workbook is encrypted or is a legacy .xls. The engine refuses it and says what to do instead.",
+      "outcome": "FATAL",
+      "errorCode": "INPUT_UNSUPPORTED",
+      "messageIncludes": "OLE compound file"
+    },
+    "A07-macro-workbook": {
+      "title": "A macro-enabled workbook",
+      "intent": "A workbook carrying a macro project is refused outright rather than read with the macros ignored.",
+      "outcome": "FATAL",
+      "errorCode": "INPUT_UNSUPPORTED",
+      "messageIncludes": "macro"
+    },
+    "A08-entity-expansion": {
+      "title": "XML that declares its own entities",
+      "intent": "Entity declarations are the vehicle for expansion attacks. The parser refuses the document rather than deciding how much expansion is acceptable.",
+      "outcome": "FATAL",
+      "errorCode": "INPUT_UNSUPPORTED",
+      "messageIncludes": "entity declaration"
+    },
+    "A09-duplicate-file": {
+      "title": "The same bytes declared twice in one namespace stop for an explicit occurrence decision",
+      "intent": "Two byte-identical files in one source namespace would double every row they contain unless the plan says what they are. The engine stops with a typed error naming both occurrences. It neither deduplicates nor doubles without a recorded decision (INDEPENDENT or EXCLUDE_ONE).",
+      "outcome": "FATAL",
+      "errorCode": "INPUT_DUPLICATE_FILE",
+      "messageIncludes": "no occurrence decision"
+    },
+    "A10-giant-cell": {
+      "title": "A cell above the configured limit",
+      "intent": "The failure names the limit, the allowed value and the actual value, so the operator can decide whether to raise it or repair the file.",
+      "outcome": "FATAL",
+      "errorCode": "INPUT_LIMIT_EXCEEDED",
+      "messageIncludes": "maxCellLength"
+    },
+    "A11-hidden-sheet": {
+      "title": "A hidden worksheet",
+      "intent": "Hidden rows are still the customer's data. The sheet is read, its rows are delivered, and the fact that it was hidden is recorded as source evidence.",
+      "outcome": "COMPLETES",
+      "rows": { "total": 1, "OUTPUT": 1, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+      "sheetEvidenceKinds": ["SHEET_HIDDEN"]
+    },
+    "A12-spreadsheet-error-cell": {
+      "title": "A spreadsheet error value",
+      "intent": "A cell holding #REF! is not a value the source asserted, but it is also not permission to clear the cell. It is preserved, flagged, and delivered as written.",
+      "outcome": "COMPLETES",
+      "rows": { "total": 2, "OUTPUT": 2, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+      "flags": 1,
+      "flagReasonCodes": ["INGEST_XLSX_ERROR_CELL"]
+    },
+    "A13-equal-occurrences": {
+      "title": "Byte-identical exports from two namespaces are both ingested with their own locators",
+      "intent": "The same export taken from two instances has equal bytes and two occurrences. Content equality is evidence, not identity: both files are read, each row keeps its own locator and lineage line, and each file carries a flag saying another occurrence holds the same bytes.",
+      "outcome": "COMPLETES",
+      "rows": { "total": 2, "OUTPUT": 2, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+      "distinctSourceFiles": 2,
+      "sheetEvidenceKinds": ["FILE_EQUAL_BYTES_OTHER_OCCURRENCE"]
+    },
+    "A14-external-resources": {
+      "title": "A workbook naming URL, UNC and file targets performs zero DNS, HTTP, socket or out-of-bundle file opens",
+      "intent": "External links, hyperlinks and relationship targets are data about the workbook, never instructions to fetch. The run completes, records that the workbook names external links, and opens nothing outside the bundle while doing it.",
+      "outcome": "COMPLETES",
+      "rows": { "total": 2, "OUTPUT": 2, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+      "sheetEvidenceKinds": ["WORKBOOK_EXTERNAL_LINKS"],
+      "zeroExternalOpens": true
+    },
+    "A15-formula-without-cache": {
+      "title": "An uncalculated workbook is isolated with the remedy of a new trusted export or an explicit exclusion",
+      "intent": "A formula whose workbook was never calculated has no cached value. Even when the plan accepts cached values with provenance, there is nothing to accept: the row is set aside, never delivered as an omission, and the stated remedy is a new trusted export or an explicit exclusion.",
+      "outcome": "COMPLETES",
+      "rows": { "total": 2, "OUTPUT": 1, "MERGED_PROVEN": 0, "ISOLATED": 1, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+      "isolatedReasonCodes": ["ISOLATED_FORMULA_CACHED_VALUE_ABSENT"],
+      "remedyIncludes": ["trusted export", "explicit exclusion"]
+    }
+  }
+}

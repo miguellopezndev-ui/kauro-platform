@@ -1,0 +1,40 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "adv-giant"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "limits": {
+    "maxCellLength": 1000
+  },
+  "files": [
+    {
+      "id": "contacts",
+      "path": "contacts.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        }
+      ]
+    }
+  ]
+}

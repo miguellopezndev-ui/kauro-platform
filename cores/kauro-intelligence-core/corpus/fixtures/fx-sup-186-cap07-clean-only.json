@@ -1,0 +1,370 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-186-cap07-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-186-cap07-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2da465acf6dc7f78170455d5b7abe86c0313b6e67a50438a7568405276b912f7",
+      "candidateSetHash": "2ee7eb273147c6d59100c1b5691e53bccb3f31dbaf267c4ee50d49f06031162b",
+      "targetContractHash": null,
+      "projectRevisionHash": "9bdf65fbe5152d67f195075af9d26a751c19464569dbed921d92cc515f7e69c0"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_aa9d1a1847263219",
+        "decision": "PRESERVE",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_4f3c558df9d9140b",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contact-export.csv",
+        "inDuplicateReview": true
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_060cd4f77f0f9304",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_a3485d9f9d136cda",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "contact-export.csv"
+      },
+      {
+        "sourceHeader": "Submission ID",
+        "sourceFieldRef": "fld_c1eb8c108aa36cb0",
+        "decision": "PRESERVE",
+        "filePath": "contacts-2024.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_ead9330f6ed32627",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contacts-2024.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_0f63a1a07bace2b9",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "contacts-2024.csv"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_97077c1d465af67b",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "filePath": "contacts-2024.csv"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_7b44a68d21c1cf45",
+        "decision": "PRESERVE",
+        "filePath": "contacts-2024.csv"
+      },
+      {
+        "sourceHeader": "Company ID",
+        "sourceFieldRef": "fld_d7470258342a5804",
+        "decision": "PRESERVE",
+        "filePath": "organisations.csv"
+      },
+      {
+        "sourceHeader": "company.name",
+        "sourceFieldRef": "fld_7636af8ea6de8a98",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "filePath": "organisations.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.name",
+      "contact.city",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.postalCode"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Submission ID",
+      "Print run",
+      "Company ID"
+    ],
+    "expectedTaskTypes": [
+      "DUPLICATE_SIGNAL_STRATEGY"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "33b47f530fa0f587c223691ca60212b27d42c044a6b648efe74bcbeef7a62124"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "contact-export.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "contacts-2024.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Submission ID"
+        },
+        "organisations.csv": {
+          "object": "COMPANY",
+          "recordIdColumn": "Company ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:contact-export.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-468",
+          "P-469",
+          "P-470",
+          "P-471",
+          "P-472",
+          "P-473"
+        ],
+        "decision": "PRESERVE",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contact-export.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "lumel.quelrane0@corp.example.test",
+          "mesia.vexova1@example.test",
+          "hala.quelath2@corp.example.test",
+          "jorel.darmar3@example.test",
+          "luma.pelsorin4@sample.invalid",
+          "lumel.quelrane0@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "read": {
+          "destination": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        "inDuplicateReview": true,
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:contact-export.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Mesenko",
+          "Tavquist",
+          "Tavdell",
+          "Belova",
+          "Sovaly",
+          "Wilvik"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:contact-export.csv:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Brandel",
+          "Kelmar",
+          "Quenby",
+          "Quenby",
+          "Kelmar",
+          "Nuvia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "contact-export.csv"
+      },
+      {
+        "header": "Submission ID",
+        "fieldRef": "src:contacts-2024.csv:Submission ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "S-224",
+          "S-225",
+          "S-226"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contacts-2024.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "noria.kesquist0@sample.invalid",
+          "daris.quelanth1@example.test",
+          "quelek.belvik2@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "read": {
+          "destination": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:contacts-2024.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Normar",
+          "Finanth",
+          "Wilath"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:contacts-2024.csv:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Kesan",
+          "Kesis",
+          "Daria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:contacts-2024.csv:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "4",
+          "5",
+          "4"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "Company ID",
+        "fieldRef": "src:organisations.csv:Company ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-277",
+          "C-278"
+        ],
+        "decision": "PRESERVE",
+        "file": "organisations.csv"
+      },
+      {
+        "header": "company.name",
+        "fieldRef": "src:organisations.csv:company.name",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelaly Group LLC",
+          "Rismar Logistics S.A."
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "file": "organisations.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "DUPLICATE_SIGNAL_STRATEGY"
+    ]
+  },
+  "canaries": [
+    "kc_85d4a6646b9a51649e5a1b1d",
+    "kc_593246e9e6c3b2d7a7701eb2"
+  ]
+}

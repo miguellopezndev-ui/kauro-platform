@@ -1,0 +1,156 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-005-k05-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-005-k05-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "123baba1fb7b830f3c0b71ecf8a91c3cb3686fb1ff8aab5e5aa5d3316ddf6ba1",
+      "candidateSetHash": "fcabaaccbc09e0cd632cb3308a44402c2634396c81ae454c3ec16d6e355abe1e",
+      "targetContractHash": null,
+      "projectRevisionHash": "35a29c71f66fdf5702895cee163e58a5fb22525f071864deec606def61df362b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Ηλεκτρονικό ταχυδρομείο",
+        "sourceFieldRef": "fld_c0c82cf19a450af7",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "E-mail 2019 (outdated)",
+        "sourceFieldRef": "fld_818b98fe94b66dc1",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Όνομα",
+        "sourceFieldRef": "fld_190094c9904d6cad",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "E-mail 2019 (outdated)"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "95e2ef18546e9d8365159927ffe131efbcbb8b745a95acda2c1eef36a48bb274"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Ηλεκτρονικό ταχυδρομείο",
+        "fieldRef": "src:Ηλεκτρονικό ταχυδρομείο",
+        "valueClass": "EMAIL",
+        "values": [
+          "orvia.dardell0@sample.invalid",
+          "wilo.pelero1@corp.example.test",
+          "nora.mesova2@example.test",
+          "vexel.wilsorin3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "E-mail 2019 (outdated)",
+        "fieldRef": "src:E-mail 2019 (outdated)",
+        "valueClass": "EMAIL",
+        "values": [
+          "orva.kesdell40@example.test",
+          "tulis.finmar41@corp.example.test",
+          "mesis.tulmar42@corp.example.test",
+          "fino.zerova43@example.test"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Όνομα",
+        "fieldRef": "src:Όνομα",
+        "valueClass": "TEXT",
+        "values": [
+          "Pelis",
+          "Halo",
+          "Wilis",
+          "Quelek"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-headers",
+      "lang:el",
+      "ugly:stale-header"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_13f5a052b754",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Όνομα",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_5c5e090220d8b14b3a33ecfe",
+    "kc_c529a2e1aff889905ef7936a"
+  ]
+}

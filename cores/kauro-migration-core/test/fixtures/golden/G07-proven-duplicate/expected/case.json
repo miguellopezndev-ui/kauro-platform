@@ -1,0 +1,41 @@
+{
+  "id": "G07",
+  "title": "A proven duplicate",
+  "intent": "One record represented by two physical rows carrying the same source record id. The two rows are combined, both stay traceable, and the surviving row's empty phone is filled from the absorbed row without that counting as a conflict.",
+  "expect": {
+    "rows": { "total": 3, "OUTPUT": 2, "MERGED_PROVEN": 1, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 2, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 1,
+    "mergeConflicts": 0,
+    "mergeFieldDecisions": 1,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 2,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    { "row": "contacts.csv#2", "disposition": "OUTPUT" },
+    { "row": "contacts.csv#3", "disposition": "MERGED_PROVEN", "reasonCode": "IDENTITY_ROW_ABSORBED_BY_PROVEN_MERGE" },
+    { "row": "contacts.csv#4", "disposition": "OUTPUT" }
+  ],
+  "merges": [
+    {
+      "survivorRow": "contacts.csv#2",
+      "absorbedRows": ["contacts.csv#3"],
+      "identityEvidenceKinds": ["SOURCE_RECORD_ID"],
+      "conflicts": [],
+      "fieldDecisions": [
+        { "field": "contact.phone", "value": "+12125550147", "fromRow": "contacts.csv#3", "reasonCode": "IDENTITY_MERGE_FIELD_FILLED_FROM_ABSORBED_ROW" }
+      ]
+    }
+  ],
+  "delivered": [
+    { "sourceRecordId": "1", "values": { "contact.email": "ada@example.com", "contact.phone": "+12125550147" } },
+    { "sourceRecordId": "2", "values": { "contact.email": "alan@example.org" } }
+  ]
+}

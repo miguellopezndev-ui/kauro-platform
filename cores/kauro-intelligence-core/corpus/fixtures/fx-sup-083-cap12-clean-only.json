@@ -1,0 +1,152 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-083-cap12-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-083-cap12-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "b12e81416c65e6c6a0abbf06ece0974932145f1cae7303938fe781a24ef2aeed",
+      "candidateSetHash": "624d8735ea749fcda0fd7833d9217dff80645b5102726fa9b18afe67fcbbe3b4",
+      "targetContractHash": null,
+      "projectRevisionHash": "0d5f9255ac85b08983313e0eb2c26ec93bb2216009d1d863854f8e61c33b69d2"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Cognome",
+        "sourceFieldRef": "fld_40bf8be9fffd28d9",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Value",
+        "sourceFieldRef": "fld_bc59a40936e6c474",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "requiredEvidenceRefs": [
+          "ev_56abff0d2ba43a72"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.createdAt",
+      "contact.email",
+      "contact.lastName",
+      "contact.ownerEmail"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "450f0a900c38bf9759d687960d52912c9a5c0db6535391be43fd9bb8e56bf7a7"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Cognome",
+        "fieldRef": "src:Cognome",
+        "valueClass": "TEXT",
+        "values": [
+          "Norenko",
+          "Orvvik",
+          "Norvik",
+          "Risero",
+          "Halvik"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Value",
+        "fieldRef": "src:Value",
+        "valueClass": "EMAIL",
+        "values": [
+          "noria.sovova0@corp.example.test",
+          "belan.orvdell1@example.test",
+          "jora.halvik2@sample.invalid",
+          "kesel.risell3@example.test",
+          "mesia.risaly4@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "evidence": [
+          "ev:self"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_ecd1639d7c52",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cognome",
+        "targetField": "contact.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_de49a63e2820e55df59e5d1b",
+    "kc_e39b2964d3921a2fbf2aa44b"
+  ]
+}

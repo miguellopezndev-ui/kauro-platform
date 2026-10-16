@@ -1,0 +1,212 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-055-k10-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-055-k10-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e5097c546ca4bbfc8ae5fd3ad2f367a84965920f1141a3af9843b6b5260ddb83",
+      "candidateSetHash": "71d81b5fe8f263dec97adabf3089a3f78824be24b274c23b9e568d2728564b3a",
+      "targetContractHash": null,
+      "projectRevisionHash": "9e5e81fd6c045b3c3c3e089b0d3df09643a91ddaca546fc214dbe917a1013642"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_659f1f55b91ac7bc",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_ba0382015ebb0b0a",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Ubicación",
+        "sourceFieldRef": "fld_a4819504bf1134f6",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_45a4be6b570664f5",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.country",
+      "company.ownerEmail",
+      "contact.city",
+      "contact.country",
+      "contact.doNotCall",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "4b9366f5587815cd6d1174b1073072558b0d1e296f85ce3e22878e7116dee23e"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Halath",
+          "Lumiko",
+          "Sovanth",
+          "Halanth",
+          "Norell"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "quelo.vexova0@corp.example.test",
+          "finek.risrane1@sample.invalid",
+          "zeris.beldell2@sample.invalid",
+          "orvia.kesero3@corp.example.test",
+          "quelel.finell4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Ubicación",
+        "fieldRef": "src:Ubicación",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora, Norvania",
+          "Tessin, Norvania",
+          "Tessin, Norvania",
+          "Tessin, Estmark",
+          "Orvale, Estmark"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-28",
+          "A-63",
+          "A-72",
+          "B-22",
+          "A-4"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:composite-value"
+    ]
+  },
+  "canaries": [
+    "kc_f5fdbd22da7fd7a50cbf7e05",
+    "kc_8ac03fbc096f809a29fc117e"
+  ]
+}

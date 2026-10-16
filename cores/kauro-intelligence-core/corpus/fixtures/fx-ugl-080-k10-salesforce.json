@@ -1,0 +1,214 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-080-k10-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-080-k10-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "84bd20ad3451b3901f32cd8e542a181712abee30544a84496e6fc26da96254b5",
+      "candidateSetHash": "bf2438072a0918f0a6bd9a3393248795c9005e8abdd0d2c7ab7e5c01ce8aae7c",
+      "targetContractHash": "tc_8caea8ed13d772d12c1840ea7d516e46844c466ca6267b5b76c433cbd33235c2",
+      "projectRevisionHash": "1f0e0fbbac8e8bad679a3811fdb9cf810ef502c4868259c284a65cbf5c85c58e"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Ηλεκτρονικό ταχυδρομείο",
+        "sourceFieldRef": "fld_fcfaeaa73858c555",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Berechnung",
+        "sourceFieldRef": "fld_fe311f6bcbeb0575",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Επώνυμο",
+        "sourceFieldRef": "fld_f3cf75d83f3f4006",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Χώρα",
+        "sourceFieldRef": "fld_3d209f37e5712489",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.description",
+      "contact.email",
+      "contact.lastName",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Berechnung"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "a92faa6e362c473154e04aab86b1be5ef366d79ed84ae89734d53d820f02b433"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Ηλεκτρονικό ταχυδρομείο",
+        "fieldRef": "src:Ηλεκτρονικό ταχυδρομείο",
+        "valueClass": "MIXED",
+        "values": [
+          "nora.yanell0@corp.example.test",
+          "#N/A",
+          "yanek.kesenko2@example.test",
+          "",
+          "joris.risdell4@sample.invalid",
+          "finel.noranth5@example.test",
+          "risek.belrane6@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Berechnung",
+        "fieldRef": "src:Berechnung",
+        "valueClass": "MIXED",
+        "values": [
+          "=SUM(B2:B9)",
+          "#REF!",
+          "(blank)",
+          "null",
+          "N/A",
+          "0",
+          "#VALUE!"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Επώνυμο",
+        "fieldRef": "src:Επώνυμο",
+        "valueClass": "TEXT",
+        "values": [
+          "Belunda",
+          "Orviko",
+          "Wilova",
+          "Beldell",
+          "Halero"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Χώρα",
+        "fieldRef": "src:Χώρα",
+        "valueClass": "TEXT",
+        "values": [
+          "Norvania",
+          "Kelland",
+          "Estmark",
+          "Kelland",
+          "Kelland"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:spreadsheet-artefacts",
+      "lang:el"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_b67ca3ce3b80",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Επώνυμο",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_a7e8888699a5",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Χώρα",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_49ad83bb8a32542d6e3da306",
+    "kc_d87623330894558b6b49bc7f"
+  ]
+}

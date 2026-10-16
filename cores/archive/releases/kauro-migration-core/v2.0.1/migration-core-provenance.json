@@ -1,0 +1,321 @@
+{
+  "artifactKind": "MIGRATION_CORE_PROVENANCE",
+  "provenanceVersion": "2",
+  "coreVersion": "2.0.1",
+  "packageVersion": "2.0.1",
+  "packageFormatVersion": "2.0.0",
+  "sourceRegistryVersion": "2026-09-06",
+  "campaign": {
+    "campaignId": "c_53d6b2453fe15386",
+    "sealedAt": "2026-09-11T02:18:41Z",
+    "subjectDigest": "535b44e033e1630b7423240e17a8af7f6703843e75122211b5f23056e4b7597b"
+  },
+  "freezeDecision": {
+    "decidedBy": "tools/freeze-verdict.mjs",
+    "outsideTree": true
+  },
+  "gatesAllPass": true,
+  "supportEnvelope": {
+    "modes": [
+      "HUBSPOT",
+      "SALESFORCE",
+      "CLEAN_ONLY"
+    ],
+    "hubspotObjects": [
+      "CONTACT",
+      "COMPANY",
+      "DEAL"
+    ],
+    "salesforceObjects": [
+      "ACCOUNT",
+      "CONTACT",
+      "LEAD",
+      "OPPORTUNITY"
+    ],
+    "activities": "OUT"
+  },
+  "resourceContract": {
+    "hardMemoryLimitBytes": 8589934592,
+    "memoryBudgetBytes": 6012954214,
+    "scratchBudgetBytes": 51539607552,
+    "wallClockLimitMs": 28800000
+  },
+  "capacity": [
+    {
+      "mode": "CLEAN_ONLY",
+      "present": true,
+      "path": "qualification/capacity/clean-only.json",
+      "sourceRows": 1003000,
+      "result": "PASS",
+      "peakRssBytes": 1700073472,
+      "peakScratchBytes": 10798835609,
+      "packageBytes": 1607222375,
+      "wallClockMs": 1103646,
+      "insideMemoryBudget": true,
+      "insideScratchBudget": true,
+      "insideWallClock": true
+    },
+    {
+      "mode": "HUBSPOT",
+      "present": true,
+      "path": "qualification/capacity/hubspot.json",
+      "sourceRows": 1003750,
+      "result": "PASS",
+      "peakRssBytes": 1653944320,
+      "peakScratchBytes": 12219445584,
+      "packageBytes": 1859274353,
+      "wallClockMs": 1260985,
+      "insideMemoryBudget": true,
+      "insideScratchBudget": true,
+      "insideWallClock": true
+    },
+    {
+      "mode": "SALESFORCE",
+      "present": true,
+      "path": "qualification/capacity/salesforce.json",
+      "sourceRows": 1003000,
+      "result": "PASS",
+      "peakRssBytes": 1587810304,
+      "peakScratchBytes": 10797818282,
+      "packageBytes": 1716646645,
+      "wallClockMs": 1110007,
+      "insideMemoryBudget": true,
+      "insideScratchBudget": true,
+      "insideWallClock": true
+    }
+  ],
+  "gates": [
+    {
+      "gate": "CORE-CONSTITUTION-01",
+      "state": "PASS",
+      "establishedBy": "the offline universe ran it (exit 0); CORE-CONSTITUTION-01 = PASS",
+      "observedAt": null,
+      "evidence": "qualification/candidate/universe.json#constitution"
+    },
+    {
+      "gate": "TARGET-CONTRACT-01",
+      "state": "PASS",
+      "establishedBy": "the offline universe ran it (exit 0); TARGET-CONTRACT-01 = PASS",
+      "observedAt": null,
+      "evidence": "qualification/candidate/universe.json#target-contract"
+    },
+    {
+      "gate": "EVIDENCE-RULES-01",
+      "state": "PASS",
+      "establishedBy": "the offline universe ran it (exit 0); EVIDENCE-RULES-01 = PASS",
+      "observedAt": null,
+      "evidence": "qualification/candidate/universe.json#evidence-rules"
+    },
+    {
+      "gate": "SABOTAGE",
+      "state": "PASS",
+      "establishedBy": "the offline universe ran the whole corpus (exit 0); outcomes: KILLED 98",
+      "observedAt": null,
+      "evidence": "qualification/candidate/universe.json#sabotage"
+    },
+    {
+      "gate": "SABOTAGE-LEFT-NO-TRACE",
+      "state": "PASS",
+      "establishedBy": "no tracked change, no untracked file, no mode change, and nothing undeclared under tmp/",
+      "observedAt": null,
+      "evidence": "qualification/candidate/universe.json#sabotage-left-no-trace"
+    },
+    {
+      "gate": "FINAL-ADV-01",
+      "state": "PASS",
+      "establishedBy": "8 attacks",
+      "observedAt": null,
+      "evidence": "qualification/evidence/final-adversarial.json"
+    },
+    {
+      "gate": "HSP-TARGET-01 (target contract)",
+      "state": "PASS",
+      "establishedBy": "42 checks against 51872453",
+      "observedAt": "2026-09-11T02:19:08Z",
+      "evidence": "qualification/evidence/hs-target-contract.json"
+    },
+    {
+      "gate": "HSP-TARGET-01 (import)",
+      "state": "PASS",
+      "establishedBy": "27 expectations against 51872453",
+      "observedAt": "2026-09-11T02:19:45Z",
+      "evidence": "qualification/evidence/hs-import.json"
+    },
+    {
+      "gate": "SF-TARGET-01 (target contract)",
+      "state": "PASS",
+      "establishedBy": "11 checks against 00Dak000018tvSeEAI",
+      "observedAt": "2026-09-11T02:19:09Z",
+      "evidence": "qualification/evidence/sf-target-contract.json"
+    },
+    {
+      "gate": "SF-TARGET-01 (Data Loader)",
+      "state": "PASS",
+      "establishedBy": "29 expectations against 00Dak000018tvSeEAI",
+      "observedAt": "2026-09-11T02:23:44Z",
+      "evidence": "qualification/evidence/sf-dataloader.json"
+    },
+    {
+      "gate": "SF-OCR-01",
+      "state": "PASS",
+      "establishedBy": "13 expectations, real org, real Data Loader",
+      "observedAt": "2026-09-11T02:19:11Z",
+      "evidence": "qualification/evidence/sf-ocr.json"
+    },
+    {
+      "gate": "CAPACITY-FOUNDING",
+      "state": "PASS",
+      "establishedBy": "a million representative source rows in each of CLEAN_ONLY, HUBSPOT, SALESFORCE, inside the founding budgets in bytes"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "qualification/evidence/final-adversarial.json",
+      "required": true,
+      "present": true,
+      "sha256": "98f875a6b140a28ebdf4eef5d404b3cfa90b63b6f00e8dbfdd4b8e33487fe3aa",
+      "claim": "the bounded adversarial pass over the final head"
+    },
+    {
+      "path": "qualification/evidence/hs-target-contract.json",
+      "required": true,
+      "present": true,
+      "sha256": "e081f3c55a9c0079a028f1be8d7e3c7f33d3ba9ec5aee47165825bdeef3c5142",
+      "claim": "the HubSpot target contract, captured from a real portal"
+    },
+    {
+      "path": "qualification/evidence/hs-import.json",
+      "required": true,
+      "present": true,
+      "sha256": "0126cbe47224f1fa36455cfbce46d016a141e872c8c5b5e6c478c8b2aa59b550",
+      "claim": "HubSpot imports through the CRM Imports API, read back record by record"
+    },
+    {
+      "path": "qualification/evidence/sf-target-contract.json",
+      "required": true,
+      "present": true,
+      "sha256": "8c43d4edf3aa2cfeffe65e07fbab2a41621bf58886ed980c6e0cdf86020f63d8",
+      "claim": "the Salesforce target contract, built from a real describe"
+    },
+    {
+      "path": "qualification/evidence/sf-dataloader.json",
+      "required": true,
+      "present": true,
+      "sha256": "cf43459293b3ce87c62062cf326fbbd38aa0d3ae0b7e3acb4a4ef02c8b0f4330",
+      "claim": "Salesforce loads through the official Data Loader, read back record by record"
+    },
+    {
+      "path": "qualification/evidence/sf-ocr.json",
+      "required": true,
+      "present": true,
+      "sha256": "aebc20b4dee9e0f6c434b2f1116587eeca80f09368dcc38f84dc71c95826cc74",
+      "claim": "OpportunityContactRole is outside the envelope, and the adapter says so"
+    },
+    {
+      "path": "qualification/capacity/clean-only.json",
+      "required": true,
+      "present": true,
+      "sha256": "75407d8bc00443780a1caf595b2dabedcba218fec6f5b268ae8604f4372f8f60",
+      "claim": "a million representative source rows in CLEAN_ONLY, inside the founding budgets"
+    },
+    {
+      "path": "qualification/capacity/hubspot.json",
+      "required": true,
+      "present": true,
+      "sha256": "e0d5ae974711856db43daf69e75179afe19901f57003296658f367a3474cb934",
+      "claim": "a million representative source rows in HUBSPOT, inside the founding budgets"
+    },
+    {
+      "path": "qualification/capacity/salesforce.json",
+      "required": true,
+      "present": true,
+      "sha256": "c9f09cd71ac143b6e46ae0279eff07c6b36cc0ea53527c519fe42ac87d5984dc",
+      "claim": "a million representative source rows in SALESFORCE, inside the founding budgets"
+    },
+    {
+      "path": "qualification/capacity/matrix.json",
+      "required": true,
+      "present": true,
+      "sha256": "0f9bfbf65d861617c9fe7e15e7909b93d2f44d8347acfe6b5188f0f4adf6c1bd",
+      "claim": "the twelve complementary profiles at the founding rung"
+    },
+    {
+      "path": "qualification/candidate/manifest.json",
+      "required": true,
+      "present": true,
+      "sha256": "a1e79648d1dfdc571dacba53114f927818a197010ba4c5788e3213c6cc9c0e41",
+      "claim": "what the candidate is, file by file"
+    },
+    {
+      "path": "qualification/candidate/provenance.json",
+      "required": true,
+      "present": true,
+      "sha256": "4083d7ad7904416f560379939aa6d4e7a4ce93257bfcf04ce12e66c5746c0476",
+      "claim": "the candidate record the manifest belongs to"
+    },
+    {
+      "path": "qualification/candidate/preflight.json",
+      "required": true,
+      "present": true,
+      "sha256": "289455fa3a6307a20e02040725f1405a1a5031a25e4fdaa09b1f62b8946f8c54",
+      "claim": "every fact the tree can answer about itself"
+    },
+    {
+      "path": "qualification/candidate/universe.json",
+      "required": true,
+      "present": true,
+      "sha256": "010d11935da263d9e4f4d449637cb7c28016c30f474409d1604b4b87a09a5e0c",
+      "claim": "the offline universe, 19 steps"
+    },
+    {
+      "path": "qualification/candidate/campaign.json",
+      "required": true,
+      "present": true,
+      "sha256": "873f56a7be451ef6874ccc85b83c964dd04e87a56e813d472c2c1a98a0092f87",
+      "claim": "the campaign every measurement here belongs to"
+    },
+    {
+      "path": "qualification/evidence/HUBSPOT_SCOPE_BLOCKER.md",
+      "required": true,
+      "present": true,
+      "sha256": "3095f9c8692281b981a95521acfda6359abb8fc1514d3a77dcb53679352a7e44",
+      "claim": "which HubSpot portal is which, and what was once done to the other one"
+    },
+    {
+      "path": "qualification/evidence/SF_DATALOADER_AUTH.md",
+      "required": true,
+      "present": true,
+      "sha256": "685a4ff5511ffa1d1d3247a0a49f4bb2d3b53668fc9b66c4fd69288a9fc645c6",
+      "claim": "how Data Loader authenticates, and how it does not"
+    },
+    {
+      "path": "qualification/evidence/TENANT_SAFETY.md",
+      "required": true,
+      "present": true,
+      "sha256": "794addfaee4ca99014b226c8c04af4559418a98bc867160b278cc93dfd52284b",
+      "claim": "why writing to these two tenants is safe"
+    },
+    {
+      "path": "docs/work/GATES.md",
+      "required": true,
+      "present": true,
+      "sha256": "40366d218c968e163f1f192fdac33f09fcf9a59615302e608b1a946d88e51456",
+      "claim": "the gate table and the capacity figures"
+    },
+    {
+      "path": "qualification/evidence/hs-custom-property.json",
+      "required": false,
+      "present": true,
+      "sha256": "c1d3a8973660cab1f1c0319a6a263232731736fc47a76a6f5576f6649f1a2d4a",
+      "claim": "that a property Kavo creates behaves as one HubSpot ships"
+    }
+  ],
+  "inventoryProblems": [],
+  "doesNotClaim": [
+    "That the committed acceptance packages have been imported anywhere. They are reproducibility evidence. What was imported was built from the qualification corpora, into the developer-test portal and the Developer Edition org named in the vendor evidence.",
+    "That either qualification tenant is a production account. Neither is: one is an isolated HubSpot developer test account, the other a disposable Salesforce Developer Edition org, and qualification/evidence/TENANT_SAFETY.md records how each was established before anything was written.",
+    "That an attestation issued from outside this repository has ever been verified here. Every attestation this engine has verified is a genuine Ed25519 signature over a contract naming an instance nobody owns; the seam is real and the external issuer is not yet.",
+    "That the capacity figures hold on a smaller machine. They are one host's measurements — win32 — and every capacity record carries the environment it was taken on.",
+    "That this record establishes which commit it describes. It cannot: a file inside a tree cannot name the tree that contains it. The commit, the git tree and the cross-platform result are the external CI receipt’s, and tools/receipt-verify.mjs is what checks them."
+  ]
+}

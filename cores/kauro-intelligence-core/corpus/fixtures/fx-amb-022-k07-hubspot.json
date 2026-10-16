@@ -1,0 +1,127 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-022-k07-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-022-k07-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "34ffe4800e725bf0dc302af15083b2b0b95f1b18cc7fdc0da6e80adf44570421",
+      "candidateSetHash": "bc3b34eecd7ae340763da36168ff48f1a1afb3f2192217727695b6f65380ac53",
+      "targetContractHash": "tc_1206267bf547f844e0a1a1c988212dfd72f931c2e0e696abf0236c05f6d5094e",
+      "projectRevisionHash": "41b8fcb6a2c4fbdfddfa04e752dd2d40e89962e33aafff996dfb2b47f1d13377"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Erstellt am",
+        "sourceFieldRef": "fld_0dfb6d1e4c03c382",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_16936e301040298f",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.createdAt"
+    ],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "a77caec4b08403ffb640316ba868fb458c59e2ab9e7b6166e3a402da506ebd05"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP10",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Erstellt am",
+        "fieldRef": "src:Erstellt am",
+        "valueClass": "DATE",
+        "values": [
+          "23.01.2020",
+          "05/27/2022",
+          "17.06.2021",
+          "09/17/2019"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-9783",
+          "TKT-5454",
+          "TKT-9694",
+          "TKT-8838"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.createdAt"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:missing-target"
+    ]
+  },
+  "canaries": [
+    "kc_137a2ce74db0eb95bcbf2d1b",
+    "kc_8846ef3a15cec84b294a9ecd"
+  ]
+}

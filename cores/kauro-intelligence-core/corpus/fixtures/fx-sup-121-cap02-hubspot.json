@@ -1,0 +1,281 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-121-cap02-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-121-cap02-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "3a5e1278b76a0cfdac7ada57108203b44a098d829f14b2464fd4603612b416ff",
+      "candidateSetHash": "1d7f4c1b5014d4b6969607ebfe57d08b66eac4713cdeeeb0efb06eb2ac29b90e",
+      "targetContractHash": "tc_909a40b384fce1335563745ac118f66f505c123c94224d94264a7a1316eb3a3f",
+      "projectRevisionHash": "fb843780dc6f792c15638ad3164dc0921f853ed20c858faf8af7451d4d3a9acb"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_c5845b80857d2149",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_4f5409b6a9e5d7df",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_e6bcf8eca3b833e7",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_6aad6d50212dce41",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_d1526e7847f93b41",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_17705461e903044d",
+        "decision": "MAP",
+        "destinationField": "contact.companyName"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_92c33f7744e3cdc6",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_72e3136af99078a2",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.companyName",
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code",
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "5bffa89217a4150281f111a518b49cc8cd1190504235b14c4aec09dd8014a8f5"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "meso.lumath0@example.test",
+          "yano.yanenko1@corp.example.test",
+          "mesis.rissorin2@corp.example.test",
+          "risis.dardell3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "Valdoria",
+          "Kelland",
+          "Norvania",
+          "Estmark"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Mesis",
+          "Halel",
+          "Joran",
+          "Tulia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Tessin",
+          "Orvale",
+          "Brandel",
+          "Kelmar"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Nordell",
+          "Finova",
+          "Belsorin",
+          "Pelero"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "alpha",
+          "delta",
+          "alpha",
+          "alpha"
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-34",
+          "R-23",
+          "R-17",
+          "R-5"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "A-12",
+          "B-28",
+          "C-35",
+          "A-51"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_22bf02e79023",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "contact.companyName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_2dfa34abb178d4371401646b",
+    "kc_1cc6a0de53f83811d0c66ec3"
+  ]
+}

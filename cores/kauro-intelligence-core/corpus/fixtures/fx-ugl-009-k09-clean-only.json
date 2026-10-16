@@ -1,0 +1,129 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-009-k09-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-009-k09-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "8a0992d1411ca1ff7cf14e685d193de5e527d41d97d24fface3d7104b5c71c4d",
+      "candidateSetHash": "fddd59e1b0507cb9fb6149f52779d15281e0f46f7d06cefcae9bb70f372c758f",
+      "targetContractHash": null,
+      "projectRevisionHash": "d7a384e3f7afcc7e3094dcc1323ddedd9713d6a7d36969a4c4b890fef882f389"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_564ab65c12434fb7",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_14d0ceacfb1e22e9",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.employeeCount"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "83185acb9438a27159a33913557a6775d65e80c0f38d64eab7c396ac5682accd"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "MIXED",
+        "values": [
+          "２４９７９",
+          "３６２６",
+          "５４２８"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-2738",
+          "TKT-8980",
+          "TKT-3285"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:cjk-fullwidth",
+      "lang:ja",
+      "ugly:encoding"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_13284f6b3f40",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Employees",
+        "targetField": "company.employeeCount"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_287bd454872d76876b0bc81f",
+    "kc_ce5a85beff02f2c08e525f44"
+  ]
+}

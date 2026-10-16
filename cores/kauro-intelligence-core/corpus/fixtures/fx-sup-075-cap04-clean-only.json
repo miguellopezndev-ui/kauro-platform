@@ -1,0 +1,161 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-075-cap04-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-075-cap04-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "59a17cbd05eb714f827bbdb34344d3710f1685d84bc651f3caf48ca540ebafce",
+      "candidateSetHash": "1e79e5f9f87d4360bd74f1afd659226af84f3c6f3de718c2f119d0b463e0fbe9",
+      "targetContractHash": null,
+      "projectRevisionHash": "720109dbb6db16676c5e93e8d8c88f4b60350d81e83c409d91f45ef80c4ea292"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Date de clôture",
+        "sourceFieldRef": "fld_35d3e72d33eaa309",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate"
+      },
+      {
+        "sourceHeader": "Value (export)",
+        "sourceFieldRef": "fld_cb8c28bf32fa894b",
+        "decision": "MAP",
+        "destinationField": "deal.name",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_587d6884fe36239b",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.closeDate",
+      "deal.name"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "7b4b351d4a5a77471a14357f9bba5e54083ad033eabee7f1e15bd88c9e66ea1f"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL",
+      "locale": {
+        "dateFormat": "MM/DD/YYYY"
+      }
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Date de clôture",
+        "fieldRef": "src:Date de clôture",
+        "valueClass": "DATE",
+        "values": [
+          "02/21/2024",
+          "02/25/2023",
+          "07/25/2025"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate"
+      },
+      {
+        "header": "Value (export)",
+        "fieldRef": "src:Value (export)",
+        "valueClass": "TEXT",
+        "values": [
+          "  Pilot 2025 Vexero",
+          "Expansion 2026 Belorin ",
+          "  Renewal 2024 Jorova"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-27",
+          "batch-36",
+          "batch-17"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_fcc927e08fc4",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Date de clôture",
+        "targetField": "deal.closeDate"
+      },
+      {
+        "memoryId": "memconv_b37b2297f87e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Value (export)",
+        "targetField": "deal.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_c4b26c17c9467c636901178d",
+    "kc_5208d7c137073afe3ed82000"
+  ]
+}

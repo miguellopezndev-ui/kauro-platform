@@ -1,0 +1,142 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-025-k10-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-025-k10-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "440afc686131da97d0f63f604a07b75b5ac115b756b3012218ff353d85f1976f",
+      "candidateSetHash": "7b93d4e82f57d45a92ed5de84975db6883a7837ebc30e2bb35c920aba9f12ea3",
+      "targetContractHash": "tc_d754754757376edd549f9d2583e06de42002df9bc8dabb89faf666690fd84236",
+      "projectRevisionHash": "61d3df06a96bce56b9fa78ca67908d3cb965b4b408aa4eeaad0488c8dd6d1714"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Location",
+        "sourceFieldRef": "fld_addb7ab632a94b44",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.country",
+      "company.source_id",
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "1fd75f1104a58a7149fa808a1e0f63d9ee9e2ce2595ba8e24e660d5e2ce4da47"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP11",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Location",
+        "fieldRef": "src:Location",
+        "valueClass": "TEXT",
+        "values": [
+          "Tessin, Valdoria",
+          "Orvale, Estmark",
+          "Tessin, Norvania",
+          "Tessin, Estmark",
+          "Valmora, Valdoria",
+          "Tessin, Valdoria",
+          "Tessin, Estmark"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:composite-value"
+    ]
+  },
+  "canaries": [
+    "kc_a973898dec3b07f93ebb7af0",
+    "kc_4f2dde75b491e2fa962bb9d2"
+  ]
+}

@@ -1,0 +1,182 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-005-cap06-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-005-cap06-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "4635bfa1168f4fe4cdee591b62c5834951f86cd2eb9e08efc74d564bf8c7d870",
+      "candidateSetHash": "384d1a77f796d550bd1e6b1b0dc7a0ff52bc352d21316d4b48fdd0581f3ebd6f",
+      "targetContractHash": null,
+      "projectRevisionHash": "e49171c5bdd509d43260bb172bcad95cde44704cee69ed9bbf1c655935258f05"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-Mail-Adresse",
+        "sourceFieldRef": "fld_49316418a3c251be",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "requiredEvidenceRefs": [
+          "ev_417028e32d2b1331"
+        ]
+      },
+      {
+        "sourceHeader": "Straße",
+        "sourceFieldRef": "fld_418df9fc4ab027f8",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "Webseite",
+        "sourceFieldRef": "fld_e58c37e2c5a45d99",
+        "decision": "MAP",
+        "destinationField": "contact.website"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_31108032f1c31c31",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.email",
+      "contact.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "51e38a37ae886cdcf34533d3db09cb9da7ff64ae9b3f5d880b9955c5ca1a0803"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-Mail-Adresse",
+        "fieldRef": "src:E-Mail-Adresse",
+        "valueClass": "EMAIL",
+        "values": [
+          "sovel.norova0@example.test",
+          "tavo.risunda1@sample.invalid",
+          "yanek.finaly2@example.test",
+          "orvia.belrane3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Straße",
+        "fieldRef": "src:Straße",
+        "valueClass": "TEXT",
+        "values": [
+          "82 Pelsorin Street",
+          "5 Lumero Street",
+          "159 Finero Street",
+          "98 Norova Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "Webseite",
+        "fieldRef": "src:Webseite",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.jorenko-works.test",
+          "https://www.jorath-foods.test",
+          "https://www.lumquist-works.test",
+          "https://www.belaly-group.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.website"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-40",
+          "batch-17",
+          "batch-1",
+          "batch-17"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_93d7ba43b590",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Straße",
+        "targetField": "contact.addressLine1"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_143aec6ae5125a0a60a2b75f",
+    "kc_106b8a2a8830d3efd2e75b5d"
+  ]
+}

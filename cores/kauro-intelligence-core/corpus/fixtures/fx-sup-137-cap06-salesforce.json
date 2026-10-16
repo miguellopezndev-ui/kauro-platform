@@ -1,0 +1,298 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-137-cap06-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-137-cap06-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "eecaa569033ab08c529947b465d22a528d904c812a3d7321018d32a3ee421264",
+      "candidateSetHash": "9fc0acd2dc057b0d8a9445b1136fe624b9b0a3a305b84d07147b15ab5b436135",
+      "targetContractHash": "tc_ea1c8511b94443754daf16ba113a24b74ded153908630c58a1006238e751207a",
+      "projectRevisionHash": "a0aff66b9857c635e0e0318312fc9064640af16fd2c49848923c900c07a49d2e"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_3b3d242a9067eafc",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_9439138439c57ae1",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_ac04cce1e0b098d5",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "MailingCity",
+        "sourceFieldRef": "fld_43746e43d0c3ad25",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Member Number",
+        "sourceFieldRef": "fld_26389a2a6ad490c2",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv",
+        "adoptsIdentity": true
+      },
+      {
+        "sourceHeader": "Member Number",
+        "sourceFieldRef": "fld_822101c12dc01b5d",
+        "decision": "PRESERVE",
+        "filePath": "contacts-2024.csv",
+        "adoptsIdentity": true
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_130194550b3b4e1c",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "filePath": "contacts-2024.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_1f2e94496e71f526",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "contacts-2024.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.postalCode",
+      "contact.Member_Number__c",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Member Number",
+      "Member Number"
+    ],
+    "expectedTaskTypes": [
+      "IDENTITY_STRATEGY"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "668ce2a5cca7a3ed766cd8bd4a62238bcf1eb49b38267663b59bcafb27eb5e70"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "customers.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "contacts-2024.csv": {
+          "object": "CONTACT"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "Member_Number__c",
+            "valueClass": "TEXT",
+            "required": false,
+            "label": "Member Number",
+            "externalId": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:customers.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-427",
+          "P-428",
+          "P-429",
+          "P-430"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:customers.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "wilek.lumunda0@sample.invalid",
+          "orvek.yanmar1@sample.invalid",
+          "tavek.mesath2@example.test",
+          "tulek.yanrane3@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:customers.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumvik",
+          "Quelenko",
+          "Finath",
+          "Quelova"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "customers.csv"
+      },
+      {
+        "header": "MailingCity",
+        "fieldRef": "src:customers.csv:MailingCity",
+        "valueClass": "TEXT",
+        "values": [
+          "Tessin",
+          "Quenby",
+          "Quenby",
+          "Tessin"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Member Number",
+        "fieldRef": "src:customers.csv:Member Number",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "ME-9423",
+          "ME-9424",
+          "ME-9425",
+          "ME-9426"
+        ],
+        "decision": "PRESERVE",
+        "adoptsIdentity": true,
+        "file": "customers.csv"
+      },
+      {
+        "header": "Member Number",
+        "fieldRef": "src:contacts-2024.csv:Member Number",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "ME-9426",
+          "ME-9723",
+          "ME-9724"
+        ],
+        "decision": "PRESERVE",
+        "adoptsIdentity": true,
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:contacts-2024.csv:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Daris",
+          "Sovek",
+          "Mesis"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "file": "contacts-2024.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:contacts-2024.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvorin",
+          "Pelaly",
+          "Tavell"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "contacts-2024.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "IDENTITY_STRATEGY"
+    ]
+  },
+  "canaries": [
+    "kc_c6a29b671ed9ca36421a5f95",
+    "kc_12d1061bba6b8441d872b503"
+  ]
+}

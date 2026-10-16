@@ -1,0 +1,130 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-090-k00-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-090-k00-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "431ab346636630f4105f4b11c0331805b91c1589d3a549d5a730d39ca1dafbf4",
+      "candidateSetHash": "a4d8b43943bfcc50d0335485d8809641ed22844a2ff8597ccc1e005bc0239ebc",
+      "targetContractHash": null,
+      "projectRevisionHash": "d769fb15434d4595ae39beb6c4d7119e8488e6abff8915b63be22a1a15bab700"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Created",
+        "sourceFieldRef": "fld_e2fca89c78a55ba7",
+        "decision": "MAP",
+        "destinationField": "contact.createdAt"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.createdAt",
+      "contact.jobTitle",
+      "contact.lastName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6881500d3551188f8d7d8e5551eb5918314ab0afd9379bbb3939dcd7c150e1b8"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Created",
+        "fieldRef": "src:Created",
+        "valueClass": "DATE",
+        "values": [
+          "06/06/2021",
+          "03/06/2023",
+          "07/06/2020",
+          "12/08/2024",
+          "12/11/2022",
+          "09/07/2026"
+        ],
+        "decision": "MAP",
+        "destination": "contact.createdAt"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:date-order"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_9811e057a1c5",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Created",
+        "targetField": "contact.createdAt"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_febbd740c6b5486b07740c64",
+    "kc_23914cfdeccddee8d7c6e6c8"
+  ]
+}

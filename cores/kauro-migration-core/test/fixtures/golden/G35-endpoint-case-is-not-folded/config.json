@@ -1,0 +1,72 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g35-endpoint-case"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "companies",
+      "path": "companies.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "contacts",
+      "path": "contacts.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "companies",
+      "fileId": "companies",
+      "object": "COMPANY",
+      "sourceRecordIdColumn": {
+        "header": "Company ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "Name"
+          },
+          "destinationField": "company.name",
+          "semanticType": "TEXT"
+        }
+      ]
+    },
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        }
+      ]
+    }
+  ],
+  "associations": [
+    {
+      "id": "contact-company",
+      "kind": "COLUMN_REFERENCE",
+      "recordMappingId": "contacts",
+      "relationshipType": "CONTACT_TO_COMPANY",
+      "keyColumn": {
+        "header": "Company Ref"
+      },
+      "targetRecordMappingId": "companies",
+      "targetMatchKey": "SOURCE_RECORD_ID"
+    }
+  ]
+}

@@ -1,0 +1,157 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-002-cap03-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-002-cap03-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "6cc72f8e732cbbd3c49d79a169e94bcc1e3df5757123c169e481ce89a7f507db",
+      "candidateSetHash": "2c0aa1d7a76c1bd7a03d1e6d2034ce98439159762ae4bdb300ba0a46ece2fbbe",
+      "targetContractHash": null,
+      "projectRevisionHash": "dbf77b7e4947296116690fc36218677b74d5c818b119f5142e0d358387517e17"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name - src",
+        "sourceFieldRef": "fld_f531bc25657452d3",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Status",
+        "sourceFieldRef": "fld_6439e00d2185d216",
+        "decision": "MAP",
+        "destinationField": "lead.status"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_9d787408cb2222c6",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.lastName",
+      "lead.phone",
+      "lead.status"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "4b9140e0ab7c0d0a99689d1c34244a6b8e84591a3ca17994f59c1610ccf9e900"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name - src",
+        "fieldRef": "src:Last name - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Sovenko",
+          "Darath",
+          "Tulell",
+          "Kesdell"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Status",
+        "fieldRef": "src:Status",
+        "valueClass": "ENUM",
+        "values": [
+          "Dead",
+          "Converted",
+          "Working",
+          "Dead"
+        ],
+        "decision": "MAP",
+        "destination": "lead.status"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "9",
+          "3",
+          "5",
+          "9"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_b9cd50a0d289",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Last name - src",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_050ad5d8f14f29870cac9d87",
+    "kc_06f3a6f78b2961a8f96cac7e"
+  ]
+}

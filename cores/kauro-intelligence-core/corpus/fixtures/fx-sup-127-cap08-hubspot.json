@@ -1,0 +1,305 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-127-cap08-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-127-cap08-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "dbb89d98c00bd71ee50035a19cb749a64cd29d9619f31ad8e1795224096dd369",
+      "candidateSetHash": "ea25391a3481e8b00a44dfdb17cfa0ac306bbfca1ed65648c2e8105fdebef427",
+      "targetContractHash": "tc_0ac0cb04c329993274174c611ab4de240cc96e4b1f5fd17542947a7a8f0498bb",
+      "projectRevisionHash": "8df434bd0b9a40f6ffa8f61eff707a254680c6f8095f38035618af7e44c270c8"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_c581908e0a2c752a",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_dd5c28aec1222c43",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_18d33a70d6232e11",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Deal ID",
+        "sourceFieldRef": "fld_8af9165cddadafde",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv",
+        "associatesWith": "opportunities.csv"
+      },
+      {
+        "sourceHeader": "Deal ID",
+        "sourceFieldRef": "fld_65ae622bc26bb5d3",
+        "decision": "PRESERVE",
+        "filePath": "opportunities.csv"
+      },
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_21fbabf72e08ee5e",
+        "decision": "MAP",
+        "destinationField": "deal.name",
+        "filePath": "opportunities.csv"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_6326b157a76e774c",
+        "decision": "PRESERVE",
+        "filePath": "opportunities.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.companyName",
+      "contact.email",
+      "contact.source_id",
+      "deal.name",
+      "deal.ownerEmail",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Deal ID",
+      "Deal ID",
+      "Folder code"
+    ],
+    "expectedTaskTypes": [
+      "ASSOCIATION_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "b78eb650b120a270520923a09355ce962fa0ef177584279ba876a597b39f9ecf"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "customers.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "opportunities.csv": {
+          "object": "DEAL",
+          "recordIdColumn": "Deal ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:customers.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-584",
+          "P-585",
+          "P-586",
+          "P-587",
+          "P-588"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:customers.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "wilek.noranth0@example.test",
+          "tavis.darquist1@corp.example.test",
+          "risan.daraly2@sample.invalid",
+          "noran.risunda3@sample.invalid",
+          "pelis.finaly4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "customers.csv"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:customers.csv:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Kelmar",
+          "Orvale",
+          "Tessin",
+          "Kelmar",
+          "Orvale"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Deal ID",
+        "fieldRef": "src:customers.csv:Deal ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "D-803",
+          "D-805",
+          "D-806",
+          "D-806",
+          "D-805"
+        ],
+        "decision": "PRESERVE",
+        "associatesWith": "opportunities.csv",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Deal ID",
+        "fieldRef": "src:opportunities.csv:Deal ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "D-803",
+          "D-804",
+          "D-805",
+          "D-806"
+        ],
+        "decision": "PRESERVE",
+        "file": "opportunities.csv"
+      },
+      {
+        "header": "Deal name",
+        "fieldRef": "src:opportunities.csv:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Onboarding 2026 Tavmar",
+          "Onboarding 2025 Belanth",
+          "Supply contract 2025 Zerenko",
+          "Renewal 2026 Tavell"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name",
+        "file": "opportunities.csv"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:opportunities.csv:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F984",
+          "F941",
+          "F983",
+          "F260"
+        ],
+        "decision": "PRESERVE",
+        "file": "opportunities.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "ASSOCIATION_MAPPING"
+    ]
+  },
+  "canaries": [
+    "kc_cf2227cecf078ca6164f5836",
+    "kc_9cd02a15f4788d78acf89ba8"
+  ]
+}

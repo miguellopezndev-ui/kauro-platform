@@ -1,0 +1,172 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-040-k10-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-040-k10-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0f220453010d1bfc82b614d07fc46071f411414657efb63bd73f28a5289fcb92",
+      "candidateSetHash": "e31831a268d530cb4c1cc7d55448c91a1bbc3272a0350d8128e5ffbebf28c699",
+      "targetContractHash": "tc_694ea5e121973b2d3c8771003ca7b8b65744e87f2fa871c9268c76747180e455",
+      "projectRevisionHash": "7c5491185332ff44ea482ce94507846ef2dab3a1dc1bf07e41d70d1e993dd569"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Ubicación",
+        "sourceFieldRef": "fld_9656ee54481a80be",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_0f0ffb64f100b57e",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.country",
+      "company.industry",
+      "company.name",
+      "company.source_id",
+      "contact.city",
+      "contact.country",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "82689e885b4a049ca980e84c8a6148da9f40928a28948ae991d36415e8226875"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP11",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Ubicación",
+        "fieldRef": "src:Ubicación",
+        "valueClass": "TEXT",
+        "values": [
+          "Tessin, Estmark",
+          "Valmora, Norvania",
+          "Orvale, Estmark",
+          "Valmora, Norvania",
+          "Tessin, Norvania"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-3645",
+          "TKT-6129",
+          "TKT-1892",
+          "TKT-9449",
+          "TKT-2040"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:composite-value"
+    ]
+  },
+  "canaries": [
+    "kc_76e0cdca234a3255b5ba90d5",
+    "kc_6daab520476a6c32a4d83111"
+  ]
+}

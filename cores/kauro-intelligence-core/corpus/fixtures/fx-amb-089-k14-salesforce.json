@@ -1,0 +1,169 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-089-k14-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-089-k14-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "94238b80f63452f282ab359235688bcdf81e019cb93c8ef8b430d43246b06520",
+      "candidateSetHash": "4374007c205b25e075eb5593c6a15537574ab16f6376fefee73895931bd62d48",
+      "targetContractHash": "tc_857992c786b38a4a554e0c7694be10a9e4eabc3cd88070fb0f288f195b7575ca",
+      "projectRevisionHash": "c26dd9cda0f46c1ef0338838c262e78e7f5742caad51408f1fb32f96ffdfe632"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_220051ab605e8a5e",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_244105d64445f05b",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Otros",
+        "sourceFieldRef": "fld_e848074c0ca6d4aa",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.description",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "4fbe9422e95a98dc34150bc3c30e61fdc7c4f5fe2a8891800df3f269c2327815"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Fino",
+          "Sovis",
+          "Pelel",
+          "Vexo",
+          ""
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumath",
+          "Vexvik",
+          "Haliko",
+          "Norero",
+          ""
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Otros",
+        "fieldRef": "src:Otros",
+        "valueClass": "MIXED",
+        "values": [
+          "",
+          "71",
+          "",
+          "",
+          "see attached"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:sparse-column"
+    ]
+  },
+  "canaries": [
+    "kc_a83c8ddaa363996a2f70bd10",
+    "kc_3f0f27be47d5d6c9e6a37b5a"
+  ]
+}

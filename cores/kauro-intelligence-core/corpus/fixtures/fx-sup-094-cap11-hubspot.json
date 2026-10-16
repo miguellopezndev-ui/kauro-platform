@@ -1,0 +1,282 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-094-cap11-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-094-cap11-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e6d185b15bb7481aa4c19f3628f109fbb1425c29fc48d29ca6802c2b3ffa7b6e",
+      "candidateSetHash": "bd95692ad20ca0dbf048dfbfede5f258ffc2ca37ce557cd0019cda3b1ac39061",
+      "targetContractHash": "tc_8c83464b7f791eb3b7c992f789209beeb7a6a0ac20e2f0f13378cde971c87a44",
+      "projectRevisionHash": "c1d51145eaea4da48d7c98ed7c39a63714822f9dd31d1d8a26d21bafbc619f1a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_4fd3244c71bb3d3a",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Street address",
+        "sourceFieldRef": "fld_c99c6de5cc4bd000",
+        "decision": "MAP",
+        "destinationField": "company.addressLine1"
+      },
+      {
+        "sourceHeader": "State",
+        "sourceFieldRef": "fld_d89712939383bb6d",
+        "decision": "MAP",
+        "destinationField": "company.state"
+      },
+      {
+        "sourceHeader": "Postal code",
+        "sourceFieldRef": "fld_45605733f73c2c4c",
+        "decision": "MAP",
+        "destinationField": "company.postalCode"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_c76eca14f7d27e52",
+        "decision": "MAP",
+        "destinationField": "company.country"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_167026085ce2ded4",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_bc8eba1ac7c359ba",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.city",
+      "company.country",
+      "company.description",
+      "company.name",
+      "company.phone",
+      "company.postalCode",
+      "company.state",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run",
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "1b410433a28a69d57c58485f8fc46e3684abc5c09e4025b6d25e3f9fd72c274a"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Kesova Labs B.V.",
+          "Kesero Partners LLC",
+          "Mesova Partners SAS",
+          "Sovquist Foods GmbH",
+          "Norath Logistics LLC",
+          "Quelquist Works S.L."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Street address",
+        "fieldRef": "src:Street address",
+        "valueClass": "TEXT",
+        "values": [
+          "100 Zeranth Street",
+          "47 Sovorin Street",
+          "14 Joriko Street",
+          "18 Mesell Street",
+          "10 Noriko Street",
+          "197 Kesunda Street"
+        ],
+        "decision": "MAP",
+        "destination": "company.addressLine1"
+      },
+      {
+        "header": "State",
+        "fieldRef": "src:State",
+        "valueClass": "TEXT",
+        "values": [
+          "Upland",
+          "Upland",
+          "North",
+          "Upland",
+          "Central",
+          "Central"
+        ],
+        "decision": "MAP",
+        "destination": "company.state"
+      },
+      {
+        "header": "Postal code",
+        "fieldRef": "src:Postal code",
+        "valueClass": "TEXT",
+        "values": [
+          "63059",
+          "81816",
+          "52820",
+          "99254",
+          "43498",
+          "95657"
+        ],
+        "decision": "MAP",
+        "destination": "company.postalCode"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "Valdoria",
+          "Norvania",
+          "Norvania",
+          "Estmark",
+          "Norvania",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "company.country"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "7",
+          "7",
+          "1",
+          "1",
+          "7",
+          "3"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "93e19f34",
+          "6c432661",
+          "8a94f1f6",
+          "1995ea66",
+          "b40a70a0",
+          "7a110939"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_4a923fe8e82f",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_2f77aee5e2d857a8a0489169",
+    "kc_2bf85a9e2a88cce87adf0cf0"
+  ]
+}

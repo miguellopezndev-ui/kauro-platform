@@ -1,0 +1,313 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-106-cap11-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-106-cap11-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "682f58e6050cea26dcd853a3222c44e6a10dff264353c8bf25211f20072f702b",
+      "candidateSetHash": "996c1082c2a14250e8dde3d9b7a7c46c52b664ba305c17a249ad24c843ddc4c6",
+      "targetContractHash": "tc_14c986dba65d3ec9cf8ac4c3401ee3381f2fa712f3f211d49837ef3629164c21",
+      "projectRevisionHash": "a80ed79d5aa8bc0a8f012cb250bcc3aaf6d42fc0419c7783e9afbfcda46e7000"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_e0174e10e2bfd3fe",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Ciudad",
+        "sourceFieldRef": "fld_ae4cf93b07891bac",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Dirección",
+        "sourceFieldRef": "fld_36597921b2a6d34b",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "País",
+        "sourceFieldRef": "fld_18228bba1a3e435e",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Código postal",
+        "sourceFieldRef": "fld_fc7e6d40a14232bf",
+        "decision": "MAP",
+        "destinationField": "contact.postalCode"
+      },
+      {
+        "sourceHeader": "Provincia",
+        "sourceFieldRef": "fld_511662463996a45e",
+        "decision": "MAP",
+        "destinationField": "contact.state"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_228589be21b5b4bb",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_b378ed39fe004d10",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.lastName",
+      "contact.postalCode",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag",
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "4a72e00138c077e96c3bb6a51ea0b18a8b6be24db0588b779dd204b1a06988bf"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "tava.wilell0@sample.invalid",
+          "fina.queliko1@example.test",
+          "vexo.jorell2@corp.example.test",
+          "kesia.kesorin3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Ciudad",
+        "fieldRef": "src:Ciudad",
+        "valueClass": "TEXT",
+        "values": [
+          "Brandel",
+          "Quenby",
+          "Orvale",
+          "Orvale"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Dirección",
+        "fieldRef": "src:Dirección",
+        "valueClass": "TEXT",
+        "values": [
+          "196 Beliko Street",
+          "93 Risanth Street",
+          "66 Finath Street",
+          "121 Belova Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "País",
+        "fieldRef": "src:País",
+        "valueClass": "TEXT",
+        "values": [
+          "Norvania",
+          "Kelland",
+          "Kelland",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Código postal",
+        "fieldRef": "src:Código postal",
+        "valueClass": "TEXT",
+        "values": [
+          "13503",
+          "14094",
+          "34609",
+          "41958"
+        ],
+        "decision": "MAP",
+        "destination": "contact.postalCode"
+      },
+      {
+        "header": "Provincia",
+        "fieldRef": "src:Provincia",
+        "valueClass": "TEXT",
+        "values": [
+          "Upland",
+          "Coastal",
+          "Coastal",
+          "Coastal"
+        ],
+        "decision": "MAP",
+        "destination": "contact.state"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "green",
+          "blue",
+          "green",
+          "green"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "95b67c74",
+          "cb696728",
+          "88f53f47",
+          "aa89d83c"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_eb761996ceb4",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ciudad",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_f7012a41c2e3",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Dirección",
+        "targetField": "contact.addressLine1"
+      },
+      {
+        "memoryId": "memconv_78c28cfcdd57",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "País",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_fdfb36352c28",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Código postal",
+        "targetField": "contact.postalCode"
+      },
+      {
+        "memoryId": "memconv_6639e2e628db",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Provincia",
+        "targetField": "contact.state"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_ff0702f826a19823ca54306d",
+    "kc_d02aa889c495630ad2974f3d"
+  ]
+}

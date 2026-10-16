@@ -1,0 +1,130 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-078-cap07-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-078-cap07-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "b4e8658de159b31df9bfe443a3972f456abd1ce84548b2fa6a6bb8e53d8f5e25",
+      "candidateSetHash": "f97c158ee5df345d2d697f7fde95adde34fcd92ab9ae00803dce47b82f4383f1",
+      "targetContractHash": null,
+      "projectRevisionHash": "11952dbf9d62bbcbfbaf9fe0ab8c059a6bf265703a28d636c44ea8612a7fe302"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_0ff01f07c840c56c",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "requiredEvidenceRefs": [
+          "ev_7622d73c62dfaa8b"
+        ]
+      },
+      {
+        "sourceHeader": "Website - src",
+        "sourceFieldRef": "fld_d2c5dcd6a2f3f454",
+        "decision": "MAP",
+        "destinationField": "contact.website"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3d9e6b122abdf78e11bf0615f078243fcde2655df15c81e38032b7205a804b37"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "luman.quelaly0@corp.example.test",
+          "halek.tavenko1@example.test",
+          "orva.wilell2@corp.example.test",
+          "lumo.yanath3@corp.example.test",
+          "luman.quelaly0@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Website - src",
+        "fieldRef": "src:Website - src",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.wilmar-studio.test",
+          "https://www.jorsorin-foods.test",
+          "https://www.orviko-studio.test",
+          "https://www.kessorin-group.test",
+          "https://www.sovmar-foods.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.website"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_c22fac3c1ba27990175c2b16",
+    "kc_b280080626dea890182b2942"
+  ]
+}

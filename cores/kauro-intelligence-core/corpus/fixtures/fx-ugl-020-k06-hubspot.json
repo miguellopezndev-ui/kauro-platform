@@ -1,0 +1,182 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-020-k06-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-020-k06-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5e8d6cfbc609de95690ab41aca9e6f24cb39bd6ea3bea874ac80e43307cb8c68",
+      "candidateSetHash": "b50c0273805828dc4cabd2ec1a555bec1d72cc97d5b3ffeb0b1f3c225a4afe5c",
+      "targetContractHash": "tc_19a9053c03b7477984d69b08e61c79c50f5167fa83cac1fff263c241e36875d0",
+      "projectRevisionHash": "b8bca1925f552c4e1c92e917e505861d149dbdca194a1d6517809192f13b7618"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Fonction",
+        "sourceFieldRef": "fld_415409e8bbe0cd9b",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Ville",
+        "sourceFieldRef": "fld_6afffcd90ae22c0a",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.country"
+    ],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.website",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "8bb65fe7f180d4d8bccf6274d5966243a7002c6ce2a8a9b3dfc4fac6d2c6e019"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Fonction",
+        "fieldRef": "src:Fonction",
+        "valueClass": "TEXT",
+        "values": [
+          "Site engineer",
+          "Operations lead",
+          "Operations lead",
+          "Buyer",
+          "Site engineer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Ville",
+        "fieldRef": "src:Ville",
+        "valueClass": "TEXT",
+        "values": [
+          "Nuvia",
+          "Kelmar",
+          "Kelmar",
+          "Nuvia",
+          "Brandel"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.country"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-memory",
+      "lang:fr"
+    ],
+    "memory": [
+      {
+        "memoryId": "mem_da3c31ea464b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "STALE",
+        "sourceHeaderPattern": "Fonction",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_2cca77d19db8",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Fonction",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_570213d0b692",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ville",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_16394d3d17344e1dcba0a16f",
+    "kc_d0dd010dc75f7d1dd58b5a7f"
+  ]
+}

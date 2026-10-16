@@ -1,0 +1,226 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-002-k02-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-002-k02-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "c64bed24c5a85786141798105da59e149ee078ecefe46ce5628536c7a777e39e",
+      "candidateSetHash": "978abed00cabc264c2027295ea9cee33e536dfdf633b423bb595ebb0b083696f",
+      "targetContractHash": null,
+      "projectRevisionHash": "027f19730d9130439f606965f6ed1acdab6b87d252e1d9565a965a77a4282d53"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Kraj",
+        "sourceFieldRef": "fld_ec6fa381faa911a2",
+        "decision": "MAP",
+        "destinationField": "contact.country",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Nazwisko",
+        "sourceFieldRef": "fld_8e82ff12fc4f8a11",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Stanowisko",
+        "sourceFieldRef": "fld_cafd12229ac84bcf",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Import batch ",
+        "sourceFieldRef": "fld_d2f81712893fedd2",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_ecef645589967718",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.marketingConsent"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch ",
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "a0fb46912762791dc50163de7afaff6a580f148459d00c7b90eb02cb7ea74b85"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "marketingConsent",
+            "valueClass": "BOOLEAN",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Kraj",
+        "fieldRef": "src:Kraj",
+        "valueClass": "TEXT",
+        "values": [
+          "\tValdoria  ",
+          " Valdoria ",
+          " Estmark  ",
+          " Norvania "
+        ],
+        "decision": "MAP",
+        "destination": "contact.country",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Nazwisko",
+        "fieldRef": "src:Nazwisko",
+        "valueClass": "TEXT",
+        "values": [
+          " Norenko  ",
+          "\tRisdell ",
+          " Kesero  ",
+          " Dardell "
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Stanowisko",
+        "fieldRef": "src:Stanowisko",
+        "valueClass": "TEXT",
+        "values": [
+          " Site engineer  ",
+          "\tOperations lead ",
+          "\tSite engineer  ",
+          " Operations lead "
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Import batch ",
+        "fieldRef": "src:Import batch ",
+        "valueClass": "TEXT",
+        "values": [
+          " B8 ",
+          " B4 ",
+          " A5 ",
+          " A3 "
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "blue",
+          "red",
+          "amber",
+          "blue"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:whitespace",
+      "lang:pl"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_c0ed85895ce8",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Kraj",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_7f8bf34d0a04",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nazwisko",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_ecf47be99bb8",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Stanowisko",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_69c045c2d50594c8cf36e2a4",
+    "kc_5b97607c464443e4162243d9"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "G06",
+  "title": "Two different people share an email address",
+  "intent": "Ada and Alan are provably different records that happen to share an address. They must not be merged. The destination matches contacts by email, so delivering both would let the destination merge them: that is a destination key conflict and both are set aside for review.",
+  "expect": {
+    "rows": { "total": 4, "OUTPUT": 2, "MERGED_PROVEN": 0, "ISOLATED": 2, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 2, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 1,
+    "destinationKeyConflicts": 1,
+    "formulaRisks": 2,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    { "row": "contacts.csv#2", "disposition": "ISOLATED", "reasonCode": "DESTINATION_KEY_CONFLICT" },
+    { "row": "contacts.csv#3", "disposition": "ISOLATED", "reasonCode": "DESTINATION_KEY_CONFLICT" },
+    { "row": "contacts.csv#4", "disposition": "OUTPUT" },
+    { "row": "contacts.csv#5", "disposition": "OUTPUT" }
+  ],
+  "duplicateClusters": [
+    {
+      "signal": "EMAIL_EXACT",
+      "signalValue": "shared@example.com",
+      "members": 2,
+      "reasonCode": "IDENTITY_CANDIDATE_EMAIL_EXACT",
+      "notMergedReasonCode": "IDENTITY_CANDIDATE_CONFLICTING_ATTRIBUTES"
+    }
+  ],
+  "destinationConflicts": [
+    { "object": "CONTACT", "keyField": "contact.email", "keyValue": "shared@example.com", "records": 2 }
+  ]
+}

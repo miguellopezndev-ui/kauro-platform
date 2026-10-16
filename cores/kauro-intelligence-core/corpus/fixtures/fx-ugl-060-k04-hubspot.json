@@ -1,0 +1,158 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-060-k04-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-060-k04-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "96276055715908c193eb97dbcb628fd324ba691da2fdce385c74706eb5a3aa8b",
+      "candidateSetHash": "fe7aa6d7186f6bac356f376897735a08e958c0d7453396a375a2e5048e85dd78",
+      "targetContractHash": "tc_67dd59f2abfc9b1f650d6119c69004ca3bee09ae2723f98d8bac938b6db4458f",
+      "projectRevisionHash": "e5c9a13d0226548a00287d7652826cb3df140e0839c26748f00af80f0af7c021"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrÃĳnico",
+        "sourceFieldRef": "fld_033fcef2a5d54546",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "TelÃĩfono mÃĳvil",
+        "sourceFieldRef": "fld_bd6c834545737299",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "DirecciÃĳn",
+        "sourceFieldRef": "fld_e613f8ff7f7e8026",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.website",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "TelÃĩfono mÃĳvil",
+      "DirecciÃĳn"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "4791f78f6a9aa7244bf83e520429500c75a360e1980cac2b632a6ac9c3704140"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrÃĳnico",
+        "fieldRef": "src:Correo electrÃĳnico",
+        "valueClass": "EMAIL",
+        "values": [
+          "norek.vexunda0@example.test",
+          "wilo.norenko1@sample.invalid",
+          "luma.zerrane2@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "TelÃĩfono mÃĳvil",
+        "fieldRef": "src:TelÃĩfono mÃĳvil",
+        "valueClass": "TEXT",
+        "values": [
+          "+12025550164",
+          "+12025550199",
+          "+12025550150"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "DirecciÃĳn",
+        "fieldRef": "src:DirecciÃĳn",
+        "valueClass": "TEXT",
+        "values": [
+          "Calle NÃĺÃıez 57",
+          "Calle NÃĺÃıez 17",
+          "Avenida CaÃıÃĳn 59"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:mojibake",
+      "lang:es",
+      "ugly:encoding"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_83d8c131bb15",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Correo electrÃĳnico",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_f0b8b41af936cc8ae2d4d5c0",
+    "kc_72b9198a94729e42d6f50fd5"
+  ]
+}

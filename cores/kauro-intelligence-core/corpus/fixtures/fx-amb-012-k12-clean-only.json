@@ -1,0 +1,128 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-012-k12-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-012-k12-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9d10dd747d2e12c98f29ad1c9ce1a42016a017dce983fb9b36fa9fbb9316edb6",
+      "candidateSetHash": "509090c6408a5ff9b1849e4372322c7641ad2505f31a43db2f15f300c2788e45",
+      "targetContractHash": null,
+      "projectRevisionHash": "d34a5e4a1ca0e94f2aed1efbc6b179e2f685f1e6f04e6d5691ab4b4c7b9a3dca"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Check",
+        "sourceFieldRef": "fld_ea429fa5c6ce9bdf",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.companyName",
+      "contact.doNotCall",
+      "contact.doNotEmail",
+      "contact.lifecycleStage",
+      "lead.status"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "914222dd6cd5620cb277a3437b377456eabe4cfbbd0070c8ba49173e13b0d34c"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP05",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Check",
+        "fieldRef": "src:Check",
+        "valueClass": "BOOLEAN",
+        "values": [
+          "Y",
+          "N",
+          "?",
+          "Y",
+          "N"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:unknown-flag"
+    ]
+  },
+  "canaries": [
+    "kc_6002e75ab2764e8a0e4fadfa",
+    "kc_48442e16b06b5326e1436ff4"
+  ]
+}

@@ -1,0 +1,179 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-108-cap01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-108-cap01-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0dd7736ff446210f11c3db8984ebb2906077ef1f511c56c10f3545c040260335",
+      "candidateSetHash": "2fbbde1283d210af0f25015951b82dc73ba65df426db5199a0040ecd425a62dc",
+      "targetContractHash": null,
+      "projectRevisionHash": "4236100f5ea473914f1356f09c6e897ca090ac6362d19c60d7bc326a4a8da492"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_0e7c1467921d4b7c",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Last name (export)",
+        "sourceFieldRef": "fld_eb240aae053ca79a",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Lead source [v2]",
+        "sourceFieldRef": "fld_0f08de4065106280",
+        "decision": "MAP",
+        "destinationField": "lead.leadSource"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.lastName"
+    ],
+    "expectedTargetUniverse": [
+      "contact.lastName",
+      "lead.lastName",
+      "lead.leadSource"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "24b64de472dc031e45512bcb89318ed92f4ca589f967d5adec03700c47c4b14c"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "leadSource",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-29",
+          "R-9",
+          "R-34",
+          "R-5"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Last name (export)",
+        "fieldRef": "src:Last name (export)",
+        "valueClass": "TEXT",
+        "values": [
+          "  Kesanth",
+          "Darmar ",
+          "  Wilova",
+          "Lumquist "
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Lead source [v2]",
+        "fieldRef": "src:Lead source [v2]",
+        "valueClass": "ENUM",
+        "values": [
+          "trade show",
+          "partner",
+          "cold call",
+          "trade show"
+        ],
+        "decision": "MAP",
+        "destination": "lead.leadSource"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.lastName"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_d4f775a251c8",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Last name (export)",
+        "targetField": "lead.lastName"
+      },
+      {
+        "memoryId": "memconv_35da06972033",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Lead source [v2]",
+        "targetField": "lead.leadSource"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_3918a59c25316aae5a318fd6",
+    "kc_7afcad891591379039293605"
+  ]
+}

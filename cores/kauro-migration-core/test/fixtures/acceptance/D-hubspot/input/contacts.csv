@@ -1,0 +1,6 @@
+Contact ID,First Name,Last Name,Email,Phone,Country,Job Title,Company ID
+C-1,Ada,Lovelace,ada@analytical.example,+1 212 555 0147,US,Chief Engineer,A-1
+C-2,Alan,Turing,alan@bletchley.example,+44 20 7946 0958,GB,Cryptanalyst,A-2
+C-3,Sofia,Restrepo,sofia@andina.example,3001234567,CO,Head of Sales,A-3
+C-4,Grace,Hopper,grace@analytical.example,(415) 555-2671,US,Compiler Lead,A-1
+C-5,Lucia,Fernandez,lucia@iberia.example,+34 612 345 678,ES,Account Director,A-4

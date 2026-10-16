@@ -1,0 +1,185 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-158-cap03-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-158-cap03-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "d16a4f6fe421176dd3b9ac4f4302803ca6e9504ebaa411379a9c5119c30e6a73",
+      "candidateSetHash": "a7003d0283f7d733b50edc6da3bee63a131b57ccc741da6ac4883665e871d970",
+      "targetContractHash": "tc_9a1186fa638167c5a4ec44abbc82434088122a0233603a1674f7756d40a03bc7",
+      "projectRevisionHash": "fef43e38b0bd707dbfa643a44287c19b155ae277ee425be7646fbacc8002581c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_6a26df538bb3fefc",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Mobile",
+        "sourceFieldRef": "fld_768418a7b6cdf420",
+        "decision": "MAP",
+        "destinationField": "contact.mobilePhone",
+        "semanticType": "PHONE"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_9fa683548fd03348",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_99e4fc35a5c35758",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.mobilePhone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag",
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3ea5610e8101c63a373d5f373738ecd9078ffbb24bab2337b93814e604ed0e03"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "tulia.belrane0@sample.invalid",
+          "belek.belvik1@example.test",
+          "sovia.quelmar2@corp.example.test",
+          "daro.vexdell3@example.test",
+          "jorek.dardell4@sample.invalid",
+          "kesia.vexquist5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Mobile",
+        "fieldRef": "src:Mobile",
+        "valueClass": "MIXED",
+        "values": [
+          "+12025550116",
+          "+12025550123",
+          "(202) 555-0112",
+          "+12025550147",
+          "+447700900604",
+          "+1 202 555 0143"
+        ],
+        "decision": "MAP",
+        "destination": "contact.mobilePhone",
+        "semanticType": "PHONE"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "amber",
+          "amber",
+          "blue",
+          "blue",
+          "amber",
+          "green"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "f359ea39",
+          "da908ff5",
+          "1faeae7e",
+          "75244107",
+          "b9f5b44f",
+          "f317af8c"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_4822695f5641",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Mobile",
+        "targetField": "contact.mobilePhone"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_18cba8942b7504ecd2481a73",
+    "kc_2c68574793c58b3152776b0f"
+  ]
+}

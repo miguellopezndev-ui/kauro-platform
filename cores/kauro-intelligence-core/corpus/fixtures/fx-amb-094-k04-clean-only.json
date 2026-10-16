@@ -1,0 +1,200 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-094-k04-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-094-k04-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "8051da7cbc815c824657995852f8b2c0962a813f41109d7754f7ca59ff12fb60",
+      "candidateSetHash": "4abff8a9c1ae643b23c3a2e652f7a5cc8a0f6aaabdd63528c128ffde401b2b42",
+      "targetContractHash": null,
+      "projectRevisionHash": "ddaabaa9cec24154df8b8888544983e46d71a9daf5fbef74c8ecb3aef913fc77"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_652ed0917d2fbca3",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_8096d852b4ace50b",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Nom ou société",
+        "sourceFieldRef": "fld_f971d9580662bb73",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.country",
+      "company.name",
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "lead.company",
+      "lead.createdAt",
+      "lead.lastName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3b7727506729cbbc3772156c9290c4a66d8bf04fdac9018b6d19ce98585917f6"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "daro.vexdell0@sample.invalid",
+          "wilek.norvik1@example.test",
+          "fina.kesvik2@corp.example.test",
+          "finia.tavquist3@corp.example.test",
+          "lumis.norsorin4@sample.invalid",
+          "dara.norrane5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Bela",
+          "Vexa",
+          "Belis",
+          "Kesia",
+          "Tavia",
+          "Wilel"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Nom ou société",
+        "fieldRef": "src:Nom ou société",
+        "valueClass": "TEXT",
+        "values": [
+          "Darek Norquist",
+          "Halunda Works GmbH",
+          "Tulia Wilrane",
+          "Jorova Logistics SAS",
+          "Tulan Risvik",
+          "Lumdell Systems GmbH"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:person-or-company"
+    ]
+  },
+  "canaries": [
+    "kc_c981eb7f574632a74f1964c4",
+    "kc_e6d38e47c0099349ce95adfa"
+  ]
+}

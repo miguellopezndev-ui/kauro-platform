@@ -1,0 +1,206 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-213-cap10-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-213-cap10-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0cd00dfaf8539c2575a442abf0c582dc85fa75f83e8ba871974366e0f9d17818",
+      "candidateSetHash": "38b72fe1a40cf0226c58a605049b02642276bde28362ed23bb27747dcd3c7824",
+      "targetContractHash": "tc_d54aa2b04da7c3a190545c1fede49d9f7e93879078dfd4abd73b6160d8750fc0",
+      "projectRevisionHash": "fafbe821b5159e94e6ff8e948221ab55652b7c0e9c621d8d28721e7e0288e1df"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Cognome",
+        "sourceFieldRef": "fld_3bc1cad67e789bb5",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Città",
+        "sourceFieldRef": "fld_fd12c0e13ed194df",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Paese",
+        "sourceFieldRef": "fld_a6e02016e9955b7c",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.mobilePhone",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "67e82b28523385fb877cc35e2ae9718831f44a4f26ce08a2886364864db6ff0e"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Cognome",
+        "fieldRef": "src:Cognome",
+        "valueClass": "TEXT",
+        "values": [
+          "Finsorin",
+          "Lumell",
+          "Darquist",
+          "Sovaly",
+          "Joraly"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Città",
+        "fieldRef": "src:Città",
+        "valueClass": "TEXT",
+        "values": [
+          "Nuvia",
+          "Nuvia",
+          "Valmora",
+          "Nuvia",
+          "Valmora"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Paese",
+        "fieldRef": "src:Paese",
+        "valueClass": "TEXT",
+        "values": [
+          "  Norvania",
+          "Kelland ",
+          "  Norvania",
+          "Norvania ",
+          "  Kelland"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_2c20cada8883",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cognome",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_dc1c805a157d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Città",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_eb8bf25a6590",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Paese",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_c4786722c6054d0196e554d1",
+    "kc_057293df9290a57099fcf645"
+  ]
+}

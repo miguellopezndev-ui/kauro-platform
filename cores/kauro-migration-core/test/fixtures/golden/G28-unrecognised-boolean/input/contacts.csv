@@ -1,0 +1,4 @@
+Contact ID,First Name,Last Name,Email,Opted In
+C-1,Ada,Lovelace,ada@example.com,Y
+C-2,Alan,Turing,alan@example.org,N
+C-3,Grace,Hopper,grace@example.net,true

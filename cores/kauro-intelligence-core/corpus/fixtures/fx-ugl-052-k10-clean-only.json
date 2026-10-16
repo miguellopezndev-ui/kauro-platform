@@ -1,0 +1,132 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-052-k10-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-052-k10-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9b47077811324c67989cfa320151314c2751f1bc102b6d743daa44227af843c1",
+      "candidateSetHash": "43d435555331ce9edb7583b68cde48d4904d3b494bd5150dbdbca8affb506396",
+      "targetContractHash": null,
+      "projectRevisionHash": "b8b9de9b0572308916931562c7962b1707dcabd5f0a2a92f5bd28f3812ef5353"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-posta",
+        "sourceFieldRef": "fld_94d1e539348d3da4",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Total",
+        "sourceFieldRef": "fld_9d4b254c04c47a2a",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.createdAt",
+      "contact.email"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Total"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "f99dc0e1a602691003d11501efd801fe1435bc8d14f020eae4aad19c2884f0ef"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-posta",
+        "fieldRef": "src:E-posta",
+        "valueClass": "MIXED",
+        "values": [
+          "zeran.lumquist0@corp.example.test",
+          "#N/A",
+          "wilia.quelquist2@sample.invalid",
+          "",
+          "sovis.wilmar4@example.test",
+          "joro.mesiko5@sample.invalid",
+          "tula.haliko6@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Total",
+        "fieldRef": "src:Total",
+        "valueClass": "MIXED",
+        "values": [
+          "=SUM(B2:B9)",
+          "#REF!",
+          "(blank)",
+          "null",
+          "N/A",
+          "0",
+          "#VALUE!"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:spreadsheet-artefacts",
+      "lang:tr"
+    ]
+  },
+  "canaries": [
+    "kc_7d7bd6384780573841057cce",
+    "kc_a8e486a4e5374c14760a92d0"
+  ]
+}

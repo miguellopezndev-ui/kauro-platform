@@ -1,0 +1,145 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-046-k04-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-046-k04-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e51769b1a178bd289a427a79efe65cf0c08f7a8a892cd78b5ab3fb99bb62d0be",
+      "candidateSetHash": "a4a61ff492afc065fc5fc6a52bb88b1fa986dcb34a0e03ff5276a73577543443",
+      "targetContractHash": null,
+      "projectRevisionHash": "d05242a4a501b85cc02b4cace2aa0e871150fa8ff57ef9df148df833914d22ba"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrÃĳnico",
+        "sourceFieldRef": "fld_b418b563ea5474f2",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "TelÃĩfono mÃĳvil",
+        "sourceFieldRef": "fld_0073fd3a0d3255c1",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "DirecciÃĳn",
+        "sourceFieldRef": "fld_70489334afa6c5bd",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "TelÃĩfono mÃĳvil",
+      "DirecciÃĳn"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0786e4a0793ec60f84f99c816704a154cc1faf36317ce81302ecfe5070a2e5b3"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrÃĳnico",
+        "fieldRef": "src:Correo electrÃĳnico",
+        "valueClass": "EMAIL",
+        "values": [
+          "belia.orvvik0@sample.invalid",
+          "zeran.belanth1@sample.invalid",
+          "bela.tavrane2@sample.invalid",
+          "lumia.wilsorin3@sample.invalid",
+          "vexis.tulunda4@corp.example.test",
+          "wilek.tulenko5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "TelÃĩfono mÃĳvil",
+        "fieldRef": "src:TelÃĩfono mÃĳvil",
+        "valueClass": "TEXT",
+        "values": [
+          "+447700900556",
+          "+12025550141",
+          "+12025550172",
+          "+12025550192",
+          "+12025550144",
+          "+12025550156"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "DirecciÃĳn",
+        "fieldRef": "src:DirecciÃĳn",
+        "valueClass": "TEXT",
+        "values": [
+          "Calle NÃĺÃıez 82",
+          "Calle NÃĺÃıez 64",
+          "Plaza EspaÃıa 64",
+          "Avenida CaÃıÃĳn 66",
+          "Calle NÃĺÃıez 9",
+          "Calle NÃĺÃıez 97"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:mojibake",
+      "lang:es",
+      "ugly:encoding"
+    ]
+  },
+  "canaries": [
+    "kc_52253ea70c8a0e0fabf2970b",
+    "kc_0e468b8d1d9523f00fa286ab"
+  ]
+}

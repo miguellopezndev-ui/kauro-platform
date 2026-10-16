@@ -1,0 +1,320 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-205-cap02-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-205-cap02-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "01b208c955e8d4214e20a1b7ee2efd36a32c95017a090db3f76151c721c83120",
+      "candidateSetHash": "ebae9adb693c2ae2e9ad340d59635fea0c88924c62e14fdac8a75fd062d011a4",
+      "targetContractHash": "tc_59a94e264707643c307f0f819407e8f4ff15d91b0c75923f1f70959a7b7c589b",
+      "projectRevisionHash": "171240ba267d632f438d462a1c65813f2d9ad8bded3c7da83ebb7c36b73968a4"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-mail",
+        "sourceFieldRef": "fld_a30d67d715b3b4aa",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Primeiro nome",
+        "sourceFieldRef": "fld_ee5bce89cceff4b2",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Cargo",
+        "sourceFieldRef": "fld_bbe4459838476adf",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Endereço",
+        "sourceFieldRef": "fld_fcb2a025e4800639",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "CEP",
+        "sourceFieldRef": "fld_e2e111287bbfa02b",
+        "decision": "MAP",
+        "destinationField": "contact.postalCode"
+      },
+      {
+        "sourceHeader": "Cidade",
+        "sourceFieldRef": "fld_4f3549b9d75a4afa",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Telefone",
+        "sourceFieldRef": "fld_f851db0b0127e1d7",
+        "decision": "MAP",
+        "destinationField": "contact.phone",
+        "allowedDestinationFields": [
+          "contact.phone",
+          "contact.mobilePhone"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.mobilePhone",
+      "contact.phone",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "349f71feeb6067f755216252c3eaf0d052cafdc94d4b9cd2fde1e1e0d4ece349"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-mail",
+        "fieldRef": "src:E-mail",
+        "valueClass": "EMAIL",
+        "values": [
+          "sovis.jorvik0@example.test",
+          "orvia.halath1@example.test",
+          "risa.wilquist2@sample.invalid",
+          "kesis.darero3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Primeiro nome",
+        "fieldRef": "src:Primeiro nome",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumis",
+          "Daran",
+          "Keso",
+          "Orvia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Cargo",
+        "fieldRef": "src:Cargo",
+        "valueClass": "TEXT",
+        "values": [
+          "  Site engineer",
+          "Controller ",
+          "  Buyer",
+          "Site engineer "
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Endereço",
+        "fieldRef": "src:Endereço",
+        "valueClass": "TEXT",
+        "values": [
+          "195 Belorin Street",
+          "159 Norvik Street",
+          "100 Quelath Street",
+          "124 Vexunda Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "CEP",
+        "fieldRef": "src:CEP",
+        "valueClass": "TEXT",
+        "values": [
+          "11022",
+          "52511",
+          "71703",
+          "31938"
+        ],
+        "decision": "MAP",
+        "destination": "contact.postalCode"
+      },
+      {
+        "header": "Cidade",
+        "fieldRef": "src:Cidade",
+        "valueClass": "TEXT",
+        "values": [
+          "Kelmar",
+          "Orvale",
+          "Orvale",
+          "Kelmar"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Telefone",
+        "fieldRef": "src:Telefone",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550100",
+          "+12025550190",
+          "+447700900706",
+          "+12025550113"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone",
+        "alternatives": [
+          "contact.mobilePhone"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_e23c9e93d569",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Primeiro nome",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_e139f97c04fb",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cargo",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_6ebd7c2dc793",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Endereço",
+        "targetField": "contact.addressLine1"
+      },
+      {
+        "memoryId": "memconv_28c05e48a134",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "CEP",
+        "targetField": "contact.postalCode"
+      },
+      {
+        "memoryId": "memconv_3ab43348b35a",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cidade",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_c97b7419a27c334d337a48fc",
+    "kc_d8bd71966b49c7d2c127678e"
+  ]
+}

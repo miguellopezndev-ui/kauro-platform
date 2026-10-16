@@ -1,0 +1,195 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-110-cap03-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-110-cap03-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "8b5d4d9696709fdcbbf99235dc882532abddce94e445228c7cbb86005c91477b",
+      "candidateSetHash": "a4a0be2d6b0c9c0f683e0d98301befd7c33cffb5fa72581f2a9eb816e3383892",
+      "targetContractHash": null,
+      "projectRevisionHash": "1bcb7db7499b572a96b37df388a0a416ab02aef6631332e2e3667ad0c425ae52"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_1ef46faf88dc4f14",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Fecha de alta",
+        "sourceFieldRef": "fld_255f1cb3d3876d9f",
+        "decision": "MAP",
+        "destinationField": "contact.createdAt"
+      },
+      {
+        "sourceHeader": "No llamar",
+        "sourceFieldRef": "fld_f2133dacb7f46815",
+        "decision": "MAP",
+        "destinationField": "contact.doNotCall"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.createdAt",
+      "contact.description",
+      "contact.doNotCall",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.mobilePhone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "be5f605ca93625c7dce47198827fa01f801873ec0a8665c158102f8684e794f9"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "belis.finsorin0@sample.invalid",
+          "mesan.kesova1@sample.invalid",
+          "bela.zervik2@example.test",
+          "noran.wilero3@sample.invalid",
+          "halan.jorova4@corp.example.test",
+          "orvel.tavova5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Fecha de alta",
+        "fieldRef": "src:Fecha de alta",
+        "valueClass": "MIXED",
+        "values": [
+          "2018-01-18",
+          "2021-05-23",
+          "16/02/2022",
+          "2025-06-24",
+          "2021-08-28",
+          "19/08/2023"
+        ],
+        "decision": "MAP",
+        "destination": "contact.createdAt"
+      },
+      {
+        "header": "No llamar",
+        "fieldRef": "src:No llamar",
+        "valueClass": "MIXED",
+        "values": [
+          "true",
+          "true",
+          "No",
+          "true",
+          "true",
+          "No"
+        ],
+        "decision": "MAP",
+        "destination": "contact.doNotCall"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_0e1d8b91d952",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Fecha de alta",
+        "targetField": "contact.createdAt"
+      },
+      {
+        "memoryId": "memconv_bd279d87b2eb",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "No llamar",
+        "targetField": "contact.doNotCall"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_5104f64605a9666d934773d1",
+    "kc_af5fc79a42ba85cdbfcd87a0"
+  ]
+}

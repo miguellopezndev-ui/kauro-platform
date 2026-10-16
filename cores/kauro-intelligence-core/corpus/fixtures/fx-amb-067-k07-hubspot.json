@@ -1,0 +1,133 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-067-k07-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-067-k07-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "79550beb0d49e8fd531982c8d4b7d637d0a790f0ad5f945c261b012ebabb3ae3",
+      "candidateSetHash": "e199587b745fc2cf4057c16f124eb72ba148c9d1e043a2d9d2735c73cd6f11d2",
+      "targetContractHash": "tc_1206267bf547f844e0a1a1c988212dfd72f931c2e0e696abf0236c05f6d5094e",
+      "projectRevisionHash": "caed148a45e1ad5f471185d66715a39c74ba055b9236c1ea1fddd34f1f988757"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Phone extension",
+        "sourceFieldRef": "fld_ca451e3acf2e3fac",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_b9520084e8110784",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.phoneExtension"
+    ],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "81e2a42f21d6c6194df214d71df9082fb45f90943cf6742f3a4b016caa5a9176"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP10",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Phone extension",
+        "fieldRef": "src:Phone extension",
+        "valueClass": "TEXT",
+        "values": [
+          "beta",
+          "gamma",
+          "gamma",
+          "alpha",
+          "beta",
+          "delta",
+          "delta"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "6",
+          "9",
+          "8",
+          "5",
+          "3",
+          "2",
+          "8"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.phoneExtension"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:missing-target"
+    ]
+  },
+  "canaries": [
+    "kc_aa50e1bef868523461f1e379",
+    "kc_079387f95388c926aa4c66d5"
+  ]
+}

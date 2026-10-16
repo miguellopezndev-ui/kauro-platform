@@ -1,0 +1,158 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-070-k10-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-070-k10-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "36b297643a89ae50e302c55416d51fa282c98d095e308dcae9bff411a3378ef7",
+      "candidateSetHash": "97c7bede1f1dcee9ef539e4aae80848e53be7ccdbce3bfb21d403e96efc497cb",
+      "targetContractHash": "tc_f8bc60dbb27a10e8fb1179ccff0af989c393ac1b11af33f91442851e8911b273",
+      "projectRevisionHash": "a17a1800ccf331d2a3e88261399f8fe688e5c845dceb3d2960f694c5cbcef57f"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Where",
+        "sourceFieldRef": "fld_784aaa7174bbfb10",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.country",
+      "company.description",
+      "company.source_id",
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.ownerEmail",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "08ef795c18caa0d6dffe307897cb90a091a801c80ee54954380bc98ee39e4c0d"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP11",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Where",
+        "fieldRef": "src:Where",
+        "valueClass": "TEXT",
+        "values": [
+          "Tessin, Estmark",
+          "Orvale, Estmark",
+          "Orvale, Estmark",
+          "Orvale, Valdoria",
+          "Orvale, Valdoria"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:composite-value"
+    ]
+  },
+  "canaries": [
+    "kc_aeae573f09a988dc2711a11f",
+    "kc_9b5744b3df32d7055120742a"
+  ]
+}

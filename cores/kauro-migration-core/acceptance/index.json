@@ -1,0 +1,1133 @@
+{
+  "cases": [
+    {
+      "artifacts": [
+        {
+          "byteLength": 211,
+          "path": "01_IMPORT/clean-only/associations/company_to_deal.csv",
+          "rowCount": 3,
+          "sha256": "176a6f4e4fa2b94df34f6b80f0852fbe5a59b3ab0b8ec10e011988ca7f88497a"
+        },
+        {
+          "byteLength": 313,
+          "path": "01_IMPORT/clean-only/associations/contact_to_company.csv",
+          "rowCount": 5,
+          "sha256": "4de62b0205ad10810697a7509d16e759fa0faf09b69cab7852953d188802fc7f"
+        },
+        {
+          "byteLength": 262,
+          "path": "01_IMPORT/clean-only/associations/contact_to_deal.csv",
+          "rowCount": 4,
+          "sha256": "6af50f1164597f2e855fd1ba2205d1ced568d3478f3737b33f7294953002e74e"
+        },
+        {
+          "byteLength": 423,
+          "path": "01_IMPORT/clean-only/companies.csv",
+          "rowCount": 4,
+          "sha256": "fea35359dd7b2fd11368c9bb3056100c38383ef995956deb91f1f7f7ec81b5a5"
+        },
+        {
+          "byteLength": 543,
+          "path": "01_IMPORT/clean-only/contacts.csv",
+          "rowCount": 5,
+          "sha256": "c7defc44f3eedcb60c0b0f513829d59fe9052bd68eb24eaf6e1fe4625e14c2bb"
+        },
+        {
+          "byteLength": 337,
+          "path": "01_IMPORT/clean-only/deals.csv",
+          "rowCount": 3,
+          "sha256": "98ec83b57e80539d4b543a05a7cf34211717ea761cc2a90d4868be5e5819e45b"
+        },
+        {
+          "byteLength": 310,
+          "path": "01_IMPORT/clean-only/leads.csv",
+          "rowCount": 3,
+          "sha256": "399efa3329d3e9d4334a4c2a9afbc41f301e2888bf7dfddbe8df2bba7d26764e"
+        },
+        {
+          "byteLength": 77,
+          "path": "02_EXCEPTIONS/destination-conflicts.csv",
+          "rowCount": 0,
+          "sha256": "05f9663497ca6282b6d5c6d274100f42e29623b2496d4eb158ffa248bba456d0"
+        },
+        {
+          "byteLength": 157,
+          "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+          "rowCount": 0,
+          "sha256": "086a9ccaeddde8d7f5f8d158d9c050452f570cf42b3e2385c6aa8bfcde236c00"
+        },
+        {
+          "byteLength": 1452,
+          "path": "02_EXCEPTIONS/formula-risk.csv",
+          "rowCount": 8,
+          "sha256": "23d38891e1197d3cbe7a271468400ba46e40017989acf922309ff2247118304b"
+        },
+        {
+          "byteLength": 145,
+          "path": "02_EXCEPTIONS/isolated.csv",
+          "rowCount": 0,
+          "sha256": "77158a3c7e750595f4be722070519a4cdae796420b73caff6117840b242e1d75"
+        },
+        {
+          "byteLength": 114,
+          "path": "02_EXCEPTIONS/leftovers.csv",
+          "rowCount": 0,
+          "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+        },
+        {
+          "byteLength": 114,
+          "path": "02_EXCEPTIONS/rejected-input.csv",
+          "rowCount": 0,
+          "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+        },
+        {
+          "byteLength": 158,
+          "path": "02_EXCEPTIONS/unmapped-fields.csv",
+          "rowCount": 0,
+          "sha256": "e193b1fb95b588a0f8fec5a42f961b36e4e8c2bfb7f03bd122531811da153106"
+        },
+        {
+          "byteLength": 206,
+          "path": "02_EXCEPTIONS/unresolved-associations.csv",
+          "rowCount": 0,
+          "sha256": "d0efcfc09f4e1d53ce26a3b410252680069be09956c191b850b3ee1c936f40bf"
+        },
+        {
+          "byteLength": 5022,
+          "path": "03_TRACEABILITY/associations.csv",
+          "rowCount": 12,
+          "sha256": "6141f78a60b4c76487ccfaed7277ef2fe71dfe7b3ce09a43c8d10bc907d28083"
+        },
+        {
+          "byteLength": 3601,
+          "path": "03_TRACEABILITY/changes.csv",
+          "rowCount": 8,
+          "sha256": "33f219b9d42d81acf7324bbf07a541bd2b51a20429c11ffd53bda6a7f733da2e"
+        },
+        {
+          "byteLength": 31295,
+          "path": "03_TRACEABILITY/config.normalized.json",
+          "rowCount": null,
+          "sha256": "159f0923d6329083299e2383044804642450bd66cd39f0379f22eb4f3748fcab"
+        },
+        {
+          "byteLength": 109,
+          "path": "03_TRACEABILITY/destination-matching.csv",
+          "rowCount": 0,
+          "sha256": "b572fb9c9af32a87898e824321ec6a2fab85f7feb31a2f120819781d442d5b2b"
+        },
+        {
+          "byteLength": 220,
+          "path": "03_TRACEABILITY/flags.csv",
+          "rowCount": 0,
+          "sha256": "65bcdcd42fa2febc22f757c2be866f10d4ba3568eb44f451f85fc7911458107d"
+        },
+        {
+          "byteLength": 1799,
+          "path": "03_TRACEABILITY/import-crosswalk.csv",
+          "rowCount": 15,
+          "sha256": "b1a359f9ed4bb77bf90173100a5b3df92885ee24f6377929e708bad524c82c64"
+        },
+        {
+          "byteLength": 36,
+          "path": "03_TRACEABILITY/instance-verification.csv",
+          "rowCount": 0,
+          "sha256": "418e6bd6d0d7bad87790f4625e9ae9d5be53da8cc2b9b0f6145cee9eaad57d44"
+        },
+        {
+          "byteLength": 19,
+          "path": "03_TRACEABILITY/merges.json",
+          "rowCount": null,
+          "sha256": "847c1ecf26a213bd1fed56d1309f963b1152b3aa1d3ae81d7c3ac0d060811f37"
+        },
+        {
+          "byteLength": 1606,
+          "path": "03_TRACEABILITY/reconciliation.json",
+          "rowCount": null,
+          "sha256": "c4d3229c5e297c649751c2ece911b9eee20616a4bf5c4d9e0e88fad0ba45eb4e"
+        },
+        {
+          "byteLength": 8531,
+          "path": "03_TRACEABILITY/source-lineage.csv",
+          "rowCount": 19,
+          "sha256": "ba10e7e13e897cfb928e2130af6b9c68a707f22d93375886fc8aa2fcb3f76e6d"
+        },
+        {
+          "byteLength": 3890,
+          "path": "04_DOCUMENTATION/audit.md",
+          "rowCount": null,
+          "sha256": "b6c6a10a93a6d6d198ac71a5f9473de1daaed71c02656863a42041586304922a"
+        },
+        {
+          "byteLength": 548,
+          "path": "04_DOCUMENTATION/data-view/clean-only/contacts.csv",
+          "rowCount": 5,
+          "sha256": "6d4ed88a4be27bc4d6f5ba963e40891a57d9351bf1aa925daeac8e163bbfa5ff"
+        },
+        {
+          "byteLength": 313,
+          "path": "04_DOCUMENTATION/data-view/clean-only/leads.csv",
+          "rowCount": 3,
+          "sha256": "ed1cd7b76248c2de75fa6581ca5014f7b51bacb37a52417c3682056322ddb87c"
+        },
+        {
+          "byteLength": 3630,
+          "path": "04_DOCUMENTATION/import-instructions.md",
+          "rowCount": null,
+          "sha256": "afd3a10aa9cc5f8de8c3051c04ec7a894e8f313bd911e979deafae7edfe3a64c"
+        }
+      ],
+      "associations": {
+        "byDisposition": {
+          "DEDUPLICATED": 0,
+          "LEFTOVER": 0,
+          "OUTPUT": 12,
+          "UNRESOLVED": 0
+        },
+        "sourceEdges": 12,
+        "withoutDisposition": 0
+      },
+      "bundleId": "B-5aa7638ee54fbb15",
+      "caseId": "A-clean-multi-object",
+      "cells": {
+        "changed": 8,
+        "clearedByExplicitAuthorization": 0,
+        "flagged": 0,
+        "rowsWithChanges": 8,
+        "unmappedPreserved": 0
+      },
+      "configHash": "159f0923d6329083299e2383044804642450bd66cd39f0379f22eb4f3748fcab",
+      "coreVersion": "3.0.0",
+      "destination": {
+        "instanceVerificationItems": 0,
+        "keyConflicts": 0,
+        "spreadsheetFormulaRiskValues": 8
+      },
+      "identity": {
+        "absorbedRows": 0,
+        "consentConflicts": 0,
+        "duplicateCandidateClusters": 0,
+        "duplicateCandidateRows": 0,
+        "mergeConflicts": 0,
+        "provenMerges": 0
+      },
+      "intent": "Contacts, companies, deals and leads with all three relationship shapes in one run, and nothing wrong in the source. Everything is delivered and every relationship resolves.",
+      "manifestSha256": "69a35b99f6e033d1375ccc0f268adf8d92e09d4c54daf57d2a91a6804bdd985e",
+      "records": {
+        "byObject": {
+          "COMPANY": 4,
+          "CONTACT": 5,
+          "DEAL": 3,
+          "LEAD": 3
+        },
+        "total": 15
+      },
+      "runId": "run_1e78f48c07a50c92162685d9",
+      "sourceRows": {
+        "byDisposition": {
+          "ISOLATED": 0,
+          "LEFTOVER": 0,
+          "MERGED_PROVEN": 0,
+          "OUTPUT": 19,
+          "REJECTED_INPUT": 0
+        },
+        "total": 19,
+        "withoutDisposition": 0
+      },
+      "target": {
+        "adapterVersion": "1.0.0",
+        "mode": "CREATE_ONLY",
+        "vendor": "CLEAN_ONLY"
+      },
+      "title": "Clean multi-object migration",
+      "verification": {
+        "checksRun": 60,
+        "passed": true,
+        "problems": []
+      }
+    },
+    {
+      "artifacts": [
+        {
+          "byteLength": 646,
+          "path": "01_IMPORT/clean-only/contacts.csv",
+          "rowCount": 8,
+          "sha256": "a49ca7a601ce304f52664c178ea251c413d49cb7e2b2d856ead2f6d5a1aa2667"
+        },
+        {
+          "byteLength": 77,
+          "path": "02_EXCEPTIONS/destination-conflicts.csv",
+          "rowCount": 0,
+          "sha256": "05f9663497ca6282b6d5c6d274100f42e29623b2496d4eb158ffa248bba456d0"
+        },
+        {
+          "byteLength": 157,
+          "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+          "rowCount": 0,
+          "sha256": "086a9ccaeddde8d7f5f8d158d9c050452f570cf42b3e2385c6aa8bfcde236c00"
+        },
+        {
+          "byteLength": 1304,
+          "path": "02_EXCEPTIONS/formula-risk.csv",
+          "rowCount": 7,
+          "sha256": "5d0da4752bdeaafc635f7dcf4c6b8c1b563c177b9315ecaf8fd0ea9adeef3b81"
+        },
+        {
+          "byteLength": 145,
+          "path": "02_EXCEPTIONS/isolated.csv",
+          "rowCount": 0,
+          "sha256": "77158a3c7e750595f4be722070519a4cdae796420b73caff6117840b242e1d75"
+        },
+        {
+          "byteLength": 114,
+          "path": "02_EXCEPTIONS/leftovers.csv",
+          "rowCount": 0,
+          "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+        },
+        {
+          "byteLength": 114,
+          "path": "02_EXCEPTIONS/rejected-input.csv",
+          "rowCount": 0,
+          "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+        },
+        {
+          "byteLength": 1493,
+          "path": "02_EXCEPTIONS/unmapped-fields.csv",
+          "rowCount": 5,
+          "sha256": "9d63c3bc498320a9d9128bb35e1de0c5fb44981761e28d1bbb243bad1589e010"
+        },
+        {
+          "byteLength": 206,
+          "path": "02_EXCEPTIONS/unresolved-associations.csv",
+          "rowCount": 0,
+          "sha256": "d0efcfc09f4e1d53ce26a3b410252680069be09956c191b850b3ee1c936f40bf"
+        },
+        {
+          "byteLength": 274,
+          "path": "03_TRACEABILITY/associations.csv",
+          "rowCount": 0,
+          "sha256": "8dffe96314114baf20a78b2c4e861f78a2bfdba215777b90aa7259c11be49673"
+        },
+        {
+          "byteLength": 4410,
+          "path": "03_TRACEABILITY/changes.csv",
+          "rowCount": 10,
+          "sha256": "b645404dde7bb0188ffb4cd57e017ab8e57e69510ffbb320dbedc3fe99519885"
+        },
+        {
+          "byteLength": 9245,
+          "path": "03_TRACEABILITY/config.normalized.json",
+          "rowCount": null,
+          "sha256": "40e2a5091853d9f6e2c770b2cbc8c0cd68b94f039949a385285a08f0ecb71404"
+        },
+        {
+          "byteLength": 109,
+          "path": "03_TRACEABILITY/destination-matching.csv",
+          "rowCount": 0,
+          "sha256": "b572fb9c9af32a87898e824321ec6a2fab85f7feb31a2f120819781d442d5b2b"
+        },
+        {
+          "byteLength": 1055,
+          "path": "03_TRACEABILITY/flags.csv",
+          "rowCount": 2,
+          "sha256": "17d8baf32b2b6a94157e05d50b6583dca9b83c6a2544880480893d71c1535b10"
+        },
+        {
+          "byteLength": 875,
+          "path": "03_TRACEABILITY/import-crosswalk.csv",
+          "rowCount": 8,
+          "sha256": "887225325d147063c977cf6b458ab56dc0152499a7fc38ffdc5687a1883ded6d"
+        },
+        {
+          "byteLength": 36,
+          "path": "03_TRACEABILITY/instance-verification.csv",
+          "rowCount": 0,
+          "sha256": "418e6bd6d0d7bad87790f4625e9ae9d5be53da8cc2b9b0f6145cee9eaad57d44"
+        },
+        {
+          "byteLength": 19,
+          "path": "03_TRACEABILITY/merges.json",
+          "rowCount": null,
+          "sha256": "847c1ecf26a213bd1fed56d1309f963b1152b3aa1d3ae81d7c3ac0d060811f37"
+        },
+        {
+          "byteLength": 1748,
+          "path": "03_TRACEABILITY/reconciliation.json",
+          "rowCount": null,
+          "sha256": "88574b010628186b5e174e96c1bd2adfa7298be6f4fd9fece45c519d224f7b3d"
+        },
+        {
+          "byteLength": 4265,
+          "path": "03_TRACEABILITY/source-lineage.csv",
+          "rowCount": 8,
+          "sha256": "511fd1a02eaf08ee9da7d26644f490c2cf93887285b681b876fe24355d703ebd"
+        },
+        {
+          "byteLength": 4460,
+          "path": "04_DOCUMENTATION/audit.md",
+          "rowCount": null,
+          "sha256": "63823ec5f1a579333a1315177844b5191a566971e2728bcc9ce2f802640613c7"
+        },
+        {
+          "byteLength": 653,
+          "path": "04_DOCUMENTATION/data-view/clean-only/contacts.csv",
+          "rowCount": 8,
+          "sha256": "7214a9da39eea2be8b05965ec3552b983febd30ef896ed85f3850f2ab46558e7"
+        },
+        {
+          "byteLength": 1640,
+          "path": "04_DOCUMENTATION/import-instructions.md",
+          "rowCount": null,
+          "sha256": "5b9d870e33d1529cb86577213b297028c35c40ed356993de1b19f41c9c568f51"
+        }
+      ],
+      "associations": {
+        "byDisposition": {
+          "DEDUPLICATED": 0,
+          "LEFTOVER": 0,
+          "OUTPUT": 0,
+          "UNRESOLVED": 0
+        },
+        "sourceEdges": 0,
+        "withoutDisposition": 0
+      },
+      "bundleId": "B-4d0d2a15e1ade00c",
+      "caseId": "B-dirty-multinational",
+      "cells": {
+        "changed": 10,
+        "clearedByExplicitAuthorization": 0,
+        "flagged": 2,
+        "rowsWithChanges": 7,
+        "unmappedPreserved": 5
+      },
+      "configHash": "40e2a5091853d9f6e2c770b2cbc8c0cd68b94f039949a385285a08f0ecb71404",
+      "coreVersion": "3.0.0",
+      "destination": {
+        "instanceVerificationItems": 0,
+        "keyConflicts": 0,
+        "spreadsheetFormulaRiskValues": 7
+      },
+      "identity": {
+        "absorbedRows": 0,
+        "consentConflicts": 0,
+        "duplicateCandidateClusters": 0,
+        "duplicateCandidateRows": 0,
+        "mergeConflicts": 0,
+        "provenMerges": 0
+      },
+      "intent": "Phone numbers from five countries with and without evidence, whitespace, mixed email case, Unicode names, an unparseable date and postal codes with leading zeros. Nothing is guessed and nothing is blanked.",
+      "manifestSha256": "20d35be70a587da2ae0cd5e7f65b1ab390eb4da1a794407139153155ba1142c4",
+      "records": {
+        "byObject": {
+          "COMPANY": 0,
+          "CONTACT": 8,
+          "DEAL": 0,
+          "LEAD": 0
+        },
+        "total": 8
+      },
+      "runId": "run_13174ec28740b76d61f91a28",
+      "sourceRows": {
+        "byDisposition": {
+          "ISOLATED": 0,
+          "LEFTOVER": 0,
+          "MERGED_PROVEN": 0,
+          "OUTPUT": 8,
+          "REJECTED_INPUT": 0
+        },
+        "total": 8,
+        "withoutDisposition": 0
+      },
+      "target": {
+        "adapterVersion": "1.0.0",
+        "mode": "CREATE_ONLY",
+        "vendor": "CLEAN_ONLY"
+      },
+      "title": "Dirty multinational data",
+      "verification": {
+        "checksRun": 60,
+        "passed": true,
+        "problems": []
+      }
+    },
+    {
+      "artifacts": [
+        {
+          "byteLength": 180,
+          "path": "01_IMPORT/hubspot/contacts.csv",
+          "rowCount": 3,
+          "sha256": "a8b7b31910c2ab5aca895efa0be0c130f3f4f96aa0c47fee3892e51ed1f5f4d8"
+        },
+        {
+          "byteLength": 785,
+          "path": "02_EXCEPTIONS/destination-conflicts.csv",
+          "rowCount": 2,
+          "sha256": "49cacdc9b8f03ffafb61880662ec8b54e827a06e7f5342353bd0d62ff9f74f13"
+        },
+        {
+          "byteLength": 4445,
+          "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+          "rowCount": 8,
+          "sha256": "8f7afd7facd9885d691898a8685302524e527495b7e13f4b428def8acc541e4c"
+        },
+        {
+          "byteLength": 77,
+          "path": "02_EXCEPTIONS/formula-risk.csv",
+          "rowCount": 0,
+          "sha256": "c56bc99e6ef7aecb7ecc178956026fbf5e044a8fe88836bc4c6380715c8a4006"
+        },
+        {
+          "byteLength": 2265,
+          "path": "02_EXCEPTIONS/isolated.csv",
+          "rowCount": 5,
+          "sha256": "0222e707b74f48e3bf573235a7e8e326d6eec1d109529cebd811d9feef850642"
+        },
+        {
+          "byteLength": 114,
+          "path": "02_EXCEPTIONS/leftovers.csv",
+          "rowCount": 0,
+          "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+        },
+        {
+          "byteLength": 114,
+          "path": "02_EXCEPTIONS/rejected-input.csv",
+          "rowCount": 0,
+          "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+        },
+        {
+          "byteLength": 158,
+          "path": "02_EXCEPTIONS/unmapped-fields.csv",
+          "rowCount": 0,
+          "sha256": "e193b1fb95b588a0f8fec5a42f961b36e4e8c2bfb7f03bd122531811da153106"
+        },
+        {
+          "byteLength": 206,
+          "path": "02_EXCEPTIONS/unresolved-associations.csv",
+          "rowCount": 0,
+          "sha256": "d0efcfc09f4e1d53ce26a3b410252680069be09956c191b850b3ee1c936f40bf"
+        },
+        {
+          "byteLength": 274,
+          "path": "03_TRACEABILITY/associations.csv",
+          "rowCount": 0,
+          "sha256": "8dffe96314114baf20a78b2c4e861f78a2bfdba215777b90aa7259c11be49673"
+        },
+        {
+          "byteLength": 247,
+          "path": "03_TRACEABILITY/changes.csv",
+          "rowCount": 0,
+          "sha256": "306c212cba85e82f0da921e61ba45c9e39606edf62573790c1d41732704319d9"
+        },
+        {
+          "byteLength": 12206,
+          "path": "03_TRACEABILITY/config.normalized.json",
+          "rowCount": null,
+          "sha256": "b834e980c633752dfbb7d21d34bb3f510ae6f2bf815fbddb47ff8a1c91e57369"
+        },
+        {
+          "byteLength": 109,
+          "path": "03_TRACEABILITY/destination-matching.csv",
+          "rowCount": 0,
+          "sha256": "b572fb9c9af32a87898e824321ec6a2fab85f7feb31a2f120819781d442d5b2b"
+        },
+        {
+          "byteLength": 220,
+          "path": "03_TRACEABILITY/flags.csv",
+          "rowCount": 0,
+          "sha256": "65bcdcd42fa2febc22f757c2be866f10d4ba3568eb44f451f85fc7911458107d"
+        },
+        {
+          "byteLength": 376,
+          "path": "03_TRACEABILITY/import-crosswalk.csv",
+          "rowCount": 3,
+          "sha256": "a316f57afed4b4d14cd6c475e968c1f628e080e7bda0fb37f2453bd23bdf4b57"
+        },
+        {
+          "byteLength": 3065,
+          "path": "03_TRACEABILITY/instance-verification.csv",
+          "rowCount": 10,
+          "sha256": "18763ad9c4e3ccee7599d9389d746d24c856a25925cbc473c6bdd6ceb8358b67"
+        },
+        {
+          "byteLength": 2327,
+          "path": "03_TRACEABILITY/merges.json",
+          "rowCount": null,
+          "sha256": "a0dc90850d0072063283ccc5c787236311fe698355974fe03f406b64a22b688c"
+        },
+        {
+          "byteLength": 1743,
+          "path": "03_TRACEABILITY/reconciliation.json",
+          "rowCount": null,
+          "sha256": "aeed2b27eea3a5471fd59b11b57431ff9b0fb4b6db4a5dcb9990006c9f99c0c2"
+        },
+        {
+          "byteLength": 5801,
+          "path": "03_TRACEABILITY/source-lineage.csv",
+          "rowCount": 10,
+          "sha256": "3b3230467559f4a1ed2a5f0506225f10ac30aa72a42ddf8a6d889ff6d60c5857"
+        },
+        {
+          "byteLength": 8992,
+          "path": "04_DOCUMENTATION/audit.md",
+          "rowCount": null,
+          "sha256": "35fa9c8f64c7ff9e69196cf4891fdb34aadf4275ee777339e5e8b9db0fab2dd9"
+        },
+        {
+          "byteLength": 1690,
+          "path": "04_DOCUMENTATION/import-instructions.md",
+          "rowCount": null,
+          "sha256": "67ffec0258566b233f9434bd620e778d99814cf8bfc0255835646c2e22947abf"
+        }
+      ],
+      "associations": {
+        "byDisposition": {
+          "DEDUPLICATED": 0,
+          "LEFTOVER": 0,
+          "OUTPUT": 0,
+          "UNRESOLVED": 0
+        },
+        "sourceEdges": 0,
+        "withoutDisposition": 0
+      },
+      "bundleId": "B-be4960c54b201b76",
+      "caseId": "C-identity-adversarial",
+      "cells": {
+        "changed": 0,
+        "clearedByExplicitAuthorization": 0,
+        "flagged": 0,
+        "rowsWithChanges": 0,
+        "unmappedPreserved": 0
+      },
+      "configHash": "b834e980c633752dfbb7d21d34bb3f510ae6f2bf815fbddb47ff8a1c91e57369",
+      "coreVersion": "3.0.0",
+      "destination": {
+        "instanceVerificationItems": 10,
+        "keyConflicts": 2,
+        "spreadsheetFormulaRiskValues": 0
+      },
+      "identity": {
+        "absorbedRows": 2,
+        "consentConflicts": 0,
+        "duplicateCandidateClusters": 4,
+        "duplicateCandidateRows": 7,
+        "mergeConflicts": 2,
+        "provenMerges": 2
+      },
+      "intent": "A proven duplicate, a proven duplicate that disagrees with itself, two different people sharing an address, a shared mailbox used by two people, and the same record id in two different source systems. Only the provable duplicate is combined.",
+      "manifestSha256": "daca27c3d715ad187612d04321cb87d84cda1fbbae3f34aad128d8f4185754aa",
+      "records": {
+        "byObject": {
+          "COMPANY": 0,
+          "CONTACT": 3,
+          "DEAL": 0,
+          "LEAD": 0
+        },
+        "total": 3
+      },
+      "runId": "run_1ea3b00c381f2c04712ae01f",
+      "sourceRows": {
+        "byDisposition": {
+          "ISOLATED": 5,
+          "LEFTOVER": 0,
+          "MERGED_PROVEN": 2,
+          "OUTPUT": 3,
+          "REJECTED_INPUT": 0
+        },
+        "total": 10,
+        "withoutDisposition": 0
+      },
+      "target": {
+        "adapterVersion": "2.0.0",
+        "mode": "CREATE_ONLY",
+        "vendor": "HUBSPOT"
+      },
+      "title": "Identity under adversarial conditions",
+      "verification": {
+        "checksRun": 60,
+        "passed": true,
+        "problems": []
+      }
+    },
+    {
+      "artifacts": [
+        {
+          "byteLength": 214,
+          "path": "01_IMPORT/hubspot/associations/company_to_deal.csv",
+          "rowCount": 3,
+          "sha256": "d365ee59b082498d1d5fcb1fa3d6bd1744e1192830ca2e9fc409fd375f2746df"
+        },
+        {
+          "byteLength": 316,
+          "path": "01_IMPORT/hubspot/associations/contact_to_company.csv",
+          "rowCount": 5,
+          "sha256": "fa26f0ec53ee3d1330dbb1599e6cf4a033727c76c75f5c2b741cd3ffd7ac3bd5"
+        },
+        {
+          "byteLength": 265,
+          "path": "01_IMPORT/hubspot/associations/contact_to_deal.csv",
+          "rowCount": 4,
+          "sha256": "eea7b38d6c5179a150c3d92875acf3e4ae46924b872acbe7c497f34812cf35ae"
+        },
+        {
+          "byteLength": 374,
+          "path": "01_IMPORT/hubspot/companies.csv",
+          "rowCount": 4,
+          "sha256": "4f25fc4e9bf08189b631a745004b0b3f1285dea82cfd25df26827137828ec69c"
+        },
+        {
+          "byteLength": 513,
+          "path": "01_IMPORT/hubspot/contacts.csv",
+          "rowCount": 5,
+          "sha256": "abacc983bf97a441da56819beeae18f4d44851b10cf9abd3e8f43cb0c85fdb49"
+        },
+        {
+          "byteLength": 323,
+          "path": "01_IMPORT/hubspot/deals.csv",
+          "rowCount": 3,
+          "sha256": "e496f5e2842895b435e7c10d8367d19737ee0e16728e6a7f02a54046e9fa77f6"
+        },
+        {
+          "byteLength": 77,
+          "path": "02_EXCEPTIONS/destination-conflicts.csv",
+          "rowCount": 0,
+          "sha256": "05f9663497ca6282b6d5c6d274100f42e29623b2496d4eb158ffa248bba456d0"
+        },
+        {
+          "byteLength": 157,
+          "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+          "rowCount": 0,
+          "sha256": "086a9ccaeddde8d7f5f8d158d9c050452f570cf42b3e2385c6aa8bfcde236c00"
+        },
+        {
+          "byteLength": 939,
+          "path": "02_EXCEPTIONS/formula-risk.csv",
+          "rowCount": 5,
+          "sha256": "b4398bfd35b649697e4213a2323e9df12b4dfdd190106d959c1c5a2888e18bf3"
+        },
+        {
+          "byteLength": 145,
+          "path": "02_EXCEPTIONS/isolated.csv",
+          "rowCount": 0,
+          "sha256": "77158a3c7e750595f4be722070519a4cdae796420b73caff6117840b242e1d75"
+        },
+        {
+          "byteLength": 114,
+          "path": "02_EXCEPTIONS/leftovers.csv",
+          "rowCount": 0,
+          "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+        },
+        {
+          "byteLength": 114,
+          "path": "02_EXCEPTIONS/rejected-input.csv",
+          "rowCount": 0,
+          "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+        },
+        {
+          "byteLength": 1229,
+          "path": "02_EXCEPTIONS/unmapped-fields.csv",
+          "rowCount": 4,
+          "sha256": "4debe0c1983afb1f35e1664a2be5c7a8156a72f37407da12663eb55454cfaabf"
+        },
+        {
+          "byteLength": 206,
+          "path": "02_EXCEPTIONS/unresolved-associations.csv",
+          "rowCount": 0,
+          "sha256": "d0efcfc09f4e1d53ce26a3b410252680069be09956c191b850b3ee1c936f40bf"
+        },
+        {
+          "byteLength": 5022,
+          "path": "03_TRACEABILITY/associations.csv",
+          "rowCount": 12,
+          "sha256": "5576d52bf9f53ed5ff5d7726d10cc6c38d47faec204c2005c10a11ad3e3ec7ca"
+        },
+        {
+          "byteLength": 2347,
+          "path": "03_TRACEABILITY/changes.csv",
+          "rowCount": 5,
+          "sha256": "ed0f028eb5de1e88e092f8e7bb25abebcfc18fe4aafef02a01728a6e97f60772"
+        },
+        {
+          "byteLength": 21923,
+          "path": "03_TRACEABILITY/config.normalized.json",
+          "rowCount": null,
+          "sha256": "d69f4427cb53b495cd013e74318bfe9e95eab29534b5449f5049913be2f736e0"
+        },
+        {
+          "byteLength": 109,
+          "path": "03_TRACEABILITY/destination-matching.csv",
+          "rowCount": 0,
+          "sha256": "b572fb9c9af32a87898e824321ec6a2fab85f7feb31a2f120819781d442d5b2b"
+        },
+        {
+          "byteLength": 220,
+          "path": "03_TRACEABILITY/flags.csv",
+          "rowCount": 0,
+          "sha256": "65bcdcd42fa2febc22f757c2be866f10d4ba3568eb44f451f85fc7911458107d"
+        },
+        {
+          "byteLength": 1496,
+          "path": "03_TRACEABILITY/import-crosswalk.csv",
+          "rowCount": 12,
+          "sha256": "958fa9eba2bfa1029fac36b33bbd95dd08dd677831682acdd2e318daba9d1e45"
+        },
+        {
+          "byteLength": 3065,
+          "path": "03_TRACEABILITY/instance-verification.csv",
+          "rowCount": 10,
+          "sha256": "18763ad9c4e3ccee7599d9389d746d24c856a25925cbc473c6bdd6ceb8358b67"
+        },
+        {
+          "byteLength": 19,
+          "path": "03_TRACEABILITY/merges.json",
+          "rowCount": null,
+          "sha256": "847c1ecf26a213bd1fed56d1309f963b1152b3aa1d3ae81d7c3ac0d060811f37"
+        },
+        {
+          "byteLength": 1604,
+          "path": "03_TRACEABILITY/reconciliation.json",
+          "rowCount": null,
+          "sha256": "ba6fdfa01986cf26f155fdd4e8c307af4833b9205ae68f6f97692f4ef97bba00"
+        },
+        {
+          "byteLength": 7169,
+          "path": "03_TRACEABILITY/source-lineage.csv",
+          "rowCount": 16,
+          "sha256": "3bd434b4808a751313c4693036d07773bdaaceb91fe65ffbc11589242b6ea105"
+        },
+        {
+          "byteLength": 8375,
+          "path": "04_DOCUMENTATION/audit.md",
+          "rowCount": null,
+          "sha256": "20cf33b3f381d486a0054a3f51f7d447d841811e7a5f12801f77ef619c8fd916"
+        },
+        {
+          "byteLength": 518,
+          "path": "04_DOCUMENTATION/data-view/hubspot/contacts.csv",
+          "rowCount": 5,
+          "sha256": "83ee6e77391aa9bc9e70795b80321019eb53ab089b995dc7f30faf3243964d6c"
+        },
+        {
+          "byteLength": 3495,
+          "path": "04_DOCUMENTATION/import-instructions.md",
+          "rowCount": null,
+          "sha256": "1261aa92c7e306a13e303909e279d4386ff9bebf019bce583d26a6a6ccd8b0d3"
+        }
+      ],
+      "associations": {
+        "byDisposition": {
+          "DEDUPLICATED": 0,
+          "LEFTOVER": 0,
+          "OUTPUT": 12,
+          "UNRESOLVED": 0
+        },
+        "sourceEdges": 12,
+        "withoutDisposition": 0
+      },
+      "bundleId": "B-56cc789fa965680a",
+      "caseId": "D-hubspot",
+      "cells": {
+        "changed": 5,
+        "clearedByExplicitAuthorization": 0,
+        "flagged": 0,
+        "rowsWithChanges": 5,
+        "unmappedPreserved": 4
+      },
+      "configHash": "d69f4427cb53b495cd013e74318bfe9e95eab29534b5449f5049913be2f736e0",
+      "coreVersion": "3.0.0",
+      "destination": {
+        "instanceVerificationItems": 10,
+        "keyConflicts": 0,
+        "spreadsheetFormulaRiskValues": 5
+      },
+      "identity": {
+        "absorbedRows": 0,
+        "consentConflicts": 0,
+        "duplicateCandidateClusters": 0,
+        "duplicateCandidateRows": 0,
+        "mergeConflicts": 0,
+        "provenMerges": 0
+      },
+      "intent": "One shared source bundle rendered for HubSpot.",
+      "manifestSha256": "6177cda1ce9bacc728b25bb38a7250321a3615cd6dc6818b2cea623b4be82241",
+      "records": {
+        "byObject": {
+          "COMPANY": 4,
+          "CONTACT": 5,
+          "DEAL": 3,
+          "LEAD": 0
+        },
+        "total": 12
+      },
+      "runId": "run_7de4954394a3ebfe70462bc4",
+      "sourceRows": {
+        "byDisposition": {
+          "ISOLATED": 0,
+          "LEFTOVER": 0,
+          "MERGED_PROVEN": 0,
+          "OUTPUT": 16,
+          "REJECTED_INPUT": 0
+        },
+        "total": 16,
+        "withoutDisposition": 0
+      },
+      "target": {
+        "adapterVersion": "2.0.0",
+        "mode": "CREATE_ONLY",
+        "vendor": "HUBSPOT"
+      },
+      "title": "HubSpot destination package",
+      "verification": {
+        "checksRun": 60,
+        "passed": true,
+        "problems": []
+      }
+    },
+    {
+      "artifacts": [
+        {
+          "byteLength": 336,
+          "path": "01_IMPORT/salesforce/Account.csv",
+          "rowCount": 4,
+          "sha256": "f67571aa38f82a714cf4d7e8aa23d69fb98ee6fc314f90de1a0e2b3eb4cbf3c8"
+        },
+        {
+          "byteLength": 509,
+          "path": "01_IMPORT/salesforce/Contact.csv",
+          "rowCount": 5,
+          "sha256": "16d0818b7890681fa9f37b105c55829af45d4385200b5a82543a3f5066544b91"
+        },
+        {
+          "byteLength": 280,
+          "path": "01_IMPORT/salesforce/Lead.csv",
+          "rowCount": 3,
+          "sha256": "439adce8f5a0a62c644798e2b26ec67117b51dd84d8854f5a5c7b5cc5aca3304"
+        },
+        {
+          "byteLength": 271,
+          "path": "01_IMPORT/salesforce/Opportunity.csv",
+          "rowCount": 3,
+          "sha256": "bc5cff1c925f2fb28e09fccf126a8704f26e7001e2516eae1cb2cfa23643f7f7"
+        },
+        {
+          "byteLength": 229,
+          "path": "01_IMPORT/salesforce/associations/company_to_deal.csv",
+          "rowCount": 3,
+          "sha256": "2043fb59027be142459e4eb0dcb5e5812bcc243a3edd56b338971a79ae01b632"
+        },
+        {
+          "byteLength": 331,
+          "path": "01_IMPORT/salesforce/associations/contact_to_company.csv",
+          "rowCount": 5,
+          "sha256": "c401764814e7387498ec69c5f9d8e2ed9d38c89fa7fce0cdede72cd0d6ccfbc8"
+        },
+        {
+          "byteLength": 76,
+          "path": "01_IMPORT/salesforce/associations/contact_to_deal.csv",
+          "rowCount": 0,
+          "sha256": "cc17ff1b71f1a118cb23d7de66a037ea45f49481f8209402839abb1669b4aa7a"
+        },
+        {
+          "byteLength": 77,
+          "path": "02_EXCEPTIONS/destination-conflicts.csv",
+          "rowCount": 0,
+          "sha256": "05f9663497ca6282b6d5c6d274100f42e29623b2496d4eb158ffa248bba456d0"
+        },
+        {
+          "byteLength": 157,
+          "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+          "rowCount": 0,
+          "sha256": "086a9ccaeddde8d7f5f8d158d9c050452f570cf42b3e2385c6aa8bfcde236c00"
+        },
+        {
+          "byteLength": 1452,
+          "path": "02_EXCEPTIONS/formula-risk.csv",
+          "rowCount": 8,
+          "sha256": "d5b7a15fe0a2e60968885aaeaa53df24837b4133623a68f6bb659ef0cee620bc"
+        },
+        {
+          "byteLength": 145,
+          "path": "02_EXCEPTIONS/isolated.csv",
+          "rowCount": 0,
+          "sha256": "77158a3c7e750595f4be722070519a4cdae796420b73caff6117840b242e1d75"
+        },
+        {
+          "byteLength": 1826,
+          "path": "02_EXCEPTIONS/leftovers.csv",
+          "rowCount": 4,
+          "sha256": "16561871f1e24d238925c69fa98b8d23574cc160f340614085720a7c8e88da10"
+        },
+        {
+          "byteLength": 114,
+          "path": "02_EXCEPTIONS/rejected-input.csv",
+          "rowCount": 0,
+          "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+        },
+        {
+          "byteLength": 2091,
+          "path": "02_EXCEPTIONS/unmapped-fields.csv",
+          "rowCount": 7,
+          "sha256": "084cc1c1d87dc64d3bec50c640f07ac2ac457d0ef7cddab332ed378095528844"
+        },
+        {
+          "byteLength": 2182,
+          "path": "02_EXCEPTIONS/unresolved-associations.csv",
+          "rowCount": 4,
+          "sha256": "b6287e7cf5b11f7a89f722f6e18b0dcfd5fb4883e67de4827fdf984bd36e258d"
+        },
+        {
+          "byteLength": 5430,
+          "path": "03_TRACEABILITY/associations.csv",
+          "rowCount": 12,
+          "sha256": "e28d600d10f17e2a85d6a29f9a495e1b42833995f9460a4c0f7dd3a07f4ab5d5"
+        },
+        {
+          "byteLength": 3601,
+          "path": "03_TRACEABILITY/changes.csv",
+          "rowCount": 8,
+          "sha256": "33f219b9d42d81acf7324bbf07a541bd2b51a20429c11ffd53bda6a7f733da2e"
+        },
+        {
+          "byteLength": 28814,
+          "path": "03_TRACEABILITY/config.normalized.json",
+          "rowCount": null,
+          "sha256": "c26fe273fc2638ba6b66f6a6ebee64a6ebcbcbf22aa592ab4df0b585b9654ce0"
+        },
+        {
+          "byteLength": 109,
+          "path": "03_TRACEABILITY/destination-matching.csv",
+          "rowCount": 0,
+          "sha256": "b572fb9c9af32a87898e824321ec6a2fab85f7feb31a2f120819781d442d5b2b"
+        },
+        {
+          "byteLength": 220,
+          "path": "03_TRACEABILITY/flags.csv",
+          "rowCount": 0,
+          "sha256": "65bcdcd42fa2febc22f757c2be866f10d4ba3568eb44f451f85fc7911458107d"
+        },
+        {
+          "byteLength": 1801,
+          "path": "03_TRACEABILITY/import-crosswalk.csv",
+          "rowCount": 15,
+          "sha256": "48a95b654b76257a3509952b7d15cc964c85ebf1b64c961991f02741af708016"
+        },
+        {
+          "byteLength": 2197,
+          "path": "03_TRACEABILITY/instance-verification.csv",
+          "rowCount": 7,
+          "sha256": "cf4740277ddbf8191aff9721550c49b23c4855a3cde9495beaa4739b61efb9fa"
+        },
+        {
+          "byteLength": 19,
+          "path": "03_TRACEABILITY/merges.json",
+          "rowCount": null,
+          "sha256": "847c1ecf26a213bd1fed56d1309f963b1152b3aa1d3ae81d7c3ac0d060811f37"
+        },
+        {
+          "byteLength": 1648,
+          "path": "03_TRACEABILITY/reconciliation.json",
+          "rowCount": null,
+          "sha256": "7d2305a9c30f8ba08074a415d92c3fa88be6cf643e70b0509e76019984555ae3"
+        },
+        {
+          "byteLength": 9147,
+          "path": "03_TRACEABILITY/source-lineage.csv",
+          "rowCount": 19,
+          "sha256": "eec21760ef84c9385d545e6af29ba6f24dd59cd59546aa91ad4fb5fd99f8c86e"
+        },
+        {
+          "byteLength": 10352,
+          "path": "04_DOCUMENTATION/audit.md",
+          "rowCount": null,
+          "sha256": "20a06663ca7f3985689db6103e276d1acad28db5e51303f41a23f484c7878b07"
+        },
+        {
+          "byteLength": 514,
+          "path": "04_DOCUMENTATION/data-view/salesforce/Contact.csv",
+          "rowCount": 5,
+          "sha256": "4df3d3887d63e5f033fadc906d7d578d8bb0aed52eda3696533436b4a91b8ecc"
+        },
+        {
+          "byteLength": 283,
+          "path": "04_DOCUMENTATION/data-view/salesforce/Lead.csv",
+          "rowCount": 3,
+          "sha256": "f14c238ee3affa7fee386cf418b23eb96517e52c638a8d9a32e7fc3d5d17b66e"
+        },
+        {
+          "byteLength": 3880,
+          "path": "04_DOCUMENTATION/import-instructions.md",
+          "rowCount": null,
+          "sha256": "5ac29d9458ea3b09c42a514784a3b05b68e86eb0f914713a88236fc7612bcde0"
+        }
+      ],
+      "associations": {
+        "byDisposition": {
+          "DEDUPLICATED": 0,
+          "LEFTOVER": 4,
+          "OUTPUT": 8,
+          "UNRESOLVED": 0
+        },
+        "sourceEdges": 12,
+        "withoutDisposition": 0
+      },
+      "bundleId": "B-5aa7638ee54fbb15",
+      "caseId": "D-salesforce",
+      "cells": {
+        "changed": 8,
+        "clearedByExplicitAuthorization": 0,
+        "flagged": 0,
+        "rowsWithChanges": 8,
+        "unmappedPreserved": 7
+      },
+      "configHash": "c26fe273fc2638ba6b66f6a6ebee64a6ebcbcbf22aa592ab4df0b585b9654ce0",
+      "coreVersion": "3.0.0",
+      "destination": {
+        "instanceVerificationItems": 7,
+        "keyConflicts": 0,
+        "spreadsheetFormulaRiskValues": 8
+      },
+      "identity": {
+        "absorbedRows": 0,
+        "consentConflicts": 0,
+        "duplicateCandidateClusters": 0,
+        "duplicateCandidateRows": 0,
+        "mergeConflicts": 0,
+        "provenMerges": 0
+      },
+      "intent": "The same source bundle rendered for Salesforce, which carries a Lead object HubSpot does not, and supports fewer relationships: a contact on an opportunity is an OpportunityContactRole, which is outside this envelope.",
+      "manifestSha256": "46d9e077930d8dbbf73f934e43d5d6d788423f6683e07307e17adbf7bafb43c4",
+      "records": {
+        "byObject": {
+          "COMPANY": 4,
+          "CONTACT": 5,
+          "DEAL": 3,
+          "LEAD": 3
+        },
+        "total": 15
+      },
+      "runId": "run_1f14da073d9785022620c861",
+      "sourceRows": {
+        "byDisposition": {
+          "ISOLATED": 0,
+          "LEFTOVER": 4,
+          "MERGED_PROVEN": 0,
+          "OUTPUT": 15,
+          "REJECTED_INPUT": 0
+        },
+        "total": 19,
+        "withoutDisposition": 0
+      },
+      "target": {
+        "adapterVersion": "2.0.0",
+        "mode": "CREATE_ONLY",
+        "vendor": "SALESFORCE"
+      },
+      "title": "Salesforce destination package",
+      "verification": {
+        "checksRun": 60,
+        "passed": true,
+        "problems": []
+      }
+    }
+  ],
+  "coreVersion": "3.0.0"
+}

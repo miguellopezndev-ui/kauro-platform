@@ -1,0 +1,144 @@
+{
+  "partition": "FINAL",
+  "fileName": "seed-cap04-transformation.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "seed-cap04-transformation",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "a179fcba21d966052ed75b2b53ccfb0fc2f4d319415fa9be6578873df012d164",
+      "candidateSetHash": "d632c56074aa223183180abf4a611cf8e0d404ae64583df3fe6b1b2ba8ba94bc",
+      "targetContractHash": null,
+      "projectRevisionHash": "4dbccd24b824bc579e74fb952cfae26242e01d32b251bfc126718d2cc7c237d4"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Deal name - src",
+        "sourceFieldRef": "fld_bd2d1818cfca44b8",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Close date",
+        "sourceFieldRef": "fld_54dfd87c26f46b6a",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate",
+        "transformPrimitive": "PARSE_DATE_ISO",
+        "typedTransformParams": {
+          "dateFormat": "DD/MM/YYYY"
+        }
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.closeDate",
+      "deal.name"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [
+      "TRANSFORMATION_SELECTION"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "99c4857f1d4cb76cedcde3074f51b5f2ecf81dc3a826e0da9c30a95c8dde1b63"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL",
+      "locale": {
+        "dateFormat": "DD/MM/YYYY"
+      }
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Deal name - src",
+        "fieldRef": "src:Deal name - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Renewal 2026 Acme",
+          "Pilot 2026 Globex"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Close date",
+        "fieldRef": "src:Close date",
+        "valueClass": "DATE",
+        "values": [
+          "13/04/2026",
+          "28/02/2026"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate",
+        "transform": "PARSE_DATE_ISO",
+        "params": {
+          "dateFormat": "DD/MM/YYYY"
+        }
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "TRANSFORMATION_SELECTION"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_8c60ff733336",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Deal name - src",
+        "targetField": "deal.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_07c30aa82c9813c010fcd838",
+    "kc_c116b910085eedc222ba2455"
+  ]
+}

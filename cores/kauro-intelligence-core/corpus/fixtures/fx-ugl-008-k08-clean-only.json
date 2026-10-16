@@ -1,0 +1,211 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-008-k08-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-008-k08-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "088e63c62faff7b5f8d43f722b1bc9af764237e9cb397078d1afb6f5a2b912fe",
+      "candidateSetHash": "3d1f86ad13b116636123a8ec0a1daa4d4b4e01c06dc888d8b171ca901be0570b",
+      "targetContractHash": null,
+      "projectRevisionHash": "e2518b22fabfffb59e8e95068f2c6189c47702ff02a77fdda0e9655583b63f76"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "البريد الإلكتروني",
+        "sourceFieldRef": "fld_fa22c1bf8717cec6",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "اسم العائلة",
+        "sourceFieldRef": "fld_f50d937fe8ba1f64",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "المدينة",
+        "sourceFieldRef": "fld_b6a0cc7d28041e3c",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "المدينة / العنوان",
+        "sourceFieldRef": "fld_cc2f3d87e3a4e9c2",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_9e71aeb653db7bed",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.lastName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "المدينة / العنوان",
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "91d7a7185bfd5efbb7af6ab2af52808259ecb7785b3fdaa232bc3bfd71806f3f"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "البريد الإلكتروني",
+        "fieldRef": "src:البريد الإلكتروني",
+        "valueClass": "EMAIL",
+        "values": [
+          "finan.finanth0@corp.example.test",
+          "zera.halrane1@sample.invalid",
+          "quelia.mesanth2@corp.example.test",
+          "yanek.risanth3@corp.example.test",
+          "lumel.pelvik4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "اسم العائلة",
+        "fieldRef": "src:اسم العائلة",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumaly",
+          "Wiliko",
+          "Lumquist",
+          "Mesorin",
+          "Kesanth"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "المدينة",
+        "fieldRef": "src:المدينة",
+        "valueClass": "TEXT",
+        "values": [
+          "Tessin",
+          "Orvale",
+          "Nuvia",
+          "Tessin",
+          "Quenby"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "المدينة / العنوان",
+        "fieldRef": "src:المدينة / العنوان",
+        "valueClass": "TEXT",
+        "values": [
+          "ירושלים 12",
+          "القاهرة 7",
+          "القاهرة 7",
+          "القاهرة 7",
+          "Valmora القاهرة"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "8692c509",
+          "95b86bc8",
+          "752783e0",
+          "f0e8c179",
+          "22015caa"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:rtl",
+      "lang:ar"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_93a62a079153",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "اسم العائلة",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_3019aaa45939",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "المدينة",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_780ef6293ef1391591d88d4d",
+    "kc_81f50b655abf8787b9136df1"
+  ]
+}

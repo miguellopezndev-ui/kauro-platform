@@ -1,0 +1,224 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-034-k06-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-034-k06-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5fdaca80cf322bd928d7337a91cde3f8002b314b86574a6bd32648c1252686d2",
+      "candidateSetHash": "d66ef5821d276b3668fe4cf7dff77f6b910b6294bf9192d6721bff67c60dd733",
+      "targetContractHash": "tc_f1965a100e0572a18cdd209d9fd0c29a6d0e2d254f07ca88e3258663b0ffb3a7",
+      "projectRevisionHash": "0a12a79eaf40355cb9ff04754ce7a963814e90e39cba2ce6140ba30973027ac8"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "País",
+        "sourceFieldRef": "fld_712b5741041499b3",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Sobrenome",
+        "sourceFieldRef": "fld_b316f4830e2c9377",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "E-mail",
+        "sourceFieldRef": "fld_ec3929601779a237",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "company.name"
+    ],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.name",
+      "company.source_id",
+      "contact.country",
+      "contact.email",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "8868bd07a02a8cebd2246899492ae5ea7be4a46ac518acbade6b039675803077"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "País",
+        "fieldRef": "src:País",
+        "valueClass": "TEXT",
+        "values": [
+          "Estmark",
+          "Norvania",
+          "Norvania",
+          "Kelland",
+          "Valdoria",
+          "Kelland"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Sobrenome",
+        "fieldRef": "src:Sobrenome",
+        "valueClass": "TEXT",
+        "values": [
+          "Vexunda",
+          "Pelero",
+          "Tavquist",
+          "Pelenko",
+          "Orviko",
+          "Orvero"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "E-mail",
+        "fieldRef": "src:E-mail",
+        "valueClass": "EMAIL",
+        "values": [
+          "yana.sovorin0@corp.example.test",
+          "lumo.kesell1@example.test",
+          "orvek.kesanth2@sample.invalid",
+          "zeria.yanrane3@sample.invalid",
+          "belel.pelrane4@example.test",
+          "quela.findell5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      }
+    ],
+    "forbiddenDestinations": [
+      "company.name"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-memory",
+      "lang:pt"
+    ],
+    "memory": [
+      {
+        "memoryId": "mem_5f5bff537aad",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "CONFLICTED",
+        "sourceHeaderPattern": "País",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "mem_5b8234b7da1e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "RETIRED",
+        "sourceHeaderPattern": "País",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_d10e532ac21b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "País",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_243a9014b221",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Sobrenome",
+        "targetField": "contact.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_daa930a849a643d5c4fb7237",
+    "kc_25ecda004d816ff1499669b4"
+  ]
+}

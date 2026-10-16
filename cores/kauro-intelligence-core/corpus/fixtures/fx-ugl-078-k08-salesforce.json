@@ -1,0 +1,229 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-078-k08-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-078-k08-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "1061e1244cdb6f69a4c6963da4bec3bb65548093c16cad22664f8c834a7cc3c6",
+      "candidateSetHash": "4e315fdb5b234e792b7e841b87283e672b8c7b558af8ab63baa2715a4d72482f",
+      "targetContractHash": "tc_29d193cf1f8b08e186fbdf587eba7414f8d34e864f2e9534bbc30f3e73dea1ae",
+      "projectRevisionHash": "5776701040541f53aee3c5e157c3e29b441fd44c3024ac92a22941a90a3075cc"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "עיר",
+        "sourceFieldRef": "fld_c68a37edd765ebed",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "דוא״ל",
+        "sourceFieldRef": "fld_2fb4ad155b32bdf2",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "תפקיד",
+        "sourceFieldRef": "fld_cb316015a210bb3b",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "עיר / כתובת",
+        "sourceFieldRef": "fld_70223280fc61bcbd",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_ca2cf8f90799f88a",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "עיר / כתובת",
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3440359dcfcd119aedef07fc9da9f7871d34a426a1dd146bbfbfea59b48cc64a"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "עיר",
+        "fieldRef": "src:עיר",
+        "valueClass": "TEXT",
+        "values": [
+          "Kelmar",
+          "Orvale",
+          "Brandel",
+          "Valmora",
+          "Orvale"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "דוא״ל",
+        "fieldRef": "src:דוא״ל",
+        "valueClass": "EMAIL",
+        "values": [
+          "zero.zeranth0@example.test",
+          "zeria.finanth1@sample.invalid",
+          "daris.kesiko2@corp.example.test",
+          "mesa.lumvik3@sample.invalid",
+          "norel.quelsorin4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "תפקיד",
+        "fieldRef": "src:תפקיד",
+        "valueClass": "TEXT",
+        "values": [
+          "Operations lead",
+          "Account manager",
+          "Site engineer",
+          "Site engineer",
+          "Controller"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "עיר / כתובת",
+        "fieldRef": "src:עיר / כתובת",
+        "valueClass": "TEXT",
+        "values": [
+          "القاهرة 7",
+          "ירושלים 12",
+          "القاهرة 7",
+          "ירושלים 12",
+          "القاهرة 7"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-13",
+          "batch-20",
+          "batch-32",
+          "batch-36",
+          "batch-21"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:rtl",
+      "lang:he"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_e8500f0995a5",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "עיר",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_60212b998567",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "תפקיד",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_0ef635c912070bfe1d250d7b",
+    "kc_199218a47e1237076a82fbce"
+  ]
+}

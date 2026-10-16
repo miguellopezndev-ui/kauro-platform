@@ -1,0 +1,182 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-105-cap10-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-105-cap10-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "ebd03f9a0a58096e3691aa96d6a2c337998db67647435c957c0ab1f2c3d9e0c5",
+      "candidateSetHash": "38ed1b6f028de0bd0cacbcec1a02368718d1510039c28d3d800116f2b527e544",
+      "targetContractHash": "tc_6a54b34fa7683a4dd0cb8dc13b90ddbf159d93be2c171643206b0c0a69f79630",
+      "projectRevisionHash": "68576bbe30f04cc1236e3306c33ce2b6b9d2d6393b252bd39cfc34d69738fe4d"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Apellidos",
+        "sourceFieldRef": "fld_7cf421194b516dd9",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Cargo",
+        "sourceFieldRef": "fld_6e6bbfb942d3b8ef",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_1b18de8c17abe2ca",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.name",
+      "company.source_id",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "33c480858b728c70038dfe6c3c45184c8652eb0bb6e9f83b21edeb9860bb09cf"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Apellidos",
+        "fieldRef": "src:Apellidos",
+        "valueClass": "TEXT",
+        "values": [
+          "Halmar",
+          "Zerell",
+          "Halorin",
+          "Kesunda"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Cargo",
+        "fieldRef": "src:Cargo",
+        "valueClass": "TEXT",
+        "values": [
+          "Account manager",
+          "Site engineer",
+          "Buyer",
+          "Account manager"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "B-79",
+          "C-92",
+          "C-54",
+          "C-53"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_a991db847496",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Apellidos",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_aa17d310c80d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cargo",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b11b5f912188304c957aca55",
+    "kc_3b9732ddc315c1ea1970f7cd"
+  ]
+}

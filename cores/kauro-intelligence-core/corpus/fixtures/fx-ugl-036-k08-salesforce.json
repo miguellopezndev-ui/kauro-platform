@@ -1,0 +1,179 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-036-k08-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-036-k08-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "ae6613faf91a675ca6c1fe715b1204c046f8f61d3f554f4486f3ea61436a8cf1",
+      "candidateSetHash": "a8a8ac81030c07f03f3535a12891ca747f0f8cca7fdbd4619972c9f960828a49",
+      "targetContractHash": "tc_08d9a20fb1832b6e7f8e219e6fdf83c2a740e67618956da5967950e2bbfa1284",
+      "projectRevisionHash": "e139b88a4f7897f98865722ed12b7cf5b060a1807e5ba3d1cb83553c651c3c5f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "البريد الإلكتروني",
+        "sourceFieldRef": "fld_2af25fdc6324ccb7",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "الاسم الأول",
+        "sourceFieldRef": "fld_a3af1d6c39ad73e7",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "المدينة / العنوان",
+        "sourceFieldRef": "fld_6ee21ab333dc73e3",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "المدينة / العنوان"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "87f616510e813f6f79004eafe80e155c06b7a69122c093964b89d55954db2d24"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "البريد الإلكتروني",
+        "fieldRef": "src:البريد الإلكتروني",
+        "valueClass": "EMAIL",
+        "values": [
+          "daran.norova0@corp.example.test",
+          "sovo.yansorin1@example.test",
+          "tavis.orvova2@corp.example.test",
+          "orvan.risova3@example.test",
+          "zera.zermar4@sample.invalid",
+          "lumek.noraly5@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "الاسم الأول",
+        "fieldRef": "src:الاسم الأول",
+        "valueClass": "TEXT",
+        "values": [
+          "Quela",
+          "Zero",
+          "Quelia",
+          "Vexel",
+          "Vexo",
+          "Kesis"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "المدينة / العنوان",
+        "fieldRef": "src:المدينة / العنوان",
+        "valueClass": "TEXT",
+        "values": [
+          "ירושלים 12",
+          "Valmora القاهرة",
+          "Valmora القاهرة",
+          "Valmora القاهرة",
+          "القاهرة 7",
+          "ירושלים 12"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:rtl",
+      "lang:ar"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_22b3e535f4bf",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "الاسم الأول",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_59957a1ee3c761ac3bc99990",
+    "kc_0aaf4adc1c4e89ee1ef415f9"
+  ]
+}

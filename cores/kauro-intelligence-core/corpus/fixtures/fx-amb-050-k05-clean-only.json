@@ -1,0 +1,155 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-050-k05-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-050-k05-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0592d80ed403c8f7473d2f4cdc3c65221718a103c8b90e98b1d589b631161d90",
+      "candidateSetHash": "274657c2026c6f6c59b844a333821933c70967d5e27669cc3ca8cf0ccc869275",
+      "targetContractHash": null,
+      "projectRevisionHash": "5905ab4509d7528db0978b8477013e776a08dbc7a130b9478bd53f804162c19d"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email 1",
+        "sourceFieldRef": "fld_f8513e88e827eda6",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Email (other)",
+        "sourceFieldRef": "fld_d3ec01bb21ba0b73",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Mail secundario",
+        "sourceFieldRef": "fld_f932d1f447f682ed",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.doNotCall",
+      "contact.email",
+      "contact.firstName"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0c7863a9f28191dccf3cf7c5342662c9bb5ecf7b1de4816792d706996b8bcdef"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email 1",
+        "fieldRef": "src:Email 1",
+        "valueClass": "EMAIL",
+        "values": [
+          "tulis.sovero0@sample.invalid",
+          "kesek.queliko1@example.test",
+          "pelia.risova2@sample.invalid",
+          "tavan.tulvik3@sample.invalid"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Email (other)",
+        "fieldRef": "src:Email (other)",
+        "valueClass": "EMAIL",
+        "values": [
+          "noris.darell0@example.test",
+          "lumel.quelorin1@example.test",
+          "belek.kesiko2@corp.example.test",
+          "bela.lumath3@corp.example.test"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Mail secundario",
+        "fieldRef": "src:Mail secundario",
+        "valueClass": "EMAIL",
+        "values": [
+          "noria.vexaly0@example.test",
+          "bela.tuliko1@example.test",
+          "tulek.vexaly2@sample.invalid",
+          "tava.queldell3@corp.example.test"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "alternativeOutcomes": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "tags": [
+      "ambig:two-primary-emails"
+    ]
+  },
+  "canaries": [
+    "kc_6db6705ad070443ef99c9479",
+    "kc_605a42bb59fc9e1e13be2f00"
+  ]
+}

@@ -1,0 +1,147 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-056-k11-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-056-k11-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "eaf576a06656f4bdda83be0e68a8f1f62d5e05ed951706b178d96ffa47f2de28",
+      "candidateSetHash": "9680ac9ea008bfe555955b5e3446abc2438bdd6ec5bf0a432df1b5e46aeed6f4",
+      "targetContractHash": null,
+      "projectRevisionHash": "c36e366949ed3b5881851ed890531db377500f7995b31cf42b190bef46653796"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Estado",
+        "sourceFieldRef": "fld_ce4ea8d57ee09a48",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_9a72dfbe0381cac4",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.lifecycleStage",
+      "contact.state",
+      "deal.stage",
+      "lead.status"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6e688e35360fcf12cbd3642ff31f03d731b64a6105ee9cebfba3897a157d19fb"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Estado",
+        "fieldRef": "src:Estado",
+        "valueClass": "MIXED",
+        "values": [
+          "Norte",
+          "pendiente",
+          "Costa",
+          "activo",
+          "Norte"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-15",
+          "batch-29",
+          "batch-38",
+          "batch-2",
+          "batch-16"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:homograph-header"
+    ]
+  },
+  "canaries": [
+    "kc_7bafdcabbb1ec815765aa2d3",
+    "kc_1b98a437524a54b197362536"
+  ]
+}

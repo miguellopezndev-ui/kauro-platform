@@ -1,0 +1,154 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-179-cap12-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-179-cap12-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "bb939a54b8f0152b8631372cc1a9f2e366c8c1714aba214aef3c9ee0f06656c9",
+      "candidateSetHash": "f2ee57366b5b20f9cac172c8cf9608cedb20737ce7407060883a1f738e1cefb6",
+      "targetContractHash": "tc_da0b0e30d22111f34d456508c32ceb250c91be9db318f224b6a19c50c60c69ab",
+      "projectRevisionHash": "ab0abf646dc4714c0b182da4c4c059b0d93acd5e02ce3b1abbe7fe24e430ed02"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_3236f94fb57f59d4",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Column B",
+        "sourceFieldRef": "fld_c9060e5eb1356b7f",
+        "decision": "MAP",
+        "destinationField": "company.phone",
+        "requiredEvidenceRefs": [
+          "ev_ab1db21197c375df"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.name",
+      "company.phone",
+      "company.postalCode",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0d1258f51b9afca544eee6d99b97efe416e6d7f150fb67a037386df40c387448"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Finova Labs GmbH",
+          "Yaniko Logistics Inc.",
+          "Quelath Partners LLC"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Column B",
+        "fieldRef": "src:Column B",
+        "valueClass": "PHONE",
+        "values": [
+          "+447700900888",
+          "+12025550143",
+          "+12025550183"
+        ],
+        "decision": "MAP",
+        "destination": "company.phone",
+        "evidence": [
+          "ev:self"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_549fa42f2765",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_e700f8cacd62e6a5dd9cc6c8",
+    "kc_ee402092dc52520a200c861c"
+  ]
+}

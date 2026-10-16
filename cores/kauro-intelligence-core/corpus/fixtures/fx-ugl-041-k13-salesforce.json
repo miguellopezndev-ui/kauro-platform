@@ -1,0 +1,199 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-041-k13-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-041-k13-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5a5bdff8e574c79421e0f723a7f3f8d072bb61d6be74e81cb5345bccefb1ff33",
+      "candidateSetHash": "4821a6a88de4bfa92f38994ce969ad18009059b4e49fe99172b81321c1948383",
+      "targetContractHash": "tc_2b58d33f4c7c2959179b77a94a988cee63dbed9f3d74f9de936b77683fba0b4f",
+      "projectRevisionHash": "539addd52ed6f75ad30c29d4837f527b93e18bbbd4d9e57f7a493eb399db93ee"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_28785c4cda181718",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "email ",
+        "sourceFieldRef": "fld_5b2a2c063efcdd83",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "EMAIL 2",
+        "sourceFieldRef": "fld_bb0c197a22a79102",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Soyad",
+        "sourceFieldRef": "fld_b452e34b3f3de1ac",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.description",
+      "contact.email",
+      "contact.lastName",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "email ",
+      "EMAIL 2"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "d5172893a2b489b5e763198532da462d583ea2b1bee1b620682e697e421e8bf1"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "noria.orvorin0@sample.invalid",
+          "orvia.jorunda1@example.test",
+          "darel.tulorin2@sample.invalid",
+          "quelis.orviko3@corp.example.test",
+          "belis.tulquist4@sample.invalid",
+          "norek.belenko5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "email ",
+        "fieldRef": "src:email ",
+        "valueClass": "EMAIL",
+        "values": [
+          "vexa.darrane50@example.test",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "EMAIL 2",
+        "fieldRef": "src:EMAIL 2",
+        "valueClass": "EMAIL",
+        "values": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "tulia.nordell60@corp.example.test"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Soyad",
+        "fieldRef": "src:Soyad",
+        "valueClass": "TEXT",
+        "values": [
+          "Rismar",
+          "Norunda",
+          "Risrane",
+          "Halvik",
+          "Yanunda",
+          "Daranth"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:near-duplicate-headers",
+      "lang:tr"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_3509271c7690",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Soyad",
+        "targetField": "contact.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_7705ee0048285c0b42508a69",
+    "kc_08c6df587d274e2750e0e5e0"
+  ]
+}

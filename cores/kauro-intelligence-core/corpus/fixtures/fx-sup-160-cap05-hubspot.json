@@ -1,0 +1,230 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-160-cap05-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-160-cap05-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "02c4502866bc6991bf9356f69e55374c152b82b622b92e5ff65a4460701da8fa",
+      "candidateSetHash": "48fb8de102a9c7c6420197da006f5a289a372050ccc8f9f0235ba908561e496b",
+      "targetContractHash": "tc_73318580b7a7df5d2b5d2bbb39b9afcdc6c7a6bba4a576b8688290b7dca48cfc",
+      "projectRevisionHash": "51f59c0fa607d6e8c948ab9bfaec105356a9f628535e919c66e089ad00ded57f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-Mail-Adresse",
+        "sourceFieldRef": "fld_13892b639d64a900",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Lifecycle stage",
+        "sourceFieldRef": "fld_556fa2643c7d993e",
+        "decision": "MAP",
+        "destinationField": "contact.lifecycleStage",
+        "valueMap": [
+          {
+            "from": "won",
+            "to": "customer"
+          },
+          {
+            "from": "new",
+            "to": "lead"
+          },
+          {
+            "from": "lost",
+            "to": "other"
+          },
+          {
+            "from": "pending",
+            "to": "opportunity"
+          }
+        ],
+        "requiredEvidenceRefs": [
+          "ev_1597cd7042245067"
+        ]
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_f3eda9f92a507c00",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lifecycleStage",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [
+      "VALUE_MAP"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "ce4770527db06d558760b0bb4614684e72b7c4188b5dcfca72b93fe55fe512a7"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "label": "Lifecycle stage",
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-Mail-Adresse",
+        "fieldRef": "src:E-Mail-Adresse",
+        "valueClass": "EMAIL",
+        "values": [
+          "belo.finaly0@corp.example.test",
+          "luman.tavaly1@sample.invalid",
+          "lumia.tulorin2@sample.invalid",
+          "pelek.wilanth3@corp.example.test",
+          "quelis.normar4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Lifecycle stage",
+        "fieldRef": "src:Lifecycle stage",
+        "valueClass": "ENUM",
+        "values": [
+          "won",
+          "new",
+          "lost",
+          "pending",
+          "won",
+          "new",
+          "lost",
+          "pending",
+          "won",
+          "new",
+          "lost"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lifecycleStage",
+        "evidence": [
+          "ev:self"
+        ],
+        "valueMap": [
+          {
+            "from": "won",
+            "to": "customer"
+          },
+          {
+            "from": "new",
+            "to": "lead"
+          },
+          {
+            "from": "lost",
+            "to": "other"
+          },
+          {
+            "from": "pending",
+            "to": "opportunity"
+          }
+        ]
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "red",
+          "blue",
+          "red",
+          "red",
+          "green"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "VALUE_MAP"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_72e046f50ae3",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "E-Mail-Adresse",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_c7f9ed992ad7652a0b43f887",
+    "kc_fbad5d85c72ca4a58a247bb3"
+  ]
+}

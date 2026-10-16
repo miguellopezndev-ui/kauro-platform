@@ -1,0 +1,319 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-060-cap01-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-060-cap01-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "a0c3108b04312dccef90229376ec4641dde1f49dc466f5c7ceeb0a5110e387db",
+      "candidateSetHash": "eb86c4f284f36ef2c6a0283e52955f4221679f1b4b13b96a15e18a0e4d12159e",
+      "targetContractHash": "tc_1935d7914a9a595e5faf4be0f32437411b3568cd802ac6979e2643e45cf8a747",
+      "projectRevisionHash": "a3af43c007fa1afb5141e25e25667b5febda36e019b0fe21f7fed030b3bb1b5d"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_158e78d8698a8c50",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Company (CRM)",
+        "sourceFieldRef": "fld_3f21342daa975c47",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Phone (CRM)",
+        "sourceFieldRef": "fld_477c16de30a7975e",
+        "decision": "MAP",
+        "destinationField": "company.phone"
+      },
+      {
+        "sourceHeader": "Employees (export)",
+        "sourceFieldRef": "fld_c5b5cf7bfc8e62a0",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      },
+      {
+        "sourceHeader": "Website (CRM)",
+        "sourceFieldRef": "fld_e5c062646fae4769",
+        "decision": "MAP",
+        "destinationField": "company.website"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_f991aae71f4fa197",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "deal.name"
+    ],
+    "expectedTargetUniverse": [
+      "company.country",
+      "company.employeeCount",
+      "company.name",
+      "company.phone",
+      "company.website",
+      "company.source_id",
+      "deal.amount",
+      "deal.closeDate",
+      "deal.description",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref",
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "09bba3158867579b1688e115aa8abed9277a30457794bd4c9b002ba3e8ee36bd"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-7118",
+          "TKT-6383",
+          "TKT-2016",
+          "TKT-9085",
+          "TKT-5532"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Company (CRM)",
+        "fieldRef": "src:Company (CRM)",
+        "valueClass": "TEXT",
+        "values": [
+          "Vexanth Labs Ltd",
+          "Vexanth Systems B.V.",
+          "Vexaly Studio B.V.",
+          "Mesanth Works SAS",
+          "Belquist Foods S.A."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Phone (CRM)",
+        "fieldRef": "src:Phone (CRM)",
+        "valueClass": "PHONE",
+        "values": [
+          "+447700900782",
+          "+447700900225",
+          "+12025550168",
+          "+12025550128",
+          "+447700900605"
+        ],
+        "decision": "MAP",
+        "destination": "company.phone"
+      },
+      {
+        "header": "Employees (export)",
+        "fieldRef": "src:Employees (export)",
+        "valueClass": "NUMBER",
+        "values": [
+          "9197",
+          "91107",
+          "47817",
+          "83634",
+          "45716"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      },
+      {
+        "header": "Website (CRM)",
+        "fieldRef": "src:Website (CRM)",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.jorunda-foods.test",
+          "https://www.messorin-foods.test",
+          "https://www.mesrane-labs.test",
+          "https://www.vexath-partners.test",
+          "https://www.darmar-labs.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L76250",
+          "L41735",
+          "L46647",
+          "L20447",
+          "L63262"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "deal.name"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_c0ecfdef98c9",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company (CRM)",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_15578c06d26c",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Phone (CRM)",
+        "targetField": "company.phone"
+      },
+      {
+        "memoryId": "memconv_0e89b82bdc87",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Employees (export)",
+        "targetField": "company.employeeCount"
+      },
+      {
+        "memoryId": "memconv_c83669f713d0",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Website (CRM)",
+        "targetField": "company.website"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_8d119e1babece80dc70ae72b",
+    "kc_c212ee0ae08339926d739fde"
+  ]
+}

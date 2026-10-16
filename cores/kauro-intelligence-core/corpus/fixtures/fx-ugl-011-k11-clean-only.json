@@ -1,0 +1,169 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-011-k11-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-011-k11-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "4644fa18caeb4283cbfe0309f75db53e0132e08a90eb6050f2262722933113e3",
+      "candidateSetHash": "47c7f71308e30e31814b41f7df5be6cc96105d5da9a1583ae41cdbd50f98bb8e",
+      "targetContractHash": null,
+      "projectRevisionHash": "d50dd50febece35645e56a14ffc0b5229f74fad7149de30a430633a246efca3a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "first-name",
+        "sourceFieldRef": "fld_5174c1264f809cca",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "E-MAIL ",
+        "sourceFieldRef": "fld_0198aa5c616bce1f",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Tel.:",
+        "sourceFieldRef": "fld_e84db4ea1ef56886",
+        "decision": "MAP",
+        "destinationField": "contact.phone"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.marketingConsent",
+      "contact.phone",
+      "contact.postalCode"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "2a54a168500b20c60c5e098b7a27712d7d197229f77a3c2ddcafcca645ab2ffd"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "marketingConsent",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "first-name",
+        "fieldRef": "src:first-name",
+        "valueClass": "TEXT",
+        "values": [
+          "Wilek",
+          "Quelek",
+          "Pelek",
+          "Tulia",
+          "Wilek",
+          "Kesa"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "E-MAIL ",
+        "fieldRef": "src:E-MAIL ",
+        "valueClass": "EMAIL",
+        "values": [
+          "nora.darunda0@sample.invalid",
+          "mesis.tulrane1@sample.invalid",
+          "mesan.mesdell2@example.test",
+          "vexek.sovquist3@example.test",
+          "sovek.mesquist4@sample.invalid",
+          "tulel.pelsorin5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Tel.:",
+        "fieldRef": "src:Tel.:",
+        "valueClass": "PHONE",
+        "values": [
+          "202.555.0186",
+          "+1 202 555 0144",
+          "+1-202-555-0189",
+          "202.555.0102",
+          "+44-7700-900-422",
+          "+44-7700-900-922"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:header-variants",
+      "lang:th"
+    ]
+  },
+  "canaries": [
+    "kc_a0b19d2d8556591bd36238e7",
+    "kc_9b09d564b29f1f44a4e729b6"
+  ]
+}

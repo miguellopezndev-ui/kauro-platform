@@ -1,0 +1,178 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-070-k00-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-070-k00-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "770eadc55cefde37d21b1b4f0effe96d2d18b1961c8ba6560214354d0dbf1d14",
+      "candidateSetHash": "b1b5ca277b64308af1dc791c5c814e2e6caadbd194d90a754f03d496fc5246fc",
+      "targetContractHash": "tc_08d9a20fb1832b6e7f8e219e6fdf83c2a740e67618956da5967950e2bbfa1284",
+      "projectRevisionHash": "8d0fa816f05cdfa6623499dff3eb83057162e79249e2228ea3dae21910985e66"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Indirizzo email",
+        "sourceFieldRef": "fld_1c96c4b4f4165acb",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Nome",
+        "sourceFieldRef": "fld_e9094140b078ccd6",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Ruolo",
+        "sourceFieldRef": "fld_8ad8a96cc3183587",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "749b70a94ff6e45f2c0530a68e668aa689dc66c9cb1c4d5635ee6e328db35a45"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Indirizzo email",
+        "fieldRef": "src:Indirizzo email",
+        "valueClass": "EMAIL",
+        "values": [
+          "jora.risvik0@corp.example.test",
+          "wila.haldell1@example.test",
+          "luma.tulenko2@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Nome",
+        "fieldRef": "src:Nome",
+        "valueClass": "TEXT",
+        "values": [
+          "Hala",
+          "Finan",
+          "Joria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Ruolo",
+        "fieldRef": "src:Ruolo",
+        "valueClass": "TEXT",
+        "values": [
+          "Site engineer",
+          "Site engineer",
+          "Controller"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:multilingual",
+      "lang:it"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_2b68e38fe1b0",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nome",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_e2ed18fbcea7",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ruolo",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_a6366e68670f533e2f5cb15a",
+    "kc_4ef53bc3452c76b40acd210f"
+  ]
+}

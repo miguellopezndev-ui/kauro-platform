@@ -1,0 +1,286 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-024-cap01-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-024-cap01-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2dd11757df3af9c17a9f2fb8574533c720f46bb1477e34acffc383c10f1acffe",
+      "candidateSetHash": "411dde3771c6ecbb378ba7ef9cd52cc5ab4410b7a0845f2ec3ccc1863513867f",
+      "targetContractHash": "tc_ce6d6330ba81cc2f33c4d2dd1af6b39d1613dac1597119296e0d88ffef7c9122",
+      "projectRevisionHash": "3e533fd13a4683259236c3937581cfa37a99b6ac42f335384dd6c1aba1dd4335"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_a76772565730ccf0",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Company [v2]",
+        "sourceFieldRef": "fld_500efdaa65c5a7ea",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Industry (CRM)",
+        "sourceFieldRef": "fld_aa59cc9a2ead5310",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Website (export)",
+        "sourceFieldRef": "fld_aa0fa51677d63a9b",
+        "decision": "MAP",
+        "destinationField": "company.website"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_bd8b5aceba63db48",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "deal.name"
+    ],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.industry",
+      "company.name",
+      "company.phone",
+      "company.state",
+      "company.website",
+      "company.source_id",
+      "deal.closeDate",
+      "deal.description",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin",
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "b6252f71ebf864362fc614bd82e67344a2c4afe889f71c7b9f09bf98781beba5"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-31",
+          "B-70",
+          "C-42",
+          "A-85"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Company [v2]",
+        "fieldRef": "src:Company [v2]",
+        "valueClass": "TEXT",
+        "values": [
+          "Sovmar Studio SAS",
+          "Risdell Works Ltd",
+          "Halaly Studio Inc.",
+          "Tulath Logistics S.A."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Industry (CRM)",
+        "fieldRef": "src:Industry (CRM)",
+        "valueClass": "TEXT",
+        "values": [
+          "  Logistics",
+          "Software ",
+          "  Textiles",
+          "Textiles "
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Website (export)",
+        "fieldRef": "src:Website (export)",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.tulath-partners.test",
+          "https://www.tavenko-logistics.test",
+          "https://www.finorin-logistics.test",
+          "https://www.mesero-works.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-20",
+          "R-57",
+          "R-5",
+          "R-12"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "deal.name"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_b200387570d9",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company [v2]",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_96ffd6ac5f3f",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Industry (CRM)",
+        "targetField": "company.industry"
+      },
+      {
+        "memoryId": "memconv_78a8a22e415e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Website (export)",
+        "targetField": "company.website"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_6dea6d0f44a05630504272b3",
+    "kc_19bb5ab69ad7d0b0b3aac124"
+  ]
+}

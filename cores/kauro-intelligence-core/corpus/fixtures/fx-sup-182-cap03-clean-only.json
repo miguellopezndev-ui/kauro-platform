@@ -1,0 +1,223 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-182-cap03-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-182-cap03-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "dbed4e934ee0e6f8e05f7011678f91db0c2665b65434de8fa215430ee6a0e7b1",
+      "candidateSetHash": "9f625f6b803af57a4954b523643f53ddb139558b238afba01e227cc8fa5fdf65",
+      "targetContractHash": null,
+      "projectRevisionHash": "a2331ae070193bb687916ef35c83bb05ec4b11811868a7f91ab707147557a019"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_bf27787ecb4a13ab",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_baf7570263db53d6",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      },
+      {
+        "sourceHeader": "Phone",
+        "sourceFieldRef": "fld_f3465ccb2b381a2a",
+        "decision": "MAP",
+        "destinationField": "company.phone",
+        "semanticType": "PHONE"
+      },
+      {
+        "sourceHeader": "Annual revenue",
+        "sourceFieldRef": "fld_7695a4d7b3c86615",
+        "decision": "MAP",
+        "destinationField": "company.annualRevenue",
+        "semanticType": "NUMBER"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_e220cec230a23f07",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.employeeCount",
+      "company.name",
+      "company.phone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "58c64a5d3f86baacb978fc8ec06ad4636ffc447c8e77473fa346987f6b8aa4b3"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Wilunda Foods B.V.",
+          "Darmar Labs S.A.",
+          "Pelaly Works LLC",
+          "Wilmar Foods GmbH",
+          "Kesova Logistics S.L.",
+          "Joraly Works SAS"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "MIXED",
+        "values": [
+          "97970",
+          "69942",
+          "72,636.28",
+          "75114",
+          "81063",
+          "25,543.67"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      },
+      {
+        "header": "Phone",
+        "fieldRef": "src:Phone",
+        "valueClass": "MIXED",
+        "values": [
+          "+447700900473",
+          "+12025550164",
+          "+44 7700 900519",
+          "+447700900431",
+          "+12025550183",
+          "+1-202-555-0194"
+        ],
+        "decision": "MAP",
+        "destination": "company.phone",
+        "semanticType": "PHONE"
+      },
+      {
+        "header": "Annual revenue",
+        "fieldRef": "src:Annual revenue",
+        "valueClass": "MIXED",
+        "values": [
+          "25480",
+          "72947",
+          "15.319,43",
+          "40923",
+          "11039",
+          "50.541,68"
+        ],
+        "decision": "MAP",
+        "destination": "company.annualRevenue",
+        "semanticType": "NUMBER"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "6",
+          "8",
+          "2",
+          "3",
+          "7",
+          "7"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_c50f2e5ee97f",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_5b0ef0acf1bd",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Employees",
+        "targetField": "company.employeeCount"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_4e75cb8d115d551d9f08d604",
+    "kc_45cac8f6933ee3f73e433eef"
+  ]
+}

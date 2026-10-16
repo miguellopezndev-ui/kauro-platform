@@ -1,0 +1,204 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-195-cap04-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-195-cap04-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "c5e3c9c47f27443e4d6911586ebfac9cfafb595ad490777b2f328ac4b40ed9e1",
+      "candidateSetHash": "e3cf3f2c1364ef0e55a2c27a1cd62348cd210a6cead5af80f8b3cd2b20c15984",
+      "targetContractHash": "tc_9f11d4297bd34a68426a4f3c4bcb4dd3fcbbac186dc370a98c54bf2c53dd4a31",
+      "projectRevisionHash": "215933a72154e07c13edae7f88ba2fd0d5ef6d602498e55a24154262e84d46ac"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Montant",
+        "sourceFieldRef": "fld_a669832e48781255",
+        "decision": "MAP",
+        "destinationField": "deal.amount",
+        "transformPrimitive": "NORMALISE_NUMBER",
+        "typedTransformParams": {
+          "decimalSeparator": ","
+        }
+      },
+      {
+        "sourceHeader": "Date de clôture",
+        "sourceFieldRef": "fld_85e7d9a500d6db95",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate",
+        "transformPrimitive": "PARSE_DATE_ISO",
+        "typedTransformParams": {
+          "dateFormat": "DD/MM/YYYY"
+        }
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_11213df20fcd71a9",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.currency",
+      "deal.name",
+      "deal.ownerEmail",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "176ac5d8ec072aee3b76bafc101320feb9bb25e80fb6870a311ca262178573c4"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL",
+      "locale": {
+        "dateFormat": "DD/MM/YYYY"
+      }
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Montant",
+        "fieldRef": "src:Montant",
+        "valueClass": "NUMBER",
+        "values": [
+          "25585,42",
+          "38880,15",
+          "62434,96",
+          "86983,96"
+        ],
+        "decision": "MAP",
+        "destination": "deal.amount",
+        "transform": "NORMALISE_NUMBER",
+        "params": {
+          "decimalSeparator": ","
+        }
+      },
+      {
+        "header": "Date de clôture",
+        "fieldRef": "src:Date de clôture",
+        "valueClass": "DATE",
+        "values": [
+          "17/03/2023",
+          "21/07/2019",
+          "14/05/2018",
+          "16/06/2026"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate",
+        "transform": "PARSE_DATE_ISO",
+        "params": {
+          "dateFormat": "DD/MM/YYYY"
+        }
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "8",
+          "2",
+          "3",
+          "4"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_40dc9f23d1946a698ca6a8b2",
+    "kc_60c0479710ec01c5204da336"
+  ]
+}

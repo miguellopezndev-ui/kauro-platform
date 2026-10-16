@@ -1,0 +1,301 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-130-cap11-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-130-cap11-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "d60721b115f958562abf828c5df9219570ca5421926691576e40c43874892a70",
+      "candidateSetHash": "22bc60a20eea7bab1d54812f41a444decfe3396bc22b438179f22c37ff25c3c1",
+      "targetContractHash": "tc_72c11053a0263ec8f8f8676d02e058279d15581609ded71965aaee69be1c8130",
+      "projectRevisionHash": "243dd41fff3777e0c32bfac31d07eaf346bd223bfdf6f4fa102830e80349a62c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_1270e4039d3110da",
+        "decision": "PRESERVE",
+        "filePath": "crm-contacts.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_0c4505c1e9bc1563",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "crm-contacts.csv"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_0d381a8261dcb428",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "filePath": "crm-contacts.csv"
+      },
+      {
+        "sourceHeader": "Company name",
+        "sourceFieldRef": "fld_5aeeef9bcbc8eaad",
+        "decision": "MAP",
+        "destinationField": "contact.companyName",
+        "filePath": "crm-contacts.csv"
+      },
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_89baf5aae2fbf0d7",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "filePath": "organisations.csv"
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_b490287b60926c12",
+        "decision": "MAP",
+        "destinationField": "company.website",
+        "filePath": "organisations.csv"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_2a30a7bf1a99770b",
+        "decision": "MAP",
+        "destinationField": "company.city",
+        "filePath": "organisations.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.domain",
+      "company.name",
+      "company.state",
+      "company.website",
+      "company.source_id",
+      "contact.companyName",
+      "contact.email",
+      "contact.firstName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID"
+    ],
+    "expectedTaskTypes": [
+      "CONSISTENCY_REVIEW"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "199c0d926b94f613bcb4090a49a40a26fb2aa0f6f355140a977133263f3801af"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "crm-contacts.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "organisations.csv": {
+          "object": "COMPANY",
+          "recordIdColumn": "Name"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:crm-contacts.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-849",
+          "P-850",
+          "P-851",
+          "P-852",
+          "P-853"
+        ],
+        "decision": "PRESERVE",
+        "file": "crm-contacts.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:crm-contacts.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "orvia.quelvik0@corp.example.test",
+          "yanis.mesiko1@sample.invalid",
+          "vexia.pelell2@example.test",
+          "vexia.vexrane3@example.test",
+          "tavis.vexquist4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "crm-contacts.csv"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:crm-contacts.csv:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Orva",
+          "Wilek",
+          "Kesa",
+          "Yanek",
+          "Daris"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "file": "crm-contacts.csv"
+      },
+      {
+        "header": "Company name",
+        "fieldRef": "src:crm-contacts.csv:Company name",
+        "valueClass": "TEXT",
+        "values": [
+          "Tulova Logistics GmbH",
+          "Darvik Logistics GmbH",
+          "Darvik Logistics GmbH",
+          "Halsorin Systems LLC",
+          "Tulova Logistics GmbH"
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName",
+        "file": "crm-contacts.csv"
+      },
+      {
+        "header": "Name",
+        "fieldRef": "src:organisations.csv:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Darvik Logistics GmbH",
+          "Halsorin Systems LLC",
+          "Tulova Logistics GmbH"
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "file": "organisations.csv"
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:organisations.csv:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.vexvik-systems.test",
+          "https://www.risiko-partners.test",
+          "https://www.kesiko-labs.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website",
+        "file": "organisations.csv"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:organisations.csv:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Kelmar",
+          "Quenby",
+          "Orvale"
+        ],
+        "decision": "MAP",
+        "destination": "company.city",
+        "file": "organisations.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "CONSISTENCY_REVIEW"
+    ]
+  },
+  "canaries": [
+    "kc_83827e78bff6408419f1576b",
+    "kc_0890fc3206a9fdcfd35241bc"
+  ]
+}

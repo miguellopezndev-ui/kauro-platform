@@ -1,0 +1,167 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-079-k04-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-079-k04-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "da5d8e1ea1ea06901bf947b6cbed4e3eba1655d68ca5f3a36de3deac7c33fcd4",
+      "candidateSetHash": "a898acbacd5b32fe2490310beb4146f5f06116f51eabad870eaa7b4906690bfd",
+      "targetContractHash": "tc_70478cf87b3f6c7589a80049319b2704a6afea0211b1d8fca17a7b89de3864ba",
+      "projectRevisionHash": "8ca3454257d55d821d8f00cecbca81715498b9c84efa5158603a10b0fe94bdfd"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Name (full)",
+        "sourceFieldRef": "fld_5dd9820d24f1237f",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.employeeCount",
+      "company.name",
+      "company.source_id",
+      "contact.lastName",
+      "contact.source_id",
+      "lead.company",
+      "lead.lastName",
+      "lead.mobilePhone",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "7f57283a4834b0698a5a96765de298ab11546b925239087477a33e400ed1ae45"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP01",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Name (full)",
+        "fieldRef": "src:Name (full)",
+        "valueClass": "TEXT",
+        "values": [
+          "Zero Lummar",
+          "Kesath Foods S.L.",
+          "Belo Norell",
+          "Orviko Studio B.V.",
+          "Vexa Belvik"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "alternativeOutcomes": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "tags": [
+      "ambig:person-or-company"
+    ]
+  },
+  "canaries": [
+    "kc_94ce8bdf902ce664b0073dbf",
+    "kc_51fcf1a076ca5464975c9d45"
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-076-k01-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-076-k01-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "a2217515a367b810b0ba6bbe806720e9652f7dc5fa135a0f8488227543170e8b",
+      "candidateSetHash": "551400d274b4c9496665f512d190037d4c2dff349e64eb5a75147b5c69ab4c88",
+      "targetContractHash": "tc_95ed5936b1dd294a1113c1d15e709640dda070059981877d29776daa0ebca6a9",
+      "projectRevisionHash": "b4d18014b7981198119a4f4a769e89000daea99e2b92e64fb1eeaa9a004723a4"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Telefono",
+        "sourceFieldRef": "fld_a74c1f12852e7bfc",
+        "decision": "MAP",
+        "destinationField": "contact.phone"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.phone",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "93dc6347872866b1a0d7eb84a7bcdb823af24aa38b78b678317ab63928b905aa"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Telefono",
+        "fieldRef": "src:Telefono",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0121",
+          "7700 900388",
+          "7700 900966",
+          "7700 900852",
+          "202-555-0144",
+          "202-555-0152",
+          "202-555-0172"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:phone-region"
+    ]
+  },
+  "canaries": [
+    "kc_f4bd8c38521a10bd3d5f59e8",
+    "kc_c1d876bdc10264e6ce25ccbc"
+  ]
+}

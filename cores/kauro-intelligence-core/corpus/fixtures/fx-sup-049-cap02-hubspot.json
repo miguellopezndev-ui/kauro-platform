@@ -1,0 +1,294 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-049-cap02-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-049-cap02-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "768f5a4b01f099b28e4cb367d890a17b19eb0b019ba7cfbf0291a8eff037c9c0",
+      "candidateSetHash": "40ad9da8e824b2512478d9264636451fc129482c89672073e02fa62fa67db8d2",
+      "targetContractHash": "tc_83bec1f14fecee78ee33c68889656260f6d4555d94f919fabee6861e0244325e",
+      "projectRevisionHash": "5090407b3391cc76247daaa72b17db686fe20e1adc8f3554cb00d91b06b029bd"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_ef6b3cd034b1d3cb",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_29a5bd7117976599",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_e2f36405b778ffee",
+        "decision": "MAP",
+        "destinationField": "company.country"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_e65dab3b43df1b27",
+        "decision": "MAP",
+        "destinationField": "company.city"
+      },
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_b3aa1b6826611c5a",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_5235615f5e7f9faa",
+        "decision": "MAP",
+        "destinationField": "company.website",
+        "allowedDestinationFields": [
+          "company.website",
+          "company.domain"
+        ]
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_4f19c74239f3705d",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.city",
+      "company.country",
+      "company.domain",
+      "company.employeeCount",
+      "company.industry",
+      "company.name",
+      "company.ownerEmail",
+      "company.phone",
+      "company.postalCode",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "8524a5c673c49e76652ac9e089b308b4350e7b0765ba5005a03b0dfc70bd8107"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "  Risiko Group Ltd",
+          "Findell Foods Inc. ",
+          "  Wilunda Studio SAS",
+          "Finero Systems SAS "
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Textiles",
+          "Packaging",
+          "Textiles",
+          "Packaging"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "  Estmark",
+          "Kelland ",
+          "  Estmark",
+          "Kelland "
+        ],
+        "decision": "MAP",
+        "destination": "company.country"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Nuvia",
+          "Brandel",
+          "Valmora",
+          "Valmora"
+        ],
+        "decision": "MAP",
+        "destination": "company.city"
+      },
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "NUMBER",
+        "values": [
+          "8639",
+          "40981",
+          "27586",
+          "4571"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.risvik-partners.test",
+          "https://www.finath-studio.test",
+          "https://www.lumath-labs.test",
+          "https://www.kesiko-studio.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website",
+        "alternatives": [
+          "company.domain"
+        ]
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-12",
+          "R-55",
+          "R-17",
+          "R-54"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_599c13950446",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_49ad31c752ef7b486d93a8ad",
+    "kc_1a9cb46bcc28c76a45fbe371"
+  ]
+}

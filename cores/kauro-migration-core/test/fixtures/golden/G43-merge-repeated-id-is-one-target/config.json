@@ -1,0 +1,73 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g43-repeated-id"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "contacts",
+      "path": "contacts.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "companies",
+      "path": "companies.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        }
+      ]
+    },
+    {
+      "id": "companies",
+      "fileId": "companies",
+      "object": "COMPANY",
+      "sourceRecordIdColumn": {
+        "header": "Company ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "Name"
+          },
+          "destinationField": "company.name",
+          "semanticType": "TEXT"
+        }
+      ]
+    }
+  ],
+  "associations": [
+    {
+      "id": "contact-company",
+      "kind": "COLUMN_REFERENCE",
+      "recordMappingId": "companies",
+      "relationshipType": "CONTACT_TO_COMPANY",
+      "ownerSide": "TO",
+      "keyColumn": {
+        "header": "Contact Ref"
+      },
+      "targetRecordMappingId": "contacts",
+      "targetMatchKey": "SOURCE_RECORD_ID"
+    }
+  ]
+}

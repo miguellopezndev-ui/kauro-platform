@@ -1,0 +1,248 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-016-k02-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-016-k02-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "fdd29626ca2d0d50ecbd3957494e8ad1ca1b0a568d22f42279731ab2470d50f3",
+      "candidateSetHash": "81f902c9007131c21e271aaefcf4b59102d83ca7b4b867b125a2559d7392a535",
+      "targetContractHash": "tc_396d4b12e0b25ab7a064b3f9c12b1e44c13e4f13896ee6735da3376ed3d1d2d9",
+      "projectRevisionHash": "0468666333a9501a756a347056cc63c5468f1089295c406ab28b954db0db6a52"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Πόλη",
+        "sourceFieldRef": "fld_e55fc197db0b5a59",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Ηλεκτρονικό ταχυδρομείο",
+        "sourceFieldRef": "fld_a3bdc539dc47849b",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Θέση",
+        "sourceFieldRef": "fld_df75b43484025165",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Colour tag ",
+        "sourceFieldRef": "fld_a7483c9f7624b5d0",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_aeb6ba8ae891ee37",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag ",
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "5429d17c5097874f83128505a85a1d2440785a2cf6cacbd69dc34937052bf60b"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Πόλη",
+        "fieldRef": "src:Πόλη",
+        "valueClass": "TEXT",
+        "values": [
+          " Tessin  ",
+          " Valmora ",
+          " Valmora  ",
+          "\tKelmar ",
+          " Kelmar  ",
+          "\tBrandel "
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Ηλεκτρονικό ταχυδρομείο",
+        "fieldRef": "src:Ηλεκτρονικό ταχυδρομείο",
+        "valueClass": "EMAIL",
+        "values": [
+          " finia.nordell0@sample.invalid  ",
+          " vexia.wilaly1@example.test ",
+          "\tbelis.lumvik2@corp.example.test  ",
+          "\ttava.wilunda3@example.test ",
+          " kesa.mesmar4@corp.example.test  ",
+          " tulo.zeranth5@corp.example.test "
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Θέση",
+        "fieldRef": "src:Θέση",
+        "valueClass": "TEXT",
+        "values": [
+          " Operations lead  ",
+          " Operations lead ",
+          " Controller  ",
+          " Account manager ",
+          "\tController  ",
+          "\tOperations lead "
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Colour tag ",
+        "fieldRef": "src:Colour tag ",
+        "valueClass": "TEXT",
+        "values": [
+          " B3 ",
+          " B5 ",
+          " B6 ",
+          " B9 ",
+          " C2 ",
+          " A9 "
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "amber",
+          "amber",
+          "amber",
+          "blue",
+          "amber",
+          "red"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:whitespace",
+      "lang:el"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_994203aa0f65",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Πόλη",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_19e6018971df",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ηλεκτρονικό ταχυδρομείο",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_911cd6c89df5",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Θέση",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_8e5bbab50e9f59570d9c0cbc",
+    "kc_99fa8a9a294f9c80c783760d"
+  ]
+}

@@ -1,0 +1,209 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-062-k06-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-062-k06-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "a6ca9dcc9323aba5076b78ae78b774a94c81a95fb711e49e51a491dd03001b2b",
+      "candidateSetHash": "f5785abb1b1126412b1a4688d658f8cf0992b7d199855e2441cb619d41a2154d",
+      "targetContractHash": "tc_b66bd7821dfb1c0906197bdb5716a7e922eb34645a15fdfe617b3bbeaace2470",
+      "projectRevisionHash": "ff35b6e2b09bcccbe4eadd1aacc78b66bb367196fc2772771b86ffe0a4d39f5d"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-mailadres",
+        "sourceFieldRef": "fld_367f0d76f3343b5b",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Voornaam",
+        "sourceFieldRef": "fld_45dbaadd34558471",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Functie",
+        "sourceFieldRef": "fld_5a8d955bcd234b2f",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.country"
+    ],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c6e2e0aeec54f28b950dfed911cfb159b2de08850f2327e632a7a74a8699b871"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-mailadres",
+        "fieldRef": "src:E-mailadres",
+        "valueClass": "EMAIL",
+        "values": [
+          "tavel.yanquist0@corp.example.test",
+          "lumel.risunda1@example.test",
+          "yanek.kesvik2@corp.example.test",
+          "kesia.orvaly3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Voornaam",
+        "fieldRef": "src:Voornaam",
+        "valueClass": "TEXT",
+        "values": [
+          "Tulia",
+          "Kesek",
+          "Daro",
+          "Tulo"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Functie",
+        "fieldRef": "src:Functie",
+        "valueClass": "TEXT",
+        "values": [
+          "Site engineer",
+          "Controller",
+          "Buyer",
+          "Operations lead"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.country"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-memory",
+      "lang:nl"
+    ],
+    "memory": [
+      {
+        "memoryId": "mem_7fd396bcae73",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "STALE",
+        "sourceHeaderPattern": "E-mailadres",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "mem_6fa914748ed8",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "RETIRED",
+        "sourceHeaderPattern": "E-mailadres",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_8ade1e6d00f6",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "E-mailadres",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_679ee15320df",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Voornaam",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_005117c63a2d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Functie",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_fe629014ef1aab1dd45a8de1",
+    "kc_1577a7eda4d11b8750c4ea9a"
+  ]
+}

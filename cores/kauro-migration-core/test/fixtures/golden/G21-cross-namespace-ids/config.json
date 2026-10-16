@@ -1,0 +1,91 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g21-default"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "crma",
+      "path": "crm-a.csv",
+      "format": "CSV",
+      "sourceSystem": "crm_a",
+      "sourceNamespace": "acme-crm-a"
+    },
+    {
+      "id": "crmb",
+      "path": "crm-b.csv",
+      "format": "CSV",
+      "sourceSystem": "crm_b",
+      "sourceNamespace": "acme-crm-b"
+    }
+  ],
+  "records": [
+    {
+      "id": "contacts-a",
+      "fileId": "crma",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL"
+        }
+      ]
+    },
+    {
+      "id": "contacts-b",
+      "fileId": "crmb",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL"
+        }
+      ]
+    }
+  ]
+}

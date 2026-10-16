@@ -1,0 +1,145 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-000-cap01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-000-cap01-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "37edf27989a31afe3ef5bbdd5c74ca69f44d25d911b43e9f755398cd66c6f183",
+      "candidateSetHash": "0cfba9416a6e0e8acd5069a3eab27142e05322f556ae04bf9cdfceff6afe8959",
+      "targetContractHash": null,
+      "projectRevisionHash": "d3aa737d7d93c99a1d56fb569660c72b1b5c5c640adef441c463d37b32338ffc"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Oportunidad (legacy)",
+        "sourceFieldRef": "fld_003a77aee456929d",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Moneda [v2]",
+        "sourceFieldRef": "fld_cd7c3e60b66b31e7",
+        "decision": "MAP",
+        "destinationField": "deal.currency"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.currency",
+      "deal.name"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "9bb23f90a4a933e6ef36ebceff8271e9f00b28594b9b4e615e0b1cbfa1e0eb81"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Oportunidad (legacy)",
+        "fieldRef": "src:Oportunidad (legacy)",
+        "valueClass": "TEXT",
+        "values": [
+          "Renewal 2026 Tuliko",
+          "Supply contract 2027 Darsorin",
+          "Onboarding 2027 Zerell",
+          "Onboarding 2024 Rismar"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Moneda [v2]",
+        "fieldRef": "src:Moneda [v2]",
+        "valueClass": "TEXT",
+        "values": [
+          "alpha",
+          "alpha",
+          "beta",
+          "delta"
+        ],
+        "decision": "MAP",
+        "destination": "deal.currency"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_8ad4672755f2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Oportunidad (legacy)",
+        "targetField": "deal.name"
+      },
+      {
+        "memoryId": "memconv_d42b62cbb3c0",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Moneda [v2]",
+        "targetField": "deal.currency"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_afa1265e7a5be84d9cf2828d",
+    "kc_50dfbbd07107f2e82722372f"
+  ]
+}

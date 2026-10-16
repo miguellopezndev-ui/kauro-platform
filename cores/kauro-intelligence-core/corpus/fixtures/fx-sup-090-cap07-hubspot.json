@@ -1,0 +1,197 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-090-cap07-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-090-cap07-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "457519d2420b4df9b56a2297e9b84dc15f35c7677eb99f073f81eca7d517e636",
+      "candidateSetHash": "7976badcd39b40bdab0b5dbd80664d9b2037d4408aa0bea16611ec3142684058",
+      "targetContractHash": "tc_3733a22c2acaee086c194751c55d6b76107c613c084f076d698a9fc832410385",
+      "projectRevisionHash": "9592b8c1936d6011f1c18b93cb3059e2e6bde082696ca39bb460ddc99f9fbc6e"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_3bf7c5dbd3b69da3",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "requiredEvidenceRefs": [
+          "ev_5a1eb1e3b1c51be5"
+        ]
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_e29736a62514300c",
+        "decision": "MAP",
+        "destinationField": "contact.website"
+      },
+      {
+        "sourceHeader": "Last name - src",
+        "sourceFieldRef": "fld_1892beba69c4bce4",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_58cc4155a443c41b",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lastName",
+      "contact.ownerEmail",
+      "contact.website",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Folder code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "efe7eea349efbda63b22f4ce4d1af4f9c929804c7d810d88c62fafa6ad559360"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "fino.mesunda0@corp.example.test",
+          "kesa.sovmar1@sample.invalid",
+          "daran.jorenko2@example.test",
+          "daro.quelova3@sample.invalid",
+          "fino.mesunda0@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.jorenko-foods.test",
+          "https://www.quelova-labs.test",
+          "https://www.tulorin-studio.test",
+          "https://www.zermar-logistics.test",
+          "https://www.orvero-systems.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.website"
+      },
+      {
+        "header": "Last name - src",
+        "fieldRef": "src:Last name - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Rismar",
+          "Norquist",
+          "Halmar",
+          "Tulero",
+          "Tavmar"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F884",
+          "F201",
+          "F847",
+          "F853"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_a3737a2e41d3",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Last name - src",
+        "targetField": "contact.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_a58e223d93e2198bc4eaf85f",
+    "kc_7aa9bc6c9179546ae34070c8"
+  ]
+}

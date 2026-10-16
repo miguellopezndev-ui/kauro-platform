@@ -1,0 +1,179 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-013-k13-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-013-k13-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "038119eb01d21f267c7cc00e71ab6e04ed122ff532eaae3e9eaccf6090fd1414",
+      "candidateSetHash": "1fcb4c3b28ceda29971c95713239571371075207fa1587f4675260de5856f9d7",
+      "targetContractHash": null,
+      "projectRevisionHash": "97d60f25ef7191368aa494299a56beeb189d5adbaf92d0008e9a070bdc2689bd"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_7bcdef875a5769c7",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "company.name",
+        "sourceFieldRef": "fld_39ae3d0b75cdedc1",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Annual revenue + Währung",
+        "sourceFieldRef": "fld_d7ffed7c9c4491dc",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_4e16abb953b36e7d",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.industry",
+      "company.name"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Folder code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3d53980506d71939713af9922af107f998eb2bbaabb95ea9876dbd7bf15353a0"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Industry",
+        "fieldRef": "src:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Packaging",
+          "Food service",
+          "Textiles",
+          "Food service",
+          "Textiles",
+          "Food service",
+          "Logistics"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "company.name",
+        "fieldRef": "src:company.name",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelaly Labs Inc.",
+          "Wilvik Logistics Ltd",
+          "Darunda Group S.A.",
+          "Risquist Labs S.A.",
+          "Pelsorin Studio LLC",
+          "Halrane Labs S.A.",
+          "Tulanth Foods LLC"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Annual revenue + Währung",
+        "fieldRef": "src:Annual revenue + Währung",
+        "valueClass": "MIXED",
+        "values": [
+          "€1,525",
+          "$9,868",
+          "£8,506",
+          "€1,402",
+          "$6,192",
+          "£4,870",
+          "€9,281"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F831",
+          "F913",
+          "F404",
+          "F948",
+          "F277",
+          "F173",
+          "F536"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:mixed-currency"
+    ]
+  },
+  "canaries": [
+    "kc_d065096ef1bf9ffa9fa366e3",
+    "kc_fcbc0326b8b1a4bb53e8b5e0"
+  ]
+}

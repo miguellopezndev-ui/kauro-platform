@@ -1,0 +1,271 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-153-cap10-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-153-cap10-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0c3bbafc75972b7ed5333a600af733de1325ec1ef159907805c6c27dbf20195f",
+      "candidateSetHash": "cf1a16c15d7e1a0c19eacc0cc437b62607dce94f0d5ec29afdde3409356ad519",
+      "targetContractHash": null,
+      "projectRevisionHash": "ad230a724f12e580bf55e0dd3f2a0eac0a6e93d98a04c279d9c2f6069d4ed3eb"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_599fdb13233f4e33",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_bcb66eb82a81ee53",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_20fa6e4c39e1bb32",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Street address",
+        "sourceFieldRef": "fld_49d04e24968a3d11",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "Website - src",
+        "sourceFieldRef": "fld_db0b5095d12d3f1f",
+        "decision": "MAP",
+        "destinationField": "contact.website"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_f8961eb2d9ea7dab",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_8b7026404e06f75c",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.city",
+      "contact.addressLine1",
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.mobilePhone",
+      "contact.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials",
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "a4ec3a98dd30900f47beb580c6025377313c6e41a770fb04e822ce7e3a13cc76"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "belan.darenko0@sample.invalid",
+          "sova.belenko1@example.test",
+          "halel.yandell2@sample.invalid",
+          "tulis.quelvik3@sample.invalid",
+          "tavek.kesunda4@example.test",
+          "sovek.tuliko5@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "Norvania",
+          "Valdoria",
+          "Norvania",
+          "Valdoria",
+          "Estmark",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Nuvia",
+          "Valmora",
+          "Valmora",
+          "Nuvia",
+          "Quenby",
+          "Quenby"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Street address",
+        "fieldRef": "src:Street address",
+        "valueClass": "TEXT",
+        "values": [
+          "146 Joriko Street",
+          "53 Zerero Street",
+          "20 Mesorin Street",
+          "73 Sovvik Street",
+          "100 Finero Street",
+          "185 Sovsorin Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "Website - src",
+        "fieldRef": "src:Website - src",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.belrane-foods.test",
+          "https://www.sovunda-foods.test",
+          "https://www.finorin-logistics.test",
+          "https://www.lumdell-partners.test",
+          "https://www.findell-group.test",
+          "https://www.zerath-foods.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.website"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "JD",
+          "ER",
+          "PF",
+          "TT",
+          "PW",
+          "AT"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-53",
+          "R-1",
+          "R-32",
+          "R-23",
+          "R-45",
+          "R-45"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_a373f97af2157fb4810d0d58",
+    "kc_5abcdd5815dcd1e3b0e45891"
+  ]
+}

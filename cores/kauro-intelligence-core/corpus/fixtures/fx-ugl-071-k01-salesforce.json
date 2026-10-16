@@ -1,0 +1,132 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-071-k01-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-071-k01-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "dcfff95d756320707c5932d90f23388f8b2f38a86540f06d00e6d8e7b085b2d0",
+      "candidateSetHash": "2508e103d3b23b60933daec85ab5b7f42224dc337a9ecfdf248167e3609b4a13",
+      "targetContractHash": "tc_79061d4073ec0b607d4aed638ec44304fc7d8cf3694c1e6286c0ef71177eca7b",
+      "projectRevisionHash": "fa0dc8c67fe6b3109fae3e0f78acd78c13a782615d3eee63013c3f5a476c2e6a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Close date",
+        "sourceFieldRef": "fld_5c4858a9473e6c08",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.closeDate",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "8f2bda71d93c1368e39fe2aa3288692482f5077e7e8988a0fde140516e47f3b8"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": true
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Close date",
+        "fieldRef": "src:Close date",
+        "valueClass": "MIXED",
+        "values": [
+          "14/07/2024",
+          "2020-03-20",
+          "18/01/2025",
+          "2023-07-20",
+          "16/09/2024",
+          "2024-03-21",
+          "27/03/2023",
+          "2025-09-19"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:mixed-dates",
+      "lang:he",
+      "ugly:mixed-date-formats"
+    ]
+  },
+  "canaries": [
+    "kc_549f8a88e7b03abaa82c0df6",
+    "kc_6f22e221878d9880ddfb1da8"
+  ]
+}

@@ -1,0 +1,236 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-161-cap06-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-161-cap06-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "450e10527e6028f8ab52a2f6f6589eeecc976aa726cf2a0d2f9b6377871da228",
+      "candidateSetHash": "6afc51cd38ebda87f2473e5973ba9bee66dbef5c4700c32e02c6d436fdb55cf5",
+      "targetContractHash": "tc_b6764d674e95ef349a174cea3f6cd71101f921197f8fb01fae55767043e326b6",
+      "projectRevisionHash": "a551bce3fc43f64b7a58a82c1971a49511bb19e838656ed184c8849919594944"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Domain",
+        "sourceFieldRef": "fld_1501ec93548cee1a",
+        "decision": "MAP",
+        "destinationField": "company.domain",
+        "requiredEvidenceRefs": [
+          "ev_4c86582a00cfca4b"
+        ]
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_60fcc765e81dc7bc",
+        "decision": "MAP",
+        "destinationField": "company.website"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_c9521c01b080481e",
+        "decision": "MAP",
+        "destinationField": "company.city"
+      },
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_597829f70464c529",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_e76b7b2dc6dc79de",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.city",
+      "company.country",
+      "company.domain",
+      "company.name",
+      "company.phone",
+      "company.state",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "a9c0839d23be2601a84d90e3100c58de183b0f9501c2790edc0089ef2e7a78cc"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Domain",
+        "fieldRef": "src:Domain",
+        "valueClass": "TEXT",
+        "values": [
+          "halvik-labs.test",
+          "sovova-works.test",
+          "darenko-group.test",
+          "orvquist-systems.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.domain",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.darvik-partners.test",
+          "https://www.finorin-systems.test",
+          "https://www.darquist-labs.test",
+          "https://www.tavell-partners.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "Orvale",
+          "Kelmar",
+          "Brandel"
+        ],
+        "decision": "MAP",
+        "destination": "company.city"
+      },
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Peldell Foods GmbH",
+          "Mesaly Systems Inc.",
+          "Darova Works Inc.",
+          "Joriko Partners LLC"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "KR",
+          "GC",
+          "DN"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_f86f86afa813",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_e6a09a35a8679bbe3d730446",
+    "kc_4ce7b1b744f2b3266329fdb1"
+  ]
+}

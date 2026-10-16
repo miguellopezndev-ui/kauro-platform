@@ -1,0 +1,184 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-003-k03-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-003-k03-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "a8980f87053609b6461ba936dd8d3aecf19ccaa9f63263a653c55be42fa84172",
+      "candidateSetHash": "9a6615fcf7b55045a966e5d15f1fe649427e78fef2339263be7c5c472e0bdd0e",
+      "targetContractHash": null,
+      "projectRevisionHash": "b427e1ab9bb882e9f6842e4620d1144d01a5e360ae336d3b82bf4202a0baf511"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_d653ef5d9989a0b5",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "﻿First name",
+        "sourceFieldRef": "fld_779ef2d2b022940c",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name​",
+        "sourceFieldRef": "fld_f821c7afc8f55cd9",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Ｎａｍｅ es",
+        "sourceFieldRef": "fld_80e4c84be34c46c3",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.createdAt",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.state"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Ｎａｍｅ es"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "2343bfa67e7ab6b4a286f4af233865207451c2db8b74cf61d08956154957f85e"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "riso.jorero0@example.test",
+          "halis.quelero1@example.test",
+          "tulo.zerquist2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "﻿First name",
+        "fieldRef": "src:bom-es",
+        "valueClass": "TEXT",
+        "values": [
+          "Belel",
+          "Kesia",
+          "Pelan"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name​",
+        "fieldRef": "src:zw-es",
+        "valueClass": "TEXT",
+        "values": [
+          "Mesrane​",
+          "Mesiko​",
+          "Quelero​"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Ｎａｍｅ es",
+        "fieldRef": "src:Ｎａｍｅ es",
+        "valueClass": "TEXT",
+        "values": [
+          "Kesaly Systems S.L.",
+          "Pelvik Logistics Ltd",
+          "Belrane Studio Ltd"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:encoding",
+      "lang:es"
+    ]
+  },
+  "canaries": [
+    "kc_8c4c1cd999d2029d3754718c",
+    "kc_bb54dc8d47d5c95fdff7a83f"
+  ]
+}

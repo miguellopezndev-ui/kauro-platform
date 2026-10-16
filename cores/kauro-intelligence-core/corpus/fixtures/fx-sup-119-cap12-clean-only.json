@@ -1,0 +1,197 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-119-cap12-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-119-cap12-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e6cde63d7cf89ec22805fce8dbe0e206b592d6da411a353148e5171d8bc0cf24",
+      "candidateSetHash": "faafe3bde138bf50acbd308016ca094aca3003aadf2089ea5192fab46c5b8973",
+      "targetContractHash": null,
+      "projectRevisionHash": "64e2bd212864aee464e6d73cdc9bc999ac454e1c82fa0f12a6a0e99133b3f1fb"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_fd9eafb6d6f84460",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Field 3",
+        "sourceFieldRef": "fld_ab62747f326d8479",
+        "decision": "MAP",
+        "destinationField": "contact.phone",
+        "requiredEvidenceRefs": [
+          "ev_3cf6aaee0d63f059"
+        ]
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_9a8f2491d376e159",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_dd790f8dea6e42e3",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.companyName",
+      "contact.doNotCall",
+      "contact.email",
+      "contact.mobilePhone",
+      "contact.ownerEmail",
+      "contact.phone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Row checksum",
+      "Folder code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e596ab757a96ff348804659263c7d9acca83428dec1bbb934a3e66b7dca88049"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "zeran.finunda0@example.test",
+          "sovia.pelenko1@example.test",
+          "pelis.zersorin2@sample.invalid",
+          "tulek.vexova3@example.test",
+          "orvel.peliko4@example.test",
+          "darek.belath5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Field 3",
+        "fieldRef": "src:Field 3",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550188",
+          "+12025550124",
+          "+447700900290",
+          "+447700900701",
+          "+12025550163",
+          "+12025550130"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "61205013",
+          "41b5d3c9",
+          "46a9ccd8",
+          "59faafe7",
+          "67b6d97f",
+          "39b76a0a"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F461",
+          "F453",
+          "F274",
+          "F967",
+          "F451",
+          "F195"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_1e991ffa6797a594091caeec",
+    "kc_209550dd217dad86df3cdb19"
+  ]
+}

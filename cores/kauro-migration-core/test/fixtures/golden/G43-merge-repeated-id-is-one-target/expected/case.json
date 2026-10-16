@@ -1,0 +1,47 @@
+{
+  "id": "G43",
+  "title": "A record that answers to a key through two of its rows is one target, not two",
+  "intent": "Two rows of contacts.csv carry the same contact id C-1 with the same values, so they are one contact, and the second row is absorbed. A company names that contact by C-1. The contact answers to C-1 through both of its rows, and a relationship to it must resolve to the one record it is; counting the record once per row would call its own id ambiguous.",
+  "expect": {
+    "rows": {
+      "total": 3,
+      "OUTPUT": 2,
+      "MERGED_PROVEN": 1,
+      "ISOLATED": 0,
+      "LEFTOVER": 0,
+      "REJECTED_INPUT": 0
+    },
+    "records": {
+      "CONTACT": 1,
+      "COMPANY": 1,
+      "DEAL": 0,
+      "LEAD": 0
+    },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 1,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": {
+      "total": 1,
+      "OUTPUT": 1,
+      "DEDUPLICATED": 0,
+      "UNRESOLVED": 0,
+      "LEFTOVER": 0
+    }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "edgeDetails": [
+    {
+      "row": "companies.csv#2",
+      "relationshipType": "CONTACT_TO_COMPANY",
+      "fromKeyRaw": "C-1",
+      "disposition": "OUTPUT",
+      "reasonCode": "ASSOCIATION_RESOLVED"
+    }
+  ]
+}

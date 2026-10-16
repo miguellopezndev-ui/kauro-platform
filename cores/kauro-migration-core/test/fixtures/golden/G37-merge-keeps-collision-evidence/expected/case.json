@@ -1,0 +1,47 @@
+{
+  "id": "G37",
+  "title": "A merge must not erase the evidence of an id collision",
+  "intent": "Two rows of the first export are proven to be one record by a shared legacy id, and one of them carries raw id 9. The second export also has a record with raw id 9, in its own identity space. Those two records are not proven to be one, and the coincidence has to be reported — reading only the surviving row's id let the merge hide it, which is exactly what the contract says duplicate signals must never do.",
+  "expect": {
+    "rows": {
+      "total": 3,
+      "OUTPUT": 2,
+      "MERGED_PROVEN": 1,
+      "ISOLATED": 0,
+      "LEFTOVER": 0,
+      "REJECTED_INPUT": 0
+    },
+    "records": {
+      "CONTACT": 2,
+      "COMPANY": 0,
+      "DEAL": 0,
+      "LEAD": 0
+    },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 1,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 1,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": {
+      "total": 0,
+      "OUTPUT": 0,
+      "DEDUPLICATED": 0,
+      "UNRESOLVED": 0,
+      "LEFTOVER": 0
+    }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "duplicateClusters": [
+    {
+      "signal": "SOURCE_ID_ACROSS_IDENTITY_SPACES",
+      "signalValue": "9",
+      "members": 2,
+      "reasonCode": "IDENTITY_SAME_ID_ACROSS_IDENTITY_SPACES",
+      "notMergedReasonCode": "IDENTITY_SAME_ID_ACROSS_IDENTITY_SPACES"
+    }
+  ]
+}

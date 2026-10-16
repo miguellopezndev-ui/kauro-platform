@@ -1,0 +1,199 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-021-k07-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-021-k07-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "554eb1de7f890951bdb7e7f2711151fab2525d55a08d696c0383c3053c09ccc4",
+      "candidateSetHash": "d49f37a1e9dd13e5a28af4bbcaef65ff8efc26916124088d09cfab84b3281b84",
+      "targetContractHash": "tc_c734a4fcfc94596fed842222684e980affb8ea50675c7d2db1cf4a0a613aaf0c",
+      "projectRevisionHash": "0d357912eb05ed26708f869a1b61cdc39831fcaa5771bd69b95e40cdf4187a75"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Имя",
+        "sourceFieldRef": "fld_e73d8573aed75d8f",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Должность",
+        "sourceFieldRef": "fld_3905f444ee0848ea",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Score hérité",
+        "sourceFieldRef": "fld_e502f44c6b543160",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.legacyScore"
+    ],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.ownerEmail",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "96d2d0a4e43b707c47f8f23395d4458217423d52010d03da34bd8a0f017842eb"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Имя",
+        "fieldRef": "src:Имя",
+        "valueClass": "TEXT",
+        "values": [
+          "Pelia",
+          "Quela",
+          "Lumo",
+          "Risis",
+          "Quelan"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Должность",
+        "fieldRef": "src:Должность",
+        "valueClass": "TEXT",
+        "values": [
+          "Operations lead",
+          "Operations lead",
+          "Buyer",
+          "Site engineer",
+          "Site engineer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Score hérité",
+        "fieldRef": "src:Score hérité",
+        "valueClass": "MIXED",
+        "values": [
+          "29",
+          "23",
+          "8",
+          "23",
+          "69"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.legacyScore"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-target",
+      "lang:ru",
+      "ugly:stale-header"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_cbc9db4af08b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Имя",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_f1ff2cd2cb1f",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Должность",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b413b6c86a4f483ff9b1f735",
+    "kc_1e9f5c9bcd6fdc7649cbef24"
+  ]
+}

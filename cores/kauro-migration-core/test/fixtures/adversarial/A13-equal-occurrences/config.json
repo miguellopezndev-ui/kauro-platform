@@ -1,0 +1,61 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "adv-equal-occurrences"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "contacts",
+      "path": "contacts.csv",
+      "format": "CSV",
+      "sourceNamespace": "instance-A"
+    },
+    {
+      "id": "copy",
+      "path": "contacts-copy.csv",
+      "format": "CSV",
+      "sourceNamespace": "instance-B"
+    }
+  ],
+  "records": [
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        }
+      ]
+    },
+    {
+      "id": "copy",
+      "fileId": "copy",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        }
+      ]
+    }
+  ]
+}

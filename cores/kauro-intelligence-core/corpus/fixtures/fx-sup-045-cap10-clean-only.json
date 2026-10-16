@@ -1,0 +1,172 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-045-cap10-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-045-cap10-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "d3e57a3178e40ee2bfd4fcfb634e851dec14a46fbfef89d15a0485fe28f4b2ab",
+      "candidateSetHash": "d7de968394e4dd7beba3232ac38c42d4eb252eb3e807d53ac9b5357863548249",
+      "targetContractHash": null,
+      "projectRevisionHash": "3bb9eae6ec5a7a0fd4d6861d9630e4c0d2e7f5afb5279d4e4f6d1f671b5879bd"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_d521372bcad00f50",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Ciudad",
+        "sourceFieldRef": "fld_f8020fb7802809e3",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_8fec2344156aaee4",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.lifecycleStage",
+      "contact.marketingConsent"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "452c9fa370beecfe0ab00e232e8b9731724998e81a7248ae439c7bfce835050a"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "marketingConsent",
+            "valueClass": "BOOLEAN",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "tulel.orvell0@example.test",
+          "zeris.wilunda1@corp.example.test",
+          "joro.halaly2@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Ciudad",
+        "fieldRef": "src:Ciudad",
+        "valueClass": "TEXT",
+        "values": [
+          "Quenby",
+          "Valmora",
+          "Valmora"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "A-4",
+          "A-21",
+          "C-35"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_d882fc4f60a2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ciudad",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_8f98d6e90105912992b15569",
+    "kc_0c94ee377c4cfb2f43f86ccf"
+  ]
+}

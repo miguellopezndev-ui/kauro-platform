@@ -1,0 +1,482 @@
+{
+  "evidenceSchemaVersion": "3.0.0",
+  "gate": "CAPACITY-PROFILE-MATRIX",
+  "observedAt": "2026-10-02T20:20:47Z",
+  "capture": {
+    "captureVersion": "2.0.0",
+    "producer": "tools/capacity.mjs",
+    "producerFingerprint": "25c634c7c50f0aa4095a5567f095b27760ed2c2cde2e1507d7b3482522931b96",
+    "producerFiles": 89,
+    "campaignId": "c_c87b11a87f0014e3",
+    "subjectDigestAtStart": "045214ef4302d902047cc4e94652109ef63279cce28315280bb88e7f30759505",
+    "startedAt": "2026-10-02T14:21:42Z",
+    "environment": {
+      "node": "v24.14.1",
+      "platform": "win32",
+      "arch": "x64",
+      "osRelease": "10.0.26300",
+      "cpuCount": 12,
+      "totalMemoryBytes": 14893805568
+    },
+    "producerFingerprintAtEnd": "25c634c7c50f0aa4095a5567f095b27760ed2c2cde2e1507d7b3482522931b96",
+    "subjectDigestAtEnd": "045214ef4302d902047cc4e94652109ef63279cce28315280bb88e7f30759505",
+    "endedAt": "2026-10-02T20:20:48Z",
+    "valid": true,
+    "invalidation": null
+  },
+  "note": "The complementary dimension matrix. Each profile is sized as a share of the rung by its own rowFactor, and declaredRows is what those parameters say the rung should produce. Nothing here was scaled down to finish sooner.",
+  "rungs": [
+    1000000
+  ],
+  "capacityProfilesVersion": "1.2.1",
+  "limits": {
+    "hardMemoryLimitBytes": 8589934592,
+    "memoryBudgetBytes": 6012954214,
+    "hardScratchLimitBytes": 68719476736,
+    "scratchBudgetBytes": 51539607552,
+    "wallClockLimitMs": 28800000
+  },
+  "environment": {
+    "node": "v24.14.1",
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26300",
+    "cpuCount": 12,
+    "totalMemoryBytes": 14893805568,
+    "samplingIntervalMs": 50,
+    "maxRssCalibration": {
+      "ratio": 1024,
+      "unit": "KiB",
+      "maxRSS": 244784,
+      "rss": 250658816,
+      "detail": "a child allocating 209715200 bytes reported rss 250658816 and maxRSS 244784"
+    },
+    "processLimits": {
+      "rss": 668389376,
+      "maxRss": 2329661440
+    },
+    "processLimitsReason": "this platform exposes no POSIX resource limits"
+  },
+  "results": [
+    {
+      "profile": "P1",
+      "dimension": "ROW_COUNT",
+      "mode": "CLEAN_ONLY",
+      "rung": 1000000,
+      "declaredRows": 1000000,
+      "sourceRows": 1000000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 70556405,
+        "packageBytes": 1583940111,
+        "peakRssBytes": 1229971456,
+        "peakScratchBytes": 8338176424,
+        "scratchBytesWritten": 36952779397,
+        "wallClockMs": 685291
+      },
+      "reconciliation": {
+        "rowsIngested": 1000000,
+        "delivered": 1000000,
+        "edges": 0,
+        "declaredEdges": 0,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P2",
+      "dimension": "SCHEMA_WIDTH",
+      "mode": "CLEAN_ONLY",
+      "rung": 1000000,
+      "declaredRows": 100000,
+      "sourceRows": 100000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 55245659,
+        "packageBytes": 246582475,
+        "peakRssBytes": 1686781952,
+        "peakScratchBytes": 3044301777,
+        "scratchBytesWritten": 15823453174,
+        "wallClockMs": 353808
+      },
+      "reconciliation": {
+        "rowsIngested": 100000,
+        "delivered": 100000,
+        "edges": 0,
+        "declaredEdges": 0,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P3",
+      "dimension": "SHEET_COUNT",
+      "mode": "CLEAN_ONLY",
+      "rung": 1000000,
+      "declaredRows": 2000024,
+      "sourceRows": 2000024,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 1003580411,
+        "packageBytes": 5954080904,
+        "peakRssBytes": 1597419520,
+        "peakScratchBytes": 22364676053,
+        "scratchBytesWritten": 98780231863,
+        "wallClockMs": 2262407
+      },
+      "reconciliation": {
+        "rowsIngested": 2000024,
+        "delivered": 2000000,
+        "edges": 0,
+        "declaredEdges": 0,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P4",
+      "dimension": "DUPLICATE_SIGNALS",
+      "mode": "CLEAN_ONLY",
+      "rung": 1000000,
+      "declaredRows": 500000,
+      "sourceRows": 500000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 31278174,
+        "packageBytes": 997389268,
+        "peakRssBytes": 975876096,
+        "peakScratchBytes": 4125432769,
+        "scratchBytesWritten": 16468882641,
+        "wallClockMs": 320473
+      },
+      "reconciliation": {
+        "rowsIngested": 500000,
+        "delivered": 500000,
+        "edges": 0,
+        "declaredEdges": 0,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P5",
+      "dimension": "PROVEN_MERGES",
+      "mode": "CLEAN_ONLY",
+      "rung": 1000000,
+      "declaredRows": 500000,
+      "sourceRows": 500000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 34417064,
+        "packageBytes": 808122671,
+        "peakRssBytes": 2114105344,
+        "peakScratchBytes": 3460403794,
+        "scratchBytesWritten": 13848771894,
+        "wallClockMs": 291870
+      },
+      "reconciliation": {
+        "rowsIngested": 500000,
+        "delivered": 250000,
+        "edges": 0,
+        "declaredEdges": 0,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P6",
+      "dimension": "EDGE_COUNT",
+      "mode": "CLEAN_ONLY",
+      "rung": 1000000,
+      "declaredRows": 1000000,
+      "sourceRows": 1000000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 68681517,
+        "packageBytes": 1661733525,
+        "peakRssBytes": 1086824448,
+        "peakScratchBytes": 11329589953,
+        "scratchBytesWritten": 52225175052,
+        "wallClockMs": 946111
+      },
+      "reconciliation": {
+        "rowsIngested": 1000000,
+        "delivered": 1000000,
+        "edges": 900000,
+        "declaredEdges": 900000,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P7",
+      "dimension": "CARDINALITY",
+      "mode": "CLEAN_ONLY",
+      "rung": 1000000,
+      "declaredRows": 1000000,
+      "sourceRows": 1000000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 74334205,
+        "packageBytes": 1634103010,
+        "peakRssBytes": 1231245312,
+        "peakScratchBytes": 8405657749,
+        "scratchBytesWritten": 37211738711,
+        "wallClockMs": 716457
+      },
+      "reconciliation": {
+        "rowsIngested": 1000000,
+        "delivered": 1000000,
+        "edges": 0,
+        "declaredEdges": 0,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P8",
+      "dimension": "VALUE_SIZE",
+      "mode": "CLEAN_ONLY",
+      "rung": 1000000,
+      "declaredRows": 200000,
+      "sourceRows": 200000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 1651622403,
+        "packageBytes": 3627011428,
+        "peakRssBytes": 2218778624,
+        "peakScratchBytes": 12511782751,
+        "scratchBytesWritten": 44907067169,
+        "wallClockMs": 593199
+      },
+      "reconciliation": {
+        "rowsIngested": 200000,
+        "delivered": 200000,
+        "edges": 0,
+        "declaredEdges": 0,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P9",
+      "dimension": "EXCEPTIONS",
+      "mode": "CLEAN_ONLY",
+      "rung": 1000000,
+      "declaredRows": 750000,
+      "sourceRows": 750000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 37430954,
+        "packageBytes": 928779587,
+        "peakRssBytes": 1467445248,
+        "peakScratchBytes": 4493405571,
+        "scratchBytesWritten": 17910551054,
+        "wallClockMs": 414328
+      },
+      "reconciliation": {
+        "rowsIngested": 750000,
+        "delivered": 500000,
+        "edges": 0,
+        "declaredEdges": 0,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P10",
+      "dimension": "BUNDLE_SHAPE",
+      "mode": "CLEAN_ONLY",
+      "rung": 1000000,
+      "declaredRows": 500000,
+      "sourceRows": 500000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 212256687,
+        "packageBytes": 829499538,
+        "peakRssBytes": 1195290624,
+        "peakScratchBytes": 5009023133,
+        "scratchBytesWritten": 23400035126,
+        "wallClockMs": 581206
+      },
+      "reconciliation": {
+        "rowsIngested": 500000,
+        "delivered": 500000,
+        "edges": 200000,
+        "declaredEdges": 200000,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P11",
+      "dimension": "TARGET_HUBSPOT",
+      "mode": "HUBSPOT",
+      "rung": 1000000,
+      "declaredRows": 1000000,
+      "sourceRows": 1000000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 151146149,
+        "packageBytes": 1710685273,
+        "peakRssBytes": 1089753088,
+        "peakScratchBytes": 12061754650,
+        "scratchBytesWritten": 59577279858,
+        "wallClockMs": 1306363
+      },
+      "reconciliation": {
+        "rowsIngested": 1000000,
+        "delivered": 1000000,
+        "edges": 800000,
+        "declaredEdges": 800000,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P12",
+      "dimension": "TARGET_SALESFORCE",
+      "mode": "SALESFORCE",
+      "rung": 1000000,
+      "declaredRows": 1000000,
+      "sourceRows": 1000000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 148995556,
+        "packageBytes": 1596802656,
+        "peakRssBytes": 1152053248,
+        "peakScratchBytes": 10531950477,
+        "scratchBytesWritten": 52145239974,
+        "wallClockMs": 984003
+      },
+      "reconciliation": {
+        "rowsIngested": 1000000,
+        "delivered": 1000000,
+        "edges": 600000,
+        "declaredEdges": 600000,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P13",
+      "dimension": "GIANT_CLUSTER",
+      "mode": "CLEAN_ONLY",
+      "rung": 1000000,
+      "declaredRows": 1000000,
+      "sourceRows": 1000000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 67334065,
+        "packageBytes": 1415938329,
+        "peakRssBytes": 2427023360,
+        "peakScratchBytes": 7337229774,
+        "scratchBytesWritten": 33413672090,
+        "wallClockMs": 2306006
+      },
+      "reconciliation": {
+        "rowsIngested": 1000000,
+        "delivered": 750001,
+        "edges": 0,
+        "declaredEdges": 0,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    },
+    {
+      "profile": "P14",
+      "dimension": "SKEWED_JOIN",
+      "mode": "CLEAN_ONLY",
+      "rung": 1000000,
+      "declaredRows": 1000000,
+      "sourceRows": 1000000,
+      "result": "PASS",
+      "detail": null,
+      "measured": {
+        "sourceBytes": 72105224,
+        "packageBytes": 1972048994,
+        "peakRssBytes": 1204408320,
+        "peakScratchBytes": 12378305469,
+        "scratchBytesWritten": 56812537650,
+        "wallClockMs": 1016601
+      },
+      "reconciliation": {
+        "rowsIngested": 1000000,
+        "delivered": 1000000,
+        "edges": 900000,
+        "declaredEdges": 900000,
+        "equationHolds": true,
+        "checksRun": 60
+      },
+      "verification": {
+        "ok": true,
+        "attestationOk": true
+      }
+    }
+  ]
+}

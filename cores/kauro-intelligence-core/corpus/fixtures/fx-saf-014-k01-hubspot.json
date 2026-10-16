@@ -1,0 +1,127 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-saf-014-k01-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-saf-014-k01-hubspot",
+    "family": "SAFETY",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9cc531be3541eec9589b4e093921ef4f320910e1a60d9e40b4954dddd99b2ec2",
+      "candidateSetHash": "ca15c2f08513fcaf53bf7ae81c049ceb096086604c4e68d9a4663f56fbedda3d",
+      "targetContractHash": "tc_1206267bf547f844e0a1a1c988212dfd72f931c2e0e696abf0236c05f6d5094e",
+      "projectRevisionHash": "a283db01d601ac60d01db01d191e7b677305435bdb3b139c3d4bbf6cb8340543"
+    },
+    "expectedOutcomeClass": "REQUIRES_AGENCY_DECISION",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Region code",
+        "sourceFieldRef": "fld_80a3ba5dca4bf91a",
+        "decision": "AGENCY_DECISION"
+      },
+      {
+        "sourceHeader": "Lfd. Nr.",
+        "sourceFieldRef": "fld_e943f873741bbf9f",
+        "decision": "AGENCY_DECISION"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": true,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": true
+    },
+    "expectedTruthDigest": "20697e311fb7d612b41967acc3e46e436a8b3890d5116addb4fb4897ff786249"
+  },
+  "structure": {
+    "family": "SAFETY",
+    "mode": "HUBSPOT",
+    "capability": "CAP06",
+    "outcomeClass": "REQUIRES_AGENCY_DECISION",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Region code",
+        "fieldRef": "src:Region code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P1",
+          "P2",
+          "P1",
+          "P2",
+          "P1",
+          "P2",
+          "P1"
+        ],
+        "decision": "AGENCY_DECISION"
+      },
+      {
+        "header": "Lfd. Nr.",
+        "fieldRef": "src:Lfd. Nr.",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "1",
+          "2",
+          "3",
+          "1",
+          "2",
+          "3",
+          "1"
+        ],
+        "decision": "AGENCY_DECISION"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": true,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": true
+    },
+    "tags": [
+      "safety:composite-key"
+    ]
+  },
+  "canaries": [
+    "kc_131bc0618053a0fd2324ab5a",
+    "kc_ac4205f26e0ee8369de3f40d"
+  ]
+}

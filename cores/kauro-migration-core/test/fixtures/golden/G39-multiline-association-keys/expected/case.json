@@ -1,0 +1,111 @@
+{
+  "id": "G39",
+  "title": "Association keys and a relationship label that hold line breaks",
+  "intent": "A company id typed across two lines, a company name matched on across two lines, a contact id with a break in it and a relationship label with one. Every association key in this engine is a cell out of a spreadsheet, and a quoted CSV field may hold a line break; the sort these keys are spilled through owns the newline as its record separator. Four spills took the raw cell and the reconciliation composed a fifth key out of the label, so a bundle like this one aborted the migration in the external sort rather than migrating. Every relationship here resolves, and the from_key_raw and to_key_raw columns hold what the cells held rather than an escaped spelling of it.",
+  "expect": {
+    "rows": {
+      "total": 8,
+      "OUTPUT": 8,
+      "MERGED_PROVEN": 0,
+      "ISOLATED": 0,
+      "LEFTOVER": 0,
+      "REJECTED_INPUT": 0
+    },
+    "records": {
+      "CONTACT": 2,
+      "COMPANY": 2,
+      "DEAL": 2,
+      "LEAD": 0
+    },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": {
+      "total": 6,
+      "OUTPUT": 6,
+      "DEDUPLICATED": 0,
+      "UNRESOLVED": 0,
+      "LEFTOVER": 0
+    }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "edgeDetails": [
+    {
+      "row": "contacts.csv#2",
+      "relationshipType": "CONTACT_TO_COMPANY",
+      "toKeyRaw": "C\n1",
+      "disposition": "OUTPUT",
+      "reasonCode": "ASSOCIATION_RESOLVED"
+    },
+    {
+      "row": "contacts.csv#3",
+      "relationshipType": "CONTACT_TO_COMPANY",
+      "toKeyRaw": "C2",
+      "disposition": "OUTPUT",
+      "reasonCode": "ASSOCIATION_RESOLVED"
+    },
+    {
+      "row": "deals.csv#2",
+      "relationshipType": "COMPANY_TO_DEAL",
+      "fromKeyRaw": "Analytical\nEngines",
+      "disposition": "OUTPUT",
+      "reasonCode": "ASSOCIATION_RESOLVED"
+    },
+    {
+      "row": "deals.csv#3",
+      "relationshipType": "COMPANY_TO_DEAL",
+      "fromKeyRaw": "Bletchley Works",
+      "disposition": "OUTPUT",
+      "reasonCode": "ASSOCIATION_RESOLVED"
+    },
+    {
+      "row": "contact-deals.csv#2",
+      "relationshipType": "CONTACT_TO_DEAL",
+      "fromKeyRaw": "1\na",
+      "toKeyRaw": "D1",
+      "disposition": "OUTPUT",
+      "reasonCode": "ASSOCIATION_RESOLVED"
+    },
+    {
+      "row": "contact-deals.csv#3",
+      "relationshipType": "CONTACT_TO_DEAL",
+      "fromKeyRaw": "2",
+      "toKeyRaw": "D2",
+      "disposition": "OUTPUT",
+      "reasonCode": "ASSOCIATION_RESOLVED"
+    }
+  ],
+  "dispositions": [
+    {
+      "row": "contacts.csv#2",
+      "disposition": "OUTPUT",
+      "contributionKind": "RECORD"
+    },
+    {
+      "row": "contact-deals.csv#2",
+      "disposition": "OUTPUT",
+      "contributionKind": "ASSOCIATION"
+    }
+  ],
+  "delivered": [
+    {
+      "sourceRecordId": "1\na",
+      "values": {
+        "contact.firstName": "Ada",
+        "contact.email": "ada@example.com"
+      }
+    },
+    {
+      "sourceRecordId": "C\n1",
+      "values": {
+        "company.name": "Analytical\nEngines"
+      }
+    }
+  ]
+}

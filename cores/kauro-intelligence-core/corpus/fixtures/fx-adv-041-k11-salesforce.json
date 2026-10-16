@@ -1,0 +1,146 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-adv-041-k11-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-adv-041-k11-salesforce",
+    "family": "ADVERSARIAL",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "b918cda758585e2a7c7a9d7e3a67ee77ae9810994ef89fd14d1c716876c67a33",
+      "candidateSetHash": "eee29f3a5b7bdd4e89e7744b7f57f0583e8712e6f986acc0d42f0e032d82ea37",
+      "targetContractHash": "tc_608a79af8b06fd617474f9f7610f2ae8371ae7be54bd97865acd92711e329c42",
+      "projectRevisionHash": "7841ea39b1e7459eb5e363eb6c13776f71b6b1391a9d7251e1c23c65982eb557"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_e0570309f89e0310",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.state"
+    ],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lastName",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [
+        "memotherclient_7e934d95ca09"
+      ],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "097305b678105223e5fae266b243825d8292b4ecb44a8ab7d3b91ae81726313c"
+  },
+  "structure": {
+    "family": "ADVERSARIAL",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "wilel.vexdell0@sample.invalid",
+          "joris.quelenko1@example.test",
+          "belan.tavero2@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.state"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [
+        "memotherclient_7e934d95ca09"
+      ],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "adv:retired-memory-entry",
+      "cross:retired-entry",
+      "egress:run-ledger",
+      "memory:client"
+    ],
+    "memory": [
+      {
+        "memoryId": "mem_dd776e051db0",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "RETIRED",
+        "sourceHeaderPattern": "Email",
+        "targetField": "contact.state"
+      },
+      {
+        "memoryId": "memotherclient_7e934d95ca09",
+        "scope": "CLIENT",
+        "owner": "OTHER_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Email",
+        "targetField": "contact.state"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_fc3d45d0d0245f9ac5743531",
+    "kc_5646da9fae74e99f800edea6"
+  ]
+}

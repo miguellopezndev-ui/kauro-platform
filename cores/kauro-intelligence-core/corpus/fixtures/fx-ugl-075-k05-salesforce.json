@@ -1,0 +1,190 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-075-k05-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-075-k05-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "1e04f42dfd967e1f90cf333905a660b25a3e24c238b6cf18b2db4d98062b61da",
+      "candidateSetHash": "24090257bd134e8b1a4b5307cf790800f89e5c89eed61b79bb24ea9f04eb4158",
+      "targetContractHash": "tc_96d9476ecdf3d2466ea3ef4ee5417254aa8934e4ca96c244f9d5671b7a348d16",
+      "projectRevisionHash": "9d8cf594489e27a650201b56cc3cb9cc1f2111ffaa0402aa814b9b89b0717239"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_698fbb3efbbfcdad",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Ancien courriel (obsolète)",
+        "sourceFieldRef": "fld_baa19eb67e742c7f",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_1cff908cd754a984",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_5d0bf96af42e3a67",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Ancien courriel (obsolète)",
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "16b48d18cc5613019bbee4baaac8f70a623bd72a00d4895d083339639432867d"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "risis.tulenko0@example.test",
+          "norek.tavenko1@sample.invalid",
+          "zeran.kesath2@corp.example.test",
+          "dara.belanth3@corp.example.test",
+          "mesel.finaly4@example.test",
+          "nora.finvik5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Ancien courriel (obsolète)",
+        "fieldRef": "src:Ancien courriel (obsolète)",
+        "valueClass": "EMAIL",
+        "values": [
+          "sovo.yanaly40@corp.example.test",
+          "jora.kesenko41@example.test",
+          "wilek.norrane42@example.test",
+          "sovia.darenko43@corp.example.test",
+          "wilan.yanell44@example.test",
+          "sovo.orvvik45@corp.example.test"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Darel",
+          "Orvan",
+          "Mesel",
+          "Belan",
+          "Sovan",
+          "Finel"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "9",
+          "1",
+          "7",
+          "1",
+          "4",
+          "3"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-headers",
+      "lang:en",
+      "ugly:stale-header"
+    ]
+  },
+  "canaries": [
+    "kc_3b399cd4a75267136828bc03",
+    "kc_db4d0fcc51b72dbccc502935"
+  ]
+}

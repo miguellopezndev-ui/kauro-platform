@@ -1,0 +1,249 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-058-cap11-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-058-cap11-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "bd186723a5b1b34e15ad463641037b9499c609bd54ecc9b6164b2b7427866e56",
+      "candidateSetHash": "42005b49814650b2f6d3524877d87f66966493539596b92b8162561651a3b5a9",
+      "targetContractHash": "tc_192e3837aeeb5fb314e75c027406e1ceb1735e291cdbcdf0ef2cafafacd1ba87",
+      "projectRevisionHash": "7462a687cc6bd93e71b93228b1dd4e052f038a623c13e7852aed056e5f27678b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_382579b9aa65b2ae",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_edc2a2a0a7a24e0a",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_8d095ae161f954b0",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Company name",
+        "sourceFieldRef": "fld_1b7117a8f1c059b1",
+        "decision": "MAP",
+        "destinationField": "contact.companyName",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_a5c40f100eae1a50",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "filePath": "organisations.csv"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_7874c106d8e1bdca",
+        "decision": "PRESERVE",
+        "filePath": "organisations.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.name",
+      "company.source_id",
+      "contact.companyName",
+      "contact.email",
+      "contact.mobilePhone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Print run",
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [
+      "CONSISTENCY_REVIEW"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "059f3b340ea648eee113ede0ad33c0617767c1121422a1a8bc2c2f982506baf6"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "customers.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "organisations.csv": {
+          "object": "COMPANY",
+          "recordIdColumn": "Name"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:customers.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-264",
+          "P-265",
+          "P-266",
+          "P-267"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:customers.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "hala.noraly0@sample.invalid",
+          "orvis.norquist1@sample.invalid",
+          "quelis.risanth2@example.test",
+          "tulo.rissorin3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:customers.csv:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "6",
+          "1",
+          "6",
+          "7"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Company name",
+        "fieldRef": "src:customers.csv:Company name",
+        "valueClass": "TEXT",
+        "values": [
+          "Sovath Works GmbH",
+          "Darorin Partners SAS",
+          "Darorin Partners SAS",
+          "Darorin Partners SAS"
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Name",
+        "fieldRef": "src:organisations.csv:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Darorin Partners SAS",
+          "Sovath Works GmbH"
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "file": "organisations.csv"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:organisations.csv:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "amber",
+          "red"
+        ],
+        "decision": "PRESERVE",
+        "file": "organisations.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "CONSISTENCY_REVIEW"
+    ]
+  },
+  "canaries": [
+    "kc_036ade887454c772b7dc83e8",
+    "kc_cdc4f8cd55f2ecd56613bba1"
+  ]
+}

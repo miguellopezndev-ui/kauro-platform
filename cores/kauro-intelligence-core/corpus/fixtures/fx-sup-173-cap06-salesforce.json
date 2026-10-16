@@ -1,0 +1,232 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-173-cap06-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-173-cap06-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "d9c19098445f8ff49a55ffdbd9f97595889abce08d2e4a5a3a470c9db1829ba6",
+      "candidateSetHash": "69004b2c9ea0e4a33a8964482c99b7b2926b608fd5d0f375f461f36ff9f43b10",
+      "targetContractHash": "tc_a4d58bd65594efcc932989a697922f57a4e4716694c01eee44b58edb122d18de",
+      "projectRevisionHash": "d53479175901f5e38f5e0dbf14f8354eb2dc416abd08bc80ca9b481a4c3d1253"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Société",
+        "sourceFieldRef": "fld_825a844d754d2e4c",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "requiredEvidenceRefs": [
+          "ev_a1fddb15137d0832"
+        ]
+      },
+      {
+        "sourceHeader": "Employés",
+        "sourceFieldRef": "fld_9f2a875ba05f2979",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      },
+      {
+        "sourceHeader": "Site web",
+        "sourceFieldRef": "fld_944fd77b303b75fa",
+        "decision": "MAP",
+        "destinationField": "company.website"
+      },
+      {
+        "sourceHeader": "Téléphone",
+        "sourceFieldRef": "fld_2eb870b7c8a27623",
+        "decision": "MAP",
+        "destinationField": "company.phone"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_1939e846d97832e2",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.addressLine1",
+      "company.employeeCount",
+      "company.name",
+      "company.phone",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6a5ca214318cda1cf6d02008b7c63fefdd5a1ae2717ca797dba72992365662f3"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Société",
+        "fieldRef": "src:Société",
+        "valueClass": "TEXT",
+        "values": [
+          "Risrane Group Ltd",
+          "Noraly Systems LLC",
+          "Yanath Group SAS",
+          "Vexquist Logistics Ltd",
+          "Jorero Logistics B.V."
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Employés",
+        "fieldRef": "src:Employés",
+        "valueClass": "NUMBER",
+        "values": [
+          "79954",
+          "19515",
+          "79649",
+          "59840",
+          "73311"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      },
+      {
+        "header": "Site web",
+        "fieldRef": "src:Site web",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.zerunda-group.test",
+          "https://www.orvrane-systems.test",
+          "https://www.orvmar-logistics.test",
+          "https://www.sovvik-works.test",
+          "https://www.kesmar-group.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website"
+      },
+      {
+        "header": "Téléphone",
+        "fieldRef": "src:Téléphone",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550199",
+          "+12025550191",
+          "+12025550119",
+          "+12025550149",
+          "+447700900664"
+        ],
+        "decision": "MAP",
+        "destination": "company.phone"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "blue",
+          "amber",
+          "red",
+          "green",
+          "amber"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_096911d14e38",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Société",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_1e39a10b0dad",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Site web",
+        "targetField": "company.website"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_c31ffecdd185ba59c69636eb",
+    "kc_521304fc0d3c779d1f3dee23"
+  ]
+}

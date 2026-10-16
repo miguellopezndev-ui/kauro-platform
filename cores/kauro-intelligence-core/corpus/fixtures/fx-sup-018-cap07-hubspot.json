@@ -1,0 +1,185 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-018-cap07-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-018-cap07-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5e8fd8e38e1a3990390b8132d5fe4bbdd014413663263cf6168c603fadb0f018",
+      "candidateSetHash": "52d9103767ea09cdb256c28510fd6ee4e1cb28f3478f8f6c0fc0e378f4702609",
+      "targetContractHash": "tc_0c8119c76ea0c4e2e5de2470c9f6355af30308b19ed203efbda6af67cb045ae6",
+      "projectRevisionHash": "b3d3f89035fe5e7d00d83e017c29819f1b591b4abe734e956968c3e7fbfebd32"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_a731715d83e04d82",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "requiredEvidenceRefs": [
+          "ev_5e911b41082245fb"
+        ]
+      },
+      {
+        "sourceHeader": "Country - src",
+        "sourceFieldRef": "fld_72ad8b6b064b208c",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_c8453ffb2dbf21a7",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_3a9d51f9aaa8e521",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref",
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "7a8202b1264c4f69eb0bb0442a0bae56c9c1fe74366c7a64058b4ad917601031"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "risek.belrane0@sample.invalid",
+          "vexia.tulanth1@example.test",
+          "luma.wilvik2@corp.example.test",
+          "risa.mesath3@sample.invalid",
+          "risek.belrane0@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Country - src",
+        "fieldRef": "src:Country - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Kelland",
+          "Estmark",
+          "Kelland",
+          "Estmark",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-8561",
+          "TKT-6603",
+          "TKT-8926",
+          "TKT-4292",
+          "TKT-5534"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "6085fba",
+          "bfe0dcf8",
+          "3677dc08",
+          "feb4bec7",
+          "fd87c5a2"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_d28ada7da18f",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Country - src",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_2fabf1190f4ba6d9744b924e",
+    "kc_93e63c04c07b0b1cad8a79ba"
+  ]
+}

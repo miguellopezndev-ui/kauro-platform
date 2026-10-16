@@ -1,0 +1,130 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-007-k07-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-007-k07-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "87a663e911d21e7a169e973104959f9215e42607d78070a5a00c9466389d9c35",
+      "candidateSetHash": "c3a7ab05630f5142f4efb1a7b456e44591a53be1c6055301baf4478e9c162944",
+      "targetContractHash": null,
+      "projectRevisionHash": "309a6485db2ce24134c623fddc6f51e9737fc13e1ee3ff6783e3fd4ff1fd5978"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Otros",
+        "sourceFieldRef": "fld_a3b4284cf63690d1",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_e02a5c5ae7347eb9",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.phone",
+      "lead.annualRevenue"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "ac0b95b37e2d09078a879a72ab114195f1c2165dfc0137a8829d70c9d082931a"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Otros",
+        "fieldRef": "src:Otros",
+        "valueClass": "MIXED",
+        "values": [
+          "",
+          "see attached",
+          "",
+          "",
+          "noria.yanquist4@sample.invalid"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "FK",
+          "MJ",
+          "VR",
+          "BW",
+          ""
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:sparse-column"
+    ]
+  },
+  "canaries": [
+    "kc_c1257946ea67f2e44e00d5f4",
+    "kc_a6fd363a3e6f1f7ab51d8161"
+  ]
+}

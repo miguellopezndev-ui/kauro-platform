@@ -1,0 +1,197 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-ugl-100-k02-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-100-k02-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "5d94e6aa45e40e4d96b01365b1c1e9e8e2eca3115d1507ef179e84d9e47d0da6",
+      "candidateSetHash": "a450313075e03ecae43208e71e7bfc6edf3b35bf1025b4eb514fd01e8a66fd26",
+      "targetContractHash": "tc_bc87b2ed527980740807d95b7853764e5c743318857be5d66c9edddf48d3e0a3",
+      "projectRevisionHash": "28b363cbe6309e3259adbe25be6ee9ebd4342cd7d6e0948cf3759c44db9e302f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "País",
+        "sourceFieldRef": "fld_bf0fdc0e28e89626",
+        "decision": "MAP",
+        "destinationField": "contact.country",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Ciudad",
+        "sourceFieldRef": "fld_fe488a6c130e4a99",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Folder code ",
+        "sourceFieldRef": "fld_2b6828036d0418b2",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_9a3df0a590f1e06b",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Folder code ",
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "4955f0934da6648442f24ee61567ae68c5020cfe22db42a71468e238239d3002"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "País",
+        "fieldRef": "src:País",
+        "valueClass": "TEXT",
+        "values": [
+          "\tNorvania  ",
+          " Kelland ",
+          " Kelland  ",
+          " Valdoria "
+        ],
+        "decision": "MAP",
+        "destination": "contact.country",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Ciudad",
+        "fieldRef": "src:Ciudad",
+        "valueClass": "TEXT",
+        "values": [
+          " Nuvia  ",
+          "\tBrandel ",
+          " Kelmar  ",
+          " Kelmar "
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Folder code ",
+        "fieldRef": "src:Folder code ",
+        "valueClass": "TEXT",
+        "values": [
+          " A2 ",
+          " A7 ",
+          " B6 ",
+          " A7 "
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "green",
+          "red",
+          "amber",
+          "blue"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:whitespace",
+      "lang:es"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_64f4aabc8836",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "País",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_ac195719b13d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ciudad",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_03b9bc6dcca5ce7ae9318a35",
+    "kc_d01bedc6ee9dab51caadd59c"
+  ]
+}

@@ -1,0 +1,232 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-103-cap08-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-103-cap08-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "d57779130ca5dc87d8797ee2acf1abb73c8ccb836d44cf2b088733a2934ea81b",
+      "candidateSetHash": "309b093ddb1082d81050d1ff7d521c2b98d8ce9690e4782fa24c559f0f4bf3e5",
+      "targetContractHash": "tc_657ac35a8f3708fcad2973b878ee79143389b3af1b46214c2c4d4e305e515f32",
+      "projectRevisionHash": "8c14b873d2f7d9fc68f1370a61fa68adccc6c956a30eb9b477a079b6b43ab395"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_7ceb0d6730b9bf44",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_4421c73be06fc0a6",
+        "decision": "MAP",
+        "destinationField": "lead.company"
+      },
+      {
+        "sourceHeader": "Email - src",
+        "sourceFieldRef": "fld_16858c2bf5a37276",
+        "decision": "MAP",
+        "destinationField": "lead.email"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_9f9576ce7b851141",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_f472d61cd8c1bc46",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.name",
+      "company.source_id",
+      "lead.company",
+      "lead.email",
+      "lead.industry",
+      "lead.lastName",
+      "lead.rating",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Row checksum",
+      "Sales rep initials"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "097efc6c394b2cb94f3ddf09f16dcb511a12e90bd4b111af3d1b488d64e3c0f8"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "rating",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Belmar",
+          "Jorquist",
+          "Tavunda",
+          "Halorin",
+          "Orvorin",
+          "Mesquist"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Belunda Group S.A.",
+          "Risunda Foods SAS",
+          "Yanell Group B.V.",
+          "Noranth Labs B.V.",
+          "Mesunda Foods Inc.",
+          "Tulero Labs SAS"
+        ],
+        "decision": "MAP",
+        "destination": "lead.company"
+      },
+      {
+        "header": "Email - src",
+        "fieldRef": "src:Email - src",
+        "valueClass": "EMAIL",
+        "values": [
+          "vexan.tulell0@example.test",
+          "joran.sovorin1@corp.example.test",
+          "daran.pelanth2@sample.invalid",
+          "vexek.vexorin3@corp.example.test",
+          "risia.normar4@example.test",
+          "quelan.pelunda5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "lead.email"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "1f12c26c",
+          "993c9adb",
+          "f892e62f",
+          "4970b67b",
+          "f207ac1b",
+          "55521244"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "DP",
+          "EB",
+          "PT",
+          "PT",
+          "ND",
+          "HB"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "link:on-record"
+    ]
+  },
+  "canaries": [
+    "kc_55e04e7ea646a8b4f6b6922e",
+    "kc_d42a52a8416601d65357ed2b"
+  ]
+}

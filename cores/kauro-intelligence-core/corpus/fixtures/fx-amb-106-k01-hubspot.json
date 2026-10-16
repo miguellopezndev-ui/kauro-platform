@@ -1,0 +1,129 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-amb-106-k01-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-106-k01-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "afaa82e93b73f86e13cd88951fd148cfc3fd0095bb3b42de2660349961e8f0fc",
+      "candidateSetHash": "cafe77f0655d4630a3164ee459bb20dbcd25025a2733ff7e3a818e30a4297207",
+      "targetContractHash": "tc_8aaaf02df4ec6d75b53c9288dc64ff9b77ea54c55e82c084c95c8a4fffa87a0b",
+      "projectRevisionHash": "2e1bb2e367de2e383aaf109fd4fa0998a2dbbe86ecab9c8fd8f06bffeeaeb365"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Mobile",
+        "sourceFieldRef": "fld_4300f27c724ad406",
+        "decision": "MAP",
+        "destinationField": "contact.mobilePhone"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.mobilePhone",
+      "contact.ownerEmail",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "dcd159f9b2c9b547c5024a611236af4bcdb35558e7364661fe14b89ff5338528"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Mobile",
+        "fieldRef": "src:Mobile",
+        "valueClass": "PHONE",
+        "values": [
+          "7700 900521",
+          "202-555-0198",
+          "202-555-0171",
+          "7700 900189",
+          "7700 900495"
+        ],
+        "decision": "MAP",
+        "destination": "contact.mobilePhone"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:phone-region"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_b420aa313e3e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Mobile",
+        "targetField": "contact.mobilePhone"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_46983552fa784a6b10460bb0",
+    "kc_5a3e45cc61b4ddd095561ef9"
+  ]
+}

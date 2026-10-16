@@ -1,0 +1,229 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-092-cap09-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-092-cap09-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "fc8530f36a0759dc8969c00be89da8770e42d61cacaf72ef780b2daf5b0a0bdc",
+      "candidateSetHash": "b1b8ccf0550ca90f9f727f311b4f216bd3efbd9e982146e139ba99795be10ecd",
+      "targetContractHash": "tc_e54b956c5ad0b5ba9f91b6b9f3105bf4d345142ae9186f0cd17b79edd7b05eb3",
+      "projectRevisionHash": "f7a669af3f5dbc3bb8539b1a6bb4b0024143e5d9f0fa78df41601010e2835b00"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_6ae829e6472225d2",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Street address - src",
+        "sourceFieldRef": "fld_21b7487a2901ce01",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_1f22265a3c7d8d5b",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_d344324e59947e5b",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_a4f39aa9e2211ea3",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_dc58a80fb1606912",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.website",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials",
+      "Warehouse bin",
+      "Folder code",
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "b96f0335d754b2ae1e31c0ac26c5b11e14a1e6349d6119962de1c6db194dde49"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "daria.yanorin0@example.test",
+          "tula.pelaly1@corp.example.test",
+          "orvel.orviko2@sample.invalid",
+          "risis.wilenko3@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Street address - src",
+        "fieldRef": "src:Street address - src",
+        "valueClass": "TEXT",
+        "values": [
+          "89 Joranth Street",
+          "13 Tavova Street",
+          "19 Kessorin Street",
+          "131 Norunda Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "JE",
+          "AG",
+          "BC",
+          "TS"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "A-49",
+          "B-65",
+          "A-92",
+          "C-59"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F298",
+          "F592",
+          "F556",
+          "F737"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L37483",
+          "L83551",
+          "L23098",
+          "L64591"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_e96d8a8ee319",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Street address - src",
+        "targetField": "contact.addressLine1"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_69f082fe006b6053333fc29a",
+    "kc_1a60924c6a9eef469c3c042b"
+  ]
+}

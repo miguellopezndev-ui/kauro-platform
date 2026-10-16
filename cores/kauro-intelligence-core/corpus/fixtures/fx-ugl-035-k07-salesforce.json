@@ -1,0 +1,182 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-035-k07-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-035-k07-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "29edfe0b3471b810098764949cca35053f4d8be37c01aeb1ea92781c981b54f4",
+      "candidateSetHash": "8be6ba3ad12f82654064e5cbb9a2a02e9e111fa746d0379d4586bcb68c564ddb",
+      "targetContractHash": "tc_f6e292f47a3781b0e98bc4f3d3ece8e211aa83a728c1aa9d64d7dce643376775",
+      "projectRevisionHash": "9a8d9bacd59c19949926854600af06b518d697a5b9362656764ad75f61dcb687"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "المسمى الوظيفي",
+        "sourceFieldRef": "fld_fc7af81ee49480ce",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Puntuación antigua",
+        "sourceFieldRef": "fld_fb5d753fc51f5cd5",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_5f5fc9caab9bb934",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.lifecycleStage"
+    ],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "aa7f137d7d16f4bea94c8018146d7fafb1b4eb3e123c9bab4eb228bcf81f709a"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "المسمى الوظيفي",
+        "fieldRef": "src:المسمى الوظيفي",
+        "valueClass": "TEXT",
+        "values": [
+          "Buyer",
+          "Account manager",
+          "Account manager",
+          "Controller",
+          "Buyer",
+          "Controller"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Puntuación antigua",
+        "fieldRef": "src:Puntuación antigua",
+        "valueClass": "MIXED",
+        "values": [
+          "6",
+          "63",
+          "4",
+          "84",
+          "76",
+          "26"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-6038",
+          "TKT-3555",
+          "TKT-4274",
+          "TKT-4544",
+          "TKT-2451",
+          "TKT-8224"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.lifecycleStage"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-target",
+      "lang:ar",
+      "ugly:stale-header"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_22f642f28e2e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "المسمى الوظيفي",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_49cb31a948fe345a6f7840e8",
+    "kc_bb884a11f630ca6b0f439ad1"
+  ]
+}

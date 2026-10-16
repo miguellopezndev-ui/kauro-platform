@@ -1,0 +1,310 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-043-cap08-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-043-cap08-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "6d3ded532e72c2e97b4c7883141b24945eb16d5e6a667b7a5199d43eaa98d17e",
+      "candidateSetHash": "1fdce7ac4981cd351aa2b3c6dd77b80d52f17022954b287fd94f2c56f4cf6f26",
+      "targetContractHash": null,
+      "projectRevisionHash": "0916adb86fac95fddb82d6c4a26423312e6a8a4657787d697bc69d3be43fce38"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_d546522550da53cf",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_3137b57a1bbab6f1",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_ab9ba2a6ca00fa46",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Job title",
+        "sourceFieldRef": "fld_9b77f430b35e05b0",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_5c138ecbb8066d78",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Opportunity ref",
+        "sourceFieldRef": "fld_3c993bcf03641d01",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv",
+        "associatesWith": "opportunities.csv"
+      },
+      {
+        "sourceHeader": "Deal ID",
+        "sourceFieldRef": "fld_0a4a41c8d1f05426",
+        "decision": "PRESERVE",
+        "filePath": "opportunities.csv"
+      },
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_d9edc8996cfafeb4",
+        "decision": "MAP",
+        "destinationField": "deal.name",
+        "filePath": "opportunities.csv"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_3022bf6dc2d3743d",
+        "decision": "PRESERVE",
+        "filePath": "opportunities.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.phone",
+      "deal.name",
+      "deal.stage"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Legacy system id",
+      "Opportunity ref",
+      "Deal ID",
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [
+      "ASSOCIATION_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "8bbf85da1c09f3b32ceb429328c4103c675df546342470e2e87f5d07cc406c37"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "customers.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "opportunities.csv": {
+          "object": "DEAL",
+          "recordIdColumn": "Deal ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:customers.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-237",
+          "P-238",
+          "P-239"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:customers.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "mesa.taviko0@corp.example.test",
+          "belek.risova1@corp.example.test",
+          "mesel.jorenko2@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "customers.csv"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:customers.csv:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Nuvia",
+          "Valmora",
+          "Valmora"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Job title",
+        "fieldRef": "src:customers.csv:Job title",
+        "valueClass": "TEXT",
+        "values": [
+          "Operations lead",
+          "Buyer",
+          "Account manager"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:customers.csv:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L86119",
+          "L77753",
+          "L79676"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Opportunity ref",
+        "fieldRef": "src:customers.csv:Opportunity ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "D-633",
+          "D-635",
+          "D-633"
+        ],
+        "decision": "PRESERVE",
+        "associatesWith": "opportunities.csv",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Deal ID",
+        "fieldRef": "src:opportunities.csv:Deal ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "D-632",
+          "D-633",
+          "D-634",
+          "D-635"
+        ],
+        "decision": "PRESERVE",
+        "file": "opportunities.csv"
+      },
+      {
+        "header": "Deal name",
+        "fieldRef": "src:opportunities.csv:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Supply contract 2024 Wilsorin",
+          "Expansion 2025 Joriko",
+          "Pilot 2027 Norsorin",
+          "Supply contract 2026 Mesunda"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name",
+        "file": "opportunities.csv"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:opportunities.csv:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "red",
+          "amber",
+          "blue",
+          "red"
+        ],
+        "decision": "PRESERVE",
+        "file": "opportunities.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "ASSOCIATION_MAPPING"
+    ]
+  },
+  "canaries": [
+    "kc_9e3ef8a8dd2c69cc55d5ee0b",
+    "kc_4928d2c3591e8e8fe7e168d3"
+  ]
+}

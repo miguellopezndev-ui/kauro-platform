@@ -1,0 +1,177 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-176-cap09-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-176-cap09-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9085d07221247673e217367816c47aa9f9942813783878c635bb27dd1026eb4b",
+      "candidateSetHash": "7c8c1d2445888650bb0ffcc15983762854711e74d8e4d4892e132e904c7c5163",
+      "targetContractHash": "tc_c38f937dfad2015314e8b462c7eecd679d587c6b2717d9ddd8a069a6ed93f0dd",
+      "projectRevisionHash": "55609c73262fc8eeb173b4f040b1f7490c2d4767a9fc443d8292bac96815cc8a"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name - src",
+        "sourceFieldRef": "fld_6740f78af6900866",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_f77f97c08cc5808a",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_fc5ff468e0025ca3",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.company",
+      "lead.description",
+      "lead.lastName",
+      "lead.mobilePhone",
+      "lead.status",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials",
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3c40f21b63babe413d34ca756330b15313717ae2bdc83413a17480be0326d9c1"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Open - Not Contacted",
+              "Working - Contacted",
+              "Closed - Converted",
+              "Closed - Not Converted"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name - src",
+        "fieldRef": "src:Last name - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Yanmar",
+          "Belunda",
+          "Finsorin"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "EL",
+          "TC",
+          "DR"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L50807",
+          "L58710",
+          "L81615"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_72c7635cf674",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Last name - src",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_7b1e899f1260273b79775a95",
+    "kc_06207e9099d350b62e9e79fd"
+  ]
+}

@@ -1,0 +1,312 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-067-cap08-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-067-cap08-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "efa2f498a8ed2edb2188efba3b8f87844ebf93c28ebfff0ccae2daed9b98d54a",
+      "candidateSetHash": "fb7ebe0a5019b18633da53cf0ec6890a3d81b3724e56d62b8d29faefc5f8a917",
+      "targetContractHash": "tc_ca899cefaec22e7881fb5dc9a2bb5f051c54caf5ff4454f7b4444c2177663d87",
+      "projectRevisionHash": "32c26ee8223c3b531e62b5df32d9858220f4dc8c6a2715bddd7d7edeaabd9d67"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_45b5ff6754d0820f",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_0bd5dc4f71d9a020",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_21e1d86621575af0",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_834115a1138bc188",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Cuenta ref",
+        "sourceFieldRef": "fld_32586484d193e1bd",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv",
+        "associatesWith": "companies.csv"
+      },
+      {
+        "sourceHeader": "Company ID",
+        "sourceFieldRef": "fld_58cda4559c6066b5",
+        "decision": "PRESERVE",
+        "filePath": "companies.csv"
+      },
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_f209e37320993c1a",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "filePath": "companies.csv"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_5de68d9b8322a305",
+        "decision": "PRESERVE",
+        "filePath": "companies.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.name",
+      "company.source_id",
+      "contact.addressLine1",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Folder code",
+      "Cuenta ref",
+      "Company ID",
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [
+      "ASSOCIATION_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e7c12bcec885d3a70e93bb5db12eb35fce086c2d26a0364bad8299a288b8b31d"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "customers.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "companies.csv": {
+          "object": "COMPANY",
+          "recordIdColumn": "Company ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:customers.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-369",
+          "P-370",
+          "P-371",
+          "P-372",
+          "P-373"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:customers.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "joris.mesaly0@sample.invalid",
+          "halan.wilero1@corp.example.test",
+          "orva.tuliko2@corp.example.test",
+          "kesek.risunda3@example.test",
+          "norel.zerunda4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "customers.csv"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:customers.csv:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Quela",
+          "Joris",
+          "Tulek",
+          "Kesek",
+          "Orvis"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:customers.csv:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F622",
+          "F880",
+          "F736",
+          "F603",
+          "F203"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Cuenta ref",
+        "fieldRef": "src:customers.csv:Cuenta ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-291",
+          "C-291",
+          "C-291",
+          "C-293",
+          "C-293"
+        ],
+        "decision": "PRESERVE",
+        "associatesWith": "companies.csv",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Company ID",
+        "fieldRef": "src:companies.csv:Company ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-290",
+          "C-291",
+          "C-292",
+          "C-293"
+        ],
+        "decision": "PRESERVE",
+        "file": "companies.csv"
+      },
+      {
+        "header": "Name",
+        "fieldRef": "src:companies.csv:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Beliko Studio Ltd",
+          "Sovunda Labs Ltd",
+          "Yanrane Foods Ltd",
+          "Tavell Studio GmbH"
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "file": "companies.csv"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:companies.csv:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "cc975a0e",
+          "4960ca2a",
+          "7895c0a3",
+          "40a19c93"
+        ],
+        "decision": "PRESERVE",
+        "file": "companies.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "ASSOCIATION_MAPPING"
+    ]
+  },
+  "canaries": [
+    "kc_7a2dcb98667a7dcac5aa2b9c",
+    "kc_35a77cdd073cba449d840b62"
+  ]
+}

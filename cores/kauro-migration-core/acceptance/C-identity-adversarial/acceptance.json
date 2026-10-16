@@ -1,0 +1,198 @@
+{
+  "artifacts": [
+    {
+      "byteLength": 180,
+      "path": "01_IMPORT/hubspot/contacts.csv",
+      "rowCount": 3,
+      "sha256": "a8b7b31910c2ab5aca895efa0be0c130f3f4f96aa0c47fee3892e51ed1f5f4d8"
+    },
+    {
+      "byteLength": 785,
+      "path": "02_EXCEPTIONS/destination-conflicts.csv",
+      "rowCount": 2,
+      "sha256": "49cacdc9b8f03ffafb61880662ec8b54e827a06e7f5342353bd0d62ff9f74f13"
+    },
+    {
+      "byteLength": 4445,
+      "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+      "rowCount": 8,
+      "sha256": "8f7afd7facd9885d691898a8685302524e527495b7e13f4b428def8acc541e4c"
+    },
+    {
+      "byteLength": 77,
+      "path": "02_EXCEPTIONS/formula-risk.csv",
+      "rowCount": 0,
+      "sha256": "c56bc99e6ef7aecb7ecc178956026fbf5e044a8fe88836bc4c6380715c8a4006"
+    },
+    {
+      "byteLength": 2265,
+      "path": "02_EXCEPTIONS/isolated.csv",
+      "rowCount": 5,
+      "sha256": "0222e707b74f48e3bf573235a7e8e326d6eec1d109529cebd811d9feef850642"
+    },
+    {
+      "byteLength": 114,
+      "path": "02_EXCEPTIONS/leftovers.csv",
+      "rowCount": 0,
+      "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+    },
+    {
+      "byteLength": 114,
+      "path": "02_EXCEPTIONS/rejected-input.csv",
+      "rowCount": 0,
+      "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+    },
+    {
+      "byteLength": 158,
+      "path": "02_EXCEPTIONS/unmapped-fields.csv",
+      "rowCount": 0,
+      "sha256": "e193b1fb95b588a0f8fec5a42f961b36e4e8c2bfb7f03bd122531811da153106"
+    },
+    {
+      "byteLength": 206,
+      "path": "02_EXCEPTIONS/unresolved-associations.csv",
+      "rowCount": 0,
+      "sha256": "d0efcfc09f4e1d53ce26a3b410252680069be09956c191b850b3ee1c936f40bf"
+    },
+    {
+      "byteLength": 274,
+      "path": "03_TRACEABILITY/associations.csv",
+      "rowCount": 0,
+      "sha256": "8dffe96314114baf20a78b2c4e861f78a2bfdba215777b90aa7259c11be49673"
+    },
+    {
+      "byteLength": 247,
+      "path": "03_TRACEABILITY/changes.csv",
+      "rowCount": 0,
+      "sha256": "306c212cba85e82f0da921e61ba45c9e39606edf62573790c1d41732704319d9"
+    },
+    {
+      "byteLength": 12206,
+      "path": "03_TRACEABILITY/config.normalized.json",
+      "rowCount": null,
+      "sha256": "b834e980c633752dfbb7d21d34bb3f510ae6f2bf815fbddb47ff8a1c91e57369"
+    },
+    {
+      "byteLength": 109,
+      "path": "03_TRACEABILITY/destination-matching.csv",
+      "rowCount": 0,
+      "sha256": "b572fb9c9af32a87898e824321ec6a2fab85f7feb31a2f120819781d442d5b2b"
+    },
+    {
+      "byteLength": 220,
+      "path": "03_TRACEABILITY/flags.csv",
+      "rowCount": 0,
+      "sha256": "65bcdcd42fa2febc22f757c2be866f10d4ba3568eb44f451f85fc7911458107d"
+    },
+    {
+      "byteLength": 376,
+      "path": "03_TRACEABILITY/import-crosswalk.csv",
+      "rowCount": 3,
+      "sha256": "a316f57afed4b4d14cd6c475e968c1f628e080e7bda0fb37f2453bd23bdf4b57"
+    },
+    {
+      "byteLength": 3065,
+      "path": "03_TRACEABILITY/instance-verification.csv",
+      "rowCount": 10,
+      "sha256": "18763ad9c4e3ccee7599d9389d746d24c856a25925cbc473c6bdd6ceb8358b67"
+    },
+    {
+      "byteLength": 2327,
+      "path": "03_TRACEABILITY/merges.json",
+      "rowCount": null,
+      "sha256": "a0dc90850d0072063283ccc5c787236311fe698355974fe03f406b64a22b688c"
+    },
+    {
+      "byteLength": 1743,
+      "path": "03_TRACEABILITY/reconciliation.json",
+      "rowCount": null,
+      "sha256": "aeed2b27eea3a5471fd59b11b57431ff9b0fb4b6db4a5dcb9990006c9f99c0c2"
+    },
+    {
+      "byteLength": 5801,
+      "path": "03_TRACEABILITY/source-lineage.csv",
+      "rowCount": 10,
+      "sha256": "3b3230467559f4a1ed2a5f0506225f10ac30aa72a42ddf8a6d889ff6d60c5857"
+    },
+    {
+      "byteLength": 8992,
+      "path": "04_DOCUMENTATION/audit.md",
+      "rowCount": null,
+      "sha256": "35fa9c8f64c7ff9e69196cf4891fdb34aadf4275ee777339e5e8b9db0fab2dd9"
+    },
+    {
+      "byteLength": 1690,
+      "path": "04_DOCUMENTATION/import-instructions.md",
+      "rowCount": null,
+      "sha256": "67ffec0258566b233f9434bd620e778d99814cf8bfc0255835646c2e22947abf"
+    }
+  ],
+  "associations": {
+    "byDisposition": {
+      "DEDUPLICATED": 0,
+      "LEFTOVER": 0,
+      "OUTPUT": 0,
+      "UNRESOLVED": 0
+    },
+    "sourceEdges": 0,
+    "withoutDisposition": 0
+  },
+  "bundleId": "B-be4960c54b201b76",
+  "caseId": "C-identity-adversarial",
+  "cells": {
+    "changed": 0,
+    "clearedByExplicitAuthorization": 0,
+    "flagged": 0,
+    "rowsWithChanges": 0,
+    "unmappedPreserved": 0
+  },
+  "configHash": "b834e980c633752dfbb7d21d34bb3f510ae6f2bf815fbddb47ff8a1c91e57369",
+  "coreVersion": "3.0.0",
+  "destination": {
+    "instanceVerificationItems": 10,
+    "keyConflicts": 2,
+    "spreadsheetFormulaRiskValues": 0
+  },
+  "identity": {
+    "absorbedRows": 2,
+    "consentConflicts": 0,
+    "duplicateCandidateClusters": 4,
+    "duplicateCandidateRows": 7,
+    "mergeConflicts": 2,
+    "provenMerges": 2
+  },
+  "intent": "A proven duplicate, a proven duplicate that disagrees with itself, two different people sharing an address, a shared mailbox used by two people, and the same record id in two different source systems. Only the provable duplicate is combined.",
+  "manifestSha256": "daca27c3d715ad187612d04321cb87d84cda1fbbae3f34aad128d8f4185754aa",
+  "records": {
+    "byObject": {
+      "COMPANY": 0,
+      "CONTACT": 3,
+      "DEAL": 0,
+      "LEAD": 0
+    },
+    "total": 3
+  },
+  "runId": "run_1ea3b00c381f2c04712ae01f",
+  "sourceRows": {
+    "byDisposition": {
+      "ISOLATED": 5,
+      "LEFTOVER": 0,
+      "MERGED_PROVEN": 2,
+      "OUTPUT": 3,
+      "REJECTED_INPUT": 0
+    },
+    "total": 10,
+    "withoutDisposition": 0
+  },
+  "target": {
+    "adapterVersion": "2.0.0",
+    "mode": "CREATE_ONLY",
+    "vendor": "HUBSPOT"
+  },
+  "title": "Identity under adversarial conditions",
+  "verification": {
+    "checksRun": 60,
+    "passed": true,
+    "problems": []
+  }
+}

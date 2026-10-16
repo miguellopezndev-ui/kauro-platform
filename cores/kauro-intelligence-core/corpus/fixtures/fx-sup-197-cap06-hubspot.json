@@ -1,0 +1,288 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-197-cap06-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-197-cap06-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "f5074e85139d0e82bb63bad3ea6ea0f508c5034574b640c407e0ca5fe67eed51",
+      "candidateSetHash": "e4d461d82a7c0c94a23da58b4c5a0ddccf781dc41b360d45cbafb8af3ddf9ca3",
+      "targetContractHash": "tc_e1c2c263c116c59e02b35e4c3fad3f19ca78ff73dae1f7e52abc4cf7964beec1",
+      "projectRevisionHash": "0e294e33ae4218bc271759098f28a8d10509d637ccbe896515332e1112c96833"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_ed0faabd92c3b9d8",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_bb900cb9230d69cc",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_789a15c4a8f690df",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Client Code",
+        "sourceFieldRef": "fld_a1a02e66a2040803",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv",
+        "adoptsIdentity": true
+      },
+      {
+        "sourceHeader": "Client Code",
+        "sourceFieldRef": "fld_17d6a661c407afd4",
+        "decision": "PRESERVE",
+        "filePath": "event-attendees.csv",
+        "adoptsIdentity": true
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_52aa5255a8cdfe76",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "filePath": "event-attendees.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_2385ba9650eb58c5",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "event-attendees.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_b0fa907f0f8aa060",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "event-attendees.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.client_code",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Audit remark code",
+      "Client Code",
+      "Client Code"
+    ],
+    "expectedTaskTypes": [
+      "IDENTITY_STRATEGY"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "f183a1fe98650a49d04971ae405b6fd3dd4af8c857c76364a7eec2c1f124c97f"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "customers.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "event-attendees.csv": {
+          "object": "CONTACT"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "client_code",
+            "valueClass": "TEXT",
+            "required": false,
+            "label": "Client Code",
+            "externalId": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:customers.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-677",
+          "P-678",
+          "P-679"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:customers.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "meso.mesorin0@example.test",
+          "zeris.soviko1@sample.invalid",
+          "finek.tuldell2@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:customers.csv:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-16",
+          "R-60",
+          "R-4"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Client Code",
+        "fieldRef": "src:customers.csv:Client Code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "CL-9126",
+          "CL-9127",
+          "CL-9128"
+        ],
+        "decision": "PRESERVE",
+        "adoptsIdentity": true,
+        "file": "customers.csv"
+      },
+      {
+        "header": "Client Code",
+        "fieldRef": "src:event-attendees.csv:Client Code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "CL-9128",
+          "CL-9865",
+          "CL-9866",
+          "CL-9867",
+          "CL-9868"
+        ],
+        "decision": "PRESERVE",
+        "adoptsIdentity": true,
+        "file": "event-attendees.csv"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:event-attendees.csv:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Joran",
+          "Tavis",
+          "Yano",
+          "Halek",
+          "Tulek"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "file": "event-attendees.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:event-attendees.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "jora.tavenko0@example.test",
+          "darel.halorin1@example.test",
+          "orvek.risath2@example.test",
+          "pela.finiko3@sample.invalid",
+          "sovia.tulenko4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "event-attendees.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:event-attendees.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Risvik",
+          "Darero",
+          "Lumova",
+          "Jororin",
+          "Yanova"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "event-attendees.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "IDENTITY_STRATEGY"
+    ]
+  },
+  "canaries": [
+    "kc_024d628c80fd5882d38b149a",
+    "kc_196b23fbfab979ab508d6446"
+  ]
+}

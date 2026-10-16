@@ -1,0 +1,191 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-149-cap06-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-149-cap06-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "3218d4f404ff322a6dca2ff22ff4bc3a01bc41fc9c78d2336871ba27f15cd9b3",
+      "candidateSetHash": "b7dc6461e416e552cd9e1ae6fb4aeabf0ea6f1b560dfbe340192509baba1e810",
+      "targetContractHash": null,
+      "projectRevisionHash": "4fc67d88667d82dbe89f629f314a7ef3a25d38809b0305047339480c9515107b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Indirizzo email",
+        "sourceFieldRef": "fld_d8f41a676485eb47",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "requiredEvidenceRefs": [
+          "ev_6a519200524a0187"
+        ]
+      },
+      {
+        "sourceHeader": "Nome",
+        "sourceFieldRef": "fld_afd1d665c1a21418",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_110799dc7f719154",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_a0ad280929981d0d",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.phone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Legacy system id",
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "52ddc02fc2afb071a18a945a4a3114346f4918b061c449d7eaf89570d24bf52d"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Indirizzo email",
+        "fieldRef": "src:Indirizzo email",
+        "valueClass": "EMAIL",
+        "values": [
+          "vexek.pelova0@example.test",
+          "tulo.pelorin1@corp.example.test",
+          "zera.lumaly2@sample.invalid",
+          "joran.zerell3@corp.example.test",
+          "sovo.finvik4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Nome",
+        "fieldRef": "src:Nome",
+        "valueClass": "TEXT",
+        "values": [
+          "Vexis",
+          "Pela",
+          "Tavel",
+          "Darek",
+          "Sovia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L40886",
+          "L67607",
+          "L13287",
+          "L90257",
+          "L48638"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-31",
+          "batch-8",
+          "batch-7",
+          "batch-11",
+          "batch-7"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_3c780ea6b3fd",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nome",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_822ffd06ce5d766cb41d0b55",
+    "kc_9d374fe95cde973ea015e4f8"
+  ]
+}

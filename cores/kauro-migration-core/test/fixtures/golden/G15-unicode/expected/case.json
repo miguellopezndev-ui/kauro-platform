@@ -1,0 +1,26 @@
+{
+  "id": "G15",
+  "title": "Unicode round-trip",
+  "intent": "Accents, an eyebrow-raising apostrophe, non-Latin scripts and Icelandic letters must survive ingest, transformation and delivery byte for byte.",
+  "expect": {
+    "rows": { "total": 4, "OUTPUT": 4, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 4, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "delivered": [
+    { "sourceRecordId": "1", "values": { "contact.firstName": "Núñez", "contact.lastName": "O'Brien", "contact.city": "Bogotá" } },
+    { "sourceRecordId": "2", "values": { "contact.firstName": "François", "contact.lastName": "Müller", "contact.city": "Zürich" } },
+    { "sourceRecordId": "3", "values": { "contact.firstName": "芳子", "contact.lastName": "山田", "contact.city": "東京" } },
+    { "sourceRecordId": "4", "values": { "contact.firstName": "Ægir", "contact.lastName": "Þórsson", "contact.city": "Reykjavík" } }
+  ]
+}

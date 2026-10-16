@@ -1,0 +1,178 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-023-k08-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-023-k08-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "70fa198e812a6f6f7f7c619a2ad71dfe0da31d5d2a0c7528d5c1b1cd6be5562d",
+      "candidateSetHash": "3586a22f36382cca9b09b6b7c0fa1d9009f9d5486dc875864337502e85a14e01",
+      "targetContractHash": "tc_b0b817114cd994e03630ed235979c1e563c1f0c3d40116319e4b2121b9c79308",
+      "projectRevisionHash": "c46ae465054c34dbe7faafa04b8134a022de292963a67ebcdd1232b2f362a3a0"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_f275bb2424864c10",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Correo o teléfono",
+        "sourceFieldRef": "fld_b8ee16192e94a472",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_30dfa9803ee697ec",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.lastName",
+      "contact.lifecycleStage",
+      "contact.ownerEmail",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0139e913e6d5378c212d7fb4bd0ad6a4cfa6037c03f96519d879cb4878dc756d"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Finath",
+          "Risquist",
+          "Halunda",
+          "Sovanth"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Correo o teléfono",
+        "fieldRef": "src:Correo o teléfono",
+        "valueClass": "MIXED",
+        "values": [
+          "tavel.tulvik0@example.test",
+          "+12025550159",
+          "tavan.pelenko2@example.test",
+          "4291",
+          "zerel.quelorin4@corp.example.test",
+          "2039"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-34",
+          "batch-2",
+          "batch-12",
+          "batch-17"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:header-values-conflict"
+    ]
+  },
+  "canaries": [
+    "kc_b2df83871ee2af72e8cbd6e6",
+    "kc_cba1171271115239d65df848"
+  ]
+}

@@ -1,0 +1,201 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-207-cap04-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-207-cap04-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0fdc5f668d1cb055bcabec8f36ae110562c796796e0912ec88b322e6ac28f82e",
+      "candidateSetHash": "903f01ee7bdb6daa7fe3c49408103fd82062b4220d7647ab1de5daa7999d56c7",
+      "targetContractHash": "tc_8bb0574e45900996ef68b54dd8811e59559ef978be8a941262a56b224c990ab3",
+      "projectRevisionHash": "21abf0e4e5532342f060a5b466b18a376e6f17a66370e4c1958dd514f3880562"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Betrag",
+        "sourceFieldRef": "fld_41e2389ff614eb22",
+        "decision": "MAP",
+        "destinationField": "deal.amount",
+        "transformPrimitive": "NORMALISE_NUMBER",
+        "typedTransformParams": {
+          "decimalSeparator": ","
+        }
+      },
+      {
+        "sourceHeader": "Abschlussdatum",
+        "sourceFieldRef": "fld_ec68649bcf19b8d4",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate",
+        "transformPrimitive": "PARSE_DATE_ISO",
+        "typedTransformParams": {
+          "dateFormat": "DD/MM/YYYY"
+        }
+      },
+      {
+        "sourceHeader": "Label (legacy)",
+        "sourceFieldRef": "fld_e2b60e4cfd3ff1e9",
+        "decision": "MAP",
+        "destinationField": "deal.name",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6d07e3e70d77f51c0e8f5c013fc4b3c800f1d4750ff96ae5b3ca82b341a9e878"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL",
+      "locale": {
+        "dateFormat": "DD/MM/YYYY"
+      }
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": true
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Betrag",
+        "fieldRef": "src:Betrag",
+        "valueClass": "NUMBER",
+        "values": [
+          "40327,70",
+          "34001,60",
+          "19588,45",
+          "76872,37",
+          "8320,92"
+        ],
+        "decision": "MAP",
+        "destination": "deal.amount",
+        "transform": "NORMALISE_NUMBER",
+        "params": {
+          "decimalSeparator": ","
+        }
+      },
+      {
+        "header": "Abschlussdatum",
+        "fieldRef": "src:Abschlussdatum",
+        "valueClass": "DATE",
+        "values": [
+          "14/08/2019",
+          "20/03/2025",
+          "22/07/2023",
+          "15/07/2023",
+          "23/04/2022"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate",
+        "transform": "PARSE_DATE_ISO",
+        "params": {
+          "dateFormat": "DD/MM/YYYY"
+        }
+      },
+      {
+        "header": "Label (legacy)",
+        "fieldRef": "src:Label (legacy)",
+        "valueClass": "TEXT",
+        "values": [
+          "  Renewal 2024 Joriko",
+          "Pilot 2025 Pelmar ",
+          "  Supply contract 2025 Tuliko",
+          "Expansion 2024 Tavero ",
+          "  Pilot 2025 Kesova"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name",
+        "transform": "TRIM_WHITESPACE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_acc03a0442b7",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Label (legacy)",
+        "targetField": "deal.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_e2b9f24f6b78aa0eca54158e",
+    "kc_1949e1a79ee8e1752f822ed7"
+  ]
+}

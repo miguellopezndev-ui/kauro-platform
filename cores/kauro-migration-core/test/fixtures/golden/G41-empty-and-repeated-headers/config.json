@@ -1,0 +1,60 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g41-empty-and-repeated-headers"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "contacts",
+      "path": "contacts.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "index": 2
+          },
+          "destinationField": "contact.description",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Phone",
+            "occurrence": 1
+          },
+          "destinationField": "contact.phone",
+          "semanticType": "PHONE"
+        },
+        {
+          "column": {
+            "header": "Phone",
+            "occurrence": 2
+          },
+          "destinationField": "contact.mobilePhone",
+          "semanticType": "PHONE"
+        }
+      ]
+    }
+  ]
+}

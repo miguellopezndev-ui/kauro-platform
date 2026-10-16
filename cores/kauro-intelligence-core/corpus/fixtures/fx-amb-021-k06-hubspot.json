@@ -1,0 +1,178 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-021-k06-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-021-k06-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "15d76b81828616e60e8ca38591edc929de1dfefb69d1174d0b329030face9b78",
+      "candidateSetHash": "571c805cb00191a61f0ae9ba0976ab6292434149040c5cf3b09dd3bebb66834d",
+      "targetContractHash": "tc_38954aa15c34567faa9b9ca7d5aba7afa8b3468b83c9ca380fe11c2a19e08973",
+      "projectRevisionHash": "94824618b4bbd00be6198ef1d90cd15ab7ec4f25f066dc22e2f54cd7cce2d61c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_2e59d11776d548e1",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_764db2e5fa4a90f3",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Tipo",
+        "sourceFieldRef": "fld_9f0389a8f85c988d",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lastName",
+      "contact.lifecycleStage",
+      "contact.ownerEmail",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "9b03c4f35636282383b9e31792bab2c798c99ff4976a7aa89670b8ba8ffec9ef"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "orvo.lumova0@corp.example.test",
+          "wila.wilell1@corp.example.test",
+          "pelek.finunda2@corp.example.test",
+          "quelan.halsorin3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Mesunda",
+          "Sovanth",
+          "Joranth",
+          "Halath"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Tipo",
+        "fieldRef": "src:Tipo",
+        "valueClass": "ENUM",
+        "values": [
+          "Q",
+          "A",
+          "X1",
+          "Q",
+          "A",
+          "X1"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:enum-codes"
+    ]
+  },
+  "canaries": [
+    "kc_2d3d07b4a80dfd40f66e5071",
+    "kc_77ec8b922bba3a5866acf85a"
+  ]
+}

@@ -1,0 +1,270 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "legacy_crm",
+    "namespace": "acme-2026-08"
+  },
+  "target": {
+    "mode": "SALESFORCE",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "contacts",
+      "path": "contacts.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "companies",
+      "path": "companies.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "deals",
+      "path": "deals.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "contactdeals",
+      "path": "contact-deals.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "leads",
+      "path": "leads.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "leads",
+      "fileId": "leads",
+      "object": "LEAD",
+      "sourceRecordIdColumn": {
+        "header": "Lead ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "lead.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "lead.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Company"
+          },
+          "destinationField": "lead.company",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "lead.email",
+          "semanticType": "EMAIL"
+        },
+        {
+          "column": {
+            "header": "Phone"
+          },
+          "destinationField": "lead.phone",
+          "semanticType": "PHONE",
+          "options": {
+            "phoneCountryColumn": {
+              "header": "Country"
+            }
+          }
+        },
+        {
+          "column": {
+            "header": "Status"
+          },
+          "destinationField": "lead.status",
+          "semanticType": "TEXT"
+        }
+      ]
+    },
+    {
+      "id": "contacts",
+      "fileId": "contacts",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Last Name"
+          },
+          "destinationField": "contact.lastName",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Email"
+          },
+          "destinationField": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        {
+          "column": {
+            "header": "Phone"
+          },
+          "destinationField": "contact.phone",
+          "semanticType": "PHONE",
+          "options": {
+            "phoneCountryColumn": {
+              "header": "Country"
+            }
+          }
+        },
+        {
+          "column": {
+            "header": "Job Title"
+          },
+          "destinationField": "contact.jobTitle",
+          "semanticType": "TEXT"
+        }
+      ]
+    },
+    {
+      "id": "companies",
+      "fileId": "companies",
+      "object": "COMPANY",
+      "sourceRecordIdColumn": {
+        "header": "Company ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "Name"
+          },
+          "destinationField": "company.name",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "City"
+          },
+          "destinationField": "company.city",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Country"
+          },
+          "destinationField": "company.country",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Employees"
+          },
+          "destinationField": "company.employeeCount",
+          "semanticType": "NUMBER",
+          "options": {
+            "decimalSeparator": ".",
+            "thousandsSeparator": "NONE"
+          }
+        }
+      ]
+    },
+    {
+      "id": "deals",
+      "fileId": "deals",
+      "object": "DEAL",
+      "sourceRecordIdColumn": {
+        "header": "Deal ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "Deal Name"
+          },
+          "destinationField": "deal.name",
+          "semanticType": "TEXT"
+        },
+        {
+          "column": {
+            "header": "Amount"
+          },
+          "destinationField": "deal.amount",
+          "semanticType": "NUMBER",
+          "options": {
+            "decimalSeparator": ".",
+            "thousandsSeparator": "NONE"
+          }
+        },
+        {
+          "column": {
+            "header": "Close Date"
+          },
+          "destinationField": "deal.closeDate",
+          "semanticType": "DATE"
+        },
+        {
+          "column": {
+            "header": "Stage"
+          },
+          "destinationField": "deal.stage",
+          "semanticType": "TEXT"
+        }
+      ]
+    }
+  ],
+  "associations": [
+    {
+      "id": "contact-company",
+      "kind": "COLUMN_REFERENCE",
+      "recordMappingId": "contacts",
+      "relationshipType": "CONTACT_TO_COMPANY",
+      "keyColumn": {
+        "header": "Company ID"
+      },
+      "targetRecordMappingId": "companies",
+      "targetMatchKey": "SOURCE_RECORD_ID"
+    },
+    {
+      "id": "company-deal",
+      "kind": "COLUMN_REFERENCE",
+      "recordMappingId": "deals",
+      "relationshipType": "COMPANY_TO_DEAL",
+      "ownerSide": "TO",
+      "keyColumn": {
+        "header": "Company ID"
+      },
+      "targetRecordMappingId": "companies",
+      "targetMatchKey": "SOURCE_RECORD_ID"
+    },
+    {
+      "id": "contact-deal",
+      "kind": "EDGE_FILE",
+      "fileId": "contactdeals",
+      "relationshipType": "CONTACT_TO_DEAL",
+      "fromRecordMappingId": "contacts",
+      "fromKeyColumn": {
+        "header": "Contact ID"
+      },
+      "toRecordMappingId": "deals",
+      "toKeyColumn": {
+        "header": "Deal ID"
+      }
+    }
+  ]
+}

@@ -1,0 +1,164 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-023-cap12-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-023-cap12-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "52bd07a4f701c430cb85d10e525847561460d938577652bc94ed239fdb8dec8b",
+      "candidateSetHash": "12d5af5419dc26e71b23065ac7026a01b4c2aeeffa60b9275d4406154eda389c",
+      "targetContractHash": "tc_11e30c60cfa2906cc76073c0a73e29dadeac7f48b947db87f8d65fc1ca9c212a",
+      "projectRevisionHash": "91e60090be536e2cb97f4361bb67d62617c69b9a97e59af8ac825d4278759c9f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_ea963170bc8e75b4",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Info",
+        "sourceFieldRef": "fld_63c4573d99365906",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate",
+        "requiredEvidenceRefs": [
+          "ev_a787c685491e827a"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.closeDate",
+      "deal.name",
+      "deal.ownerEmail",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e64a4a5e145691426ffbc57d53b6fbea40e29b4efe1d74b6f9d4e98213c3715d"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Deal name",
+        "fieldRef": "src:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Pilot 2024 Beliko",
+          "Supply contract 2027 Risanth",
+          "Pilot 2026 Kesunda",
+          "Supply contract 2025 Finvik",
+          "Expansion 2025 Mesorin",
+          "Expansion 2024 Zerero"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Info",
+        "fieldRef": "src:Info",
+        "valueClass": "DATE",
+        "values": [
+          "2025-05-24",
+          "2022-01-25",
+          "2022-02-16",
+          "2019-05-24",
+          "2022-01-17",
+          "2019-01-17"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate",
+        "evidence": [
+          "ev:self"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_d1b1faedadd43c389170c26c",
+    "kc_a04aa8c96e3b65a5e55891b6"
+  ]
+}

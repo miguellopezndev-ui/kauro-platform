@@ -1,0 +1,67 @@
+{
+  "name": "kauro-migration-core",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Clean-room deterministic CRM migration core.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22.11.0"
+  },
+  "bin": {
+    "kauro-core": "./dist/src/cli/main.js"
+  },
+  "exports": {
+    ".": "./dist/src/index.js"
+  },
+  "files": [
+    "dist",
+    "spec"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "node tools/contract-lint.mjs",
+    "spec:gen": "node dist/tools/gen-spec.js",
+    "spec:check": "node dist/tools/gen-spec.js --check",
+    "test": "node tools/run-tests.mjs",
+    "test:coverage": "node tools/run-tests.mjs --coverage",
+    "golden": "node tools/run-tests.mjs --filter golden",
+    "property": "node tools/run-tests.mjs --filter property",
+    "determinism": "node dist/tools/determinism-replay.js",
+    "sabotage": "node tools/sabotage.mjs",
+    "acceptance": "node dist/tools/build-acceptance-packages.js",
+    "bench": "node dist/tools/bench.js",
+    "gate": "npm run build && npm run typecheck && npm run lint && npm run spec:check && npm run constitution && npm run target-contract && npm run test && npm run determinism && npm run acceptance && npm run strong && npm run adversarial",
+    "strong": "node tools/run-tests.mjs --filter source-backed",
+    "constitution": "node tools/constitution-gate.mjs",
+    "target-contract": "node tools/target-contract-gate.mjs",
+    "adversarial": "node tools/final-adversarial.mjs",
+    "provenance": "node tools/provenance.mjs",
+    "provenance:check": "node tools/provenance.mjs --check",
+    "architecture": "node tools/architecture-gate.mjs",
+    "architecture:self-test": "node tools/architecture-gate.mjs --self-test",
+    "gate:all": "npm run gate && npm run architecture",
+    "universe": "node tools/universe.mjs",
+    "drift": "node tools/drift-gate.mjs",
+    "release-candidate": "node tools/release-candidate-gate.mjs",
+    "release-candidate:self-test": "node tools/release-candidate-gate.mjs --self-test",
+    "audit": "npm audit --audit-level=moderate",
+    "evidence:self-test": "node tools/evidence-selftest.mjs",
+    "launcher:self-test": "bash bench/prepare-universe-selftest.sh",
+    "subject": "node tools/execution-subject.mjs",
+    "campaign:seal": "node tools/seal-campaign.mjs",
+    "campaign:check": "node tools/seal-campaign.mjs --check",
+    "freeze:verdict": "node tools/freeze-verdict.mjs",
+    "pack:release": "node tools/pack.mjs"
+  },
+  "dependencies": {
+    "fflate": "0.8.3",
+    "libphonenumber-js": "1.13.12"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "fast-check": "4.9.0",
+    "typescript": "5.9.3"
+  }
+}

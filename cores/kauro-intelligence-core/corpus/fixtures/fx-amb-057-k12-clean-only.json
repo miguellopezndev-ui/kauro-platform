@@ -1,0 +1,157 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-057-k12-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-057-k12-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "7657af8f4a566e38eef4e531e1cc9c6f1070c0bacf750fe71dfd0b0bbc061abe",
+      "candidateSetHash": "e1957f876263ccbd5f52381af6c4c7922a75d780beea8d4afe4a3426a8685da0",
+      "targetContractHash": null,
+      "projectRevisionHash": "11a6db23e7ca8fe1d1968f16dba83aa93190ea2d1d0f279c9573f4939594ad12"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Marca",
+        "sourceFieldRef": "fld_1e2d1887625401c7",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_1d46c08e364d7530",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.createdAt",
+      "contact.doNotCall",
+      "contact.doNotEmail",
+      "contact.lifecycleStage",
+      "lead.status",
+      "lead.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0270cbacc3f58321b85510d8915408bf7573182cf6c1f352aef79c3f2cfd761c"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP05",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Marca",
+        "fieldRef": "src:Marca",
+        "valueClass": "BOOLEAN",
+        "values": [
+          "Y",
+          "N",
+          "?",
+          "Y",
+          "N",
+          "?",
+          "Y"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "B-76",
+          "A-10",
+          "B-28",
+          "C-35",
+          "C-72",
+          "A-52"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:unknown-flag"
+    ]
+  },
+  "canaries": [
+    "kc_3c522346557e1e149ace1fa2",
+    "kc_e2210fadb1306954e55a0734"
+  ]
+}

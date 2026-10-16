@@ -1,0 +1,290 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-204-cap01-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-204-cap01-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "b672d35cf2c09dae9fb454e4567eef9e436f9fbf776ba56266cfdcf9f08736c8",
+      "candidateSetHash": "849dd0696e2cf88f879f5c7d8f28a68fb11e5e709ed0c82e0c877272cc5f22a2",
+      "targetContractHash": "tc_071d319ca699bdcf8afab29571cddb771dfb2152ca53127487f1fd3940d9c149",
+      "projectRevisionHash": "5cb882b0cb0eea3c3281a0581a33d84c94f7b80060d359b7d30bfa2f2bf3d6a7"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company - src",
+        "sourceFieldRef": "fld_ae531ea1783acc0b",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Industry (CRM)",
+        "sourceFieldRef": "fld_4fddf18dad0d73e3",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Website - src",
+        "sourceFieldRef": "fld_3974c7ce776e1a99",
+        "decision": "MAP",
+        "destinationField": "company.website"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_2ca1598c382bc882",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_e723eace5aad393d",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "deal.name"
+    ],
+    "expectedTargetUniverse": [
+      "company.industry",
+      "company.name",
+      "company.website",
+      "company.source_id",
+      "contact.city",
+      "contact.lastName",
+      "contact.source_id",
+      "deal.closeDate",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin",
+      "Folder code"
+    ],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "eb38033c2931706ae5525e844371a6ffe42bea28634ee0e6acfc9fa06b735503"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company - src",
+        "fieldRef": "src:Company - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvanth Foods Ltd",
+          "Pelova Group GmbH",
+          "Orvsorin Partners Ltd",
+          "Noranth Foods S.L.",
+          "Jorquist Systems SAS"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Industry (CRM)",
+        "fieldRef": "src:Industry (CRM)",
+        "valueClass": "TEXT",
+        "values": [
+          "  Logistics",
+          "Logistics ",
+          "  Packaging",
+          "Textiles ",
+          "  Food service"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Website - src",
+        "fieldRef": "src:Website - src",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.norero-foods.test",
+          "https://www.orvsorin-logistics.test",
+          "https://www.zerquist-works.test",
+          "https://www.kesaly-systems.test",
+          "https://www.zerquist-works.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-14",
+          "A-39",
+          "A-72",
+          "C-79",
+          "B-30"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F417",
+          "F245",
+          "F501",
+          "F150",
+          "F111"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "deal.name"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_56e86cedb2df",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company - src",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_5984676017fc",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Industry (CRM)",
+        "targetField": "company.industry"
+      },
+      {
+        "memoryId": "memconv_55c6cbcbb0c0",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Website - src",
+        "targetField": "company.website"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_d62617c85f13657b8b217e2e",
+    "kc_a5a41017b8a77300c26bcbdc"
+  ]
+}

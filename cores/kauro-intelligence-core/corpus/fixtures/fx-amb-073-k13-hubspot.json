@@ -1,0 +1,177 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-073-k13-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-073-k13-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "f042b8e84854c00cd38517568183c33e915c03a32090278e077e05c6a05af059",
+      "candidateSetHash": "b237869a6eef68c35f2dd880c45a980d2293a008464470d2673bb2a92f365976",
+      "targetContractHash": "tc_93fe2b517e56de01f4aa8c645049b78d472b560ddf3cbf7dc5381765dfd560cc",
+      "projectRevisionHash": "487a5b492c1a3e1f87b9d0d191ab309c2c4e9d31c51abd81bce221373bff2973"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_b364dc50a8a5a8a8",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Importe + Währung",
+        "sourceFieldRef": "fld_534f12fe2afb8baf",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.currency",
+      "deal.description",
+      "deal.name",
+      "deal.ownerEmail",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "40c02f3ac8551b78b0559e6c1b980475ff3f74e009c78487081285231465bc04"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Deal name",
+        "fieldRef": "src:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Supply contract 2025 Belunda",
+          "Supply contract 2027 Risath",
+          "Renewal 2025 Jorath",
+          "Onboarding 2026 Vexunda",
+          "Supply contract 2025 Kesaly",
+          "Supply contract 2024 Finquist"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Importe + Währung",
+        "fieldRef": "src:Importe + Währung",
+        "valueClass": "MIXED",
+        "values": [
+          "€7,342",
+          "$8,742",
+          "£4,638",
+          "€9,848",
+          "$2,578",
+          "£7,663"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:mixed-currency"
+    ]
+  },
+  "canaries": [
+    "kc_6c9d4d05c9d115fe60c22c8c",
+    "kc_2bde8e23d22ac1f74cff1995"
+  ]
+}

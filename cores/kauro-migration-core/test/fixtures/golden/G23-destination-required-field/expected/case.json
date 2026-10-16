@@ -1,0 +1,29 @@
+{
+  "id": "G23",
+  "title": "A record the destination cannot create",
+  "intent": "HubSpot requires an email address to create a contact. Alan's row has none. Rather than delivering a row the import would reject, the record is set aside with the reason, and the other two are delivered.",
+  "expect": {
+    "rows": { "total": 3, "OUTPUT": 2, "MERGED_PROVEN": 0, "ISOLATED": 1, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 2, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    { "row": "contacts.csv#2", "disposition": "OUTPUT" },
+    { "row": "contacts.csv#3", "disposition": "ISOLATED", "reasonCode": "DESTINATION_REQUIRED_FIELD_MISSING" },
+    { "row": "contacts.csv#4", "disposition": "OUTPUT" }
+  ],
+  "delivered": [
+    { "sourceRecordId": "1", "values": { "contact.email": "ada@example.com" } },
+    { "sourceRecordId": "3", "values": { "contact.email": "grace@example.net" } }
+  ]
+}

@@ -1,0 +1,175 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-084-k09-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-084-k09-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "874512b294c84828c0995a604cf3151d4bff975b00a3009b7c75a8db7ee65772",
+      "candidateSetHash": "789433e7590bfe4150e410f072fc237c0b1f7d6036258e371967efcd5e940b20",
+      "targetContractHash": "tc_6ff25978c152f0eb860cedce2c9f9c722401197f16c367dc3a406e6da99af134",
+      "projectRevisionHash": "70f2e02285651ba8c3d84c5393aa4812fff459492a41cda70a16a4dfb82a6d86"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_3de9a8c5ca6ac190",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Town",
+        "sourceFieldRef": "fld_6baf36f07117456e",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_25450e7c152dd09d",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "52f0effdc814d7217a9b36c1f715479266008703cdd960db14129372b394268e"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP07",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Name",
+        "fieldRef": "src:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "N. Jorquist",
+          "Noria Jorquist",
+          "O. Sovdell",
+          "Orvia Sovdell",
+          "Z. Risvik",
+          "Zerel Risvik"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Town",
+        "fieldRef": "src:Town",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "valmora",
+          "Valmora",
+          "valmora",
+          "Valmora",
+          "valmora"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "5",
+          "9",
+          "8",
+          "9",
+          "3",
+          "8"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "alternativeOutcomes": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "tags": [
+      "ambig:duplicate-people"
+    ]
+  },
+  "canaries": [
+    "kc_e8b312b4474890007903e4a7",
+    "kc_aaf14f27c2dc0069499e8d0b"
+  ]
+}

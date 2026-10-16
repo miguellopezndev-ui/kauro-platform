@@ -1,0 +1,182 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-203-cap12-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-203-cap12-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "db439ef2230c4c69419d98490ed613b050ada5d6885c2d185d29f6be9366061b",
+      "candidateSetHash": "1c1bbe55ce14cda53a2f694521710db5efd56af8f5fd3a3b0de199238ec20b5c",
+      "targetContractHash": "tc_fe0cedc52b298bf8a89db6997c928b2307bafe841899d43f805e9d7ff0aca93e",
+      "projectRevisionHash": "19795d4b87b492959292ceb7da1040e0760b5fbbab60aa2dc41f8ce0158ca3b8"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_9ef1943292fde4c8",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Info",
+        "sourceFieldRef": "fld_267bbf0eb573360e",
+        "decision": "MAP",
+        "destinationField": "deal.amount",
+        "requiredEvidenceRefs": [
+          "ev_398dccb655475795"
+        ]
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_09e1e6c70b8c557c",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.description",
+      "deal.name",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Folder code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "7d3f3e9bb54a5148ccc93ea02f19874ac5a48038a82a8c69b0b69ef9a7b8f74a"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Deal name",
+        "fieldRef": "src:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Expansion 2027 Belova",
+          "Supply contract 2025 Lumell",
+          "Renewal 2027 Halorin",
+          "Onboarding 2024 Lumsorin",
+          "Supply contract 2025 Quelsorin"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Info",
+        "fieldRef": "src:Info",
+        "valueClass": "NUMBER",
+        "values": [
+          "52706",
+          "38842",
+          "36048",
+          "37002",
+          "23227"
+        ],
+        "decision": "MAP",
+        "destination": "deal.amount",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F529",
+          "F126",
+          "F699",
+          "F429",
+          "F969"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_710f43b74570b4966f300894",
+    "kc_379cd623252d1664e2f6ef15"
+  ]
+}

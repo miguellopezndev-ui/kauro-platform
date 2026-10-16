@@ -1,0 +1,195 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-032-cap09-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-032-cap09-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "d9561fc269403097dc1e64e2c3345b412d0bf79032a6757059efef19dd6117ac",
+      "candidateSetHash": "33352bc0ffe5c849c22e15f5d625d942d4620a52cd94697fcbf7903743c5f93f",
+      "targetContractHash": "tc_5497cefb509ccb830bd35b1e9c5e95d0c113d9031f8504b5a60f08bee724351b",
+      "projectRevisionHash": "b3ed2184deec702fd9015242b300d1e3ddb81d2aec05fcba06cc06dd01a3230f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_5191131e229ba88c",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_f81bb46c2dbcde48",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_4e0b4e0a188a6fb3",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_1a3ebe84302bbd8c",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.industry",
+      "company.name",
+      "company.phone",
+      "company.postalCode",
+      "company.state",
+      "company.website",
+      "company.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag",
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "973a94b66354f79f03f42c28e9a4881ea0eb9b4a585cfeb82ef4da8438230a85"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumath Foods GmbH",
+          "Lumero Works SAS",
+          "Jorsorin Group B.V."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Packaging",
+          "Software",
+          "Textiles"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "red",
+          "green",
+          "red"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "5",
+          "1",
+          "2"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_ca37fddf0e6c",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_6af9169b108d9f44412c84ac",
+    "kc_2c3c5b0775d94ea20a425780"
+  ]
+}

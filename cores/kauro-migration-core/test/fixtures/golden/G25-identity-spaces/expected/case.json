@@ -1,0 +1,61 @@
+{
+  "id": "G25",
+  "title": "Independent id sequences, and one export split across two files",
+  "intent": "Contacts numbered from 1 and leads numbered from 1 is the most ordinary CRM export there is, and the two sequences mean nothing to each other. They must not merge on numeric coincidence. The two halves of one customer export declare the same identity space, and there record 1 genuinely is record 1, so those two rows do merge. Not merging is not the same as saying nothing: each overlapping id is reported as a duplicate candidate, because from the outside an accidental overlap and a split export look identical, and only the operator can tell them apart.",
+  "expect": {
+    "rows": { "total": 5, "OUTPUT": 4, "MERGED_PROVEN": 1, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 4, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 1,
+    "mergeConflicts": 0,
+    "mergeFieldDecisions": 1,
+    "duplicateCandidateClusters": 2,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 2,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "duplicateClusters": [
+    {
+      "signal": "SOURCE_ID_ACROSS_IDENTITY_SPACES",
+      "signalValue": "1",
+      "members": 2,
+      "reasonCode": "IDENTITY_SAME_ID_ACROSS_IDENTITY_SPACES",
+      "notMergedReasonCode": "IDENTITY_SAME_ID_ACROSS_IDENTITY_SPACES"
+    },
+    {
+      "signal": "SOURCE_ID_ACROSS_IDENTITY_SPACES",
+      "signalValue": "2",
+      "members": 2,
+      "reasonCode": "IDENTITY_SAME_ID_ACROSS_IDENTITY_SPACES",
+      "notMergedReasonCode": "IDENTITY_SAME_ID_ACROSS_IDENTITY_SPACES"
+    }
+  ],
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    { "row": "contacts-a.csv#2", "disposition": "OUTPUT" },
+    { "row": "contacts-a.csv#3", "disposition": "OUTPUT" },
+    { "row": "contacts-b.csv#2", "disposition": "MERGED_PROVEN", "reasonCode": "IDENTITY_ROW_ABSORBED_BY_PROVEN_MERGE" },
+    { "row": "leads.csv#2", "disposition": "OUTPUT" },
+    { "row": "leads.csv#3", "disposition": "OUTPUT" }
+  ],
+  "merges": [
+    {
+      "survivorRow": "contacts-a.csv#2",
+      "absorbedRows": ["contacts-b.csv#2"],
+      "identityEvidenceKinds": ["SOURCE_RECORD_ID"],
+      "conflicts": [],
+      "fieldDecisions": [
+        { "field": "contact.phone", "value": "+12125550147", "fromRow": "contacts-b.csv#2", "reasonCode": "IDENTITY_MERGE_FIELD_FILLED_FROM_ABSORBED_ROW" }
+      ]
+    }
+  ],
+  "delivered": [
+    { "sourceRecordId": "1", "values": { "contact.firstName": "Ada", "contact.email": "ada@example.com", "contact.phone": "+12125550147" } },
+    { "sourceRecordId": "1", "values": { "contact.firstName": "Grace", "contact.email": "grace@example.net" } },
+    { "sourceRecordId": "2", "values": { "contact.firstName": "Alan", "contact.email": "alan@example.org" } },
+    { "sourceRecordId": "2", "values": { "contact.firstName": "Katherine", "contact.email": "katherine@example.com" } }
+  ]
+}

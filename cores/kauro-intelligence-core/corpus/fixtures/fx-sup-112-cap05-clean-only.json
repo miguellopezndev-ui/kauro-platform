@@ -1,0 +1,175 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-112-cap05-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-112-cap05-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "872c96d6f3887a967aa55c05bb22e7d34a147d0678b0ae55e27ee683c4cfeaea",
+      "candidateSetHash": "9863bc90263ce61470e75436f0d01951b9c748999acb5bb39e361f706b0a509c",
+      "targetContractHash": null,
+      "projectRevisionHash": "64902c606d07f529628bbc81c528b42581b3107c04755fe8fcb2691b69864741"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name - src",
+        "sourceFieldRef": "fld_1557cb4049f62fd0",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Status",
+        "sourceFieldRef": "fld_e289ffe7ec970b11",
+        "decision": "MAP",
+        "destinationField": "lead.status",
+        "requiredEvidenceRefs": [
+          "ev_adcd8a1dafb9a341"
+        ]
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_c09e732f4e0b43c2",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.doNotCall",
+      "lead.doNotEmail",
+      "lead.lastName",
+      "lead.ownerEmail",
+      "lead.status"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "4382b535892505ab800992f5c1cefc7fdd500002cb0d53ebdc8be4c0b87d643f"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name - src",
+        "fieldRef": "src:Last name - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelova",
+          "Sovmar",
+          "Wilorin"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Status",
+        "fieldRef": "src:Status",
+        "valueClass": "ENUM",
+        "values": [
+          "Open",
+          "Dead",
+          "Converted",
+          "Open",
+          "Dead",
+          "Converted"
+        ],
+        "decision": "MAP",
+        "destination": "lead.status",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-5",
+          "batch-31",
+          "batch-23"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_37e371beb83d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Last name - src",
+        "targetField": "lead.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_e66026d142d972d57c70774e",
+    "kc_cc0f4368c21bd48f6cea7ec1"
+  ]
+}

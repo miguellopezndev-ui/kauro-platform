@@ -1,0 +1,179 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-058-k02-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-058-k02-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9de14b8777cd54ec062be77ab03d8568205708e440fa83c9f39157993f5c3010",
+      "candidateSetHash": "d309d20f2a0da54806973e966f1e51f00777b508013e7f0c154ae0bf84ecce0e",
+      "targetContractHash": "tc_8cf1393886f58b1deca45c0984b66441a5c811ae501182f003cc68416d12ef1f",
+      "projectRevisionHash": "1dc96338eb5dc6b1968ad7ccc63829ddfeb839fc9a6ca13dbec97ff4c2dc3f5e"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Land",
+        "sourceFieldRef": "fld_9435e65b5b2f8bc4",
+        "decision": "MAP",
+        "destinationField": "contact.country",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Titel",
+        "sourceFieldRef": "fld_ffa64e043448248e",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Folder code ",
+        "sourceFieldRef": "fld_dfe489976be5a202",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Folder code "
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "d632f16c20e1ad4c46ddd4e9b06c8509af2f01d55ab96668072ec5ad07ed1697"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Land",
+        "fieldRef": "src:Land",
+        "valueClass": "TEXT",
+        "values": [
+          " Valdoria  ",
+          " Kelland ",
+          " Kelland  ",
+          " Estmark "
+        ],
+        "decision": "MAP",
+        "destination": "contact.country",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Titel",
+        "fieldRef": "src:Titel",
+        "valueClass": "TEXT",
+        "values": [
+          " Controller  ",
+          " Buyer ",
+          " Account manager  ",
+          " Site engineer "
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Folder code ",
+        "fieldRef": "src:Folder code ",
+        "valueClass": "TEXT",
+        "values": [
+          " A4 ",
+          " B6 ",
+          " B7 ",
+          " A1 "
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:whitespace",
+      "lang:sv"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_389c43f054f8",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Land",
+        "targetField": "contact.country"
+      },
+      {
+        "memoryId": "memconv_d75175fc7014",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Titel",
+        "targetField": "contact.jobTitle"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_0c6bf285e0bfc21878f79a07",
+    "kc_e050ce191a38c80b1150d64e"
+  ]
+}

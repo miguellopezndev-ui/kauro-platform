@@ -1,0 +1,314 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-115-cap08-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-115-cap08-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "8096ed06535581d10bd38d4e60c0d5afbd87ba6d497120090177141fcb884e6f",
+      "candidateSetHash": "1d887962eba96bc5846ef875f8777c86799cf4853c357dcb7af89f82cb2a8e9c",
+      "targetContractHash": null,
+      "projectRevisionHash": "38de8280a3dc3f667f6d53165fdae04f37957f3c37087c74374e970dbe043c96"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_c54798d0798535de",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_079f0589803f001f",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_cb1b0dcc33c38ca4",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_023a9e274c9f131b",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_5ca3793497d70837",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_9211d3fa74348391",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Opportunity ref",
+        "sourceFieldRef": "fld_cf1dc418546248d1",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv",
+        "associatesWith": "pipeline.csv"
+      },
+      {
+        "sourceHeader": "Deal ID",
+        "sourceFieldRef": "fld_0b43879e677607a5",
+        "decision": "PRESERVE",
+        "filePath": "pipeline.csv"
+      },
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_590e43c31ae828b2",
+        "decision": "MAP",
+        "destinationField": "deal.name",
+        "filePath": "pipeline.csv"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_c5758461fb4b2a1d",
+        "decision": "PRESERVE",
+        "filePath": "pipeline.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.lastName",
+      "deal.name"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Audit remark code",
+      "Legacy system id",
+      "Opportunity ref",
+      "Deal ID",
+      "Print run"
+    ],
+    "expectedTaskTypes": [
+      "ASSOCIATION_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6d1e19795ad3123106ac15611857fde9d0334a1acbe0425d9308f014d710b432"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "contacts.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "pipeline.csv": {
+          "object": "DEAL",
+          "recordIdColumn": "Deal ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:contacts.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-882",
+          "P-883",
+          "P-884"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contacts.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "daria.belanth0@sample.invalid",
+          "sovo.tulova1@example.test",
+          "vexis.queldell2@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:contacts.csv:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Tavunda",
+          "Tavenko",
+          "Halell"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:contacts.csv:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Tessin",
+          "Valmora",
+          "Quenby"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:contacts.csv:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-32",
+          "R-43",
+          "R-15"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:contacts.csv:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L83358",
+          "L78478",
+          "L56990"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Opportunity ref",
+        "fieldRef": "src:contacts.csv:Opportunity ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "D-778",
+          "D-780",
+          "D-779"
+        ],
+        "decision": "PRESERVE",
+        "associatesWith": "pipeline.csv",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Deal ID",
+        "fieldRef": "src:pipeline.csv:Deal ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "D-778",
+          "D-779",
+          "D-780"
+        ],
+        "decision": "PRESERVE",
+        "file": "pipeline.csv"
+      },
+      {
+        "header": "Deal name",
+        "fieldRef": "src:pipeline.csv:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Pilot 2024 Belunda",
+          "Pilot 2026 Peliko",
+          "Onboarding 2024 Finova"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name",
+        "file": "pipeline.csv"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:pipeline.csv:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "1",
+          "5",
+          "8"
+        ],
+        "decision": "PRESERVE",
+        "file": "pipeline.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "ASSOCIATION_MAPPING"
+    ]
+  },
+  "canaries": [
+    "kc_0cf5e19594fb9628364053c4",
+    "kc_58321f8e9212e78c87a0f80e"
+  ]
+}

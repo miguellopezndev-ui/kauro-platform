@@ -1,0 +1,163 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-086-k02-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-086-k02-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "57b53e0a8121cfee698fc7c5478380972d3ce062ed0a8ebf3988bfd2814f34c1",
+      "candidateSetHash": "e9308f74fb9defb4fa48116adb5e6695e6d1976e3097daa24c223e4566b842ae",
+      "targetContractHash": null,
+      "projectRevisionHash": "89c5c3a820ad6226abf4e4b61218e69f6d779f264915dbda03b066c1939bab73"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_481e335f91624faa",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Job title",
+        "sourceFieldRef": "fld_8a8daee4c36ff527",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Colour tag ",
+        "sourceFieldRef": "fld_6e3ca2e59928b570",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.doNotCall",
+      "contact.jobTitle",
+      "contact.lifecycleStage",
+      "contact.ownerEmail"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag "
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "507e675655c039e573d744bdccdd978cadf1495fc16bcb731f42a916671e2b57"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "\tEstmark  ",
+          " Valdoria ",
+          " Estmark  ",
+          " Norvania "
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Job title",
+        "fieldRef": "src:Job title",
+        "valueClass": "TEXT",
+        "values": [
+          " Controller  ",
+          "\tBuyer ",
+          " Account manager  ",
+          " Account manager "
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Colour tag ",
+        "fieldRef": "src:Colour tag ",
+        "valueClass": "TEXT",
+        "values": [
+          " A3 ",
+          " C6 ",
+          " C4 ",
+          " B6 "
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:whitespace",
+      "lang:en"
+    ]
+  },
+  "canaries": [
+    "kc_4fd665c883cf8de8368fc8a5",
+    "kc_6f7f94450da88a20dfc87cdd"
+  ]
+}

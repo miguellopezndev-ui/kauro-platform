@@ -1,0 +1,246 @@
+{
+  "artifacts": [
+    {
+      "byteLength": 211,
+      "path": "01_IMPORT/clean-only/associations/company_to_deal.csv",
+      "rowCount": 3,
+      "sha256": "176a6f4e4fa2b94df34f6b80f0852fbe5a59b3ab0b8ec10e011988ca7f88497a"
+    },
+    {
+      "byteLength": 313,
+      "path": "01_IMPORT/clean-only/associations/contact_to_company.csv",
+      "rowCount": 5,
+      "sha256": "4de62b0205ad10810697a7509d16e759fa0faf09b69cab7852953d188802fc7f"
+    },
+    {
+      "byteLength": 262,
+      "path": "01_IMPORT/clean-only/associations/contact_to_deal.csv",
+      "rowCount": 4,
+      "sha256": "6af50f1164597f2e855fd1ba2205d1ced568d3478f3737b33f7294953002e74e"
+    },
+    {
+      "byteLength": 423,
+      "path": "01_IMPORT/clean-only/companies.csv",
+      "rowCount": 4,
+      "sha256": "fea35359dd7b2fd11368c9bb3056100c38383ef995956deb91f1f7f7ec81b5a5"
+    },
+    {
+      "byteLength": 543,
+      "path": "01_IMPORT/clean-only/contacts.csv",
+      "rowCount": 5,
+      "sha256": "c7defc44f3eedcb60c0b0f513829d59fe9052bd68eb24eaf6e1fe4625e14c2bb"
+    },
+    {
+      "byteLength": 337,
+      "path": "01_IMPORT/clean-only/deals.csv",
+      "rowCount": 3,
+      "sha256": "98ec83b57e80539d4b543a05a7cf34211717ea761cc2a90d4868be5e5819e45b"
+    },
+    {
+      "byteLength": 310,
+      "path": "01_IMPORT/clean-only/leads.csv",
+      "rowCount": 3,
+      "sha256": "399efa3329d3e9d4334a4c2a9afbc41f301e2888bf7dfddbe8df2bba7d26764e"
+    },
+    {
+      "byteLength": 77,
+      "path": "02_EXCEPTIONS/destination-conflicts.csv",
+      "rowCount": 0,
+      "sha256": "05f9663497ca6282b6d5c6d274100f42e29623b2496d4eb158ffa248bba456d0"
+    },
+    {
+      "byteLength": 157,
+      "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+      "rowCount": 0,
+      "sha256": "086a9ccaeddde8d7f5f8d158d9c050452f570cf42b3e2385c6aa8bfcde236c00"
+    },
+    {
+      "byteLength": 1452,
+      "path": "02_EXCEPTIONS/formula-risk.csv",
+      "rowCount": 8,
+      "sha256": "23d38891e1197d3cbe7a271468400ba46e40017989acf922309ff2247118304b"
+    },
+    {
+      "byteLength": 145,
+      "path": "02_EXCEPTIONS/isolated.csv",
+      "rowCount": 0,
+      "sha256": "77158a3c7e750595f4be722070519a4cdae796420b73caff6117840b242e1d75"
+    },
+    {
+      "byteLength": 114,
+      "path": "02_EXCEPTIONS/leftovers.csv",
+      "rowCount": 0,
+      "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+    },
+    {
+      "byteLength": 114,
+      "path": "02_EXCEPTIONS/rejected-input.csv",
+      "rowCount": 0,
+      "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+    },
+    {
+      "byteLength": 158,
+      "path": "02_EXCEPTIONS/unmapped-fields.csv",
+      "rowCount": 0,
+      "sha256": "e193b1fb95b588a0f8fec5a42f961b36e4e8c2bfb7f03bd122531811da153106"
+    },
+    {
+      "byteLength": 206,
+      "path": "02_EXCEPTIONS/unresolved-associations.csv",
+      "rowCount": 0,
+      "sha256": "d0efcfc09f4e1d53ce26a3b410252680069be09956c191b850b3ee1c936f40bf"
+    },
+    {
+      "byteLength": 5022,
+      "path": "03_TRACEABILITY/associations.csv",
+      "rowCount": 12,
+      "sha256": "6141f78a60b4c76487ccfaed7277ef2fe71dfe7b3ce09a43c8d10bc907d28083"
+    },
+    {
+      "byteLength": 3601,
+      "path": "03_TRACEABILITY/changes.csv",
+      "rowCount": 8,
+      "sha256": "33f219b9d42d81acf7324bbf07a541bd2b51a20429c11ffd53bda6a7f733da2e"
+    },
+    {
+      "byteLength": 31295,
+      "path": "03_TRACEABILITY/config.normalized.json",
+      "rowCount": null,
+      "sha256": "159f0923d6329083299e2383044804642450bd66cd39f0379f22eb4f3748fcab"
+    },
+    {
+      "byteLength": 109,
+      "path": "03_TRACEABILITY/destination-matching.csv",
+      "rowCount": 0,
+      "sha256": "b572fb9c9af32a87898e824321ec6a2fab85f7feb31a2f120819781d442d5b2b"
+    },
+    {
+      "byteLength": 220,
+      "path": "03_TRACEABILITY/flags.csv",
+      "rowCount": 0,
+      "sha256": "65bcdcd42fa2febc22f757c2be866f10d4ba3568eb44f451f85fc7911458107d"
+    },
+    {
+      "byteLength": 1799,
+      "path": "03_TRACEABILITY/import-crosswalk.csv",
+      "rowCount": 15,
+      "sha256": "b1a359f9ed4bb77bf90173100a5b3df92885ee24f6377929e708bad524c82c64"
+    },
+    {
+      "byteLength": 36,
+      "path": "03_TRACEABILITY/instance-verification.csv",
+      "rowCount": 0,
+      "sha256": "418e6bd6d0d7bad87790f4625e9ae9d5be53da8cc2b9b0f6145cee9eaad57d44"
+    },
+    {
+      "byteLength": 19,
+      "path": "03_TRACEABILITY/merges.json",
+      "rowCount": null,
+      "sha256": "847c1ecf26a213bd1fed56d1309f963b1152b3aa1d3ae81d7c3ac0d060811f37"
+    },
+    {
+      "byteLength": 1606,
+      "path": "03_TRACEABILITY/reconciliation.json",
+      "rowCount": null,
+      "sha256": "c4d3229c5e297c649751c2ece911b9eee20616a4bf5c4d9e0e88fad0ba45eb4e"
+    },
+    {
+      "byteLength": 8531,
+      "path": "03_TRACEABILITY/source-lineage.csv",
+      "rowCount": 19,
+      "sha256": "ba10e7e13e897cfb928e2130af6b9c68a707f22d93375886fc8aa2fcb3f76e6d"
+    },
+    {
+      "byteLength": 3890,
+      "path": "04_DOCUMENTATION/audit.md",
+      "rowCount": null,
+      "sha256": "b6c6a10a93a6d6d198ac71a5f9473de1daaed71c02656863a42041586304922a"
+    },
+    {
+      "byteLength": 548,
+      "path": "04_DOCUMENTATION/data-view/clean-only/contacts.csv",
+      "rowCount": 5,
+      "sha256": "6d4ed88a4be27bc4d6f5ba963e40891a57d9351bf1aa925daeac8e163bbfa5ff"
+    },
+    {
+      "byteLength": 313,
+      "path": "04_DOCUMENTATION/data-view/clean-only/leads.csv",
+      "rowCount": 3,
+      "sha256": "ed1cd7b76248c2de75fa6581ca5014f7b51bacb37a52417c3682056322ddb87c"
+    },
+    {
+      "byteLength": 3630,
+      "path": "04_DOCUMENTATION/import-instructions.md",
+      "rowCount": null,
+      "sha256": "afd3a10aa9cc5f8de8c3051c04ec7a894e8f313bd911e979deafae7edfe3a64c"
+    }
+  ],
+  "associations": {
+    "byDisposition": {
+      "DEDUPLICATED": 0,
+      "LEFTOVER": 0,
+      "OUTPUT": 12,
+      "UNRESOLVED": 0
+    },
+    "sourceEdges": 12,
+    "withoutDisposition": 0
+  },
+  "bundleId": "B-5aa7638ee54fbb15",
+  "caseId": "A-clean-multi-object",
+  "cells": {
+    "changed": 8,
+    "clearedByExplicitAuthorization": 0,
+    "flagged": 0,
+    "rowsWithChanges": 8,
+    "unmappedPreserved": 0
+  },
+  "configHash": "159f0923d6329083299e2383044804642450bd66cd39f0379f22eb4f3748fcab",
+  "coreVersion": "3.0.0",
+  "destination": {
+    "instanceVerificationItems": 0,
+    "keyConflicts": 0,
+    "spreadsheetFormulaRiskValues": 8
+  },
+  "identity": {
+    "absorbedRows": 0,
+    "consentConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "duplicateCandidateRows": 0,
+    "mergeConflicts": 0,
+    "provenMerges": 0
+  },
+  "intent": "Contacts, companies, deals and leads with all three relationship shapes in one run, and nothing wrong in the source. Everything is delivered and every relationship resolves.",
+  "manifestSha256": "69a35b99f6e033d1375ccc0f268adf8d92e09d4c54daf57d2a91a6804bdd985e",
+  "records": {
+    "byObject": {
+      "COMPANY": 4,
+      "CONTACT": 5,
+      "DEAL": 3,
+      "LEAD": 3
+    },
+    "total": 15
+  },
+  "runId": "run_1e78f48c07a50c92162685d9",
+  "sourceRows": {
+    "byDisposition": {
+      "ISOLATED": 0,
+      "LEFTOVER": 0,
+      "MERGED_PROVEN": 0,
+      "OUTPUT": 19,
+      "REJECTED_INPUT": 0
+    },
+    "total": 19,
+    "withoutDisposition": 0
+  },
+  "target": {
+    "adapterVersion": "1.0.0",
+    "mode": "CREATE_ONLY",
+    "vendor": "CLEAN_ONLY"
+  },
+  "title": "Clean multi-object migration",
+  "verification": {
+    "checksRun": 60,
+    "passed": true,
+    "problems": []
+  }
+}

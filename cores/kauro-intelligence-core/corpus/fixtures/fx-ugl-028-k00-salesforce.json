@@ -1,0 +1,178 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-028-k00-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-028-k00-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e6d0260e4fe855887274f5f35ecc0413448cfbb4b73461adb9aff69850e01823",
+      "candidateSetHash": "e91886f92d2d836a8ded7be07f0fca367860941043d33910e288cbd70cbe5d04",
+      "targetContractHash": "tc_8a4ed808a726039b4f6c9c07cb1906c0d171e7fcffb5e5db59b831b8c6df2200",
+      "projectRevisionHash": "808d851e226a8cec352b1ea94b508189b166d11a6f36aa079349142afe1d7f9f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-Mail-Adresse",
+        "sourceFieldRef": "fld_50aabe64b991b00a",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Stadt",
+        "sourceFieldRef": "fld_4206ec4166e7a7dc",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Land",
+        "sourceFieldRef": "fld_241b05858b67c3e3",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.country",
+      "contact.email",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "31b2efc0ca249066a8d4c968c1d9835597fa159a641ee8bf761ed2f19f2190d1"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-Mail-Adresse",
+        "fieldRef": "src:E-Mail-Adresse",
+        "valueClass": "EMAIL",
+        "values": [
+          "wilek.tulell0@sample.invalid",
+          "sovis.darenko1@example.test",
+          "orvel.lumorin2@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Stadt",
+        "fieldRef": "src:Stadt",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "Tessin",
+          "Brandel"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Land",
+        "fieldRef": "src:Land",
+        "valueClass": "TEXT",
+        "values": [
+          "Estmark",
+          "Estmark",
+          "Norvania"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:multilingual",
+      "lang:de"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_90d09e316682",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Stadt",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_821aa31aea1b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Land",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_56a1126117b9ffc89191e2a6",
+    "kc_eb5aedca02947449584d2427"
+  ]
+}

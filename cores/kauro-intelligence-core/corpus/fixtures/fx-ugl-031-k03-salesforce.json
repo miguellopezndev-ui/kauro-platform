@@ -1,0 +1,210 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-031-k03-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-031-k03-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "a35a2bc91e81c71b49f194a3c0bff559a8380f3d5c29b511fe816a224fd2b6b4",
+      "candidateSetHash": "fd207b2c9dc38e2dc4f739c1a69c522907984d862a4fdf4a4bf8f05ffbacec5d",
+      "targetContractHash": "tc_8656947fe1161a33e8e49f5ae965ad2f3d7c29fa56cd01b8378e7d9a725d6d35",
+      "projectRevisionHash": "344ead60091ef563cf1ab9c983c9b423013ab909a6d91248e28b3d24c811e005"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Adresse courriel",
+        "sourceFieldRef": "fld_a0c35df19fbdb11a",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "﻿First name",
+        "sourceFieldRef": "fld_2fc01034abd82f58",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name​",
+        "sourceFieldRef": "fld_f65f178699013f3c",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Ｎａｍｅ fr",
+        "sourceFieldRef": "fld_8b3e6925e50caba6",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_57414e37e56c8bdf",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Ｎａｍｅ fr",
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c26a60572919b4e716763cbff36d6653ff5d44def15e4a5d5ec63da9441fe287"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Adresse courriel",
+        "fieldRef": "src:Adresse courriel",
+        "valueClass": "EMAIL",
+        "values": [
+          "lumek.kesova0@sample.invalid",
+          "yana.queldell1@sample.invalid",
+          "halia.mesaly2@example.test",
+          "zeran.mesmar3@sample.invalid",
+          "kesel.nordell4@sample.invalid",
+          "sovan.tavmar5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "﻿First name",
+        "fieldRef": "src:bom-fr",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvel",
+          "Pelia",
+          "Kesa",
+          "Risa",
+          "Sovo",
+          "Mesis"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name​",
+        "fieldRef": "src:zw-fr",
+        "valueClass": "TEXT",
+        "values": [
+          "Zeraly​",
+          "Jorenko​",
+          "Quelquist​",
+          "Finath​",
+          "Quelunda​",
+          "Lumell​"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Ｎａｍｅ fr",
+        "fieldRef": "src:Ｎａｍｅ fr",
+        "valueClass": "TEXT",
+        "values": [
+          "Pelrane Works GmbH",
+          "Mesell Systems B.V.",
+          "Norquist Works SAS",
+          "Tulorin Partners Ltd",
+          "Tulquist Studio S.L.",
+          "Mesiko Works B.V."
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "green",
+          "blue",
+          "amber",
+          "amber",
+          "green",
+          "green"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:encoding",
+      "lang:fr"
+    ]
+  },
+  "canaries": [
+    "kc_333339a5d56d685972424be4",
+    "kc_322c558572baea1b6407c829"
+  ]
+}

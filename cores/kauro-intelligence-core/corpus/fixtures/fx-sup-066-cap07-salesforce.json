@@ -1,0 +1,407 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-066-cap07-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-066-cap07-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2504af6e9028d58647f7cdb78bf3458e2f53ad4be0e4fc922c1292439ae89ac0",
+      "candidateSetHash": "94ba9a592724f90f6e1638d6f8695d033601b680f56c87641be5783fea508d6a",
+      "targetContractHash": "tc_f0747cd16430dba1cdee12d10f737e67a5f6b4c5d49632c952edc2fe50896d34",
+      "projectRevisionHash": "42b3afb00ac6417efe97a83358a8b4a9212c785380ed087361be7a0e17f32c25"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_5333a9cb75b3de6a",
+        "decision": "PRESERVE",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_3bf31362959794a5",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "people.csv",
+        "inDuplicateReview": true
+      },
+      {
+        "sourceHeader": "MailingCity",
+        "sourceFieldRef": "fld_5d1321e2611e6730",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Submission ID",
+        "sourceFieldRef": "fld_c1e6c4a4c20cc4f7",
+        "decision": "PRESERVE",
+        "filePath": "imported-leads.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_b434fd01e443ee55",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "imported-leads.csv",
+        "inDuplicateReview": true
+      },
+      {
+        "sourceHeader": "Title",
+        "sourceFieldRef": "fld_e3ab2e964b1ae3e5",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "filePath": "imported-leads.csv"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_a0be7991f8a7bff8",
+        "decision": "PRESERVE",
+        "filePath": "imported-leads.csv"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_4ae8eb1ba9283171",
+        "decision": "PRESERVE",
+        "filePath": "imported-leads.csv"
+      },
+      {
+        "sourceHeader": "Company ID",
+        "sourceFieldRef": "fld_5afb6350e8dcc691",
+        "decision": "PRESERVE",
+        "filePath": "companies.csv"
+      },
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_f40a493a585855e1",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "filePath": "companies.csv"
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_4155e9e000d58cb6",
+        "decision": "MAP",
+        "destinationField": "company.website",
+        "filePath": "companies.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.name",
+      "company.website",
+      "company.source_id",
+      "contact.city",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.mobilePhone",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Submission ID",
+      "Internal ticket ref",
+      "Sales rep initials",
+      "Company ID"
+    ],
+    "expectedTaskTypes": [
+      "DUPLICATE_SIGNAL_STRATEGY"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "0daeeccd1fce5a5e77882740e04fa85169df8f2a6951cd2abd20306c6f42547e"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "people.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "imported-leads.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Submission ID"
+        },
+        "companies.csv": {
+          "object": "COMPANY",
+          "recordIdColumn": "Company ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:people.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-138",
+          "P-139",
+          "P-140",
+          "P-141",
+          "P-142"
+        ],
+        "decision": "PRESERVE",
+        "file": "people.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:people.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "halis.zersorin0@example.test",
+          "nora.mesvik1@example.test",
+          "noran.wilath2@corp.example.test",
+          "orva.joriko3@corp.example.test",
+          "joro.zervik4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "read": {
+          "destination": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        "inDuplicateReview": true,
+        "file": "people.csv"
+      },
+      {
+        "header": "MailingCity",
+        "fieldRef": "src:people.csv:MailingCity",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvale",
+          "Kelmar",
+          "Nuvia",
+          "Kelmar",
+          "Nuvia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "people.csv"
+      },
+      {
+        "header": "Submission ID",
+        "fieldRef": "src:imported-leads.csv:Submission ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "S-221",
+          "S-222",
+          "S-223",
+          "S-224",
+          "S-225"
+        ],
+        "decision": "PRESERVE",
+        "file": "imported-leads.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:imported-leads.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "joro.zervik4@sample.invalid",
+          "vexa.jorath1@corp.example.test",
+          "zero.sovsorin2@sample.invalid",
+          "daris.pelell3@corp.example.test",
+          "yanis.quelquist4@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "read": {
+          "destination": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        "inDuplicateReview": true,
+        "file": "imported-leads.csv"
+      },
+      {
+        "header": "Title",
+        "fieldRef": "src:imported-leads.csv:Title",
+        "valueClass": "TEXT",
+        "values": [
+          "Operations lead",
+          "Operations lead",
+          "Controller",
+          "Site engineer",
+          "Operations lead"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "file": "imported-leads.csv"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:imported-leads.csv:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-2532",
+          "TKT-5198",
+          "TKT-9348",
+          "TKT-9093",
+          "TKT-7400"
+        ],
+        "decision": "PRESERVE",
+        "file": "imported-leads.csv"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:imported-leads.csv:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "JC",
+          "FS",
+          "CN",
+          "JL",
+          "TM"
+        ],
+        "decision": "PRESERVE",
+        "file": "imported-leads.csv"
+      },
+      {
+        "header": "Company ID",
+        "fieldRef": "src:companies.csv:Company ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-833",
+          "C-834",
+          "C-835"
+        ],
+        "decision": "PRESERVE",
+        "file": "companies.csv"
+      },
+      {
+        "header": "Name",
+        "fieldRef": "src:companies.csv:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Tuldell Logistics Inc.",
+          "Darell Studio B.V.",
+          "Wiliko Studio S.L."
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "file": "companies.csv"
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:companies.csv:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.pelenko-group.test",
+          "https://www.kesath-studio.test",
+          "https://www.norunda-works.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website",
+        "file": "companies.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "DUPLICATE_SIGNAL_STRATEGY"
+    ]
+  },
+  "canaries": [
+    "kc_e3d12ba96c3d681cdde7ab6b",
+    "kc_25a776dab2295243379a9a00"
+  ]
+}

@@ -1,0 +1,153 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-019-k05-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-019-k05-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "37acc5ba84cccdef5887fbf853d08d001f9bfde94d50a6b3e4f791c68962249b",
+      "candidateSetHash": "9bbd0c1c2ef88eec0b49ca89a1d124c54527d93093c6957c2f914d73f5340407",
+      "targetContractHash": "tc_a3f914938c75e52b438b682e3ddd99969b3af87aa9926bcc1642087a80a57594",
+      "projectRevisionHash": "2ace3f73f4dc822978e5eb932d6456293bd803f44bcd4abd32e95093cda398c0"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "ईमेल",
+        "sourceFieldRef": "fld_a9c887b31aec60c7",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Ancien courriel (obsolète)",
+        "sourceFieldRef": "fld_5a099d6dfa099e12",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.lifecycleStage",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Ancien courriel (obsolète)"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "82b481950f01ab9c650a70eb05e0c607af1a86072e9de7ed5f34e5e839b600c7"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "ईमेल",
+        "fieldRef": "src:ईमेल",
+        "valueClass": "EMAIL",
+        "values": [
+          "halis.sovell0@example.test",
+          "belel.wilell1@sample.invalid",
+          "tulo.pelenko2@corp.example.test",
+          "finek.kesell3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Ancien courriel (obsolète)",
+        "fieldRef": "src:Ancien courriel (obsolète)",
+        "valueClass": "EMAIL",
+        "values": [
+          "tavan.zerorin40@example.test",
+          "quelo.kesorin41@corp.example.test",
+          "belan.orvath42@example.test",
+          "sovis.mesorin43@example.test"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-headers",
+      "lang:hi",
+      "ugly:stale-header"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_5aa818ad12a1",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "ईमेल",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_a7598bee5b0f89ffd794990e",
+    "kc_c5cfa27cef1bd013adbda4ef"
+  ]
+}

@@ -1,0 +1,234 @@
+{
+  "artifacts": [
+    {
+      "byteLength": 214,
+      "path": "01_IMPORT/hubspot/associations/company_to_deal.csv",
+      "rowCount": 3,
+      "sha256": "d365ee59b082498d1d5fcb1fa3d6bd1744e1192830ca2e9fc409fd375f2746df"
+    },
+    {
+      "byteLength": 316,
+      "path": "01_IMPORT/hubspot/associations/contact_to_company.csv",
+      "rowCount": 5,
+      "sha256": "fa26f0ec53ee3d1330dbb1599e6cf4a033727c76c75f5c2b741cd3ffd7ac3bd5"
+    },
+    {
+      "byteLength": 265,
+      "path": "01_IMPORT/hubspot/associations/contact_to_deal.csv",
+      "rowCount": 4,
+      "sha256": "eea7b38d6c5179a150c3d92875acf3e4ae46924b872acbe7c497f34812cf35ae"
+    },
+    {
+      "byteLength": 374,
+      "path": "01_IMPORT/hubspot/companies.csv",
+      "rowCount": 4,
+      "sha256": "4f25fc4e9bf08189b631a745004b0b3f1285dea82cfd25df26827137828ec69c"
+    },
+    {
+      "byteLength": 513,
+      "path": "01_IMPORT/hubspot/contacts.csv",
+      "rowCount": 5,
+      "sha256": "abacc983bf97a441da56819beeae18f4d44851b10cf9abd3e8f43cb0c85fdb49"
+    },
+    {
+      "byteLength": 323,
+      "path": "01_IMPORT/hubspot/deals.csv",
+      "rowCount": 3,
+      "sha256": "e496f5e2842895b435e7c10d8367d19737ee0e16728e6a7f02a54046e9fa77f6"
+    },
+    {
+      "byteLength": 77,
+      "path": "02_EXCEPTIONS/destination-conflicts.csv",
+      "rowCount": 0,
+      "sha256": "05f9663497ca6282b6d5c6d274100f42e29623b2496d4eb158ffa248bba456d0"
+    },
+    {
+      "byteLength": 157,
+      "path": "02_EXCEPTIONS/duplicate-candidates.csv",
+      "rowCount": 0,
+      "sha256": "086a9ccaeddde8d7f5f8d158d9c050452f570cf42b3e2385c6aa8bfcde236c00"
+    },
+    {
+      "byteLength": 939,
+      "path": "02_EXCEPTIONS/formula-risk.csv",
+      "rowCount": 5,
+      "sha256": "b4398bfd35b649697e4213a2323e9df12b4dfdd190106d959c1c5a2888e18bf3"
+    },
+    {
+      "byteLength": 145,
+      "path": "02_EXCEPTIONS/isolated.csv",
+      "rowCount": 0,
+      "sha256": "77158a3c7e750595f4be722070519a4cdae796420b73caff6117840b242e1d75"
+    },
+    {
+      "byteLength": 114,
+      "path": "02_EXCEPTIONS/leftovers.csv",
+      "rowCount": 0,
+      "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+    },
+    {
+      "byteLength": 114,
+      "path": "02_EXCEPTIONS/rejected-input.csv",
+      "rowCount": 0,
+      "sha256": "d27afd33d3a22eb4aceaafa0822caf84bdd7bdfe6047a85554d8a5a936573fc2"
+    },
+    {
+      "byteLength": 1229,
+      "path": "02_EXCEPTIONS/unmapped-fields.csv",
+      "rowCount": 4,
+      "sha256": "4debe0c1983afb1f35e1664a2be5c7a8156a72f37407da12663eb55454cfaabf"
+    },
+    {
+      "byteLength": 206,
+      "path": "02_EXCEPTIONS/unresolved-associations.csv",
+      "rowCount": 0,
+      "sha256": "d0efcfc09f4e1d53ce26a3b410252680069be09956c191b850b3ee1c936f40bf"
+    },
+    {
+      "byteLength": 5022,
+      "path": "03_TRACEABILITY/associations.csv",
+      "rowCount": 12,
+      "sha256": "5576d52bf9f53ed5ff5d7726d10cc6c38d47faec204c2005c10a11ad3e3ec7ca"
+    },
+    {
+      "byteLength": 2347,
+      "path": "03_TRACEABILITY/changes.csv",
+      "rowCount": 5,
+      "sha256": "ed0f028eb5de1e88e092f8e7bb25abebcfc18fe4aafef02a01728a6e97f60772"
+    },
+    {
+      "byteLength": 21923,
+      "path": "03_TRACEABILITY/config.normalized.json",
+      "rowCount": null,
+      "sha256": "d69f4427cb53b495cd013e74318bfe9e95eab29534b5449f5049913be2f736e0"
+    },
+    {
+      "byteLength": 109,
+      "path": "03_TRACEABILITY/destination-matching.csv",
+      "rowCount": 0,
+      "sha256": "b572fb9c9af32a87898e824321ec6a2fab85f7feb31a2f120819781d442d5b2b"
+    },
+    {
+      "byteLength": 220,
+      "path": "03_TRACEABILITY/flags.csv",
+      "rowCount": 0,
+      "sha256": "65bcdcd42fa2febc22f757c2be866f10d4ba3568eb44f451f85fc7911458107d"
+    },
+    {
+      "byteLength": 1496,
+      "path": "03_TRACEABILITY/import-crosswalk.csv",
+      "rowCount": 12,
+      "sha256": "958fa9eba2bfa1029fac36b33bbd95dd08dd677831682acdd2e318daba9d1e45"
+    },
+    {
+      "byteLength": 3065,
+      "path": "03_TRACEABILITY/instance-verification.csv",
+      "rowCount": 10,
+      "sha256": "18763ad9c4e3ccee7599d9389d746d24c856a25925cbc473c6bdd6ceb8358b67"
+    },
+    {
+      "byteLength": 19,
+      "path": "03_TRACEABILITY/merges.json",
+      "rowCount": null,
+      "sha256": "847c1ecf26a213bd1fed56d1309f963b1152b3aa1d3ae81d7c3ac0d060811f37"
+    },
+    {
+      "byteLength": 1604,
+      "path": "03_TRACEABILITY/reconciliation.json",
+      "rowCount": null,
+      "sha256": "ba6fdfa01986cf26f155fdd4e8c307af4833b9205ae68f6f97692f4ef97bba00"
+    },
+    {
+      "byteLength": 7169,
+      "path": "03_TRACEABILITY/source-lineage.csv",
+      "rowCount": 16,
+      "sha256": "3bd434b4808a751313c4693036d07773bdaaceb91fe65ffbc11589242b6ea105"
+    },
+    {
+      "byteLength": 8375,
+      "path": "04_DOCUMENTATION/audit.md",
+      "rowCount": null,
+      "sha256": "20cf33b3f381d486a0054a3f51f7d447d841811e7a5f12801f77ef619c8fd916"
+    },
+    {
+      "byteLength": 518,
+      "path": "04_DOCUMENTATION/data-view/hubspot/contacts.csv",
+      "rowCount": 5,
+      "sha256": "83ee6e77391aa9bc9e70795b80321019eb53ab089b995dc7f30faf3243964d6c"
+    },
+    {
+      "byteLength": 3495,
+      "path": "04_DOCUMENTATION/import-instructions.md",
+      "rowCount": null,
+      "sha256": "1261aa92c7e306a13e303909e279d4386ff9bebf019bce583d26a6a6ccd8b0d3"
+    }
+  ],
+  "associations": {
+    "byDisposition": {
+      "DEDUPLICATED": 0,
+      "LEFTOVER": 0,
+      "OUTPUT": 12,
+      "UNRESOLVED": 0
+    },
+    "sourceEdges": 12,
+    "withoutDisposition": 0
+  },
+  "bundleId": "B-56cc789fa965680a",
+  "caseId": "D-hubspot",
+  "cells": {
+    "changed": 5,
+    "clearedByExplicitAuthorization": 0,
+    "flagged": 0,
+    "rowsWithChanges": 5,
+    "unmappedPreserved": 4
+  },
+  "configHash": "d69f4427cb53b495cd013e74318bfe9e95eab29534b5449f5049913be2f736e0",
+  "coreVersion": "3.0.0",
+  "destination": {
+    "instanceVerificationItems": 10,
+    "keyConflicts": 0,
+    "spreadsheetFormulaRiskValues": 5
+  },
+  "identity": {
+    "absorbedRows": 0,
+    "consentConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "duplicateCandidateRows": 0,
+    "mergeConflicts": 0,
+    "provenMerges": 0
+  },
+  "intent": "One shared source bundle rendered for HubSpot.",
+  "manifestSha256": "6177cda1ce9bacc728b25bb38a7250321a3615cd6dc6818b2cea623b4be82241",
+  "records": {
+    "byObject": {
+      "COMPANY": 4,
+      "CONTACT": 5,
+      "DEAL": 3,
+      "LEAD": 0
+    },
+    "total": 12
+  },
+  "runId": "run_7de4954394a3ebfe70462bc4",
+  "sourceRows": {
+    "byDisposition": {
+      "ISOLATED": 0,
+      "LEFTOVER": 0,
+      "MERGED_PROVEN": 0,
+      "OUTPUT": 16,
+      "REJECTED_INPUT": 0
+    },
+    "total": 16,
+    "withoutDisposition": 0
+  },
+  "target": {
+    "adapterVersion": "2.0.0",
+    "mode": "CREATE_ONLY",
+    "vendor": "HUBSPOT"
+  },
+  "title": "HubSpot destination package",
+  "verification": {
+    "checksRun": 60,
+    "passed": true,
+    "problems": []
+  }
+}

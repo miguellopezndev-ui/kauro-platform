@@ -1,0 +1,203 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-162-cap07-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-162-cap07-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "3a85ddbf4cda97e52c491aa632a5697e014abab36a7d6dc1f734363dea506b6a",
+      "candidateSetHash": "67407349e94a4a8066483f784fb0586d5a189343fef5e770808c4e268bfbee7b",
+      "targetContractHash": "tc_ab21e91c6f220f9632c1984460eb2bd3b5af8007c4c9264b57a36e92f51c24cc",
+      "projectRevisionHash": "199bd575e50e7da5249d29e6b39be86f76cc873ef7a2c6d7dd78f853dfa38a1c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-mail",
+        "sourceFieldRef": "fld_91b175a466084c70",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "requiredEvidenceRefs": [
+          "ev_dc5560e0e72ad43b"
+        ]
+      },
+      {
+        "sourceHeader": "Cidade",
+        "sourceFieldRef": "fld_4c367ca026b64d75",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_e1d9fac7d5e9dd96",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.firstName",
+      "contact.lifecycleStage",
+      "contact.phone",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "dc1f4bcb9333ab62871a025c85a06e18e37d433f1ea81ea079a51648b87a7fe9"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "subscriber",
+              "lead",
+              "marketingqualifiedlead",
+              "salesqualifiedlead",
+              "opportunity",
+              "customer",
+              "evangelist",
+              "other"
+            ]
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-mail",
+        "fieldRef": "src:E-mail",
+        "valueClass": "EMAIL",
+        "values": [
+          "quelis.quelrane0@corp.example.test",
+          "sovan.risell1@corp.example.test",
+          "bela.pelero2@sample.invalid",
+          "lumia.tuliko3@example.test",
+          "orvan.kesdell4@sample.invalid",
+          "quelis.quelrane0@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Cidade",
+        "fieldRef": "src:Cidade",
+        "valueClass": "TEXT",
+        "values": [
+          "Nuvia",
+          "Brandel",
+          "Tessin",
+          "Kelmar",
+          "Nuvia",
+          "Quenby"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "9",
+          "5",
+          "1",
+          "1",
+          "5",
+          "6"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_a1607af693a6",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cidade",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_86c99923cc5af91dce15052a",
+    "kc_7c2d09d0ced59e2627da3243"
+  ]
+}

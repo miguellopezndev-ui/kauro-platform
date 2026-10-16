@@ -1,0 +1,310 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-157-cap02-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-157-cap02-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "95696965eaf376a92ed072d92032ebd23b94b16cdfeeb039cd4722a3ed42e3ce",
+      "candidateSetHash": "f01a572a1bc7c1052453a5af128fc72f530250db5e1378f4f6d4073be3e9dd3c",
+      "targetContractHash": "tc_d5b2a67d6501c218fbeeb503b5bf7d2fe535f8cf29a4ed8b2d5461d088691374",
+      "projectRevisionHash": "607267e5fb099fbf8e06287281846de5ae4792de2202807e9d768d537ebb8ed1"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-Mail-Adresse",
+        "sourceFieldRef": "fld_1c5b75d17fb93288",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Position",
+        "sourceFieldRef": "fld_aae2f049c4f7d4b5",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Vorname",
+        "sourceFieldRef": "fld_2be1292a666d29c8",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Telefon",
+        "sourceFieldRef": "fld_90c000a661dc9994",
+        "decision": "MAP",
+        "destinationField": "contact.phone",
+        "allowedDestinationFields": [
+          "contact.phone",
+          "contact.mobilePhone"
+        ]
+      },
+      {
+        "sourceHeader": "Straße",
+        "sourceFieldRef": "fld_e2c023be746003e4",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "Firma",
+        "sourceFieldRef": "fld_db977d4bf2c2db30",
+        "decision": "MAP",
+        "destinationField": "contact.companyName"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_7cb88db9190dbee8",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.companyName",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.mobilePhone",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "ebb0a496500f55a7a9bcd9faa2c775fa41d566366c9140913c1e9b17f82358b5"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-Mail-Adresse",
+        "fieldRef": "src:E-Mail-Adresse",
+        "valueClass": "EMAIL",
+        "values": [
+          "meso.tulsorin0@corp.example.test",
+          "halia.vexunda1@example.test",
+          "tavek.vexvik2@sample.invalid",
+          "kesia.tulquist3@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Position",
+        "fieldRef": "src:Position",
+        "valueClass": "TEXT",
+        "values": [
+          "Site engineer",
+          "Operations lead",
+          "Site engineer",
+          "Site engineer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Vorname",
+        "fieldRef": "src:Vorname",
+        "valueClass": "TEXT",
+        "values": [
+          "  Jorel",
+          "Dara ",
+          "  Vexa",
+          "Belo "
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Telefon",
+        "fieldRef": "src:Telefon",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550132",
+          "+12025550192",
+          "+12025550144",
+          "+12025550109"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone",
+        "alternatives": [
+          "contact.mobilePhone"
+        ]
+      },
+      {
+        "header": "Straße",
+        "fieldRef": "src:Straße",
+        "valueClass": "TEXT",
+        "values": [
+          "87 Belanth Street",
+          "8 Mesquist Street",
+          "175 Wilell Street",
+          "2 Dariko Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "Firma",
+        "fieldRef": "src:Firma",
+        "valueClass": "TEXT",
+        "values": [
+          "alpha",
+          "delta",
+          "gamma",
+          "beta"
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "B-51",
+          "B-66",
+          "A-26",
+          "B-3"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_df5073055ea6",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "E-Mail-Adresse",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_2fe44a4d54ea",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Position",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_8b637c98b3d3",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Vorname",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_2695d26101a3",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Telefon",
+        "targetField": "contact.phone"
+      },
+      {
+        "memoryId": "memconv_a57017ab77db",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Straße",
+        "targetField": "contact.addressLine1"
+      },
+      {
+        "memoryId": "memconv_c7a10c00bad3",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Firma",
+        "targetField": "contact.companyName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_107db1fbce616a183fc80541",
+    "kc_789d98784385994851f4d8b6"
+  ]
+}

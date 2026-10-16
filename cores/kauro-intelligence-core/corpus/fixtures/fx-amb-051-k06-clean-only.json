@@ -1,0 +1,174 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-051-k06-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-051-k06-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "8cd66cb3d203aa7bf140901b0e52a3e974a569bc49cd46e5e7bda9f4ca22b7b5",
+      "candidateSetHash": "95469be1bb150c7c38bd829c7dd8005a615a9a7af8f54b578b81499ddf28f78a",
+      "targetContractHash": null,
+      "projectRevisionHash": "2266c94b54326987ceeb1eceaba9e3c4ab58691c73f504b8e02d3d5353e91ef0"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_918be5c87ef39651",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_49a4febd1159f57c",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Class",
+        "sourceFieldRef": "fld_9b95dbd4464f63b5",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.createdAt",
+      "contact.email",
+      "contact.lastName",
+      "contact.lifecycleStage",
+      "contact.phoneExtension",
+      "contact.postalCode"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c67214774d989ab6121de4d5265b4dc1edd1026dc8bbab96a9123b675dba17bf"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP05",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "phoneExtension",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "wilis.finanth0@corp.example.test",
+          "daria.jordell1@sample.invalid",
+          "tulis.wilvik2@corp.example.test",
+          "belan.mesiko3@example.test",
+          "wila.quelenko4@corp.example.test",
+          "tulo.lumova5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Tavova",
+          "Pelmar",
+          "Norsorin",
+          "Risenko",
+          "Vexiko",
+          "Tulanth"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Class",
+        "fieldRef": "src:Class",
+        "valueClass": "ENUM",
+        "values": [
+          "Q",
+          "A",
+          "B",
+          "C",
+          "Q",
+          "A",
+          "B",
+          "C"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:enum-codes"
+    ]
+  },
+  "canaries": [
+    "kc_cd824c8437c63f16c2bd5bf4",
+    "kc_2cbc9c216421025205138bab"
+  ]
+}

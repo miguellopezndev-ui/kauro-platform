@@ -1,0 +1,25 @@
+{
+  "id": "G14",
+  "title": "Leading zeros and long numeric identifiers",
+  "intent": "Postal codes and account numbers that a spreadsheet would turn into numbers. Nothing is coerced: the delivered values are the source characters, including leading zeros and a number longer than a double can represent exactly.",
+  "expect": {
+    "rows": { "total": 3, "OUTPUT": 3, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 3, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "delivered": [
+    { "sourceRecordId": "0001", "values": { "contact.postalCode": "01730", "custom:Account Number": "00123456789012345678" } },
+    { "sourceRecordId": "0002", "values": { "contact.postalCode": "02139", "custom:Account Number": "9007199254740993" } },
+    { "sourceRecordId": "0003", "values": { "contact.postalCode": "00501", "custom:Account Number": "0000000000000001" } }
+  ]
+}

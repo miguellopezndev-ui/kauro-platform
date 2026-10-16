@@ -1,0 +1,257 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-109-cap02-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-109-cap02-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "3e29e5a9d52f3f2e88a2552a226cdf96451c2b1fbbd4c21948ae791b84603a70",
+      "candidateSetHash": "051de2c04f4199f8e19cf3bf2035c584936e7cae9f3656a8d3e2a9adee7f2a6a",
+      "targetContractHash": null,
+      "projectRevisionHash": "0bf4f4fecaeeeb40a52be9b46601183a748e4a48ed5e5ca470d953cb743f63bb"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_33d0199ede245bf6",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_61c88a7c2fca8f8f",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_08da7f1b51c2a721",
+        "decision": "MAP",
+        "destinationField": "contact.website"
+      },
+      {
+        "sourceHeader": "Job title",
+        "sourceFieldRef": "fld_389045db6b071ff0",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Street address",
+        "sourceFieldRef": "fld_2a44956c65290dac",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_0280ff776a218217",
+        "decision": "MAP",
+        "destinationField": "contact.companyName"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_449d1771778a5fd0",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.companyName",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.mobilePhone",
+      "contact.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "dfe17e7ec6b7a4bbe6bc0eb821d74eb06941a486d3b2575642f6aa36ff4c9ff5"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "nora.lumanth0@corp.example.test",
+          "risis.finunda1@corp.example.test",
+          "dara.wilanth2@sample.invalid",
+          "tavan.quelova3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "  Mesel",
+          "Tavo ",
+          "  Nora",
+          "Mesia "
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.beliko-studio.test",
+          "https://www.jorsorin-works.test",
+          "https://www.rissorin-logistics.test",
+          "https://www.jorquist-labs.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.website"
+      },
+      {
+        "header": "Job title",
+        "fieldRef": "src:Job title",
+        "valueClass": "TEXT",
+        "values": [
+          "Site engineer",
+          "Buyer",
+          "Account manager",
+          "Controller"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Street address",
+        "fieldRef": "src:Street address",
+        "valueClass": "TEXT",
+        "values": [
+          "126 Belell Street",
+          "53 Tavdell Street",
+          "93 Risath Street",
+          "93 Kesova Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "gamma",
+          "gamma",
+          "delta",
+          "alpha"
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "6",
+          "7",
+          "1",
+          "8"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_915bcaf4535b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "contact.companyName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_3524a2587a2dd3823d574700",
+    "kc_8487bdc510f15991b1c429cf"
+  ]
+}

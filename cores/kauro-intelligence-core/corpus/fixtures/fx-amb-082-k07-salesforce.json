@@ -1,0 +1,123 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-082-k07-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-082-k07-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "05d1e04ed9bdda17ef8c8f218cbcdf5c88c9bd8ffdf3e052b55a51939a0cf93d",
+      "candidateSetHash": "4f1ff96877805c89a399ccdb28201d9cd8b3f0d8994eaa8214eb771f8fc952fa",
+      "targetContractHash": "tc_1fe632d26348db3732df581278ca0ab51c58968e1abe67d68b141c95fe087c38",
+      "projectRevisionHash": "b4e8af520c2d65e0d107852a60da35073fa1be72a2d7b6f34944aa5929389f13"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_501b4a1b7ffabd48",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.companyName"
+    ],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6669b4ba41d620337d677a2504ef606c53087b098be294d32bd2f61ce0d07eb8"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP10",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "beta",
+          "delta",
+          "delta",
+          "alpha",
+          "gamma",
+          "beta",
+          "alpha"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.companyName"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:missing-target"
+    ]
+  },
+  "canaries": [
+    "kc_a237bb9efc249622c1209f7f",
+    "kc_8164cda64c570c5b9d507f5b"
+  ]
+}

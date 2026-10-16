@@ -1,0 +1,230 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-017-cap06-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-017-cap06-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "826d4aa30e7b17288fb9b47bdf995fd67af0182f018a354d040b625952e47239",
+      "candidateSetHash": "75dd7d18ed203b3e49c8d6d6b42cb020c503e33b9324013b3b36f9cb91654f0b",
+      "targetContractHash": "tc_10f3468e7c3d411d4610ac0f4f8136465ccd68ad1645c1025d01383de599beb5",
+      "projectRevisionHash": "52698f5ad5babd772ea6c46f358d7a616d09958eecdaa9c06d5d9696e716a5df"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_4308f1aaea4ffc7a",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "requiredEvidenceRefs": [
+          "ev_b4cdf549fdf4dee3"
+        ]
+      },
+      {
+        "sourceHeader": "Ciudad",
+        "sourceFieldRef": "fld_ebd57abbf04bb5fc",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Nombre",
+        "sourceFieldRef": "fld_760bda3cef66f6fa",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_12fd0c08c8a8418f",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.phone",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Legacy system id"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "7501ebbcca85289bf15f8879614a4eb6d06a2ec33308de7ef786466531f38e19"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP06",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "finan.sovunda0@corp.example.test",
+          "zeria.halell1@corp.example.test",
+          "noran.wilell2@corp.example.test",
+          "sova.tavvik3@corp.example.test",
+          "yanis.kesunda4@sample.invalid",
+          "wilel.risiko5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Ciudad",
+        "fieldRef": "src:Ciudad",
+        "valueClass": "TEXT",
+        "values": [
+          "Quenby",
+          "Kelmar",
+          "Brandel",
+          "Orvale",
+          "Valmora",
+          "Nuvia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Nombre",
+        "fieldRef": "src:Nombre",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvel",
+          "Dara",
+          "Fina",
+          "Quela",
+          "Kesan",
+          "Wilel"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L90607",
+          "L69622",
+          "L18414",
+          "L75561",
+          "L44957",
+          "L81368"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_2519d4074a45",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Correo electrónico",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_f573efb50394",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Ciudad",
+        "targetField": "contact.city"
+      },
+      {
+        "memoryId": "memconv_8ac318297181",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nombre",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_123190d0a89c30fb3e17d22d",
+    "kc_c0ae63e7d1f140a39cf90141"
+  ]
+}

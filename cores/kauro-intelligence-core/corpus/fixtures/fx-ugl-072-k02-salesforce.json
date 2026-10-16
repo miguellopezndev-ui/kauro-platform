@@ -1,0 +1,169 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-072-k02-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-072-k02-salesforce",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "46d9e22e38c4eb986c96c3b27ae86c2824656087870571babd2e6438055764fa",
+      "candidateSetHash": "41790391808bef4ee67ecabd32767f543cff231430613a2548158b5ad41b5244",
+      "targetContractHash": "tc_4ab20668a96f5d842a3d659a909ea26cdd56295fec29599b5f5ec80b94d90841",
+      "projectRevisionHash": "5430c630794cc25bcb3af635bb1c2e098d6eca379b4cf1f503dce4b38d53551c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_451b86dd1ea62729",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Họ",
+        "sourceFieldRef": "fld_1764b0cf627df1e5",
+        "decision": "MAP",
+        "destinationField": "contact.lastName",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Import batch ",
+        "sourceFieldRef": "fld_e435d731cc2aee81",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.country",
+      "contact.email",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch "
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "2a66bd2ad4f9a9dab35fc52ac12c9ac30c3b82535799d14cabab1b5a9b9d1102"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "SALESFORCE",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "\twilan.orviko0@sample.invalid  ",
+          " quelel.finaly1@sample.invalid ",
+          "\ttulia.kesdell2@sample.invalid  ",
+          " tulo.mesath3@corp.example.test "
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Họ",
+        "fieldRef": "src:Họ",
+        "valueClass": "TEXT",
+        "values": [
+          " Halmar  ",
+          "\tWilero ",
+          "\tHalath  ",
+          " Risvik "
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Import batch ",
+        "fieldRef": "src:Import batch ",
+        "valueClass": "TEXT",
+        "values": [
+          " C8 ",
+          " B5 ",
+          " C3 ",
+          " B9 "
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:whitespace",
+      "lang:vi"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_c84951127f5e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Họ",
+        "targetField": "contact.lastName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_34bb68d801dbdf3a25ed9397",
+    "kc_844632de6efb69740832e9dd"
+  ]
+}

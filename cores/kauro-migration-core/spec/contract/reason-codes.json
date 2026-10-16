@@ -1,0 +1,418 @@
+{
+  "categories": [
+    "INGEST",
+    "MAPPING",
+    "TRANSFORM",
+    "IDENTITY",
+    "ASSOCIATION",
+    "DESTINATION"
+  ],
+  "codes": [
+    {
+      "category": "ASSOCIATION",
+      "code": "ASSOCIATION_DEDUPLICATED_AFTER_MERGE",
+      "description": "After proven records were combined, this relationship became a duplicate of another one. The relationship is delivered exactly once."
+    },
+    {
+      "category": "ASSOCIATION",
+      "code": "ASSOCIATION_ENDPOINT_AMBIGUOUS",
+      "description": "One end of the relationship matches more than one source record, so it could not be resolved."
+    },
+    {
+      "category": "ASSOCIATION",
+      "code": "ASSOCIATION_ENDPOINT_NOT_DELIVERED",
+      "description": "One end of the relationship resolves to a record that was set aside rather than delivered, so the relationship cannot be delivered either."
+    },
+    {
+      "category": "ASSOCIATION",
+      "code": "ASSOCIATION_ENDPOINT_NOT_FOUND",
+      "description": "One end of the relationship refers to a record that does not exist in the source data. No record was invented."
+    },
+    {
+      "category": "ASSOCIATION",
+      "code": "ASSOCIATION_RESOLVED",
+      "description": "Both ends of the relationship were resolved to delivered records."
+    },
+    {
+      "category": "ASSOCIATION",
+      "code": "ASSOCIATION_SELF_REFERENCE",
+      "description": "Both ends of the relationship resolve to the same record."
+    },
+    {
+      "category": "ASSOCIATION",
+      "code": "ASSOCIATION_UNSUPPORTED_BY_TARGET",
+      "description": "The destination system does not support this relationship through file import."
+    },
+    {
+      "category": "DESTINATION",
+      "code": "DESTINATION_FORMULA_RISK_VALUE",
+      "description": "The delivered value begins with a character that spreadsheet applications interpret as a formula. The import file holds the exact value; import it directly rather than opening it in a spreadsheet first."
+    },
+    {
+      "category": "DESTINATION",
+      "code": "DESTINATION_INSTANCE_PICKLIST_VALUE_UNKNOWN",
+      "description": "The value is not among the active options the attested target contract declares for this picklist field in the destination instance. It was not mapped onto a nearby option; the record is set aside."
+    },
+    {
+      "category": "DESTINATION",
+      "code": "DESTINATION_INSTANCE_REQUIRED_FIELD_MISSING",
+      "description": "The attested target contract declares this field required to create a record in the destination instance, and the record has no value for it."
+    },
+    {
+      "category": "DESTINATION",
+      "code": "DESTINATION_INSTANCE_VALUE_TOO_LONG",
+      "description": "The value exceeds a limit the attested target contract declares for this field in the destination instance: its length, or its numeric precision and scale. The value was preserved, not truncated; the record is set aside."
+    },
+    {
+      "category": "DESTINATION",
+      "code": "DESTINATION_INSTANCE_VERIFICATION_REQUIRED",
+      "description": "Whether the destination accepts this depends on configuration inside the customer account, which cannot be checked from files alone."
+    },
+    {
+      "category": "DESTINATION",
+      "code": "DESTINATION_KEY_CONFLICT",
+      "description": "Two records the source proves to be different would be matched to a single record by the destination import key. Delivering them would silently merge two different records."
+    },
+    {
+      "category": "DESTINATION",
+      "code": "DESTINATION_REQUIRED_FIELD_MISSING",
+      "description": "The destination system requires this field and the record has no value for it."
+    },
+    {
+      "category": "DESTINATION",
+      "code": "DESTINATION_VALUE_TOO_LONG",
+      "description": "The value exceeds the maximum length the destination accepts for this field."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_CANDIDATE_COMPANY_DOMAIN",
+      "description": "The records share the same company web domain."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_CANDIDATE_CONFLICTING_ATTRIBUTES",
+      "description": "The records share a signal but disagree on other populated fields, which argues against them being one record."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_CANDIDATE_EMAIL_EXACT",
+      "description": "The records share the same email address. A shared email address is a signal, not proof of identity."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_CANDIDATE_NAME_EXACT",
+      "description": "The records share the same full name."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_CANDIDATE_PHONE_E164",
+      "description": "The records share the same phone number in international form."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_CROSS_NAMESPACE_ID_COLLISION",
+      "description": "The same raw record identifier appears under two different source systems or namespaces. These are different records and were not combined."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_DISTINCT_NO_PROVING_EVIDENCE",
+      "description": "The rows share weaker signals but nothing that proves they are the same record, so they were kept separate."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_KEY_NORMALIZED",
+      "description": "The plan declares an identity normalization for this key column and it changed the identifier, so the row is keyed by the normalized spelling. The identifier the source wrote is preserved beside it."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_MEMBER_KEY_NOT_SHARED",
+      "description": "A key that only one row of a proven merge carries. It is recorded so the merged record can be read in full, but it joined nothing and is not part of the argument for merging."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_MERGE_CLEAR_CONFLICT",
+      "description": "Rows proven to be one record disagree about whether a field should hold a value or be emptied. Choosing either would destroy one row's instruction, so the record was set aside."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_MERGE_CONSENT_CONFLICT",
+      "description": "Rows proven to be one record disagree on a consent, privacy or suppression field. The engine never resolves these automatically."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_MERGE_FIELD_CONFLICT",
+      "description": "Rows proven to be one record hold different non-empty values for the same field. No winner was chosen automatically."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_MERGE_FIELD_FILLED_FROM_ABSORBED_ROW",
+      "description": "The surviving row had no value for this field and took the value from another row proven to be the same record."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_NORMALIZATION_COLLISION",
+      "description": "Rows whose identifiers the source spelled differently share one identity key only because the plan declares an identity normalization. Every source spelling is named on the merge."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_PROVEN_EXTERNAL_ID",
+      "description": "These rows carry the same value in a column the configuration declares to be an authoritative external identifier."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_PROVEN_SOURCE_RECORD_ID",
+      "description": "These rows carry the same source CRM record identifier within the same source system and namespace, which proves they describe one record."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_ROW_ABSORBED_BY_PROVEN_MERGE",
+      "description": "This row was combined into another row proven to describe the same record."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "IDENTITY_SAME_ID_ACROSS_IDENTITY_SPACES",
+      "description": "The same raw record id appears in two different identity spaces of the same source. These may be two halves of one export or two unrelated id sequences; the engine cannot tell, so it reports the coincidence instead of acting on it."
+    },
+    {
+      "category": "INGEST",
+      "code": "INGEST_OCCURRENCE_EXCLUDED",
+      "description": "The row belongs to a file the plan excluded as a copy of another occurrence (occurrences: EXCLUDE_ONE). It was read and counted, and it is not delivered."
+    },
+    {
+      "category": "INGEST",
+      "code": "INGEST_ROW_ACCEPTED",
+      "description": "The source row was read successfully and passed structural checks."
+    },
+    {
+      "category": "INGEST",
+      "code": "INGEST_ROW_BLANK",
+      "description": "The source row contained no value in any column."
+    },
+    {
+      "category": "INGEST",
+      "code": "INGEST_ROW_COLUMN_COUNT_MISMATCH",
+      "description": "The source row had a different number of columns than the header row."
+    },
+    {
+      "category": "INGEST",
+      "code": "INGEST_XLSX_ERROR_CELL",
+      "description": "The spreadsheet cell held a spreadsheet error value such as #REF! or #N/A."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "ISOLATED_AMBIGUOUS_FIELD",
+      "description": "A field on this row could not be interpreted with certainty and the configuration asks for such rows to be set aside for review."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "ISOLATED_FORMULA_CACHED_VALUE",
+      "description": "The row depends on a spreadsheet formula result the configuration has not authorized, so it was set aside for review."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "ISOLATED_FORMULA_CACHED_VALUE_ABSENT",
+      "description": "The row depends on a spreadsheet formula the workbook never calculated, so there is no value to deliver. It was set aside for review. The remedy is a new trusted export in which the workbook has been calculated, or an explicit exclusion of the row or column in the configuration."
+    },
+    {
+      "category": "IDENTITY",
+      "code": "ISOLATED_IDENTITY_CONFLICT",
+      "description": "Rows proven to be one record hold conflicting values, so the combined record was set aside for a human decision instead of a guess."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "ISOLATED_INVALID_FIELD",
+      "description": "A field on this row is not valid for its declared type and the configuration asks for such rows to be set aside for review."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "ISOLATED_UNSUPPORTED_FIELD",
+      "description": "A field on this row uses source material the engine will not deliver, so the row was set aside for review."
+    },
+    {
+      "category": "MAPPING",
+      "code": "LEFTOVER_ASSOCIATION_SHEET_ONLY",
+      "description": "The source sheet describes relationships only. Its rows produce associations rather than records."
+    },
+    {
+      "category": "MAPPING",
+      "code": "LEFTOVER_NO_RECORD_MAPPING",
+      "description": "The source sheet is not mapped to any destination object by the migration configuration, so its rows were not migrated."
+    },
+    {
+      "category": "DESTINATION",
+      "code": "TARGET_CLEAR_NOT_REPRESENTABLE",
+      "description": "The plan authorizes clearing this field, and the destination import path cannot express clearing an existing value. A blank cell is not an instruction to delete: this destination ignores it and keeps the value it already holds. Rather than deliver a file that silently does nothing, the record is set aside."
+    },
+    {
+      "category": "DESTINATION",
+      "code": "TARGET_CLEAR_TOKEN_COLLISION",
+      "description": "A delivered value is exactly the text this format reserves for an authorized clear. Writing it would tell the reader to empty a field the source asked to fill. The record is set aside rather than delivered as an instruction nobody gave."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_BOOLEAN_PARSED",
+      "description": "The value matched a declared true or false spelling and was normalized."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_BOOLEAN_UNRECOGNIZED",
+      "description": "The value is not one of the declared true or false spellings. It was preserved unchanged."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_CLEARED_BY_EXPLICIT_AUTHORIZATION",
+      "description": "The value was deliberately cleared by a rule the configuration explicitly authorized to destroy data."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_CONFIGURED_NORMALIZATION_APPLIED",
+      "description": "The value was rewritten by rules the migration configuration declares for this column: Unicode composition, an exact value mapping, or a case rule. The evidence names which of them ran."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_DATETIME_NO_TIMEZONE_EVIDENCE",
+      "description": "The timestamp has no time zone and none was declared for this column, so it was preserved unchanged rather than shifted."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_DATETIME_PARSED",
+      "description": "The timestamp was read using the declared format and the declared time zone offset or zone."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_DATE_AMBIGUOUS_NO_FORMAT_EVIDENCE",
+      "description": "The value is not an ISO 8601 date and no date format was declared for this column, so it was preserved unchanged rather than interpreted."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_DATE_FROM_SPREADSHEET_SERIAL",
+      "description": "The spreadsheet cell is stored as a date serial number carrying a date number format, so the workbook itself establishes the calendar date."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_DATE_INVALID_FOR_DECLARED_FORMAT",
+      "description": "The value does not match the date format declared for this column. It was preserved unchanged."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_DATE_ISO_ACCEPTED",
+      "description": "The value is an unambiguous ISO 8601 calendar date and was accepted as written."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_DATE_PARSED_WITH_DECLARED_FORMAT",
+      "description": "The value was read using the date format declared in the migration configuration."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_EMAIL_DOMAIN_LOWERCASED",
+      "description": "The domain part of the email address was lowercased. Domains are case-insensitive; the local part was left untouched because it is not."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_EMAIL_INVALID_SYNTAX",
+      "description": "The value is not a syntactically valid email address. It was preserved unchanged."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_ENUM_VALUE_ACCEPTED",
+      "description": "The value matched one of the allowed options declared for this column."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_ENUM_VALUE_NOT_IN_DECLARED_SET",
+      "description": "The value is not one of the allowed options declared for this column. It was preserved unchanged."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_FORMULA_CACHED_VALUE_ABSENT",
+      "description": "The spreadsheet cell holds a formula and the workbook stored no result for it, so it was never calculated. The engine never evaluates formulas and there is no cached value to accept under either policy. This is not an empty cell and it was not treated as one. Obtain a new trusted export in which the workbook has been calculated, or exclude the row or column explicitly in the configuration."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_FORMULA_CACHED_VALUE_ACCEPTED",
+      "description": "The spreadsheet cell holds a formula. The configuration authorizes using the value the spreadsheet cached; the formula text is recorded as provenance and was never evaluated."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_FORMULA_CACHED_VALUE_NOT_AUTHORIZED",
+      "description": "The spreadsheet cell holds a formula. The engine never evaluates formulas, and the configuration does not authorize using the value the spreadsheet had cached, so the value was preserved and the row was set aside."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_IDENTIFIER_NUMERIC_IN_SOURCE",
+      "description": "The spreadsheet stored this identifier as a number, so any leading zeros were already absent from the file before this migration read it. The stored value was carried through unchanged."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_IDENTIFIER_PRESERVED",
+      "description": "The value is an identifier and was carried through as text. Leading zeros and length are preserved exactly."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_LOCAL_TIME_AMBIGUOUS",
+      "description": "The local time happens twice in the declared zone (the clocks went back) and the plan does not choose the earlier or the later occurrence, so it was preserved unchanged."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_LOCAL_TIME_NONEXISTENT",
+      "description": "The local time never happens in the declared zone (the clocks went forward over it), so it was preserved unchanged rather than moved to another hour."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_NUMBER_AMBIGUOUS_SEPARATORS",
+      "description": "The value can be read under more than one separator convention and none was declared, so it was preserved unchanged."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_NUMBER_INVALID",
+      "description": "The value is not a number under the declared separator convention. It was preserved unchanged."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_NUMBER_PARSED",
+      "description": "The number was read using the declared decimal and thousands separators."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_PHONE_E164",
+      "description": "The phone number was rewritten in E.164 form using explicit country evidence."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_PHONE_EXTENSION_NO_DESTINATION_FIELD",
+      "description": "The phone number carries an extension but the configuration provides no destination field for it. The original value was preserved so the extension is not lost."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_PHONE_EXTENSION_SEPARATED",
+      "description": "The extension was written to its configured destination field and the number was normalized."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_PHONE_INVALID",
+      "description": "The value could not be read as a valid phone number for the established country. It was preserved unchanged."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_PHONE_NO_COUNTRY_EVIDENCE",
+      "description": "The phone number has no international prefix and no country was established for this data, so it was preserved unchanged rather than guessed."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_UNCHANGED",
+      "description": "The value was accepted exactly as it appears in the source."
+    },
+    {
+      "category": "TRANSFORM",
+      "code": "TRANSFORM_WHITESPACE_TRIMMED",
+      "description": "Leading and trailing whitespace was removed. No other character was altered."
+    },
+    {
+      "category": "MAPPING",
+      "code": "UNMAPPED_COLUMN_PRESERVED",
+      "description": "The source column is not mapped to a destination field. Its value was preserved in the unmapped-fields artifact instead of being discarded."
+    }
+  ],
+  "version": "3.0.0"
+}

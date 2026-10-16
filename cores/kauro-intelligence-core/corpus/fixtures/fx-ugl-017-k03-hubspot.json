@@ -1,0 +1,208 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-017-k03-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-017-k03-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "24bb7f861d704d4c6b1e1ba2ed3781b6f8eb49a80bf9925957e6191dd950424f",
+      "candidateSetHash": "5f30b98ea904cb13deeaee7036916569db6e5e141d35f7dde8e7697474c82e5e",
+      "targetContractHash": "tc_92a2d19c19883ebb4f67baf6fb103bf67872965fa37983cc90d71be7c6511243",
+      "projectRevisionHash": "4257d2cfe8e9664e773f2a437166df427473558662104305b9cced84278cc274"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-Mail-Adresse",
+        "sourceFieldRef": "fld_e44364660f661b94",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "﻿First name",
+        "sourceFieldRef": "fld_c3ae1b884e4d3292",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name​",
+        "sourceFieldRef": "fld_e5565ac18abbda8c",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Ｎａｍｅ de",
+        "sourceFieldRef": "fld_612157a7035266e3",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.mobilePhone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Ｎａｍｅ de"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3537c5a01ec9c92d00a77d5a3b501a8bf46ed136d381cf6216e95fffa607faff"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-Mail-Adresse",
+        "fieldRef": "src:E-Mail-Adresse",
+        "valueClass": "EMAIL",
+        "values": [
+          "lumo.pelero0@corp.example.test",
+          "mesia.yanunda1@sample.invalid",
+          "zerel.vexenko2@example.test",
+          "quelek.belaly3@sample.invalid",
+          "belan.kesell4@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "﻿First name",
+        "fieldRef": "src:bom-de",
+        "valueClass": "TEXT",
+        "values": [
+          "Yanel",
+          "Lumek",
+          "Sovek",
+          "Noria",
+          "Jorek"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name​",
+        "fieldRef": "src:zw-de",
+        "valueClass": "TEXT",
+        "values": [
+          "Halsorin​",
+          "Risenko​",
+          "Jorvik​",
+          "Noriko​",
+          "Belath​"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Ｎａｍｅ de",
+        "fieldRef": "src:Ｎａｍｅ de",
+        "valueClass": "TEXT",
+        "values": [
+          "Norath Systems Ltd",
+          "Orvrane Systems Inc.",
+          "Darunda Systems LLC",
+          "Darunda Partners Inc.",
+          "Joranth Studio S.L."
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:encoding",
+      "lang:de"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_eb82ad56ec3b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "E-Mail-Adresse",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b9c50177ba96f71df898861e",
+    "kc_f5ebe7d63312f020b5e0186e"
+  ]
+}

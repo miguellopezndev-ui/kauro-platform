@@ -1,0 +1,184 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-087-k03-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-087-k03-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "279accd4267a1dccb11cd06d1a332f2829224a364aefb528ea3e01cd1070d02e",
+      "candidateSetHash": "f84273260aa7a10692a552855af5e7229b58495cf58a3ebf7de123cbdc0206fd",
+      "targetContractHash": null,
+      "projectRevisionHash": "b08e5561bd739046d8e0b4e5a63d772df748b8c616823d294bc7a2d01461ab29"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "メールアドレス",
+        "sourceFieldRef": "fld_99ddfe211d9f75b6",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "﻿First name",
+        "sourceFieldRef": "fld_582dbdcd035101bc",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name​",
+        "sourceFieldRef": "fld_e71c034939b65d87",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Ｎａｍｅ ja",
+        "sourceFieldRef": "fld_b0835bcaf7691d00",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.doNotCall",
+      "contact.doNotEmail",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.mobilePhone"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Ｎａｍｅ ja"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "cc95d6a3ad97226e05e407de71ffc601791d12cf88f551cb1072828a3553c05c"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "メールアドレス",
+        "fieldRef": "src:メールアドレス",
+        "valueClass": "EMAIL",
+        "values": [
+          "kesan.darova0@sample.invalid",
+          "vexan.belunda1@corp.example.test",
+          "orvel.sovero2@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "﻿First name",
+        "fieldRef": "src:bom-ja",
+        "valueClass": "TEXT",
+        "values": [
+          "Norek",
+          "Belan",
+          "Vexia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name​",
+        "fieldRef": "src:zw-ja",
+        "valueClass": "TEXT",
+        "values": [
+          "Zersorin​",
+          "Findell​",
+          "Tulell​"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Ｎａｍｅ ja",
+        "fieldRef": "src:Ｎａｍｅ ja",
+        "valueClass": "TEXT",
+        "values": [
+          "Tavova Works B.V.",
+          "Tulanth Labs Inc.",
+          "Wilaly Systems Ltd"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:encoding",
+      "lang:ja"
+    ]
+  },
+  "canaries": [
+    "kc_47ac95df2175622224f7566d",
+    "kc_ba6a82b9d04ca9528d25a236"
+  ]
+}

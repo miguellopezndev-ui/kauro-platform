@@ -1,0 +1,143 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-ugl-105-k07-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-105-k07-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "b7e8857d6564b5770b4946866092c0828e4486b67bd17514286212ddb128cce5",
+      "candidateSetHash": "72f7d3e41d8e84c61bde6ca20874f1e7f302dba74070c4d53cd267a730928c39",
+      "targetContractHash": "tc_4096fe52ec6fad54c08fc822b299e3f3f0e3ee22daf9fadf2e2c368615561547",
+      "projectRevisionHash": "3d38c7bf344f6e809f7977dda067a5d15c6afe99eef5bdaec46c77f275c67646"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "शहर",
+        "sourceFieldRef": "fld_46ba060d11dbb963",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Puntuación antigua",
+        "sourceFieldRef": "fld_15f005709f875590",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.description"
+    ],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "b7d032e5a4abc4a2e5fc5a20a44b5369e26a82c3b5351f7c54093b7cfc839438"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "शहर",
+        "fieldRef": "src:शहर",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvale",
+          "Brandel",
+          "Tessin"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Puntuación antigua",
+        "fieldRef": "src:Puntuación antigua",
+        "valueClass": "MIXED",
+        "values": [
+          "71",
+          "70",
+          "61"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.description"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-target",
+      "lang:hi",
+      "ugly:stale-header"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_21c75d0b0bdd",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "शहर",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b966d3e114dfb05986612486",
+    "kc_47b4273484b325db53f512b6"
+  ]
+}

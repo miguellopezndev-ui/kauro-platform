@@ -1,0 +1,129 @@
+{
+  "artifactKind": "INTELLIGENCE_CORE_RELEASE_DOSSIER",
+  "repository": "miguellopezndev-ui/kauro-intelligence-core",
+  "tag": "v0.4.0",
+  "commit": "1c97fa69ba9d5758df8854579341d8c5dab8f8d3",
+  "tree": "635a18615d202534e9932cfbc25f269e8938e824",
+  "package": {
+    "name": "kauro-intelligence-core",
+    "version": "0.4.0"
+  },
+  "migrationCore": {
+    "name": "kavo-migration-core",
+    "version": "2.0.1",
+    "sha256": "787f0b80a906d31605e3946ad00df86d2a131e3e89d78855c1c4f327b37fa000",
+    "repository": "miguellopezndev-ui/kauro-migration-core",
+    "commit": "a2a549031de85d95be8645dd9c5156dfff2050a0",
+    "tag": "v2.0.1",
+    "releaseId": 387057468,
+    "assetId": 557300441
+  },
+  "ci": {
+    "runId": 36620992913,
+    "event": "push",
+    "branch": "main",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "dependency audit",
+        "conclusion": "success",
+        "id": 109586042108
+      },
+      {
+        "name": "sabotage (INTELLIGENCE-SABOTAGE-01)",
+        "conclusion": "success",
+        "id": 109586042370
+      },
+      {
+        "name": "architecture closure (INTELLIGENCE-ARCHITECTURE-01)",
+        "conclusion": "success",
+        "id": 109586042421
+      },
+      {
+        "name": "gate (windows-latest, node 24)",
+        "conclusion": "success",
+        "id": 109586042483
+      },
+      {
+        "name": "gate (ubuntu-latest, node 24)",
+        "conclusion": "success",
+        "id": 109586042618
+      },
+      {
+        "name": "gate receipt",
+        "conclusion": "success",
+        "id": 109617326678
+      }
+    ]
+  },
+  "verdict": {
+    "closed": "TRUE",
+    "releaseCandidate": "FALSE",
+    "frozen": "FALSE",
+    "facts": 18,
+    "ciPackSha256": "af3d603e84887fd091a57eb49304a79f80cf99e543d7e47967292839786784eb"
+  },
+  "sabotage": {
+    "mode": "QUALIFICATION",
+    "counts": {
+      "inventory": 175,
+      "reached": 175,
+      "killed": 175,
+      "survived": 0,
+      "didNotCompile": 0,
+      "infraError": 0,
+      "notReached": 0
+    }
+  },
+  "assets": [
+    {
+      "name": "kauro-intelligence-core-0.4.0.tgz",
+      "role": "PACKAGE",
+      "origin": "npm pack from a clean Linux checkout at the commit, umask 022, after npm ci and npm run build",
+      "bytes": 155553,
+      "sha256": "af3d603e84887fd091a57eb49304a79f80cf99e543d7e47967292839786784eb"
+    },
+    {
+      "name": "source-1c97fa69ba9d5758df8854579341d8c5dab8f8d3.tar.gz",
+      "role": "SOURCE",
+      "origin": "git archive of the commit, gzip -n -9",
+      "bytes": 1209664,
+      "sha256": "8e8ba850a4622871252aac4adb5064a476f5d4e6d9438c48a429da6e1008a251"
+    },
+    {
+      "name": "sbom.cdx.json",
+      "role": "SBOM",
+      "origin": "npm sbom --sbom-format cyclonedx over the installed lockfile",
+      "bytes": 8976,
+      "sha256": "39f7469b419c0199a3556ed05af4e04e2119b3fff6a85942504bc83edce9f9d6"
+    },
+    {
+      "name": "architecture-gate.json",
+      "role": "ARCHITECTURE_VERDICT",
+      "origin": "artifact architecture-gate of the CI run on the merged commit",
+      "bytes": 9241,
+      "sha256": "641aac644e78f2e422e85340552fe344c2ebbdc0644410df996630561ec8cc6d",
+      "artifactId": 11061243039,
+      "artifactDigest": "sha256:335f8a253ee95c8ddbcedd6156f01ec3e0d2926c398d7de5703b1ece95e55083"
+    },
+    {
+      "name": "sabotage-report.json",
+      "role": "SABOTAGE_QUALIFICATION",
+      "origin": "artifact sabotage-report of the CI run on the merged commit",
+      "bytes": 108966,
+      "sha256": "2215d4380a49d4b3333031660dd855e9d3c6b34d8ab202b90c5f47a98712dd38",
+      "artifactId": 11061662319,
+      "artifactDigest": "sha256:0bfab3e2f56addfbf667174e31f53718d995568e37cb0180ad424a612e1c7515"
+    },
+    {
+      "name": "ci-receipt.json",
+      "role": "CI_RECEIPT",
+      "origin": "artifact ic1-receipt of the CI run on the merged commit, verified with tools/compose-receipt.mjs at the commit",
+      "bytes": 124671,
+      "sha256": "5ee438bc62be795bf7624c265e7e7162d77f08e6ca4a9cd8b2cd61db5f0312eb",
+      "artifactId": 11062132513,
+      "artifactDigest": "sha256:3ebbe85e88689f8ad1401160458d3d6d94c5a00d79a2bd79e6f9fe1ba71026f3"
+    }
+  ],
+  "problems": []
+}

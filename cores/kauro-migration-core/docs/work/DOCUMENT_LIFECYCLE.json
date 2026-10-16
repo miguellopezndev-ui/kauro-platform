@@ -1,0 +1,85 @@
+{
+  "artifactKind": "MIGRATION_CORE_DOCUMENT_LIFECYCLE",
+  "version": "1.0.0",
+  "note": "Which documents make current claims about the engine, and which record what was once true. DRIFT-01 checks current documents against the executable constants and exempts historical ones. The exemption used to be earned by a document containing the word \"historical\" or \"superseded\" anywhere in its first forty lines, which is neither necessary nor sufficient: docs/work/MC1_EXECUTION_STATE.md is a record of a finished front and was checked as current because it never uses either word, while any current document that mentions a superseded figure in order to correct it exempted itself from every rule at once. A status is a decision, so it is recorded as one, with who decided it and when. A tracked document that is not listed here is CURRENT: the default is to be checked.",
+  "statuses": [
+    "CURRENT",
+    "HISTORICAL",
+    "SUPERSEDED",
+    "GENERATED"
+  ],
+  "documents": [
+    {
+      "path": "docs/work/MC1_EXECUTION_STATE.md",
+      "status": "HISTORICAL",
+      "supersededBy": null,
+      "decidedOn": "2026-09-08",
+      "authority": "KAURO_MIGRATION_CORE_HOJA_DE_RUTA_CIERRE_V1",
+      "reason": "The working record of MC-1. It describes the engine as it stood before the bounded architecture and before package format 2.0.0, and it is kept because the reasoning in it is why several decisions are what they are."
+    },
+    {
+      "path": "docs/work/MC2_EXECUTION_STATE.md",
+      "status": "HISTORICAL",
+      "supersededBy": "docs/work/MC3_EXECUTION_STATE.md",
+      "decidedOn": "2026-09-08",
+      "authority": "KAURO_MIGRATION_CORE_HOJA_DE_RUTA_CIERRE_V1",
+      "reason": "The working record of MC-2, including the ledger of thirty defects MC-3 absorbed. Its figures describe the candidate MC-2 produced, not this one."
+    },
+    {
+      "path": "docs/work/CAPACITY_BASELINE.md",
+      "status": "HISTORICAL",
+      "supersededBy": "qualification/capacity/",
+      "decidedOn": "2026-09-08",
+      "authority": "KAURO_CUALIFICACION_INTEGRAL_CANONICO_V1",
+      "reason": "The pre-MC-2 capacity measurements, taken before the engine spilled to a scratch store and denominated in mebibytes. The measured evidence under qualification/capacity replaces it."
+    },
+    {
+      "path": "docs/work/FINAL_V1_DELTA.md",
+      "status": "HISTORICAL",
+      "supersededBy": "docs/CONTRACT.md",
+      "decidedOn": "2026-09-08",
+      "authority": "KAURO_MIGRATION_CORE_CANONICO_V1",
+      "reason": "A delta taken against the engine before the target-mode contract change. Every claim in it is about code that no longer exists; the contract document carries what replaced it."
+    },
+    {
+      "path": "docs/release/CLOSING_REPORT_MIGRATION_CORE_V1.md",
+      "status": "HISTORICAL",
+      "supersededBy": "docs/release/MIGRATION_CORE_V1_PROVENANCE.md",
+      "decidedOn": "2026-09-08",
+      "authority": "KAURO_MIGRATION_CORE_HOJA_DE_RUTA_CIERRE_V1",
+      "reason": "The closing report of the V1 release line (v1.0.0 to v1.0.2). It is the record of a release that happened, and its figures are that release's."
+    },
+    {
+      "path": "acceptance/README.md",
+      "status": "GENERATED",
+      "supersededBy": null,
+      "decidedOn": "2026-09-08",
+      "authority": "tools/build-acceptance-packages.ts",
+      "reason": "Regenerated from the acceptance packages by npm run acceptance, and checked by the universe's artifacts-reproducible step. It is a current claim and is checked as one; the status records that editing it by hand is not how it changes."
+    },
+    {
+      "path": "docs/work/MC3_EXECUTION_STATE.md",
+      "status": "HISTORICAL",
+      "supersededBy": "docs/release/EQUIVALENCE_2.0.3.md",
+      "decidedOn": "2026-09-29",
+      "authority": "package B02, release 2.0.3",
+      "reason": "The working record of MC-3 and its reopening, which ended in the unreleased 2.0.2. Its counts and campaigns are that candidate's; 2.0.3 re-derives its own."
+    },
+    {
+      "path": "docs/work/MC3_TERMINAL_RESULT.md",
+      "status": "HISTORICAL",
+      "supersededBy": "docs/release/EQUIVALENCE_2.0.3.md",
+      "decidedOn": "2026-09-29",
+      "authority": "package B02, release 2.0.3",
+      "reason": "The terminal account of MC-3 as of the 2.0.1 release. Its figures describe that release."
+    },
+    {
+      "path": "docs/work/MC3_DELIVERY.md",
+      "status": "HISTORICAL",
+      "supersededBy": "docs/release/EQUIVALENCE_2.0.3.md",
+      "decidedOn": "2026-09-29",
+      "authority": "package B02, release 2.0.3",
+      "reason": "The MC-3 delivery note written before the 2.0.1 chain ran. Its state is that front's."
+    }
+  ]
+}

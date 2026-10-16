@@ -1,0 +1,614 @@
+{
+  "gate": "HSP-TARGET-01 (import)",
+  "observedAt": "2026-10-02T12:30:40Z",
+  "observedInstance": {
+    "vendor": "hubspot",
+    "instanceId": "51872453",
+    "instancePseudonym": "i_85d7849b12c37767",
+    "observedBy": "GET /account-info/v3/details, on the credential that performed these imports, in this run",
+    "detail": "DEVELOPER_TEST"
+  },
+  "privileges": [
+    {
+      "privilege": "contacts.read",
+      "probe": "GET /crm/v3/objects/contacts",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "privilege": "companies.read",
+      "probe": "GET /crm/v3/objects/companies",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "privilege": "deals.read",
+      "probe": "GET /crm/v3/objects/deals",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "privilege": "properties.read",
+      "probe": "GET /crm/v3/properties/contacts",
+      "status": 200,
+      "ok": true
+    },
+    {
+      "privilege": "imports.read",
+      "probe": "GET /crm/v3/imports",
+      "status": 200,
+      "ok": true
+    }
+  ],
+  "namespace": {
+    "campaignId": "c_c87b11a87f0014e3",
+    "namespace": "qc87b11a87f",
+    "domain": "qc87b11a87f.kauro-qualification.dev",
+    "corpusFilesRewritten": [
+      "Q1-create/input/companies.csv",
+      "Q1-create/input/contacts.csv",
+      "Q1-create/input/deals.csv",
+      "Q2-enumeration/input/contacts.csv",
+      "Q3-update/input/contacts.csv",
+      "Q4-mixed/input/contacts.csv",
+      "Q5-custom-property/input/contacts.csv",
+      "Q6-custom-key-upsert/input/contacts.csv",
+      "Q7-required-blank/input/contacts.csv"
+    ],
+    "substitutions": 17,
+    "valuesPrefixed": 2,
+    "corpus": {
+      "files": 16,
+      "bytes": 12133
+    }
+  },
+  "portalId": "51872453",
+  "portalIdSource": "GET /account-info/v3/details on the credential that performed these imports, in this run",
+  "accountType": "DEVELOPER_TEST",
+  "contractPortalId": "51872453",
+  "capturedAt": "2026-10-02T12:30:40Z",
+  "imports": [
+    {
+      "label": "Q1 contacts",
+      "status": 200,
+      "state": "DONE",
+      "counters": {
+        "TOTAL_ROWS": 3,
+        "PROPERTY_VALUES_EMITTED": 3,
+        "CREATED_OBJECTS": 3,
+        "MAPPED_COLUMNS": 5
+      },
+      "errorCount": 0,
+      "firstError": null,
+      "detail": null
+    },
+    {
+      "label": "Q1 companies",
+      "status": 200,
+      "state": "DONE",
+      "counters": {
+        "TOTAL_ROWS": 2,
+        "PROPERTY_VALUES_EMITTED": 2,
+        "CREATED_OBJECTS": 2,
+        "CREATED_CUSTOM_OBJECTS": 2,
+        "MAPPED_COLUMNS": 3
+      },
+      "errorCount": 0,
+      "firstError": null,
+      "detail": null
+    },
+    {
+      "label": "Q1 deals",
+      "status": 200,
+      "state": "DONE",
+      "counters": {
+        "TOTAL_ROWS": 2,
+        "PROPERTY_VALUES_EMITTED": 2,
+        "CREATED_OBJECTS": 2,
+        "CREATED_CUSTOM_OBJECTS": 2,
+        "MAPPED_COLUMNS": 5
+      },
+      "errorCount": 0,
+      "firstError": null,
+      "detail": null
+    },
+    {
+      "label": "Q2 undefined enumeration value",
+      "status": 200,
+      "state": "DONE",
+      "counters": {
+        "TOTAL_ROWS": 1,
+        "PROPERTY_VALUES_EMITTED": 1,
+        "CREATED_OBJECTS": 1,
+        "MAPPED_COLUMNS": 4
+      },
+      "errorCount": 0,
+      "firstError": null,
+      "detail": null
+    },
+    {
+      "label": "Q7 required value blank",
+      "status": 200,
+      "state": "DONE",
+      "counters": {
+        "TOTAL_ROWS": 1,
+        "PROPERTY_VALUES_EMITTED": 1,
+        "CREATED_OBJECTS": 1,
+        "MAPPED_COLUMNS": 4
+      },
+      "errorCount": 0,
+      "firstError": null,
+      "detail": null
+    },
+    {
+      "label": "Q3 update by email",
+      "status": 200,
+      "state": "DONE",
+      "counters": {
+        "TOTAL_ROWS": 3,
+        "PROPERTY_VALUES_EMITTED": 3,
+        "UPDATED_OBJECTS": 3,
+        "MAPPED_COLUMNS": 4
+      },
+      "errorCount": 0,
+      "firstError": null,
+      "detail": null
+    },
+    {
+      "label": "Q4 one existing and one new",
+      "status": 200,
+      "state": "DONE",
+      "counters": {
+        "TOTAL_ROWS": 2,
+        "PROPERTY_VALUES_EMITTED": 2,
+        "CREATED_OBJECTS": 1,
+        "UPDATED_OBJECTS": 1,
+        "MAPPED_COLUMNS": 4
+      },
+      "errorCount": 0,
+      "firstError": null,
+      "detail": null
+    },
+    {
+      "label": "I7 two-file common column",
+      "status": 200,
+      "state": "DONE",
+      "counters": {
+        "TOTAL_ROWS": 5,
+        "PROPERTY_VALUES_EMITTED": 8,
+        "UPDATED_OBJECTS": 5,
+        "ASSOCIATIONS_EMITTED": 3,
+        "ASSOCIATIONS_CREATED": 3,
+        "MAPPED_COLUMNS": 9,
+        "ASSOCIATIONS_PROCESSED": 3
+      },
+      "errorCount": 0,
+      "firstError": null,
+      "detail": null
+    }
+  ],
+  "cases": [
+    {
+      "id": "Q1-create.packageVerifies",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I1.contacts",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I1.companies",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I1.deals",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I9.contactsDelivered",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I10.exportBackMatchesThePackage",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I2.aPropertyBeyondTheIdentifiers",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I3.definedEnumerationValue",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I5.stageResolvesByInternalIdentity",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I5.pipelineResolvesByInternalIdentity",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "Q2-enumeration.packageVerifies",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I4.undefinedEnumerationValueIsRejected",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I4.thePackagePredictedIt",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "Q7-required-blank.packageVerifies",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I11.requiredBlankIsRejected",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I11.thePackagePredictedIt",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "Q3-update.packageVerifies",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I6.updateCreatesNothing",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I6.updateKeepsTheSameRecord",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I6.updateChangedTheValue",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "Q4-mixed.packageVerifies",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I6.mixedCreatedExactlyOne",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I6.mixedUpdatedTheExisting",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I7.theAssociationFileJoinsTheObjectFiles",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I7.associationResolves",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I8.activityObjectRefused",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "I8.activityRelationshipRefused",
+      "ok": true,
+      "expected": true,
+      "observed": true,
+      "detail": null
+    },
+    {
+      "id": "X1.everyCreatedRecordIsInThisCampaignNamespace",
+      "ok": true,
+      "expected": {
+        "createdOutside": 0,
+        "strangersInside": 0,
+        "created": true
+      },
+      "observed": {
+        "createdOutside": 0,
+        "strangersInside": 0,
+        "created": true
+      },
+      "detail": null
+    },
+    {
+      "id": "X2.cleanupRemovedExactlyTheRecordsCreated",
+      "ok": true,
+      "expected": {
+        "requested": 10,
+        "deleted": 10,
+        "leftBehind": 0
+      },
+      "observed": {
+        "requested": 10,
+        "deleted": 10,
+        "leftBehind": 0
+      },
+      "detail": null
+    },
+    {
+      "id": "X3.theNamespaceIsEmptyOnReadBack",
+      "ok": true,
+      "expected": 0,
+      "observed": 0,
+      "detail": null
+    }
+  ],
+  "failures": [],
+  "contractHash": "tc_8c4767ffc7dda6614910e37bf76913bab738d0f1473aad1bcdbdb2764ad1dc2e",
+  "columnsTheApiCannotCarry": [
+    "Association Key"
+  ],
+  "created": {
+    "total": 10,
+    "byType": {
+      "contacts": 6,
+      "companies": 2,
+      "deals": 2
+    },
+    "outsideTheNamespace": [],
+    "strangersInTheNamespace": [],
+    "ids": [
+      {
+        "objectType": "contacts",
+        "id": "252550783057",
+        "note": "dorothy@qc87b11a87f.kauro-qualification.dev",
+        "createdAt": "2026-10-02T12:32:11Z"
+      },
+      {
+        "objectType": "contacts",
+        "id": "252551000848",
+        "note": "ada@qc87b11a87f.kauro-qualification.dev",
+        "createdAt": "2026-10-02T12:32:11Z"
+      },
+      {
+        "objectType": "contacts",
+        "id": "252552236341",
+        "note": "grace@qc87b11a87f.kauro-qualification.dev",
+        "createdAt": "2026-10-02T12:32:11Z"
+      },
+      {
+        "objectType": "contacts",
+        "id": "252552548961",
+        "note": "presentmail@qc87b11a87f.kauro-qualification.dev",
+        "createdAt": "2026-10-02T12:32:11Z"
+      },
+      {
+        "objectType": "contacts",
+        "id": "252560008966",
+        "note": "alan@qc87b11a87f.kauro-qualification.dev",
+        "createdAt": "2026-10-02T12:32:11Z"
+      },
+      {
+        "objectType": "contacts",
+        "id": "252561051247",
+        "note": "radia@qc87b11a87f.kauro-qualification.dev",
+        "createdAt": "2026-10-02T12:32:11Z"
+      },
+      {
+        "objectType": "companies",
+        "id": "58865136396",
+        "note": "bletchley.qc87b11a87f.kauro-qualification.dev",
+        "createdAt": "2026-10-02T12:32:11Z"
+      },
+      {
+        "objectType": "companies",
+        "id": "58878003730",
+        "note": "analytical.qc87b11a87f.kauro-qualification.dev",
+        "createdAt": "2026-10-02T12:32:11Z"
+      },
+      {
+        "objectType": "deals",
+        "id": "65555634105",
+        "note": "[qc87b11a87f] Analytical Engines renewal",
+        "createdAt": "2026-10-02T12:32:46Z"
+      },
+      {
+        "objectType": "deals",
+        "id": "65558576283",
+        "note": "[qc87b11a87f] Bletchley Systems expansion",
+        "createdAt": "2026-10-02T12:32:46Z"
+      }
+    ]
+  },
+  "cleanup": {
+    "vendor": "hubspot",
+    "instanceId": "51872453",
+    "namespace": "qc87b11a87f.kauro-qualification.dev",
+    "requested": 10,
+    "deleted": 10,
+    "confirmedGone": 10,
+    "leftBehind": [],
+    "ok": true,
+    "outcomes": [
+      {
+        "objectType": "contacts",
+        "id": "252550783057",
+        "note": "dorothy@qc87b11a87f.kauro-qualification.dev",
+        "deleted": true,
+        "stillPresent": false,
+        "detail": "GET -> 404"
+      },
+      {
+        "objectType": "contacts",
+        "id": "252551000848",
+        "note": "ada@qc87b11a87f.kauro-qualification.dev",
+        "deleted": true,
+        "stillPresent": false,
+        "detail": "GET -> 404"
+      },
+      {
+        "objectType": "contacts",
+        "id": "252552236341",
+        "note": "grace@qc87b11a87f.kauro-qualification.dev",
+        "deleted": true,
+        "stillPresent": false,
+        "detail": "GET -> 404"
+      },
+      {
+        "objectType": "contacts",
+        "id": "252552548961",
+        "note": "presentmail@qc87b11a87f.kauro-qualification.dev",
+        "deleted": true,
+        "stillPresent": false,
+        "detail": "GET -> 404"
+      },
+      {
+        "objectType": "contacts",
+        "id": "252560008966",
+        "note": "alan@qc87b11a87f.kauro-qualification.dev",
+        "deleted": true,
+        "stillPresent": false,
+        "detail": "GET -> 404"
+      },
+      {
+        "objectType": "contacts",
+        "id": "252561051247",
+        "note": "radia@qc87b11a87f.kauro-qualification.dev",
+        "deleted": true,
+        "stillPresent": false,
+        "detail": "GET -> 404"
+      },
+      {
+        "objectType": "companies",
+        "id": "58865136396",
+        "note": "bletchley.qc87b11a87f.kauro-qualification.dev",
+        "deleted": true,
+        "stillPresent": false,
+        "detail": "GET -> 404"
+      },
+      {
+        "objectType": "companies",
+        "id": "58878003730",
+        "note": "analytical.qc87b11a87f.kauro-qualification.dev",
+        "deleted": true,
+        "stillPresent": false,
+        "detail": "GET -> 404"
+      },
+      {
+        "objectType": "deals",
+        "id": "65555634105",
+        "note": "[qc87b11a87f] Analytical Engines renewal",
+        "deleted": true,
+        "stillPresent": false,
+        "detail": "GET -> 404"
+      },
+      {
+        "objectType": "deals",
+        "id": "65558576283",
+        "note": "[qc87b11a87f] Bletchley Systems expansion",
+        "deleted": true,
+        "stillPresent": false,
+        "detail": "GET -> 404"
+      }
+    ],
+    "note": "Deleted by id, one at a time, and each one read back afterwards. Nothing is matched by a pattern and nothing this runner did not create is reachable from here."
+  },
+  "namespaceOnReadBack": {
+    "records": []
+  },
+  "result": "PASS",
+  "capture": {
+    "captureVersion": "2.0.0",
+    "producer": "qualification/hubspot/run-import-qualification.mjs",
+    "producerFingerprint": "84aec2d35f4386e739a91a6e027f731b5de1181314b8e1afe39da1afb6cfe086",
+    "producerFiles": 107,
+    "campaignId": "c_c87b11a87f0014e3",
+    "subjectDigestAtStart": "045214ef4302d902047cc4e94652109ef63279cce28315280bb88e7f30759505",
+    "startedAt": "2026-10-02T12:30:33Z",
+    "environment": {
+      "node": "v24.14.1",
+      "platform": "win32",
+      "arch": "x64",
+      "osRelease": "10.0.26300",
+      "cpuCount": 12,
+      "totalMemoryBytes": 14893805568
+    },
+    "producerFingerprintAtEnd": "84aec2d35f4386e739a91a6e027f731b5de1181314b8e1afe39da1afb6cfe086",
+    "subjectDigestAtEnd": "045214ef4302d902047cc4e94652109ef63279cce28315280bb88e7f30759505",
+    "endedAt": "2026-10-02T12:33:04Z",
+    "valid": true,
+    "invalidation": null
+  }
+}

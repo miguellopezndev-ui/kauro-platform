@@ -1,0 +1,300 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-070-cap11-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-070-cap11-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "1031d7b22d6dfea809f50f52d40c36a79e1d0e83fb683f60223f9dca029e58a2",
+      "candidateSetHash": "eab00f75ff22c2b8f71e9babd0f5614f262c79c434006f360adc0bad3e0f714c",
+      "targetContractHash": "tc_489cb370d915939a042d5afa5a1fce3b6c5ecd60325f066d65ec6d86a92c21da",
+      "projectRevisionHash": "4c0720421b468aa0a72fafba34ce9ef150c5852f2b764969c4c14be70a4fa77f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_057fa0e0487323ff",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Street address",
+        "sourceFieldRef": "fld_6b0050feba6e16c1",
+        "decision": "MAP",
+        "destinationField": "lead.addressLine1"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_563f5348df7639ba",
+        "decision": "MAP",
+        "destinationField": "lead.city"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_3784e5ec8e641651",
+        "decision": "MAP",
+        "destinationField": "lead.country"
+      },
+      {
+        "sourceHeader": "Postal code",
+        "sourceFieldRef": "fld_4dae3015201d71e5",
+        "decision": "MAP",
+        "destinationField": "lead.postalCode"
+      },
+      {
+        "sourceHeader": "State",
+        "sourceFieldRef": "fld_940e581ba24a904c",
+        "decision": "MAP",
+        "destinationField": "lead.state"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_f00aaea79a0024a1",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.addressLine1",
+      "lead.city",
+      "lead.company",
+      "lead.country",
+      "lead.description",
+      "lead.doNotCall",
+      "lead.industry",
+      "lead.lastName",
+      "lead.postalCode",
+      "lead.state",
+      "lead.status",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "fb349f101b44a9639d48b75ee34ffe280e4aaa903c5ad40ffa4198e5ecafffb0"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "doNotCall",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Open - Not Contacted",
+              "Working - Contacted",
+              "Closed - Converted",
+              "Closed - Not Converted"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Risdell",
+          "Orvova",
+          "Sovaly",
+          "Quelath",
+          "Queldell"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Street address",
+        "fieldRef": "src:Street address",
+        "valueClass": "TEXT",
+        "values": [
+          "43 Mesaly Street",
+          "198 Vexova Street",
+          "109 Tulunda Street",
+          "127 Zermar Street",
+          "140 Sovsorin Street"
+        ],
+        "decision": "MAP",
+        "destination": "lead.addressLine1"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Nuvia",
+          "Tessin",
+          "Valmora",
+          "Tessin",
+          "Kelmar"
+        ],
+        "decision": "MAP",
+        "destination": "lead.city"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "Valdoria",
+          "Estmark",
+          "Kelland",
+          "Kelland",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "lead.country"
+      },
+      {
+        "header": "Postal code",
+        "fieldRef": "src:Postal code",
+        "valueClass": "TEXT",
+        "values": [
+          "52279",
+          "86988",
+          "65549",
+          "39418",
+          "66142"
+        ],
+        "decision": "MAP",
+        "destination": "lead.postalCode"
+      },
+      {
+        "header": "State",
+        "fieldRef": "src:State",
+        "valueClass": "TEXT",
+        "values": [
+          "Coastal",
+          "North",
+          "Coastal",
+          "Upland",
+          "Coastal"
+        ],
+        "decision": "MAP",
+        "destination": "lead.state"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-9915",
+          "TKT-3485",
+          "TKT-7954",
+          "TKT-1852",
+          "TKT-4527"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_f772d20f2c20",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Street address",
+        "targetField": "lead.addressLine1"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_05e0f3bc21434374f176faa5",
+    "kc_59efcc8b3fe650c0298b8b15"
+  ]
+}

@@ -1,0 +1,139 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-093-k09-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-093-k09-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "cb685300bece36a5fe42951ed4393315410b07f117a4e1f895e1e6c0c19f3f0e",
+      "candidateSetHash": "61b9030cd642a1165503254344a8b90af5530893fd604076d1d7954ea3837812",
+      "targetContractHash": null,
+      "projectRevisionHash": "b33687b4b97ce46e8784d32772f93b4dc97063316c32b27645429a2874179580"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "金額",
+        "sourceFieldRef": "fld_6fc93734f36831cd",
+        "decision": "MAP",
+        "destinationField": "deal.amount"
+      },
+      {
+        "sourceHeader": "Import batch",
+        "sourceFieldRef": "fld_d3a5268b02824523",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Import batch"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "cbd2d1c63f1b11bfc54700cb6a195859684480bc3214fbf710d2974d444cdb70"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "金額",
+        "fieldRef": "src:金額",
+        "valueClass": "MIXED",
+        "values": [
+          "６９９４９",
+          "５７２６",
+          "５９１５４",
+          "２６１２４",
+          "３２５６４"
+        ],
+        "decision": "MAP",
+        "destination": "deal.amount"
+      },
+      {
+        "header": "Import batch",
+        "fieldRef": "src:Import batch",
+        "valueClass": "TEXT",
+        "values": [
+          "batch-11",
+          "batch-5",
+          "batch-26",
+          "batch-7",
+          "batch-27"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:cjk-fullwidth",
+      "lang:ja",
+      "ugly:encoding"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_238faf7d1241",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "金額",
+        "targetField": "deal.amount"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_d3a49684d850279434efdbc5",
+    "kc_d3f6fe913560d5d887973b7d"
+  ]
+}

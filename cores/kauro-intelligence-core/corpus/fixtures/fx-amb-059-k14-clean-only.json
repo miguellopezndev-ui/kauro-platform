@@ -1,0 +1,167 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-059-k14-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-059-k14-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9b9c0ba461d737d3208b632f1771805a845add88cc4800f222a126050b3b7b07",
+      "candidateSetHash": "39ee8b3f399690ca533e1c079dd336660614d068083e89290d443c06d4a0b34f",
+      "targetContractHash": null,
+      "projectRevisionHash": "a0c962225ab1d58ef8aa3c146581e0d1ed9c376f5aedba99db8330820679e0e8"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_eaeb825acc530896",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Otros",
+        "sourceFieldRef": "fld_21fed736b0a493c8",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_7de3111080777cae",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.description",
+      "contact.email",
+      "lead.doNotEmail"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "12802f5bd91b092c3e46d3c2e08a6f0c6e959b366a1421acb8af9da19cbc60b8"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "doNotEmail",
+            "valueClass": "BOOLEAN",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "pelis.vexath0@sample.invalid",
+          "sovan.mesiko1@example.test",
+          "tavo.finunda2@corp.example.test",
+          "belan.zerova3@example.test",
+          "daria.quelsorin4@sample.invalid",
+          "mesia.vexsorin5@corp.example.test",
+          "yanis.beldell6@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Otros",
+        "fieldRef": "src:Otros",
+        "valueClass": "MIXED",
+        "values": [
+          "",
+          "42",
+          "",
+          "",
+          "tavel.yanova4@example.test",
+          "",
+          ""
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "9d6dbb2",
+          "70f21542",
+          "1c6180f6",
+          "a6d3f9ff",
+          "b0299cd9",
+          "363f86bb",
+          "b46c4554"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:sparse-column"
+    ]
+  },
+  "canaries": [
+    "kc_c847717ad08b9d9c82b7fda9",
+    "kc_f035e3d1bd3b456a9d826a61"
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-191-cap12-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-191-cap12-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "b2731f6eb7fb50c6b840191dbd071610a892d7f2980546d1f104523872b5a587",
+      "candidateSetHash": "49481e9d362376c9be48b9a1c08587874f4d3b456036476ead4f1960529d9d85",
+      "targetContractHash": null,
+      "projectRevisionHash": "88d2b7178afc07177f8cde9c4d30bc5e302e681d7e79d0755a0cd350cc090eb8"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Correo electrónico",
+        "sourceFieldRef": "fld_be74458ced123480",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Field 3",
+        "sourceFieldRef": "fld_96320b1d4feecd6f",
+        "decision": "MAP",
+        "destinationField": "contact.phone",
+        "requiredEvidenceRefs": [
+          "ev_d43d95632d13bd14"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.description",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.phone",
+      "contact.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "dc4e10a4dc7f3d5f1c3de87273605a9a17c645e035a46a73deae488688df5d90"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Correo electrónico",
+        "fieldRef": "src:Correo electrónico",
+        "valueClass": "EMAIL",
+        "values": [
+          "tavel.jorero0@corp.example.test",
+          "nora.quelvik1@corp.example.test",
+          "joria.orvquist2@example.test",
+          "quelek.risanth3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Field 3",
+        "fieldRef": "src:Field 3",
+        "valueClass": "PHONE",
+        "values": [
+          "+447700900237",
+          "+12025550159",
+          "+447700900264",
+          "+12025550164"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone",
+        "evidence": [
+          "ev:self"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_786c103c3a49f55f2beecd89",
+    "kc_1d5ce50ad03a79b61827639c"
+  ]
+}

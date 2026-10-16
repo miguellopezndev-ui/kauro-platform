@@ -1,0 +1,171 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-027-cap04-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-027-cap04-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "7c4afda22106fe80e1d4995084493a6dbc41ea98685bc56356aee6153127311a",
+      "candidateSetHash": "9f14ac300e9eeb4aac4bf4fc9dcf54c33b92c49640cf26f16bdd7385ad6cf671",
+      "targetContractHash": "tc_5d518bea876885bbb38d4aba2eaed3c076670e766f19daab063f1fbc1ffeb4dd",
+      "projectRevisionHash": "d7b6d8997e9555b94b9e13c4a3df6471f14420ade8ae43d6f5c7a4bef04ce320"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Montant",
+        "sourceFieldRef": "fld_73854c746f295266",
+        "decision": "MAP",
+        "destinationField": "deal.amount",
+        "transformPrimitive": "NORMALISE_NUMBER",
+        "typedTransformParams": {
+          "decimalSeparator": ","
+        }
+      },
+      {
+        "sourceHeader": "Date de clôture",
+        "sourceFieldRef": "fld_1522b33e94fb971c",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate",
+        "transformPrimitive": "PARSE_DATE_ISO",
+        "typedTransformParams": {
+          "dateFormat": "MM/DD/YYYY"
+        }
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.currency",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "feb548045fc20a0425dc0a8f0a407a02e943fb762883cf45eb2e94ad0a195bd3"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL",
+      "locale": {
+        "dateFormat": "MM/DD/YYYY"
+      }
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": true
+          },
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Montant",
+        "fieldRef": "src:Montant",
+        "valueClass": "NUMBER",
+        "values": [
+          "56406,53",
+          "67741,30",
+          "89825,48"
+        ],
+        "decision": "MAP",
+        "destination": "deal.amount",
+        "transform": "NORMALISE_NUMBER",
+        "params": {
+          "decimalSeparator": ","
+        }
+      },
+      {
+        "header": "Date de clôture",
+        "fieldRef": "src:Date de clôture",
+        "valueClass": "DATE",
+        "values": [
+          "07/21/2025",
+          "01/16/2020",
+          "02/16/2025"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate",
+        "transform": "PARSE_DATE_ISO",
+        "params": {
+          "dateFormat": "MM/DD/YYYY"
+        }
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_51a5cc7c29b5af139c8091f2",
+    "kc_221974fbebfd16c412a3704a"
+  ]
+}

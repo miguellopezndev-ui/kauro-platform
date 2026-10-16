@@ -1,0 +1,166 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-091-k07-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-091-k07-clean-only",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "186dba672137b6c818a6d8abee559e626a4eb3a4663d79733b9079564e191862",
+      "candidateSetHash": "5a1498ba91e6bed80be252e2d156fb990f5852997bbc712d5bc104984066014d",
+      "targetContractHash": null,
+      "projectRevisionHash": "67164b6f3333167726d1f783190bb1acb21c5d0a99691a5a34a5d1228b0ef99b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Ηλεκτρονικό ταχυδρομείο",
+        "sourceFieldRef": "fld_a88d7c2a6e5f2fa5",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Lifecycle (old CRM)",
+        "sourceFieldRef": "fld_7786fee7a61324df",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_670f2229d8118e09",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.legacyScore"
+    ],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.country",
+      "contact.createdAt",
+      "contact.email"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Sales rep initials"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "b1c0ea82f3fcfecadaa332a2aa228c5904e582f6a2cd46d0c8e6fde3a9ec40af"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Ηλεκτρονικό ταχυδρομείο",
+        "fieldRef": "src:Ηλεκτρονικό ταχυδρομείο",
+        "valueClass": "EMAIL",
+        "values": [
+          "risis.mesaly0@sample.invalid",
+          "fina.zermar1@corp.example.test",
+          "mesis.belanth2@corp.example.test",
+          "wilo.risorin3@example.test",
+          "norek.yananth4@sample.invalid",
+          "tavan.kesiko5@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Lifecycle (old CRM)",
+        "fieldRef": "src:Lifecycle (old CRM)",
+        "valueClass": "MIXED",
+        "values": [
+          "99",
+          "69",
+          "22",
+          "98",
+          "25",
+          "62"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "RC",
+          "KA",
+          "RB",
+          "CN",
+          "ER",
+          "PV"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.legacyScore"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:stale-target",
+      "lang:el",
+      "ugly:stale-header"
+    ]
+  },
+  "canaries": [
+    "kc_80f01b6090e93706d3ddbf04",
+    "kc_3e444ee375e450132a972195"
+  ]
+}

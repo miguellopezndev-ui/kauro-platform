@@ -1,0 +1,186 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-171-cap04-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-171-cap04-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "feccda6b3ced75db431ca7d630127c9b7c42f931fec9675f3d5ea808a219ea76",
+      "candidateSetHash": "7eec00ad6e8ece778013bdd48e22fed6e72eae7e1fcee7da43871e36a5908fc2",
+      "targetContractHash": "tc_633602ed9de9ec2240a7ea2bc35e8de27b0fb851cf3c20719c4ad68f2c3a7172",
+      "projectRevisionHash": "861c2e04f1cbb9b19ad37a444496f2e2e39fb07ceac7a373f7cfcd654397d33b"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Phone",
+        "sourceFieldRef": "fld_b308751690dc7cd6",
+        "decision": "MAP",
+        "destinationField": "lead.phone",
+        "transformPrimitive": "PARSE_PHONE_E164",
+        "typedTransformParams": {
+          "defaultRegion": "US"
+        }
+      },
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_7612e4f75cd65bab",
+        "decision": "MAP",
+        "destinationField": "lead.employeeCount",
+        "transformPrimitive": "NORMALISE_NUMBER",
+        "typedTransformParams": {
+          "decimalSeparator": ","
+        }
+      },
+      {
+        "sourceHeader": "E-mail addr (CRM)",
+        "sourceFieldRef": "fld_0ff41dd5daef3eb7",
+        "decision": "MAP",
+        "destinationField": "lead.email",
+        "transformPrimitive": "NORMALISE_EMAIL_CASE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.company",
+      "lead.email",
+      "lead.employeeCount",
+      "lead.lastName",
+      "lead.phone",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "80db2bc61d8d8871dbd89034bce3500efd70c03b7c4d0621e52c4b255ad0977d"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD",
+      "locale": {
+        "defaultRegion": "US"
+      }
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Phone",
+        "fieldRef": "src:Phone",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0182",
+          "202-555-0150",
+          "202-555-0123",
+          "202-555-0133"
+        ],
+        "decision": "MAP",
+        "destination": "lead.phone",
+        "transform": "PARSE_PHONE_E164",
+        "params": {
+          "defaultRegion": "US"
+        }
+      },
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "NUMBER",
+        "values": [
+          "71268,64",
+          "75740,21",
+          "94586,48",
+          "18154,29"
+        ],
+        "decision": "MAP",
+        "destination": "lead.employeeCount",
+        "transform": "NORMALISE_NUMBER",
+        "params": {
+          "decimalSeparator": ","
+        }
+      },
+      {
+        "header": "E-mail addr (CRM)",
+        "fieldRef": "src:E-mail addr (CRM)",
+        "valueClass": "EMAIL",
+        "values": [
+          "FINA.QUELVIK0@corp.example.test",
+          "belo.tulaly1@corp.example.test",
+          "HALA.VEXQUIST2@example.test",
+          "quelia.vexmar3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "lead.email",
+        "transform": "NORMALISE_EMAIL_CASE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    }
+  },
+  "canaries": [
+    "kc_7976ca38f65b1bbe1173cc36",
+    "kc_544c53bb9260ff1c532a9eea"
+  ]
+}

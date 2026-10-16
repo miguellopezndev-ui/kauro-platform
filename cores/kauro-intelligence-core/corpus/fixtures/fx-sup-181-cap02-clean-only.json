@@ -1,0 +1,252 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-sup-181-cap02-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-181-cap02-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "e2e1b3993ee87d48cc66a620cb44785b531c133d18f2465f5336099e9ec811de",
+      "candidateSetHash": "9ebd703d64cb10bd77a4b64b44aa0749636f6109651bf8db9931affb6e0777c9",
+      "targetContractHash": null,
+      "projectRevisionHash": "36925a1ffb07cc97e0661810ef3e159677b8a3ae40180728380182c86475274c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_d401523e4f96af39",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_d38751fc51cc3283",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_f813a428c67b40b8",
+        "decision": "MAP",
+        "destinationField": "company.country"
+      },
+      {
+        "sourceHeader": "Domain",
+        "sourceFieldRef": "fld_87c9eebf01d1456c",
+        "decision": "MAP",
+        "destinationField": "company.domain"
+      },
+      {
+        "sourceHeader": "Website",
+        "sourceFieldRef": "fld_c284a9e34afc052f",
+        "decision": "MAP",
+        "destinationField": "company.website"
+      },
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_b999db9c250eebdf",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.country",
+      "company.domain",
+      "company.employeeCount",
+      "company.industry",
+      "company.name",
+      "company.phone",
+      "company.postalCode",
+      "company.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "82eb3f59e28919322c5f177d95fd99c1af682199b37422ddad165dff1879837e"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Halvik Partners SAS",
+          "Beliko Works B.V.",
+          "Darunda Group Ltd",
+          "Joranth Studio SAS"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Food service",
+          "Packaging",
+          "Textiles",
+          "Software"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "  Kelland",
+          "Kelland ",
+          "  Valdoria",
+          "Valdoria "
+        ],
+        "decision": "MAP",
+        "destination": "company.country"
+      },
+      {
+        "header": "Domain",
+        "fieldRef": "src:Domain",
+        "valueClass": "TEXT",
+        "values": [
+          "orvmar-studio.test",
+          "dariko-systems.test",
+          "halanth-partners.test",
+          "quelenko-labs.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.domain"
+      },
+      {
+        "header": "Website",
+        "fieldRef": "src:Website",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.orvunda-group.test",
+          "https://www.tulaly-studio.test",
+          "https://www.orvmar-works.test",
+          "https://www.tavorin-systems.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website"
+      },
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "NUMBER",
+        "values": [
+          "46339",
+          "62796",
+          "10030",
+          "47925"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_98481e40b18f",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_6dc3e282624b",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Employees",
+        "targetField": "company.employeeCount"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_41d374f13005b71191878f1d",
+    "kc_dbb83a9743aa523888b32844"
+  ]
+}

@@ -1,0 +1,156 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-074-cap03-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-074-cap03-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "243201022eeeab5da80e24bffb7b2b2fbfb6b53ab8ad2c713a658abb5861ea4a",
+      "candidateSetHash": "0ef9039b968bb57d9584159f182859941bb473140621980f3ca68f390356d1ce",
+      "targetContractHash": null,
+      "projectRevisionHash": "05e415f204e191af9c43569c7980f337afd355f8b341e3c5fb40ca9df681fc39"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Company",
+        "sourceFieldRef": "fld_039d05e656fe540e",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Employees",
+        "sourceFieldRef": "fld_3b3f529d22f1fc14",
+        "decision": "MAP",
+        "destinationField": "company.employeeCount"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.domain",
+      "company.employeeCount",
+      "company.name",
+      "company.phone",
+      "company.state"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c188a0ea137be9a3e9ff8e50f91adc17c5ae51f707f73a403492ffd562b14715"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Company",
+        "fieldRef": "src:Company",
+        "valueClass": "TEXT",
+        "values": [
+          "Yanenko Studio Inc.",
+          "Finunda Partners Inc.",
+          "Tavvik Group LLC"
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Employees",
+        "fieldRef": "src:Employees",
+        "valueClass": "MIXED",
+        "values": [
+          "25337",
+          "37404",
+          "9.609,20"
+        ],
+        "decision": "MAP",
+        "destination": "company.employeeCount"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_e8f3472c8052",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Company",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_c8bebb5c5ce3",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Employees",
+        "targetField": "company.employeeCount"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_b19019886d0b38a408198a01",
+    "kc_36b1ef1ca4aeebf9e453b825"
+  ]
+}

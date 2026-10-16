@@ -1,0 +1,299 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-046-cap11-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-046-cap11-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "1320489449eb8e1f2bee93c211d3e067a075dabb5c793c4ff30b35e05ab999c2",
+      "candidateSetHash": "cbb47817325336b9f6f8b7e5a010955e1b59d6be2e9d6c79ce902a5c8573f739",
+      "targetContractHash": null,
+      "projectRevisionHash": "73d929c9ea0195f9d3010ca6d0219018689867a26d467c5c04c811409a83d79f"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_40499eb8c91432ec",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_73a44d1b130bacb4",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_998d99ad786f097e",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_c9549e8879ecf5e3",
+        "decision": "PRESERVE",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "Company name",
+        "sourceFieldRef": "fld_a0c6acdac9b643cd",
+        "decision": "MAP",
+        "destinationField": "contact.companyName",
+        "filePath": "customers.csv"
+      },
+      {
+        "sourceHeader": "company.name",
+        "sourceFieldRef": "fld_b698a75dda1a9f52",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "filePath": "companies.csv"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_8af67bc0bacf017a",
+        "decision": "MAP",
+        "destinationField": "company.city",
+        "filePath": "companies.csv"
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_1fec4435f1b4f374",
+        "decision": "MAP",
+        "destinationField": "company.industry",
+        "filePath": "companies.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.industry",
+      "company.name",
+      "contact.city",
+      "contact.companyName",
+      "contact.email",
+      "contact.lifecycleStage"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Sales rep initials"
+    ],
+    "expectedTaskTypes": [
+      "CONSISTENCY_REVIEW"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e62b1a1f92a803593cdef0e1113a628b6b8827f2246a592b1016cee8e56ffaaf"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "customers.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "companies.csv": {
+          "object": "COMPANY",
+          "recordIdColumn": "company.name"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:customers.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-867",
+          "P-868",
+          "P-869",
+          "P-870"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:customers.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "halis.queliko0@sample.invalid",
+          "daria.belunda1@sample.invalid",
+          "jorek.noraly2@corp.example.test",
+          "finis.mesdell3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "customers.csv"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:customers.csv:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Kelmar",
+          "Valmora",
+          "Tessin",
+          "Tessin"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:customers.csv:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "GF",
+          "GP",
+          "KL",
+          "JT"
+        ],
+        "decision": "PRESERVE",
+        "file": "customers.csv"
+      },
+      {
+        "header": "Company name",
+        "fieldRef": "src:customers.csv:Company name",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumorin Labs LLC",
+          "Lumvik Studio GmbH",
+          "Lumorin Labs LLC",
+          "Jorunda Labs Ltd"
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName",
+        "file": "customers.csv"
+      },
+      {
+        "header": "company.name",
+        "fieldRef": "src:companies.csv:company.name",
+        "valueClass": "TEXT",
+        "values": [
+          "Jorunda Labs Ltd",
+          "Lumvik Studio GmbH",
+          "Lumorin Labs LLC"
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "file": "companies.csv"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:companies.csv:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Tessin",
+          "Quenby",
+          "Orvale"
+        ],
+        "decision": "MAP",
+        "destination": "company.city",
+        "file": "companies.csv"
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:companies.csv:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Packaging",
+          "Software",
+          "Logistics"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry",
+        "file": "companies.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "CONSISTENCY_REVIEW"
+    ]
+  },
+  "canaries": [
+    "kc_3a0e754a44c20b46bd5afcbd",
+    "kc_c8190ea8f8c7e7faecf62454"
+  ]
+}

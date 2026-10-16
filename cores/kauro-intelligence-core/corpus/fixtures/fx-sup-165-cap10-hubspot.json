@@ -1,0 +1,222 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-165-cap10-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-165-cap10-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "d064befb40a1560b271d510f81f998a1f40589992b664f2e816e620124c0ebe1",
+      "candidateSetHash": "0a4283ce5ec7fbcf0ec9c8c6067ce6da0604da2ce0645dfd4eec24c0d183d86b",
+      "targetContractHash": "tc_2ee0c6dd3de883c02968436d736f462bfc797a2aafa848e3c2818ac8cbbf9029",
+      "projectRevisionHash": "4dc5ea1541a27e8b4716c3c6bb02b422a3b43483b1c2383894c3c9b1a69fd626"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_53b6a630051676a1",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Country",
+        "sourceFieldRef": "fld_a73bd5d943be2344",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Street address - src",
+        "sourceFieldRef": "fld_73ca33b0b37712dd",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "Print run",
+        "sourceFieldRef": "fld_2b5cc5a365d92152",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_f3a5cd8e8b170b67",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.domain",
+      "company.source_id",
+      "contact.addressLine1",
+      "contact.country",
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Print run",
+      "Folder code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3c9e8fa5cbfd2893da4ef17831e8c3ee16a43d677089b8ec7f85cc326ab60344"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "tula.messorin0@sample.invalid",
+          "mesek.mesrane1@example.test",
+          "risia.wilero2@example.test",
+          "mesek.pelell3@sample.invalid",
+          "sova.sovquist4@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Country",
+        "fieldRef": "src:Country",
+        "valueClass": "TEXT",
+        "values": [
+          "Kelland",
+          "Estmark",
+          "Estmark",
+          "Norvania",
+          "Kelland"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Street address - src",
+        "fieldRef": "src:Street address - src",
+        "valueClass": "TEXT",
+        "values": [
+          "128 Vexenko Street",
+          "199 Lumiko Street",
+          "134 Norquist Street",
+          "144 Halvik Street",
+          "173 Lumaly Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "Print run",
+        "fieldRef": "src:Print run",
+        "valueClass": "NUMBER",
+        "values": [
+          "4",
+          "2",
+          "8",
+          "3",
+          "3"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F880",
+          "F193",
+          "F184",
+          "F166",
+          "F551"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_7d3a5272f464",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Street address - src",
+        "targetField": "contact.addressLine1"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_759a70e6ab4dee0a58321d3d",
+    "kc_8bdf28061f4001d255ff597f"
+  ]
+}

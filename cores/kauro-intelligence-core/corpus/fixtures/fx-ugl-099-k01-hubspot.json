@@ -1,0 +1,147 @@
+{
+  "partition": "PILOT",
+  "fileName": "fx-ugl-099-k01-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-099-k01-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "77d9161766b1c05655453e3ed8d4e7cbe024267edcd6d3a33de88db56a9df1de",
+      "candidateSetHash": "ad391b0bfb250a2943db08bb1aa6733a50608edbd9b659f2f464d0adc1153a8e",
+      "targetContractHash": "tc_4a354b4843b3c60be6c9b2e974ff623d265a955488212f84b8e3e4c8c08cad20",
+      "projectRevisionHash": "b931d41c1e04b395c525972d9dea7279e31ac859a4f1b29b9cd92fd34cb9b67c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Close date",
+        "sourceFieldRef": "fld_b924733104f5fd35",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.description",
+      "deal.name",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "21e8fe369e9cbfaab5403c812bbda59bce51dcc7e7712969d4ddd697b8864452"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Close date",
+        "fieldRef": "src:Close date",
+        "valueClass": "MIXED",
+        "values": [
+          "26/06/2018",
+          "15.01.2019",
+          "14/01/2022",
+          "16.09.2026",
+          "28/02/2025"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:mixed-dates",
+      "lang:pl",
+      "ugly:mixed-date-formats"
+    ]
+  },
+  "canaries": [
+    "kc_6999618c6b3a0d474fd916e5",
+    "kc_0b5956030f10a5af5751d8e4"
+  ]
+}

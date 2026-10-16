@@ -1,0 +1,99 @@
+{
+  "id": "G31",
+  "title": "Two files, twelve columns, twelve rows each",
+  "intent": "Nothing here is unusual: two exports of the same shape, wide enough to have unmapped columns past index 9 and deep enough to have source rows either side of row 9. That is what makes it worth a case. The package's artifacts are ordered by file path, sheet and row number, and three rows carry a trailing space so that changes and unmapped values land on both sides of the 9/10 boundary. A verifier that re-derives that order by comparing row locator text puts row 10 before row 2 and orders a two-file bundle by a content hash instead of by path, and then refuses a package this engine has just written correctly. The two files are chosen so their ids sort in the opposite order to their paths.",
+  "expect": {
+    "rows": {
+      "total": 24,
+      "OUTPUT": 24,
+      "MERGED_PROVEN": 0,
+      "ISOLATED": 0,
+      "LEFTOVER": 0,
+      "REJECTED_INPUT": 0
+    },
+    "records": {
+      "CONTACT": 24,
+      "COMPANY": 0,
+      "DEAL": 0,
+      "LEAD": 0
+    },
+    "changedCells": 6,
+    "flags": 0,
+    "unmappedFields": 192,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": {
+      "total": 0,
+      "OUTPUT": 0,
+      "DEDUPLICATED": 0,
+      "UNRESOLVED": 0,
+      "LEFTOVER": 0
+    }
+  },
+  "flagDetails": [],
+  "dispositions": [
+    {
+      "row": "a-contacts.csv#10",
+      "disposition": "OUTPUT"
+    },
+    {
+      "row": "a-contacts.csv#11",
+      "disposition": "OUTPUT"
+    },
+    {
+      "row": "b-contacts.csv#10",
+      "disposition": "OUTPUT"
+    },
+    {
+      "row": "b-contacts.csv#11",
+      "disposition": "OUTPUT"
+    }
+  ],
+  "changes": [
+    {
+      "row": "a-contacts.csv#9",
+      "field": "contact.firstName",
+      "from": "First8 ",
+      "to": "First8",
+      "reasonCode": "TRANSFORM_WHITESPACE_TRIMMED"
+    },
+    {
+      "row": "a-contacts.csv#10",
+      "field": "contact.firstName",
+      "from": "First9 ",
+      "to": "First9",
+      "reasonCode": "TRANSFORM_WHITESPACE_TRIMMED"
+    },
+    {
+      "row": "a-contacts.csv#11",
+      "field": "contact.firstName",
+      "from": "First10 ",
+      "to": "First10",
+      "reasonCode": "TRANSFORM_WHITESPACE_TRIMMED"
+    },
+    {
+      "row": "b-contacts.csv#9",
+      "field": "contact.firstName",
+      "from": "First8 ",
+      "to": "First8",
+      "reasonCode": "TRANSFORM_WHITESPACE_TRIMMED"
+    },
+    {
+      "row": "b-contacts.csv#10",
+      "field": "contact.firstName",
+      "from": "First9 ",
+      "to": "First9",
+      "reasonCode": "TRANSFORM_WHITESPACE_TRIMMED"
+    },
+    {
+      "row": "b-contacts.csv#11",
+      "field": "contact.firstName",
+      "from": "First10 ",
+      "to": "First10",
+      "reasonCode": "TRANSFORM_WHITESPACE_TRIMMED"
+    }
+  ]
+}

@@ -1,0 +1,172 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-143-cap12-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-143-cap12-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "df11c197a59653b5074ac162c3305f969a420cca697d99044a773ac00c787d0e",
+      "candidateSetHash": "4d7097806cfd903ecdc997e8c80f5165b10181beb99dbf44f34b171350640e2e",
+      "targetContractHash": "tc_9d399eb1b20ec2f1d032b02f760066b1d75d73e938fb91a1644ec587b1b0fd76",
+      "projectRevisionHash": "508d08d43942f8d1746e1324a57a24fd991a3554d6d9ab6452b7a8852b9f52f4"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_bad93eda4a2f7ddd",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Dato",
+        "sourceFieldRef": "fld_8bc6e2735d9d4192",
+        "decision": "MAP",
+        "destinationField": "deal.amount",
+        "requiredEvidenceRefs": [
+          "ev_88e5e7b25f916223"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.currency",
+      "deal.name",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "8aa3cc4fc7211ae3aafbc2e0999c71644c3e75a62d5493178f6cf73b890a9a84"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Deal name",
+        "fieldRef": "src:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Expansion 2027 Yaniko",
+          "Expansion 2026 Orvrane",
+          "Renewal 2027 Tavell",
+          "Pilot 2026 Quelrane",
+          "Pilot 2026 Zerenko"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Dato",
+        "fieldRef": "src:Dato",
+        "valueClass": "NUMBER",
+        "values": [
+          "79418",
+          "57211",
+          "4199",
+          "4521",
+          "25092"
+        ],
+        "decision": "MAP",
+        "destination": "deal.amount",
+        "evidence": [
+          "ev:self"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_adc9cb8028fa",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Deal name",
+        "targetField": "deal.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_51519a50ded51cefd7053f30",
+    "kc_f333b9d42b4f6b159e649306"
+  ]
+}

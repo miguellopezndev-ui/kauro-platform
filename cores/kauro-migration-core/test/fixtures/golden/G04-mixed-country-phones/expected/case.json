@@ -1,0 +1,32 @@
+{
+  "id": "G04",
+  "title": "Four countries in one file",
+  "intent": "An explicit international prefix always wins, including on the row whose country column says US but whose number is British. A local number with no country evidence is preserved.",
+  "expect": {
+    "rows": { "total": 6, "OUTPUT": 6, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 6, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 5,
+    "flags": 1,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 5,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [
+    { "row": "contacts.csv#2", "field": "contact.phone", "from": "+57 300 1234567", "to": "+573001234567", "reasonCode": "TRANSFORM_PHONE_E164" },
+    { "row": "contacts.csv#3", "field": "contact.phone", "from": "+34 612 345 678", "to": "+34612345678", "reasonCode": "TRANSFORM_PHONE_E164" },
+    { "row": "contacts.csv#4", "field": "contact.phone", "from": "+44 20 7946 0958", "to": "+442079460958", "reasonCode": "TRANSFORM_PHONE_E164" },
+    { "row": "contacts.csv#5", "field": "contact.phone", "from": "(415) 555-2671", "to": "+14155552671", "reasonCode": "TRANSFORM_PHONE_E164" },
+    { "row": "contacts.csv#7", "field": "contact.phone", "from": "301 123 4567", "to": "+573011234567", "reasonCode": "TRANSFORM_PHONE_E164" }
+  ],
+  "flagDetails": [
+    { "row": "contacts.csv#6", "field": "contact.phone", "outcome": "AMBIGUOUS", "preserved": "3021234567", "reasonCode": "TRANSFORM_PHONE_NO_COUNTRY_EVIDENCE", "blockedDelivery": false }
+  ],
+  "delivered": [
+    { "sourceRecordId": "3", "values": { "contact.phone": "+442079460958" } },
+    { "sourceRecordId": "5", "values": { "contact.phone": "3021234567" } }
+  ]
+}

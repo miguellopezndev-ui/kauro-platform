@@ -1,0 +1,6 @@
+Contact ID,First Name,Last Name,Email,Status,Score
+1,Ada,Lovelace,ada@example.com,Active,10
+2,Grace,Hopper,grace@example.com,Inactive,20.5
+3,Alan,Turing,alan@example.com,Active,30
+4,Linus,Pauling,linus@example.com,,40
+5,Barbara,Liskov,barbara@example.com,Archived,50

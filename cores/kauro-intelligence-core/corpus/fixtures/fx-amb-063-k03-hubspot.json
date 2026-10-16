@@ -1,0 +1,164 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-063-k03-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-063-k03-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "838e0f016e4119a89b0c229702036ad238bb980388c03773c19fbcde52ec1d5d",
+      "candidateSetHash": "36a730c176a8e81eaf945ea72d40b456d9f447724a2e96e652619ed3919e0b62",
+      "targetContractHash": "tc_59d5f84937f3d06c7e2d72535701c2a21147bd649b478391ac3fafa2d5274c8a",
+      "projectRevisionHash": "b41586da9c47ecbcf74d3e8d7aa22ebd8a199ee40b4e80e79b5633ac303270db"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Misc",
+        "sourceFieldRef": "fld_846d771cb65caebf",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Info",
+        "sourceFieldRef": "fld_13f4c6a540ea2568",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.name",
+      "company.ownerEmail",
+      "company.state",
+      "company.source_id",
+      "contact.city",
+      "contact.email",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3cb14aff5c4543df5c28234523a7ae61f988fb4f5470364661b9b7f8e484b6b8"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Misc",
+        "fieldRef": "src:Misc",
+        "valueClass": "MIXED",
+        "values": [
+          "sovis.wilova0@sample.invalid",
+          "+12025550125",
+          "Quelath Group S.A.",
+          "819",
+          "tavia.vexath4@corp.example.test"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Info",
+        "fieldRef": "src:Info",
+        "valueClass": "MIXED",
+        "values": [
+          "luma.halorin0@sample.invalid",
+          "+12025550168",
+          "Vexenko Group S.L.",
+          "316",
+          "risel.finero4@corp.example.test"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:generic-header"
+    ]
+  },
+  "canaries": [
+    "kc_f426b556ab16a209784036cd",
+    "kc_a7849905c1d5ab4628f5d5bb"
+  ]
+}

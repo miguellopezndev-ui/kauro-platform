@@ -1,0 +1,237 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-020-cap09-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-020-cap09-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9378406c2d35e22e4b6435d8ca1624c7e8de1c3cc3f5ee5cebaff2c9cc079866",
+      "candidateSetHash": "601f0f2703bc967f345d9590bba42f1fed285f7e6d0fbea7cafdf9d37c473c17",
+      "targetContractHash": "tc_2ffc860012ff619546cc4b158ab129790bda7bcb0da1fdf8da931ad6339b008e",
+      "projectRevisionHash": "7c368c60e85d3a774e0a267297cd4015a3d09ce7ee9fb702e50cb5bfd4cfbdfa"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_8b5be7c89819d82b",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Job title",
+        "sourceFieldRef": "fld_73cc34c9d5fd8270",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Phone - src",
+        "sourceFieldRef": "fld_a45744e7864c5ec4",
+        "decision": "MAP",
+        "destinationField": "contact.phone",
+        "allowedDestinationFields": [
+          "contact.phone",
+          "contact.mobilePhone"
+        ]
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_055142b983654c7b",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_9fb436788d162bfe",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_216fdfae6ee9d94c",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.companyName",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.mobilePhone",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Warehouse bin",
+      "Internal ticket ref",
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "b08a0e5d7dd03fdd4d94d7d9fcc6a6d40b953defcde3de484f413942eef22038"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "belek.rissorin0@sample.invalid",
+          "luma.pelmar1@sample.invalid",
+          "orvia.orvrane2@corp.example.test",
+          "finel.jorunda3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Job title",
+        "fieldRef": "src:Job title",
+        "valueClass": "TEXT",
+        "values": [
+          "Operations lead",
+          "Controller",
+          "Operations lead",
+          "Controller"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Phone - src",
+        "fieldRef": "src:Phone - src",
+        "valueClass": "PHONE",
+        "values": [
+          "+447700900879",
+          "+12025550123",
+          "+447700900469",
+          "+12025550100"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone",
+        "alternatives": [
+          "contact.mobilePhone"
+        ]
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "C-86",
+          "C-22",
+          "B-43",
+          "B-56"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-1454",
+          "TKT-5435",
+          "TKT-1715",
+          "TKT-2624"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-3",
+          "R-57",
+          "R-12",
+          "R-55"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_9c01c6228edb",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Phone - src",
+        "targetField": "contact.phone"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_fdb4d39c6329b5cad50daf4c",
+    "kc_5e9d56970f535a83cd86c1bd"
+  ]
+}

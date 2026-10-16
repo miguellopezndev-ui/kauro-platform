@@ -1,0 +1,153 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-057-k01-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-057-k01-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "0b8c0a90557d2c14cb921e637292d6dd5fde3585110e74a94974ea84fc12a4c0",
+      "candidateSetHash": "50538bd5ec590570e2deb13d5bf81ac7d3825afd5b7d4afd5f29522921b86671",
+      "targetContractHash": "tc_e10eed18df0a2292ae07bb4cc2e324d17d7db1dee45ef412b54b49c94c4435d9",
+      "projectRevisionHash": "241b179c9f1e8531ec2b4453fc75eb82dea2a3b708c9e31f67c3a23ef8fe5aae"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Close date",
+        "sourceFieldRef": "fld_d6b2409eb6b72e34",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.description",
+      "deal.name",
+      "deal.ownerEmail",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "b62b925187692f05bc5a3a4729a4544e7371174bc1d36087868569e8af7da15c"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Close date",
+        "fieldRef": "src:Close date",
+        "valueClass": "MIXED",
+        "values": [
+          "08/19/2019",
+          "2022-08-19",
+          "01/17/2021",
+          "2024-02-14",
+          "08/25/2018"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:mixed-dates",
+      "lang:ar",
+      "ugly:mixed-date-formats"
+    ]
+  },
+  "canaries": [
+    "kc_a024b93de1f1a9a8025a011e",
+    "kc_b1156426323ac598da3c629d"
+  ]
+}

@@ -1,0 +1,227 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-131-cap12-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-131-cap12-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "1d3a40fa6c2f32adf49ac63d1b964129decb528b591a9d90b38cc95203ee6213",
+      "candidateSetHash": "a4bb28f9a616ce8aec76c8dfa7d37b56b9fc4701576ac12db6089daf0e43614d",
+      "targetContractHash": "tc_3f06810a3e6d71d9a6e76cdbd3585cb0fb6dfdb1d0b0ceef9c0bfc0ddb4ace37",
+      "projectRevisionHash": "78f2110bd72d33feb9eef622083ae6f8e72866bafc55d126abdae9c445c7bacc"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Oportunidad",
+        "sourceFieldRef": "fld_795e14de4efe7204",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Field 3",
+        "sourceFieldRef": "fld_881bce147cc5a347",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate",
+        "requiredEvidenceRefs": [
+          "ev_c87e607f3f1f8fdf"
+        ]
+      },
+      {
+        "sourceHeader": "Legacy system id",
+        "sourceFieldRef": "fld_0af98fdc60f1bb4f",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_44f5a8ae087d668d",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate",
+      "deal.currency",
+      "deal.name",
+      "deal.ownerEmail",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Legacy system id",
+      "Folder code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "d956d15aed80408e0500619371b332c63e740da81968557a2285f31126cb231d"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "currency",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Oportunidad",
+        "fieldRef": "src:Oportunidad",
+        "valueClass": "TEXT",
+        "values": [
+          "Onboarding 2024 Finvik",
+          "Pilot 2027 Yanrane",
+          "Supply contract 2027 Pelero",
+          "Renewal 2025 Zerova",
+          "Expansion 2024 Vexunda",
+          "Onboarding 2027 Norrane"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Field 3",
+        "fieldRef": "src:Field 3",
+        "valueClass": "DATE",
+        "values": [
+          "2018-06-19",
+          "2019-04-16",
+          "2022-09-28",
+          "2020-02-25",
+          "2021-04-28",
+          "2022-02-20"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate",
+        "evidence": [
+          "ev:self"
+        ]
+      },
+      {
+        "header": "Legacy system id",
+        "fieldRef": "src:Legacy system id",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "L40168",
+          "L95309",
+          "L96309",
+          "L68862",
+          "L14135",
+          "L84546"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F443",
+          "F628",
+          "F269",
+          "F671",
+          "F339",
+          "F432"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_d873568fee8e",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Oportunidad",
+        "targetField": "deal.name"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_d05046fb7a3bc2a8cac30f8e",
+    "kc_6ca729cfe169c35fddd01a40"
+  ]
+}

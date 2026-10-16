@@ -1,0 +1,234 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-027-k13-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-027-k13-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "6eaefd9aa6c08120074deda609461749bae3d9ea1ff73c454e8ccc42fd8d7214",
+      "candidateSetHash": "3b3e7a6914056f3ff0c1e92f21f81b87a6c7bda1dbf8fb1544708b426393e74a",
+      "targetContractHash": "tc_3529b7184d6565043870d4b1364e38390c795ddc711947afa96561cf2a67dd9c",
+      "projectRevisionHash": "b4e84f58ac64a3ac876132f9b3dee82a5bad87d70e37a5e33bc5ccdfbcda8fec"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_a50504445c805fb1",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "email ",
+        "sourceFieldRef": "fld_c556d9712e5d7e13",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "EMAIL 2",
+        "sourceFieldRef": "fld_4d59e3f05018652a",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "שם משפחה",
+        "sourceFieldRef": "fld_a9f8dd2b3cdc7cb6",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "מדינה",
+        "sourceFieldRef": "fld_434ef9316ea96582",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.companyName",
+      "contact.country",
+      "contact.email",
+      "contact.lastName",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "email ",
+      "EMAIL 2"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "378743fb7dcc095566fea1fafeebc6baf115d1d3ab99a7559796c0813744369f"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "daro.yanenko0@sample.invalid",
+          "mesan.risiko1@sample.invalid",
+          "quelis.tavova2@corp.example.test",
+          "lumek.joranth3@corp.example.test",
+          "sovan.finath4@example.test",
+          "joris.sovrane5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "email ",
+        "fieldRef": "src:email ",
+        "valueClass": "EMAIL",
+        "values": [
+          "joris.orvorin50@corp.example.test",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "EMAIL 2",
+        "fieldRef": "src:EMAIL 2",
+        "valueClass": "EMAIL",
+        "values": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "keso.finero60@corp.example.test"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "שם משפחה",
+        "fieldRef": "src:שם משפחה",
+        "valueClass": "TEXT",
+        "values": [
+          "Belmar",
+          "Wilero",
+          "Yanell",
+          "Halanth",
+          "Tavdell",
+          "Tulanth"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "מדינה",
+        "fieldRef": "src:מדינה",
+        "valueClass": "TEXT",
+        "values": [
+          "Valdoria",
+          "Kelland",
+          "Valdoria",
+          "Valdoria",
+          "Estmark",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:near-duplicate-headers",
+      "lang:he"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_ce3ca38f7c2c",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "שם משפחה",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_fece6a35898a",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "מדינה",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_cd6c7afa0cf679e61da73258",
+    "kc_3e3843196ff626ef8b3d32dc"
+  ]
+}

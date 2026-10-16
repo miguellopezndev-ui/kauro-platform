@@ -1,0 +1,283 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-033-cap10-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-033-cap10-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "af1859d15a2e89786ee30a73b74473af857b5e6ce627dec918807c664eb77a2e",
+      "candidateSetHash": "d27cee4d58ff9f0cd59a1f07934688b1fde6180f1964937673a021ae335fb0ac",
+      "targetContractHash": "tc_4f608802c3e0c543333083f47171a673359b369c16dc8074004baaa19d2318f1",
+      "projectRevisionHash": "36bd4528ebc247a9c396bdb9c3d171bc0f4fb1f6800c7736e4a58cdd23316395"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_b606914eeba9638a",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_12cd20cfd87b8a9b",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Street address",
+        "sourceFieldRef": "fld_af37ba2096207b0f",
+        "decision": "MAP",
+        "destinationField": "contact.addressLine1"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_e30fce7bd1ca77de",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_4fc610f62cbf1cb1",
+        "decision": "MAP",
+        "destinationField": "contact.city"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_88f417a79fc91457",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_e740f37daa3147b9",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.city",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.postalCode",
+      "contact.state",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref",
+      "Sales rep initials"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3b7b74eebb5542bf30f0060737d93bdc6bdfe41661c04e7e5011eeecaeba10d6"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP10",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Belunda",
+          "Wiliko",
+          "Risunda",
+          "Kesmar",
+          "Risenko"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Quelia",
+          "Joro",
+          "Daro",
+          "Yanek",
+          "Sovek"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Street address",
+        "fieldRef": "src:Street address",
+        "valueClass": "TEXT",
+        "values": [
+          "6 Wilquist Street",
+          "7 Sovunda Street",
+          "135 Haldell Street",
+          "81 Risell Street",
+          "190 Norero Street"
+        ],
+        "decision": "MAP",
+        "destination": "contact.addressLine1"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "sovia.tulanth0@sample.invalid",
+          "risia.pelsorin1@example.test",
+          "yanek.halova2@sample.invalid",
+          "belia.zerell3@example.test",
+          "sovek.orvunda4@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "Orvale",
+          "Valmora",
+          "Tessin",
+          "Valmora"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-6247",
+          "TKT-4235",
+          "TKT-6474",
+          "TKT-7347",
+          "TKT-6171"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "NE",
+          "TD",
+          "ET",
+          "BP",
+          "BL"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_24b5495a6118",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Street address",
+        "targetField": "contact.addressLine1"
+      },
+      {
+        "memoryId": "memconv_8c0e0e0530e3",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "City",
+        "targetField": "contact.city"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_785c21213c7092f3027733fa",
+    "kc_6b3728b0107cfec060faa763"
+  ]
+}

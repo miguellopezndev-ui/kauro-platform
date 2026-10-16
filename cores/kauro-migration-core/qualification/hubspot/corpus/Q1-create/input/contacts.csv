@@ -1,0 +1,4 @@
+Contact ID,First Name,Last Name,Email,Job Title,Lifecycle Stage,Company ID
+C-1,Ada,Lovelace,ada@kauro-qualification.dev,Chief Engineer,lead,A-1
+C-2,Alan,Turing,alan@kauro-qualification.dev,Cryptanalyst,lead,A-2
+C-3,Grace,Hopper,grace@kauro-qualification.dev,Compiler Lead,lead,A-1

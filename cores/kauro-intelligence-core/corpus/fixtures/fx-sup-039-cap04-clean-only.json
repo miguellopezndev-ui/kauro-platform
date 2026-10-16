@@ -1,0 +1,180 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-039-cap04-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-039-cap04-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "843d8a62707cef97cbad066763eff3690224646e795445e1d01dec5c39946f5f",
+      "candidateSetHash": "bea2a5f02edd41d75165c8acf252f23b74273498912fe3479a7572f22e333007",
+      "targetContractHash": null,
+      "projectRevisionHash": "3258095ceb3b1b0fd5fec6095615dfc538df5c695fc366fa0458637aa7aca652"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Close date",
+        "sourceFieldRef": "fld_f921f3b986a153fc",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate",
+        "transformPrimitive": "PARSE_DATE_ISO",
+        "typedTransformParams": {
+          "dateFormat": "MM/DD/YYYY"
+        }
+      },
+      {
+        "sourceHeader": "Amount - src",
+        "sourceFieldRef": "fld_3786b8ebd37d9e2d",
+        "decision": "MAP",
+        "destinationField": "deal.amount"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_f40d7fff4229ea18",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_aafbd1c2d2621d8d",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.amount",
+      "deal.closeDate"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag",
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "90bcd41cb9b5685c87d5742771822611fdd17b8ae783425ae25a87ec162c9102"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL",
+      "locale": {
+        "dateFormat": "MM/DD/YYYY"
+      }
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "amount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Close date",
+        "fieldRef": "src:Close date",
+        "valueClass": "DATE",
+        "values": [
+          "09/27/2021",
+          "09/21/2022",
+          "03/22/2022",
+          "08/24/2022"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate",
+        "transform": "PARSE_DATE_ISO",
+        "params": {
+          "dateFormat": "MM/DD/YYYY"
+        }
+      },
+      {
+        "header": "Amount - src",
+        "fieldRef": "src:Amount - src",
+        "valueClass": "NUMBER",
+        "values": [
+          "36969,72",
+          "70642,17",
+          "7820,73",
+          "67828,21"
+        ],
+        "decision": "MAP",
+        "destination": "deal.amount"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "red",
+          "green",
+          "amber",
+          "red"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "d35f3f3c",
+          "4c910d06",
+          "f2502f97",
+          "d63c1fdb"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_2d1c03b3c2ee",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Amount - src",
+        "targetField": "deal.amount"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_957280a0d75fb8ac73daa2c8",
+    "kc_c6e978eab764639472ba20d4"
+  ]
+}

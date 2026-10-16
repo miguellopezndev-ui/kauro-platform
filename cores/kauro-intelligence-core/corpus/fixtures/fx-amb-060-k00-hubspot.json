@@ -1,0 +1,176 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-060-k00-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-060-k00-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "87c4a6df648c8f1c83c2c89792d2cd88f057684498e3ff893ae4292cbe599a04",
+      "candidateSetHash": "1717b5fb3f0355dd998101e842561f8d451b0a2e53b7862e37e6948c4c519962",
+      "targetContractHash": "tc_11e30c60cfa2906cc76073c0a73e29dadeac7f48b947db87f8d65fc1ca9c212a",
+      "projectRevisionHash": "9718e8ac6ad91dad935932724690f6cdb29e87180dc8f396333fe2d4e3ca5209"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Deal name",
+        "sourceFieldRef": "fld_0cbd3b9f26fc0796",
+        "decision": "MAP",
+        "destinationField": "deal.name"
+      },
+      {
+        "sourceHeader": "Close date",
+        "sourceFieldRef": "fld_d4db0928f0420b59",
+        "decision": "MAP",
+        "destinationField": "deal.closeDate"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_9974d9981c6cffae",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "deal.closeDate",
+      "deal.name",
+      "deal.ownerEmail",
+      "deal.pipeline",
+      "deal.stage",
+      "deal.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "5d4b9a1c0998ac0d84bd950d6d515f7d8c1eb6478e939e2494574205e9c52bc9"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP03",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "DEAL"
+    },
+    "objects": [
+      {
+        "name": "deal",
+        "fields": [
+          {
+            "name": "closeDate",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "pipeline",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "stage",
+            "valueClass": "ENUM",
+            "required": false,
+            "options": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ]
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Deal name",
+        "fieldRef": "src:Deal name",
+        "valueClass": "TEXT",
+        "values": [
+          "Renewal 2027 Risvik",
+          "Renewal 2026 Tulsorin",
+          "Expansion 2025 Pelmar",
+          "Expansion 2025 Jorrane"
+        ],
+        "decision": "MAP",
+        "destination": "deal.name"
+      },
+      {
+        "header": "Close date",
+        "fieldRef": "src:Close date",
+        "valueClass": "DATE",
+        "values": [
+          "11/08/2021",
+          "06/12/2025",
+          "06/12/2019",
+          "06/09/2019"
+        ],
+        "decision": "MAP",
+        "destination": "deal.closeDate"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-50",
+          "R-5",
+          "R-9",
+          "R-20"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:date-order"
+    ]
+  },
+  "canaries": [
+    "kc_16666489976316c19654df7f",
+    "kc_27a1bb4a7f8105fd69ee1dc1"
+  ]
+}

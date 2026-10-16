@@ -1,0 +1,192 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-059-k03-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-059-k03-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "19ee0f15298c44d27c20829201ae7303494d2f76a231e3e2ca0e0d9a0591452f",
+      "candidateSetHash": "b0192c234354c61e592c32df3de13b95a817097c1ffbc2e80f411986dfc98ddb",
+      "targetContractHash": "tc_383261c70b89aa7e04eef371cd542ff0bb7b11b4af4567c8a94e3bb3abd583f6",
+      "projectRevisionHash": "9ab4fadd15968283d44342addced0fb41ed46031931df0806ac845c4f6bd1af0"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Indirizzo email",
+        "sourceFieldRef": "fld_ab3a3924c69d31a1",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "﻿First name",
+        "sourceFieldRef": "fld_1afd07c6751f4f52",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Last name​",
+        "sourceFieldRef": "fld_e80580ef77361754",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Ｎａｍｅ it",
+        "sourceFieldRef": "fld_43e78fc9521d3580",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.mobilePhone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Ｎａｍｅ it"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "b6c046ba4342221c1a7b637e89a2ea74281882f1eac67d96964b19b01c5a4a38"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP12",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Indirizzo email",
+        "fieldRef": "src:Indirizzo email",
+        "valueClass": "EMAIL",
+        "values": [
+          "daro.tavquist0@corp.example.test",
+          "joro.norsorin1@example.test",
+          "halel.belath2@sample.invalid",
+          "tavia.wilsorin3@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "﻿First name",
+        "fieldRef": "src:bom-it",
+        "valueClass": "TEXT",
+        "values": [
+          "Daro",
+          "Lumo",
+          "Tavel",
+          "Joris"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Last name​",
+        "fieldRef": "src:zw-it",
+        "valueClass": "TEXT",
+        "values": [
+          "Pelaly​",
+          "Orviko​",
+          "Finorin​",
+          "Norsorin​"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Ｎａｍｅ it",
+        "fieldRef": "src:Ｎａｍｅ it",
+        "valueClass": "TEXT",
+        "values": [
+          "Risorin Works B.V.",
+          "Quelunda Studio GmbH",
+          "Haldell Group Ltd",
+          "Mesunda Systems B.V."
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:encoding",
+      "lang:it"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_0aadf6738b86",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Indirizzo email",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_94805465755f4df59bbfb710",
+    "kc_f3e1aa7a3a603770bccdb894"
+  ]
+}

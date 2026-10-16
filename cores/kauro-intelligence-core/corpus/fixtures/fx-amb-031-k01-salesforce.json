@@ -1,0 +1,119 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-031-k01-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-031-k01-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "ccabff3c2bb7c2004afe324e4c350dc6b87a7af0471ef0218901db863a58487f",
+      "candidateSetHash": "86e53ab8a7da17fe46a560a9e949467358a3bfcaee6549a9307e7f98b3b5726a",
+      "targetContractHash": "tc_af2b63d4c6adc4917d313ef7a21a099276f3d6d9c5d6405fa06b935f86fe714b",
+      "projectRevisionHash": "0373c43673a2a506a15302961062953d408e01bd85a2dd521456acccd1d6a5e8"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Mobile",
+        "sourceFieldRef": "fld_bafe761752603863",
+        "decision": "MAP",
+        "destinationField": "contact.mobilePhone"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.lastName",
+      "contact.mobilePhone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "3dfb8fb911b4922b49127787bf49d7510fef0a48ca64c592b5ea68ca5704d1ad"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Mobile",
+        "fieldRef": "src:Mobile",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0129",
+          "7700 900989",
+          "7700 900361",
+          "7700 900185",
+          "7700 900532"
+        ],
+        "decision": "MAP",
+        "destination": "contact.mobilePhone"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:phone-region"
+    ]
+  },
+  "canaries": [
+    "kc_aac757fc40cb77585fc3565e",
+    "kc_4d118c8969af724761dbb2dd"
+  ]
+}

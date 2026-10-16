@@ -1,0 +1,55 @@
+{
+  "gate": "FINAL-ADV-01",
+  "attacks": [
+    {
+      "id": "A1.duplicateHeaderDisagrees",
+      "intent": "a repeated column carries two different values",
+      "caught": true,
+      "detail": "artifacts.canonicalBytes, artifacts.provenanceAgrees, artifacts.provenanceAgrees, artifacts.provenanceAgrees, artifacts.provenanceAgrees, artifacts.provenanceAgrees, artifacts.provenanceAgrees"
+    },
+    {
+      "id": "A2.streamedArtifactProvenance",
+      "intent": "a streamed artifact claims provenance the lineage denies",
+      "caught": true,
+      "detail": "artifacts.provenanceAgrees"
+    },
+    {
+      "id": "A3.streamedArtifactRowRemoved",
+      "intent": "a row is removed from a streamed artifact",
+      "caught": true,
+      "detail": "artifacts.countsAgree"
+    },
+    {
+      "id": "A4.pooledValueChanged",
+      "intent": "one row is given a different disposition",
+      "caught": true,
+      "detail": "lineage.tallies, lineage.tallies"
+    },
+    {
+      "id": "A5.adjacentRowsSwapped",
+      "intent": "two adjacent rows of an ordered artifact are swapped",
+      "caught": true,
+      "detail": "lineage.ordering, artifacts.provenanceAgrees, artifacts.provenanceAgrees, artifacts.provenanceAgrees, artifacts.provenanceAgrees, artifacts.provenanceAgrees, artifacts.provenanceAgrees, artifacts.provenanceAgrees, artifacts.provenanceAgrees"
+    },
+    {
+      "id": "A6.rowAppended",
+      "intent": "a row is appended to an artifact",
+      "caught": true,
+      "detail": "changes.consistency, reconciliation.reasonCodeTally, reconciliation.reasonCodeTally, artifacts.uniqueKeys"
+    },
+    {
+      "id": "A7.traceKeyBySeparatorAndCase",
+      "intent": "the trace key is declared as the match authority under every separator and casing a destination would produce",
+      "caught": true,
+      "detail": "every spelling refused as a trace key"
+    },
+    {
+      "id": "A8.aNameKauroDoesNotWriteIsNotTheTraceKey",
+      "intent": "a property whose name merely renders like the trace key stays usable",
+      "caught": true,
+      "detail": "not treated as the trace key, which is the boundary this states"
+    }
+  ],
+  "findings": [],
+  "result": "PASS"
+}

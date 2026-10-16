@@ -1,0 +1,231 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-202-cap11-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-202-cap11-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "ca2c5aaffd62debda9719ec257d6f16be367a131c694cd03bf5dc5d6e271937f",
+      "candidateSetHash": "7c6a181046eef8a94e5cae547e1e0109fcfba5a0785a529b2715683f12c77196",
+      "targetContractHash": "tc_fc30d4d3a85baf3562d5ef7497d819e144225bb026f90189a2e277cd2cda8117",
+      "projectRevisionHash": "cf62fd7f62371a0ac2cf71c91c172d6ebff19980ae1f9d5ab3179b56d38ed7ca"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_792d5b8ee9cdc2cd",
+        "decision": "PRESERVE",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_a172b727af321dfe",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Company name",
+        "sourceFieldRef": "fld_f6767b43ed89f447",
+        "decision": "MAP",
+        "destinationField": "contact.companyName",
+        "filePath": "people.csv"
+      },
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_f36facbf3a61ad96",
+        "decision": "MAP",
+        "destinationField": "company.name",
+        "filePath": "accounts.csv"
+      },
+      {
+        "sourceHeader": "Industry",
+        "sourceFieldRef": "fld_907673a0330d1f1b",
+        "decision": "MAP",
+        "destinationField": "company.industry",
+        "filePath": "accounts.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.industry",
+      "company.name",
+      "company.source_id",
+      "contact.companyName",
+      "contact.email",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID"
+    ],
+    "expectedTaskTypes": [
+      "CONSISTENCY_REVIEW"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c56e931b61480066e6ea0e0ed262d8b21497522db2585b02df8ca71bd3a4c281"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP11",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "people.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "accounts.csv": {
+          "object": "COMPANY",
+          "recordIdColumn": "Name"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "companyName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:people.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-715",
+          "P-716",
+          "P-717"
+        ],
+        "decision": "PRESERVE",
+        "file": "people.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:people.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "tavis.yanenko0@example.test",
+          "zeran.tulanth1@sample.invalid",
+          "kesek.kesiko2@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "file": "people.csv"
+      },
+      {
+        "header": "Company name",
+        "fieldRef": "src:people.csv:Company name",
+        "valueClass": "TEXT",
+        "values": [
+          "Darmar Partners Ltd",
+          "Sovorin Foods GmbH",
+          "Sovenko Foods Inc."
+        ],
+        "decision": "MAP",
+        "destination": "contact.companyName",
+        "file": "people.csv"
+      },
+      {
+        "header": "Name",
+        "fieldRef": "src:accounts.csv:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "Sovorin Foods GmbH",
+          "Darmar Partners Ltd",
+          "Norvik Logistics GmbH",
+          "Sovenko Foods Inc."
+        ],
+        "decision": "MAP",
+        "destination": "company.name",
+        "file": "accounts.csv"
+      },
+      {
+        "header": "Industry",
+        "fieldRef": "src:accounts.csv:Industry",
+        "valueClass": "TEXT",
+        "values": [
+          "Textiles",
+          "Food service",
+          "Logistics",
+          "Textiles"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry",
+        "file": "accounts.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "CONSISTENCY_REVIEW"
+    ]
+  },
+  "canaries": [
+    "kc_20553afb308929b1af014da9",
+    "kc_99c06ec39fa16f3703667537"
+  ]
+}

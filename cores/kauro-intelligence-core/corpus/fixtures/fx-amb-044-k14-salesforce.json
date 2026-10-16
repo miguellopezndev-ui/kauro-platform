@@ -1,0 +1,198 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-044-k14-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-044-k14-salesforce",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "c23eb35aa7165741d16070c5bea48df85c3035232589041fffbf9c63da288160",
+      "candidateSetHash": "279b3a03e235a982dbb9f4bc62eb86d8ed92b84ba13a19b4d215318c2bd5ae7c",
+      "targetContractHash": "tc_67f75d4dc2cf7755e226f9f8d5e45833075f3d7311fcb0030556958a29a912bd",
+      "projectRevisionHash": "6cbbb4956befbc17c549d29cf12520ecd01aa6f933e9c4ee6ed97e1df8915389"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_63f2e930d9bdf1c3",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_1cea1ccac625ba2c",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Otros",
+        "sourceFieldRef": "fld_fae94081ada037be",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.city",
+      "company.employeeCount",
+      "company.name",
+      "company.source_id",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "88eda6a4e83e9d32f8b30e4c3b2e320bb8dd9c390e7ab0f6f283d3b6142b3929"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP09",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "employeeCount",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Daris",
+          "Daria",
+          "Tavia",
+          "Pelel",
+          "Lumek",
+          "Dara",
+          "Lumel"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "mesan.orvero0@example.test",
+          "sovan.mesath1@example.test",
+          "finan.vexero2@sample.invalid",
+          "sovel.finvik3@corp.example.test",
+          "pela.wilell4@corp.example.test",
+          "zeris.yaniko5@sample.invalid",
+          "mesis.tavell6@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Otros",
+        "fieldRef": "src:Otros",
+        "valueClass": "MIXED",
+        "values": [
+          "",
+          "see attached",
+          "",
+          "",
+          "see attached",
+          "",
+          ""
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:sparse-column"
+    ]
+  },
+  "canaries": [
+    "kc_d34d78f57d04ea4400ff1a4c",
+    "kc_1ac435d2231a1d9883ca2e5d"
+  ]
+}

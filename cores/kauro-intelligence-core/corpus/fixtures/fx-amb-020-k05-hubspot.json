@@ -1,0 +1,134 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-020-k05-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-020-k05-hubspot",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "67505d4ebce3c0def8859254cd645a14bdcfff9514e0b0988ffda67198d224ad",
+      "candidateSetHash": "e801c02fdd5cd310dcb91beb63e03cefe7b4bf858f87353ae32fc16c5e1b98de",
+      "targetContractHash": "tc_4db70a080492055359d816eb05b454203377e12bfadf1f4ff983be4ef46cee67",
+      "projectRevisionHash": "18abc0b6ebf2a7b736d1bd412129ebd5b799ef1ca3f3d289f3510fb235cc1d77"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email 1",
+        "sourceFieldRef": "fld_60ae8b9cf98de552",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Email (work)",
+        "sourceFieldRef": "fld_bf895e8fced7c011",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.mobilePhone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "a0e2efb5f1c96df0ab68689a7d1a168410c595b0abb4bceede731a4dbf14b4a4"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "mobilePhone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email 1",
+        "fieldRef": "src:Email 1",
+        "valueClass": "EMAIL",
+        "values": [
+          "tavel.zerrane0@example.test",
+          "dara.orvaly1@sample.invalid",
+          "pela.finova2@sample.invalid",
+          "quelis.haldell3@corp.example.test",
+          "halan.darmar4@sample.invalid"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Email (work)",
+        "fieldRef": "src:Email (work)",
+        "valueClass": "EMAIL",
+        "values": [
+          "tulo.peldell0@corp.example.test",
+          "mesa.quelanth1@sample.invalid",
+          "kesia.tavrane2@sample.invalid",
+          "tula.haliko3@corp.example.test",
+          "belan.risenko4@example.test"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "alternativeOutcomes": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "tags": [
+      "ambig:two-primary-emails"
+    ]
+  },
+  "canaries": [
+    "kc_577d9c66c5bc7b3065a3f47e",
+    "kc_c4b388cd255127e56bc352e2"
+  ]
+}

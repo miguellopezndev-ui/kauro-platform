@@ -1,0 +1,12 @@
+{
+ "label": "SIMULATED: hand-written from the documented AWS Bedrock InvokeModel shape (API_runtime_InvokeModel, Errors); not a recording of a live call; the message echoes the request prompt, as providers do ({{PROMPT}} is replaced by the replayed request text)",
+ "status": 500,
+ "headers": {
+  "content-type": "application/json",
+  "x-amzn-requestid": "5e1f0c3a-0000-4000-8000-00000000e500",
+  "x-amzn-errortype": "InternalServerException:http://internal.amazon.com/coral/com.amazon.bedrock/"
+ },
+ "body": {
+  "message": "request failed: {{PROMPT}}"
+ }
+}

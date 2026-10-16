@@ -1,0 +1,9 @@
+Contact ID,First Name,Last Name,Email,Phone,Country,Signed Up,Postal Code,Segment
+1,  Sofia ,Restrepo,SOFIA@Andina.Example,+57 300 1234567,CO,2026-01-15,110111,SEG-A
+2,Mateo, Gómez,mateo@andina.example,3011234567,CO,2026-02-20,110221,SEG-A
+3,Valentina,Ruiz,valentina@andina.example,3021234567,,2026-03-05,050021,
+4,Lucía,Fernández,lucia@iberia.example,+34 612 345 678,ES,2026-04-10,28013,SEG-B
+5,Oliver,Bennett,oliver@bletchley.example,+44 20 7946 0958,US,2026-05-22,MK3 6EB,SEG-B
+6,Grace,Hopper,grace@analytical.example,(415) 555-2671,US,2026-06-30,01730,
+7,芳子,山田,yoshiko@tokyo.example,+81 3 3234 5678,JP,2026-07-04,100-0001,SEG-C
+8,Ægir,Þórsson,aegir@nordur.example,+354 561 2345,IS,not a date,101,

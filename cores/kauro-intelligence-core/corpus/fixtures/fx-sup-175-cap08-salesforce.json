@@ -1,0 +1,230 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-175-cap08-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-175-cap08-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "b158d9bbd675852c7c4d0ab9854fad99556ee1a525f3541427c5a95e59e94242",
+      "candidateSetHash": "361140be66834c6cc09615f3aad59963f9f70023fd9cea2169dd90d608095cdc",
+      "targetContractHash": "tc_0b11e96f8995992f48080996a7de9acd2afa325a50e88b0b706587121b662fba",
+      "projectRevisionHash": "99c124f5f8e762e3a83bbbb97813180cafed161b6b3fb0009e94ba9b3a4ad2fc"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Nachname",
+        "sourceFieldRef": "fld_0d757a576bbeed59",
+        "decision": "MAP",
+        "destinationField": "lead.lastName"
+      },
+      {
+        "sourceHeader": "Firma",
+        "sourceFieldRef": "fld_670e7e36e9417e82",
+        "decision": "MAP",
+        "destinationField": "lead.company"
+      },
+      {
+        "sourceHeader": "E-Mail-Adresse",
+        "sourceFieldRef": "fld_e1bcd782f8f89af0",
+        "decision": "MAP",
+        "destinationField": "lead.email"
+      },
+      {
+        "sourceHeader": "Quelle",
+        "sourceFieldRef": "fld_936da24fd85ae3ec",
+        "decision": "MAP",
+        "destinationField": "lead.leadSource"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.name",
+      "company.source_id",
+      "lead.company",
+      "lead.email",
+      "lead.lastName",
+      "lead.leadSource",
+      "lead.state",
+      "lead.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "48955a306ef657739d2f2e2208c710523f8d21a83c5d832c8ea8821738ba4d1b"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP08",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "LEAD"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "company",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": true
+          },
+          {
+            "name": "leadSource",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Nachname",
+        "fieldRef": "src:Nachname",
+        "valueClass": "TEXT",
+        "values": [
+          "Sovorin",
+          "Tulsorin",
+          "Tulorin",
+          "Kesenko"
+        ],
+        "decision": "MAP",
+        "destination": "lead.lastName"
+      },
+      {
+        "header": "Firma",
+        "fieldRef": "src:Firma",
+        "valueClass": "TEXT",
+        "values": [
+          "Finenko Group Inc.",
+          "Kesmar Labs S.L.",
+          "Mesdell Studio SAS",
+          "Kesunda Works S.L."
+        ],
+        "decision": "MAP",
+        "destination": "lead.company"
+      },
+      {
+        "header": "E-Mail-Adresse",
+        "fieldRef": "src:E-Mail-Adresse",
+        "valueClass": "EMAIL",
+        "values": [
+          "mesel.kesrane0@corp.example.test",
+          "orvel.tulrane1@corp.example.test",
+          "darel.tavquist2@sample.invalid",
+          "risan.taviko3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "lead.email"
+      },
+      {
+        "header": "Quelle",
+        "fieldRef": "src:Quelle",
+        "valueClass": "ENUM",
+        "values": [
+          "cold call",
+          "trade show",
+          "web form",
+          "cold call"
+        ],
+        "decision": "MAP",
+        "destination": "lead.leadSource"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "link:on-record"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_1db72542c49a",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Nachname",
+        "targetField": "lead.lastName"
+      },
+      {
+        "memoryId": "memconv_374bec87cce8",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Firma",
+        "targetField": "lead.company"
+      },
+      {
+        "memoryId": "memconv_88cbabc4de24",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Quelle",
+        "targetField": "lead.leadSource"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_cadeeeb67a6b4b8119f86619",
+    "kc_78e1f751fd6e320945e04f12"
+  ]
+}

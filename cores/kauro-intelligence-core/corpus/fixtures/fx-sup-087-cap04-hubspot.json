@@ -1,0 +1,247 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-087-cap04-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-087-cap04-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2698a5b759bdfae566945ac2b3906de570e5b54d37d8b1af73087fd7c248365f",
+      "candidateSetHash": "71535a04883401f966dce965f615c28802c5a6dea8cf107be8d679c469296ea4",
+      "targetContractHash": "tc_59ccba50813c8eea119c21659dce98a65ec96609c6649f1e35a6ec141cee6442",
+      "projectRevisionHash": "bf71649ab3ea40c61cb3bbbe00175793816e6bddebac2fdef5975b9228236f12"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Telefon",
+        "sourceFieldRef": "fld_fd289c286da44228",
+        "decision": "MAP",
+        "destinationField": "contact.phone",
+        "transformPrimitive": "PARSE_PHONE_E164",
+        "typedTransformParams": {
+          "defaultRegion": "US"
+        }
+      },
+      {
+        "sourceHeader": "Label [v2]",
+        "sourceFieldRef": "fld_3294905e4f18f852",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      },
+      {
+        "sourceHeader": "Correo (export)",
+        "sourceFieldRef": "fld_9238598dc3b4d3dc",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "transformPrimitive": "NORMALISE_EMAIL_CASE"
+      },
+      {
+        "sourceHeader": "Audit remark code",
+        "sourceFieldRef": "fld_11d2e49570de4d9f",
+        "decision": "PRESERVE"
+      },
+      {
+        "sourceHeader": "Warehouse bin",
+        "sourceFieldRef": "fld_bcab87cd215bc1ea",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.phone",
+      "contact.postalCode",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Audit remark code",
+      "Warehouse bin"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "9e675ccb6356a339c243217b652df850d2e573c93cef43c5f055a44d7f6821f6"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "locale": {
+        "defaultRegion": "US"
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Telefon",
+        "fieldRef": "src:Telefon",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0169",
+          "202-555-0162",
+          "202-555-0165",
+          "202-555-0172",
+          "202-555-0181",
+          "202-555-0127"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone",
+        "transform": "PARSE_PHONE_E164",
+        "params": {
+          "defaultRegion": "US"
+        }
+      },
+      {
+        "header": "Label [v2]",
+        "fieldRef": "src:Label [v2]",
+        "valueClass": "TEXT",
+        "values": [
+          "  Jorek",
+          "Lumek ",
+          "  Joria",
+          "Noria ",
+          "  Quelek",
+          "Lumo "
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "transform": "TRIM_WHITESPACE"
+      },
+      {
+        "header": "Correo (export)",
+        "fieldRef": "src:Correo (export)",
+        "valueClass": "EMAIL",
+        "values": [
+          "ORVIA.HALUNDA0@example.test",
+          "keso.mesova1@sample.invalid",
+          "TAVIA.ORVELL2@example.test",
+          "tulel.mesdell3@sample.invalid",
+          "BELIA.DARIKO4@sample.invalid",
+          "bela.halunda5@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "transform": "NORMALISE_EMAIL_CASE"
+      },
+      {
+        "header": "Audit remark code",
+        "fieldRef": "src:Audit remark code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "R-38",
+          "R-38",
+          "R-30",
+          "R-4",
+          "R-47",
+          "R-46"
+        ],
+        "decision": "PRESERVE"
+      },
+      {
+        "header": "Warehouse bin",
+        "fieldRef": "src:Warehouse bin",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "B-52",
+          "A-89",
+          "A-11",
+          "A-7",
+          "B-73",
+          "B-13"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_d40efc0ccebe",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Telefon",
+        "targetField": "contact.phone"
+      },
+      {
+        "memoryId": "memconv_f7a7f8f93381",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Label [v2]",
+        "targetField": "contact.firstName"
+      },
+      {
+        "memoryId": "memconv_f950217eb43a",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Correo (export)",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_537098c01f4d64a73cf28207",
+    "kc_7eccde4e548aeba4466a1e34"
+  ]
+}

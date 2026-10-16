@@ -1,0 +1,112 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-008-k08-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-008-k08-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "b283deaba5712b4b630fe4f56fbdc1fefb86da7e9594d492dafd2f6b08e10916",
+      "candidateSetHash": "d14b7cd408c9b21399d4faa4fbc9b34a43e21f82d61ec902329646bd0140acb8",
+      "targetContractHash": null,
+      "projectRevisionHash": "e7478a7842818b93eb4ef2d00e7f8bfd73c1a0fffe69daeeb52cebcf9ac52322"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact info",
+        "sourceFieldRef": "fld_e0444f3737298788",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "lead.email",
+      "lead.status"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "14d2ac18ef93b384cd8fafde47a47feb896c577aa00e4b41b6c88485b77a3d24"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "status",
+            "valueClass": "ENUM",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact info",
+        "fieldRef": "src:Contact info",
+        "valueClass": "MIXED",
+        "values": [
+          "mesa.risorin0@example.test",
+          "2430",
+          "orvan.zerdell2@sample.invalid",
+          "+12025550198",
+          "zerek.yaniko4@example.test",
+          "+12025550119",
+          "orvel.pelquist6@sample.invalid"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "alternativeOutcomes": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "tags": [
+      "ambig:header-values-conflict"
+    ]
+  },
+  "canaries": [
+    "kc_78b68d25fd7527ff31779b77",
+    "kc_b9225a126c553ef54eecf123"
+  ]
+}

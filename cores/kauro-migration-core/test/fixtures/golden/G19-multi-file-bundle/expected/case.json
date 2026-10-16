@@ -1,0 +1,30 @@
+{
+  "id": "G19",
+  "title": "A full multi-object bundle",
+  "intent": "Contacts, companies, deals and leads in one run, with two relationship shapes. Every row is delivered, every relationship resolves, and the counts across four files reconcile. The first lead carries the same email address as the first contact: a lead and a contact are different records, so nothing merges and nothing is even suspected.",
+  "expect": {
+    "rows": { "total": 8, "OUTPUT": 8, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 2, "COMPANY": 2, "DEAL": 2, "LEAD": 2 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 4, "OUTPUT": 4, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "edgeDetails": [
+    { "row": "contacts.csv#2", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "C1", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "contacts.csv#3", "relationshipType": "CONTACT_TO_COMPANY", "toKeyRaw": "C2", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "deals.csv#2", "relationshipType": "COMPANY_TO_DEAL", "fromKeyRaw": "C1", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" },
+    { "row": "deals.csv#3", "relationshipType": "COMPANY_TO_DEAL", "fromKeyRaw": "C2", "disposition": "OUTPUT", "reasonCode": "ASSOCIATION_RESOLVED" }
+  ],
+  "delivered": [
+    { "sourceRecordId": "D1", "values": { "deal.name": "Engine upgrade", "deal.closeDate": "2026-06-30" } },
+    { "sourceRecordId": "L1", "values": { "lead.firstName": "Katherine", "lead.lastName": "Johnson", "lead.company": "Orbital Mechanics", "lead.email": "ada@example.com" } }
+  ]
+}

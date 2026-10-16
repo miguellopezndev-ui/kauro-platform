@@ -1,0 +1,136 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-098-k08-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-098-k08-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "aa5382ec40c98d0f9b7650669e802c0fcc88cf1437baaf3faf4f01bddfcab427",
+      "candidateSetHash": "359423b60e74875a19212f70f1f84e1691470c963267ec60433c2260c679994f",
+      "targetContractHash": null,
+      "projectRevisionHash": "74c751894941bec6a265b7c7e954aa7bc33be7c5312a06ae4075d32535b1b963"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email or phone",
+        "sourceFieldRef": "fld_752cdaa6c62374a6",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_0135cac02c8e588c",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.state",
+      "lead.email"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Folder code"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "f7f3f1679112e578f85252ea8d2cc18561c6a7f1afe5ffe4afc0b1488379aa4c"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP12",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email or phone",
+        "fieldRef": "src:Email or phone",
+        "valueClass": "MIXED",
+        "values": [
+          "kesa.zersorin0@sample.invalid",
+          "4943",
+          "norel.jordell2@sample.invalid",
+          "Sovel Tulmar",
+          "yano.sovunda4@corp.example.test",
+          "+12025550144",
+          "mesek.yanath6@example.test",
+          "+12025550177",
+          "vexan.tulorin8@corp.example.test"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F903",
+          "F468",
+          "F673",
+          "F241",
+          "F778",
+          "F826",
+          "F391"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:header-values-conflict"
+    ]
+  },
+  "canaries": [
+    "kc_10f0336f96885d5955ed695d",
+    "kc_d6564541765ac60baa26050f"
+  ]
+}

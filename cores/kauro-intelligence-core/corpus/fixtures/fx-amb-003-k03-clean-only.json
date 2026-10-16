@@ -1,0 +1,199 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-amb-003-k03-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-amb-003-k03-clean-only",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "6182426e73fa0c7834becf07aa0fb240ea542cf83961a7803fb79c50afe80876",
+      "candidateSetHash": "22f9876dde4598047dc1c5ebf241f7bb94b075f754b1d3c4a846373bca1fb839",
+      "targetContractHash": null,
+      "projectRevisionHash": "c3c7e8d342792607dadf47d0eb1e9ef8a409be994703de60502b4570d22c18de"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_d36352abc78edcbc",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Last name",
+        "sourceFieldRef": "fld_1f2a4b846e482842",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Value",
+        "sourceFieldRef": "fld_59962d969cca18ad",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "Wert",
+        "sourceFieldRef": "fld_6915d476b5feeebf",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.domain",
+      "company.state",
+      "contact.addressLine1",
+      "contact.email",
+      "contact.lastName",
+      "lead.jobTitle",
+      "lead.ownerEmail"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e8a20e6ba65ed36a61014da232ec1eaadd034fc87169dc068719cf6ce75e3f61"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "lead",
+        "fields": [
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email",
+        "fieldRef": "src:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "finan.orvath0@corp.example.test",
+          "belis.belvik1@sample.invalid",
+          "risek.finrane2@example.test",
+          "orvo.halrane3@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Last name",
+        "fieldRef": "src:Last name",
+        "valueClass": "TEXT",
+        "values": [
+          "Halunda",
+          "Tavorin",
+          "Pelell",
+          "Vexunda"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Value",
+        "fieldRef": "src:Value",
+        "valueClass": "MIXED",
+        "values": [
+          "tula.finiko0@example.test",
+          "+447700900414",
+          "Tulmar Systems SAS",
+          "74"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "Wert",
+        "fieldRef": "src:Wert",
+        "valueClass": "MIXED",
+        "values": [
+          "pelel.yanorin0@corp.example.test",
+          "+12025550106",
+          "Yanero Labs GmbH",
+          "894"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ambig:generic-header"
+    ]
+  },
+  "canaries": [
+    "kc_bb7a9edae356176d503139bf",
+    "kc_72f57c4bfbb7bb23d0e8b578"
+  ]
+}

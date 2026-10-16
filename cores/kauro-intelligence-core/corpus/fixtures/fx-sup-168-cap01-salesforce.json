@@ -1,0 +1,209 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-168-cap01-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-168-cap01-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "ea8db79474b63a70ed1175080aa5a766574d9512c70e2a28519bb7c1d6117ae4",
+      "candidateSetHash": "a06d4a7c1aee92a415f4a4bf5d6403ef316a46c0c9256a849ac7ff55c9f1df9e",
+      "targetContractHash": "tc_7eac36e10ee7c8608292f2ce184a60b35411b53a32d7ac142bf2451dee8e0fc3",
+      "projectRevisionHash": "458e9d5e0671cb102fb30d47126d0a0880b8218efc7a4db8eb97a97a9e10bf3c"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Email - src",
+        "sourceFieldRef": "fld_b9a42361bf0ab6ea",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Country - src",
+        "sourceFieldRef": "fld_1bb651c55e4063d4",
+        "decision": "MAP",
+        "destinationField": "contact.country"
+      },
+      {
+        "sourceHeader": "Colour tag",
+        "sourceFieldRef": "fld_d2aca64eb895c6b2",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "company.country"
+    ],
+    "expectedTargetUniverse": [
+      "company.country",
+      "company.name",
+      "company.source_id",
+      "contact.country",
+      "contact.email",
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Colour tag"
+    ],
+    "expectedTaskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "f3bbc7197e5de8c3d0b801fd05a9e19a4435b2516e6326f85a1dd345ecaae4ea"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP01",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": null
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      },
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "country",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Email - src",
+        "fieldRef": "src:Email - src",
+        "valueClass": "EMAIL",
+        "values": [
+          "finan.haliko0@example.test",
+          "risan.rissorin1@corp.example.test",
+          "mesel.darrane2@corp.example.test",
+          "finel.pelquist3@sample.invalid",
+          "wilia.jormar4@example.test",
+          "zerek.nordell5@sample.invalid"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Country - src",
+        "fieldRef": "src:Country - src",
+        "valueClass": "TEXT",
+        "values": [
+          "Estmark",
+          "Kelland",
+          "Norvania",
+          "Valdoria",
+          "Valdoria",
+          "Valdoria"
+        ],
+        "decision": "MAP",
+        "destination": "contact.country"
+      },
+      {
+        "header": "Colour tag",
+        "fieldRef": "src:Colour tag",
+        "valueClass": "TEXT",
+        "values": [
+          "green",
+          "amber",
+          "amber",
+          "blue",
+          "blue",
+          "green"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "company.country"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "OBJECT_MAPPING"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_097fcaed8143",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Email - src",
+        "targetField": "contact.email"
+      },
+      {
+        "memoryId": "memconv_34ed02e62a3f",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Country - src",
+        "targetField": "contact.country"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_3d8246b640319554460aabfe",
+    "kc_934fe3cef60a0b5a120d76d1"
+  ]
+}

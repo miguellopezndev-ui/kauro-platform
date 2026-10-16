@@ -1,0 +1,209 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-001-cap02-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-001-cap02-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9e46aab01ed20646b4738ef9d747da3a3466ea98340483ad4a326d7bc89010e7",
+      "candidateSetHash": "955b2cc1ce98c7c529265fed2815cb1573f88d3260b5e7fc8f378cd78e1b5218",
+      "targetContractHash": null,
+      "projectRevisionHash": "0df396972974fe20b69dc60eee739b37e06cee3a183f1a68ae963f16f43bbaf1"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Azienda",
+        "sourceFieldRef": "fld_3422ccb0926c5029",
+        "decision": "MAP",
+        "destinationField": "company.name"
+      },
+      {
+        "sourceHeader": "Telefono",
+        "sourceFieldRef": "fld_dc7f1a0bb2542f34",
+        "decision": "MAP",
+        "destinationField": "company.phone"
+      },
+      {
+        "sourceHeader": "Settore",
+        "sourceFieldRef": "fld_bd5978af8bb6e8a8",
+        "decision": "MAP",
+        "destinationField": "company.industry"
+      },
+      {
+        "sourceHeader": "Sito web",
+        "sourceFieldRef": "fld_37f4a28a821af784",
+        "decision": "MAP",
+        "destinationField": "company.website",
+        "allowedDestinationFields": [
+          "company.website",
+          "company.domain"
+        ]
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "company.annualRevenue",
+      "company.domain",
+      "company.industry",
+      "company.name",
+      "company.phone",
+      "company.website"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "6f15669ac24ca92e0d6f149613a7f4092c6e03495460a311dc86c7927184f0c0"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "COMPANY"
+    },
+    "objects": [
+      {
+        "name": "company",
+        "fields": [
+          {
+            "name": "annualRevenue",
+            "valueClass": "NUMBER",
+            "required": false
+          },
+          {
+            "name": "domain",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "industry",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "name",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Azienda",
+        "fieldRef": "src:Azienda",
+        "valueClass": "TEXT",
+        "values": [
+          "Halaly Logistics Inc.",
+          "Vexova Labs Ltd",
+          "Orvunda Works S.A.",
+          "Risquist Logistics S.A."
+        ],
+        "decision": "MAP",
+        "destination": "company.name"
+      },
+      {
+        "header": "Telefono",
+        "fieldRef": "src:Telefono",
+        "valueClass": "PHONE",
+        "values": [
+          "+12025550194",
+          "+12025550125",
+          "+12025550176",
+          "+447700900331"
+        ],
+        "decision": "MAP",
+        "destination": "company.phone"
+      },
+      {
+        "header": "Settore",
+        "fieldRef": "src:Settore",
+        "valueClass": "TEXT",
+        "values": [
+          "Textiles",
+          "Textiles",
+          "Textiles",
+          "Packaging"
+        ],
+        "decision": "MAP",
+        "destination": "company.industry"
+      },
+      {
+        "header": "Sito web",
+        "fieldRef": "src:Sito web",
+        "valueClass": "TEXT",
+        "values": [
+          "https://www.risova-foods.test",
+          "https://www.tavquist-works.test",
+          "https://www.lumanth-group.test",
+          "https://www.darunda-foods.test"
+        ],
+        "decision": "MAP",
+        "destination": "company.website",
+        "alternatives": [
+          "company.domain"
+        ]
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_8879deb3d049",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Azienda",
+        "targetField": "company.name"
+      },
+      {
+        "memoryId": "memconv_6ff9e2a3c57d",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Settore",
+        "targetField": "company.industry"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_270d283463b286f141ae2240",
+    "kc_23a7c1eda9c49e612b669858"
+  ]
+}

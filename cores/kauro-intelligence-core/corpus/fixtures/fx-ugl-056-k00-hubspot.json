@@ -1,0 +1,220 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-ugl-056-k00-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-ugl-056-k00-hubspot",
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9e8c94ccfe46eacf41b15131c39cb7eab56ba31974ee359c1fa3be950ad53e91",
+      "candidateSetHash": "1682dd9ca046f8362e542467c0f8fa7e7f02e43519705272f0f8a4a08908c558",
+      "targetContractHash": "tc_92cf671f19143597de3af201bec3050b83ae662742c5028fd313cb37402f2521",
+      "projectRevisionHash": "7671ba16bf99ef857636df3a454707cec372828ed5b897f4f1d33fac8971ad50"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "E-mail",
+        "sourceFieldRef": "fld_b152d5b4d06467ca",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Sobrenome",
+        "sourceFieldRef": "fld_ff8d459031756e8a",
+        "decision": "MAP",
+        "destinationField": "contact.lastName"
+      },
+      {
+        "sourceHeader": "Cargo",
+        "sourceFieldRef": "fld_f63b16fe5d724ec2",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle"
+      },
+      {
+        "sourceHeader": "Primeiro nome",
+        "sourceFieldRef": "fld_d75d8e7751ae562a",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.addressLine1",
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.lastName",
+      "contact.ownerEmail",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "a9ec665ae7a3a037e73d002309d34852cd27bdabb7016b871a6e33dcdc1b4fc6"
+  },
+  "structure": {
+    "family": "UGLY_MULTILINGUAL_STALE",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "addressLine1",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "E-mail",
+        "fieldRef": "src:E-mail",
+        "valueClass": "EMAIL",
+        "values": [
+          "wilan.risvik0@corp.example.test",
+          "finia.yanero1@example.test",
+          "orvo.messorin2@sample.invalid",
+          "quelo.darvik3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Sobrenome",
+        "fieldRef": "src:Sobrenome",
+        "valueClass": "TEXT",
+        "values": [
+          "Lumaly",
+          "Finova",
+          "Zerath",
+          "Pelunda"
+        ],
+        "decision": "MAP",
+        "destination": "contact.lastName"
+      },
+      {
+        "header": "Cargo",
+        "fieldRef": "src:Cargo",
+        "valueClass": "TEXT",
+        "values": [
+          "Buyer",
+          "Operations lead",
+          "Operations lead",
+          "Buyer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle"
+      },
+      {
+        "header": "Primeiro nome",
+        "fieldRef": "src:Primeiro nome",
+        "valueClass": "TEXT",
+        "values": [
+          "Orvan",
+          "Quelan",
+          "Pelis",
+          "Pelis"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "ugly:multilingual",
+      "lang:pt"
+    ],
+    "memory": [
+      {
+        "memoryId": "memconv_72814b9bde64",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Sobrenome",
+        "targetField": "contact.lastName"
+      },
+      {
+        "memoryId": "memconv_3929a89f15f2",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Cargo",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_4963a1d51f52",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Primeiro nome",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_65b258b07b9928f136162160",
+    "kc_676d7799a8d25c041295fe95"
+  ]
+}

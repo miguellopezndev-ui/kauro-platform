@@ -1,0 +1,129 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-saf-079-k01-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-saf-079-k01-clean-only",
+    "family": "SAFETY",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "40c307ad41d7345a5b67ff0834c72f2c4a4261707a16d5d4477b952423f94ef3",
+      "candidateSetHash": "d910bb740c353f39471d3cd3444feb291594e984af629329758a4cc822e1afc0",
+      "targetContractHash": null,
+      "projectRevisionHash": "b878aab89fe74c64723a54b17dfd06c50d3e41a445ef5245230c93dbb0f2e9a5"
+    },
+    "expectedOutcomeClass": "REQUIRES_AGENCY_DECISION",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Branch",
+        "sourceFieldRef": "fld_ebe803c7603742b2",
+        "decision": "AGENCY_DECISION"
+      },
+      {
+        "sourceHeader": "Lfd. Nr.",
+        "sourceFieldRef": "fld_b6b1da96dca7b870",
+        "decision": "AGENCY_DECISION"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.lifecycleStage",
+      "contact.phoneExtension",
+      "contact.state"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": true,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": true
+    },
+    "expectedTruthDigest": "aa6002618d6fd7ded9338e8d16268e9bbf91180f34fd8c455131f21ae5f38ba9"
+  },
+  "structure": {
+    "family": "SAFETY",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP06",
+    "outcomeClass": "REQUIRES_AGENCY_DECISION",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "lifecycleStage",
+            "valueClass": "ENUM",
+            "required": false
+          },
+          {
+            "name": "phoneExtension",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "state",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Branch",
+        "fieldRef": "src:Branch",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P1",
+          "P2",
+          "P1",
+          "P2",
+          "P1"
+        ],
+        "decision": "AGENCY_DECISION"
+      },
+      {
+        "header": "Lfd. Nr.",
+        "fieldRef": "src:Lfd. Nr.",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "1",
+          "2",
+          "3",
+          "1",
+          "2"
+        ],
+        "decision": "AGENCY_DECISION"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": true,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": true
+    },
+    "tags": [
+      "safety:composite-key"
+    ]
+  },
+  "canaries": [
+    "kc_6d0cd634d3ebd35050c8bb02",
+    "kc_491b24480f0da8eb66038f09"
+  ]
+}

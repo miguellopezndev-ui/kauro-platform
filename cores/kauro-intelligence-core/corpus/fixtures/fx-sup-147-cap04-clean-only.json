@@ -1,0 +1,173 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-147-cap04-clean-only.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-147-cap04-clean-only",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "da1efe5a12b9236bc9bd41d3036964329fdd0fe09b29d91e099051fc535d37b6",
+      "candidateSetHash": "9e094ebb66eb368f5aaca356bf87c22baf58555995e3c38aac9f61cc3f6eb4ed",
+      "targetContractHash": null,
+      "projectRevisionHash": "b53cc0bcde41e10991bc0d6be585d1045901c5390f2c20b118e0468861ae436e"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Data di creazione",
+        "sourceFieldRef": "fld_2efe83a718ad537a",
+        "decision": "MAP",
+        "destinationField": "contact.createdAt"
+      },
+      {
+        "sourceHeader": "Telefono",
+        "sourceFieldRef": "fld_bd320f53b3fbfabc",
+        "decision": "MAP",
+        "destinationField": "contact.phone"
+      },
+      {
+        "sourceHeader": "Internal ticket ref",
+        "sourceFieldRef": "fld_57f97c0b98175f8a",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.createdAt",
+      "contact.marketingConsent",
+      "contact.phone",
+      "contact.phoneExtension",
+      "contact.postalCode"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Internal ticket ref"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "e0eced2756cf5a9855d32bca0e0b929556bf400e7e91d678d862c5cfbbd3b49e"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "CLEAN_ONLY",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "locale": {
+        "dateFormat": "MM/DD/YYYY",
+        "defaultRegion": "US"
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "createdAt",
+            "valueClass": "DATE",
+            "required": false
+          },
+          {
+            "name": "marketingConsent",
+            "valueClass": "BOOLEAN",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "phoneExtension",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "postalCode",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Data di creazione",
+        "fieldRef": "src:Data di creazione",
+        "valueClass": "DATE",
+        "values": [
+          "03/24/2021",
+          "09/23/2021",
+          "01/23/2024",
+          "07/27/2021"
+        ],
+        "decision": "MAP",
+        "destination": "contact.createdAt"
+      },
+      {
+        "header": "Telefono",
+        "fieldRef": "src:Telefono",
+        "valueClass": "PHONE",
+        "values": [
+          "202-555-0197",
+          "202-555-0149",
+          "202-555-0169",
+          "202-555-0137"
+        ],
+        "decision": "MAP",
+        "destination": "contact.phone"
+      },
+      {
+        "header": "Internal ticket ref",
+        "fieldRef": "src:Internal ticket ref",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "TKT-3145",
+          "TKT-5404",
+          "TKT-6639",
+          "TKT-3950"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_c3503d339a80",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Data di creazione",
+        "targetField": "contact.createdAt"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_3435fff73d329cffb6706191",
+    "kc_7431e4e715df2e2ad584bc26"
+  ]
+}

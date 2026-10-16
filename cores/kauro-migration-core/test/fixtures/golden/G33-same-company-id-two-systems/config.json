@@ -1,0 +1,127 @@
+{
+  "configVersion": "3.0.0",
+  "source": {
+    "system": "generic_csv",
+    "namespace": "g33-two-systems"
+  },
+  "target": {
+    "mode": "CLEAN_ONLY",
+    "importMode": "CREATE_ONLY"
+  },
+  "files": [
+    {
+      "id": "companies-a",
+      "path": "companies-a.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "companies-b",
+      "path": "companies-b.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "contacts-a",
+      "path": "contacts-a.csv",
+      "format": "CSV"
+    },
+    {
+      "id": "contacts-b",
+      "path": "contacts-b.csv",
+      "format": "CSV"
+    }
+  ],
+  "records": [
+    {
+      "id": "companies-a",
+      "fileId": "companies-a",
+      "object": "COMPANY",
+      "sourceRecordIdColumn": {
+        "header": "Company ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "Name"
+          },
+          "destinationField": "company.name",
+          "semanticType": "TEXT"
+        }
+      ]
+    },
+    {
+      "id": "companies-b",
+      "fileId": "companies-b",
+      "object": "COMPANY",
+      "sourceRecordIdColumn": {
+        "header": "Company ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "Name"
+          },
+          "destinationField": "company.name",
+          "semanticType": "TEXT"
+        }
+      ]
+    },
+    {
+      "id": "contacts-a",
+      "fileId": "contacts-a",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        }
+      ]
+    },
+    {
+      "id": "contacts-b",
+      "fileId": "contacts-b",
+      "object": "CONTACT",
+      "sourceRecordIdColumn": {
+        "header": "Contact ID"
+      },
+      "fields": [
+        {
+          "column": {
+            "header": "First Name"
+          },
+          "destinationField": "contact.firstName",
+          "semanticType": "TEXT"
+        }
+      ]
+    }
+  ],
+  "associations": [
+    {
+      "id": "a-contact-company",
+      "kind": "COLUMN_REFERENCE",
+      "recordMappingId": "contacts-a",
+      "relationshipType": "CONTACT_TO_COMPANY",
+      "keyColumn": {
+        "header": "Company ID"
+      },
+      "targetRecordMappingId": "companies-a",
+      "targetMatchKey": "SOURCE_RECORD_ID"
+    },
+    {
+      "id": "b-contact-company",
+      "kind": "COLUMN_REFERENCE",
+      "recordMappingId": "contacts-b",
+      "relationshipType": "CONTACT_TO_COMPANY",
+      "keyColumn": {
+        "header": "Company ID"
+      },
+      "targetRecordMappingId": "companies-b",
+      "targetMatchKey": "SOURCE_RECORD_ID"
+    }
+  ]
+}

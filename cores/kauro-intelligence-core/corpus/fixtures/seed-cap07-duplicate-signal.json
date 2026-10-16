@@ -1,0 +1,119 @@
+{
+  "partition": "FINAL",
+  "fileName": "seed-cap07-duplicate-signal.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "seed-cap07-duplicate-signal",
+    "family": "AMBIGUOUS_ABSTENTION",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "9acf95e752e4383ea014c77fa0aa7ab9f76a4d00befaffefc4ed5a2974b95535",
+      "candidateSetHash": "59d7d4e3be5bcf3ddf823d8da3f2404084f50befc9ea97cb533595a13017bea6",
+      "targetContractHash": "tc_df06c461331694c07f5b6786af41dfa1446aa873b8a3047c626f5f96ee88220c",
+      "projectRevisionHash": "ae2956931e3b1fd1cb7e42a2f3c3ca461b0efadf3657bf1247a62f91be4723f4"
+    },
+    "expectedOutcomeClass": "ABSTAINED",
+    "allowedAlternatives": [
+      "REQUIRES_AGENCY_DECISION"
+    ],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Name",
+        "sourceFieldRef": "fld_c12f8653e899f63d",
+        "decision": "ABSTAIN"
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_f33d41459da08710",
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.lastName",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "2e513e2852c907392f46e393f865cef814a2ebee80e36b14387b025af364e98b"
+  },
+  "structure": {
+    "family": "AMBIGUOUS_ABSTENTION",
+    "mode": "SALESFORCE",
+    "capability": "CAP07",
+    "outcomeClass": "ABSTAINED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Name",
+        "fieldRef": "src:Name",
+        "valueClass": "TEXT",
+        "values": [
+          "J. Perez",
+          "Juan Perez"
+        ],
+        "decision": "ABSTAIN"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Madrid",
+          "madrid"
+        ],
+        "decision": "ABSTAIN"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "alternativeOutcomes": [
+      "REQUIRES_AGENCY_DECISION"
+    ]
+  },
+  "canaries": [
+    "kc_3b201b624653ba29de52e499",
+    "kc_7916230603dcd28b720f97eb"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "id": "G20",
+  "title": "Custom and unmapped columns",
+  "intent": "Loyalty Tier is mapped explicitly to a destination-specific column. Legacy Segment and Internal Note are not mapped at all: their populated values are preserved in the unmapped-fields artifact rather than discarded, and they do not affect any row's disposition.",
+  "expect": {
+    "rows": { "total": 3, "OUTPUT": 3, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 3, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 4,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 0,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "unmapped": [
+    { "row": "contacts.csv#2", "columnHeader": "Legacy Segment", "value": "SEG-A" },
+    { "row": "contacts.csv#2", "columnHeader": "Internal Note", "value": "imported from old system" },
+    { "row": "contacts.csv#3", "columnHeader": "Legacy Segment", "value": "SEG-B" },
+    { "row": "contacts.csv#4", "columnHeader": "Internal Note", "value": "no segment recorded" }
+  ],
+  "delivered": [
+    { "sourceRecordId": "1", "values": { "custom:Loyalty Tier": "Gold" } },
+    { "sourceRecordId": "2", "values": { "custom:Loyalty Tier": "Silver" } }
+  ]
+}

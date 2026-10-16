@@ -1,0 +1,39 @@
+{
+  "id": "G22",
+  "title": "Two different people who share a full name",
+  "intent": "Two contacts are both called Ada Lovelace and carry different source record ids and different email addresses. A shared name is a signal for a human to look at, never proof. Nothing may be combined.",
+  "expect": {
+    "rows": { "total": 3, "OUTPUT": 3, "MERGED_PROVEN": 0, "ISOLATED": 0, "LEFTOVER": 0, "REJECTED_INPUT": 0 },
+    "records": { "CONTACT": 3, "COMPANY": 0, "DEAL": 0, "LEAD": 0 },
+    "changedCells": 0,
+    "flags": 0,
+    "unmappedFields": 0,
+    "merges": 0,
+    "mergeConflicts": 0,
+    "duplicateCandidateClusters": 1,
+    "destinationKeyConflicts": 0,
+    "formulaRisks": 0,
+    "edges": { "total": 0, "OUTPUT": 0, "DEDUPLICATED": 0, "UNRESOLVED": 0, "LEFTOVER": 0 }
+  },
+  "changes": [],
+  "flagDetails": [],
+  "dispositions": [
+    { "row": "contacts.csv#2", "disposition": "OUTPUT" },
+    { "row": "contacts.csv#3", "disposition": "OUTPUT" },
+    { "row": "contacts.csv#4", "disposition": "OUTPUT" }
+  ],
+  "duplicateClusters": [
+    {
+      "signal": "NAME_EXACT",
+      "signalValue": "ada lovelace",
+      "members": 2,
+      "reasonCode": "IDENTITY_CANDIDATE_NAME_EXACT",
+      "notMergedReasonCode": "IDENTITY_CANDIDATE_CONFLICTING_ATTRIBUTES"
+    }
+  ],
+  "delivered": [
+    { "sourceRecordId": "1", "values": { "contact.email": "ada@example.com" } },
+    { "sourceRecordId": "2", "values": { "contact.email": "ada.lovelace@example.net" } },
+    { "sourceRecordId": "3", "values": { "contact.email": "alan@example.org" } }
+  ]
+}

@@ -1,0 +1,318 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-054-cap07-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-054-cap07-hubspot",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "c979162e6d03415f8215fbc8db92c37b8df28a812b7c066d6ca4277395ac87d6",
+      "candidateSetHash": "bf81fa12ebddb5bc295e24cac545971571113bd8888f0522c0a04e214b76155b",
+      "targetContractHash": "tc_0e32f99d510d42d0837cbf13e192bc2295e23b84b575cde5fc2348fc495294c9",
+      "projectRevisionHash": "39bf1997281df74a72140f7787c490ca14c5ef067edc0727772981d2a033798d"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Contact ID",
+        "sourceFieldRef": "fld_ba3ae491a8946175",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_e6578a6e4e79179e",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "contacts.csv",
+        "inDuplicateReview": true
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_2c7b98ff67996458",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Sales rep initials",
+        "sourceFieldRef": "fld_17a2c151387d7acb",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Folder code",
+        "sourceFieldRef": "fld_2d59a984a002431f",
+        "decision": "PRESERVE",
+        "filePath": "contacts.csv"
+      },
+      {
+        "sourceHeader": "Submission ID",
+        "sourceFieldRef": "fld_73b86edddf8ab16a",
+        "decision": "PRESERVE",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Email",
+        "sourceFieldRef": "fld_b2630e4cea37b9d6",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "filePath": "webform-signups.csv",
+        "inDuplicateReview": true
+      },
+      {
+        "sourceHeader": "City",
+        "sourceFieldRef": "fld_8f780939055fb3c7",
+        "decision": "MAP",
+        "destinationField": "contact.city",
+        "filePath": "webform-signups.csv"
+      },
+      {
+        "sourceHeader": "Job title",
+        "sourceFieldRef": "fld_430150566b26b1ad",
+        "decision": "MAP",
+        "destinationField": "contact.jobTitle",
+        "filePath": "webform-signups.csv"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.email",
+      "contact.jobTitle",
+      "contact.ownerEmail",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Contact ID",
+      "Sales rep initials",
+      "Folder code",
+      "Submission ID"
+    ],
+    "expectedTaskTypes": [
+      "DUPLICATE_SIGNAL_STRATEGY"
+    ],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "8d3fa77736cae3f5d24a71d0f7dcaeb5b28ce2f65b7117b003c5fd54f9b65f1a"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "HUBSPOT",
+    "capability": "CAP07",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT",
+      "recordIdColumn": "Contact ID",
+      "files": {
+        "contacts.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Contact ID"
+        },
+        "webform-signups.csv": {
+          "object": "CONTACT",
+          "recordIdColumn": "Submission ID"
+        }
+      }
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "ownerEmail",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Contact ID",
+        "fieldRef": "src:contacts.csv:Contact ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "P-688",
+          "P-689",
+          "P-690",
+          "P-691"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:contacts.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "vexa.pelmar0@example.test",
+          "zerel.tavrane1@example.test",
+          "sovek.quelorin2@sample.invalid",
+          "mesis.orvquist3@example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "read": {
+          "destination": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        "inDuplicateReview": true,
+        "file": "contacts.csv"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:contacts.csv:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Brandel",
+          "Brandel",
+          "Brandel",
+          "Valmora"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Sales rep initials",
+        "fieldRef": "src:contacts.csv:Sales rep initials",
+        "valueClass": "TEXT",
+        "values": [
+          "RT",
+          "PE",
+          "TK",
+          "TS"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Folder code",
+        "fieldRef": "src:contacts.csv:Folder code",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "F654",
+          "F792",
+          "F245",
+          "F273"
+        ],
+        "decision": "PRESERVE",
+        "file": "contacts.csv"
+      },
+      {
+        "header": "Submission ID",
+        "fieldRef": "src:webform-signups.csv:Submission ID",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "S-808",
+          "S-809",
+          "S-810"
+        ],
+        "decision": "PRESERVE",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Email",
+        "fieldRef": "src:webform-signups.csv:Email",
+        "valueClass": "EMAIL",
+        "values": [
+          "mesis.orvquist3@example.test",
+          "sovek.quelorin2@sample.invalid",
+          "kesis.yaniko2@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "read": {
+          "destination": "contact.email",
+          "semanticType": "EMAIL"
+        },
+        "inDuplicateReview": true,
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "City",
+        "fieldRef": "src:webform-signups.csv:City",
+        "valueClass": "TEXT",
+        "values": [
+          "Valmora",
+          "Tessin",
+          "Valmora"
+        ],
+        "decision": "MAP",
+        "destination": "contact.city",
+        "file": "webform-signups.csv"
+      },
+      {
+        "header": "Job title",
+        "fieldRef": "src:webform-signups.csv:Job title",
+        "valueClass": "TEXT",
+        "values": [
+          "Buyer",
+          "Buyer",
+          "Site engineer"
+        ],
+        "decision": "MAP",
+        "destination": "contact.jobTitle",
+        "file": "webform-signups.csv"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "taskTypes": [
+      "DUPLICATE_SIGNAL_STRATEGY"
+    ]
+  },
+  "canaries": [
+    "kc_383739beff1f6dde407712b8",
+    "kc_6cd7d225d6e11861ff2234cd"
+  ]
+}

@@ -1,0 +1,168 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-sup-099-cap04-salesforce.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-sup-099-cap04-salesforce",
+    "family": "SUPPORTED",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "552bb3e38f78db2b694b94a9d515728cdf65828c178a2f6097bf8215283b8675",
+      "candidateSetHash": "8415dd6a872b985ac210829b3c66e8cb176777077fc830a96b7a272c38c2ffef",
+      "targetContractHash": "tc_20e3d82b555c59a6316f8edb3e600a7479280e55813422b19b2648c17e37907d",
+      "projectRevisionHash": "a60591cda90f3f98c9c08246e74169d81aaf503752858f37d69808727df69445"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "Mail [v2]",
+        "sourceFieldRef": "fld_7d11b131a6530efd",
+        "decision": "MAP",
+        "destinationField": "contact.email",
+        "transformPrimitive": "NORMALISE_EMAIL_CASE"
+      },
+      {
+        "sourceHeader": "Label (legacy)",
+        "sourceFieldRef": "fld_80390b9835acab17",
+        "decision": "MAP",
+        "destinationField": "contact.firstName",
+        "transformPrimitive": "TRIM_WHITESPACE"
+      }
+    ],
+    "forbiddenDestinationFields": [],
+    "expectedTargetUniverse": [
+      "contact.city",
+      "contact.description",
+      "contact.email",
+      "contact.firstName",
+      "contact.lastName",
+      "contact.phone",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "1cee4a21e0a5bc5fd641f8d187d2d81c7c6ad8bd70dcde116ae11fe74b07db97"
+  },
+  "structure": {
+    "family": "SUPPORTED",
+    "mode": "SALESFORCE",
+    "capability": "CAP04",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "city",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "description",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": false
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "lastName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "Mail [v2]",
+        "fieldRef": "src:Mail [v2]",
+        "valueClass": "EMAIL",
+        "values": [
+          "SOVIA.ZERANTH0@sample.invalid",
+          "meso.halaly1@corp.example.test",
+          "TULEK.WILATH2@example.test",
+          "halia.tavquist3@sample.invalid",
+          "ZEREK.TULSORIN4@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email",
+        "transform": "NORMALISE_EMAIL_CASE"
+      },
+      {
+        "header": "Label (legacy)",
+        "fieldRef": "src:Label (legacy)",
+        "valueClass": "TEXT",
+        "values": [
+          "  Wilo",
+          "Belan ",
+          "  Sova",
+          "Pelis ",
+          "  Zero"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName",
+        "transform": "TRIM_WHITESPACE"
+      }
+    ],
+    "forbiddenDestinations": [],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "memory": [
+      {
+        "memoryId": "memconv_53c0ad7a8df6",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Label (legacy)",
+        "targetField": "contact.firstName"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_e232b633af9f1942744d3631",
+    "kc_b649762e40321f60b0bac3c0"
+  ]
+}

@@ -1,0 +1,205 @@
+{
+  "partition": "FINAL",
+  "fileName": "fx-adv-024-k09-hubspot.json",
+  "fixture": {
+    "fixtureFormatVersion": "1.1.0",
+    "fixtureId": "fx-adv-024-k09-hubspot",
+    "family": "ADVERSARIAL",
+    "weight": 1,
+    "expectedInputHashes": {
+      "profileHash": "2d9eb93d418d53930777d7ab8f8cf08882365350dc3a4641ddab8713f954b0f5",
+      "candidateSetHash": "2a1eca3d4feab06e7ee0588289b2aea87799913024ecba22dcbc0658164724cb",
+      "targetContractHash": "tc_2f178d7c54aa59e34c10d042059385d3883d6423130ca842bcac8cb04139e252",
+      "projectRevisionHash": "53c0d4666a746e2b1356d48d9a0b3949ec093f20ae9cad69add7cd1b8ee8f353"
+    },
+    "expectedOutcomeClass": "PROPOSED",
+    "allowedAlternatives": [],
+    "expectedCandidates": [
+      {
+        "sourceHeader": "First name",
+        "sourceFieldRef": "fld_84e168ee6fad0fa4",
+        "decision": "MAP",
+        "destinationField": "contact.firstName"
+      },
+      {
+        "sourceHeader": "Adresse courriel",
+        "sourceFieldRef": "fld_bfa8ce8beb4bd433",
+        "decision": "MAP",
+        "destinationField": "contact.email"
+      },
+      {
+        "sourceHeader": "Row checksum",
+        "sourceFieldRef": "fld_9ba73ad3ffc1da91",
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinationFields": [
+      "contact.jobTitle"
+    ],
+    "expectedTargetUniverse": [
+      "contact.email",
+      "contact.firstName",
+      "contact.jobTitle",
+      "contact.phone",
+      "contact.website",
+      "contact.source_id"
+    ],
+    "requiredEvidenceRefs": [],
+    "expectedCompilerResult": "ANY",
+    "expectedPreserved": [
+      "Row checksum"
+    ],
+    "expectedTaskTypes": [],
+    "dataLevelCeiling": "L1",
+    "budgetCeiling": {
+      "maxCalls": 8,
+      "maxInvocations": 8,
+      "maxBilledInputTokens": 60000,
+      "maxBilledOutputTokens": 8000
+    },
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [
+        "memotherclient_f6bada0d1a2a"
+      ],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "expectedTruthDigest": "c2584a214fbd8c60199faebc60138ec8720a254e5d40835b94503b2f798179c2"
+  },
+  "structure": {
+    "family": "ADVERSARIAL",
+    "mode": "HUBSPOT",
+    "capability": "CAP02",
+    "outcomeClass": "PROPOSED",
+    "project": {
+      "object": "CONTACT"
+    },
+    "objects": [
+      {
+        "name": "contact",
+        "fields": [
+          {
+            "name": "email",
+            "valueClass": "EMAIL",
+            "required": true
+          },
+          {
+            "name": "firstName",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "jobTitle",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "phone",
+            "valueClass": "PHONE",
+            "required": false
+          },
+          {
+            "name": "website",
+            "valueClass": "TEXT",
+            "required": false
+          },
+          {
+            "name": "source_id",
+            "valueClass": "TEXT",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "columns": [
+      {
+        "header": "First name",
+        "fieldRef": "src:First name",
+        "valueClass": "TEXT",
+        "values": [
+          "Daran",
+          "Daria",
+          "Risan",
+          "Risia"
+        ],
+        "decision": "MAP",
+        "destination": "contact.firstName"
+      },
+      {
+        "header": "Adresse courriel",
+        "fieldRef": "src:Adresse courriel",
+        "valueClass": "EMAIL",
+        "values": [
+          "yania.kessorin0@example.test",
+          "pelis.tavell1@corp.example.test",
+          "tulel.jorova2@example.test",
+          "orvia.mesanth3@corp.example.test"
+        ],
+        "decision": "MAP",
+        "destination": "contact.email"
+      },
+      {
+        "header": "Row checksum",
+        "fieldRef": "src:Row checksum",
+        "valueClass": "IDENTIFIER",
+        "values": [
+          "81ab7b29",
+          "af0556ad",
+          "8fde7850",
+          "78ccf2da"
+        ],
+        "decision": "PRESERVE"
+      }
+    ],
+    "forbiddenDestinations": [
+      "contact.jobTitle"
+    ],
+    "gates": {
+      "identityUnproven": false,
+      "injectionSentinels": [],
+      "foreignRefs": [
+        "memotherclient_f6bada0d1a2a"
+      ],
+      "secretSentinels": [],
+      "safetyCritical": false
+    },
+    "tags": [
+      "adv:stale-memory-entry",
+      "cross:stale-entry",
+      "egress:run-ledger",
+      "memory:client"
+    ],
+    "memory": [
+      {
+        "memoryId": "mem_c9c5ef6e1f22",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "STALE",
+        "sourceHeaderPattern": "First name",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memotherclient_f6bada0d1a2a",
+        "scope": "CLIENT",
+        "owner": "OTHER_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "First name",
+        "targetField": "contact.jobTitle"
+      },
+      {
+        "memoryId": "memconv_a285eba39b19",
+        "scope": "CLIENT",
+        "owner": "SAME_CLIENT",
+        "state": "ACTIVE",
+        "sourceHeaderPattern": "Adresse courriel",
+        "targetField": "contact.email"
+      }
+    ]
+  },
+  "canaries": [
+    "kc_ac33edcd95ab8959b23687c6",
+    "kc_236cac540b2e62fff0a55c3d"
+  ]
+}
