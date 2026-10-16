@@ -31,7 +31,7 @@ export interface ChromiumProbe {
   readonly version: string;
   readonly platform: string;
   /** Linux: the browser's descendants as the kernel reports them; null elsewhere. */
-  readonly processes: ReadonlyArray<{ readonly pid: number; readonly ppid: number; readonly comm: string; readonly type: string; readonly seccomp: number | null; readonly noNewPrivs: number | null }> | null;
+  readonly processes: ReadonlyArray<{ readonly pid: number; readonly ppid: number; readonly comm: string; readonly seccomp: number | null; readonly noNewPrivs: number | null }> | null;
   /** Linux: whether any process of the tree carries a flag that turns a sandbox layer off. */
   readonly sandboxDisabledFlag: boolean | null;
 }
@@ -143,7 +143,7 @@ export class ChromiumPdfEngine implements PdfEngine {
 
   /**
    * Starts the browser exactly as `print` does, opens a page, and (on Linux) reads back from the kernel what the sandbox really did:
-   * the process tree's `--type`, `Seccomp` and `NoNewPrivs`, and whether any process carries a flag that disables a sandbox layer.
+   * the process tree's `Seccomp` and `NoNewPrivs`, and whether any process carries a flag that disables a sandbox layer.
    * A sandboxed renderer reports `Seccomp: 2` and `NoNewPrivs: 1`. It prints nothing and keeps nothing.
    */
   static async probe(executablePath: string): Promise<ChromiumProbe> {
@@ -159,14 +159,13 @@ export class ChromiumPdfEngine implements PdfEngine {
         pid: p.pid,
         ppid: p.ppid,
         comm: p.comm,
-        type: p.args.find((a) => a.startsWith("--type="))?.slice("--type=".length) ?? "browser",
         seccomp: Number(/^Seccomp:\s+(\d+)/m.exec(p.status)?.[1] ?? Number.NaN),
         noNewPrivs: Number(/^NoNewPrivs:\s+(\d+)/m.exec(p.status)?.[1] ?? Number.NaN),
       }));
       return {
         version,
         platform: process.platform,
-        processes: processes.map((p) => ({ pid: p.pid, ppid: p.ppid, comm: p.comm, type: p.type, seccomp: Number.isNaN(p.seccomp) ? null : p.seccomp, noNewPrivs: Number.isNaN(p.noNewPrivs) ? null : p.noNewPrivs })),
+        processes: processes.map((p) => ({ pid: p.pid, ppid: p.ppid, comm: p.comm, seccomp: Number.isNaN(p.seccomp) ? null : p.seccomp, noNewPrivs: Number.isNaN(p.noNewPrivs) ? null : p.noNewPrivs })),
         sandboxDisabledFlag: tree.some((p) => p.args.some((a) => SANDBOX_OFF_FLAGS.some((f) => a === f || a.startsWith(`${f}=`)))),
       };
     } finally {

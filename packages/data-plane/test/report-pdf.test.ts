@@ -41,9 +41,12 @@ describe("report PDF — real engine", { skip: needsBrowser }, () => {
     if (process.platform !== "linux") return; // the process-level sandbox facts below are read from /proc
     assert.notEqual(process.getuid?.(), 0, "the browser must not run as root");
     assert.equal(probe.sandboxDisabledFlag, false, "no process of the browser carries a flag that disables a sandbox layer");
-    const renderers = (probe.processes ?? []).filter((p) => p.type === "renderer");
-    assert.ok(renderers.length >= 1, `a renderer process was observed (${JSON.stringify(probe.processes)})`);
-    for (const r of renderers) assert.deepEqual({ seccomp: r.seccomp, noNewPrivs: r.noNewPrivs }, { seccomp: 2, noNewPrivs: 1 }, "the renderer runs under seccomp-bpf with no_new_privs (sandboxed)");
+    // Chrome's zygote-forked children (renderers, the GPU and utility processes) rewrite their command line, so they cannot be told apart by
+    // `--type`; what the kernel reports for them is what matters: under the sandbox they run with seccomp-bpf (Seccomp: 2) and no_new_privs.
+    // The browser process and the zygotes that fork them are the brokers and stay at Seccomp: 0.
+    const sandboxed = (probe.processes ?? []).filter((p) => p.seccomp === 2 && p.noNewPrivs === 1);
+    assert.ok(sandboxed.length >= 1, `children of the browser run under seccomp-bpf with no_new_privs (${JSON.stringify(probe.processes)})`);
+    assert.ok(sandboxed.every((p) => p.ppid !== 1), "the sandboxed processes are descendants of the browser");
   });
 
   for (const pageSize of ["LETTER", "A4"] as const) {
