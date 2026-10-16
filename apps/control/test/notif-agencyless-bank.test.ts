@@ -105,7 +105,7 @@ test("an agency-less event of a listed type handed to another consumer is still 
   // a second record of the same event for a consumer that does not subscribe to it: no product role may write it (the restrictive
   // subscriber policies of 0013/0021), so the superuser writes this one fixture row, to prove the dispatcher's own guard
   const otherId = ids.next();
-  await env.h.oracle.query("INSERT INTO kauro.outbox_records (outbox_id, event_id, consumer, state, attempts, next_attempt_at, created_at, updated_at) VALUES ($1, $2, 'SELECTION_EVALUATION', 'PENDING', 0, now(), now(), now())", [otherId, eventId]);
+  await env.h.oracle.query("INSERT INTO kauro.outbox_records (outbox_id, event_id, consumer, state, attempts, next_attempt_at, created_at, updated_at) VALUES ($1, $2, 'SELECTION_EVALUATION', 'PENDING', 0, $3::timestamptz, $3::timestamptz, $3::timestamptz)", [otherId, eventId, new Date(clock.nowMs() - 1_000).toISOString()]); // due at the controlled instant the batch runs at, never at the wall clock a slower runner has moved past
   const other: OutboxConsumer = { consumer: "SELECTION_EVALUATION", handle: async () => ({ kind: "DONE" }) };
   await env.plane.dispatcher.dispatchBatch(other, 100, clock.now());
   const settled = await env.h.oracle.query<{ state: string; last_error_code: string | null }>("SELECT state, last_error_code FROM kauro.outbox_records WHERE outbox_id = $1", [otherId]);
