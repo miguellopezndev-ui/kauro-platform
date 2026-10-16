@@ -105,16 +105,23 @@ export const clock: Clock = { now: () => toUtcInstant(Date.now()), nowMs: () => 
 /** A process clock a test can move forward (never backwards): the api's business clock; the database keeps its own. */
 export interface MovableClock extends Clock {
   advance(ms: number): void;
+  /** Holds the clock still at the instant (a world that stands every unit there), or releases it (null): the process clock again. */
+  standAt?(instant: string | null): void;
 }
 
 export function movableClock(): MovableClock {
   let offsetMs = 0;
+  let stoodAt: number | null = null;
   return {
-    now: () => toUtcInstant(Date.now() + offsetMs),
-    nowMs: () => Date.now() + offsetMs,
+    now: () => toUtcInstant(stoodAt ?? Date.now() + offsetMs),
+    nowMs: () => stoodAt ?? Date.now() + offsetMs,
     advance(ms: number) {
       if (!(ms > 0)) throw new RangeError("the clock moves forward");
       offsetMs += ms;
+      if (stoodAt !== null) stoodAt += ms;
+    },
+    standAt(instant) {
+      stoodAt = instant === null ? null : Date.parse(instant);
     },
   };
 }

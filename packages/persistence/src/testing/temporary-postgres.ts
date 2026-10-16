@@ -129,6 +129,19 @@ export const TEST_CLOCK_FUNCTION = `CREATE OR REPLACE FUNCTION kauro.server_now(
   LANGUAGE sql STABLE PARALLEL SAFE SET search_path = pg_catalog AS
 $$ SELECT transaction_timestamp() + make_interval(secs => coalesce(nullif(current_setting('${TEST_CLOCK_OFFSET_SETTING}', true), ''), '0')::double precision) $$`;
 
+/**
+ * The effect clock of the TEST CLOCK cluster. kauro.effect_now() is the server instant plus the time the transaction has run (0038), so a
+ * statement judged "at the controlled instant" reads that instant plus whatever the harness's own statements took: a cell that must judge
+ * a boundary to the microsecond (a grant valid from T, refused 1 us before) cannot place itself. A cell that needs the exact instant sets
+ * the transaction-local kauro_test.effect_frozen to 'on' (the world's positioning of a unit does it): effect_now() then reads
+ * kauro.server_now() exactly. Absent the setting the function is the shipped one, byte for byte in behavior.
+ */
+export const TEST_EFFECT_FROZEN_SETTING = "kauro_test.effect_frozen";
+export const TEST_EFFECT_FUNCTION = `CREATE OR REPLACE FUNCTION kauro.effect_now() RETURNS timestamptz
+  LANGUAGE sql VOLATILE PARALLEL SAFE SET search_path = pg_catalog AS
+$$ SELECT kauro.server_now() + CASE WHEN current_setting('${TEST_EFFECT_FROZEN_SETTING}', true) = 'on' THEN interval '0' ELSE (clock_timestamp() - transaction_timestamp()) END $$`;
+export const TEST_EFFECT_COMMENT = "TEST CLOCK installed by @kauro/persistence/testing: kauro.effect_now() as shipped, except that the transaction-local kauro_test.effect_frozen set to on reads kauro.server_now() exactly; never present in a deployment";
+
 export const TEST_CLOCK_COMMENT = "TEST CLOCK installed by @kauro/persistence/testing: transaction_timestamp() plus the transaction-local kauro_test.clock_offset_seconds; never present in a deployment";
 
 function openssl(args: string[], cwd: string): void {
@@ -243,6 +256,8 @@ export async function startTemporaryPostgres(options: StartOptions = {}): Promis
         try {
           await owner.query(TEST_CLOCK_FUNCTION);
           await owner.query(`COMMENT ON FUNCTION kauro.server_now() IS '${TEST_CLOCK_COMMENT}'`);
+          await owner.query(TEST_EFFECT_FUNCTION);
+          await owner.query(`COMMENT ON FUNCTION kauro.effect_now() IS '${TEST_EFFECT_COMMENT}'`);
         } finally {
           await owner.end();
         }

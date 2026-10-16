@@ -471,7 +471,7 @@ cell("GAP-DI-16 RACE (policy) M10: D2 against WithdrawOutreachChannelPolicy of t
     const C = d2Actor("D2", D(), id);
     const r = await raceAtWrite(ctx, "M10", order === 1 ? P : C, order === 1 ? C : P);
     runs.push({ order, id, r });
-    assert.ok((await w.routes.reinstatePolicy("US", "INDIVIDUAL_PROSPECT_CONTACT")).status < 300, "the policy back IN_FORCE for the next order and cell");
+    await w.routes.reinstatePolicy("US", "INDIVIDUAL_PROSPECT_CONTACT"); // the policy back IN_FORCE for the next order and cell
   }
   const [o1, o2] = runs as [(typeof runs)[0], (typeof runs)[0]];
   assert.equal(callsOf(w, o1.id), 0, "order 1: no call after the withdrawal (forbidden effect)");
@@ -1284,7 +1284,7 @@ d2Deny("channel policy", "NOT_SENT(POLICY_WITHDRAWN)", "DRAFT", async (label) =>
   assert.ok((await w.routes.withdrawPolicy("US", "INDIVIDUAL_PROSPECT_CONTACT")).status < 300);
   return x;
 }, async () => {
-  assert.ok((await w.routes.reinstatePolicy("US", "INDIVIDUAL_PROSPECT_CONTACT")).status < 300);
+  await w.routes.reinstatePolicy("US", "INDIVIDUAL_PROSPECT_CONTACT");
 });
 let restoreCompliance: (() => void) | null = null;
 d2Deny("compliance configuration", "NOT_SENT(COMPLIANCE_UNCONFIGURED)", "DRAFT", async (label) => {

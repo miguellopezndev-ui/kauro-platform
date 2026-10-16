@@ -12,13 +12,13 @@ import { randomBytes } from "node:crypto";
 import type { Client } from "pg";
 import { ContractFakeGmailSend, ContractFakeResend } from "@kauro/application/testing";
 import type { OutreachPorts, OutreachSendPort, OutreachSubmission, OutreachSubmitAnswer } from "@kauro/application";
-import type { CorrelationId, ExecutionContext, UserId } from "@kauro/domain";
+import { toUtcInstant, type CorrelationId, type ExecutionContext, type UserId } from "@kauro/domain";
 import { PgCommercialUnitOfWorkFactory, type PgCommercialUnitOfWork } from "@kauro/persistence";
-import { ROLES, raceStatementTimeoutMs, recordActiveSeller, openConnection, TEST_CLOCK_OFFSET_SETTING, type RecordedSeller, type HarnessConnection, type FaultContext, type StepClock } from "@kauro/persistence/testing";
+import { ROLES, TEST_EFFECT_FROZEN_SETTING, controlledClock, raceStatementTimeoutMs, recordActiveSeller, openConnection, TEST_CLOCK_OFFSET_SETTING, type RecordedSeller, type HarnessConnection, type FaultContext, type StepClock } from "@kauro/persistence/testing";
 import { createOutreachDispatcher, outreachLeaseResource, type OutreachDispatcher, type OutreachLeaseRef } from "../src/outreach/dispatcher.js";
 import { outreachSealerOf } from "../src/outreach/routes.js";
 import type { OptOutKey, OutreachCompliance } from "../src/outreach/mime.js";
-import type { SqlStep } from "./fault-support.js";
+import type { SqlStep, StepClockOf } from "./fault-support.js";
 import { prepareManifest, prepareTerminationTerms } from "./sellers-support.js";
 import { statementsWorld } from "./statements-support.js";
 import { call as callApi, clock, completed, freshKey, ids, outcome as outcomeOf, type Reply } from "./support.js";
@@ -185,7 +185,7 @@ class OutreachUnits extends PgCommercialUnitOfWorkFactory {
       async (uow) => {
         const at = this.#position();
         if (context.kind === "SERVICE" && at !== null) {
-          await (uow as unknown as { client: Client }).client.query(`SELECT set_config('${TEST_CLOCK_OFFSET_SETTING}', greatest(0, extract(epoch FROM ($1::timestamptz - transaction_timestamp())))::text, true)`, [at]);
+          await (uow as unknown as { client: Client }).client.query(`SELECT set_config('${TEST_CLOCK_OFFSET_SETTING}', greatest(0, extract(epoch FROM ($1::timestamptz - transaction_timestamp())))::text, true), set_config('${TEST_EFFECT_FROZEN_SETTING}', 'on', true)`, [at]);
         }
         return work(uow);
       },
@@ -205,7 +205,25 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
     },
   });
   const { w, h } = sw;
+  // the cells judge the user commands (CMD063, the owner's and seller's routes) at stated instants: every unit's transaction stands on the clock
+  sw.faults.positionEveryUnit = true;
   const state: { compliance: OutreachCompliance | null; standing: string | null } = { compliance: { ...DEFAULT_COMPLIANCE }, standing: null };
+  let standClock: StepClock | null = null;
+  let boundClock: StepClock | null = null;
+  /** The clock the units are positioned on, with the effect clock frozen on it: kauro.effect_now() reads the controlled instant exactly (the test cluster's TEST_EFFECT_FUNCTION). */
+  const frozenOf = (c: StepClock | null): StepClockOf | null =>
+    c === null
+      ? null
+      : {
+          async onServer(session) {
+            const placed = await c.onServer(session);
+            await session.query(`SELECT set_config('${TEST_EFFECT_FROZEN_SETTING}', 'on', true)`);
+            return placed;
+          },
+        };
+  /** A fresh step-up of the person at the instant the world stands at (a proof minted at the real clock is stale for a unit standing days ahead). */
+  const stepUp = (person: Parameters<typeof w.stepUp>[0]): Promise<string> =>
+    state.standing === null ? w.stepUp(person) : h.recordStepUp(person.userId as UserId, { issuedAt: toUtcInstant(Date.parse(state.standing) - 1000) });
   const gmail = new WorldGmail();
   const resend = new WorldResend();
   const ports: OutreachPorts = { gmail, resend };
@@ -275,8 +293,30 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
   const api = (c: { readonly method?: "POST" | "GET"; readonly url: string; readonly token: string | null; readonly key?: string | null; readonly body?: unknown }): Promise<Reply> =>
     callApi(w, { ...(c.method !== undefined ? { method: c.method } : {}), url: c.url, agency: null, token: c.token, key: c.key === undefined ? (c.method === "GET" ? null : freshKey("b12")) : c.key, ...(c.body !== undefined ? { body: c.body } : {}) });
 
+  /**
+   * The wire activity of CMD064 for the cells' compact one: `{ kind, intentId, evidenceRef | inboundRef, observation?, reason? }` names the intent and what the
+   * evidence is; the prospect and the draft are the intent's, the instant the one the world stands at, the evidence digest that of the reference. An activity
+   * that already names its prospect (a forged one) goes on as given, with the members it omits filled.
+   */
+  const wireActivity = async (a: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    const at = toUtcInstant(state.standing !== null ? Date.parse(state.standing) : Date.now());
+    if (typeof a["prospectId"] === "string") return { occurredAt: at, evidenceHash: sha(`evidence-${String(a["providerMessageRef"] ?? "")}`), ...a };
+    const intentId = String(a["intentId"]);
+    const row = (await h.oracle.query<{ prospect_id: string; draft_id: string }>("SELECT prospect_id, draft_id FROM kauro.outreach_send_intents WHERE intent_id = $1", [intentId])).rows[0];
+    if (row === undefined) throw new Error(`no intent ${intentId} for the activity`);
+    const kind = String(a["kind"]);
+    const evidenceRef = String(a["evidenceRef"] ?? a["inboundRef"] ?? `${kind}-${intentId}`);
+    const out: Record<string, unknown> = { prospectId: row.prospect_id, draftId: row.draft_id, kind, occurredAt: at, evidenceHash: sha(evidenceRef), providerMessageRef: kind === "REPLIED" || kind === "BOUNCED" ? evidenceRef : "NONE" };
+    if (kind === "HUMAN_SEND_OBSERVED") out["observation"] = a["observation"];
+    if (kind === "SUPPRESSED") {
+      out["suppressionKeyKind"] = a["keyKind"] ?? "CONTACT";
+      out["suppressionReason"] = a["reason"];
+    }
+    return out;
+  };
+
   const registerSender: SendWorld["routes"]["registerSender"] = async (body, options = {}) =>
-    api({ url: "/api/v1/ops/outreach/senders", token: options.token ?? owner.token, ...(options.key !== undefined ? { key: options.key } : {}), body: { ...body, assuranceProofRef: await w.stepUp(owner) } });
+    api({ url: "/api/v1/ops/outreach/senders", token: options.token ?? owner.token, ...(options.key !== undefined ? { key: options.key } : {}), body: { ...body, assuranceProofRef: await stepUp(owner) } });
   const verifySender: SendWorld["routes"]["verifySender"] = (senderId, key) =>
     api({ url: `/api/v1/ops/outreach/senders/${senderId}/verify`, token: owner.token, ...(key !== undefined ? { key } : {}), body: { verificationEvidenceHash: sha(`verified-${senderId}`) } });
   const revokeSender: SendWorld["routes"]["revokeSender"] = (senderId, key) =>
@@ -306,9 +346,15 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
     standAt(at) {
       state.standing = at;
       sw.standAt(at);
+      sw.clock.standAt?.(at);
+      // "every unit's effect clock stands at the instant": the commission and outreach services' units stand through `standing`; the api's own
+      // units (CMD063 and the owner and seller routes) are positioned on a clock held still at the instant, unless a cell's step clock is bound
+      standClock = at === null ? null : controlledClock(at);
+      sw.faults.clock = frozenOf(boundClock ?? standClock);
     },
     bindClock(c: StepClock | null) {
-      sw.faults.clock = c;
+      boundClock = c;
+      sw.faults.clock = frozenOf(boundClock ?? standClock);
     },
     setCompliance(config) {
       const before = state.compliance;
@@ -386,7 +432,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       const first = drafts[0];
       if (first === undefined) throw new Error("a grant needs at least one draft");
       const reviewId = ids.next();
-      const proofId = await w.stepUp(owner);
+      const proofId = await stepUp(owner);
       const authorizationId = ids.next();
       const validFrom = options.validFrom ?? FIXTURE_AT;
       const expiresAt = options.expiresAt ?? plusMs(FIXTURE_AT, 13 * 86_400_000);
@@ -406,10 +452,13 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       return { authorizationId, senderId: first.sender.senderId, maximumSends, validFrom, expiresAt } satisfies GrantP;
     },
     call: api,
-    outcome: (reply) => outcomeOf(w, reply),
+    // KC032 is one family on the wire: the cap itself (OUTREACH_CAP_REACHED) and the reasons it names beside it (CADENCE_CLOSED, OUTSIDE_BUSINESS_DAY,
+    // FIRST_NOT_SENT); the cells state the family by its code and the member by `subReason`
+    outcome: (reply) => outcomeOf(w, reply).replace(/^(409 PRECONDITION_FAILED) (CADENCE_CLOSED|OUTSIDE_BUSINESS_DAY|FIRST_NOT_SENT)$/, "$1 OUTREACH_CAP_REACHED"),
     subReason(reply) {
-      const body = reply.json<{ subReason?: string; details?: { subReason?: string } }>();
-      return body.subReason ?? body.details?.subReason ?? null;
+      const reason = reply.json<{ reason?: string }>().reason;
+      if (reason === "OUTREACH_CAP_REACHED") return "CAP_REACHED";
+      return reason === "CADENCE_CLOSED" || reason === "OUTSIDE_BUSINESS_DAY" || reason === "FIRST_NOT_SENT" ? reason : null;
     },
     dispatcher(name = "dispatcher") {
       // one dispatcher (one lease owner) per name: a second owner would find the lease HELD until it expires
@@ -418,14 +467,17 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       const d: OutreachDispatcher = createOutreachDispatcher(runtime);
       let fence: number | null = null;
       const admitted = new Map<string, Parameters<OutreachDispatcher["submit"]>[0]>();
+      let leasedAt: string | null = null;
       const takeOver = async (): Promise<number> => {
         const r = await d.takeOver();
         if (r.kind === "HELD") throw new Error(`${name}: another dispatcher holds the OUTBOX_DISPATCH lease`);
         fence = r.fence;
+        leasedAt = state.standing;
         return r.fence;
       };
       const lease = async (): Promise<OutreachLeaseRef> => {
-        if (fence === null) await takeOver();
+        // a lease lives 120 s on the clock the world stands at: standing somewhere else, the dispatcher's own lease is claimed again
+        if (fence === null || (state.standing !== leasedAt && boundClock === null)) await takeOver();
         return { resourceId: d.resourceId, ownerId: d.ownerId, fence: fence as number };
       };
       const adapter: Dispatcher = {
@@ -492,7 +544,7 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       return notBuilt("world.withoutSerializers", "removing a lock's acquisition needs a statement-rewrite seam in FaultRouting (the production OutreachLocks stays untouched); red-proof leg, built at batch");
     },
     routes: {
-      revokeGrant: () => notBuilt("routes.revokeGrant", "RevokeOutreachAuthorization is an L-AUTH route: not merged"),
+      revokeGrant: (g, key) => api({ url: `/api/v1/ops/outreach/authorizations/${g.authorizationId}/revoke`, token: owner.token, ...(key !== undefined ? { key } : {}), body: {} }),
       async terminate(seller, key) {
         // CMD050 TerminateSeller by the corporate owner (the shape of integration-support terminationBody with nothing handed over)
         const row = await h.oracle.query<{ version: string }>("SELECT version::text FROM kauro.sellers WHERE seller_id = $1", [seller.sellerId]);
@@ -514,15 +566,35 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
         if (row.rows[0] === undefined) throw new Error(`no capability ${capabilityId}`);
         return api({ url: `/api/v1/operations/capabilities/${capabilityId}/restrict`, token: owner.token, ...(key !== undefined ? { key } : {}), body: { expectedVersion: row.rows[0].revision, incidentRef: ids.next() } });
       },
-      publishResource: () => notBuilt("routes.publishResource", "PublishSalesResource is an L-OWNER route: not merged"),
-      withdrawPolicy: () => notBuilt("routes.withdrawPolicy", "WithdrawOutreachPolicy is an L-OWNER route: not merged"),
+      async publishResource(familyId, key) {
+        // the next version of the family, claiming what the current one claims, under a fresh step-up of the owner
+        const cur = (await h.oracle.query<{ resource_id: string; version: number }>("SELECT resource_id, version::int AS version FROM kauro.sales_resources WHERE family_id = $1 AND state = 'CURRENT'", [familyId])).rows[0];
+        if (cur === undefined) throw new Error(`no CURRENT resource in family ${familyId}`);
+        const claims = (await h.oracle.query<{ capability_id: string }>("SELECT capability_id FROM kauro.sales_resource_capabilities WHERE resource_id = $1 ORDER BY capability_id", [cur.resource_id])).rows.map((r) => r.capability_id);
+        const next = await content(owner.userId, `family-${familyId.slice(-6)}-v${cur.version + 1}`);
+        return api({ url: "/api/v1/ops/sales/resources", token: owner.token, ...(key !== undefined ? { key } : {}), body: { familyId, expectedVersion: cur.version, contentRef: next.id, capabilityIds: claims, assuranceProofRef: await stepUp(owner) } });
+      },
+      async withdrawPolicy(jurisdiction, purpose, key) {
+        const cur = (await h.oracle.query<{ version: number }>("SELECT max(version)::int AS version FROM kauro.outreach_channel_policies WHERE jurisdiction = $1 AND purpose = $2", [jurisdiction, purpose])).rows[0];
+        if (cur?.version == null) throw new Error(`no channel policy for ${jurisdiction} ${purpose}`);
+        return api({ url: "/api/v1/ops/outreach/policy-withdrawals", token: owner.token, ...(key !== undefined ? { key } : {}), body: { jurisdiction, purpose, expectedVersion: cur.version, assuranceProofRef: await stepUp(owner) } });
+      },
       registerSender,
       verifySender,
       revokeSender,
-      recordActivity: () => notBuilt("routes.recordActivity", "CMD064 RecordSalesActivity is an L-ACT route: not merged"),
-      optOut: () => notBuilt("routes.optOut", "the public opt-out route is L-ACT's (apps/api/src/outreach/opt-out-route.ts is the kit's stub): not merged"),
-      diagnose: () => notBuilt("routes.diagnose", "RecordOutreachDiagnosis is an L-ACT route: not merged"),
-      review: () => notBuilt("routes.review", "PrepareOutreachReview is an L-AUTH route: not merged"),
+      async recordActivity(actor, activity, key) {
+        return api({ url: "/api/v1/ops/sales/activities", token: actor.token, ...(key !== undefined ? { key } : {}), body: { activity: await wireActivity(activity) } });
+      },
+      // RFC 8058: the one-click POST of the mail client, no credential, no key, no agency
+      optOut: (token) => callApi(w, { url: `/api/v1/public/outreach/opt-out/${token}`, token: null, key: null, agency: null, contentType: "application/x-www-form-urlencoded", rawBody: "List-Unsubscribe=One-Click" }),
+      async diagnose(personUserId, key) {
+        return api({ url: "/api/v1/ops/outreach/diagnoses", token: owner.token, ...(key !== undefined ? { key } : {}), body: { personUserId, evidenceHash: sha(`diagnosis-${personUserId}-${ids.next()}`), assuranceProofRef: await stepUp(owner) } });
+      },
+      async review(drafts, key) {
+        const first = drafts[0];
+        if (first === undefined) throw new Error("a review needs at least one draft");
+        return api({ url: "/api/v1/ops/outreach/reviews", token: owner.token, ...(key !== undefined ? { key } : {}), body: { senderIdentityRef: first.sender.senderId, draftIds: drafts.map((d) => d.draftId), assuranceProofRef: await stepUp(owner) } });
+      },
       async suppress(target) {
         // the registry row of the 0029 writer under L8 X of its key (the L-ACT route writes the same row; ON CONFLICT DO NOTHING as every writer)
         const keyKind = "contactKey" in target ? "CONTACT" : "ORGANIZATION";
@@ -535,7 +607,16 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
           );
         });
       },
-      reinstatePolicy: () => notBuilt("routes.reinstatePolicy", "ReinstateOutreachPolicy is an L-OWNER route: not merged"),
+      // a re-review of the withdrawn policy: the owner's reviewed next version, IN_FORCE (no route names it; the policy table is append-only).
+      // It throws unless the latest version reads IN_FORCE afterwards.
+      async reinstatePolicy(jurisdiction, purpose) {
+        await h.oracle.query(
+          "INSERT INTO kauro.outreach_channel_policies (jurisdiction, purpose, version) SELECT $1, $2, coalesce(max(version), 0) + 1 FROM kauro.outreach_channel_policies WHERE jurisdiction = $1 AND purpose = $2",
+          [jurisdiction, purpose],
+        );
+        const latest = (await h.oracle.query<{ state: string }>("SELECT state FROM kauro.outreach_channel_policies WHERE jurisdiction = $1 AND purpose = $2 ORDER BY version DESC LIMIT 1", [jurisdiction, purpose])).rows[0];
+        if (latest?.state !== "IN_FORCE") throw new Error(`the ${jurisdiction} ${purpose} policy is not IN_FORCE after its re-review`);
+      },
     },
   };
   void T0;

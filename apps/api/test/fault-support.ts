@@ -43,6 +43,8 @@ interface Route {
   readonly unit?: UnitLog;
   /** Lane L-REFUND: the payment service's commerce units (wrapCommerce) are routed over the same connection too (the bank owner commands run as kauro_payment). */
   readonly payment?: boolean;
+  /** The step clock re-applied before each statement marked `/* b12:judge *\/` (the world turned positionEveryUnit on): null when none is set. */
+  readonly judgeClock?: () => StepClockOf | null;
 }
 
 /**
@@ -91,6 +93,9 @@ const RAW_CONNECTION = Symbol("raw harness connection");
 const rawConnectionOf = (client: unknown): HarnessConnection | undefined =>
   typeof client === "object" && client !== null ? ((client as Record<symbol, unknown>)[RAW_CONNECTION] as HarnessConnection | undefined) : undefined;
 
+/** The marker of a judgment statement in the B12 code (rule 25): the one statement after the last await that reads the effect clock. */
+const JUDGE_MARKER = "/* b12:judge */";
+
 /** The connection a route hands the unit of work: the harness connection with `release` a no-op and the cell's statement steps. */
 function routedClient(route: Route): PoolClient {
   const instrumented = new Map<string, (...a: unknown[]) => Promise<unknown>>();
@@ -119,7 +124,10 @@ function routedClient(route: Route): PoolClient {
             }
             hit ??= step;
           }
-          const answer = (): unknown => (hit !== null ? instrumented.get(hit.label)!(...args) : (target.query as (...x: unknown[]) => unknown)(...args));
+          const send = (): unknown => (hit !== null ? instrumented.get(hit.label)!(...args) : (target.query as (...x: unknown[]) => unknown)(...args));
+          // a judgment statement reads the clock at ITS moment: a crossing the cell made while the unit waited is consumed by it (§W)
+          const judge = route.judgeClock?.() ?? null;
+          const answer = (): unknown => (judge !== null && text.includes(JUDGE_MARKER) ? Promise.resolve(judge.onServer(target as unknown as SqlSession)).then(send) : send());
           const unit = route.unit;
           if (unit === undefined) return answer();
           const params = ((args[1] as ReadonlyArray<unknown> | undefined) ?? (first as { values?: ReadonlyArray<unknown> } | undefined)?.values ?? []) as ReadonlyArray<unknown>;
@@ -156,7 +164,7 @@ function poolOf(route: Route, role: RouteRole): unknown {
 }
 
 class RoutedFactory extends PgCommercialUnitOfWorkFactory {
-  constructor(private readonly route: Route, private readonly stand: () => { readonly at: string } | null, statementTimeoutMs: number | null, private readonly clockOf: () => StepClockOf | null = () => null) {
+  constructor(private readonly route: Route, private readonly stand: () => { readonly at: string } | null, statementTimeoutMs: number | null, private readonly clockOf: () => StepClockOf | null = () => null, private readonly everyUnit: () => boolean = () => false) {
     super({ app: poolOf(route, "kauro_app"), payment: poolOf(route, "kauro_payment"), commission: poolOf(route, "kauro_commission"), outreach: poolOf(route, "kauro_outreach"), control: poolOf(route, "kauro_control") } as never, { clock, random: (n) => new Uint8Array(randomBytes(n)), defaultStatementTimeoutMs: statementTimeoutMs ?? raceStatementTimeoutMs() });
   }
 
@@ -172,7 +180,7 @@ class RoutedFactory extends PgCommercialUnitOfWorkFactory {
         // the unit's own harness connection: under onRoles the one of its role (the invocation's first connection serves another role)
         const conn = rawConnectionOf((uow as unknown as { client?: unknown }).client) ?? this.route.conn;
         // a cell's step clock positions the unit's transaction itself (the harness proves the instant it carries was consumed: an expiry cell)
-        if (context.kind === "SERVICE" && clock !== null) await clock.onServer(conn);
+        if ((context.kind === "SERVICE" || this.everyUnit()) && clock !== null) await clock.onServer(conn);
         else if (context.kind === "SERVICE" && at !== null) {
           await (uow as unknown as { client: PoolClient }).client.query(`SELECT set_config('kauro_test.clock_offset_seconds', greatest(0, extract(epoch FROM ($1::timestamptz - transaction_timestamp())))::text, true)`, [at.at]);
         }
@@ -301,6 +309,13 @@ export class FaultRouting {
    * (`ctx.operation(name, (op) => ...)`, `faults.clock = op.clock`) and clears it after.
    */
   clock: StepClockOf | null = null;
+  /**
+   * With a step clock set, position the transaction of EVERY unit of work on it (the owner's, the seller's and the member's request units
+   * too), not only the SERVICE units of the commission group: a world whose cells judge a user command at a stated instant (B12 send) turns it on.
+   */
+  positionEveryUnit = false;
+  /** The step clock a judgment statement re-applies (see Route.judgeClock): the bound clock while positionEveryUnit is on. */
+  readonly #judgeClock = (): StepClockOf | null => (this.positionEveryUnit ? this.clock : null);
   /** Where the commission group's service units stand on the TEST CLOCK (statementsWorld's `standing`). */
   stand: () => { readonly at: string } | null = () => null;
 
@@ -310,7 +325,7 @@ export class FaultRouting {
    * into `routing.log` (B10-KIT-SUITES section 3).
    */
   on<T>(conn: HarnessConnection, role: RouteRole, points: FaultPoints, steps: ReadonlyArray<SqlStep>, fn: () => Promise<T>, routing: Routing = {}): Promise<T> {
-    return this.#als.run({ conn, role, points, steps, seen: new Map(), invocation: { seq: 0, target: routing.target ?? null, log: routing.log ?? [] }, ...(routing.payment === true ? { payment: true } : {}) }, fn);
+    return this.#als.run({ conn, role, points, steps, seen: new Map(), invocation: { seq: 0, target: routing.target ?? null, log: routing.log ?? [] }, judgeClock: this.#judgeClock, ...(routing.payment === true ? { payment: true } : {}) }, fn);
   }
 
   /**
@@ -321,7 +336,7 @@ export class FaultRouting {
     const map = new Map(Object.entries(conns) as Array<[RouteRole, HarnessConnection]>);
     const [first] = [...map.entries()];
     if (first === undefined) throw new Error("onRoles needs at least one connection");
-    return this.#als.run({ conn: first[1], role: first[0], conns: map, points, steps, seen: new Map(), invocation: { seq: 0, target: routing.target ?? null, log: routing.log ?? [] } }, fn);
+    return this.#als.run({ conn: first[1], role: first[0], conns: map, points, steps, seen: new Map(), invocation: { seq: 0, target: routing.target ?? null, log: routing.log ?? [] }, judgeClock: this.#judgeClock }, fn);
   }
 
   /**
@@ -329,7 +344,7 @@ export class FaultRouting {
    * `uow.before-commit` / `uow.after-commit` points: how a cell runs a service or a fixture write (a settlement) as the actor it races.
    */
   unit(conn: HarnessConnection, role: RouteRole, points: FaultPoints, steps: ReadonlyArray<SqlStep> = []): AnyFactory {
-    return crashableFactory(new RoutedFactory({ conn, role, points, steps, seen: new Map() }, this.stand, this.statementTimeoutMs, () => this.clock) as unknown as AnyFactory, points, "uow", ["run"]);
+    return crashableFactory(new RoutedFactory({ conn, role, points, steps, seen: new Map(), judgeClock: this.#judgeClock }, this.stand, this.statementTimeoutMs, () => this.clock, () => this.positionEveryUnit) as unknown as AnyFactory, points, "uow", ["run"]);
   }
 
   /**
@@ -430,7 +445,37 @@ export class FaultRouting {
         // outside a routed invocation: the api's own unit, its effect instant repositioned while a cell's step clock is set (lane L-ROUTE)
         if (route === undefined && prop === "run" && typeof value === "function" && this.clock !== null) {
           return (context: ExecutionContext, work: (uow: never) => Promise<unknown>, options?: unknown) =>
-            (value as (...a: unknown[]) => Promise<unknown>).call(target, context, (uow: object) => work(repositioned(uow, () => this.clock) as never), options);
+            (value as (...a: unknown[]) => Promise<unknown>).call(
+              target,
+              context,
+              async (uow: object) => {
+                const clock = this.clock;
+                if (!this.positionEveryUnit || clock === null) return work(repositioned(uow, () => this.clock) as never);
+                const client = (uow as { client: SqlSession & { query: (...a: unknown[]) => unknown } }).client;
+                await clock.onServer(client);
+                // a judgment statement re-applies the clock at its own moment (a crossing made while the unit waited is consumed by it, §W); the
+                // client belongs to the pool again after the unit, so the patch is undone with it
+                const own = Object.prototype.hasOwnProperty.call(client, "query");
+                const previous = client.query;
+                Object.defineProperty(client, "query", {
+                  configurable: true,
+                  writable: true,
+                  value: (...a: unknown[]) => {
+                    const first = a[0];
+                    const text = typeof first === "string" ? first : (first as { text?: string } | undefined)?.text ?? "";
+                    const now = this.clock;
+                    return now !== null && text.includes(JUDGE_MARKER) ? Promise.resolve(now.onServer(client)).then(() => previous.apply(client, a)) : previous.apply(client, a);
+                  },
+                });
+                try {
+                  return await work(repositioned(uow, () => this.clock) as never);
+                } finally {
+                  if (own) Object.defineProperty(client, "query", { configurable: true, writable: true, value: previous });
+                  else delete (client as { query?: unknown }).query;
+                }
+              },
+              options,
+            );
         }
         if (route === undefined || typeof value !== "function") return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
         if (prop !== "run") return (value as (...a: unknown[]) => unknown).bind(target);
@@ -445,7 +490,7 @@ export class FaultRouting {
           invocation.seq += 1;
           const unit: UnitLog = { ordinal: invocation.seq, name: invocation.target === invocation.seq ? "target" : "uow", role: null, attempts: 0, statements: [] };
           invocation.log.push(unit);
-          const routed = crashableFactory(new RoutedFactory({ ...route, unit, seen: new Map() }, this.stand, this.statementTimeoutMs, () => this.clock) as unknown as AnyFactory, route.points, unit.name, ["run"]);
+          const routed = crashableFactory(new RoutedFactory({ ...route, unit, seen: new Map() }, this.stand, this.statementTimeoutMs, () => this.clock, () => this.positionEveryUnit) as unknown as AnyFactory, route.points, unit.name, ["run"]);
           return routed.run(context, work, options);
         };
       },

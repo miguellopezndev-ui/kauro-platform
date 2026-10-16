@@ -17,6 +17,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
 import type { Client } from "pg";
+import { isOutreachBusinessInstant } from "@kauro/application";
 import { connectionPid, runCell, type FaultContext, type FaultKind, type HarnessConnection, type StepClock } from "@kauro/persistence/testing";
 import type { SqlStep } from "./fault-support.js";
 import type { Reply } from "./support.js";
@@ -49,8 +50,29 @@ export const UNCERTAIN_AFTER_MS = START_GATE_MS + CALL_BOUND_MS + MARGIN_MS;
 export const DAY_MS = 86_400_000;
 export const US = 0.001; // one microsecond in ms (instants are microsecond-exact on the server; the adapter formats them with 6 digits)
 
-/** A Thursday that is a business instant in America/Bogota and America/New_York (A10). */
-export const T0 = "2026-10-15T15:00:00.000000Z";
+/**
+ * The base instant of the send cells: a Thursday 15:00Z (10:00 in Bogota and in New York) whose following fourteen days are business days in both
+ * calendars (A10, outreach calendar of the application), the first such Thursday at least nine days after the real clock. The cells place the
+ * labelled TEST CLOCK and the controlled clock at instants around it, and both only move forward from the real clock: a literal calendar
+ * instant is a time bomb (the one this replaces was overtaken on 2026-10-16), so the base is computed from the clock the run starts at.
+ */
+export const T0 = ((): string => {
+  const DAY = 86_400_000;
+  const from = Date.now() + 9 * DAY;
+  const d = new Date(from);
+  d.setUTCHours(15, 0, 0, 0);
+  for (let n = 0; n < 800; n++, d.setTime(d.getTime() + DAY)) {
+    if (d.getTime() < from || d.getUTCDay() !== 4) continue;
+    let clean = true;
+    for (let k = 0; k <= 14 && clean; k++) {
+      const day = new Date(d.getTime() + k * DAY);
+      const weekday = day.getUTCDay() !== 0 && day.getUTCDay() !== 6;
+      if (weekday && isOutreachBusinessInstant(day) !== true) clean = false;
+    }
+    if (clean) return `${d.toISOString().slice(0, 19)}.000000Z`;
+  }
+  throw new Error("no clean business Thursday in the outreach calendar's years: the calendar needs its next edition");
+})();
 
 export const plusMs = (at: string, ms: number): string => usInstant(epochUs(at) + Math.round(ms * 1000));
 export const plusUs = (at: string, us: number): string => usInstant(epochUs(at) + us);
@@ -278,7 +300,8 @@ export interface SendWorld {
     diagnose(personUserId: string, key?: string): Promise<Reply>;
     review(drafts: ReadonlyArray<DraftP>, key?: string): Promise<Reply>;
     suppress(target: { readonly contactKey: string } | { readonly domain: string }): Promise<void>;
-    reinstatePolicy(jurisdiction: string, purpose: Purpose): Promise<Reply>;
+    /** The next reviewed version of the withdrawn policy, IN_FORCE (a fixture: no route names it); throws unless the latest version reads IN_FORCE. */
+    reinstatePolicy(jurisdiction: string, purpose: Purpose): Promise<void>;
   };
 }
 
@@ -479,10 +502,16 @@ export async function raceAtWrite<A, B>(ctx: FaultContext, cell: string, first: 
           release: () => pause.release(),
           pid: () => connectionPid(fc),
         },
+        // the second runs THROUGH ctx.mustWait (K1 `credit`): the harness observes its wait on the first's backend and credits it, and the first is
+        // held until it has (a race cell built on the bare raceAtWrite ends FaultNotInjected even when the race happened)
         second: {
-          run: () => ctx.operation(`${second.name} (second)`, () => w.on(sc, second.role, ctx, [], second.run)),
+          run: () => Promise.reject(new Error("credit uses runOn")),
+          runOn: (client: HarnessConnection) => ctx.operation(`${second.name} (second)`, () => w.on(client, second.role, ctx, [], second.run)),
+          waiter: sc,
           pid: () => connectionPid(sc),
         },
+        credit: ctx,
+        what: `${second.name} waits on ${first.name}`,
       });
     const r = control === null ? await order() : await w.withoutSerializers(control, order);
     return { first: settledOf(r.first), second: settledOf(r.second), secondBlocked: r.outcome === "blocked" };
@@ -502,7 +531,8 @@ export const answerOf = <T>(s: Settled<T>, what: string): T => {
 export function cell(title: string, fault: FaultKind, body: (ctx: FaultContext) => Promise<void>, at?: string): void {
   const id = /^([A-Z0-9-]+[a-z]?)/.exec(title)?.[1] ?? title.slice(0, 16);
   test(title, async () => {
-    await runCell({ id, step: title.slice(0, 160), fault, ...(at === undefined ? {} : { at }), expect: title }, body);
+    // the cell's controlled clock starts two days before T0 (default: the real now, which a cell must not be set behind)
+    await runCell({ id, step: title.slice(0, 160), fault, ...(at === undefined ? {} : { at }), expect: title }, body, { clockStart: plusMs(T0, -2 * DAY_MS) });
   });
 }
 

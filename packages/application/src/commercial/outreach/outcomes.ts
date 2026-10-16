@@ -50,6 +50,7 @@ export const AUTHORIZE_OUTREACH_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object
 
 /** CMD063 SendAuthorizedOutreach: the draft, its version, the grant and the content binding, judged again at commit. */
 export const SEND_AUTHORIZED_OUTREACH_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object.freeze([
+  outcome("COMMAND", "NOT_AUTHORIZED", null, "the draft is not the caller's to send: another seller's draft, or a draft the caller is not assigned (403, no reason)"),
   NOT_FOUND("the draft or the authorization"),
   STALE("draft"),
   PRE("DRAFT_CLOSED", "the draft is CANCELLED or otherwise closed", "ALWAYS"),
@@ -65,9 +66,10 @@ export const SEND_AUTHORIZED_OUTREACH_OUTCOMES: ReadonlyArray<ProblemOutcome> = 
   PRE("CADENCE_CLOSED", "the cadence window is closed or a stop fact exists (KC032)"),
   PRE("FIRST_NOT_SENT", "a follow-up has no sent first contact (KC032)"),
   PRE("OUTREACH_PAUSED", "the sending person is paused until the owner records a diagnosis (KC034)"),
-  PRE("OUTREACH_CALENDAR_UNAVAILABLE", "the date is not covered by the business calendar (KC037)"),
+  outcome("COMMAND", "CAPACITY_UNAVAILABLE", "OUTREACH_CALENDAR_UNAVAILABLE", "the date is not covered by the business calendar (KC037): the calendar needs its next edition"),
   PRE("OUTREACH_JURISDICTION_UNREVIEWED", "the channel policy was withdrawn or never reviewed (A13)"),
-  PRE("OUTREACH_COMPLIANCE_UNCONFIGURED", "the postal address or the opt-out origin is not configured (A15)"),
+  // a deployment that has not configured its postal address and opt-out origin cannot send at all: 503, retried once the owner configures it (D-16)
+  outcome("COMMAND", "CAPACITY_UNAVAILABLE", "OUTREACH_COMPLIANCE_UNCONFIGURED", "the postal address or the opt-out origin is not configured (A15): the deployment cannot send until the owner configures it"),
   PRE("RESOURCE_NOT_CURRENT", "a cited sales resource is no longer current (KC033)"),
 ]);
 

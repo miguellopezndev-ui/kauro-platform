@@ -161,7 +161,7 @@ test("CMD063-DENY: foreign and TERMINATED callers 403; then stale version, chang
     const s = await staged(w, "deny-uncertain");
     const first = await queued(w, s);
     w.gmail.script({ kind: "ACCEPTED_ANSWER_LOST" });
-    await w.dispatcher().pass();
+    await w.dispatcher().dispatch(first); // this intent alone: a pass would also dispatch the QUEUED intents earlier blocks of this test left, and one of them would take the scripted answer
     assert.equal((await intent(w, first)).state, "SEND_UNCERTAIN");
     const other = await w.draft(s.seller, s.prospect, s.seller.sender, { label: "deny-uncertain-2" });
     const g = await w.grant([other]);
@@ -198,6 +198,8 @@ test("CMD063-DENY: foreign and TERMINATED callers 403; then stale version, chang
     assert.ok((await w.routes.recordActivity(seller, { kind: "BOUNCED", intentId: bId, evidenceRef: "dsn-deny-bounced" })).status < 300, "BOUNCED recorded");
     assert.equal(await draftState(w, b.d), "BOUNCED");
     await refused("draft BOUNCED", () => send(w, seller, b.d, b.g), OUTCOME.KC036, b.d, 1);
+    // a bounce pauses the person until the owner's diagnosis (KC034): lifted, so only the draft state refuses below
+    assert.ok((await w.routes.diagnose(seller.userId)).status < 300, "the owner's diagnosis lifts the pause");
     const r = await mk("replied");
     const rId = intentIdOf(await send(w, seller, r.d, r.g));
     await w.dispatcher().dispatch(rId);
@@ -211,7 +213,9 @@ test("CMD063-DENY: foreign and TERMINATED callers 403; then stale version, chang
     const p = await w.prospect(seller);
     const ownerSender = await w.sender(w.owner);
     const d = await w.draft(w.owner, p, ownerSender);
-    const g = await w.grant([d], { maximumSends: 2 });
+    // a grant seals one hash per send it allows (KC030 "seals N hashes for M sends"): a spare draft seals the second
+    const spare = await w.draft(w.owner, await w.prospect(seller), ownerSender, { label: "deny-cancelled-spare" });
+    const g = await w.grant([d, spare], { maximumSends: 2 });
     const id = intentIdOf(await send(w, w.owner, d, g));
     assert.ok((await w.routes.terminate(seller)).status < 300);
     await w.dispatcher().pass();
@@ -261,7 +265,7 @@ test("CMD063-DENY: foreign and TERMINATED callers 403; then stale version, chang
   {
     // the outreach calendar is seeded for 2026-2028: a Wednesday of 2029 is not covered
     w.standAt("2029-01-10T15:00:00.000000Z");
-    const s = await staged(w, "deny-calendar");
+    const s = await staged(w, "deny-calendar", { validFrom: "2029-01-10T14:00:00.000000Z", expiresAt: "2029-01-11T14:00:00.000000Z" }); // a grant live on that day, so only the calendar refuses
     await refused("uncovered calendar year", () => send(w, s.seller, s.draft, s.grant), OUTCOME.KC037, s.draft);
     w.standAt(T0);
   }
@@ -275,7 +279,10 @@ cell("CMD063-RACE: identical retry replays one intent (journal L2), same key oth
   const first = await ctx.attempt(() => send(w, s.seller, s.draft, s.grant, { key }));
   const again = await ctx.attempt(() => send(w, s.seller, s.draft, s.grant, { key }));
   assert.equal((await intentsOfDraft(w, s.draft.draftId)).length, 1, "identical retry: one intent");
-  assert.deepEqual([again.status, again.text], [first.status, first.text], "identical retry replays the 200");
+  // the replay is the journaled answer byte for byte, marked replayed (the platform's envelope: `replayed: true` on a replay, false on the first answer)
+  const parsed = (r: { text: string }): Record<string, unknown> => JSON.parse(r.text) as Record<string, unknown>;
+  assert.deepEqual([again.status, { ...parsed(again), replayed: false }], [first.status, parsed(first)], "identical retry replays the 200");
+  assert.equal(parsed(again)["replayed"], true, "the replay is marked replayed");
   const other = await ctx.attempt(() => send(w, s.seller, s.draft, s.grant, { key, contentHash: sha256("other") }));
   assert.equal(out(other), OUTCOME.KEY_REUSED, "same key other hash is 409");
   assert.equal((await intentsOfDraft(w, s.draft.draftId)).length, 1, "still one intent");
@@ -749,7 +756,7 @@ cell("GAP-SE-22 RACE (policy) M11: CMD063 against WithdrawOutreachChannelPolicy 
       assert.equal(stateOf(await intent(w, id)), "NOT_SENT(POLICY_WITHDRAWN)", "order 2: refused at its claim");
       assert.equal(callsOf(w, id), 0);
     }
-    assert.ok((await w.routes.reinstatePolicy("US", "INDIVIDUAL_PROSPECT_CONTACT")).status < 300, "the US first-contact policy back IN_FORCE for the next order");
+    await w.routes.reinstatePolicy("US", "INDIVIDUAL_PROSPECT_CONTACT"); // the US first-contact policy back IN_FORCE for the next order
   }
   const [o1] = runs as [(typeof runs)[0]];
   assert.equal((await intentsOfDraft(w, o1.s.draft.draftId)).length, 0, "order 1: no row born after the withdrawal (forbidden effect)");

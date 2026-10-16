@@ -21,8 +21,10 @@ import { PgOutreachWriters, requireHeld, type Need, type OutreachIntentKeys } fr
 
 /** A send refusal; KC032 names its sub-reason (CAP_REACHED, CADENCE_CLOSED, FIRST_NOT_SENT, OUTSIDE_BUSINESS_DAY) beside the reason (plan A10/A11). */
 export class OutreachRefusal extends DomainFailure {
-  constructor(code: "PRECONDITION_FAILED" | "CAPACITY_UNAVAILABLE", message: string, reason: FailureReason, readonly subReason: string | null) {
-    super(code, message, { reason });
+  constructor(code: "PRECONDITION_FAILED" | "CAPACITY_UNAVAILABLE", message: string, reason: FailureReason, readonly subReason: string | null, current?: { readonly version: number; readonly state: string }) {
+    // the reasons KC032 names beside the cap (A10, A11) are reasons of the problem themselves: its catalogue lists them, the client branches on them
+    const named = subReason === "CADENCE_CLOSED" || subReason === "OUTSIDE_BUSINESS_DAY" || subReason === "FIRST_NOT_SENT" ? subReason : reason;
+    super(code, message, { reason: named, ...(current !== undefined ? { currentVersion: current.version, currentState: current.state } : {}) });
     this.name = "OutreachRefusal";
   }
 }
@@ -251,8 +253,10 @@ export class PgOutreachSend {
       )
     ).rows[0];
     if (v === undefined) throw new DomainFailure("INTEGRITY_FAILURE", "the send judgment answered no row");
+    // DRAFT_CLOSED and OUTREACH_ALREADY_SENT always carry the draft's current safe version and state (their catalogue entries: current ALWAYS)
     const refuse = (code: "PRECONDITION_FAILED" | "CAPACITY_UNAVAILABLE", reason: FailureReason, subReason?: string): never => {
-      throw new OutreachRefusal(code, `the send was refused: ${reason}`, reason, subReason ?? null);
+      const current = reason === "DRAFT_CLOSED" || reason === "OUTREACH_ALREADY_SENT" ? { version: Number(v.draft_version), state: v.draft_state } : undefined;
+      throw new OutreachRefusal(code, `the send was refused: ${reason}`, reason, subReason ?? null, current);
     };
     if (Number(v.draft_version) !== i.expectedVersion) throw new StaleVersionFailure(Number(v.draft_version), v.draft_state);
     if (v.draft_hash !== i.contentHash) refuse("PRECONDITION_FAILED", "OUTREACH_GRANT_INVALID");
@@ -391,6 +395,9 @@ export class PgOutreachSend {
     else if (!v.grant_ok) refusal = { state: "NOT_SENT", reason: "GRANT_EXPIRED" };
     else if (v.seller_state !== null && v.seller_state !== "ACTIVE") refusal = { state: "CANCELLED", reason: "SELLER_NOT_ACTIVE" };
     else if (f.person_seller_id !== null && v.owner_seller_id !== f.person_seller_id) refusal = { state: "CANCELLED", reason: "RECIPIENT_CHANGED" };
+    // an owner-sent intent to a prospect nobody is assigned any more (CMD050 unassigned a terminated seller's prospects after CMD063 queued it): the
+    // call to an unassigned prospect is the forbidden effect of GAP-DI-1b
+    else if (f.person_seller_id === null && v.owner_seller_id === null) refusal = { state: "CANCELLED", reason: "RECIPIENT_CHANGED" };
     else if (v.sender_state !== "VERIFIED") refusal = { state: "CANCELLED", reason: "SENDER_REVOKED" };
     else if (v.policy_state !== "IN_FORCE") refusal = { state: "NOT_SENT", reason: "POLICY_WITHDRAWN" };
     else if (Number(v.offered) !== Number(v.cited)) refusal = { state: "NOT_SENT", reason: "RESOURCE_NOT_CURRENT" };

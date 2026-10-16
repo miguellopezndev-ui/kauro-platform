@@ -153,7 +153,7 @@ function describe(r: PromiseSettledResult<unknown>): string {
 }
 
 /** The opt-out path of a message's List-Unsubscribe URI (UI49: /api/v1/public/outreach/opt-out/{token}). */
-const OPT_OUT_PATH = /\/api\/v1\/public\/outreach\/opt-out\/([A-Za-z0-9_-]+)(?=[?#]|$)/;
+const OPT_OUT_PATH = /\/api\/v1\/public\/outreach\/opt-out\/([A-Za-z0-9._-]+)(?=[?#]|$)/;
 
 /** The header value of `name` in a MIME message (RFC 5322 unfolded), or undefined. Only the header block is read. */
 export function mimeHeader(mime: string, name: string): string | undefined {
