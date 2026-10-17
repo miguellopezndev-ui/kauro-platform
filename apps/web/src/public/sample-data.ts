@@ -36,6 +36,24 @@ export const MANIFEST_FILES: readonly ManifestFile[] = Object.freeze([
   { name: "companies-clean.csv", rows: 2_951, source: 3_204, unified: 253 },
 ]);
 
+/** What the preparation did to a record of the synthetic file, as the product window on Home shows it. */
+export type RecordResult = "valid" | "normalised" | "candidate";
+
+export interface SampleRecord {
+  readonly name: string;
+  /** The value as it arrived, when the preparation changed it. */
+  readonly before: string | null;
+  readonly email: string;
+  readonly result: RecordResult;
+}
+
+/** Three invented records (reserved example.com addresses): one kept as it was, one normalised, one held for the customer's decision. */
+export const SAMPLE_RECORDS: readonly SampleRecord[] = Object.freeze([
+  { name: "Ana Ruiz", before: null, email: "ana.ruiz@example.com", result: "valid" },
+  { name: "John Smith", before: "JOHN  SMITH", email: "john.smith@example.com", result: "normalised" },
+  { name: "Maria Lopez", before: null, email: "m.lopez@example.com", result: "candidate" },
+]);
+
 /** A count as a percentage of its population with one decimal ("428 of 12,480" is "3.4%"); a count above its population is not a share. */
 export function sharePercent(count: number, population: number): string {
   if (!Number.isSafeInteger(count) || !Number.isSafeInteger(population) || count < 0 || population < 1) throw new RangeError("a share needs a count and a positive population");

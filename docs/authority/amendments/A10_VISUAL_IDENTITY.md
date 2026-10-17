@@ -44,3 +44,21 @@ ring stays an outline offset over the surface, never adjacent to a primary fill 
 No external font, script, image or stylesheet is requested (the policy of D-SEC-1 is unchanged: `font-src 'self'`, `img-src 'self'`,
 `style-src-attr 'none'`); every rule is a class of `tokens.css`, `public.css` or `shell.css`. The copy rules of A3 and the registry's
 primary copy for each screen are unchanged.
+
+## 5. The signature (2026-10-17, second pass)
+
+The owner asked for more personality on the base of the reference sketches. What carries it, and the rule each keeps:
+
+1. **Clay rock.** The brand's material: strata, layers laid down and refined. Five textures generated as SVG relief
+   (`apps/web/src/app/(public)/textures`: clay, ember for the dark theme, wine, carbon and a grain), bundled by the build into
+   `_next/static/media` and loaded from the site's own origin (`img-src 'self'`); no photograph and no request to another origin. Text
+   never sits on the raw texture: a band that carries words lays a veil of its own colour over the rock first.
+2. **The product, not a dashboard.** The Home figure is a project window drawn in HTML from the synthetic sample: the phases a project
+   goes through, its counts, and three invented records (example.com addresses), one held for the customer's decision. It is hidden
+   from assistive technology (the page says everything in words) and stamped "Synthetic sample data" in its caption (A3 3.6).
+3. **Marginal notes and a stamp.** Two short notes in an editor's italic with thin leaders, and the synthetic label as a rubber stamp.
+   Decorative, hidden from assistive technology, and words from the catalogue like every other word.
+4. **Headlines in two weights.** The last words of a page's h1 are set light in the primary colour; the words are the registry's own and
+   unchanged (one sentence for a screen reader and for the tests).
+5. **The name, cut in clay.** The footer's wordmark is filled with the clay texture (`background-clip: text`), hidden from assistive
+   technology (the header already names the site) and drawn in the system's text colour under forced colours.

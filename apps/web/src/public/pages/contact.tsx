@@ -9,7 +9,7 @@ import { PageHead } from "../parts.tsx";
 export function ContactPage(): ReactElement {
   return (
     <>
-      <PageHead size="compact" eyebrow={PUBLIC_COPY["nav.contact.label"]} title={PUBLIC_COPY["contact.title"]} lead={PUBLIC_COPY["contact.lead"]} />
+      <PageHead size="compact" accent={7} eyebrow={PUBLIC_COPY["nav.contact.label"]} title={PUBLIC_COPY["contact.title"]} lead={PUBLIC_COPY["contact.lead"]} />
       <div className="kauro-site-contact">
         <div className="kauro-site-wrap kauro-site-contact-inner">
           <aside className="kauro-site-contact-aside kauro-wine" aria-labelledby="contact-next-heading">

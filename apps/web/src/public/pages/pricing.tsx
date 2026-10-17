@@ -37,7 +37,7 @@ export function PricingPage({ publication, signInHref }: PricingPageProps): Reac
   const tiers = repeatDiscounts();
   return (
     <>
-      <PageHead size="compact" eyebrow={PUBLIC_COPY["nav.pricing.label"]} title={PUBLIC_COPY["pricing.title"]} lead={PUBLIC_COPY["pricing.lead"]} />
+      <PageHead size="compact" accent={4} eyebrow={PUBLIC_COPY["nav.pricing.label"]} title={PUBLIC_COPY["pricing.title"]} lead={PUBLIC_COPY["pricing.lead"]} />
       <Section id="pricing-ladder" heading={PUBLIC_COPY["pricing.ladder.heading"]}>
         <ul className="kauro-site-ladder">
           <li className="kauro-site-rung kauro-site-rung--free kauro-wine">

@@ -22,7 +22,17 @@ const STEPS: ReadonlyArray<{ readonly heading: PublicCopyId; readonly body: Publ
 export function HowItWorksPage(): ReactElement {
   return (
     <>
-      <PageHead eyebrow={PUBLIC_COPY["nav.how.label"]} title={PUBLIC_COPY["how.title"]} lead={PUBLIC_COPY["how.lead"]} />
+      <PageHead
+        eyebrow={PUBLIC_COPY["nav.how.label"]}
+        title={PUBLIC_COPY["how.title"]}
+        accent={3}
+        lead={PUBLIC_COPY["how.lead"]}
+        aside={
+          <p className="kauro-site-bignum" aria-hidden="true">
+            {String(STEPS.length).padStart(2, "0")}
+          </p>
+        }
+      />
       <Section
         id="how-steps"
         heading={PUBLIC_COPY["how.steps.heading"]}

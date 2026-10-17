@@ -12,7 +12,7 @@ export function StatusPage({ publication }: { readonly publication: Publication 
   const modes = publishedModes(publication);
   return (
     <>
-      <PageHead size="compact" eyebrow={PUBLIC_COPY["nav.status.label"]} title={PUBLIC_COPY["status.title"]}>
+      <PageHead size="compact" accent={1} eyebrow={PUBLIC_COPY["nav.status.label"]} title={PUBLIC_COPY["status.title"]}>
         {publication.kind === "READ" ? <p className="kauro-site-observed">{copy("status.observed.body", { time: formatInstant(publication.observedAt) })}</p> : null}
       </PageHead>
       {publication.kind === "READ" ? (

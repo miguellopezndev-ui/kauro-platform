@@ -377,3 +377,23 @@ body {
     border-color: CanvasText;
   }
 }
+
+/* The not-found page leans on the brand's rock, as the public site does. */
+@media (min-width: 48rem) {
+  body:has(> .kauro-notfound) {
+    background:
+      url("../app/(public)/textures/clay-rock.svg") right center / 38% 100% no-repeat,
+      var(--kauro-color-background);
+  }
+  :root[data-theme="dark"] body:has(> .kauro-notfound) {
+    background-image: url("../app/(public)/textures/ember-rock.svg");
+  }
+  .kauro-notfound {
+    margin-inline: clamp(1.5rem, 8vw, 8rem) auto;
+  }
+}
+@media (min-width: 48rem) and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body:has(> .kauro-notfound) {
+    background-image: url("../app/(public)/textures/ember-rock.svg");
+  }
+}

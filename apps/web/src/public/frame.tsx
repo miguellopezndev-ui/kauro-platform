@@ -72,7 +72,9 @@ export function SiteFrame({ signInHref, nav, themeControl, footerNav, children }
       <footer className="kauro-site-footer">
         <div className="kauro-site-footer-inner">
           <div className="kauro-site-footer-lead">
-            <p className="kauro-site-footer-name">{PUBLIC_COPY["site.name"]}</p>
+            <p className="kauro-site-footer-name" aria-hidden="true">
+              {PUBLIC_COPY["site.name"]}
+            </p>
             <p className="kauro-site-footer-tagline">{PUBLIC_COPY["site.footer.tagline"]}</p>
           </div>
           <div className="kauro-site-footer-meta">

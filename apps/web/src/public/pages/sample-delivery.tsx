@@ -6,7 +6,7 @@
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy } from "../../copy/public.ts";
 import { formatCount } from "../pricing-bands.ts";
-import { DataTable, FileName, LinkButton, PageHead, Section, rich } from "../parts.tsx";
+import { DataTable, FileName, LinkButton, PageHead, Section, Stamp, rich } from "../parts.tsx";
 import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, sharePercent } from "../sample-data.ts";
 import { ROUTE } from "../site.ts";
 
@@ -14,8 +14,25 @@ export function SampleDeliveryPage(): ReactElement {
   const contactsFile = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
   return (
     <>
-      <PageHead tone="clay" eyebrow={PUBLIC_COPY["nav.sample.label"]} title={PUBLIC_COPY["sample.title"]} lead={PUBLIC_COPY["sample.lead"]}>
-        <p className="kauro-site-badge">{PUBLIC_COPY["sample.badge.label"]}</p>
+      <PageHead
+        tone="clay"
+        accent={2}
+        eyebrow={PUBLIC_COPY["nav.sample.label"]}
+        title={PUBLIC_COPY["sample.title"]}
+        lead={PUBLIC_COPY["sample.lead"]}
+        aside={
+          <div className="kauro-site-cover" aria-hidden="true">
+            <div className="kauro-site-cover-sheet">
+              <p className="kauro-site-cover-kicker">{PUBLIC_COPY["sample.report.heading"]}</p>
+              <p className="kauro-site-cover-figure">{formatCount(SAMPLE.contacts)}</p>
+              <p className="kauro-site-cover-label">{PUBLIC_COPY["sample.report.contacts"]}</p>
+            </div>
+          </div>
+        }
+      >
+        <p className="kauro-site-stamp-line">
+          <Stamp>{PUBLIC_COPY["sample.badge.label"]}</Stamp>
+        </p>
       </PageHead>
       <Section id="sample-report" heading={PUBLIC_COPY["sample.report.heading"]} tone="sunken" variant="kauro-site-document">
         <div className="kauro-site-sheet">

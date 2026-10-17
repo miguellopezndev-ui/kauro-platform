@@ -23,7 +23,7 @@ const INDEX: ReadonlyArray<readonly [id: string, heading: PublicCopyId]> = [
 export function SecurityPage(): ReactElement {
   return (
     <>
-      <PageHead eyebrow={PUBLIC_COPY["nav.security.label"]} title={PUBLIC_COPY["security.title"]} lead={PUBLIC_COPY["security.lead"]} tone="inverse">
+      <PageHead eyebrow={PUBLIC_COPY["nav.security.label"]} title={PUBLIC_COPY["security.title"]} accent={4} lead={PUBLIC_COPY["security.lead"]} tone="inverse" variant="kauro-site-head-strata">
         <nav className="kauro-site-index" aria-label={PUBLIC_COPY["security.index.label"]}>
           <p className="kauro-site-index-title" aria-hidden="true">
             {PUBLIC_COPY["security.index.label"]}

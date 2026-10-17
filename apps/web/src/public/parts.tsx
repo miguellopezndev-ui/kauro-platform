@@ -38,15 +38,40 @@ export interface PageHeadProps {
   readonly tone?: Tone;
   /** "compact" for a page whose content is the point (prices, a form, a reference): less room above the fold goes to the head. */
   readonly size?: "default" | "compact";
+  /** How many of the headline's last words are set in the light accent weight (the words themselves never change). */
+  readonly accent?: number;
+  /** A modifier of the head's own look, for the page that owns it. */
+  readonly variant?: string | undefined;
 }
 
-export function PageHead({ title, lead, eyebrow, children, aside, tone = "plain", size = "default" }: PageHeadProps): ReactElement {
+/**
+ * A headline with its last words set apart: the same text, in two weights. The split is at a space of the catalogue's own sentence, so the
+ * heading reads exactly as the registry writes it (a screen reader and the tests read one sentence).
+ */
+export function Headline({ text, accent = 0 }: { readonly text: string; readonly accent?: number }): ReactElement {
+  const words = text.split(" ");
+  if (accent <= 0 || accent >= words.length) return <>{text}</>;
   return (
-    <div className={classes("kauro-site-pagehead", TONE_CLASS[tone], aside !== undefined && "kauro-site-pagehead--aside", size === "compact" && "kauro-site-pagehead--compact")}>
+    <>
+      {words.slice(0, words.length - accent).join(" ")} <span className="kauro-site-accent">{words.slice(words.length - accent).join(" ")}</span>
+    </>
+  );
+}
+
+/** A rubber stamp: the label a synthetic sample must carry, set at an angle like a mark on a printed proof. */
+export function Stamp({ children }: { readonly children: ReactNode }): ReactElement {
+  return <span className="kauro-site-stamp">{children}</span>;
+}
+
+export function PageHead({ title, lead, eyebrow, children, aside, tone = "plain", size = "default", accent = 0, variant }: PageHeadProps): ReactElement {
+  return (
+    <div className={classes("kauro-site-pagehead", TONE_CLASS[tone], aside !== undefined && "kauro-site-pagehead--aside", size === "compact" && "kauro-site-pagehead--compact", variant)}>
       <div className="kauro-site-wrap kauro-site-pagehead-inner">
         <div className="kauro-site-pagehead-title">
           {eyebrow === undefined ? null : <Eyebrow>{eyebrow}</Eyebrow>}
-          <h1>{title}</h1>
+          <h1>
+            <Headline text={title} accent={accent} />
+          </h1>
         </div>
         {lead === undefined && children === undefined ? null : (
           <div className="kauro-site-pagehead-body">

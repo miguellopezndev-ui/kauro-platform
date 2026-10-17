@@ -13,7 +13,7 @@ export function HelpPage(): ReactElement {
   const list = guides();
   return (
     <>
-      <PageHead size="compact" tone="sunken" eyebrow={PUBLIC_COPY["nav.help.label"]} title={PUBLIC_COPY["help.title"]} lead={PUBLIC_COPY["help.lead"]}>
+      <PageHead size="compact" tone="sunken" accent={3} eyebrow={PUBLIC_COPY["nav.help.label"]} title={PUBLIC_COPY["help.title"]} lead={PUBLIC_COPY["help.lead"]}>
         <p className="kauro-site-meta">{copy("help.version", { version: GUIDES_VERSION, date: GUIDES_CHANGED })}</p>
       </PageHead>
       <div className="kauro-site-docs">

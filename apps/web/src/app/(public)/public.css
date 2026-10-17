@@ -844,132 +844,6 @@ body:has(> .kauro-site-header) {
 
 /* ---- home ------------------------------------------------------------------------------------------------------------------------- */
 
-/* The synthetic manifest: a sheet on a clay panel, two sheets behind it. */
-.kauro-site-proof {
-  position: relative;
-  padding: clamp(2rem, 4vw, 3.25rem) clamp(1.25rem, 3vw, 2.75rem);
-  border-radius: var(--kauro-radius-large);
-  background: var(--kauro-color-accent-surface);
-  isolation: isolate;
-}
-.kauro-site-proof::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: repeating-linear-gradient(172deg, transparent 0 1.25rem, color-mix(in srgb, var(--kauro-color-accent) 22%, transparent) 1.25rem calc(1.25rem + 1px));
-}
-.kauro-site-proof-sheet {
-  position: relative;
-  padding: clamp(1.25rem, 2.5vw, 1.75rem);
-  border: 1px solid var(--kauro-color-border);
-  border-radius: var(--kauro-radius-large);
-  background: var(--kauro-color-raised);
-  box-shadow: 0 1.5rem 3rem -1.5rem color-mix(in srgb, var(--kauro-color-ink) 30%, transparent);
-}
-.kauro-site-proof-sheet::before,
-.kauro-site-proof-sheet::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border: 1px solid var(--kauro-color-border);
-  border-radius: inherit;
-  background: var(--kauro-color-raised);
-}
-.kauro-site-proof-sheet::before {
-  transform: translate(0.75rem, -0.75rem) rotate(2.5deg);
-  opacity: 0.55;
-}
-.kauro-site-proof-sheet::after {
-  transform: translate(0.375rem, -0.375rem) rotate(1.25deg);
-  opacity: 0.85;
-}
-.kauro-site-proof-top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kauro-space-2) var(--kauro-space-3);
-  padding-block-end: var(--kauro-space-4);
-  border-block-end: 1px solid var(--kauro-color-border);
-}
-.kauro-site-main .kauro-site-proof-title {
-  color: var(--kauro-color-text-muted);
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-.kauro-site-main p.kauro-site-proof-file {
-  margin-block: var(--kauro-space-5) var(--kauro-space-3);
-  color: var(--kauro-color-text);
-  font-size: 1rem;
-  font-weight: 600;
-}
-.kauro-site-ledger {
-  margin: 0;
-}
-.kauro-site-ledger-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: var(--kauro-space-4);
-  padding-block: var(--kauro-space-2);
-}
-.kauro-site-ledger dt {
-  color: var(--kauro-color-text-muted);
-  font-size: 0.9375rem;
-}
-.kauro-site-ledger dd {
-  margin: 0;
-  color: var(--kauro-color-text);
-  font-family: var(--kauro-display-family);
-  font-size: clamp(1.625rem, 1.3rem + 1vw, 2.125rem);
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-}
-.kauro-site-ledger-row--less dd::before {
-  content: "\2212\2009" / "";
-  color: var(--kauro-color-text-muted);
-}
-.kauro-site-ledger-row--total {
-  margin-block-start: var(--kauro-space-2);
-  padding-block-start: var(--kauro-space-3);
-  border-block-start: 1.5px solid var(--kauro-color-text);
-}
-.kauro-site-ledger-row--total dt {
-  color: var(--kauro-color-text);
-  font-weight: 600;
-}
-.kauro-site-ledger-row--total dd {
-  color: var(--kauro-color-primary);
-  font-weight: 600;
-}
-.kauro-site-proof-files {
-  margin: var(--kauro-space-4) 0 0;
-  padding: var(--kauro-space-3) 0 0;
-  border-block-start: 1px dashed var(--kauro-color-border);
-  list-style: none;
-}
-.kauro-site-proof-files li {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--kauro-space-3);
-  color: var(--kauro-color-text-muted);
-  font-size: 0.9375rem;
-}
-.kauro-site-proof-count {
-  font-variant-numeric: tabular-nums;
-}
-.kauro-site-main p.kauro-site-proof-note {
-  margin-block-start: var(--kauro-space-5);
-  color: var(--kauro-color-text-muted);
-  font-size: 0.8125rem;
-  line-height: 1.5;
-}
-
 /* Three reasons under the hero, each with a mark drawn in clay. */
 .kauro-site-facts {
   border-block: 1px solid var(--kauro-color-border);
@@ -1226,18 +1100,6 @@ body:has(> .kauro-site-header) {
 }
 .kauro-site-closing .kauro-site-section-body {
   align-self: end;
-}
-.kauro-site-closing.kauro-wine {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-}
-.kauro-site-closing.kauro-wine::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: repeating-linear-gradient(172deg, transparent 0 1.5rem, color-mix(in srgb, var(--kauro-color-text) 5%, transparent) 1.5rem calc(1.5rem + 1px));
 }
 .kauro-site-closing--plain .kauro-site-section-inner {
   padding: clamp(2rem, 4vw, 3.5rem);
@@ -2166,7 +2028,9 @@ body:has(> .kauro-site-header) {
   .kauro-site-buyer,
   .kauro-site-table-region,
   .kauro-site-sheet,
-  .kauro-site-proof-sheet {
+  .kauro-site-window,
+  .kauro-site-stack-sheet,
+  .kauro-site-stamp {
     border-color: CanvasText;
   }
   .kauro-site-header .kauro-site-nav-list a[aria-current="page"] {
@@ -2192,9 +2056,780 @@ body:has(> .kauro-site-header) {
   }
 }
 
-/* Between a phone and a wide screen the synthetic manifest keeps a sheet's proportions instead of stretching. */
+/* Between a phone and a wide screen the product window keeps a window's proportions instead of stretching. */
 @media (min-width: 36rem) and (max-width: 61.99rem) {
   .kauro-site-pagehead-aside {
-    max-inline-size: 34rem;
+    max-inline-size: 40rem;
   }
+}
+
+/* =================================================================================================================================== */
+/* The signature of the site (A10): clay rock, a stamp, notes in the margin, and headlines in two weights.                              */
+/* The rock is the brand's material: strata, layers laid down and refined, drawn as generated relief (./textures: no photograph, no     */
+/* request to another origin). Text never sits on the raw texture: a band that carries words lays a solid veil of its colour first.  */
+/* =================================================================================================================================== */
+
+/* ---- headlines in two weights --------------------------------------------------------------------------------------------------- */
+
+.kauro-site-main h1 {
+  max-inline-size: 15ch;
+  font-size: clamp(2.75rem, 1.4rem + 4.8vw, 5.75rem);
+  font-weight: 650;
+  line-height: 0.98;
+  letter-spacing: -0.048em;
+}
+.kauro-site-main .kauro-site-pagehead--compact h1 {
+  max-inline-size: 18ch;
+  font-size: clamp(2.5rem, 1.5rem + 3.4vw, 4.5rem);
+}
+.kauro-site-accent {
+  color: var(--kauro-color-primary);
+  font-weight: 300;
+  letter-spacing: -0.04em;
+}
+.kauro-site-main h2 {
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+
+/* ---- the hero: text on porcelain, the product on rock ------------------------------------------------------------------------- */
+
+.kauro-site-hero {
+  position: relative;
+  isolation: isolate;
+}
+.kauro-site-showcase {
+  position: relative;
+  margin: 0;
+  padding: clamp(2.5rem, 6vw, 4rem) clamp(1rem, 4vw, 2.5rem);
+  border-radius: var(--kauro-radius-large);
+  background: url("./textures/clay-rock.svg") center / cover, var(--kauro-color-accent);
+}
+@media (min-width: 62rem) {
+  .kauro-site-hero {
+    padding-block-end: clamp(4rem, 7vw, 7rem);
+  }
+  /* The rock runs from under the header to the end of the hero and off the right edge of the window. */
+  .kauro-site-hero::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset-block: 0;
+    inset-inline-start: 62%;
+    inset-inline-end: 0;
+    border-end-start-radius: var(--kauro-radius-large);
+    background: url("./textures/clay-rock.svg") center / cover, var(--kauro-color-accent);
+  }
+  .kauro-site-hero .kauro-site-showcase {
+    padding: 0;
+    border-radius: 0;
+    background: none;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .kauro-site-hero::before,
+  :root:not([data-theme="light"]) .kauro-site-showcase {
+    background-color: var(--kauro-color-accent-surface);
+    background-image: url("./textures/ember-rock.svg");
+  }
+}
+:root[data-theme="dark"] .kauro-site-hero::before,
+:root[data-theme="dark"] .kauro-site-showcase {
+  background-color: var(--kauro-color-accent-surface);
+  background-image: url("./textures/ember-rock.svg");
+}
+@media (min-width: 62rem) {
+  :root[data-theme="dark"] .kauro-site-hero .kauro-site-showcase {
+    background: none;
+  }
+}
+@media (min-width: 62rem) and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .kauro-site-hero .kauro-site-showcase {
+    background: none;
+  }
+}
+
+/* ---- the product window ---------------------------------------------------------------------------------------------------------- */
+
+.kauro-site-window {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.875rem;
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  box-shadow: 0 2.5rem 5rem -2rem color-mix(in srgb, var(--kauro-color-ink) 55%, transparent), 0 0.5rem 1.25rem -0.75rem color-mix(in srgb, var(--kauro-color-ink) 35%, transparent);
+}
+.kauro-site-window-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kauro-space-2) var(--kauro-space-4);
+  padding: 0.75rem 1.125rem;
+  background: var(--kauro-color-ink);
+  color: var(--kauro-color-on-ink);
+}
+.kauro-site-window-brand {
+  font-family: var(--kauro-display-family);
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+.kauro-site-window-project {
+  padding-inline-start: var(--kauro-space-4);
+  border-inline-start: 1px solid var(--kauro-color-ink-border);
+  color: var(--kauro-color-ink-muted);
+}
+.kauro-site-window-state {
+  margin-inline-start: auto;
+  padding: 0.125rem 0.625rem;
+  border: 1px solid var(--kauro-color-ink-accent);
+  border-radius: 62.5rem;
+  color: var(--kauro-color-ink-accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.kauro-site-window-body {
+  padding: 1.125rem 1.25rem 1.25rem;
+}
+.kauro-site-main p.kauro-site-window-file {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kauro-space-3);
+  max-inline-size: none;
+  padding-block-end: 0.875rem;
+  border-block-end: 1px solid var(--kauro-color-border);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.kauro-site-window-count {
+  font-family: var(--kauro-display-family);
+  font-size: 1.75rem;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.kauro-site-main p.kauro-site-window-label {
+  margin: 1rem 0 0.5rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.kauro-site-window-phases {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kauro-site-window-phases li {
+  display: grid;
+  grid-template-columns: 1.125rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.625rem;
+}
+/* A filled circle with a tick, drawn by borders. */
+.kauro-site-window-phases li::before {
+  content: "";
+  grid-column: 1;
+  grid-row: 1;
+  box-sizing: border-box;
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  border-radius: 50%;
+  background: var(--kauro-color-primary);
+}
+.kauro-site-window-phases li::after {
+  content: "";
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: center;
+  inline-size: 0.25rem;
+  block-size: 0.5rem;
+  margin-block-start: -0.125rem;
+  border: solid var(--kauro-color-on-primary);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+.kauro-site-window-phase {
+  grid-column: 2;
+  grid-row: 1;
+  font-weight: 600;
+}
+.kauro-site-window-meta {
+  grid-column: 3;
+  grid-row: 1;
+  color: var(--kauro-color-text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+.kauro-site-window-records {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+.kauro-site-window-head {
+  padding: 0.5rem 0.75rem;
+  background: var(--kauro-color-surface);
+  color: var(--kauro-color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.kauro-site-window-row {
+  display: contents;
+}
+.kauro-site-window-row > span {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-inline-size: 0;
+  padding: 0.5rem 0.75rem;
+  border-block-start: 1px solid var(--kauro-color-border);
+  overflow-wrap: anywhere;
+}
+.kauro-site-window-name {
+  font-weight: 600;
+}
+.kauro-site-window-name s {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  text-decoration-color: var(--kauro-color-primary);
+}
+.kauro-site-window-row > .kauro-site-window-email {
+  display: block;
+  align-self: center;
+  overflow: hidden;
+  overflow-wrap: normal;
+  color: var(--kauro-color-text-muted);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.6875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kauro-site-window-row--candidate > span {
+  background: var(--kauro-color-accent-surface);
+}
+.kauro-site-window-row--candidate > span:first-child {
+  box-shadow: inset 3px 0 0 var(--kauro-color-primary);
+}
+.kauro-site-window-row > span.kauro-site-outcome {
+  align-self: stretch;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.kauro-site-outcome::before {
+  content: none;
+}
+.kauro-site-window-row > .kauro-site-outcome {
+  padding-inline-end: 0.75rem;
+}
+.kauro-site-outcome {
+  font-size: 0.6875rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.kauro-site-outcome--valid {
+  color: var(--kauro-color-success-text);
+}
+.kauro-site-outcome--normalised {
+  color: var(--kauro-color-info-text);
+}
+.kauro-site-outcome--candidate {
+  color: var(--kauro-color-primary);
+}
+@media (max-width: 30rem) {
+  .kauro-site-window-records {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .kauro-site-window-head.kauro-site-window-email,
+  .kauro-site-window-row > span.kauro-site-window-email {
+    display: none;
+  }
+}
+
+/* A rubber stamp on the corner of the proof. */
+.kauro-site-showcase figcaption {
+  position: absolute;
+  z-index: 2;
+  inset-inline-end: clamp(0.5rem, 3vw, 1.5rem);
+  inset-block-end: clamp(0.5rem, 2vw, 1rem);
+}
+@media (min-width: 62rem) {
+  .kauro-site-hero .kauro-site-showcase figcaption {
+    inset-inline-end: -1rem;
+    inset-block-end: -1.75rem;
+  }
+}
+.kauro-site-stamp {
+  display: inline-block;
+  padding: 0.5rem 0.75rem;
+  border: 1.5px solid var(--kauro-color-primary);
+  border-radius: 0.25rem;
+  background: var(--kauro-color-background);
+  box-shadow: inset 0 0 0 3px var(--kauro-color-background), inset 0 0 0 4px var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  transform: rotate(-5deg);
+}
+
+/* Notes in the margin: an editor's italic and a thin leader to the thing it points at. Wide screens only, where there is a margin. */
+.kauro-site-note-hand {
+  display: none;
+}
+@media (min-width: 62rem) {
+  .kauro-site-main p.kauro-site-note-hand {
+    position: absolute;
+    z-index: 2;
+    display: block;
+    max-inline-size: none;
+    padding: 0.25rem 0.625rem;
+    border-radius: 0.25rem;
+    background: var(--kauro-color-background);
+    color: var(--kauro-color-primary);
+    font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    font-size: 1.125rem;
+    font-style: italic;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .kauro-site-note-hand::after {
+    content: "";
+    position: absolute;
+    box-sizing: border-box;
+    border: 0 solid var(--kauro-color-primary);
+  }
+  /* Under the window, pointing up at the record that waits for a decision. */
+  .kauro-site-main p.kauro-site-note-hand--decide {
+    inset-inline-start: 1.75rem;
+    inset-block-end: -3.75rem;
+  }
+  .kauro-site-note-hand--decide::after {
+    inset-inline-start: 1.25rem;
+    inset-block-end: 100%;
+    inline-size: 0;
+    block-size: 2.5rem;
+    border-inline-start-width: 1px;
+  }
+  .kauro-site-note-hand--decide::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: calc(1.25rem - 0.1875rem);
+    inset-block-end: calc(100% + 2.5rem);
+    inline-size: 0.4375rem;
+    block-size: 0.4375rem;
+    border-radius: 50%;
+    background: var(--kauro-color-primary);
+  }
+  /* Above the window, pointing down at the counts. */
+  .kauro-site-main p.kauro-site-note-hand--counts {
+    inset-inline-end: 1.5rem;
+    inset-block-start: -3.5rem;
+  }
+  .kauro-site-note-hand--counts::after {
+    inset-inline-start: -2.25rem;
+    inset-block-start: 50%;
+    inline-size: 2.25rem;
+    block-size: 3rem;
+    border-block-start-width: 1px;
+    border-inline-start-width: 1px;
+    border-start-start-radius: 1.5rem;
+  }
+}
+
+/* ---- the process band ----------------------------------------------------------------------------------------------------------- */
+
+.kauro-site-process.kauro-inverse {
+  background-image: url("./textures/grain.svg");
+  background-size: 240px;
+}
+.kauro-site-process-steps {
+  position: relative;
+  display: grid;
+  gap: var(--kauro-space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: process;
+}
+.kauro-site-process-step {
+  position: relative;
+  padding-inline-start: 4rem;
+  counter-increment: process;
+}
+.kauro-site-process-step::before {
+  content: counter(process, decimal-leading-zero) / "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border: 1px solid var(--kauro-color-ink-accent);
+  border-radius: 50%;
+  background: var(--kauro-color-background);
+  color: var(--kauro-color-ink-accent);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.kauro-site-main .kauro-site-process-step h3 {
+  margin-block-end: var(--kauro-space-2);
+  font-size: clamp(1.375rem, 1.2rem + 0.6vw, 1.75rem);
+  letter-spacing: -0.03em;
+}
+.kauro-site-process-step p {
+  color: var(--kauro-color-text-muted);
+}
+@media (min-width: 56rem) {
+  .kauro-site-process-steps {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: var(--kauro-space-6);
+  }
+  /* The line that joins the four steps. */
+  .kauro-site-process-steps::before {
+    content: "";
+    position: absolute;
+    inset-block-start: 1.375rem;
+    inset-inline: 1.375rem 0;
+    block-size: 1px;
+    background: color-mix(in srgb, var(--kauro-color-ink-accent) 45%, transparent);
+  }
+  .kauro-site-process-step {
+    padding-inline-start: 0;
+    padding-block-start: 4.25rem;
+  }
+}
+.kauro-site-process-step:first-child::before {
+  background: var(--kauro-color-ink-accent);
+  color: var(--kauro-color-ink);
+}
+
+/* ---- the delivery: a stack of sheets on wine rock ----------------------------------------------------------------------------- */
+
+.kauro-site-delivery-grid {
+  display: grid;
+  gap: var(--kauro-space-7);
+  align-items: center;
+}
+.kauro-site-stack {
+  padding: clamp(2rem, 5vw, 3.5rem) clamp(1.25rem, 4vw, 2.5rem);
+  border-radius: var(--kauro-radius-large);
+  background: url("./textures/wine-rock.svg") center / cover, var(--kauro-color-wine);
+}
+.kauro-site-stack-sheets {
+  display: grid;
+  gap: 0.625rem;
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: 24rem;
+  margin: 0 auto;
+  padding: 0 2.5rem 0 0;
+  list-style: none;
+}
+.kauro-site-stack-sheet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kauro-space-3);
+  padding: 0.875rem 1.125rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.5rem;
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  font-size: 0.875rem;
+  box-shadow: 0 1rem 2rem -1.25rem color-mix(in srgb, var(--kauro-color-ink) 70%, transparent);
+}
+.kauro-site-stack-sheet:nth-child(2),
+.kauro-site-stack-sheet:nth-child(4) {
+  transform: translateX(1.25rem);
+}
+.kauro-site-stack-sheet:nth-child(3) {
+  transform: translateX(2.5rem);
+}
+.kauro-site-stack-meta {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.kauro-site-stack-sheet--doc {
+  justify-content: flex-start;
+}
+.kauro-site-stack-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-weight: 600;
+}
+.kauro-site-stack-doc::before {
+  content: "";
+  inline-size: 0.75em;
+  block-size: 0.95em;
+  border: 1.5px solid var(--kauro-color-primary);
+  border-radius: 1px 0.25em 1px 1px;
+}
+.kauro-site-delivery .kauro-site-deliverables {
+  grid-template-columns: 1fr;
+}
+@media (min-width: 40rem) {
+  .kauro-site-delivery .kauro-site-deliverables {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 62rem) {
+  .kauro-site-delivery-grid {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    column-gap: clamp(3rem, 6vw, 6rem);
+  }
+  .kauro-site-delivery .kauro-site-stack {
+    align-self: stretch;
+    display: grid;
+    align-content: center;
+  }
+}
+
+/* ---- the bands that carry rock behind a veil of their colour -------------------------------------------------------------------- */
+
+.kauro-site-limits.kauro-inverse {
+  background-image: linear-gradient(color-mix(in srgb, var(--kauro-color-background) 90%, transparent), color-mix(in srgb, var(--kauro-color-background) 90%, transparent)), url("./textures/carbon-rock.svg");
+  background-position: center;
+  background-size: cover;
+}
+.kauro-site-quote.kauro-site-tone-clay {
+  background-image: linear-gradient(color-mix(in srgb, var(--kauro-color-accent-surface) 86%, transparent), color-mix(in srgb, var(--kauro-color-accent-surface) 86%, transparent)), url("./textures/clay-rock.svg");
+  background-position: center;
+  background-size: cover;
+}
+.kauro-site-main .kauro-site-quote-text {
+  max-inline-size: 30ch;
+  font-size: clamp(1.75rem, 1.1rem + 2.6vw, 3.25rem);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+.kauro-site-closing.kauro-wine {
+  background-image: linear-gradient(180deg, var(--kauro-color-background) 0 55%, color-mix(in srgb, var(--kauro-color-background) 55%, transparent) 100%), url("./textures/wine-rock.svg");
+  background-position: center;
+  background-size: cover;
+}
+@media (min-width: 62rem) {
+  .kauro-site-closing.kauro-wine {
+    padding-block: clamp(6rem, 10vw, 9rem);
+    background-image: linear-gradient(90deg, var(--kauro-color-background) 0 38%, color-mix(in srgb, var(--kauro-color-background) 72%, transparent) 62%, color-mix(in srgb, var(--kauro-color-background) 30%, transparent) 100%), url("./textures/wine-rock.svg");
+  }
+}
+.kauro-site-main .kauro-site-closing h2 {
+  max-inline-size: 14ch;
+  font-size: clamp(2.25rem, 1.3rem + 3.6vw, 4.25rem);
+  line-height: 1;
+}
+.kauro-site-closing.kauro-wine .kauro-site-section-body {
+  padding: clamp(1.5rem, 3vw, 2rem);
+  border-radius: var(--kauro-radius-large);
+  background: color-mix(in srgb, var(--kauro-color-background) 94%, transparent);
+}
+
+/* ---- services: one colour of the brand for each, never the colour of another company ---------------------------------------- */
+
+.kauro-site-mode,
+.kauro-site-service {
+  border-block-start: 4px solid var(--kauro-color-accent);
+}
+.kauro-site-mode--hubspot,
+.kauro-site-cards--three > .kauro-site-service:nth-child(2) {
+  border-block-start-color: var(--kauro-color-primary);
+}
+.kauro-site-mode--salesforce,
+.kauro-site-cards--three > .kauro-site-service:nth-child(3) {
+  border-block-start-color: var(--kauro-color-text);
+}
+.kauro-site-cards--three > .kauro-site-service--closed,
+.kauro-site-cards--three > .kauro-site-service--unread {
+  border-block-start-color: var(--kauro-color-border);
+}
+
+/* ---- the footer: the name, cut in clay ------------------------------------------------------------------------------------------ */
+
+.kauro-site-footer-name {
+  overflow: hidden;
+  padding-block-end: 0.04em;
+  font-size: clamp(5rem, 1.5rem + 15vw, 15rem);
+  line-height: 0.82;
+  letter-spacing: -0.065em;
+  background: url("./textures/clay-rock.svg") center / cover, var(--kauro-color-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@media (forced-colors: active) {
+  .kauro-site-footer-name {
+    background: none;
+    color: CanvasText;
+  }
+}
+
+/* ---- interior pages ------------------------------------------------------------------------------------------------------------ */
+
+/* A big numeral beside a head: how many steps, set light and huge. */
+.kauro-site-main .kauro-site-bignum {
+  margin: 0;
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--kauro-color-accent-text);
+  font-family: var(--kauro-display-family);
+  font-size: clamp(7rem, 3rem + 14vw, 16rem);
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.06em;
+  line-height: 0.8;
+}
+@media (forced-colors: active) {
+  .kauro-site-main .kauro-site-bignum {
+    color: CanvasText;
+    -webkit-text-stroke: 0;
+  }
+}
+@media (min-width: 62rem) {
+  .kauro-site-main .kauro-site-bignum {
+    text-align: end;
+  }
+}
+
+/* The cover of the sample report, on rock (Sample delivery). */
+.kauro-site-cover {
+  display: grid;
+  place-items: center;
+  min-block-size: 18rem;
+  padding: clamp(2rem, 5vw, 3.5rem);
+  border-radius: var(--kauro-radius-large);
+  background: url("./textures/clay-rock.svg") center / cover, var(--kauro-color-accent);
+}
+:root[data-theme="dark"] .kauro-site-cover {
+  background-image: url("./textures/ember-rock.svg");
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .kauro-site-cover {
+    background-image: url("./textures/ember-rock.svg");
+  }
+}
+.kauro-site-cover-sheet {
+  position: relative;
+  inline-size: min(100%, 17rem);
+  aspect-ratio: 0.77;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  border-radius: 0.375rem;
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  box-shadow: 0 2rem 4rem -2rem color-mix(in srgb, var(--kauro-color-ink) 65%, transparent), 0.5rem -0.5rem 0 -1px var(--kauro-color-raised), 0.5rem -0.5rem 0 0 var(--kauro-color-border);
+  transform: rotate(3deg);
+}
+.kauro-site-main p.kauro-site-cover-kicker {
+  padding-block-end: 0.75rem;
+  border-block-end: 2px solid var(--kauro-color-primary);
+  font-family: var(--kauro-display-family);
+  font-size: 1.125rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.kauro-site-main p.kauro-site-cover-figure {
+  margin-block-start: auto;
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-display-family);
+  font-size: 3.5rem;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+.kauro-site-main p.kauro-site-cover-label {
+  margin-block-start: 0.25rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.8125rem;
+}
+
+/* A carbon head with strata showing through (Data handling). */
+.kauro-site-pagehead.kauro-inverse.kauro-site-head-strata {
+  background-image: linear-gradient(color-mix(in srgb, var(--kauro-color-background) 88%, transparent), color-mix(in srgb, var(--kauro-color-background) 88%, transparent)), url("./textures/carbon-rock.svg");
+  background-position: center;
+  background-size: cover;
+}
+
+/* The free check on the price ladder: wine rock under a wine veil. */
+.kauro-site-rung--free.kauro-wine {
+  background-image: linear-gradient(color-mix(in srgb, var(--kauro-color-background) 70%, transparent), var(--kauro-color-background) 72%), url("./textures/wine-rock.svg");
+  background-position: center;
+  background-size: cover;
+}
+.kauro-site-main .kauro-site-price {
+  font-weight: 300;
+  letter-spacing: -0.05em;
+}
+.kauro-site-main .kauro-site-rung--free .kauro-site-price {
+  font-weight: 650;
+}
+
+/* The contact aside: wine rock under a wine veil. */
+.kauro-site-contact-aside.kauro-wine {
+  background-image: linear-gradient(color-mix(in srgb, var(--kauro-color-background) 78%, transparent), var(--kauro-color-background) 55%), url("./textures/wine-rock.svg");
+  background-position: center top;
+  background-size: cover;
+}
+
+/* The steps of How it works, numbered in the display face. */
+.kauro-site-timeline-step {
+  padding-inline-start: 5rem;
+}
+.kauro-site-timeline-step::before {
+  inline-size: 3.25rem;
+  block-size: 3.25rem;
+  font-family: var(--kauro-display-family);
+  font-size: 1.125rem;
+  font-weight: 300;
+}
+.kauro-site-timeline-step::after {
+  inset-inline-start: 1.625rem;
+  inset-block-start: 3.5rem;
+}
+
+.kauro-site-main p.kauro-site-stamp-line {
+  margin-block-start: var(--kauro-space-6);
+}
+
+.kauro-site-modes {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+}
+.kauro-site-mode .kauro-site-price {
+  margin-block-start: var(--kauro-space-2);
+}
+/* The lines of the report's text, drawn as rules on the cover. */
+.kauro-site-cover-sheet::after {
+  content: "";
+  position: absolute;
+  inset-inline: 1.5rem 3rem;
+  inset-block-start: 5.25rem;
+  block-size: 5.75rem;
+  background: repeating-linear-gradient(180deg, var(--kauro-color-border) 0 0.375rem, transparent 0.375rem 1.125rem);
 }
