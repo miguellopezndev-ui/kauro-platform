@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { DomainFailure } from "@kauro/domain";
 import { PgOutreachAuth } from "../src/index.js";
+import { TEST_EFFECT_FROZEN_SETTING } from "../src/testing/index.js";
 import { at, closeB12, draft, freshDomain, ids, nextSlot, openB12, ownerOf, plus, prospectIn, review, sender, type B12World, type Draft, type Sender } from "./b12-outreach-support.js";
 
 let w: B12World;
@@ -47,23 +48,26 @@ describe("B12 L-AUTH adapter (plan §L, §2 CMD062)", () => {
     const d = await freshDraft();
     const slot = await nextSlot(w);
     const rv = await review(w, snd, [d], slot);
-    // kauro.effect_now() is the test clock plus the time the transaction has run (0038), so the instant a statement judges at can only be
-    // placed within the few milliseconds between the clock being set and the statement: "just before" is a 250 ms margin that covers
-    // them, and "at the boundary" is exact because effect_now() never reads earlier than the instant the clock was set to. The review's
-    // expiry carries microseconds (stamped at the database instant of the issue): both instants are computed by the database, never
-    // through a JavaScript Date (which keeps milliseconds only).
+    // kauro.effect_now() is the test clock plus the time the transaction has run (0038); the transaction-local kauro_test.effect_frozen makes it
+    // read the clock's instant exactly (temporary-postgres TEST_EFFECT_FUNCTION), so both boundary instants are placed to the microsecond. They are
+    // computed by the database (the review's expiry carries microseconds), never through a JavaScript Date (which keeps milliseconds only).
     const fmt = "'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'";
     const bounds = (
       await w.h.oracle.query<{ e: string; before1us: string }>(
-        `SELECT to_char(expires_at AT TIME ZONE 'UTC', ${fmt}) AS e, to_char((expires_at - interval '250 milliseconds') AT TIME ZONE 'UTC', ${fmt}) AS before1us FROM kauro.outreach_reviews WHERE review_id = $1`,
+        `SELECT to_char(expires_at AT TIME ZONE 'UTC', ${fmt}) AS e, to_char((expires_at - interval '1 microsecond') AT TIME ZONE 'UTC', ${fmt}) AS before1us FROM kauro.outreach_reviews WHERE review_id = $1`,
         [rv.reviewId],
       )
     ).rows[0]!;
     const { e: expiresAt, before1us } = bounds;
     const q = { reviewId: rv.reviewId, draftIds: [d.draftId], senderId: snd.senderId, validFrom: slot, expiresAt: plus(slot, 3600) };
-    const early = await at(w.app, ownerOf(w), before1us, (c) => new PgOutreachAuth(c).grantFacts(q));
-    assert.equal(early.reviewLive, true, "just before the boundary (a margin that covers the statement's own elapsed time) the review is live");
-    const onTime = await at(w.app, ownerOf(w), expiresAt, (c) => new PgOutreachAuth(c).grantFacts(q));
+    const judgedAt = (instant: string) =>
+      at(w.app, ownerOf(w), instant, async (c) => {
+        await c.query("SELECT set_config($1, 'on', true)", [TEST_EFFECT_FROZEN_SETTING]);
+        return new PgOutreachAuth(c).grantFacts(q);
+      });
+    const early = await judgedAt(before1us);
+    assert.equal(early.reviewLive, true, "one microsecond before the boundary is live");
+    const onTime = await judgedAt(expiresAt);
     assert.equal(onTime.reviewLive, false, "at the boundary the review is expired");
   });
 

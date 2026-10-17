@@ -13,7 +13,7 @@ import { randomBytes } from "node:crypto";
 import type { PoolClient } from "pg";
 import type { ExecutionContext } from "@kauro/domain";
 import { PgCommercialUnitOfWork, PgCommercialUnitOfWorkFactory } from "@kauro/persistence";
-import { crashableFactory, instrumentPort, raceStatementTimeoutMs, runtimeRoleOf, type FaultPoints, type HarnessConnection, type SqlSession } from "@kauro/persistence/testing";
+import { crashableFactory, instrumentPort, raceStatementTimeoutMs, runtimeRoleOf, TEST_CLOCK_OFFSET_SETTING, TEST_CLOCK_PIN_SETTING, type FaultPoints, type HarnessConnection, type SqlSession } from "@kauro/persistence/testing";
 import { clock } from "./support.js";
 
 export type RouteRole = "kauro_app" | "kauro_payment" | "kauro_commission" | "kauro_control" | "kauro_outreach";
@@ -97,6 +97,19 @@ const rawConnectionOf = (client: unknown): HarnessConnection | undefined =>
 const JUDGE_MARKER = "/* b12:judge */";
 
 /**
+ * A judgment statement's instant (rule 25, §W): the effect clock moves to the step clock's instant at THAT statement, while kauro.server_now() stays
+ * pinned where the unit began (TEST_CLOCK_PIN_SETTING), as in a deployment, where server_now() is the transaction's start and only effect_now()
+ * advances. So a deadline the cell crosses while the unit waits is judged at effect_now(), and a product judging at server_now() still reads the start
+ * (GAP-SE-4 "red with server_now"). The pin is lifted while the step clock positions the session (its own check reads server_now()) and set back after.
+ */
+async function judgeAt(judge: StepClockOf, session: SqlSession): Promise<void> {
+  const began = await session.query<{ pin: string }>("SELECT coalesce(nullif(current_setting($1, true), ''), nullif(current_setting($2, true), ''), '0') AS pin", [TEST_CLOCK_PIN_SETTING, TEST_CLOCK_OFFSET_SETTING]);
+  await session.query("SELECT set_config($1, '', true)", [TEST_CLOCK_PIN_SETTING]);
+  await judge.onServer(session);
+  await session.query("SELECT set_config($1, $2, true)", [TEST_CLOCK_PIN_SETTING, began.rows[0]!.pin]);
+}
+
+/**
  * The advisory subjects a §M control removes (FaultRouting.droppingLocks): while a kind is listed, a routed unit's acquisition of it
  * (OutreachLocks.take: pg_advisory_xact_lock[_shared](kauro.transition_key($1, $2)) with the kind as $1) runs as a statement that takes nothing.
  * The production code is untouched: the unit still believes it holds the subject, so only the database's serialization is gone.
@@ -120,7 +133,7 @@ function routedClient(route: Route): PoolClient {
       const first = a[0];
       const text = typeof first === "string" ? first : (first as { text?: string } | undefined)?.text ?? "";
       const judge = route.judgeClock?.() ?? null;
-      if (judge !== null && text.includes(JUDGE_MARKER)) await judge.onServer(route.conn as unknown as SqlSession);
+      if (judge !== null && text.includes(JUDGE_MARKER)) await judgeAt(judge, route.conn as unknown as SqlSession);
       return (route.conn.query as (...x: unknown[]) => Promise<unknown>)(...a);
     };
   }
@@ -151,7 +164,7 @@ function routedClient(route: Route): PoolClient {
           const send = (): unknown => (hit !== null ? instrumented.get(hit.label)!(...args) : (target.query as (...x: unknown[]) => unknown)(...args));
           // a judgment statement reads the clock at ITS moment: a crossing the cell made while the unit waited is consumed by it (§W)
           const judge = route.judgeClock?.() ?? null;
-          const answer = (): unknown => (hit === null && judge !== null && text.includes(JUDGE_MARKER) ? Promise.resolve(judge.onServer(target as unknown as SqlSession)).then(send) : send());
+          const answer = (): unknown => (hit === null && judge !== null && text.includes(JUDGE_MARKER) ? judgeAt(judge, target as unknown as SqlSession).then(send) : send());
           const unit = route.unit;
           if (unit === undefined) return answer();
           const params = ((args[1] as ReadonlyArray<unknown> | undefined) ?? (first as { values?: ReadonlyArray<unknown> } | undefined)?.values ?? []) as ReadonlyArray<unknown>;
@@ -501,7 +514,7 @@ export class FaultRouting {
                     const first = a[0];
                     const text = typeof first === "string" ? first : (first as { text?: string } | undefined)?.text ?? "";
                     const now = this.clock;
-                    return now !== null && text.includes(JUDGE_MARKER) ? Promise.resolve(now.onServer(client)).then(() => previous.apply(client, a)) : previous.apply(client, a);
+                    return now !== null && text.includes(JUDGE_MARKER) ? judgeAt(now, client).then(() => previous.apply(client, a)) : previous.apply(client, a);
                   },
                 });
                 try {

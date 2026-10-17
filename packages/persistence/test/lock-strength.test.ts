@@ -199,7 +199,7 @@ test("RACE 11a (no defect): the row locks that stay FOR UPDATE — commission po
   assert.ok(awaited.has("kauro.tax_documents"), "tax_documents is an awaited subject");
   for (const f of sourcesUnder(SRC)) {
     const text = readFileSync(f, "utf8");
-    assert.ok(!/FROM kauro\.tax_documents[^`"]*FOR UPDATE/.test(text), `${f}: a row lock on kauro.tax_documents must be FOR NO KEY UPDATE`);
+    assert.ok(!/FROM kauro\.tax_documents[^`"]*\bFOR UPDATE\b/.test(text), `${f}: a row lock on kauro.tax_documents must be FOR NO KEY UPDATE`);
   }
   // the one reader of a commission line's shared half is the payout intent's insert (payout_lines_unpayable), which has no line to key-share
   const refs = await h.oracle.query<{ n: number }>("SELECT count(*)::int AS n FROM pg_constraint WHERE contype = 'f' AND conrelid = 'kauro.payout_intents'::regclass AND confrelid = 'kauro.commission_lines'::regclass");

@@ -116,6 +116,13 @@ const PORT_ATTEMPTS = 5;
  * fixture sets it with set_config(TEST_CLOCK_OFFSET_SETTING, '<seconds>', true) inside its own transaction to stand in the past.
  */
 export const TEST_CLOCK_OFFSET_SETTING = "kauro_test.clock_offset_seconds";
+/**
+ * A transaction-local pin of kauro.server_now() (seconds from transaction_timestamp()), which keeps the transaction's own instant where a unit began while
+ * the clock offset (and with it kauro.effect_now()) moves to a later judgment instant: in a deployment server_now() is transaction_timestamp(), stable
+ * for the whole transaction, and only effect_now() advances, so a cell that crosses a deadline while the unit waits proves the product judged at
+ * effect_now() (with server_now() it would still read the unit's start). Absent the setting, server_now() reads the clock offset as before.
+ */
+export const TEST_CLOCK_PIN_SETTING = "kauro_test.server_pin_seconds";
 
 /**
  * The TEST CLOCK (B07 decision D-CLOCK-1): every B07 lifecycle guard reads kauro.server_now(), which a deployment defines as
@@ -127,19 +134,21 @@ export const TEST_CLOCK_OFFSET_SETTING = "kauro_test.clock_offset_seconds";
  */
 export const TEST_CLOCK_FUNCTION = `CREATE OR REPLACE FUNCTION kauro.server_now() RETURNS timestamptz
   LANGUAGE sql STABLE PARALLEL SAFE SET search_path = pg_catalog AS
-$$ SELECT transaction_timestamp() + make_interval(secs => coalesce(nullif(current_setting('${TEST_CLOCK_OFFSET_SETTING}', true), ''), '0')::double precision) $$`;
+$$ SELECT transaction_timestamp() + make_interval(secs => coalesce(nullif(current_setting('${TEST_CLOCK_PIN_SETTING}', true), ''), nullif(current_setting('${TEST_CLOCK_OFFSET_SETTING}', true), ''), '0')::double precision) $$`;
 
 /**
  * The effect clock of the TEST CLOCK cluster. kauro.effect_now() is the server instant plus the time the transaction has run (0038), so a
  * statement judged "at the controlled instant" reads that instant plus whatever the harness's own statements took: a cell that must judge
  * a boundary to the microsecond (a grant valid from T, refused 1 us before) cannot place itself. A cell that needs the exact instant sets
  * the transaction-local kauro_test.effect_frozen to 'on' (the world's positioning of a unit does it): effect_now() then reads
- * kauro.server_now() exactly. Absent the setting the function is the shipped one, byte for byte in behavior.
+ * kauro.server_now() exactly. Absent the setting the function is the shipped one, byte for byte in behavior. It reads the clock offset itself (not
+ * server_now()), so a pinned server_now() (TEST_CLOCK_PIN_SETTING) leaves the effect clock free to stand at a later judgment instant.
  */
 export const TEST_EFFECT_FROZEN_SETTING = "kauro_test.effect_frozen";
 export const TEST_EFFECT_FUNCTION = `CREATE OR REPLACE FUNCTION kauro.effect_now() RETURNS timestamptz
   LANGUAGE sql VOLATILE PARALLEL SAFE SET search_path = pg_catalog AS
-$$ SELECT kauro.server_now() + CASE WHEN current_setting('${TEST_EFFECT_FROZEN_SETTING}', true) = 'on' THEN interval '0' ELSE (clock_timestamp() - transaction_timestamp()) END $$`;
+$$ SELECT transaction_timestamp() + make_interval(secs => coalesce(nullif(current_setting('${TEST_CLOCK_OFFSET_SETTING}', true), ''), '0')::double precision)
+     + CASE WHEN current_setting('${TEST_EFFECT_FROZEN_SETTING}', true) = 'on' THEN interval '0' ELSE (clock_timestamp() - transaction_timestamp()) END $$`;
 export const TEST_EFFECT_COMMENT = "TEST CLOCK installed by @kauro/persistence/testing: kauro.effect_now() as shipped, except that the transaction-local kauro_test.effect_frozen set to on reads kauro.server_now() exactly; never present in a deployment";
 
 export const TEST_CLOCK_COMMENT = "TEST CLOCK installed by @kauro/persistence/testing: transaction_timestamp() plus the transaction-local kauro_test.clock_offset_seconds; never present in a deployment";

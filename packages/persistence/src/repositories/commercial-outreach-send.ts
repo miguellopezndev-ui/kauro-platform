@@ -614,13 +614,23 @@ ${seed}`, "utf8").digest("hex");
     return "SEND_UNCERTAIN";
   }
 
-  /** The state of an intent (D6 settles the outbox record by it); null when none. */
-  /** D4's retry window: effect_now is still before uncertain_after + d4Grace (60 s, the claim of a repeat waits for the same instant, GAP-DI-25). */
-  async d4WindowOpen(intentId: string): Promise<boolean> {
-    const r = await execute<{ open: boolean }>(this.db, "SELECT (uncertain_after IS NOT NULL AND kauro.effect_now() < uncertain_after + interval '60 seconds') AS open FROM kauro.outreach_send_intents WHERE intent_id = $1", [intentId]);
-    return r.rows[0]?.open === true;
+  /**
+   * D4's retry window at the database's instant: the milliseconds left before uncertain_after + d4Grace (60 s, the instant a repeat's claim waits for,
+   * GAP-DI-25); null once it closed, or for an intent that carries no uncertain_after.
+   */
+  async d4WindowRemainingMs(intentId: string): Promise<number | null> {
+    const r = await execute<{ ms: string | null }>(
+      this.db,
+      "SELECT CASE WHEN uncertain_after IS NULL THEN NULL ELSE extract(epoch FROM (uncertain_after + interval '60 seconds' - kauro.effect_now())) * 1000 END AS ms FROM kauro.outreach_send_intents WHERE intent_id = $1",
+      [intentId],
+    );
+    const ms = r.rows[0]?.ms;
+    if (ms === undefined || ms === null) return null;
+    const left = Number(ms);
+    return left > 0 ? left : null;
   }
 
+  /** The state of an intent (D6 settles the outbox record by it); null when none. */
   async stateOf(intentId: string): Promise<string | null> {
     const r = await execute<{ state: string }>(this.db, "SELECT state FROM kauro.outreach_send_intents WHERE intent_id = $1", [intentId]);
     return r.rows[0]?.state ?? null;
