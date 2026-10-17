@@ -46,7 +46,7 @@ export function BandEstimator({ availability }: BandEstimatorProps): ReactElemen
           ))}
         </select>
       </div>
-      <button className="kauro-site-button" type="submit">
+      <button className="kauro-site-button kauro-site-button--primary" type="submit">
         {PUBLIC_COPY["pricing.estimate.cta"]}
       </button>
       <div id="estimate-result" className="kauro-site-result" role="status">

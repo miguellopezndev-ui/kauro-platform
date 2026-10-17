@@ -18,6 +18,7 @@ import {
   SafeText,
   StatusBadge,
   COLOR,
+  THEMES,
   contrastRatio,
   renderComponentCss,
   renderTokenCss,
@@ -180,24 +181,28 @@ test("D-DS-1, D-DS-2: no rule hides or replaces the focus indicator, and a point
   assert.equal(field?.declarations.get("min-block-size"), "var(--kauro-target-size)");
 });
 
-test("D-DS-1: every text colour the component stylesheet pairs with a background reaches 4.5:1, and a text colour it sets alone reaches 4.5:1 on white", () => {
-  let pairs = 0;
-  let alone = 0;
-  for (const { selector, declarations } of componentRules()) {
-    const text = tokenOf(declarations.get("color") ?? "");
-    if (text === null) continue;
-    const background = tokenOf(declarations.get("background") ?? "");
-    if (background !== null) {
-      pairs += 1;
-      const ratio = contrastRatio(COLOR[text], COLOR[background]);
-      assert.ok(ratio >= 4.5, `${selector}: ${text} on ${background} is ${ratio.toFixed(2)}:1`);
-    } else if (text !== "onPrimary") {
-      alone += 1;
-      const ratio = contrastRatio(COLOR[text], COLOR.background);
-      assert.ok(ratio >= 4.5, `${selector}: ${text} on white is ${ratio.toFixed(2)}:1`);
+test("D-DS-1: in both themes every text colour the component stylesheet pairs with a background reaches 4.5:1, and a text colour it sets alone reaches 4.5:1 on the page background and on a raised surface", () => {
+  for (const [theme, palette] of Object.entries(THEMES)) {
+    let pairs = 0;
+    let alone = 0;
+    for (const { selector, declarations } of componentRules()) {
+      const text = tokenOf(declarations.get("color") ?? "");
+      if (text === null) continue;
+      const background = tokenOf(declarations.get("background") ?? "");
+      if (background !== null) {
+        pairs += 1;
+        const ratio = contrastRatio(palette[text], palette[background]);
+        assert.ok(ratio >= 4.5, `${theme}: ${selector}: ${text} on ${background} is ${ratio.toFixed(2)}:1`);
+      } else if (text !== "onPrimary") {
+        alone += 1;
+        for (const surface of ["background", "raised"] as const) {
+          const ratio = contrastRatio(palette[text], palette[surface]);
+          assert.ok(ratio >= 4.5, `${theme}: ${selector}: ${text} on ${surface} is ${ratio.toFixed(2)}:1`);
+        }
+      }
     }
+    assert.ok(pairs >= 8 && alone >= 8, `the check reached ${pairs} pairs and ${alone} lone colours`);
   }
-  assert.ok(pairs >= 8 && alone >= 8, `the check reached ${pairs} pairs and ${alone} lone colours`);
 });
 
 test("D-DS-3: a value is isolated as its own bidirectional run, a collapsed disclosure is really hidden, and forced colours keep the borders that carry a component's shape", () => {

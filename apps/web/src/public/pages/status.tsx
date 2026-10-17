@@ -12,33 +12,37 @@ export function StatusPage({ publication }: { readonly publication: Publication 
   const modes = publishedModes(publication);
   return (
     <>
-      <PageHead title={PUBLIC_COPY["status.title"]} />
+      <PageHead size="compact" eyebrow={PUBLIC_COPY["nav.status.label"]} title={PUBLIC_COPY["status.title"]}>
+        {publication.kind === "READ" ? <p className="kauro-site-observed">{copy("status.observed.body", { time: formatInstant(publication.observedAt) })}</p> : null}
+      </PageHead>
       {publication.kind === "READ" ? (
         <>
-          <p className="kauro-site-lead">{copy("status.observed.body", { time: formatInstant(publication.observedAt) })}</p>
           <Section id="status-published" heading={PUBLIC_COPY["status.published.heading"]}>
             {modes.length === 0 ? (
-              <p>{PUBLIC_COPY["status.none.body"]}</p>
+              <p className="kauro-site-callout">{PUBLIC_COPY["status.none.body"]}</p>
             ) : (
-              <ul className="kauro-site-list">
-                {modes.map((published) => (
-                  <li key={published.mode}>
-                    <strong>{modeName(published.mode)}</strong> {stateText(availabilityOf(publication, published.mode))}
-                  </li>
-                ))}
+              <ul className="kauro-site-status-list">
+                {modes.map((published) => {
+                  const availability = availabilityOf(publication, published.mode);
+                  return (
+                    <li key={published.mode} className={`kauro-site-status-row kauro-site-status-row--${availability.toLowerCase()}`}>
+                      <strong>{modeName(published.mode)}</strong> <span className="kauro-site-status-state">{stateText(availability)}</span>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Section>
-          <Section id="status-incidents" heading={PUBLIC_COPY["status.incidents.heading"]}>
-            <p>{PUBLIC_COPY["status.incidents.body"]}</p>
+          <Section id="status-incidents" heading={PUBLIC_COPY["status.incidents.heading"]} layout="split">
+            <p className="kauro-site-muted">{PUBLIC_COPY["status.incidents.body"]}</p>
           </Section>
         </>
       ) : (
         <Section id="status-unavailable" heading={PUBLIC_COPY["status.unavailable.heading"]}>
-          <p>{PUBLIC_COPY["status.unavailable.body"]}</p>
+          <p className="kauro-site-callout">{PUBLIC_COPY["status.unavailable.body"]}</p>
         </Section>
       )}
-      <Section id="status-help" heading={PUBLIC_COPY["status.help.heading"]}>
+      <Section id="status-help" heading={PUBLIC_COPY["status.help.heading"]} layout="split" tone="sunken" variant="kauro-site-band-compact">
         <p>{PUBLIC_COPY["status.help.body"]}</p>
         <div className="kauro-site-actions">
           <LinkButton href={ROUTE.contact}>{PUBLIC_COPY["status.help.cta"]}</LinkButton>

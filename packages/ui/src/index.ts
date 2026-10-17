@@ -1,19 +1,26 @@
 // Tokens: the values, their checks and the stylesheet (@kauro/ui/tokens.css is renderTokenCss written to disk).
 export {
   BORDER_WIDTH_PX,
+  BRAND,
   COLOR,
+  COLOR_DARK,
+  COLOR_INVERSE,
+  COLOR_INVERSE_DARK,
+  COLOR_WINE,
   FOCUS,
   NON_TEXT_PAIRS,
+  RADIUS_LARGE_PX,
   RADIUS_PX,
   SPACING_PX,
   TARGET_SIZE_PX,
   TEXT_PAIRS,
+  THEMES,
   TYPOGRAPHY,
   contrastRatio,
   relativeLuminance,
   renderTokenCss,
 } from "./tokens.js";
-export type { ColorToken } from "./tokens.js";
+export type { ColorToken, ThemeName } from "./tokens.js";
 export { renderComponentCss } from "./styles.js";
 
 // Formatting of the figures the primitives show: counts, money by minor units, deadlines in a named zone.

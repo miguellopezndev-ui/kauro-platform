@@ -5,7 +5,7 @@ import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy } from "../../copy/public.ts";
 import { availabilityOf, cleanQualifiesId, formatInstant, publishedModes, type Availability, type Publication } from "../capabilities.ts";
 import { INPUT_LIMITS } from "../limits.ts";
-import { LinkButton, MODE_ORDER, PageHead, Section, ServiceState } from "../parts.tsx";
+import { LinkButton, MODE_ORDER, PageHead, Section, ServiceState, rich } from "../parts.tsx";
 import type { ServiceMode } from "../pricing-bands.ts";
 import { ROUTE } from "../site.ts";
 
@@ -21,24 +21,24 @@ function Details({ mode, publication }: { readonly mode: ServiceMode; readonly p
     case "CLEAN":
       return (
         <>
-          <p>{PUBLIC_COPY["services.clean.summary"]}</p>
+          <p className="kauro-site-card-lead">{PUBLIC_COPY["services.clean.summary"]}</p>
           <p>{PUBLIC_COPY["services.clean.delivery"]}</p>
           <p>{PUBLIC_COPY[cleanQualifiesId(publication)]}</p>
-          <p>{PUBLIC_COPY["services.clean.limit"]}</p>
+          <p className="kauro-site-card-limit">{PUBLIC_COPY["services.clean.limit"]}</p>
         </>
       );
     case "HUBSPOT":
       return (
         <>
-          <p>{PUBLIC_COPY["services.hubspot.summary"]}</p>
-          <p>{PUBLIC_COPY["services.hubspot.cost"]}</p>
+          <p className="kauro-site-card-lead">{PUBLIC_COPY["services.hubspot.summary"]}</p>
+          <p className="kauro-site-card-limit">{PUBLIC_COPY["services.hubspot.cost"]}</p>
         </>
       );
     case "SALESFORCE":
       return (
         <>
-          <p>{PUBLIC_COPY["services.salesforce.summary"]}</p>
-          <p>{PUBLIC_COPY["services.salesforce.limit"]}</p>
+          <p className="kauro-site-card-lead">{PUBLIC_COPY["services.salesforce.summary"]}</p>
+          <p className="kauro-site-card-limit">{PUBLIC_COPY["services.salesforce.limit"]}</p>
         </>
       );
   }
@@ -49,11 +49,13 @@ function ServiceCard({ mode, publication }: { readonly mode: ServiceMode; readon
   const listed = publishedModes(publication).find((entry) => entry.mode === mode);
   const headingId = `${CARD_ID[mode]}-heading`;
   return (
-    <article className="kauro-site-card" aria-labelledby={headingId}>
-      <h3 id={headingId}>{CARD_NAME[mode]}</h3>
-      <ServiceState availability={availability} />
+    <article className={`kauro-site-card kauro-site-service kauro-site-service--${availability.toLowerCase()}`} aria-labelledby={headingId}>
+      <div className="kauro-site-service-top">
+        <h3 id={headingId}>{CARD_NAME[mode]}</h3>
+        <ServiceState availability={availability} />
+      </div>
       {availability === "CLOSED" ? null : <Details mode={mode} publication={publication} />}
-      {listed === undefined ? null : <p className="kauro-site-note">{copy("services.mode.version", { version: listed.version, time: formatInstant(listed.validFrom) })}</p>}
+      {listed === undefined ? null : <p className="kauro-site-meta">{copy("services.mode.version", { version: listed.version, time: formatInstant(listed.validFrom) })}</p>}
     </article>
   );
 }
@@ -63,38 +65,47 @@ export function SupportedServicesPage({ publication }: { readonly publication: P
   const someClosed = publication.kind === "READ" && MODE_ORDER.some((mode) => availabilityOf(publication, mode) === "CLOSED");
   return (
     <>
-      <PageHead title={PUBLIC_COPY["services.title"]} lead={PUBLIC_COPY["services.lead"]} />
-      <Section id="services-availability" heading={PUBLIC_COPY["services.availability.heading"]}>
+      <PageHead eyebrow={PUBLIC_COPY["nav.services.label"]} title={PUBLIC_COPY["services.title"]} lead={PUBLIC_COPY["services.lead"]} />
+      <Section
+        id="services-availability"
+        heading={PUBLIC_COPY["services.availability.heading"]}
+        headExtra={publication.kind === "READ" ? <p className="kauro-site-observed">{copy("services.availability.observed", { time: formatInstant(publication.observedAt) })}</p> : undefined}
+      >
         {publication.kind === "READ" ? (
-          <>
-            <p>{copy("services.availability.observed", { time: formatInstant(publication.observedAt) })}</p>
-            {modes.length === 0 ? <p>{PUBLIC_COPY["services.availability.none"]}</p> : null}
-          </>
+          modes.length === 0 ? <p className="kauro-site-callout">{PUBLIC_COPY["services.availability.none"]}</p> : null
         ) : (
-          <p>{PUBLIC_COPY["services.availability.unknown"]}</p>
+          <p className="kauro-site-callout">{PUBLIC_COPY["services.availability.unknown"]}</p>
         )}
-        <div className="kauro-site-cards">
+        <div className="kauro-site-cards kauro-site-cards--three">
           {MODE_ORDER.map((mode) => (
             <ServiceCard key={mode} mode={mode} publication={publication} />
           ))}
         </div>
-        {someClosed ? <p>{PUBLIC_COPY["services.unavailable.body"]}</p> : null}
-        {publication.kind === "READ" && modes.length === 0 ? <p>{PUBLIC_COPY["services.none.body"]}</p> : null}
+        {someClosed ? <p className="kauro-site-muted">{PUBLIC_COPY["services.unavailable.body"]}</p> : null}
+        {publication.kind === "READ" && modes.length === 0 ? <p className="kauro-site-muted">{PUBLIC_COPY["services.none.body"]}</p> : null}
       </Section>
-      <Section id="services-scope" heading={PUBLIC_COPY["services.scope.heading"]}>
-        <p>{PUBLIC_COPY["services.scope.objects"]}</p>
-        <p>{PUBLIC_COPY["services.scope.excluded"]}</p>
-        <p>{PUBLIC_COPY["services.scope.unsupported"]}</p>
+      <Section id="services-scope" heading={PUBLIC_COPY["services.scope.heading"]} layout="split" tone="sunken">
+        <div className="kauro-site-scope">
+          <div className="kauro-site-scope-column kauro-site-scope-column--in">
+            <p className="kauro-site-scope-label">{PUBLIC_COPY["services.scope.in.label"]}</p>
+            <p>{PUBLIC_COPY["services.scope.objects"]}</p>
+          </div>
+          <div className="kauro-site-scope-column kauro-site-scope-column--out">
+            <p className="kauro-site-scope-label">{PUBLIC_COPY["services.scope.out.label"]}</p>
+            <p>{PUBLIC_COPY["services.scope.excluded"]}</p>
+          </div>
+        </div>
+        <p className="kauro-site-statement kauro-site-statement--small">{PUBLIC_COPY["services.scope.unsupported"]}</p>
       </Section>
-      <Section id="services-limits" heading={PUBLIC_COPY["services.limits.heading"]}>
-        <ul className="kauro-site-list">
+      <Section id="services-limits" heading={PUBLIC_COPY["services.limits.heading"]} layout="split">
+        <ul className="kauro-site-specs">
           <li>{PUBLIC_COPY["services.limits.formats"]}</li>
-          <li>{copy("services.limits.files", { files: INPUT_LIMITS.files, fileSize: INPUT_LIMITS.fileSize })}</li>
-          <li>{copy("services.limits.set", { setSize: INPUT_LIMITS.setSize, columns: INPUT_LIMITS.columns })}</li>
-          <li>{copy("services.limits.units", { units: INPUT_LIMITS.units })}</li>
+          <li>{rich("services.limits.files", { files: INPUT_LIMITS.files, fileSize: INPUT_LIMITS.fileSize })}</li>
+          <li>{rich("services.limits.set", { setSize: INPUT_LIMITS.setSize, columns: INPUT_LIMITS.columns })}</li>
+          <li>{rich("services.limits.units", { units: INPUT_LIMITS.units })}</li>
         </ul>
       </Section>
-      <Section id="services-next" heading={PUBLIC_COPY["services.next.heading"]}>
+      <Section id="services-next" heading={PUBLIC_COPY["services.next.heading"]} layout="split" tone="inverse" variant="kauro-site-band-compact">
         <p>{PUBLIC_COPY["services.next.body"]}</p>
         <div className="kauro-site-actions">
           <LinkButton href={ROUTE.contact}>{PUBLIC_COPY["services.next.ask.cta"]}</LinkButton>

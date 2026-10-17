@@ -25,8 +25,10 @@ export function OptOutForm({ token }: { readonly token: string }): ReactElement 
   return (
     <form method="post" action={optOutPath(token)} encType="application/x-www-form-urlencoded" onSubmit={(event) => void onSubmit(event)}>
       <input type="hidden" name={name} value={value} />
-      <button type="submit" disabled={state === "SENDING"}>{PUBLIC_COPY["unsubscribe.submit.cta"]}</button>
-      {state === "FAILED" || state === "LIMITED" ? <p role="alert">{PUBLIC_COPY[state === "LIMITED" ? "unsubscribe.limited.body" : "unsubscribe.failed.body"]}</p> : null}
+      <button className="kauro-site-button kauro-site-button--primary" type="submit" disabled={state === "SENDING"}>
+        {PUBLIC_COPY["unsubscribe.submit.cta"]}
+      </button>
+      {state === "FAILED" || state === "LIMITED" ? <p role="alert" className="kauro-site-error">{PUBLIC_COPY[state === "LIMITED" ? "unsubscribe.limited.body" : "unsubscribe.failed.body"]}</p> : null}
     </form>
   );
 }
