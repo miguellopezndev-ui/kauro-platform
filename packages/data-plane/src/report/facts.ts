@@ -45,7 +45,11 @@ export interface AuthorizedReportInputs {
   readonly branding: Branding;
   /** The stored logo's bytes when the branding names one. */
   readonly logo: Uint8Array | null;
-  readonly terms: { readonly termsVersion: string; readonly snapshot: Uint8Array } | null;
+  /**
+   * The terms the platform recorded for this delivery (the frozen quote's `terms_version` and `terms_hash`) and the snapshot those
+   * terms state the issuer in. The snapshot must hash to the recorded hash and state the recorded version, or the issuer is unverifiable.
+   */
+  readonly terms: { readonly termsVersion: string; readonly termsSha256: string; readonly snapshot: Uint8Array } | null;
   /** The sealed revision's populations and the bound receipt's counts, as the publication reads them. */
   readonly countFacts: DeliveryCountFacts | null;
   readonly findingIds: readonly string[];
@@ -111,7 +115,8 @@ export function assembleReportFacts(scope: ReportScope, inputs: AuthorizedReport
   if (inputs.terms === null) throw new ReportStageError("TERMS_UNAVAILABLE", "no terms snapshot names the issuer");
   const terms = readTermsSnapshot(inputs.terms.snapshot);
   if (!terms.ok) throw new ReportStageError("TERMS_UNVERIFIABLE", `the terms snapshot is not readable (${terms.problem})`);
-  if (terms.termsVersion !== inputs.terms.termsVersion) throw new ReportStageError("TERMS_UNVERIFIABLE", "the snapshot is of another terms version than the one the platform names");
+  if (terms.termsVersion !== inputs.terms.termsVersion) throw new ReportStageError("TERMS_UNVERIFIABLE", "the snapshot is of another terms version than the one the platform recorded");
+  if (!isSha256Hex(inputs.terms.termsSha256) || terms.sha256 !== inputs.terms.termsSha256) throw new ReportStageError("TERMS_UNVERIFIABLE", "the snapshot is not the document whose hash the platform recorded");
   if (inputs.countFacts === null) throw new ReportStageError("COUNTS_UNAVAILABLE", "the platform has no populations or receipt counts for this package");
   const counted = deliveryRowCountsOf(inputs.countFacts);
   if (counted.kind === "REFUSED") {

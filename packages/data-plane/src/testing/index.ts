@@ -28,5 +28,6 @@ export {
   SIMULATED_TERMS_VERSION,
   SimulatedReportInputs,
   simulatedReportInputsOf,
+  simulatedTermsOf,
   type SimulatedReportInputsSpec,
 } from "./report-inputs.js";

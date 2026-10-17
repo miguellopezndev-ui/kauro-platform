@@ -9,7 +9,7 @@
  *
  * Importable only from a package's test/ directory (architecture rule testOnlySubpaths).
  */
-import type { RowCounts } from "@kauro/contracts";
+import { rawDigest, type RowCounts } from "@kauro/contracts";
 import type { Branding, PrivacyClass } from "@kauro/reports";
 import { termsSnapshotBytesOf, type AuthorizedReportInputs, type ReportInputsPort, type ReportScope } from "../report/facts.js";
 
@@ -31,6 +31,12 @@ export interface SimulatedReportInputsSpec {
   readonly materialDecisionIds?: readonly string[];
 }
 
+/** A terms snapshot of the issuer and the platform's record of it (version and hash), consistent with each other. */
+export function simulatedTermsOf(termsVersion: string, issuer: { readonly legalName: string; readonly jurisdiction: string; readonly registrationId: string }): NonNullable<AuthorizedReportInputs["terms"]> {
+  const snapshot = termsSnapshotBytesOf(termsVersion, issuer);
+  return { termsVersion, termsSha256: rawDigest(snapshot), snapshot };
+}
+
 /** Inputs for `scope`, internally consistent: the snapshot is the issuer's, the receipt counts are the populations plus the dispositions. */
 export function simulatedReportInputsOf(scope: ReportScope, spec: SimulatedReportInputsSpec, overrides: Partial<AuthorizedReportInputs> = {}): AuthorizedReportInputs {
   const { physicalSourceRows, logicalSourceRecords, billableSourceUnits, associationEdges } = spec.counts;
@@ -43,7 +49,7 @@ export function simulatedReportInputsOf(scope: ReportScope, spec: SimulatedRepor
     privacyClass: spec.privacyClass ?? "SECURE_DETAIL",
     branding: spec.branding ?? { version: "brand-simulated-1", displayName: "Northwind Data Partners", logo: null },
     logo: null,
-    terms: { termsVersion, snapshot: termsSnapshotBytesOf(termsVersion, spec.issuer ?? SIMULATED_ISSUER) },
+    terms: simulatedTermsOf(termsVersion, spec.issuer ?? SIMULATED_ISSUER),
     countFacts: { populations: { physicalSourceRows, logicalSourceRecords, billableSourceUnits, associationEdges }, receiptCounts: { ...spec.counts } },
     findingIds: spec.findingIds ?? ["F-1", "F-2"],
     materialDecisionIds: spec.materialDecisionIds ?? ["D-1"],

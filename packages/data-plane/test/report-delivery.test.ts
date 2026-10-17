@@ -32,7 +32,7 @@ import {
   termsSnapshotBytesOf,
   type ReportRenderConfig,
 } from "../src/index.js";
-import { SIMULATED_ISSUER, SimulatedReportInputs, simulatedReportInputsOf } from "../src/testing/index.js";
+import { SIMULATED_ISSUER, SimulatedReportInputs, simulatedReportInputsOf, simulatedTermsOf } from "../src/testing/index.js";
 import { collect, manualChannel, v7 } from "./support/attempt.js";
 import { acceptanceCore, inputsFor, platformRecordOf, rig, scriptedEngine, scriptedPdf, sha, type Rig } from "./support/report-rig.js";
 import { readPdf, squash } from "./support/pdf-reader.js";
@@ -226,11 +226,12 @@ describe("B13xB08 the platform's facts: nothing is invented, nothing unbound is 
     const respelled = new TextEncoder().encode(`${Buffer.from(good).toString("utf8").replace('"version":1', '"version": 1')}`);
     const cases: ReadonlyArray<readonly [string, Parameters<typeof simulatedReportInputsOf>[2], string]> = [
       ["no terms snapshot", { terms: null }, "TERMS_UNAVAILABLE"],
-      ["a snapshot altered after it was made", { terms: { termsVersion: "terms-simulated-1", snapshot: flipped } }, "TERMS_UNVERIFIABLE"],
-      ["a snapshot of another terms version than the platform names", { terms: { termsVersion: "terms-simulated-2", snapshot: good } }, "TERMS_UNVERIFIABLE"],
-      ["a snapshot spelled differently from its canonical form", { terms: { termsVersion: "terms-simulated-1", snapshot: respelled } }, "TERMS_UNVERIFIABLE"],
-      ["bytes that are no snapshot", { terms: { termsVersion: "terms-simulated-1", snapshot: new TextEncoder().encode("Kauro Data S.A.S.") } }, "TERMS_UNVERIFIABLE"],
-      ["an issuer whose name carries markup", { terms: { termsVersion: "terms-simulated-1", snapshot: termsSnapshotBytesOf("terms-simulated-1", { ...SIMULATED_ISSUER, legalName: "<b>Issuer</b>" }) } }, "MODEL_REFUSED"],
+      ["a snapshot altered after it was made", { terms: { termsVersion: "terms-simulated-1", termsSha256: sha(good), snapshot: flipped } }, "TERMS_UNVERIFIABLE"],
+      ["a snapshot of another terms version than the platform names", { terms: { termsVersion: "terms-simulated-2", termsSha256: sha(good), snapshot: good } }, "TERMS_UNVERIFIABLE"],
+      ["a snapshot spelled differently from its canonical form", { terms: { termsVersion: "terms-simulated-1", termsSha256: sha(respelled), snapshot: respelled } }, "TERMS_UNVERIFIABLE"],
+      ["a recorded hash that is not the snapshot's (the platform recorded other terms)", { terms: { termsVersion: "terms-simulated-1", termsSha256: "5".repeat(64), snapshot: good } }, "TERMS_UNVERIFIABLE"],
+      ["bytes that are no snapshot", { terms: { termsVersion: "terms-simulated-1", termsSha256: sha("Kauro Data S.A.S."), snapshot: new TextEncoder().encode("Kauro Data S.A.S.") } }, "TERMS_UNVERIFIABLE"],
+      ["an issuer whose name carries markup", { terms: simulatedTermsOf("terms-simulated-1", { ...SIMULATED_ISSUER, legalName: "<b>Issuer</b>" }) }, "MODEL_REFUSED"],
     ];
     for (const [label, overrides, code] of cases) {
       const r = nextRig();
