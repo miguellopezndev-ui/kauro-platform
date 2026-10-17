@@ -51,6 +51,9 @@ export {
 export type { PriceBand, RepeatTier, PricePolicy, DiscountSelection, QuoteAmounts, QuoteTermsPreimage } from "./pricing.js";
 export { pricePolicyFrom, registryPricePolicy, baseServiceCents, repeatDiscountBps, selectDiscount, quoteAmounts, quoteExpiresAt, lookbackStartsAt, quoteTermsHash, termsMoney } from "./pricing.js";
 
+export type { LegalIdentity, LegalIdentityReading } from "./legal-identity.js";
+export { LEGAL_IDENTITY_DOMAIN, LEGAL_IDENTITY_FIELDS, legalIdentityProblems, legalIdentityBytesOf, readLegalIdentity } from "./legal-identity.js";
+
 export type { FiscalBlocker, FiscalTreatmentDecision, FiscalTreatmentInput } from "./fiscal.js";
 export { taxOf, ruleSnapshotOf, sameTaxRule, FISCAL_BLOCKERS, profileInForceAt, saleProfileAt, resolveFiscalTreatment, quotableTaxRule } from "./fiscal.js";
 

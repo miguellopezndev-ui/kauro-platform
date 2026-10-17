@@ -87,8 +87,8 @@ test("the platform's records decide: a package other than the receipt's, counts 
     ["receipt counts the package's bytes do not support", {}, { counts: { ...c, emittedRepresentatives: c.emittedRepresentatives - 1 } }],
     ["a receipt that disagrees with the sealed revision's populations", { inputs: (r) => (r === null ? r : { ...r, countFacts: { populations: r.countFacts!.populations, receiptCounts: { ...(r.countFacts!.receiptCounts as object), physicalSourceRows: 18 } } }) }, {}],
     ["no counts at all", { inputs: (r) => (r === null ? r : { ...r, countFacts: null }) }, {}],
-    ["terms whose document is not the one the quote recorded", {}, { termsHash: "5".repeat(64) }],
-    ["no terms snapshot", { inputs: (r) => (r === null ? r : { ...r, terms: null }) }, {}],
+    ["a recorded terms hash that is not KAURO_QUOTE_TERMS_V1 of the quote's own preimage", {}, { termsHash: "5".repeat(64) }],
+    ["no recorded terms", { inputs: (r) => (r === null ? r : { ...r, terms: null }) }, {}],
     ["no platform record of the report at all", { inputs: () => null }, {}],
     ["a print that returns something that is not a PDF", { engine: () => ({ engineId: "junk/1", print: () => Promise.resolve(new TextEncoder().encode("<html>no</html>".repeat(40))) }) }, {}],
   ];

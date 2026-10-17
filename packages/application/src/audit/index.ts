@@ -39,7 +39,7 @@ export { AUDIT_COMMAND_RESPONSES, AUDIT_VIEW_DEFINITIONS } from "./response-view
 export { AUDIT_READ_ROUTES } from "./read-specs.js";
 export type { CoreServices } from "./core-services.js";
 export { patchCompilerOver, unavailableCoreServices } from "./core-services.js";
-export { disclosureComposer } from "./disclosure-composer.js";
+export { disclosureComposer, disclosureItemsOf, disclosuresHashOf } from "./disclosure-composer.js";
 export type { AuditReadHandlers, AuditIntakeHandlers, AuditReadRuntime, AuditRuntime } from "./handlers/index.js";
 export {
   AGENCY_CANCELLED_REASON,

@@ -61,6 +61,9 @@ export { lostAuthority, LOST_AUTHORITY_REASONS } from "./execution/authority.js"
 export type { LostAuthorityReason } from "./execution/authority.js";
 export { deliveryObjectNameOf, expectedAuthorityHashOf, DELIVERY_OBJECT_NAME_DOMAIN, EXPECTED_AUTHORITY_DOMAIN } from "./execution/names.js";
 export { EXECUTION_SERVICES } from "./execution/work.js";
+// the platform's inputs of a B13 report (order 6; docs/design/B13-report-inputs.md): the control plane's side of ReportInputsPort
+export { PlatformReportInputs, reportInputsOf } from "./execution/report-inputs.js";
+export type { PlatformReportInputsDependencies } from "./execution/report-inputs.js";
 export type { ExecutionStep } from "./execution/work.js";
 // audit authority (package B08, mandate B08-CONTROL-AUDIT; docs/design/B08-audit-approval-jobs.md §3, §6, §8.1, §11)
 export type { AuditUnits } from "@kauro/application";

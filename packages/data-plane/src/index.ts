@@ -69,6 +69,10 @@ export { ChromiumPdfEngine, findChromiumExecutable, PDF_HTML_MAX_BYTES, type Chr
  */
 export { REPORT_STAGE_ERROR_CODES, ReportStageError, type ReportStageErrorCode } from "./report/errors.js";
 export {
+  AUDIT_STATES_WITH_PLANS,
+  B08_PACKAGE_REPORT_PRIVACY_CLASS,
+  PRINTABLE_LEGAL_FACT_STATUSES,
+  QUOTE_IN_FORCE,
   REPORT_INPUTS_EVIDENCE_CLASSES,
   TERMS_SNAPSHOT_DOMAIN,
   assembleReportFacts,
@@ -77,9 +81,15 @@ export {
   reportPackageIdOf,
   termsSnapshotBytesOf,
   type AuthorizedReportInputs,
+  type QuoteTerms,
+  type ReportBrandingInputs,
+  type ReportDecisionsInputs,
+  type ReportFindingsInputs,
   type ReportInputsEvidenceClass,
   type ReportInputsPort,
   type ReportScope,
+  type ReportSubject,
+  type SnapshotTerms,
   type TermsSnapshotReading,
 } from "./report/facts.js";
 export { REPORT_PDF_ROLE, REPORT_RECORD_DOMAIN, REPORT_RECORD_ROLE, readReportPdfRecord, reportPdfRecordBytesOf, reportRecordProblems, type ReportPdfRecord, type ReportPdfRecordReading } from "./report/record.js";

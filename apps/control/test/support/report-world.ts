@@ -3,12 +3,15 @@
 // delivers a package and the PDF report of that package through B08's own steps — staging, read-back, verification, delivery copies,
 // publication — on a real PostgreSQL 17.
 //
-// REAL: the report chain, the attempt's envelope, B08's control plane and store, the PDF engine where a browser exists, and the platform's
-// records the report inputs are read from — the validation receipt's manifest hash, the sealed revision's populations and the receipt's
-// counts (through the store function the publication itself uses), and the frozen quote's units, terms version and terms hash.
+// REAL: the report chain, the attempt's envelope, B08's control plane and store, the PDF engine where a browser exists, and the report's
+// inputs — read by the platform's own ReportInputsPort (PlatformReportInputs, order 6) in the control plane's bound SYSTEM unit of work
+// from the platform's records: the validation receipt's manifest hash, the sealed revision's populations and the receipt's counts (through
+// the store function the publication itself uses), the frozen quote with its KAURO_QUOTE_TERMS_V1 preimage, the agency's acceptance of its
+// terms version, the fiscal issuer and its legal identity document, the agency's branding version, the subject's audit findings and the
+// approval's disclosure set (the edition's composer over the plan and the receipt).
+// SYNTHETIC — the legal identity document is the labelled TEST identity of @kauro/persistence/testing (no record holds the owner's yet).
 // CONTRACT FAKE — SIMULATED: B07's object storage and the Migration core's staging (an acceptance package replayed through the writer,
-// as MigrationCoreAdapter stages one); and the terms snapshot the issuer is read from, branding, privacy class and finding ids, which no
-// platform record holds yet (the owner has not provided the issuer's legal identity). The superuser connection is the oracle only.
+// as MigrationCoreAdapter stages one). The superuser connection is the oracle only.
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -16,10 +19,12 @@ import { fileURLToPath } from "node:url";
 import type { ExecutionEnvelopePort, ExecutionOutcome, HostIo, StagedArtifact } from "@kauro/application";
 import type { RowCounts, Sha256Hex } from "@kauro/contracts";
 import { ChromiumPdfEngine, ReportingExecutionEnvelope, findChromiumExecutable, type AuthorizedReportInputs, type ReportInputsPort, type ReportRenderConfig, type ReportScope } from "@kauro/data-plane";
-import { SIMULATED_ISSUER, simulatedTermsOf } from "@kauro/data-plane/testing";
-import type { AgencyId, CorrelationId, ProcessingJobId } from "@kauro/domain";
-import { EXECUTION_SERVICES, boundSystem } from "../../src/execution/work.js";
-import { ids, startExecutionWorld, type ExecutionWorld, type ReportFixture, type TestClockExecutionUnits } from "./execution-world.js";
+import type { AuditId, AuditStepId } from "@kauro/domain";
+import { TEST_LEGAL_IDENTITY, acceptReportAgreements, publishReportAgreements, recordBranding, recordIssuerOfIdentity, recordLegalIdentity } from "@kauro/persistence/testing";
+import { AGENCY_DECISION_REQUIRED } from "../../src/audit/orchestration.js";
+import { PlatformReportInputs } from "../../src/execution/report-inputs.js";
+import { openAuditWorld, type AuditWorld } from "./audit-world.js";
+import { ids, startExecutionWorld, type AuditSubject, type ExecutionWorld, type ReportFixture, type TestClockExecutionUnits } from "./execution-world.js";
 
 export type PackageName = "A-clean-multi-object" | "D-salesforce";
 type Engine = ConstructorParameters<typeof ReportingExecutionEnvelope>[0]["engine"];
@@ -71,13 +76,15 @@ export const PACKAGE_RECORDS: Readonly<Record<PackageName, { readonly expectedMa
 });
 
 export const TERMS_VERSION = "TERMS-2026-01";
-/** The terms snapshot a quote of this world is accepted under (SIMULATED: no platform record holds the issuer's identity yet). */
-export const TERMS = simulatedTermsOf(TERMS_VERSION, SIMULATED_ISSUER);
+/** The issuer every report of this world names: the labelled synthetic identity its fiscal issuer's legal identity hash is the hash of. */
+export const ISSUER = TEST_LEGAL_IDENTITY;
+/** The branding version every agency of this world records before it queues anything. */
+export const BRAND = "Synthetic Test Agency";
 
-/** The fixture a purchase needs to deliver `name`: the package's counts and manifest hash, and the hash of the terms snapshot. */
+/** The fixture a purchase needs to deliver `name`: the package's counts and the manifest hash its receipt binds. */
 export function reportFixtureOf(name: PackageName, overrides: Partial<ReportFixture> = {}): ReportFixture {
   const record = PACKAGE_RECORDS[name];
-  return { counts: record.counts, expectedManifestSha256: record.expectedManifestSha256, termsHash: TERMS.termsSha256 as Sha256Hex, ...overrides };
+  return { counts: record.counts, expectedManifestSha256: record.expectedManifestSha256, ...overrides };
 }
 
 /** What one agency's jobs do in this world: which package the core stages, and how the report is printed. */
@@ -125,43 +132,14 @@ function coreOf(scenarios: Map<string, ReportScenario>): ExecutionEnvelopePort {
   };
 }
 
-/** The platform's recorded inputs for a job's report, read from the database (see the header for what is real). */
-function inputsOf(parts: { readonly units: TestClockExecutionUnits; readonly oracle: ExecutionWorld["h"]["oracle"] }, scenarios: Map<string, ReportScenario>): ReportInputsPort {
+/** The platform's ReportInputsPort over the world's units, and a scenario's edit of what it read (a record missing or wrong). */
+function inputsOf(units: TestClockExecutionUnits, scenarios: Map<string, ReportScenario>): ReportInputsPort {
+  const platform = new PlatformReportInputs({ units, ids });
   return {
     async read(scope: ReportScope): Promise<AuthorizedReportInputs | null> {
-      const agencyId = scope.agencyId as AgencyId;
-      const found = await parts.units.run(boundSystem(EXECUTION_SERVICES.JOB_EXECUTION, agencyId, ids.next() as CorrelationId), async (uow) => {
-        const job = await uow.execution.getJob(scope.jobId as ProcessingJobId);
-        return job === null ? null : { job, countFacts: await uow.execution.deliveryCountFacts(job) };
-      });
-      const scenario = scenarios.get(scope.agencyId);
-      if (found === null) return scenario?.inputs?.(null) ?? null;
-      const { job, countFacts } = found;
-      const receipt = (await parts.oracle.query<{ artifact_evidence_hash: string }>("SELECT artifact_evidence_hash FROM kauro.validation_receipts WHERE agency_id = $1 AND receipt_hash = $2", [scope.agencyId, job.validationReceiptHash])).rows[0];
-      const quote = (
-        await parts.oracle.query<{ quote_id: string; billable_units: string; terms_version: string; terms_hash: string }>(
-          `SELECT q.quote_id, q.billable_units::text AS billable_units, q.terms_version, q.terms_hash
-             FROM kauro.quotes q JOIN kauro.commercial_authorizations a ON a.agency_id = q.agency_id AND a.quote_id = q.quote_id
-            WHERE a.agency_id = $1 AND a.authorization_id = $2`,
-          [scope.agencyId, job.authorizationId],
-        )
-      ).rows[0];
-      if (receipt === undefined || quote === undefined) return scenario?.inputs?.(null) ?? null;
-      const read: AuthorizedReportInputs = {
-        evidenceClass: "EXECUTED_LOCAL",
-        scope,
-        expectedManifestSha256: receipt.artifact_evidence_hash,
-        quote: { quoteId: quote.quote_id, billableSourceUnits: Number(quote.billable_units) },
-        privacyClass: "SECURE_DETAIL",
-        branding: { version: "brand-simulated-1", displayName: "Northwind Data Partners", logo: null },
-        logo: null,
-        // the platform records the terms' version and hash (the frozen quote); the document they name is the simulated snapshot
-        terms: { termsVersion: quote.terms_version, termsSha256: quote.terms_hash, snapshot: TERMS.snapshot },
-        countFacts,
-        findingIds: ["F-1"],
-        materialDecisionIds: ["D-1"],
-      };
-      return scenario?.inputs === undefined ? read : scenario.inputs(read);
+      const read = await platform.read(scope);
+      const edit = scenarios.get(scope.agencyId)?.inputs;
+      return edit === undefined ? read : edit(read);
     },
   };
 }
@@ -170,13 +148,41 @@ export interface ReportWorld extends ExecutionWorld {
   readonly scenarios: Map<string, ReportScenario>;
   /** Registers the scenario of an agency's jobs. */
   scenario(agency: { readonly agencyId: string }, scenario: ReportScenario): void;
+  /** What each job's report stage answered the host, by job id (the last attempt's; a thrown error records nothing). */
+  readonly outcomes: Map<string, ExecutionOutcome>;
 }
 
 export const RENDER: ReportRenderConfig = { pageSize: "LETTER", locale: "en-US", rendererVersion: "renderer-1.0.0" };
 
 export async function startReportWorld(tag: string): Promise<ReportWorld> {
   const scenarios = new Map<string, ReportScenario>();
+  const outcomes = new Map<string, ExecutionOutcome>();
+  let self: ExecutionWorld | null = null;
+  let audits: AuditWorld | null = null;
+  /** The subject's audit, taken through its steps to NEEDS_DECISION with its finding, as AUDIT_ORCHESTRATION records it (the plan is the agency's). */
+  const audited = async (subject: AuditSubject): Promise<void> => {
+    audits ??= await openAuditWorld(self as ExecutionWorld);
+    const a = audits;
+    const { audit } = await a.start(subject);
+    const auditId = audit.auditId as AuditId;
+    const agencyId = subject.agency.agencyId;
+    const profile = await a.control(agencyId, (uow) => uow.audits.claimStep(auditId, "PROFILE", ids.next() as AuditStepId));
+    await a.control(agencyId, (uow) => uow.audits.recordStep(profile.step.stepId, { outcome: "COMPLETED", evidenceHash: sha256(`profile-${auditId}`), evidenceClass: "SIMULATED" }));
+    await a.control(agencyId, (uow) => uow.audits.advanceAudit(auditId, profile.audit.version, { to: "INTERPRETING", profileEvidenceHash: sha256(`profile-${auditId}`), candidateManifestHash: sha256(`candidates-${auditId}`) }));
+    const interpret = await a.control(agencyId, (uow) => uow.audits.claimStep(auditId, "INTERPRET", ids.next() as AuditStepId));
+    await a.control(agencyId, (uow) => uow.audits.recordStep(interpret.step.stepId, { outcome: "NEEDS_DECISION", evidenceHash: null, evidenceClass: "SIMULATED" }));
+    const decided = await a.control(agencyId, (uow) => uow.audits.advanceAudit(auditId, interpret.audit.version, { to: "NEEDS_DECISION", findingCodes: [AGENCY_DECISION_REQUIRED] }));
+    if (decided.kind !== "APPLIED") throw new Error(`the subject's audit ${auditId} did not reach NEEDS_DECISION (${decided.kind})`);
+  };
   const world = await startExecutionWorld(tag, {
+    // the issuer the quotes name: a qualified route whose legal identity hash is the recorded synthetic identity's
+    issuer: async (h) => recordIssuerOfIdentity(h, (await recordLegalIdentity(h, ISSUER)).legalIdentityHash),
+    // each agency accepts the published terms the quotes name and records its branding before it queues anything
+    onAgency: async (h, agency) => {
+      await acceptReportAgreements(h, agency, await publishReportAgreements(h, { terms: TERMS_VERSION }));
+      await recordBranding(h, agency, BRAND);
+    },
+    onSubject: audited,
     envelope: (parts) =>
       ({
         async execute(subject, io): Promise<ExecutionOutcome> {
@@ -184,16 +190,20 @@ export async function startReportWorld(tag: string): Promise<ReportWorld> {
           const envelope = new ReportingExecutionEnvelope({
             inner: coreOf(scenarios),
             storage: parts.storage,
-            inputs: inputsOf(parts, scenarios),
+            inputs: inputsOf(parts.units, scenarios),
             engine: scenario?.engine?.() ?? defaultEngine(),
             render: { ...RENDER, rendererVersion: scenario?.rendererVersion ?? RENDER.rendererVersion },
           });
-          return envelope.execute(subject, io);
+          const outcome = await envelope.execute(subject, io);
+          outcomes.set(subject.jobId, outcome);
+          return outcome;
         },
       }) satisfies ExecutionEnvelopePort,
   });
+  self = world;
   return Object.assign(world, {
     scenarios,
+    outcomes,
     scenario(agency: { readonly agencyId: string }, scenario: ReportScenario): void {
       scenarios.set(agency.agencyId, scenario);
     },

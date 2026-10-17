@@ -73,6 +73,7 @@ import { PgBankCredits } from "./repositories/bank-credits.js";
 import { PgBankSettlements } from "./repositories/bank-settlements.js";
 import { PgSessionFence } from "./session-fence.js";
 import { PgBuyerTypes, PgProjectDashboard } from "./repositories/agency-app.js";
+import { PgReportSources } from "./report/sources.js";
 import { PgExecutionReads } from "./execution/reads.js";
 import { PgExecutionStore } from "./execution/store.js";
 import { PgExecutionDiscovery } from "./execution/discovery.js";
@@ -221,6 +222,8 @@ export class PgUnitOfWork implements UnitOfWork {
   readonly buyerTypes: PgBuyerTypes;
   /** The project dashboard query (ListProjects, B11 lane A1), read through projectDashboardOf(uow). */
   readonly projectDashboard: PgProjectDashboard;
+  /** The records a B13 report is made from, the agency's branding versions and the issuers' legal identity documents (order 6, migration 0095), read through reportSourcesOf(uow). */
+  readonly reportSources: PgReportSources;
   #adoptedAgencyId: AgencyId | null = null;
   #resolvedMembershipId: MembershipId | null = null;
   #abandoned: Error | null = null;
@@ -238,6 +241,7 @@ export class PgUnitOfWork implements UnitOfWork {
     this.sessionFence = new PgSessionFence(client, roleFor(context) === "kauro_payment" ? "SERVICE" : "REQUEST");
     this.buyerTypes = new PgBuyerTypes(client);
     this.projectDashboard = new PgProjectDashboard(client);
+    this.reportSources = new PgReportSources(client);
     this.agencies = new PgAgencyRepository(client);
     this.memberships = new PgMembershipRepository(client);
     this.invitations = new PgInvitationRepository(client);
@@ -701,6 +705,15 @@ export function buyerTypesOf(uow: UnitOfWork): PgBuyerTypes {
 export function projectDashboardOf(uow: UnitOfWork): PgProjectDashboard {
   if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the project dashboard is read in a unit of work of @kauro/persistence");
   return uow.projectDashboard;
+}
+
+/**
+ * The records a B13 report is made from (order 6; migration 0095) on the connection of any unit of work of this package: `read` in the
+ * control plane's SYSTEM unit bound to the job's agency, `brandingVersions` in the agency's TENANT unit, `legalIdentities` in a SYSTEM unit.
+ */
+export function reportSourcesOf(uow: UnitOfWork): PgReportSources {
+  if (!(uow instanceof PgUnitOfWork)) throw new DomainFailure("INTEGRITY_FAILURE", "the report sources are read in a unit of work of @kauro/persistence");
+  return uow.reportSources;
 }
 
 /** The bank-transfer route's tables in a commerce unit of work of this package (lane L-ROUTE). */

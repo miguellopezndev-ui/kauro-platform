@@ -50,6 +50,8 @@ export interface ProduceStagedReportRequest {
   readonly engine: PdfEngine;
   readonly render: ReportRenderConfig;
   readonly cancellation: CancellationChannel;
+  /** Admits inputs that say SIMULATED (a test's composition only; a deployment's report is made from the platform's records). */
+  readonly admitSimulatedInputs?: boolean;
 }
 
 export interface ProducedReport {
@@ -73,6 +75,9 @@ export async function produceStagedReport(request: ProduceStagedReportRequest): 
   }
   await proceed(request.cancellation, "reading the platform's inputs");
   const inputs = await request.inputs.read(scope);
+  if (inputs !== null && inputs.evidenceClass === "SIMULATED" && request.admitSimulatedInputs !== true) {
+    throw new ReportStageError("INPUTS_SIMULATED", "the inputs are a simulator's; a report is made from the platform's records only");
+  }
   const facts = assembleReportFacts(scope, inputs, request.render.rendererVersion);
   const logo = inputs === null ? null : inputs.logo;
 
@@ -174,6 +179,8 @@ export interface ReportingExecutionEnvelopeOptions {
   readonly engine: PdfEngine;
   readonly render: ReportRenderConfig;
   readonly maxPackageBytes?: number;
+  /** See ProduceStagedReportRequest.admitSimulatedInputs. */
+  readonly admitSimulatedInputs?: boolean;
 }
 
 export class ReportingExecutionEnvelope implements ExecutionEnvelopePort {
@@ -204,6 +211,7 @@ export class ReportingExecutionEnvelope implements ExecutionEnvelopePort {
         engine: this.#o.engine,
         render: this.#o.render,
         cancellation: io.cancellation,
+        ...(this.#o.admitSimulatedInputs === undefined ? {} : { admitSimulatedInputs: this.#o.admitSimulatedInputs }),
       });
       return { ...outcome, stagedArtifacts: [...outcome.stagedArtifacts, produced.staged.pdf, produced.staged.record] };
     } catch (error) {

@@ -8,14 +8,28 @@
  *   - `includesClear` is true when any token discloses a CLEAR operation (a value the plan removes);
  *   - `disclosuresHash` is the SHA-256 of the canonical JSON of the plan hash, the receipt hash and the tokens, so a disclosure set
  *     names the exact plan and the exact evidence it describes and cannot be replayed onto another.
+ *
+ * `disclosureItemsOf` and `disclosuresHashOf` are the two halves, exported so a reader of an approval (a B13 report's material
+ * decisions, order 6) composes the same set from the same records and checks it against the approval's recorded hash.
  */
 import { canonicalBytes, rawDigest, type Sha256Hex } from "@kauro/contracts";
+import type { PlanBody } from "@kauro/domain";
 import type { DisclosureComposer, DisclosureSet } from "../ports/plan-services.js";
+
+/** The disclosure tokens of a plan body, given the physical source rows its validation receipt counted. */
+export function disclosureItemsOf(body: Pick<PlanBody, "mappings">, physicalSourceRows: number): readonly string[] {
+  return body.mappings.map((m) => `${m.intent.kind}:${m.targetObject}.${m.targetField}:${physicalSourceRows}`);
+}
+
+/** The hash an approval records for the disclosure set of `planHash` over `receiptHash`. */
+export function disclosuresHashOf(planHash: string, receiptHash: string, items: readonly string[]): Sha256Hex {
+  return rawDigest(canonicalBytes({ planHash, receiptHash, items: [...items] })) as Sha256Hex;
+}
 
 const composer: DisclosureComposer = {
   async compose(_uow, plan, body, receipt): Promise<DisclosureSet> {
-    const items = body.mappings.map((m) => `${m.intent.kind}:${m.targetObject}.${m.targetField}:${receipt.counts.physicalSourceRows}`);
-    const disclosuresHash = rawDigest(canonicalBytes({ planHash: plan.bodyHash, receiptHash: receipt.receiptHash, items })) as Sha256Hex;
+    const items = disclosureItemsOf(body, receipt.counts.physicalSourceRows);
+    const disclosuresHash = disclosuresHashOf(plan.bodyHash, receipt.receiptHash, items);
     return { disclosuresHash, items, includesClear: items.some((item) => item.startsWith("CLEAR:")) };
   },
 };
