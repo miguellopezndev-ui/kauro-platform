@@ -22,7 +22,10 @@ function scripted(steps: ReadonlyArray<Step>): { readonly rt: OutreachRuntime; c
     },
   };
   let id = 0;
-  const rt = { units, ids: { next: () => `01990000-0000-7000-8000-${String(++id).padStart(12, "0")}` } } as unknown as OutreachRuntime;
+  // the runtime clock (the injected Clock port) moves one second per read: the bound is judged on it, never on a process clock
+  let ms = Date.parse("2026-12-10T15:00:00.000Z");
+  const clock = { nowMs: () => (ms += 1_000), now: () => new Date(ms).toISOString() };
+  const rt = { units, clock, ids: { next: () => `01990000-0000-7000-8000-${String(++id).padStart(12, "0")}` } } as unknown as OutreachRuntime;
   return { rt, calls: () => n };
 }
 const lease = { resourceId: "01990000-0000-7000-8000-00000000aaaa", ownerId: "01990000-0000-7000-8000-00000000bbbb", fence: 1 };
@@ -42,4 +45,11 @@ test("D4 retry: a window the database reads closed ends the retries with the uni
   const other = scripted([{ fail: fenced }]);
   await assert.rejects(recordAnswer(other.rt, "01990000-0000-7000-8000-00000000eeee", lease, accepted, 1), (e: unknown) => e === fenced);
   assert.equal(other.calls(), 1, "no window read, no retry");
+});
+
+test("D4 retry: a database that stays unavailable for the whole window ends the retries once the widest window passed on the runtime clock, never earlier", async () => {
+  const always = scripted(Array.from({ length: 1_000 }, () => ({ fail: unavailable() })));
+  await assert.rejects(recordAnswer(always.rt, "01990000-0000-7000-8000-00000000ffff", lease, accepted, 1), (e: unknown) => e instanceof DomainFailure && e.code === "CAPACITY_UNAVAILABLE");
+  // one second per clock read, one read per failed record: uncertainAfter (37 s) + d4Grace (60 s) of runtime time, two units of work each
+  assert.equal(always.calls(), 2 * 98, "it kept the answer for the widest window the database might still have open");
 });
