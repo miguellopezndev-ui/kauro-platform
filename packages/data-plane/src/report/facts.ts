@@ -180,6 +180,17 @@ export function readTermsSnapshot(bytes: Uint8Array): TermsSnapshotReading {
 
 // --- verification of each binding -----------------------------------------------------------------------------------------------
 
+const EXACT_INSTANT = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?Z$/;
+
+/** An ISO-8601 UTC instant as microseconds since the epoch (the database's precision), or null when it is not one. */
+function microsOf(instant: string): bigint | null {
+  const m = EXACT_INSTANT.exec(instant);
+  if (m === null) return null;
+  const seconds = Date.parse(`${m[1]}Z`);
+  if (!Number.isFinite(seconds)) return null;
+  return BigInt(seconds) * 1000n + BigInt((m[2] ?? "").padEnd(6, "0"));
+}
+
 const sameScope = (a: ReportScope, b: ReportScope): boolean => a.agencyId === b.agencyId && a.projectId === b.projectId && a.jobId === b.jobId && a.attemptId === b.attemptId;
 
 /** The terms version, hash and issuer of the simulator's snapshot. */
@@ -215,7 +226,9 @@ function quoteTermsOf(scope: ReportScope, subject: ReportSubject, quote: NonNull
   if (terms.quoteState !== QUOTE_IN_FORCE) throw new ReportStageError("QUOTE_NOT_IN_FORCE", `the quote is ${terms.quoteState}: it no longer governs a purchase`);
   const accepted = terms.acceptance;
   if (accepted === null) throw new ReportStageError("TERMS_UNAVAILABLE", "the agency recorded no acceptance of the quote's terms version before the quote");
-  if (accepted.version !== terms.termsVersion || !isSha256Hex(accepted.documentHash) || !(Date.parse(accepted.acceptedAt) <= Date.parse(p.issuedAt))) {
+  const acceptedAt = microsOf(accepted.acceptedAt);
+  const issuedAt = microsOf(p.issuedAt);
+  if (accepted.version !== terms.termsVersion || !isSha256Hex(accepted.documentHash) || acceptedAt === null || issuedAt === null || acceptedAt > issuedAt) {
     throw new ReportStageError("TERMS_UNVERIFIABLE", "the agency's acceptance is of another terms version or later than the quote");
   }
   const issuer = terms.issuer;

@@ -108,6 +108,8 @@ describe("order 6 the platform's bindings: every fact verified against the recor
       ["no acceptance of the terms version by the agency", withTerms(() => ({ acceptance: null })), "TERMS_UNAVAILABLE"],
       ["an acceptance of another terms version", withTerms((t) => ({ acceptance: { ...(t.acceptance as NonNullable<QuoteTerms["acceptance"]>), version: "TERMS-2025-01" } })), "TERMS_UNVERIFIABLE"],
       ["an acceptance after the quote was issued", withTerms((t) => ({ acceptance: { ...(t.acceptance as NonNullable<QuoteTerms["acceptance"]>), acceptedAt: "2026-10-02T00:00:00.000000Z" } })), "TERMS_UNVERIFIABLE"],
+      ["an acceptance one microsecond after the quote", withTerms((t) => ({ acceptance: { ...(t.acceptance as NonNullable<QuoteTerms["acceptance"]>), acceptedAt: "2026-10-01T12:00:00.123457Z" } })), "TERMS_UNVERIFIABLE"],
+      ["an acceptance instant that is no instant", withTerms((t) => ({ acceptance: { ...(t.acceptance as NonNullable<QuoteTerms["acceptance"]>), acceptedAt: "yesterday" } })), "TERMS_UNVERIFIABLE"],
     ];
     for (const [label, inputs, code] of cases) refused(inputs, code, label);
   });
