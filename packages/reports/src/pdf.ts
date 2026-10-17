@@ -6,7 +6,8 @@
  * - Only a VerifiedReport is printed (`renderReportHtml` refuses anything else before any engine runs).
  * - The engine's answer is checked, not trusted: a PDF header and trailer, a non-empty body; otherwise nothing is returned.
  * - `pdfSha256` is SHA-256 of the exact bytes returned. Nothing here stores anything: `storage` says the bytes exist only in
- *   memory/local, and `ReportPdfPublisher` is the port a later phase implements to store and publish them.
+ *   memory/local, and `ReportPdfPublisher` is the port that stores them (B13-report-delivery.md). A ReportPdf is frozen and
+ *   registered, so a publisher can tell one this module made from a look-alike.
  */
 import { createHash } from "node:crypto";
 import { renderReportHtml } from "./html.js";
@@ -64,9 +65,10 @@ export interface ReportPdf {
 }
 
 /**
- * The interface that connects a generated PDF to package publication (not implemented in B13): it must store `bytes`, verify
- * that SHA-256 of what it stored equals `identity.pdfSha256`, and only then return the location. It returns the identity
- * unchanged so a caller can attach `pdfSha256` to the delivery record beside the ReportSnapshot's `modelHash`.
+ * The interface that connects a generated PDF to package publication: it must store `bytes`, verify that SHA-256 of what it
+ * stored equals `identity.pdfSha256`, and only then return the location. It returns the identity unchanged so a caller can attach
+ * `pdfSha256` to the delivery record beside the ReportSnapshot's `modelHash`. Storing is not publishing: the implementation in
+ * @kauro/data-plane (docs/design/B13-report-delivery.md) stages the PDF in an attempt, and only B08's publication makes it deliverable.
  */
 export interface ReportPdfPublisher {
   publish(pdf: ReportPdf): Promise<{ readonly identity: ReportPdfIdentity; readonly location: string }>;

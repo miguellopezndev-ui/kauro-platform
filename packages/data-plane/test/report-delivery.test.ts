@@ -442,6 +442,15 @@ describe("B13xB08 stored bytes: what is recorded was read back from the storage 
     assert.equal(r.writer.artifacts().filter((a) => a.role === REPORT_RECORD_ROLE).length, 1);
   });
 
+  it("at the attempt's boundary an uncertain read-back is the worker's error, not a refusal: it is thrown so that a takeover retries, and nothing is recorded", async () => {
+    const r = nextRig({ wrap: (fake) => readsAltered(fake, () => false, (b) => b) });
+    // the report's own storage view fails to read the PDF back; the writer's is the rig's
+    const failing = readsAltered(r.fake, (name) => r.writer.artifacts().some((a) => a.role === REPORT_PDF_ROLE && a.objectName === name), () => Object.assign(new Error("socket closed"), { transient: true }));
+    const envelope = new ReportingExecutionEnvelope({ inner: acceptanceCore(CLEAN), storage: failing, inputs: inputsFor(CLEAN), engine: scriptedEngine(), render });
+    await assert.rejects(envelope.execute(r.fixture.subject, r.io), (e: unknown) => e instanceof ReportStageError && e.code === "VERIFICATION_UNCERTAIN");
+    assert.equal(r.writer.artifacts().filter((a) => a.role === REPORT_RECORD_ROLE).length, 0);
+  });
+
   it("an interrupted upload (the provider received less than was sent) is a terminal SHORT_WRITE: no PDF generation exists, no record, no manifest", async () => {
     let finals = 0;
     const r = nextRig({

@@ -9,7 +9,8 @@
  * platform's inputs, and the PDF and its record are staged through the same writer, before the host writes the staged manifest.
  * The manifest therefore names the report with the package; B08's existing steps do the rest. If any step fails the attempt ends
  * REFUSED (or CANCELLED/FENCED) with no manifest, so a package is never published without the report, and a report is never
- * published without its package.
+ * published without its package. Only a refusal about the report's content or the platform's records ends the attempt REFUSED (terminal);
+ * an infrastructure failure or an uncertain read-back is thrown, so the worker host reports a retryable error and the job takes over.
  */
 import { rawDigest } from "@kauro/contracts";
 import type { CancellationChannel, CancellationState, ExecutionEnvelopePort, ExecutionOutcome, ExecutionSubject, HostIo, ObjectStoragePort, StagedArtifact } from "@kauro/application";
@@ -204,6 +205,9 @@ export class ReportingExecutionEnvelope implements ExecutionEnvelopePort {
       return { ...outcome, stagedArtifacts: [...outcome.stagedArtifacts, produced.staged.pdf, produced.staged.record] };
     } catch (error) {
       if (!(error instanceof ReportStageError)) throw error;
+      // an uncertain answer from the storage proves nothing about the report: it is the worker's error (WORKER_ERROR), which a takeover
+      // retries in a new attempt, not a refusal, which would end a paid job for a storage hiccup
+      if (error.code === "VERIFICATION_UNCERTAIN") throw error;
       if (error.code === "CANCELLED") return stopped(error.problems[0] === "FENCED" ? "FENCED" : "CANCELLED", error);
       return stopped("REFUSED", error);
     }
