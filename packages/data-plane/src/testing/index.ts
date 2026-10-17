@@ -17,3 +17,16 @@ export {
   type FakeScannerScript,
   type FakeScannerSignatures,
 } from "./malware-scanner-fake.js";
+
+/**
+ * CONTRACT SIMULATOR — SIMULATED: the platform's report inputs (B13 x B08; docs/design/B13-report-delivery.md §3). Nothing records the
+ * issuer's legal identity yet, so there is no real source; this answers with synthetic values and labels itself.
+ */
+export {
+  SIMULATED_ISSUER,
+  SIMULATED_REPORT_INPUTS_TOKEN,
+  SIMULATED_TERMS_VERSION,
+  SimulatedReportInputs,
+  simulatedReportInputsOf,
+  type SimulatedReportInputsSpec,
+} from "./report-inputs.js";

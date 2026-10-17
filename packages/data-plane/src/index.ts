@@ -62,3 +62,36 @@ export { coreTimersOf, type CoreTimers } from "./cores/operation.js";
  * sandbox on, JavaScript off, network off; the caller supplies the executable.
  */
 export { ChromiumPdfEngine, findChromiumExecutable, PDF_HTML_MAX_BYTES, type ChromiumPdfEngineOptions, type ChromiumProbe } from "./pdf/chromium-pdf-engine.js";
+
+/**
+ * The report stage (B13 x B08; docs/design/B13-report-delivery.md): the platform's report inputs, the PDF staged through the attempt's
+ * own writer with its record, and the execution envelope that joins the report to the package the core staged.
+ */
+export { REPORT_STAGE_ERROR_CODES, ReportStageError, type ReportStageErrorCode } from "./report/errors.js";
+export {
+  REPORT_INPUTS_EVIDENCE_CLASSES,
+  TERMS_SNAPSHOT_DOMAIN,
+  assembleReportFacts,
+  readTermsSnapshot,
+  reportIdOf,
+  reportPackageIdOf,
+  termsSnapshotBytesOf,
+  type AuthorizedReportInputs,
+  type ReportInputsEvidenceClass,
+  type ReportInputsPort,
+  type ReportScope,
+  type TermsSnapshotReading,
+} from "./report/facts.js";
+export { REPORT_PDF_ROLE, REPORT_RECORD_DOMAIN, REPORT_RECORD_ROLE, readReportPdfRecord, reportPdfRecordBytesOf, reportRecordProblems, type ReportPdfRecord, type ReportPdfRecordReading } from "./report/record.js";
+export { StagedReportPdfPublisher, reportPdfObjectNameOf, type ReportBinding, type StagedReportPdf, type StagedReportPdfPublisherOptions } from "./report/publisher.js";
+export {
+  DEFAULT_MAX_PACKAGE_BYTES,
+  ReportingExecutionEnvelope,
+  produceStagedReport,
+  readStagedPackage,
+  type ProduceStagedReportRequest,
+  type ProducedReport,
+  type ReportRenderConfig,
+  type ReportingExecutionEnvelopeOptions,
+} from "./report/stage.js";
+export { PACKAGE_MANIFEST_ROLE } from "./cores/migration-core-adapter.js";

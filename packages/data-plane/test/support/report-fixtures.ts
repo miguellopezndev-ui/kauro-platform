@@ -11,7 +11,7 @@ export type CaseName = "A-clean-multi-object" | "D-salesforce";
 // compiled to dist/test/support: four levels up is packages/data-plane/.., i.e. packages/
 const root = fileURLToPath(new URL("../../../../reports/test/fixtures/mc-3.0.0/", import.meta.url));
 
-function loadPackage(name: CaseName): Map<string, Uint8Array> {
+export function loadPackage(name: CaseName): Map<string, Uint8Array> {
   const dir = join(root, name);
   const files = new Map<string, Uint8Array>();
   const walk = (d: string): void => {

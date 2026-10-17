@@ -739,8 +739,11 @@ class RefusedBeforeRun extends Error {
   }
 }
 
+/** The role of the package's own manifest.json among the staged artifacts; the report stage finds the package through it. */
+export const PACKAGE_MANIFEST_ROLE = "package-manifest";
+
 function roleOf(file: string): string {
-  if (file === "manifest.json") return "package-manifest";
+  if (file === "manifest.json") return PACKAGE_MANIFEST_ROLE;
   const area = file.split("/")[0] ?? "";
   const map: Record<string, string> = { "01_IMPORT": "import", "02_EXCEPTIONS": "exceptions", "03_TRACEABILITY": "traceability", "04_DOCUMENTATION": "documentation" };
   return map[area] ?? "package-file";
