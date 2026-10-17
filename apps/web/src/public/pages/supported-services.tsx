@@ -65,7 +65,10 @@ function ServiceCard({ mode, publication }: { readonly mode: ServiceMode; readon
   const listed = publishedModes(publication).find((entry) => entry.mode === mode);
   const headingId = `${CARD_ID[mode]}-heading`;
   return (
-    <article className={`kauro-site-card kauro-site-service kauro-site-service--${availability.toLowerCase()}`} aria-labelledby={headingId}>
+    <article
+      className={`kauro-site-card kauro-site-service kauro-site-service--${availability.toLowerCase()}${mode === "CLEAN" && (availability === "AVAILABLE" || availability === "LIMITED") ? " kauro-site-service--lead kauro-wine" : ""}`}
+      aria-labelledby={headingId}
+    >
       <div className="kauro-site-service-top">
         <h3 id={headingId}>{CARD_NAME[mode]}</h3>
         <ServiceState availability={availability} />

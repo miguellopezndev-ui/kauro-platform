@@ -9,10 +9,12 @@ import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type PublicCopyId } from "../../copy/public.ts";
 import { publishedModes, type Publication } from "../capabilities.ts";
 import { modeName } from "../estimate-text.ts";
+import { Audience } from "../audience.tsx";
+import { Journey } from "../journey.tsx";
+import { PackageFolder } from "../package-folder.tsx";
 import { FileName, LinkButton, PageHead, PriceFigure, Section, ServiceState, Stamp } from "../parts.tsx";
 import { bandRange, formatCount, formatUsd, startingPrice, type ServiceMode } from "../pricing-bands.ts";
-import { Approval, Counts, ImportOrder, MarginNote, Pane, Reconcile } from "../artifacts.tsx";
-import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_CLIENTS, SAMPLE_RECORDS, type RecordResult } from "../sample-data.ts";
+import { MANIFEST_FILES, SAMPLE, SAMPLE_RECORDS, type RecordResult } from "../sample-data.ts";
 import { ROUTE } from "../site.ts";
 
 export interface HomePageProps {
@@ -104,114 +106,86 @@ const FACTS = [
   { name: "home.facts.quote.name", body: "home.facts.quote.body", mark: "quote" },
 ] as const satisfies ReadonlyArray<{ readonly name: PublicCopyId; readonly body: PublicCopyId; readonly mark: string }>;
 
-const CLIENT_PHASE: Readonly<Record<(typeof SAMPLE_CLIENTS)[number]["phase"], PublicCopyId>> = {
-  check: "home.app.phase.check.label",
-  decide: "home.app.phase.decide.label",
-  ready: "home.app.state.label",
-};
-
-const PROCESS = [
-  { name: "home.process.measure.name", body: "home.process.measure.body", key: "measure" },
-  { name: "home.process.decide.name", body: "home.process.decide.body", key: "decide" },
-  { name: "home.process.prepare.name", body: "home.process.prepare.body", key: "prepare" },
-  { name: "home.process.import.name", body: "home.process.import.body", key: "import" },
-] as const satisfies ReadonlyArray<{ readonly name: PublicCopyId; readonly body: PublicCopyId; readonly key: string }>;
-
-const countOf = (label: PublicCopyId): number => REPORT_ROWS.find((row) => row.label === label)?.count ?? 0;
-
-/** What each step of the process looks like in the product, from the synthetic sample. */
-function ProcessPane({ step }: { readonly step: (typeof PROCESS)[number]["key"] }): ReactElement | null {
-  const contacts = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
-  if (contacts === undefined) return null;
-  switch (step) {
-    case "measure":
-      return (
-        <Pane>
-          <Counts
-            rows={[
-              { value: countOf("sample.report.duplicates"), label: PUBLIC_COPY["home.frag.candidates"] },
-              { value: countOf("sample.report.emails"), label: PUBLIC_COPY["home.frag.invalid"] },
-              { value: countOf("sample.report.company"), label: PUBLIC_COPY["home.frag.company"] },
-            ]}
-          />
-        </Pane>
-      );
-    case "decide":
-      return (
-        <Pane>
-          <Approval count={2} />
-        </Pane>
-      );
-    case "prepare":
-      return (
-        <Pane>
-          <Reconcile from={contacts.source} to={contacts.rows} label={PUBLIC_COPY["home.app.phase.prepare.body"]} />
-        </Pane>
-      );
-    case "import":
-      return (
-        <Pane title={PUBLIC_COPY["home.frag.order"]}>
-          <ImportOrder files={[...MANIFEST_FILES.map((file) => file.name).reverse(), PUBLIC_COPY["home.frag.links"]]} />
-        </Pane>
-      );
-  }
-}
-
-const DELIVERY = [
-  { name: "home.delivery.report.name", body: "home.delivery.report" },
-  { name: "home.delivery.files.name", body: "home.delivery.files" },
-  { name: "home.delivery.manifest.name", body: "home.delivery.manifest" },
-  { name: "home.delivery.steps.name", body: "home.delivery.steps" },
+/** What Kauro does not do: each refusal set large and struck through, and the sentence that says it plainly beneath. */
+const LIMITS = [
+  { name: "home.limits.live.name", body: "home.limits.live" },
+  { name: "home.limits.import.name", body: "home.limits.import" },
+  { name: "home.limits.decide.name", body: "home.limits.decide" },
 ] as const satisfies ReadonlyArray<{ readonly name: PublicCopyId; readonly body: PublicCopyId }>;
 
-/** The package of the sample delivery as a stack of sheets: the cleaned files with their rows, then the documents that explain them. */
-function FileStack(): ReactElement {
-  return (
-    <div className="kauro-site-stack" aria-hidden="true">
-      <ul className="kauro-site-stack-sheets">
-        {MANIFEST_FILES.map((file) => (
-          <li key={file.name} className="kauro-site-stack-sheet">
-            <FileName>{file.name}</FileName>
-            <span className="kauro-site-stack-meta">{copy("home.files.rows", { count: formatCount(file.rows) })}</span>
-          </li>
-        ))}
-        {(["home.delivery.report.name", "home.delivery.manifest.name", "home.delivery.steps.name"] as const).map((name) => (
-          <li key={name} className="kauro-site-stack-sheet kauro-site-stack-sheet--doc">
-            <span className="kauro-site-stack-doc">{PUBLIC_COPY[name]}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+const CLEAN_FOR = ["home.modes.clean.for.crm", "home.modes.clean.for.sheets", "home.modes.clean.for.migration", "home.modes.clean.for.unchosen"] as const satisfies readonly PublicCopyId[];
 
+const MODE_LINE: Readonly<Record<ServiceMode, PublicCopyId>> = {
+  CLEAN: "home.modes.clean.line",
+  HUBSPOT: "home.modes.hubspot.line",
+  SALESFORCE: "home.modes.salesforce.line",
+};
+
+/**
+ * The services open now. CLEAN leads: it is the one most buyers start with (any data that is not going into a qualified destination) and
+ * the lowest price, so it is set on wine with who it is made for; HubSpot and Salesforce follow as the two specialised preparations. Each
+ * says what it delivers and where its price starts, and the links lead to the page that explains both.
+ */
 function ModesSection({ publication }: { readonly publication: Publication }): ReactElement {
   const modes = publishedModes(publication);
   const firstBand = formatCount(bandRange(0).to);
+  const clean = modes.find((published) => published.mode === "CLEAN");
+  const others = modes.filter((published) => published.mode !== "CLEAN");
   return (
-    <Section id="home-modes" heading={PUBLIC_COPY["home.modes.heading"]} lead={publication.kind === "READ" && modes.length > 0 ? PUBLIC_COPY["home.modes.published.lead"] : undefined}>
+    <Section id="home-modes" heading={PUBLIC_COPY["home.modes.heading"]} lead={publication.kind === "READ" && modes.length > 0 ? PUBLIC_COPY["home.modes.published.lead"] : undefined} variant="kauro-site-offer">
       {publication.kind === "UNAVAILABLE" ? (
         <p className="kauro-site-callout">{PUBLIC_COPY["home.modes.unknown.body"]}</p>
       ) : modes.length === 0 ? (
         <p className="kauro-site-callout">{PUBLIC_COPY["home.modes.none.body"]}</p>
       ) : (
-        <ul className="kauro-site-modes">
-          {modes.map((published) => (
-            <li key={published.mode} className={`kauro-site-mode kauro-site-mode--${published.mode.toLowerCase()}`}>
+        <ul className={clean === undefined ? "kauro-offer kauro-offer--even" : "kauro-offer"}>
+          {clean === undefined ? null : (
+            <li className="kauro-offer-lead kauro-wine">
+              <div className="kauro-offer-lead-main">
+                <h3>{modeName("CLEAN")}</h3>
+                <ServiceState availability={clean.state === "AVAILABLE_LIMITED" ? "LIMITED" : "AVAILABLE"} />
+                <p className="kauro-offer-line">{PUBLIC_COPY[MODE_LINE.CLEAN]}</p>
+                <p className="kauro-offer-for-label">{PUBLIC_COPY["home.modes.clean.for.label"]}</p>
+                <ul className="kauro-offer-for">
+                  {CLEAN_FOR.map((id) => (
+                    <li key={id}>{PUBLIC_COPY[id]}</li>
+                  ))}
+                </ul>
+                <p className="kauro-offer-for-label">{PUBLIC_COPY["home.modes.clean.receive.label"]}</p>
+                <ul className="kauro-offer-for kauro-offer-for--files">
+                  {[...MANIFEST_FILES.map((file) => file.name), PUBLIC_COPY["home.delivery.report.name"], PUBLIC_COPY["home.delivery.manifest.name"], PUBLIC_COPY["home.delivery.steps.name"]].map((name) => (
+                    <li key={name}>
+                      <FileName>{name}</FileName>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="kauro-offer-lead-price">
+                <PriceFigure amount={formatUsd(startingPrice("CLEAN"))} />
+                <p className="kauro-offer-price-line">{copy(PRICE_LINE.CLEAN, { price: formatUsd(startingPrice("CLEAN")), units: firstBand })}</p>
+                <LinkButton href={ROUTE.services} kind="text">
+                  {PUBLIC_COPY["nav.services.label"]}
+                </LinkButton>
+              </div>
+            </li>
+          )}
+          {others.map((published) => (
+            <li key={published.mode} className="kauro-offer-item">
               <h3>{modeName(published.mode)}</h3>
               <ServiceState availability={published.state === "AVAILABLE_LIMITED" ? "LIMITED" : "AVAILABLE"} />
+              <p className="kauro-offer-line">{PUBLIC_COPY[MODE_LINE[published.mode]]}</p>
               <PriceFigure amount={formatUsd(startingPrice(published.mode))} />
-              <p className="kauro-site-mode-price">{copy(PRICE_LINE[published.mode], { price: formatUsd(startingPrice(published.mode)), units: firstBand })}</p>
+              <p className="kauro-offer-price-line">{copy(PRICE_LINE[published.mode], { price: formatUsd(startingPrice(published.mode)), units: firstBand })}</p>
             </li>
           ))}
         </ul>
       )}
       <p className="kauro-site-links">
+        <LinkButton href={ROUTE.pricing} kind="text">
+          {PUBLIC_COPY["home.modes.more.cta"]}
+        </LinkButton>
         <LinkButton href={ROUTE.services} kind="text">
           {PUBLIC_COPY["nav.services.label"]}
-        </LinkButton>
-        <LinkButton href={ROUTE.pricing} kind="text">
-          {PUBLIC_COPY["home.hero.pricing.cta"]}
         </LinkButton>
       </p>
     </Section>
@@ -248,102 +222,30 @@ export function HomePage({ publication, signInHref }: HomePageProps): ReactEleme
         </ul>
       </div>
       <Section id="home-process" heading={PUBLIC_COPY["home.process.heading"]} eyebrow={PUBLIC_COPY["nav.how.label"]} tone="inverse" variant="kauro-site-process">
-        <ol className="kauro-site-process-steps">
-          {PROCESS.map((step) => (
-            <li key={step.name} className="kauro-site-process-step">
-              <h3>{PUBLIC_COPY[step.name]}</h3>
-              <p>{PUBLIC_COPY[step.body]}</p>
-              <ProcessPane step={step.key} />
-            </li>
-          ))}
-        </ol>
+        <Journey />
         <p className="kauro-site-links">
           <LinkButton href={ROUTE.how} kind="text">
             {PUBLIC_COPY["nav.how.label"]}
           </LinkButton>
         </p>
       </Section>
-      <Section id="home-buyer" heading={PUBLIC_COPY["home.buyer.heading"]} lead={PUBLIC_COPY["home.buyer.body"]}>
-        <ul className="kauro-site-buyers">
-          <li className="kauro-site-buyer">
-            <h3>{PUBLIC_COPY["home.buyer.agency.name"]}</h3>
-            <p>{PUBLIC_COPY["home.buyer.agency.body"]}</p>
-            <Pane variant="kauro-site-frag--clients">
-              {SAMPLE_CLIENTS.map((client) => (
-                <span key={client.name} className={`kauro-site-frag-client kauro-site-frag-client--${client.phase}`}>
-                  <span className="kauro-site-frag-client-name">{client.name}</span>
-                  <span className="kauro-site-frag-client-phase">{PUBLIC_COPY[CLIENT_PHASE[client.phase]]}</span>
-                </span>
-              ))}
-            </Pane>
-          </li>
-          <li className="kauro-site-buyer">
-            <h3>{PUBLIC_COPY["home.buyer.company.name"]}</h3>
-            <p>{PUBLIC_COPY["pricing.in-house.body"]}</p>
-            <Pane variant="kauro-site-frag--same">
-              <span className="kauro-site-frag-tag">
-                <span className="kauro-site-frag-label">{PUBLIC_COPY["home.frag.agency"]}</span>
-                <span className="kauro-site-frag-figure">{formatUsd(startingPrice("CLEAN"))}</span>
-              </span>
-              <span className="kauro-site-frag-equals" />
-              <span className="kauro-site-frag-tag">
-                <span className="kauro-site-frag-label">{PUBLIC_COPY["home.frag.in-house"]}</span>
-                <span className="kauro-site-frag-figure">{formatUsd(startingPrice("CLEAN"))}</span>
-              </span>
-            </Pane>
-            <MarginNote>{PUBLIC_COPY["home.note.same"]}</MarginNote>
-          </li>
-        </ul>
+      <Section id="home-buyer" heading={PUBLIC_COPY["home.buyer.heading"]} lead={PUBLIC_COPY["home.buyer.body"]} layout="split" variant="kauro-site-buyer-section">
+        <Audience />
       </Section>
       <Section id="home-delivery" heading={PUBLIC_COPY["home.delivery.heading"]} tone="sunken" variant="kauro-site-delivery">
-        <div className="kauro-site-delivery-grid">
-          <FileStack />
-          <div className="kauro-site-delivery-list">
-            <ol className="kauro-site-deliverables">
-              {DELIVERY.map((item) => (
-                <li key={item.name} className="kauro-site-deliverable">
-                  <h3>{PUBLIC_COPY[item.name]}</h3>
-                  <p>{PUBLIC_COPY[item.body]}</p>
-                </li>
-              ))}
-            </ol>
-            <p className="kauro-site-links">
-              <LinkButton href={ROUTE.sample} kind="text">
-                {PUBLIC_COPY["home.hero.sample.cta"]}
-              </LinkButton>
-            </p>
-          </div>
-        </div>
+        <PackageFolder sampleHref={ROUTE.sample} sampleLabel={PUBLIC_COPY["home.hero.sample.cta"]} />
       </Section>
-      <Section
-        id="home-limits"
-        heading={PUBLIC_COPY["home.limits.heading"]}
-        layout="split"
-        tone="inverse"
-        variant="kauro-site-limits"
-        headExtra={
-          <Pane variant="kauro-site-frag--route">
-            <span className="kauro-site-route-row kauro-site-route-row--blocked">
-              <span className="kauro-site-route-node">{PUBLIC_COPY["site.name"]}</span>
-              <span className="kauro-site-route-cut" />
-              <span className="kauro-site-route-node">{PUBLIC_COPY["home.frag.crm"]}</span>
-            </span>
-            <span className="kauro-site-route-row">
-              <span className="kauro-site-route-node kauro-site-route-node--quiet">{PUBLIC_COPY["home.frag.files"]}</span>
-              <span className="kauro-site-route-line" />
-              <span className="kauro-site-route-node kauro-site-route-node--quiet">{PUBLIC_COPY["home.frag.team"]}</span>
-              <span className="kauro-site-route-line" />
-              <span className="kauro-site-route-node">{PUBLIC_COPY["home.frag.crm"]}</span>
-            </span>
-            <MarginNote>{PUBLIC_COPY["home.note.never"]}</MarginNote>
-          </Pane>
-        }
-      >
-        <ul className="kauro-site-statements">
-          <li>{PUBLIC_COPY["home.limits.live"]}</li>
-          <li>{PUBLIC_COPY["home.limits.import"]}</li>
-          <li>{PUBLIC_COPY["home.limits.decide"]}</li>
-        </ul>
+      <Section id="home-limits" heading={PUBLIC_COPY["home.limits.heading"]} tone="inverse" variant="kauro-site-limits">
+        <ol className="kauro-strikes">
+          {LIMITS.map((limit) => (
+            <li key={limit.name} className="kauro-strike">
+              <span className="kauro-strike-name" aria-hidden="true">
+                {PUBLIC_COPY[limit.name]}
+              </span>
+              <p className="kauro-strike-body">{PUBLIC_COPY[limit.body]}</p>
+            </li>
+          ))}
+        </ol>
       </Section>
       <ModesSection publication={publication} />
       <Section id="home-context" heading={PUBLIC_COPY["home.context.heading"]} tone="wine" variant="kauro-site-quote">

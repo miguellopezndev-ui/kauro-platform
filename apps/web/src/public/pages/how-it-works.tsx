@@ -6,6 +6,7 @@ import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type PublicCopyId } from "../../copy/public.ts";
 import { Approval, Counts, FileChips, ImportOrder, MarginNote, Pane, Reconcile } from "../artifacts.tsx";
 import { LinkButton, PageHead, PriceFigure, Section } from "../parts.tsx";
+import { Scrolly } from "../scrolly.tsx";
 import { formatUsd, startingPrice } from "../pricing-bands.ts";
 import { POLICY_SNAPSHOT } from "../policy-snapshot.ts";
 import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_SOURCES } from "../sample-data.ts";
@@ -97,7 +98,6 @@ export function HowItWorksPage(): ReactElement {
       <Section
         id="how-steps"
         heading={PUBLIC_COPY["how.steps.heading"]}
-        layout="split"
         variant="kauro-site-how-steps"
         headExtra={
           <ul className="kauro-site-legend" aria-hidden="true">
@@ -106,16 +106,16 @@ export function HowItWorksPage(): ReactElement {
           </ul>
         }
       >
-        <ol className="kauro-site-timeline">
-          {STEPS.map((step) => (
-            <li key={step.heading} className={`kauro-site-timeline-step kauro-site-timeline-step--${step.actor}`}>
-              <p className="kauro-site-actor">{PUBLIC_COPY[ACTOR_LABEL[step.actor]]}</p>
-              <h3>{PUBLIC_COPY[step.heading]}</h3>
-              <p>{PUBLIC_COPY[step.body]}</p>
-              <StepPane step={step.key} />
-            </li>
-          ))}
-        </ol>
+        <Scrolly
+          steps={STEPS.map((step) => ({
+            key: step.key,
+            actor: step.actor,
+            actorLabel: PUBLIC_COPY[ACTOR_LABEL[step.actor]],
+            heading: PUBLIC_COPY[step.heading],
+            body: PUBLIC_COPY[step.body],
+            pane: <StepPane step={step.key} />,
+          }))}
+        />
       </Section>
       <Section id="how-responsibility" heading={PUBLIC_COPY["how.responsibility.heading"]} layout="split" tone="wine" variant="kauro-site-band-grain">
         <p className="kauro-site-statement">{PUBLIC_COPY["how.responsibility.body"]}</p>

@@ -79,3 +79,25 @@ The owner asked for more personality on the base of the reference sketches. What
 4. **Wine as the middle colour.** Between porcelain and carbon, wine leads where a page says its one strong sentence: the context band
    of Home, the menu, the responsibility band of How it works, the scope question of Supported services, the free check, the contact aside.
 5. **The not-found page** answers in the product's terms: a lookup that matched no row, stamped, beside the heading.
+
+## 7. Fourth pass (2026-10-17): walk the process, and every section built from its own content
+
+1. **The menu is a card, not a room.** The folded navigation opens as a carbon card under its button; it never covers the page, never
+   locks its scroll and never widens it. Escape or a click outside closes it. Without script it is still the native disclosure of §6.
+2. **The process is walked, not read** (`apps/web/src/public/journey.tsx`). Home's process is four steps on a rail: measure, decide,
+   prepare, import. Each one shows the Kauro window at that step. The counts run up as they are measured. The visitor approves the three
+   proposed changes themselves (real buttons, `aria-pressed`). The rows reconcile in prepare, and the files fall into order in import.
+3. **Interactive pieces are progressive.** The journey, the buyer switch (`audience.tsx`), the delivery folder (`package-folder.tsx`) and
+   the step reader of How it works (`scrolly.tsx`) render every panel stacked before the script runs. After it they become an ARIA tabs
+   pattern (arrows, Home, End) or a scroll-driven stage. The figures they draw are hidden from assistive technology; the words beside
+   them carry the meaning. Every animation stops for `prefers-reduced-motion`, and no hook reads the clock (K0): a count runs on the
+   animation frame's own timestamp.
+4. **Section by its content.**
+   - The buyer section switches between an agency's client workspaces and a company's single workspace, with the same price.
+   - The delivery section is a folder with wine tabs whose open document sits beside its explanation, with no wine box.
+   - The limits are struck-through sentences, not a diagram.
+   - The offer leads with CLEAN on wine (who it is made for, what arrives, from what price). HubSpot and Salesforce follow as the two
+     qualified destinations, and on Supported services CLEAN's card spans the row.
+   - Data handling answers a cross-customer request with a "Not found" stamp and shows the model's limited context as a redacted file.
+5. **Depth only where something rests.** The ticket of the free check carries a shadow over a darkened rock, so it sits in front of it.
+   The 404 is one larger tilted lookup card that holds the heading, the zero and the stamp together.
