@@ -254,6 +254,15 @@ export interface SendWorld {
   agencyMember(label: string): Promise<Person>;
   /** A US prospect registered by (and assigned to) the seller, with one recorded contact and its source evidence. */
   prospect(seller: SellerP, options?: { readonly contact?: string; readonly organization?: string; readonly jurisdiction?: string }): Promise<ProspectP>;
+  /**
+   * A US prospect the OWNER registered (CMD045's writer in the owner's session: the owner's source evidence and business contact, owned by nobody), then
+   * assigned to the seller: the seller owns it but cannot read its contact (prospect_contacts_self_read), the case of review finding F2.
+   */
+  assignedProspect(seller: SellerP, options?: { readonly contact?: string; readonly organization?: string }): Promise<ProspectP & { readonly registration: string }>;
+  /** Rows of a read in the person's own session (kauro_app, OPERATOR context, no agency), under its RLS: what that person can see. */
+  readAs<T extends object>(person: Person, sql: string, params?: ReadonlyArray<unknown>): Promise<T[]>;
+  /** The owner's (re)assignment of the prospect to the seller, or to nobody (prospects_owner_update; one version step). */
+  reassign(prospectId: string, seller: SellerP | null): Promise<void>;
   /** A further identity of the person (route default GMAIL_API), registered and (unless pending) verified. */
   sender(person: Person, options?: { readonly route?: SenderRoute; readonly pending?: true }): Promise<SenderP>;
   /** The CURRENT resource every default draft cites, its family and the capability it claims. */

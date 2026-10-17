@@ -187,15 +187,17 @@ function destinationRecord(r: DestinationRow): PayoutDestinationRecord {
 }
 
 /**
- * Whether the suppression registry reaches the prospect row `p` (D-B12O-12 as decided for R2-130): its organization key, or the contact key of the
- * business contact its registrar recorded. kauro.prospect_suppressions is the authority of an opt-out; the public opt-out records the registry row only
- * and never moves a prospect (KA098: kauro_outreach holds no UPDATE on prospects, A17), so the readers derive the exclusion instead of waiting for a
- * transition nobody performs. The registry is read by every ACTIVE seller and the owner (prospect_suppressions_read) and the contact by its recorder or the
- * owner, so the derivation never widens what the session reads; the view carries the outcome only, never the suppression's reason or recorder.
+ * Whether the suppression registry reaches the prospect row `p` (D-B12O-12 as decided for R2-130): its organization key, or its business contact's key.
+ * kauro.prospect_suppressions is the authority of an opt-out; the public opt-out records the registry row only and never moves a prospect (KA098:
+ * kauro_outreach holds no UPDATE on prospects, A17), so the readers derive the exclusion instead of waiting for a transition nobody performs. The contact's
+ * key is the prospect's own column (migration 0094: copied from the contact at birth, held to it by a foreign key, immutable), so every session that reads
+ * the prospect — its registrar, the seller it is assigned to, the owner — reaches the same answer without reading the contact itself (a seller reads only
+ * the contacts it recorded, prospect_contacts_self_read). The registry is read by every ACTIVE seller and the owner (prospect_suppressions_read); the view
+ * carries the outcome only, never the key, the suppression's reason or its recorder.
  */
 const REGISTRY_REACHES = `EXISTS (SELECT 1 FROM kauro.prospect_suppressions s
    WHERE (s.key_kind = 'ORGANIZATION' AND s.suppression_key = p.organization_key)
-      OR (s.key_kind = 'CONTACT' AND s.suppression_key IN (SELECT c.contact_key FROM kauro.prospect_contacts c WHERE c.recorded_by_user_id = p.registered_by_user_id AND c.contact_id = p.business_contact_id)))`;
+      OR (s.key_kind = 'CONTACT' AND s.suppression_key = p.business_contact_key))`;
 /**
  * A prospect as its readers present it: `state` and `suppressed` are EFFECTIVE (the stored row, or SUPPRESSED when the registry reaches it), every other
  * column is the stored one — `version` included, so an effective SUPPRESSED is never a transition: no history row, no version step, nothing stored moves.

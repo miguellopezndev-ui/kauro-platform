@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
 import { connectionPid, FaultPoints, type FaultContext } from "@kauro/persistence/testing";
 import {
-  activate, activityKinds, answerOf, callsOf, cell, CELL_CONTROLS, contactSuppressions, D4_GRACE_MS, DAY_MS, draftRow, draftState, evidenceOf, firstContacts, firstContacts24h, grantReserved, holdLease,
+  activate, activityKinds, answerOf, callsOf, callsTotal, cell, CELL_CONTROLS, contactSuppressions, D4_GRACE_MS, DAY_MS, draftRow, draftState, evidenceOf, firstContacts, firstContacts24h, grantReserved, holdLease,
   holdSubject, intent, intentIdOf, intentsOfDraft, LEASE_TTL_MS, msOf, onEffectClock, OUTCOME, outboxOf, plusMs, plusUs, prospectState, queued, raceAtWrite,
   rev2OrderControl, send, sendWorld, senderState, sentFirst, staged, START_GATE_MS, storedProspect, stateOf, T0, tokenOf, UNCERTAIN_AFTER_MS, W, waitingBehind, warningsOf,
   type ClassifiedAnswer, type Dispatcher, type DraftP, type DraftState, type GrantP, type RaceActor, type RaceResult, type SellerP, type SendWorld, type Staged,
@@ -207,9 +207,13 @@ test("R2-129 (observed not sent): draft SEND_UNCERTAIN before, HUMAN_SEND_OBSERV
  * seller's prospect; no new send starts for the key — a sealed grant over a fresh draft, a second sender identity, a re-registration of the contact by
  * another seller and a new contact recorded on the prospect are all refused PROSPECT_SUPPRESSED.
  */
-async function excludedEverywhere(what: string, contactKey: string, held: ReadonlyArray<{ readonly seller: SellerP; readonly prospect: Staged["prospect"]; readonly stored: { state: string; suppressed: boolean; version: number } }>): Promise<void> {
+async function excludedEverywhere(what: string, contactKey: string, held: ReadonlyArray<{ readonly seller: SellerP; readonly prospect: Staged["prospect"]; readonly stored: { state: string; suppressed: boolean; version: number }; readonly assigned?: true }>): Promise<void> {
   assert.deepEqual(await contactSuppressions(w, contactKey), [{ reason: "OPT_OUT", recordedByService: "outreach-service", recordedByUserId: null }], `${what}: one durable registry row, the outreach service's`);
-  for (const { seller, prospect, stored } of held) {
+  for (const { seller, prospect, stored, assigned } of held) {
+    // a prospect the owner registered and assigned (review finding F2): CMD063 refuses its seller at discovery, the owner's contact address not being its
+    // to read, suppressed or not; the exclusion stands behind that wall (no intent, no call)
+    const sendRefused = assigned === true ? "404 NOT_FOUND -" : OUTCOME.KC016;
+    const callsBefore = callsTotal(w);
     const shown = await w.prospectAs(seller, prospect.prospectId);
     assert.deepEqual([shown?.state, shown?.suppressed], ["SUPPRESSED", true], `${what}: the seller's own reader shows its prospect suppressed`);
     assert.deepEqual([(await w.prospectAs(w.owner, prospect.prospectId))?.state, (await w.prospectAs(w.owner, prospect.prospectId))?.suppressed], ["SUPPRESSED", true], `${what}: the owner's reader too`);
@@ -217,10 +221,11 @@ async function excludedEverywhere(what: string, contactKey: string, held: Readon
     assert.equal(shown?.version, stored.version, `${what}: the reader's version is the stored one`);
     // no new sequence for the key, whatever the path
     const fresh = await w.draft(seller, prospect, seller.sender, { label: `${what}-fresh-${prospect.prospectId.slice(-6)}` });
-    assert.equal(out(await send(w, seller, fresh, await w.grant([fresh]))), OUTCOME.KC016, `${what}: a sealed grant over a fresh draft never overrides the exclusion`);
+    assert.equal(out(await send(w, seller, fresh, await w.grant([fresh]))), sendRefused, `${what}: a sealed grant over a fresh draft never overrides the exclusion`);
     const other = await w.sender(seller);
     const viaOther = await w.draft(seller, prospect, other, { label: `${what}-other-sender-${prospect.prospectId.slice(-6)}` });
-    assert.equal(out(await send(w, seller, viaOther, await w.grant([viaOther]))), OUTCOME.KC016, `${what}: another sender identity of the seller is refused alike`);
+    assert.equal(out(await send(w, seller, viaOther, await w.grant([viaOther]))), sendRefused, `${what}: another sender identity of the seller is refused alike`);
+    assert.deepEqual([await intentsOfDraft(w, fresh.draftId), await intentsOfDraft(w, viaOther.draftId), callsTotal(w) - callsBefore], [[], [], 0], `${what}: no intent, no provider call`);
     const contact = await w.call({ url: `/api/v1/ops/prospects/${prospect.prospectId}/contacts`, token: seller.token, key: `r2-130-contact-${prospect.prospectId}-${Date.now()}`, body: { contactLabel: "Operations lead", channel: "EMAIL", address: `new-${Date.now()}@contact.example` } });
     assert.equal(out(contact), OUTCOME.KC016, `${what}: the suppressed prospect takes no new contact`);
   }
@@ -238,7 +243,7 @@ const reimportRefused = async (what: string, contact: string): Promise<void> => 
 cell("R2-130 (cross-seller): the public opt-out through the token of P1's submitted message (taken from the MIME the fake recorded) against the claim of another seller's prospect P2 with the same contact key, held at the suppression key L8 (the only lock they share): order 1 opt-out first: NOT_SENT(SUPPRESSED), zero calls, P2 shown suppressed; order 2 claim first: exactly one submission, the opt-out commits after it, the next intent to that contact NOT_SENT(SUPPRESSED) with zero calls; red with D2's L8 removed", "race", async (ctx) => {
   // traces: opt-out L8 X (contact key) -> registry row; D2 of P2 L1 S(seller B) -> L3 S(P2) -> L4 X(B) -> ... -> L8 S(K) -> L10 X: they share only L8
   w.standAt(T0);
-  type Held = { seller: SellerP; prospect: Staged["prospect"]; stored: { state: string; suppressed: boolean; version: number } };
+  type Held = { seller: SellerP; prospect: Staged["prospect"]; stored: { state: string; suppressed: boolean; version: number }; assigned?: true };
   const runs: Array<{ order: Order; contact: string; p2: Staged; i2: string; i3: string; held: Held[]; r: RaceResult<unknown, unknown> }> = [];
   for (const order of ORDERS) {
     const contact = `m21-${order}-${Date.now()}@contact.example`;
@@ -252,8 +257,12 @@ cell("R2-130 (cross-seller): the public opt-out through the token of P1's submit
     const sellerC = await w.seller(`m21-${order}-c`);
     const p3 = await staged(w, `m21-${order}-c`, { seller: sellerC, prospect: await w.prospect(sellerC, { contact }) });
     const i3 = await queued(w, p3);
+    // review finding F2: a prospect of the same contact the OWNER registered and assigned to seller D, who cannot read that contact
+    const sellerD = await w.seller(`m21-${order}-d`);
+    const p4 = await w.assignedProspect(sellerD, { contact });
     const held: Held[] = [];
     for (const [seller, s] of [[sellerA, p1], [sellerB, p2], [sellerC, p3]] as const) held.push({ seller, prospect: s.prospect, stored: await storedProspect(w, s.prospect) });
+    held.push({ seller: sellerD, prospect: p4, stored: await storedProspect(w, p4), assigned: true });
     const O: RaceActor<unknown> = { name: "public opt-out", role: "kauro_outreach", run: () => w.routes.optOut(token), at: W.suppressionInsert };
     const C = d2Actor("D2 of P2", D(), i2);
     runs.push({ order, contact, p2, i2, i3, held, r: await raceAtWrite(ctx, "M21", order === 1 ? O : C, order === 1 ? C : O) });
@@ -337,6 +346,61 @@ test("R2-130 control: with L8 removed from both actors (CELL_CONTROLS M21: its a
   // the control is lifted: the next send of the key is refused again
   const again = await staged(w, "m21-control-after", { seller: sellerB, prospect: p2.prospect });
   assert.equal(out(await send(w, sellerB, again.draft, again.grant)), OUTCOME.KC016, "with L8 back the exclusion holds");
+});
+
+test("R2-130 (assigned, review finding F2): a prospect the owner registered and assigned to a seller who cannot read its business contact is shown suppressed to that seller and to the owner once the contact opts out after the assignment, follows a reassignment to the next seller, takes no new contact and starts no new send; a re-registration of the contact by another seller is refused (KC016); no seller reads another's prospect and no answer carries the contact's key", async () => {
+  w.standAt(T0);
+  const contact = `f2-${Date.now()}@contact.example`;
+  // a seller's own prospect of the contact, its first message sent: the public opt-out's token comes from that MIME
+  const sellerA = await w.seller("f2-a");
+  const own = await staged(w, "f2-a", { seller: sellerA, prospect: await w.prospect(sellerA, { contact }) });
+  const token = tokenOf(w, await sentFirst(w, own));
+  const sellerX = await w.seller("f2-x");
+  const assigned = await w.assignedProspect(sellerX, { contact });
+  assert.ok(!assigned.registration.includes(assigned.contactKey), "the owner's CMD045 answer carries no contact key");
+  // the assigned seller owns the prospect but reads none of its contact: not the row, not its address, not the key through any of them
+  assert.deepEqual(await w.readAs(sellerX, "SELECT contact_id FROM kauro.prospect_contacts WHERE contact_key = $1", [assigned.contactKey]), [], "the assigned seller reads no contact row of the key");
+  assert.deepEqual(await w.readAs(sellerX, "SELECT contact_id FROM kauro.prospect_contact_addresses WHERE lower(address) = lower($1)", [contact]), [], "nor its address");
+  assert.deepEqual([(await w.prospectAs(sellerX, assigned.prospectId))?.state, (await w.prospectAs(sellerX, assigned.prospectId))?.ownerSellerId], ["RESEARCHED", sellerX.sellerId], "before the opt-out the assigned seller reads its prospect RESEARCHED");
+  const stored = await storedProspect(w, assigned);
+
+  // the opt-out comes after the assignment
+  assert.ok((await w.routes.optOut(token)).status < 300, "the public opt-out commits");
+  assert.deepEqual(await contactSuppressions(w, assigned.contactKey), [{ reason: "OPT_OUT", recordedByService: "outreach-service", recordedByUserId: null }], "one registry row, the outreach service's");
+  for (const [who, person] of [["the assigned seller", sellerX], ["the owner", w.owner]] as const) {
+    const shown = await w.prospectAs(person, assigned.prospectId);
+    assert.deepEqual([shown?.state, shown?.suppressed, shown?.version], ["SUPPRESSED", true, stored.version], `${who} is shown the prospect suppressed (the stored version)`);
+  }
+  assert.deepEqual(await storedProspect(w, assigned), stored, "the stored row did not move (state, flag, version)");
+  const contactBy = async (seller: SellerP): Promise<Reply> =>
+    w.call({ url: `/api/v1/ops/prospects/${assigned.prospectId}/contacts`, token: seller.token, key: `f2-contact-${seller.sellerId.slice(-8)}-${Date.now()}`, body: { contactLabel: "Operations lead", channel: "EMAIL", address: `new-${Date.now()}@contact.example` } });
+  const refusedContact = await contactBy(sellerX);
+  assert.equal(out(refusedContact), OUTCOME.KC016, "the assigned seller's new contact on the suppressed prospect is refused");
+  assert.ok(!refusedContact.text.includes(assigned.contactKey), "the refusal carries no contact key");
+  // no new message: a sealed grant over a fresh draft of the key never overrides the exclusion
+  // (CMD063 refuses the assigned seller at discovery: the address behind the owner's contact is not its to read, suppressed or not, so no message to it
+  // can ever be prepared by that seller; the exclusion stands behind that wall: no intent, no call)
+  const fresh = await w.draft(sellerX, assigned, sellerX.sender, { label: "f2-fresh" });
+  const callsBefore = callsTotal(w);
+  const refusedSend = await send(w, sellerX, fresh, await w.grant([fresh]));
+  assert.equal(out(refusedSend), "404 NOT_FOUND -", "a send of the assigned seller to the opted-out contact is refused");
+  assert.deepEqual([await intentsOfDraft(w, fresh.draftId), callsTotal(w) - callsBefore], [[], 0], "no intent, no provider call");
+  assert.ok(!refusedSend.text.includes(assigned.contactKey), "the send refusal carries no contact key");
+
+  // the owner reassigns the prospect: the next seller is shown it suppressed at once, the previous one no longer reads it
+  const sellerY = await w.seller("f2-y");
+  await w.reassign(assigned.prospectId, sellerY);
+  const toY = await w.prospectAs(sellerY, assigned.prospectId);
+  assert.deepEqual([toY?.state, toY?.suppressed, toY?.ownerSellerId], ["SUPPRESSED", true, sellerY.sellerId], "the next seller is shown the prospect suppressed");
+  assert.equal(await w.prospectAs(sellerX, assigned.prospectId), null, "the previous seller reads it no more");
+  assert.equal(out(await contactBy(sellerY)), OUTCOME.KC016, "the next seller's new contact is refused too");
+  assert.deepEqual(await w.readAs(sellerY, "SELECT contact_id FROM kauro.prospect_contacts WHERE contact_key = $1", [assigned.contactKey]), [], "the next seller reads no contact row of the key either");
+
+  // re-entry: the contact recorded again by a seller who never held it, under a new organization, is refused by the database (KC016)
+  await reimportRefused("assigned", contact);
+  // isolation: each seller reads only its own prospect
+  assert.equal(await w.prospectAs(sellerY, own.prospect.prospectId), null, "the next seller reads no other seller's prospect");
+  assert.equal(await w.prospectAs(sellerA, assigned.prospectId), null, "the registrar of the other prospect reads not the assigned one");
 });
 
 test("R2-130 boundary: the exclusion is derived without a privilege — kauro_outreach holds no UPDATE on prospects and no write on the transition history (kauro.commercial_transitions), and no SECURITY DEFINER routine is added or runnable by it", async () => {

@@ -289,6 +289,13 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
   const owner = sw.owner; // the corporate KAURO_OWNER (statements world), not the agency owner of w
   const recorded = new Map<string, RecordedSeller>();
   let seq = 0;
+  /** The owner's (re)assignment of a prospect (prospects_owner_update: owner_seller_id and one version step; no command of these lanes names it). */
+  const reassign = async (prospectId: string, seller: { readonly sellerId: string } | null): Promise<void> => {
+    await within(owner.userId, fixtureAt(), async (c) => {
+      const r = await c.query("UPDATE kauro.prospects SET owner_seller_id = $2, version = version + 1 WHERE prospect_id = $1", [prospectId, seller?.sellerId ?? null]);
+      if (r.rowCount !== 1) throw new Error(`the owner could not assign prospect ${prospectId}`);
+    });
+  };
 
   const content = async (userId: string, label: string): Promise<{ id: string; subject: string; body: string }> => {
     const subject = `Data migration help ${label}`;
@@ -439,6 +446,33 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       });
       return { prospectId, contactKey, organizationKey, sellerId: seller.sellerId } satisfies ProspectP;
     },
+    async assignedProspect(seller, options = {}) {
+      const domain = options.organization ?? `owner-org-${++seq}-${ids.next().slice(-6)}.example`;
+      const contactId = ids.next();
+      const address = options.contact ?? `lead-${seq}-${contactId.slice(-6)}@${domain}`;
+      const contactKey = sha(`KAURO_PROSPECT_CONTACT_V1\n${address}`);
+      const evidenceHash = sha(`source-evidence-${contactId}`);
+      // the owner's own evidence and contact (fixtures standing in for RecordProspectSource), then CMD045 through its route by the owner: registered by
+      // the owner, owned by nobody, the business contact's key copied by the database (migration 0094), never sent by the client
+      await within(owner.userId, fixtureAt(), async (c) => {
+        await c.query(
+          "INSERT INTO kauro.prospect_source_evidence (evidence_id, recorded_by_user_id, seller_id, evidence_hash, source_url_digest, observed_on, lawful_basis, segment, created_at) VALUES ($1, $2, NULL, $3, $4, current_date, 'LEGITIMATE_INTEREST', 'AGENCY', now())",
+          [ids.next(), owner.userId, evidenceHash, sha(`https://${domain}/`)],
+        );
+        await c.query("INSERT INTO kauro.prospect_contacts (contact_id, recorded_by_user_id, contact_key, contact_label, role_label, channel, created_at) VALUES ($1, $2, $3, 'Operations lead', 'Head of operations', 'EMAIL', now())", [contactId, owner.userId, contactKey]);
+        await c.query("INSERT INTO kauro.prospect_contact_addresses (contact_id, recorded_by_user_id, address) VALUES ($1, $2, $3)", [contactId, owner.userId, address]);
+      });
+      const registration = await api({ url: "/api/v1/sales/prospects", token: owner.token, body: { organizationLabel: domain, businessContactRef: contactId, sourceEvidenceHash: evidenceHash, jurisdiction: "United States" } });
+      if (registration.status !== 201) throw new Error(`the owner's CMD045 answered ${registration.status}: ${registration.text}`);
+      const body = registration.json<{ data?: { prospectId?: string }; prospectId?: string }>();
+      const prospectId = body.data?.prospectId ?? body.prospectId;
+      if (typeof prospectId !== "string") throw new Error(`the owner's CMD045 names no prospect: ${registration.text}`);
+      const organizationKey = (await h.oracle.query<{ k: string }>("SELECT organization_key AS k FROM kauro.prospects WHERE prospect_id = $1", [prospectId])).rows[0]!.k;
+      await reassign(prospectId, seller);
+      return { prospectId, contactKey, organizationKey, sellerId: seller.sellerId, registration: registration.text };
+    },
+    reassign,
+    readAs: (person, sql, params = []) => within(person.userId, fixtureAt(), async (c) => (await c.query(sql, [...params])).rows),
     sender,
     resource: defaultResource,
     async draft(author, prospect, snd, options = {}) {

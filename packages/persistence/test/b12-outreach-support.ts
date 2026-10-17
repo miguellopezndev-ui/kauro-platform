@@ -39,8 +39,8 @@ export interface B12World extends World {
   slot: number;
 }
 
-export async function openB12(label: string): Promise<B12World> {
-  const w = await openWorld(label);
+export async function openB12(label: string, options: { readonly migrationsDir?: string } = {}): Promise<B12World> {
+  const w = await openWorld(label, options);
   const outreach = await w.h.pg.connect("kauro_outreach_test");
   const s = await activeSeller(w, `${label}-seller-one`);
   const s2 = await activeSeller(w, `${label}-seller-two`);
