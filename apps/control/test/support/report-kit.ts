@@ -27,7 +27,7 @@ export function kitOf(w: ReportWorld) {
     (await w.h.oracle.query<Copy>("SELECT role, object_name, generation, sha256, byte_length::text AS byte_length FROM kauro.staged_artifacts WHERE attempt_id = $1 ORDER BY object_name", [attemptId])).rows;
 
   const deliveredOf = async (packageVersionId: string): Promise<Copy[]> =>
-    (await w.h.oracle.query<Copy>("SELECT role, object_name, generation, sha256, byte_length::text AS byte_length FROM kauro.delivery_artifacts WHERE package_version_id = $1 ORDER BY object_name", [packageVersionId])).rows;
+    (await w.h.oracle.query<Copy>("SELECT object_id, role, object_name, generation, sha256, byte_length::text AS byte_length FROM kauro.delivery_artifacts WHERE package_version_id = $1 ORDER BY object_name", [packageVersionId])).rows;
 
   /** The objects under an attempt's staging prefix. */
   const stagingObjects = async (prefix: string): Promise<Array<{ readonly objectName: string; readonly generation: string }>> =>
