@@ -62,3 +62,20 @@ The owner asked for more personality on the base of the reference sketches. What
    unchanged (one sentence for a screen reader and for the tests).
 5. **The name, cut in clay.** The footer's wordmark is filled with the clay texture (`background-clip: text`), hidden from assistive
    technology (the header already names the site) and drawn in the system's text colour under forced colours.
+
+## 6. Third pass (2026-10-17): the menu, fragments, and rock only under things
+
+1. **The navigation is folded into a menu.** The header shows the name, the theme control, Sign in and a Menu button; the page links are
+   one native disclosure (`<details>`), so the menu opens without script, stays the page's one "Main" navigation and keeps every link in
+   document order. The script adds Escape and a click on the veil to close it. The open menu is a wine room with the pages set large
+   and numbered.
+2. **Fragments of the product beside the words** (`apps/web/src/public/artifacts.tsx`): the counts a check finds, a change waiting for
+   approval, a sum that reconciles, an import order, a quote, importer settings, the same price for an agency and a company, where the
+   files go (never from Kauro to a CRM), two customers behind their walls, the small window of a file a model may see. Values from the
+   synthetic sample and the policy, words from the catalogue, hidden from assistive technology because the text beside them says it.
+3. **Rock only under things.** The texture is a surface something rests on (the hero window, the sheets of a delivery, the report cover,
+   the ticket of the free check) and never behind words: the footer wordmark cut in clay and the rock on the not-found page are removed,
+   and the bands that carry text are their own colour with a grain.
+4. **Wine as the middle colour.** Between porcelain and carbon, wine leads where a page says its one strong sentence: the context band
+   of Home, the menu, the responsibility band of How it works, the scope question of Supported services, the free check, the contact aside.
+5. **The not-found page** answers in the product's terms: a lookup that matched no row, stamped, beside the heading.

@@ -60,3 +60,13 @@ export function sharePercent(count: number, population: number): string {
   if (count > population) throw new RangeError("a count never exceeds its population");
   return `${(Math.round((count * 1000) / population) / 10).toFixed(1)}%`;
 }
+
+/** Three invented client workspaces of an agency, for the illustration on Home; each is at a different phase of a project. */
+export const SAMPLE_CLIENTS: ReadonlyArray<{ readonly name: string; readonly phase: "check" | "decide" | "ready" }> = Object.freeze([
+  { name: "Northwind Data", phase: "ready" },
+  { name: "Bluefin Retail", phase: "decide" },
+  { name: "Atlas Logistics", phase: "check" },
+]);
+
+/** The source files a team uploads in the synthetic project, before anything is prepared. */
+export const SAMPLE_SOURCES: readonly string[] = Object.freeze(["contacts.csv", "companies.xlsx"]);

@@ -6,6 +6,7 @@
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy } from "../../copy/public.ts";
 import { formatCount } from "../pricing-bands.ts";
+import { MarginNote } from "../artifacts.tsx";
 import { DataTable, FileName, LinkButton, PageHead, Section, Stamp, rich } from "../parts.tsx";
 import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, sharePercent } from "../sample-data.ts";
 import { ROUTE } from "../site.ts";
@@ -37,6 +38,7 @@ export function SampleDeliveryPage(): ReactElement {
       <Section id="sample-report" heading={PUBLIC_COPY["sample.report.heading"]} tone="sunken" variant="kauro-site-document">
         <div className="kauro-site-sheet">
           <p className="kauro-site-sheet-intro">{rich("sample.report.intro", { contacts: formatCount(SAMPLE.contacts) })}</p>
+          <MarginNote>{PUBLIC_COPY["sample.note.population"]}</MarginNote>
           <DataTable
             variant="kauro-site-table-region--report"
             caption={PUBLIC_COPY["sample.report.table.caption"]}

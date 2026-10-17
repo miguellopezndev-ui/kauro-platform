@@ -2669,26 +2669,6 @@ body:has(> .kauro-site-header) {
   border-block-start-color: var(--kauro-color-border);
 }
 
-/* ---- the footer: the name, cut in clay ------------------------------------------------------------------------------------------ */
-
-.kauro-site-footer-name {
-  overflow: hidden;
-  padding-block-end: 0.04em;
-  font-size: clamp(5rem, 1.5rem + 15vw, 15rem);
-  line-height: 0.82;
-  letter-spacing: -0.065em;
-  background: url("./textures/clay-rock.svg") center / cover, var(--kauro-color-accent);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-@media (forced-colors: active) {
-  .kauro-site-footer-name {
-    background: none;
-    color: CanvasText;
-  }
-}
-
 /* ---- interior pages ------------------------------------------------------------------------------------------------------------ */
 
 /* A big numeral beside a head: how many steps, set light and huge. */
@@ -2832,4 +2812,912 @@ body:has(> .kauro-site-header) {
   inset-block-start: 5.25rem;
   block-size: 5.75rem;
   background: repeating-linear-gradient(180deg, var(--kauro-color-border) 0 0.375rem, transparent 0.375rem 1.125rem);
+}
+
+/* =================================================================================================================================== */
+/* Third pass: a quiet header with the menu folded away, and rock only where something rests on it.                                  */
+/* =================================================================================================================================== */
+
+/* ---- the header: the name, the theme, sign in, and the menu ------------------------------------------------------------------- */
+
+.kauro-site-header {
+  position: sticky;
+  inset-block-start: 0;
+  background: color-mix(in srgb, var(--kauro-color-background) 92%, transparent);
+  backdrop-filter: saturate(1.4) blur(12px);
+}
+.kauro-site-header-inner,
+.kauro-site-header-inner {
+  flex-wrap: nowrap;
+  min-block-size: 4.5rem;
+  padding-block: 0;
+}
+.kauro-site-header-actions {
+  order: 2;
+  margin-inline-start: auto;
+}
+.kauro-site-header .kauro-site-menu {
+  order: 3;
+  margin-inline-start: var(--kauro-space-2);
+}
+.kauro-site-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kauro-space-3);
+  min-block-size: 2.75rem;
+  box-sizing: border-box;
+  padding-inline: var(--kauro-space-4);
+  border-radius: var(--kauro-radius);
+  background: var(--kauro-color-text);
+  color: var(--kauro-color-background);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+.kauro-site-menu-toggle::-webkit-details-marker {
+  display: none;
+}
+.kauro-site-menu-toggle::marker {
+  content: "";
+}
+/* Two rules that become a cross while the menu is open. */
+.kauro-site-menu-glyph {
+  position: relative;
+  inline-size: 1rem;
+  block-size: 0.625rem;
+}
+.kauro-site-menu-glyph::before,
+.kauro-site-menu-glyph::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  block-size: 1.5px;
+  background: currentColor;
+  transition: transform var(--kauro-site-ease), inset-block-start var(--kauro-site-ease);
+}
+.kauro-site-menu-glyph::before {
+  inset-block-start: 0;
+}
+.kauro-site-menu-glyph::after {
+  inset-block-start: calc(100% - 1.5px);
+}
+.kauro-site-menu[open] .kauro-site-menu-glyph::before {
+  inset-block-start: calc(50% - 0.75px);
+  transform: rotate(45deg);
+}
+.kauro-site-menu[open] .kauro-site-menu-glyph::after {
+  inset-block-start: calc(50% - 0.75px);
+  transform: rotate(-45deg);
+}
+.kauro-site-menu[open] .kauro-site-menu-toggle {
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+}
+@media (max-width: 30rem) {
+  .kauro-site-menu-label {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .kauro-site-menu-toggle {
+    inline-size: 2.75rem;
+    justify-content: center;
+    padding-inline: 0;
+  }
+}
+
+/* The open menu: a wine room under the header, the pages set large and numbered. */
+.kauro-site-menu-panel {
+  position: fixed;
+  z-index: -1;
+  inset: 4.5rem 0 0;
+  overflow-y: auto;
+  background-image: url("./textures/grain.svg");
+  background-size: 240px;
+}
+body:has(.kauro-site-menu[open]) {
+  overflow: hidden;
+}
+.kauro-site-menu-inner {
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--kauro-space-7);
+  max-inline-size: var(--kauro-site-width);
+  margin-inline: auto;
+  padding: clamp(2rem, 6vh, 4.5rem) var(--kauro-site-gutter) var(--kauro-space-7);
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav {
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list {
+  display: grid;
+  gap: 0;
+  white-space: normal;
+  counter-reset: page;
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list li {
+  counter-increment: page;
+  border-block-end: 1px solid var(--kauro-color-border);
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list a,
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list li:first-child a {
+  display: flex;
+  align-items: baseline;
+  gap: var(--kauro-space-4);
+  min-block-size: 0;
+  padding: clamp(0.5rem, 1.4vh, 0.875rem) 0;
+  color: var(--kauro-color-text);
+  font-family: var(--kauro-display-family);
+  font-size: clamp(1.75rem, 1rem + 2.6vw, 3.25rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list a::before {
+  content: counter(page, decimal-leading-zero) / "";
+  flex: none;
+  inline-size: 2.5rem;
+  color: var(--kauro-color-accent-text);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list a:hover {
+  color: var(--kauro-color-accent-text);
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list a[aria-current="page"] {
+  color: var(--kauro-color-accent-text);
+  font-weight: 300;
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list a[aria-current="page"]::after,
+.kauro-site-header .kauro-site-menu .kauro-site-nav-list li:first-child a[aria-current="page"]::after {
+  content: none;
+}
+.kauro-site-main .kauro-site-menu-tagline,
+.kauro-site-menu-tagline {
+  align-self: end;
+  max-inline-size: 18ch;
+  margin: 0;
+  color: var(--kauro-color-text-muted);
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: clamp(1.25rem, 1rem + 1vw, 1.75rem);
+  font-style: italic;
+  line-height: 1.25;
+}
+@media (min-width: 62rem) {
+  .kauro-site-menu-inner {
+    grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+    column-gap: clamp(3rem, 6vw, 6rem);
+  }
+}
+
+/* ---- the footer: plain, small, in order -------------------------------------------------------------------------------------- */
+
+.kauro-site-footer-name {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+.kauro-site-footer-tagline {
+  margin-block-start: var(--kauro-space-2);
+  font-size: 1rem;
+}
+.kauro-site-footer-inner {
+  padding-block: clamp(2.5rem, 5vw, 4rem) var(--kauro-space-6);
+}
+@media (min-width: 56rem) {
+  .kauro-site-footer-lead {
+    align-items: baseline;
+  }
+  .kauro-site-footer-tagline {
+    margin: 0;
+  }
+}
+
+/* ---- rock only under things: the bands that carry words go back to their colour ----------------------------------------------- */
+
+.kauro-site-limits.kauro-inverse,
+.kauro-site-pagehead.kauro-inverse.kauro-site-head-strata {
+  background-image: url("./textures/grain.svg");
+  background-size: 240px;
+}
+.kauro-site-rung--free.kauro-wine,
+.kauro-site-contact-aside.kauro-wine {
+  background-image: url("./textures/grain.svg");
+  background-size: 240px;
+  background-position: 0 0;
+}
+/* The header is opaque: a backdrop filter would make it the containing block of the fixed menu below it. */
+.kauro-site-header {
+  background: var(--kauro-color-background);
+  backdrop-filter: none;
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav {
+  display: block;
+}
+.kauro-site-header .kauro-site-menu .kauro-site-nav {
+  order: 0;
+  flex: none;
+}
+
+/* ---- fragments of the product (artifacts.tsx) ------------------------------------------------------------------------------------ */
+
+.kauro-site-frag {
+  position: relative;
+  display: grid;
+  gap: 0.625rem;
+  box-sizing: border-box;
+  max-inline-size: 24rem;
+  margin-block-start: var(--kauro-space-5);
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.625rem;
+  background: var(--kauro-color-raised);
+  color: var(--kauro-color-text);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  box-shadow: 0 1.25rem 2.5rem -1.75rem color-mix(in srgb, var(--kauro-color-ink) 60%, transparent);
+}
+.kauro-site-frag-title {
+  color: var(--kauro-color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.kauro-site-frag-figure {
+  font-family: var(--kauro-display-family);
+  font-size: 1.375rem;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.kauro-site-frag-label {
+  color: var(--kauro-color-text-muted);
+}
+
+/* Counts: a figure and what it counts. */
+.kauro-site-frag-counts {
+  display: grid;
+  gap: 0.375rem;
+}
+.kauro-site-frag-count {
+  display: grid;
+  grid-template-columns: 4.25rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.75rem;
+}
+.kauro-site-frag-count .kauro-site-frag-figure {
+  text-align: end;
+}
+
+/* A change waiting for approval, and the control that would approve it. */
+.kauro-site-frag-approval {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.375rem 0.75rem;
+}
+.kauro-site-frag-change {
+  font-weight: 650;
+}
+.kauro-site-frag-waiting {
+  grid-column: 1;
+  color: var(--kauro-color-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.kauro-site-frag-button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding: 0.4375rem 0.875rem;
+  border-radius: 0.3125rem;
+  background: var(--kauro-color-primary);
+  color: var(--kauro-color-on-primary);
+  font-weight: 650;
+}
+
+/* A sum that reconciles. */
+.kauro-site-frag-reconcile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.375rem 0.625rem;
+}
+.kauro-site-frag-arrow::before {
+  content: "\2192";
+  color: var(--kauro-color-text-muted);
+}
+.kauro-site-frag-figure--out {
+  color: var(--kauro-color-primary);
+}
+.kauro-site-frag-ok {
+  flex-basis: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--kauro-color-success-text);
+  font-weight: 600;
+}
+.kauro-site-frag-ok::before {
+  content: "";
+  inline-size: 0.3125rem;
+  block-size: 0.5625rem;
+  margin-inline: 0.125rem 0.25rem;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-0.125rem) rotate(45deg);
+}
+
+/* Files in import order, joined by a rule. */
+.kauro-site-frag-order {
+  display: grid;
+  gap: 0.375rem;
+  counter-reset: order;
+}
+.kauro-site-frag-step {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  counter-increment: order;
+}
+.kauro-site-frag-step::before {
+  content: counter(order);
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 50%;
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.6875rem;
+  font-weight: 650;
+}
+
+/* File chips, and a state beside them. */
+.kauro-site-frag-files {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+.kauro-site-frag-file {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--kauro-color-border);
+  border-radius: 0.3125rem;
+  background: var(--kauro-color-surface);
+}
+.kauro-site-frag-state {
+  margin-inline-start: auto;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--kauro-color-primary);
+  border-radius: 62.5rem;
+  color: var(--kauro-color-primary);
+  font-size: 0.6875rem;
+  font-weight: 650;
+}
+
+/* Settings, each with its value. */
+.kauro-site-frag-settings {
+  display: grid;
+  gap: 0.375rem;
+}
+.kauro-site-frag-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.kauro-site-frag-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--kauro-color-text-muted);
+  font-weight: 650;
+}
+/* A switch drawn off: an outlined track with its knob on the left. */
+.kauro-site-frag-switch::before {
+  content: "";
+  inline-size: 1.75rem;
+  block-size: 1rem;
+  box-sizing: border-box;
+  border: 1px solid var(--kauro-color-control-border);
+  border-radius: 62.5rem;
+  background: radial-gradient(circle at 0.5rem 50%, var(--kauro-color-control-border) 0.3125rem, transparent 0.34rem);
+}
+
+/* An agency's clients, each at its own phase. */
+.kauro-site-frag--clients {
+  gap: 0;
+  padding-block: 0.375rem;
+}
+.kauro-site-frag-client {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-block: 0.5rem;
+}
+.kauro-site-frag-client + .kauro-site-frag-client {
+  border-block-start: 1px solid var(--kauro-color-border);
+}
+.kauro-site-frag-client-name {
+  font-weight: 650;
+}
+.kauro-site-frag-client-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+}
+.kauro-site-frag-client-phase::before {
+  content: "";
+  inline-size: 0.4375rem;
+  block-size: 0.4375rem;
+  border-radius: 50%;
+  background: var(--kauro-color-accent);
+}
+.kauro-site-frag-client--decide .kauro-site-frag-client-phase {
+  color: var(--kauro-color-primary);
+  font-weight: 600;
+}
+.kauro-site-frag-client--decide .kauro-site-frag-client-phase::before {
+  background: var(--kauro-color-primary);
+}
+.kauro-site-frag-client--ready .kauro-site-frag-client-phase::before {
+  background: var(--kauro-color-success-text);
+}
+
+/* The same price for an agency and a company. */
+.kauro-site-frag--same {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+}
+.kauro-site-frag-tag {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px dashed var(--kauro-color-control-border);
+  border-radius: 0.375rem;
+}
+.kauro-site-frag-tag .kauro-site-frag-figure {
+  font-size: 1.125rem;
+}
+.kauro-site-frag-equals::before {
+  content: "=";
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-display-family);
+  font-size: 1.5rem;
+  font-weight: 300;
+}
+
+/* Where the files go: never from Kauro to a CRM; from Kauro to the team, and from the team to its CRM. */
+.kauro-site-frag--route {
+  max-inline-size: 26rem;
+  margin-block-start: var(--kauro-space-6);
+  padding: 1.125rem;
+  gap: 1rem;
+}
+.kauro-site-route-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.kauro-site-route-node {
+  flex: none;
+  padding: 0.3125rem 0.625rem;
+  border: 1px solid var(--kauro-color-text);
+  border-radius: 0.3125rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.kauro-site-route-node--quiet {
+  border-color: var(--kauro-color-control-border);
+  color: var(--kauro-color-text-muted);
+  font-weight: 500;
+}
+.kauro-site-route-line {
+  flex: 1;
+  min-inline-size: 0.75rem;
+  block-size: 1px;
+  background: var(--kauro-color-text-muted);
+}
+.kauro-site-route-cut {
+  position: relative;
+  flex: 1;
+  min-inline-size: 2rem;
+  block-size: 0;
+  border-block-start: 1px dashed var(--kauro-color-danger-text);
+}
+/* The cross on the cut line. */
+.kauro-site-route-cut::before,
+.kauro-site-route-cut::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: calc(50% - 0.4375rem);
+  inset-block-start: -0.5rem;
+  inline-size: 0.875rem;
+  block-size: 1.5px;
+  margin-block-start: 0.4375rem;
+  background: var(--kauro-color-danger-text);
+  transform: rotate(45deg);
+}
+.kauro-site-route-cut::after {
+  transform: rotate(-45deg);
+}
+
+/* Notes in the margin, set in the flow beside a fragment. */
+.kauro-site-margin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-block-start: 0.75rem;
+  color: var(--kauro-color-primary);
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: 1.0625rem;
+  font-style: italic;
+  line-height: 1.2;
+}
+.kauro-site-margin::before {
+  content: "";
+  flex: none;
+  inline-size: 1.75rem;
+  block-size: 1px;
+  background: currentColor;
+}
+.kauro-site-margin--up {
+  position: relative;
+  padding-inline-start: 1.25rem;
+}
+.kauro-site-margin--up::before {
+  position: absolute;
+  inset-inline-start: 0.375rem;
+  inset-block-end: 0.6em;
+  inline-size: 0.625rem;
+  block-size: 1.375rem;
+  border: solid currentColor;
+  border-width: 1px 0 0 1px;
+  border-start-start-radius: 0.5rem;
+  background: none;
+  transform: scaleY(-1);
+  transform-origin: bottom;
+}
+.kauro-site-frag .kauro-site-margin {
+  margin-block-start: 0;
+}
+
+/* In the process band the fragments sit on carbon. */
+.kauro-site-process-step .kauro-site-frag {
+  max-inline-size: none;
+}
+.kauro-site-buyer .kauro-site-frag {
+  max-inline-size: none;
+}
+
+/* ---- the context band: wine, the sentence large ----------------------------------------------------------------------------- */
+
+.kauro-site-quote.kauro-wine {
+  background-image: url("./textures/grain.svg");
+  background-size: 240px;
+}
+.kauro-site-main .kauro-site-quote.kauro-wine h2 {
+  color: var(--kauro-color-accent-text);
+}
+
+/* ---- the start: a ticket for the free check, stamped, on rock ---------------------------------------------------------------- */
+
+.kauro-site-start .kauro-site-section-head .kauro-site-actions {
+  margin-block-start: var(--kauro-space-6);
+}
+.kauro-site-main .kauro-site-start h2 {
+  font-size: clamp(2.25rem, 1.3rem + 3.6vw, 4.25rem);
+  line-height: 1;
+}
+.kauro-site-ticket-rock {
+  display: grid;
+  place-items: center;
+  min-block-size: 22rem;
+  padding: clamp(2rem, 5vw, 3.5rem) clamp(1.25rem, 4vw, 2.5rem);
+  border-radius: var(--kauro-radius-large);
+  background: url("./textures/clay-rock.svg") center / cover, var(--kauro-color-accent);
+}
+:root[data-theme="dark"] .kauro-site-ticket-rock {
+  background-image: url("./textures/ember-rock.svg");
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .kauro-site-ticket-rock {
+    background-image: url("./textures/ember-rock.svg");
+  }
+}
+.kauro-site-ticket {
+  position: relative;
+  display: grid;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  inline-size: min(100%, 22rem);
+  padding: 1.5rem 1.5rem 1.75rem;
+  border-radius: 0.5rem;
+  background:
+    radial-gradient(circle at 0 62%, transparent 0.75rem, var(--kauro-color-raised) 0.8rem) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 62%, transparent 0.75rem, var(--kauro-color-raised) 0.8rem) right / 51% 100% no-repeat;
+  color: var(--kauro-color-text);
+  filter: drop-shadow(0 1.5rem 2rem color-mix(in srgb, var(--kauro-color-ink) 45%, transparent));
+  transform: rotate(-3deg);
+}
+.kauro-site-ticket-brand {
+  font-family: var(--kauro-display-family);
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+.kauro-site-ticket-title {
+  padding-block-end: 0.875rem;
+  border-block-end: 1px dashed var(--kauro-color-control-border);
+  font-family: var(--kauro-display-family);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+.kauro-site-ticket-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.875rem;
+}
+.kauro-site-ticket-line::before {
+  content: "";
+  inline-size: 0.3125rem;
+  block-size: 0.5625rem;
+  margin-inline: 0.125rem 0.25rem;
+  border: solid var(--kauro-color-success-text);
+  border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-0.125rem) rotate(45deg);
+}
+.kauro-site-ticket-stamp {
+  position: absolute;
+  inset-inline-end: 1rem;
+  inset-block-start: 1rem;
+  padding: 0.375rem 0.75rem;
+  border: 2px solid var(--kauro-color-primary);
+  border-radius: 0.25rem;
+  box-shadow: inset 0 0 0 2px var(--kauro-color-raised), inset 0 0 0 3px var(--kauro-color-primary);
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transform: rotate(12deg);
+}
+
+/* The fragments of the four steps line up on one baseline. */
+@media (min-width: 56rem) {
+  .kauro-site-process-step {
+    display: flex;
+    flex-direction: column;
+  }
+  .kauro-site-process-step .kauro-site-frag {
+    margin-block-start: auto;
+    transform: translateY(var(--kauro-space-5));
+  }
+  .kauro-site-process-step p {
+    margin-block-end: var(--kauro-space-5);
+  }
+}
+
+.kauro-site-route-line {
+  position: relative;
+}
+.kauro-site-route-line::after {
+  content: "";
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-start: -0.1875rem;
+  inline-size: 0.375rem;
+  block-size: 0.375rem;
+  border: solid var(--kauro-color-text-muted);
+  border-width: 1px 1px 0 0;
+  transform: rotate(45deg);
+}
+.kauro-site-frag--route {
+  font-size: 0.875rem;
+}
+
+/* ---- fragments of the interior pages ------------------------------------------------------------------------------------------- */
+
+.kauro-site-band-grain.kauro-wine,
+.kauro-site-band-grain.kauro-inverse {
+  background-image: url("./textures/grain.svg");
+  background-size: 240px;
+}
+.kauro-site-service .kauro-site-frag,
+.kauro-site-timeline .kauro-site-frag {
+  max-inline-size: 22rem;
+}
+.kauro-site-service .kauro-site-frag {
+  margin-block: var(--kauro-space-2) var(--kauro-space-4);
+  box-shadow: none;
+  background: var(--kauro-color-surface);
+}
+.kauro-site-timeline .kauro-site-margin {
+  display: flex;
+}
+
+/* A quote, as the purchase step shows it. */
+.kauro-site-frag--quote {
+  justify-items: start;
+}
+.kauro-site-main .kauro-site-frag--quote .kauro-site-price {
+  margin: 0;
+  font-size: 2rem;
+}
+
+/* What is counted, and what is not. */
+.kauro-site-frag--units {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  max-inline-size: 28rem;
+  padding: 0;
+  overflow: hidden;
+}
+.kauro-site-units-col {
+  display: grid;
+  gap: 0.375rem;
+  padding: 1rem 1.125rem;
+}
+.kauro-site-units-col .kauro-site-frag-figure {
+  color: var(--kauro-color-primary);
+  font-size: 2rem;
+}
+.kauro-site-units-col--not {
+  border-inline-start: 1px dashed var(--kauro-color-control-border);
+  background: var(--kauro-color-surface);
+}
+.kauro-site-units-col--not .kauro-site-frag-figure {
+  color: var(--kauro-color-text-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* Two customers behind their walls; a request across the line is answered as if nothing were there. */
+.kauro-site-frag--walls {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.75rem;
+  max-inline-size: 34rem;
+}
+.kauro-site-wall {
+  display: grid;
+  align-content: start;
+  gap: 0.375rem;
+  padding: 0.75rem;
+  border: 1.5px solid var(--kauro-color-text);
+  border-radius: 0.375rem;
+}
+.kauro-site-wall--other {
+  border-color: var(--kauro-color-control-border);
+  border-style: dashed;
+}
+.kauro-site-wall-file {
+  block-size: 0.5rem;
+  border-radius: 0.125rem;
+  background: var(--kauro-color-border);
+}
+.kauro-site-wall-file:nth-child(3) {
+  inline-size: 70%;
+}
+.kauro-site-wall-cross {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.375rem;
+  max-inline-size: 8rem;
+  text-align: center;
+  font-size: 0.75rem;
+}
+.kauro-site-wall-answer {
+  padding: 0.25rem 0.5rem;
+  border: 1.5px solid var(--kauro-color-primary);
+  border-radius: 0.25rem;
+  color: var(--kauro-color-primary);
+  font-family: var(--kauro-mono-family);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transform: rotate(-4deg);
+}
+@media (max-width: 30rem) {
+  .kauro-site-frag--walls {
+    grid-template-columns: 1fr;
+  }
+  .kauro-site-wall-cross {
+    max-inline-size: none;
+  }
+}
+
+/* A file of which a model sees only a small window. */
+.kauro-site-frag--context {
+  max-inline-size: 22rem;
+}
+.kauro-site-context-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+}
+.kauro-site-context-cell {
+  block-size: 0.75rem;
+  border-radius: 2px;
+  background: var(--kauro-color-border);
+}
+.kauro-site-context-cell--seen {
+  background: var(--kauro-color-primary);
+}
+.kauro-site-context-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 1rem;
+  color: var(--kauro-color-text-muted);
+  font-size: 0.75rem;
+}
+.kauro-site-context-key > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.kauro-site-context-key > span::before {
+  content: "";
+  inline-size: 0.625rem;
+  block-size: 0.625rem;
+  border-radius: 2px;
+  background: var(--kauro-color-border);
+}
+.kauro-site-context-key-seen::before {
+  background: var(--kauro-color-primary);
+}
+
+.kauro-site-frag--context .kauro-site-frag-title {
+  font-family: var(--kauro-mono-family);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.kauro-site-context-key > .kauro-site-context-key-seen::before {
+  background: var(--kauro-color-primary);
+}
+
+@media (max-width: 30rem) {
+  .kauro-site-frag--route {
+    padding: 0.875rem;
+  }
+  .kauro-site-route-row {
+    gap: 0.375rem;
+  }
+  .kauro-site-route-node {
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    padding: 0.25rem 0.375rem;
+    font-size: 0.75rem;
+    white-space: normal;
+    text-align: center;
+  }
+  .kauro-site-route-line {
+    min-inline-size: 0.625rem;
+  }
+  .kauro-site-route-cut {
+    min-inline-size: 1.5rem;
+  }
 }

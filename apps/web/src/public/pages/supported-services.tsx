@@ -4,7 +4,9 @@
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy } from "../../copy/public.ts";
 import { availabilityOf, cleanQualifiesId, formatInstant, publishedModes, type Availability, type Publication } from "../capabilities.ts";
+import { FileChips, ImportOrder, Pane, Settings } from "../artifacts.tsx";
 import { INPUT_LIMITS } from "../limits.ts";
+import { MANIFEST_FILES } from "../sample-data.ts";
 import { LinkButton, MODE_ORDER, PageHead, Section, ServiceState, rich } from "../parts.tsx";
 import type { ServiceMode } from "../pricing-bands.ts";
 import { ROUTE } from "../site.ts";
@@ -24,6 +26,9 @@ function Details({ mode, publication }: { readonly mode: ServiceMode; readonly p
           <p className="kauro-site-card-lead">{PUBLIC_COPY["services.clean.summary"]}</p>
           <p>{PUBLIC_COPY["services.clean.delivery"]}</p>
           <p>{PUBLIC_COPY[cleanQualifiesId(publication)]}</p>
+          <Pane>
+            <FileChips files={[...MANIFEST_FILES.map((file) => file.name), PUBLIC_COPY["home.delivery.report.name"], PUBLIC_COPY["home.delivery.manifest.name"]]} />
+          </Pane>
           <p className="kauro-site-card-limit">{PUBLIC_COPY["services.clean.limit"]}</p>
         </>
       );
@@ -31,6 +36,14 @@ function Details({ mode, publication }: { readonly mode: ServiceMode; readonly p
       return (
         <>
           <p className="kauro-site-card-lead">{PUBLIC_COPY["services.hubspot.summary"]}</p>
+          <Pane>
+            <Settings
+              rows={[
+                { label: PUBLIC_COPY["services.frag.marketing"], value: PUBLIC_COPY["services.frag.off"] },
+                { label: PUBLIC_COPY["services.frag.enrichment"], value: PUBLIC_COPY["services.frag.off"] },
+              ]}
+            />
+          </Pane>
           <p className="kauro-site-card-limit">{PUBLIC_COPY["services.hubspot.cost"]}</p>
         </>
       );
@@ -38,6 +51,9 @@ function Details({ mode, publication }: { readonly mode: ServiceMode; readonly p
       return (
         <>
           <p className="kauro-site-card-lead">{PUBLIC_COPY["services.salesforce.summary"]}</p>
+          <Pane title={PUBLIC_COPY["home.frag.order"]}>
+            <ImportOrder plain files={[PUBLIC_COPY["services.frag.accounts"], PUBLIC_COPY["services.frag.contacts"], PUBLIC_COPY["services.frag.opportunities"]]} />
+          </Pane>
           <p className="kauro-site-card-limit">{PUBLIC_COPY["services.salesforce.limit"]}</p>
         </>
       );
@@ -105,7 +121,7 @@ export function SupportedServicesPage({ publication }: { readonly publication: P
           <li>{rich("services.limits.units", { units: INPUT_LIMITS.units })}</li>
         </ul>
       </Section>
-      <Section id="services-next" heading={PUBLIC_COPY["services.next.heading"]} layout="split" tone="inverse" variant="kauro-site-band-compact">
+      <Section id="services-next" heading={PUBLIC_COPY["services.next.heading"]} layout="split" tone="wine" variant="kauro-site-band-compact kauro-site-band-grain">
         <p>{PUBLIC_COPY["services.next.body"]}</p>
         <div className="kauro-site-actions">
           <LinkButton href={ROUTE.contact}>{PUBLIC_COPY["services.next.ask.cta"]}</LinkButton>

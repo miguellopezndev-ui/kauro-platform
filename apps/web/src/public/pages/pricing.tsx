@@ -5,7 +5,9 @@
 // The ladder reads in the order a buyer climbs it: the free check, the three services with their starting price, then the repeat discount.
 import type { ReactElement } from "react";
 import { PUBLIC_COPY, copy, type PublicCopyId } from "../../copy/public.ts";
+import { MarginNote, Pane } from "../artifacts.tsx";
 import { BandEstimator } from "../band-estimator.tsx";
+import { MANIFEST_FILES, SAMPLE } from "../sample-data.ts";
 import { availabilityOf, type Availability, type Publication } from "../capabilities.ts";
 import { modeName } from "../estimate-text.ts";
 import { DataTable, LinkButton, MODE_ORDER, PageHead, PriceFigure, Section, ServiceState } from "../parts.tsx";
@@ -74,6 +76,19 @@ export function PricingPage({ publication, signInHref }: PricingPageProps): Reac
       </Section>
       <Section id="pricing-unit" heading={PUBLIC_COPY["pricing.unit.heading"]} layout="split" tone="sunken">
         <p className="kauro-site-statement kauro-site-statement--small">{PUBLIC_COPY["pricing.unit.body"]}</p>
+        <Pane variant="kauro-site-frag--units">
+          <span className="kauro-site-units-col">
+            <span className="kauro-site-frag-title">{PUBLIC_COPY["pricing.frag.counted"]}</span>
+            <span className="kauro-site-frag-figure">{formatCount(SAMPLE.contacts)}</span>
+            <span className="kauro-site-frag-label">{PUBLIC_COPY["pricing.table.units.label"]}</span>
+          </span>
+          <span className="kauro-site-units-col kauro-site-units-col--not">
+            <span className="kauro-site-frag-title">{PUBLIC_COPY["pricing.frag.not-counted"]}</span>
+            <span className="kauro-site-frag-figure">{formatCount(MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile)?.rows ?? 0)}</span>
+            <span className="kauro-site-frag-label">{PUBLIC_COPY["pricing.frag.output"]}</span>
+          </span>
+        </Pane>
+        <MarginNote>{PUBLIC_COPY["pricing.note.split"]}</MarginNote>
         <p className="kauro-site-muted">{PUBLIC_COPY["pricing.unit.zero"]}</p>
       </Section>
       <Section id="pricing-quote" heading={PUBLIC_COPY["pricing.quote.heading"]} layout="split">

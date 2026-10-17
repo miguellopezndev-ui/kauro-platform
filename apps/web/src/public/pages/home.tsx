@@ -11,7 +11,8 @@ import { publishedModes, type Publication } from "../capabilities.ts";
 import { modeName } from "../estimate-text.ts";
 import { FileName, LinkButton, PageHead, PriceFigure, Section, ServiceState, Stamp } from "../parts.tsx";
 import { bandRange, formatCount, formatUsd, startingPrice, type ServiceMode } from "../pricing-bands.ts";
-import { MANIFEST_FILES, SAMPLE, SAMPLE_RECORDS, type RecordResult } from "../sample-data.ts";
+import { Approval, Counts, ImportOrder, MarginNote, Pane, Reconcile } from "../artifacts.tsx";
+import { MANIFEST_FILES, REPORT_ROWS, SAMPLE, SAMPLE_CLIENTS, SAMPLE_RECORDS, type RecordResult } from "../sample-data.ts";
 import { ROUTE } from "../site.ts";
 
 export interface HomePageProps {
@@ -103,12 +104,58 @@ const FACTS = [
   { name: "home.facts.quote.name", body: "home.facts.quote.body", mark: "quote" },
 ] as const satisfies ReadonlyArray<{ readonly name: PublicCopyId; readonly body: PublicCopyId; readonly mark: string }>;
 
+const CLIENT_PHASE: Readonly<Record<(typeof SAMPLE_CLIENTS)[number]["phase"], PublicCopyId>> = {
+  check: "home.app.phase.check.label",
+  decide: "home.app.phase.decide.label",
+  ready: "home.app.state.label",
+};
+
 const PROCESS = [
-  { name: "home.process.measure.name", body: "home.process.measure.body" },
-  { name: "home.process.decide.name", body: "home.process.decide.body" },
-  { name: "home.process.prepare.name", body: "home.process.prepare.body" },
-  { name: "home.process.import.name", body: "home.process.import.body" },
-] as const satisfies ReadonlyArray<{ readonly name: PublicCopyId; readonly body: PublicCopyId }>;
+  { name: "home.process.measure.name", body: "home.process.measure.body", key: "measure" },
+  { name: "home.process.decide.name", body: "home.process.decide.body", key: "decide" },
+  { name: "home.process.prepare.name", body: "home.process.prepare.body", key: "prepare" },
+  { name: "home.process.import.name", body: "home.process.import.body", key: "import" },
+] as const satisfies ReadonlyArray<{ readonly name: PublicCopyId; readonly body: PublicCopyId; readonly key: string }>;
+
+const countOf = (label: PublicCopyId): number => REPORT_ROWS.find((row) => row.label === label)?.count ?? 0;
+
+/** What each step of the process looks like in the product, from the synthetic sample. */
+function ProcessPane({ step }: { readonly step: (typeof PROCESS)[number]["key"] }): ReactElement | null {
+  const contacts = MANIFEST_FILES.find((file) => file.name === SAMPLE.contactsFile);
+  if (contacts === undefined) return null;
+  switch (step) {
+    case "measure":
+      return (
+        <Pane>
+          <Counts
+            rows={[
+              { value: countOf("sample.report.duplicates"), label: PUBLIC_COPY["home.frag.candidates"] },
+              { value: countOf("sample.report.emails"), label: PUBLIC_COPY["home.frag.invalid"] },
+              { value: countOf("sample.report.company"), label: PUBLIC_COPY["home.frag.company"] },
+            ]}
+          />
+        </Pane>
+      );
+    case "decide":
+      return (
+        <Pane>
+          <Approval count={2} />
+        </Pane>
+      );
+    case "prepare":
+      return (
+        <Pane>
+          <Reconcile from={contacts.source} to={contacts.rows} label={PUBLIC_COPY["home.app.phase.prepare.body"]} />
+        </Pane>
+      );
+    case "import":
+      return (
+        <Pane title={PUBLIC_COPY["home.frag.order"]}>
+          <ImportOrder files={[...MANIFEST_FILES.map((file) => file.name).reverse(), PUBLIC_COPY["home.frag.links"]]} />
+        </Pane>
+      );
+  }
+}
 
 const DELIVERY = [
   { name: "home.delivery.report.name", body: "home.delivery.report" },
@@ -206,6 +253,7 @@ export function HomePage({ publication, signInHref }: HomePageProps): ReactEleme
             <li key={step.name} className="kauro-site-process-step">
               <h3>{PUBLIC_COPY[step.name]}</h3>
               <p>{PUBLIC_COPY[step.body]}</p>
+              <ProcessPane step={step.key} />
             </li>
           ))}
         </ol>
@@ -215,15 +263,35 @@ export function HomePage({ publication, signInHref }: HomePageProps): ReactEleme
           </LinkButton>
         </p>
       </Section>
-      <Section id="home-buyer" heading={PUBLIC_COPY["home.buyer.heading"]} layout="split" lead={PUBLIC_COPY["home.buyer.body"]}>
+      <Section id="home-buyer" heading={PUBLIC_COPY["home.buyer.heading"]} lead={PUBLIC_COPY["home.buyer.body"]}>
         <ul className="kauro-site-buyers">
           <li className="kauro-site-buyer">
             <h3>{PUBLIC_COPY["home.buyer.agency.name"]}</h3>
             <p>{PUBLIC_COPY["home.buyer.agency.body"]}</p>
+            <Pane variant="kauro-site-frag--clients">
+              {SAMPLE_CLIENTS.map((client) => (
+                <span key={client.name} className={`kauro-site-frag-client kauro-site-frag-client--${client.phase}`}>
+                  <span className="kauro-site-frag-client-name">{client.name}</span>
+                  <span className="kauro-site-frag-client-phase">{PUBLIC_COPY[CLIENT_PHASE[client.phase]]}</span>
+                </span>
+              ))}
+            </Pane>
           </li>
           <li className="kauro-site-buyer">
             <h3>{PUBLIC_COPY["home.buyer.company.name"]}</h3>
             <p>{PUBLIC_COPY["pricing.in-house.body"]}</p>
+            <Pane variant="kauro-site-frag--same">
+              <span className="kauro-site-frag-tag">
+                <span className="kauro-site-frag-label">{PUBLIC_COPY["home.frag.agency"]}</span>
+                <span className="kauro-site-frag-figure">{formatUsd(startingPrice("CLEAN"))}</span>
+              </span>
+              <span className="kauro-site-frag-equals" />
+              <span className="kauro-site-frag-tag">
+                <span className="kauro-site-frag-label">{PUBLIC_COPY["home.frag.in-house"]}</span>
+                <span className="kauro-site-frag-figure">{formatUsd(startingPrice("CLEAN"))}</span>
+              </span>
+            </Pane>
+            <MarginNote>{PUBLIC_COPY["home.note.same"]}</MarginNote>
           </li>
         </ul>
       </Section>
@@ -247,7 +315,30 @@ export function HomePage({ publication, signInHref }: HomePageProps): ReactEleme
           </div>
         </div>
       </Section>
-      <Section id="home-limits" heading={PUBLIC_COPY["home.limits.heading"]} layout="split" tone="inverse" variant="kauro-site-limits">
+      <Section
+        id="home-limits"
+        heading={PUBLIC_COPY["home.limits.heading"]}
+        layout="split"
+        tone="inverse"
+        variant="kauro-site-limits"
+        headExtra={
+          <Pane variant="kauro-site-frag--route">
+            <span className="kauro-site-route-row kauro-site-route-row--blocked">
+              <span className="kauro-site-route-node">{PUBLIC_COPY["site.name"]}</span>
+              <span className="kauro-site-route-cut" />
+              <span className="kauro-site-route-node">{PUBLIC_COPY["home.frag.crm"]}</span>
+            </span>
+            <span className="kauro-site-route-row">
+              <span className="kauro-site-route-node kauro-site-route-node--quiet">{PUBLIC_COPY["home.frag.files"]}</span>
+              <span className="kauro-site-route-line" />
+              <span className="kauro-site-route-node kauro-site-route-node--quiet">{PUBLIC_COPY["home.frag.team"]}</span>
+              <span className="kauro-site-route-line" />
+              <span className="kauro-site-route-node">{PUBLIC_COPY["home.frag.crm"]}</span>
+            </span>
+            <MarginNote>{PUBLIC_COPY["home.note.never"]}</MarginNote>
+          </Pane>
+        }
+      >
         <ul className="kauro-site-statements">
           <li>{PUBLIC_COPY["home.limits.live"]}</li>
           <li>{PUBLIC_COPY["home.limits.import"]}</li>
@@ -255,15 +346,31 @@ export function HomePage({ publication, signInHref }: HomePageProps): ReactEleme
         </ul>
       </Section>
       <ModesSection publication={publication} />
-      <Section id="home-context" heading={PUBLIC_COPY["home.context.heading"]} tone="clay" variant="kauro-site-quote">
+      <Section id="home-context" heading={PUBLIC_COPY["home.context.heading"]} tone="wine" variant="kauro-site-quote">
         <p className="kauro-site-quote-text">{PUBLIC_COPY["home.context.body"]}</p>
       </Section>
-      <Section id="home-start" heading={PUBLIC_COPY["home.closing.heading"]} layout="split" tone="wine" variant="kauro-site-closing">
-        <p className="kauro-site-closing-body">{PUBLIC_COPY["home.closing.body"]}</p>
-        <div className="kauro-site-actions">
-          <LinkButton href={signInHref} primary>
-            {PUBLIC_COPY["public.cta.request-health-check.cta"]}
-          </LinkButton>
+      <Section
+        id="home-start"
+        heading={PUBLIC_COPY["home.closing.heading"]}
+        layout="split"
+        variant="kauro-site-start"
+        lead={PUBLIC_COPY["home.closing.body"]}
+        headExtra={
+          <div className="kauro-site-actions">
+            <LinkButton href={signInHref} primary>
+              {PUBLIC_COPY["public.cta.request-health-check.cta"]}
+            </LinkButton>
+          </div>
+        }
+      >
+        <div className="kauro-site-ticket-rock" aria-hidden="true">
+          <div className="kauro-site-ticket">
+            <span className="kauro-site-ticket-brand">{PUBLIC_COPY["site.name"]}</span>
+            <span className="kauro-site-ticket-title">{PUBLIC_COPY["health-check.title"]}</span>
+            <span className="kauro-site-ticket-line">{PUBLIC_COPY["home.ticket.measured"]}</span>
+            <span className="kauro-site-ticket-line">{PUBLIC_COPY["home.ticket.obligation"]}</span>
+            <span className="kauro-site-ticket-stamp">{PUBLIC_COPY["pricing.ladder.check.price"]}</span>
+          </div>
         </div>
       </Section>
     </>
