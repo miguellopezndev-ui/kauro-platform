@@ -24,6 +24,8 @@ export interface AuthDraftRecord {
   readonly contactLabel: string | null;
   readonly policyInForce: boolean;
   readonly complianceConfigured: boolean;
+  /** The draft's prospect is excluded: the registry reaches its organization or contact key, or it is stored SUPPRESSED (R2-130, review finding F2). */
+  readonly suppressed: boolean;
 }
 export interface AuthReviewItem {
   readonly draftId: string;

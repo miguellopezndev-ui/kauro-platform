@@ -747,6 +747,33 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
         if (first === undefined) throw new Error("a review needs at least one draft");
         return api({ url: "/api/v1/ops/outreach/reviews", token: owner.token, ...(key !== undefined ? { key } : {}), body: { senderIdentityRef: first.sender.senderId, draftIds: drafts.map((d) => d.draftId), assuranceProofRef: await stepUp(owner) } });
       },
+      async reviewed(drafts) {
+        const first = drafts[0];
+        if (first === undefined) throw new Error("a review needs at least one draft");
+        // PrepareOutreachReview and CMD062 under ONE step-up proof (CMD062 admits only the review issued under its own proof)
+        const proof = await stepUp(owner);
+        const review = await api({ url: "/api/v1/ops/outreach/reviews", token: owner.token, body: { senderIdentityRef: first.sender.senderId, draftIds: drafts.map((d) => d.draftId), assuranceProofRef: proof } });
+        const digest = completed<{ digest: string }>(review, 201).data.digest;
+        return {
+          review,
+          authorize: (options = {}) => {
+            const from = options.validFrom ?? state.standing ?? FIXTURE_AT;
+            return api({
+              url: "/api/v1/ops/outreach/authorizations",
+              token: owner.token,
+              body: {
+                senderIdentityRef: first.sender.senderId,
+                allowedContentHashes: drafts.map((d) => d.contentHash),
+                validFrom: from,
+                expiresAt: options.expiresAt ?? plusMs(from, 86_400_000),
+                maximumSends: options.maximumSends ?? drafts.length,
+                permissionEvidenceHash: digest,
+                assuranceProofRef: proof,
+              },
+            });
+          },
+        };
+      },
       async suppress(target) {
         // the registry row of the 0029 writer under L8 X of its key (the L-ACT route writes the same row; ON CONFLICT DO NOTHING as every writer)
         const keyKind = "contactKey" in target ? "CONTACT" : "ORGANIZATION";

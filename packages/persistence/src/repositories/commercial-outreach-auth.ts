@@ -29,6 +29,11 @@ export interface AuthDraftFact {
   readonly contactLabel: string | null;
   readonly policyInForce: boolean;
   readonly complianceConfigured: boolean;
+  /**
+   * Whether the draft's prospect is excluded (R2-130, review finding F2): the suppression registry reaches its organization key, the draft's contact key or the
+   * prospect's business contact key (migration 0094), or the prospect or the draft is stored SUPPRESSED. Read under L8 S of those keys in CMD062.
+   */
+  readonly suppressed: boolean;
 }
 export interface ReviewItemInput {
   readonly draftId: string;
@@ -111,7 +116,9 @@ export class PgOutreachAuth {
               (SELECT c.contact_label FROM kauro.prospect_contacts c WHERE c.contact_key = d.contact_key ORDER BY c.created_at, c.contact_id LIMIT 1) AS contact_label,
               EXISTS (SELECT 1 FROM kauro.outreach_channel_policies cp WHERE cp.jurisdiction = kauro.outreach_jurisdiction(p.jurisdiction) AND cp.purpose = d.purpose AND cp.state = 'IN_FORCE') AS policy_in_force,
               EXISTS (SELECT 1 FROM kauro.outreach_channel_policies cp WHERE cp.jurisdiction = kauro.outreach_jurisdiction(p.jurisdiction) AND cp.purpose = d.purpose AND cp.state = 'IN_FORCE'
-                        AND cp.postal_address IS NOT NULL AND cp.opt_out_origin IS NOT NULL) AS compliance_configured
+                        AND cp.postal_address IS NOT NULL AND cp.opt_out_origin IS NOT NULL) AS compliance_configured,
+              (p.state = 'SUPPRESSED' OR d.state = 'SUPPRESSED' OR EXISTS (SELECT 1 FROM kauro.prospect_suppressions x
+                 WHERE (x.key_kind = 'ORGANIZATION' AND x.suppression_key = p.organization_key) OR (x.key_kind = 'CONTACT' AND x.suppression_key IN (d.contact_key, p.business_contact_key)))) AS suppressed
          FROM kauro.outreach_drafts d JOIN kauro.prospects p ON p.prospect_id = d.prospect_id
         WHERE d.draft_id = ANY($1::uuid[]) ORDER BY d.draft_id`,
       [draftIds],
@@ -126,6 +133,7 @@ export class PgOutreachAuth {
       contactLabel: row["contact_label"] === null ? null : text(row["contact_label"]),
       policyInForce: row["policy_in_force"] === true,
       complianceConfigured: row["compliance_configured"] === true,
+      suppressed: row["suppressed"] === true,
     }));
   }
 
@@ -172,9 +180,13 @@ export class PgOutreachAuth {
     };
   }
 
-  // --- CMD062 (L1 -> L2 -> L5 S -> L6 S -> L7 S -> L10 S ascending -> judge -> INSERT) --------------------------------------------------------
+  // --- CMD062 (L1 -> L2 -> L5 S -> L6 S -> L7 S -> L8 S -> L10 S ascending -> judge -> INSERT) -------------------------------------------------
 
-  /** Discovery (the links are append-only) then the serializer set in the global order: capabilities, resource families, the sender, the drafts. */
+  /**
+   * Discovery (the links and the keys are append-only or immutable) then the serializer set in the global order: capabilities, resource families, the
+   * sender, the suppression keys of the drafts (L8 S: their contact keys, their prospects' business contact and organization keys — an opt-out in flight
+   * orders before or after the grant, R2-130 / review finding F2), the drafts.
+   */
   async lockGrantSet(draftIds: ReadonlyArray<string>, senderId: string): Promise<void> {
     const caps = await execute(
       this.db,
@@ -187,6 +199,14 @@ export class PgOutreachAuth {
     await this.locks.takeAll("L5", caps.rows.map((x) => text(x["subject"])), "S");
     await this.locks.takeAll("L6", fams.rows.map((x) => text(x["family"])), "S");
     await this.locks.take("L7", senderId, "S");
+    const keys = await execute(
+      this.db,
+      `SELECT DISTINCT k FROM kauro.outreach_drafts d JOIN kauro.prospects p ON p.prospect_id = d.prospect_id,
+              unnest(ARRAY['CONTACT:' || d.contact_key, 'ORGANIZATION:' || p.organization_key, 'CONTACT:' || p.business_contact_key]) AS k
+        WHERE d.draft_id = ANY($1::uuid[]) AND k IS NOT NULL`,
+      [draftIds],
+    );
+    await this.locks.takeAll("L8", keys.rows.map((x) => text(x["k"])), "S");
     await this.locks.takeAll("L10", draftIds, "S");
   }
 

@@ -15312,7 +15312,7 @@
             ]
           },
           "409": {
-            "description": "Problem (10 \"Responses and safe errors\"): the 8 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
+            "description": "Problem (10 \"Responses and safe errors\"): the 9 outcomes of this operation answered 409, listed in x-kauro-outcomes; frontends branch on code and reason, never on the title.",
             "headers": {
               "X-Correlation-Id": {
                 "$ref": "#/components/headers/CorrelationId"
@@ -15364,6 +15364,12 @@
                 "reason": "OUTREACH_ROUTE_FORBIDDEN",
                 "layer": "COMMAND",
                 "meaning": "the sender route may not carry the purpose (KC028)"
+              },
+              {
+                "code": "PRECONDITION_FAILED",
+                "reason": "PROSPECT_SUPPRESSED",
+                "layer": "COMMAND",
+                "meaning": "the organization key or the contact key of a draft is suppressed (KC016; R2-130, review finding F2)"
               },
               {
                 "code": "PRECONDITION_FAILED",

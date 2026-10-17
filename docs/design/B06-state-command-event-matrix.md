@@ -3039,6 +3039,7 @@ state — always, sometimes, or never (—). Frontends branch on code and reason
 | 409 | PRECONDITION_FAILED | SENDER_NOT_VERIFIED | — | — | COMMAND | the sender identity is not VERIFIED (KC031) |
 | 409 | PRECONDITION_FAILED | SENDER_REVOKED | — | — | COMMAND | the sender identity was revoked |
 | 409 | PRECONDITION_FAILED | OUTREACH_ROUTE_FORBIDDEN | — | — | COMMAND | the sender route may not carry the purpose (KC028) |
+| 409 | PRECONDITION_FAILED | PROSPECT_SUPPRESSED | — | — | COMMAND | the organization key or the contact key of a draft is suppressed (KC016; R2-130, review finding F2) |
 | 409 | PRECONDITION_FAILED | OUTREACH_JURISDICTION_UNREVIEWED | — | — | COMMAND | the jurisdiction of the purpose has no reviewed channel policy, or it was withdrawn (A13) |
 | 409 | PRECONDITION_FAILED | OUTREACH_COMPLIANCE_UNCONFIGURED | — | — | COMMAND | the postal address or the opt-out origin is not configured (A15) |
 | 422 | INTEGRITY_FAILURE | — | — | — | PLATFORM | a stored fact the command relies on is not what its own records say; nonretryable until the subject or implementation changes |

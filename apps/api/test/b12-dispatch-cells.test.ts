@@ -35,6 +35,7 @@ const D = (): Dispatcher => w.dispatcher();
 const out = (r: Reply): string => w.outcome(r);
 const WARNING_INSERT = { label: "warning_insert", match: /INSERT INTO kauro\.outreach_provider_warnings\b/ } as const;
 const D3_GATE = { label: "d3_gate", match: /kauro\.effect_now\(\)/ } as const;
+const GRANT_INSERT = { label: "grant_insert", match: /INSERT INTO kauro\.outreach_authorizations\b/ } as const;
 
 /** A cell whose dispatcher takes over the OUTBOX_DISPATCH lease runs in a world of its own, so the file's lease stays with its one dispatcher. */
 async function ownWorld(label: string, body: () => Promise<void>): Promise<void> {
@@ -313,6 +314,44 @@ cell("R2-130 (same prospect): the public opt-out through the FIRST message's tok
   w.standAt(T0);
 });
 
+cell("R2-130 (authorization, review finding F2): the public opt-out of a contact against CMD062 authorizing a reviewed draft of another seller's prospect with the same contact key, held at L8 (CMD062 takes L8 S of its drafts' keys): order 1 opt-out first: the grant is refused PROSPECT_SUPPRESSED and nothing is authorized; order 2 grant first: it is issued, the opt-out commits after it and the send under it is refused KC016 with no intent and no call; red with L8 removed from both (a grant over a contact whose opt-out held it)", "race", async (ctx) => {
+  // a world of its own whose first-contact channel policy carries the deployment's postal address and opt-out origin (the owner's configuration, D-16;
+  // the shipped seed has none, so CMD062 would answer OUTREACH_COMPLIANCE_UNCONFIGURED to every grant): a fixture, as reinstatePolicy
+  await ownWorld("r130-authorization", async () => {
+    await w.oracle.query(
+      `INSERT INTO kauro.outreach_channel_policies (jurisdiction, purpose, version, postal_address, opt_out_origin)
+       SELECT 'US', 'INDIVIDUAL_PROSPECT_CONTACT', max(version) + 1, 'Kauro Inc 1 Main Street Springfield', 'https://optout.kauro.example'
+         FROM kauro.outreach_channel_policies WHERE jurisdiction = 'US' AND purpose = 'INDIVIDUAL_PROSPECT_CONTACT'`,
+    );
+    w.standAt(T0);
+    const runs: Array<{ order: Order; seller: SellerP; draft: DraftP; review: string; r: RaceResult<unknown, unknown> }> = [];
+    for (const order of ORDERS) {
+      const contact = `f2-au-${order}-${Date.now()}@contact.example`;
+      const sellerA = await w.seller(`f2-au-${order}-a`);
+      const token = tokenOf(w, await sentFirst(w, await staged(w, `f2-au-${order}-a`, { seller: sellerA, prospect: await w.prospect(sellerA, { contact }) })));
+      const sellerB = await w.seller(`f2-au-${order}-b`);
+      const draft = await w.draft(sellerB, await w.prospect(sellerB, { contact }), sellerB.sender, { label: `f2-au-${order}` });
+      const rv = await w.routes.reviewed([draft]);
+      const O: RaceActor<unknown> = { name: "public opt-out", role: "kauro_outreach", run: () => w.routes.optOut(token), at: W.suppressionInsert };
+      const G: RaceActor<unknown> = { name: "CMD062", role: "kauro_app", run: () => rv.authorize(), at: GRANT_INSERT };
+      runs.push({ order, seller: sellerB, draft, review: rv.review.json<{ data: { reviewId: string } }>().data.reviewId, r: await raceAtWrite(ctx, "F2-AU", order === 1 ? O : G, order === 1 ? G : O) });
+    }
+    const [o1, o2] = runs as [(typeof runs)[0], (typeof runs)[0]];
+    const grantsOf = async (reviewId: string): Promise<number> => (await w.oracle.query<{ n: number }>("SELECT count(*)::int AS n FROM kauro.outreach_authorizations WHERE review_id = $1", [reviewId])).rows[0]!.n;
+    const refusedFirst = replyOf(o1.r.second, "CMD062");
+    assert.equal(refusedFirst.status < 300 ? `${refusedFirst.status} GRANTED` : out(refusedFirst), OUTCOME.KC016, "order 1: the grant after the opt-out is refused PROSPECT_SUPPRESSED (forbidden effect: a grant over an opted-out contact)");
+    assert.equal(await grantsOf(o1.review), 0, "order 1: nothing is authorized");
+    const issued = replyOf(o2.r.first, "CMD062");
+    assert.equal(issued.status, 201, `order 2: the grant first is issued: ${issued.text}`);
+    assert.ok(replyOf(o2.r.second, "opt-out").status < 300, "order 2: the opt-out commits after it");
+    const grant = issued.json<{ data: GrantP }>().data;
+    const callsBefore = callsTotal(w);
+    assert.equal(out(await send(w, o2.seller, o2.draft, grant)), OUTCOME.KC016, "order 2: the send under the grant is refused");
+    assert.deepEqual([await intentsOfDraft(w, o2.draft.draftId), callsTotal(w) - callsBefore], [[], 0], "order 2: no intent, no call");
+    assert.deepEqual(runs.map((x) => x.r.secondBlocked), [true, true], "the second waited on the first's L8 in both orders");
+  });
+});
+
 test("R2-130 control: with L8 removed from both actors (CELL_CONTROLS M21: its acquisition and its database assertion), an opt-out held after its registry INSERT no longer orders D2 — the provider is called for the contact whose opt-out was in flight, the red the cells' L8 prevents", async () => {
   w.standAt(T0);
   const contact = `m21-control-${Date.now()}@contact.example`;
@@ -383,6 +422,10 @@ test("R2-130 (assigned, review finding F2): a prospect the owner registered and 
   assert.equal(out(refusedDraft), OUTCOME.KC016, "after the opt-out the assigned seller's draft is refused PROSPECT_SUPPRESSED");
   assert.ok(!refusedDraft.text.includes(assigned.contactKey), "the draft refusal carries no contact key");
   const fresh = await w.draft(sellerX, assigned, sellerX.sender, { label: "f2-fresh" });
+  // CMD062 through its route: the owner's review of the draft issues, its authorization is refused (no new authorization for an excluded contact)
+  const refusedGrant = await (await w.routes.reviewed([fresh])).authorize();
+  assert.equal(out(refusedGrant), OUTCOME.KC016, "the owner's authorization of a draft to the opted-out contact is refused PROSPECT_SUPPRESSED");
+  assert.ok(!refusedGrant.text.includes(assigned.contactKey), "the authorization refusal carries no contact key");
   const callsBefore = callsTotal(w);
   const refusedSend = await send(w, sellerX, fresh, await w.grant([fresh]));
   assert.equal(out(refusedSend), OUTCOME.KC016, "a send of the assigned seller to the opted-out contact is refused PROSPECT_SUPPRESSED");

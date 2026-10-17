@@ -320,6 +320,8 @@ export interface SendWorld {
     optOut(token: string): Promise<Reply>;
     diagnose(personUserId: string, key?: string): Promise<Reply>;
     review(drafts: ReadonlyArray<DraftP>, key?: string): Promise<Reply>;
+    /** PrepareOutreachReview (201 asserted) under a fresh step-up, and CMD062 through its route under the same proof, to call when the cell chooses. */
+    reviewed(drafts: ReadonlyArray<DraftP>): Promise<{ readonly review: Reply; authorize(options?: { readonly validFrom?: string; readonly expiresAt?: string; readonly maximumSends?: number }): Promise<Reply> }>;
     suppress(target: { readonly contactKey: string } | { readonly domain: string }): Promise<void>;
     /** The next reviewed version of the withdrawn policy, IN_FORCE (a fixture: no route names it); throws unless the latest version reads IN_FORCE. */
     reinstatePolicy(jurisdiction: string, purpose: Purpose): Promise<void>;
@@ -441,6 +443,8 @@ export const CELL_CONTROLS: Readonly<Record<string, Control>> = {
   M21: { locks: ["L8"], coGuards: [] },
   M22: { locks: ["L8"], coGuards: [] },
   M23: { locks: ["L8"], coGuards: [] },
+  // R2-130 / review finding F2: the opt-out against CMD062 (L8 S of the drafts' keys)
+  "F2-AU": { locks: ["L8"], coGuards: [] },
   M26: { locks: ["L10"], coGuards: ["T1"] },
   M27: { locks: ["L10"], coGuards: ["T1"] },
   M30: { locks: ["L13"], coGuards: [] },

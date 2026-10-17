@@ -44,6 +44,7 @@ export const AUTHORIZE_OUTREACH_OUTCOMES: ReadonlyArray<ProblemOutcome> = Object
   PRE("SENDER_NOT_VERIFIED", "the sender identity is not VERIFIED (KC031)"),
   PRE("SENDER_REVOKED", "the sender identity was revoked"),
   PRE("OUTREACH_ROUTE_FORBIDDEN", "the sender route may not carry the purpose (KC028)"),
+  PRE("PROSPECT_SUPPRESSED", "the organization key or the contact key of a draft is suppressed (KC016; R2-130, review finding F2)"),
   PRE("OUTREACH_JURISDICTION_UNREVIEWED", "the jurisdiction of the purpose has no reviewed channel policy, or it was withdrawn (A13)"),
   PRE("OUTREACH_COMPLIANCE_UNCONFIGURED", "the postal address or the opt-out origin is not configured (A15)"),
 ]);
