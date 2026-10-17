@@ -96,6 +96,20 @@ const rawConnectionOf = (client: unknown): HarnessConnection | undefined =>
 /** The marker of a judgment statement in the B12 code (rule 25): the one statement after the last await that reads the effect clock. */
 const JUDGE_MARKER = "/* b12:judge */";
 
+/**
+ * The advisory subjects a §M control removes (FaultRouting.droppingLocks): while a kind is listed, a routed unit's acquisition of it
+ * (OutreachLocks.take: pg_advisory_xact_lock[_shared](kauro.transition_key($1, $2)) with the kind as $1) runs as a statement that takes nothing.
+ * The production code is untouched: the unit still believes it holds the subject, so only the database's serialization is gone.
+ */
+const DROPPED_LOCK_KINDS = new Set<string>();
+const ADVISORY_TAKE = /^\s*SELECT pg_advisory_xact_lock(_shared)?\(kauro\.transition_key\(\$1, \$2\)\)\s*$/;
+function withoutDroppedLock(args: unknown[]): unknown[] {
+  if (DROPPED_LOCK_KINDS.size === 0 || typeof args[0] !== "string" || !ADVISORY_TAKE.test(args[0])) return args;
+  const params = args[1];
+  if (!Array.isArray(params) || !DROPPED_LOCK_KINDS.has(String(params[0]))) return args;
+  return ["SELECT NULL /* control: lock dropped */"];
+}
+
 /** The connection a route hands the unit of work: the harness connection with `release` a no-op and the cell's statement steps. */
 function routedClient(route: Route): PoolClient {
   const instrumented = new Map<string, (...a: unknown[]) => Promise<unknown>>();
@@ -117,7 +131,8 @@ function routedClient(route: Route): PoolClient {
       if (prop === "release") return () => undefined;
       if (prop === RAW_CONNECTION) return route.conn;
       if (prop === "query") {
-        return (...args: unknown[]) => {
+        return (...given: unknown[]) => {
+          const args = withoutDroppedLock(given);
           const first = args[0];
           const text = typeof first === "string" ? first : (first as { text?: string } | undefined)?.text ?? "";
           // every step counts the statements it matches (its regex and its `when`), whichever step instruments the statement, so two steps of one
@@ -323,6 +338,19 @@ export class FaultRouting {
    * too), not only the SERVICE units of the commission group: a world whose cells judge a user command at a stated instant (B12 send) turns it on.
    */
   positionEveryUnit = false;
+  /**
+   * fn with the advisory subjects of `kinds` dropped from every routed unit (see DROPPED_LOCK_KINDS): the acquisition half of a §M control; the
+   * database's assertion half (kauro.outreach_require_lock) is the world's to lift. The kinds are restored when fn settles.
+   */
+  async droppingLocks<T>(kinds: ReadonlyArray<string>, fn: () => Promise<T>): Promise<T> {
+    if (DROPPED_LOCK_KINDS.size > 0) throw new Error("a control is already dropping locks");
+    for (const k of kinds) DROPPED_LOCK_KINDS.add(k);
+    try {
+      return await fn();
+    } finally {
+      DROPPED_LOCK_KINDS.clear();
+    }
+  }
   /** The step clock a judgment statement re-applies (see Route.judgeClock): the bound clock while positionEveryUnit is on. */
   readonly #judgeClock = (): StepClockOf | null => (this.positionEveryUnit ? this.clock : null);
   /** Where the commission group's service units stand on the TEST CLOCK (statementsWorld's `standing`). */

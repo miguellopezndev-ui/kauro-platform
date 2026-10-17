@@ -4,7 +4,8 @@
  *
  * One unit of work of the caller's OPERATOR context, in B06's pipeline order: access (seller, else owner, each read after its transition
  * lock L1: GAP-PK-2) → journal reserve (or the replay of the journaled 201) → the prospect (a seller sees the prospects it owns; a foreign
- * and an unknown one answer alike, NOT_FOUND; a SUPPRESSED prospect takes no contact, PROSPECT_SUPPRESSED) → the address is a business
+ * and an unknown one answer alike, NOT_FOUND; a SUPPRESSED prospect takes no contact, PROSPECT_SUPPRESSED — effective suppression: the stored row, or
+ * the registry reaching its organization or its business contact's key, R2-130) → the address is a business
  * address (SCHEMA_VIOLATION otherwise) and its key is KAURO_PROSPECT_CONTACT_V1 of the case-folded NFC address, whoever records it
  * (A14): two recorders of one address hold two contact rows and one key (GAP-PK-1, a unique-free record by design), so a suppression of
  * the key survives reimport, reassignment and provider change. The contact row and its restricted address are written in this one

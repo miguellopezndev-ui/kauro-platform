@@ -9,11 +9,11 @@
 // fails under its control (KAURO_B12_CONTROL=<M>) at its forbidden-effect assertion, which each body asserts before the observed block.
 import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
-import { connectionPid, type FaultContext } from "@kauro/persistence/testing";
+import { connectionPid, FaultPoints, type FaultContext } from "@kauro/persistence/testing";
 import {
-  activate, activityKinds, answerOf, callsOf, cell, D4_GRACE_MS, DAY_MS, draftRow, draftState, evidenceOf, firstContacts, firstContacts24h, grantReserved, holdLease,
+  activate, activityKinds, answerOf, callsOf, cell, CELL_CONTROLS, contactSuppressions, D4_GRACE_MS, DAY_MS, draftRow, draftState, evidenceOf, firstContacts, firstContacts24h, grantReserved, holdLease,
   holdSubject, intent, intentIdOf, intentsOfDraft, LEASE_TTL_MS, msOf, onEffectClock, OUTCOME, outboxOf, plusMs, plusUs, prospectState, queued, raceAtWrite,
-  rev2OrderControl, send, sendWorld, senderState, sentFirst, staged, START_GATE_MS, stateOf, T0, tokenOf, UNCERTAIN_AFTER_MS, W, waitingBehind, warningsOf,
+  rev2OrderControl, send, sendWorld, senderState, sentFirst, staged, START_GATE_MS, storedProspect, stateOf, T0, tokenOf, UNCERTAIN_AFTER_MS, W, waitingBehind, warningsOf,
   type ClassifiedAnswer, type Dispatcher, type DraftP, type DraftState, type GrantP, type RaceActor, type RaceResult, type SellerP, type SendWorld, type Staged,
 } from "./b12-send-support.js";
 import type { Reply } from "./support.js";
@@ -197,10 +197,49 @@ test("R2-129 (observed not sent): draft SEND_UNCERTAIN before, HUMAN_SEND_OBSERV
 });
 
 // --- R2-130 ------------------------------------------------------------------------------------------------------------------------------
+// The opt-out's authority is the registry row (kauro.prospect_suppressions, CONTACT, OPT_OUT, recorded by the outreach service); the service never moves a
+// prospect (KA098, A17), so "shown suppressed" is the EFFECTIVE state the product's readers derive from the registry (D-B12O-12 as decided for R2-130:
+// commercial-sales.ts REGISTRY_REACHES). The cells prove it through the readers and the operations, and that nothing stored moved.
+
+/**
+ * After an opt-out of `contactKey` committed: the registry row is durable and the service's own; every prospect of the key reads SUPPRESSED to its own seller
+ * (and to the owner) while its stored row is untouched (same state, flag and version: no transition, no UPDATE by kauro_outreach); a seller reads no other
+ * seller's prospect; no new send starts for the key — a sealed grant over a fresh draft, a second sender identity, a re-registration of the contact by
+ * another seller and a new contact recorded on the prospect are all refused PROSPECT_SUPPRESSED.
+ */
+async function excludedEverywhere(what: string, contactKey: string, held: ReadonlyArray<{ readonly seller: SellerP; readonly prospect: Staged["prospect"]; readonly stored: { state: string; suppressed: boolean; version: number } }>): Promise<void> {
+  assert.deepEqual(await contactSuppressions(w, contactKey), [{ reason: "OPT_OUT", recordedByService: "outreach-service", recordedByUserId: null }], `${what}: one durable registry row, the outreach service's`);
+  for (const { seller, prospect, stored } of held) {
+    const shown = await w.prospectAs(seller, prospect.prospectId);
+    assert.deepEqual([shown?.state, shown?.suppressed], ["SUPPRESSED", true], `${what}: the seller's own reader shows its prospect suppressed`);
+    assert.deepEqual([(await w.prospectAs(w.owner, prospect.prospectId))?.state, (await w.prospectAs(w.owner, prospect.prospectId))?.suppressed], ["SUPPRESSED", true], `${what}: the owner's reader too`);
+    assert.deepEqual(await storedProspect(w, prospect), stored, `${what}: the stored row did not move (state, flag, version): the exclusion is derived, never a transition`);
+    assert.equal(shown?.version, stored.version, `${what}: the reader's version is the stored one`);
+    // no new sequence for the key, whatever the path
+    const fresh = await w.draft(seller, prospect, seller.sender, { label: `${what}-fresh-${prospect.prospectId.slice(-6)}` });
+    assert.equal(out(await send(w, seller, fresh, await w.grant([fresh]))), OUTCOME.KC016, `${what}: a sealed grant over a fresh draft never overrides the exclusion`);
+    const other = await w.sender(seller);
+    const viaOther = await w.draft(seller, prospect, other, { label: `${what}-other-sender-${prospect.prospectId.slice(-6)}` });
+    assert.equal(out(await send(w, seller, viaOther, await w.grant([viaOther]))), OUTCOME.KC016, `${what}: another sender identity of the seller is refused alike`);
+    const contact = await w.call({ url: `/api/v1/ops/prospects/${prospect.prospectId}/contacts`, token: seller.token, key: `r2-130-contact-${prospect.prospectId}-${Date.now()}`, body: { contactLabel: "Operations lead", channel: "EMAIL", address: `new-${Date.now()}@contact.example` } });
+    assert.equal(out(contact), OUTCOME.KC016, `${what}: the suppressed prospect takes no new contact`);
+  }
+  for (const a of held) {
+    for (const b of held) if (a !== b) assert.equal(await w.prospectAs(a.seller, b.prospect.prospectId), null, `${what}: a seller reads no other seller's prospect`);
+  }
+}
+
+/** A re-registration of the opted-out contact address by a seller who never held it (list reimport, another seller): refused by the database (KC016). */
+const reimportRefused = async (what: string, contact: string): Promise<void> => {
+  const late = await w.seller(`reimport-${Date.now()}`);
+  await assert.rejects(w.prospect(late, { contact }), (e: unknown) => (e as { code?: string }).code === "KC016", `${what}: a re-registration of the contact by another seller is refused (KC016)`);
+};
+
 cell("R2-130 (cross-seller): the public opt-out through the token of P1's submitted message (taken from the MIME the fake recorded) against the claim of another seller's prospect P2 with the same contact key, held at the suppression key L8 (the only lock they share): order 1 opt-out first: NOT_SENT(SUPPRESSED), zero calls, P2 shown suppressed; order 2 claim first: exactly one submission, the opt-out commits after it, the next intent to that contact NOT_SENT(SUPPRESSED) with zero calls; red with D2's L8 removed", "race", async (ctx) => {
-  // traces: opt-out L8 X (contact key) -> L14 prospect rows; D2 of P2 L1 S(seller B) -> L3 S(P2) -> L4 X(B) -> ... -> L8 S(K) -> L10 X: they share only L8
+  // traces: opt-out L8 X (contact key) -> registry row; D2 of P2 L1 S(seller B) -> L3 S(P2) -> L4 X(B) -> ... -> L8 S(K) -> L10 X: they share only L8
   w.standAt(T0);
-  const runs: Array<{ order: Order; p2: Staged; i2: string; i3: string; r: RaceResult<unknown, unknown> }> = [];
+  type Held = { seller: SellerP; prospect: Staged["prospect"]; stored: { state: string; suppressed: boolean; version: number } };
+  const runs: Array<{ order: Order; contact: string; p2: Staged; i2: string; i3: string; held: Held[]; r: RaceResult<unknown, unknown> }> = [];
   for (const order of ORDERS) {
     const contact = `m21-${order}-${Date.now()}@contact.example`;
     const sellerA = await w.seller(`m21-${order}-a`);
@@ -213,25 +252,29 @@ cell("R2-130 (cross-seller): the public opt-out through the token of P1's submit
     const sellerC = await w.seller(`m21-${order}-c`);
     const p3 = await staged(w, `m21-${order}-c`, { seller: sellerC, prospect: await w.prospect(sellerC, { contact }) });
     const i3 = await queued(w, p3);
+    const held: Held[] = [];
+    for (const [seller, s] of [[sellerA, p1], [sellerB, p2], [sellerC, p3]] as const) held.push({ seller, prospect: s.prospect, stored: await storedProspect(w, s.prospect) });
     const O: RaceActor<unknown> = { name: "public opt-out", role: "kauro_outreach", run: () => w.routes.optOut(token), at: W.suppressionInsert };
     const C = d2Actor("D2 of P2", D(), i2);
-    runs.push({ order, p2, i2, i3, r: await raceAtWrite(ctx, "M21", order === 1 ? O : C, order === 1 ? C : O) });
+    runs.push({ order, contact, p2, i2, i3, held, r: await raceAtWrite(ctx, "M21", order === 1 ? O : C, order === 1 ? C : O) });
   }
   const [o1, o2] = runs as [(typeof runs)[0], (typeof runs)[0]];
   assert.equal(callsOf(w, o1.i2), 0, "order 1: zero calls to the suppressed contact (forbidden effect)");
   assert.equal(stateOf(await intent(w, o1.i2)), "NOT_SENT(SUPPRESSED)");
-  assert.equal(await prospectState(w, o1.p2.prospect), "SUPPRESSED", "order 1: P2 shown suppressed");
+  assert.deepEqual([(await w.prospectAs(o1.held[1]!.seller, o1.p2.prospect.prospectId))?.state], ["SUPPRESSED"], "order 1: P2 shown suppressed to its seller");
   assert.equal(callsOf(w, o2.i2), 1, "order 2: exactly one submission");
   assert.ok(replyOf(o2.r.second, "opt-out").status < 300, "order 2: the opt-out commits after it");
-  for (const { order, i3 } of runs) {
+  for (const { order, i3, contact, held } of runs) {
     await D().dispatch(i3);
     assert.deepEqual([stateOf(await intent(w, i3)), callsOf(w, i3)], ["NOT_SENT(SUPPRESSED)", 0], `order ${order}: the next intent to that contact NOT_SENT(SUPPRESSED) with zero calls`);
+    await excludedEverywhere(`order ${order}`, held[0]!.prospect.contactKey, held);
+    await reimportRefused(`order ${order}`, contact);
   }
   assert.deepEqual(runs.map((x) => x.r.secondBlocked), [true, true], "the second waited on the first's L8 in both orders");
 });
 
 cell("R2-130 (same prospect): the public opt-out through the FIRST message's token (from the MIME the fake recorded) against the claim of the queued follow-up, held at L8 (the opt-out takes no L3, L4, L4g, L10): order 1: NOT_SENT(SUPPRESSED), zero calls; order 2: one submission then SUPPRESSED; the sealed grant never overrides the refusal; red with L8 removed from both (zero-call assertion fails); the support refuses a token of an intent never submitted", "race", async (ctx) => {
-  const runs: Array<{ order: Order; s: Staged; follow: string; g: GrantP; r: RaceResult<unknown, unknown> }> = [];
+  const runs: Array<{ order: Order; s: Staged; follow: string; g: GrantP; stored: { state: string; suppressed: boolean; version: number }; r: RaceResult<unknown, unknown> }> = [];
   for (const order of ORDERS) {
     w.standAt(T0);
     const s = await staged(w, `m22-${order}`);
@@ -242,9 +285,10 @@ cell("R2-130 (same prospect): the public opt-out through the FIRST message's tok
     const g = await w.grant([f]);
     const follow = intentIdOf(await send(w, s.seller, f, g));
     if (order === 1) assert.throws(() => tokenOf(w, follow), "the support refuses a token of an intent never submitted");
+    const stored = await storedProspect(w, s.prospect);
     const O: RaceActor<unknown> = { name: "public opt-out", role: "kauro_outreach", run: () => w.routes.optOut(token), at: W.suppressionInsert };
     const C = d2Actor("D2 of the follow-up", D(), follow);
-    runs.push({ order, s, follow, g, r: await raceAtWrite(ctx, "M22", order === 1 ? O : C, order === 1 ? C : O) });
+    runs.push({ order, s, follow, g, stored, r: await raceAtWrite(ctx, "M22", order === 1 ? O : C, order === 1 ? C : O) });
   }
   const [o1, o2] = runs as [(typeof runs)[0], (typeof runs)[0]];
   assert.equal(callsOf(w, o1.follow), 0, "order 1: zero calls after the opt-out committed (forbidden effect)");
@@ -252,9 +296,65 @@ cell("R2-130 (same prospect): the public opt-out through the FIRST message's tok
   const live = await w.oracle.query<{ revoked: boolean }>("SELECT revoked FROM kauro.outreach_authorizations WHERE authorization_id = $1", [o1.g.authorizationId]);
   assert.equal(live.rows[0]?.revoked, false, "order 1: the sealed grant is live and still never overrides the refusal");
   assert.equal(callsOf(w, o2.follow), 1, "order 2: one submission");
-  assert.equal(await prospectState(w, o2.s.prospect), "SUPPRESSED", "order 2: then SUPPRESSED");
+  assert.deepEqual([(await w.prospectAs(o2.s.seller, o2.s.prospect.prospectId))?.state], ["SUPPRESSED"], "order 2: then SUPPRESSED, as its seller is shown it");
+  for (const { order, s, stored } of runs) {
+    // the sequence stops: a further follow-up of the prospect is refused at send, its sealed grant notwithstanding
+    const next = await w.draft(s.seller, s.prospect, s.seller.sender, { purpose: "FOLLOW_UP", label: `m22-${order}-next` });
+    assert.equal(out(await send(w, s.seller, next, await w.grant([next]))), OUTCOME.KC016, `order ${order}: the follow-up after the opt-out is refused`);
+    await excludedEverywhere(`order ${order}`, s.prospect.contactKey, [{ seller: s.seller, prospect: s.prospect, stored }]);
+  }
   assert.deepEqual(runs.map((x) => x.r.secondBlocked), [true, true]);
   w.standAt(T0);
+});
+
+test("R2-130 control: with L8 removed from both actors (CELL_CONTROLS M21: its acquisition and its database assertion), an opt-out held after its registry INSERT no longer orders D2 — the provider is called for the contact whose opt-out was in flight, the red the cells' L8 prevents", async () => {
+  w.standAt(T0);
+  const contact = `m21-control-${Date.now()}@contact.example`;
+  const sellerA = await w.seller("m21-control-a");
+  const p1 = await staged(w, "m21-control-a", { seller: sellerA, prospect: await w.prospect(sellerA, { contact }) });
+  const token = tokenOf(w, await sentFirst(w, p1));
+  const sellerB = await w.seller("m21-control-b");
+  const p2 = await staged(w, "m21-control-b", { seller: sellerB, prospect: await w.prospect(sellerB, { contact }) });
+  const i2 = await queued(w, p2);
+  const points = new FaultPoints();
+  const local = { points } as unknown as FaultContext;
+  const oc = await w.open("kauro_outreach_test");
+  const dc = await w.open("kauro_outreach_test");
+  try {
+    await w.withoutSerializers(CELL_CONTROLS["M21"]!, async () => {
+      const pause = points.pause("db.suppression_insert.after");
+      const optOut = w.on(oc, "kauro_outreach", local, [W.suppressionInsert], () => w.routes.optOut(token));
+      await pause.reached; // the registry row is written, uncommitted; with L8 gone nothing holds D2 behind it
+      await w.on(dc, "kauro_outreach", local, [], () => D().dispatch(i2));
+      pause.release();
+      assert.ok((await optOut).status < 300, "the opt-out commits");
+    });
+  } finally {
+    await oc.end().catch(() => undefined);
+    await dc.end().catch(() => undefined);
+  }
+  assert.equal(callsOf(w, i2), 1, "without L8 the claim judged the registry before the opt-out committed and the provider was called (the forbidden effect)");
+  // the control is lifted: the next send of the key is refused again
+  const again = await staged(w, "m21-control-after", { seller: sellerB, prospect: p2.prospect });
+  assert.equal(out(await send(w, sellerB, again.draft, again.grant)), OUTCOME.KC016, "with L8 back the exclusion holds");
+});
+
+test("R2-130 boundary: the exclusion is derived without a privilege — kauro_outreach holds no UPDATE on prospects and no write on the transition history (kauro.commercial_transitions), and no SECURITY DEFINER routine is added or runnable by it", async () => {
+  const can = await w.oracle.query<{ prospects: boolean; transitions: boolean }>(
+    `SELECT has_table_privilege('kauro_outreach', 'kauro.prospects', 'UPDATE') OR has_any_column_privilege('kauro_outreach', 'kauro.prospects', 'UPDATE') AS prospects,
+            has_table_privilege('kauro_outreach', 'kauro.commercial_transitions', 'INSERT,UPDATE,DELETE') AS transitions`,
+  );
+  assert.deepEqual(can.rows, [{ prospects: false, transitions: false }]);
+  // the SECURITY DEFINER routines are the four payment ones migrations.test.ts justifies; none is the outreach service's to run
+  const definers = await w.oracle.query<{ fn: string; outreach: boolean }>(
+    "SELECT p.proname AS fn, has_function_privilege('kauro_outreach', p.oid, 'EXECUTE') AS outreach FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'kauro' AND p.prosecdef ORDER BY p.proname",
+  );
+  assert.deepEqual(definers.rows, [
+    { fn: "bank_owner_authority", outreach: false },
+    { fn: "payment_session_fence", outreach: false },
+    { fn: "register_bank_payment_route", outreach: false },
+    { fn: "route_provider_available_cents", outreach: false },
+  ]);
 });
 
 // --- R2-131 / R2-132 ---------------------------------------------------------------------------------------------------------------------

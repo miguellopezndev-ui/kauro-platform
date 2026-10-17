@@ -13,7 +13,7 @@ import type { Client } from "pg";
 import { ContractFakeGmailSend, ContractFakeResend } from "@kauro/application/testing";
 import type { OutreachPorts, OutreachSendPort, OutreachSubmission, OutreachSubmitAnswer } from "@kauro/application";
 import { toUtcInstant, type CommerceUnitOfWorkFactory, type CorrelationId, type ExecutionContext, type UserId } from "@kauro/domain";
-import { PgCommercialUnitOfWorkFactory, type PgCommercialUnitOfWork } from "@kauro/persistence";
+import { PgCommercialUnitOfWorkFactory, PgSalesRepository, type PgCommercialUnitOfWork } from "@kauro/persistence";
 import { ROLES, TEST_EFFECT_FROZEN_SETTING, raceStatementTimeoutMs, recordActiveSeller, openConnection, TEST_CLOCK_OFFSET_SETTING, type RecordedSeller, type HarnessConnection, type FaultContext, type StepClock } from "@kauro/persistence/testing";
 import { createOutreachDispatcher, outreachLeaseResource, type OutreachDispatcher, type OutreachLeaseRef } from "../src/outreach/dispatcher.js";
 import { outreachSealerOf } from "../src/outreach/routes.js";
@@ -24,6 +24,7 @@ import { statementsWorld } from "./statements-support.js";
 import { call as callApi, clock, completed, freshKey, ids, outcome as outcomeOf, type Reply } from "./support.js";
 import {
   CELL_CONTROLS,
+  SUBJECT,
   T0,
   plusMs,
   type ClassifiedAnswer,
@@ -623,10 +624,42 @@ export async function sendWorldOf(_label: string): Promise<SendWorld> {
       return { subject: row.subject, body: row.body };
     },
     async withoutSerializers<T>(control: Control, fn: () => Promise<T>): Promise<T> {
-      void control;
       void CELL_CONTROLS;
       void statementTimeout;
-      return notBuilt("world.withoutSerializers", "removing a lock's acquisition needs a statement-rewrite seam in FaultRouting (the production OutreachLocks stays untouched); red-proof leg, built at batch");
+      // built for the controls whose set is advisory subjects of §L only and that drop no co-guard (M21, M22, M23...: L8); a control naming a row lock,
+      // a lease or a co-guard is not removed here and says so instead of running half-removed
+      const kinds = control.locks.map((l) => SUBJECT[l]);
+      if (control.coGuards.length > 0 || kinds.some((k) => k === undefined)) {
+        return notBuilt("world.withoutSerializers", `a control with co-guards or non-advisory locks (${control.locks.join(", ")}; ${control.coGuards.join(", ") || "no co-guard"})`);
+      }
+      const dropped = kinds as string[];
+      // the database's half: kauro.outreach_require_lock (T2) asserts the dropped kinds no more while the control runs; restored verbatim after
+      const original = (await h.oracle.query<{ def: string }>("SELECT pg_get_functiondef('kauro.outreach_require_lock(text,text,text,text)'::regprocedure) AS def")).rows[0]!.def;
+      await h.oracle.query(
+        `CREATE OR REPLACE FUNCTION kauro.outreach_require_lock(kind text, subject text, mode text, what text) RETURNS void
+           LANGUAGE plpgsql STABLE SET search_path = pg_catalog AS
+         $control$
+         BEGIN
+           IF kind = ANY (ARRAY[${dropped.map((k) => `'${k.replace(/'/g, "''")}'`).join(", ")}]::text[]) THEN RETURN; END IF;
+           IF subject IS NULL OR NOT kauro.outreach_lock_held(kind, subject, mode) THEN
+             RAISE EXCEPTION 'LOCK_NOT_HELD: % requires % % of %', what, kind, mode, coalesce(subject, '(none)') USING ERRCODE = 'KA096';
+           END IF;
+         END
+         $control$`,
+      );
+      try {
+        // the units' half: every routed acquisition of the dropped kinds takes nothing
+        return await sw.faults.droppingLocks(dropped, fn);
+      } finally {
+        await h.oracle.query(original);
+      }
+    },
+    async prospectAs(person, prospectId) {
+      // the product's own reader (PgSalesRepository.getProspect) in the person's own session: what the seller or the owner is shown, under its RLS
+      return within(person.userId, state.standing ?? FIXTURE_AT, async (c) => {
+        const p = await new PgSalesRepository(c, ids).getProspect(prospectId as never);
+        return p === null ? null : { state: p.state, suppressed: p.suppressed, version: p.version, ownerSellerId: p.ownerSellerId ?? null };
+      });
     },
     routes: {
       revokeGrant: (g, key) => api({ url: `/api/v1/ops/outreach/authorizations/${g.authorizationId}/revoke`, token: owner.token, ...(key !== undefined ? { key } : {}), body: {} }),

@@ -292,6 +292,11 @@ export interface SendWorld {
    * assertion) and every listed co-guard dropped (K1 withoutGuards, b12-outreach-support.ts:421), everything else unchanged.
    */
   withoutSerializers<T>(control: Control, fn: () => Promise<T>): Promise<T>;
+  /**
+   * The prospect as the person is shown it: the product's reader (PgSalesRepository.getProspect) in the person's own session, under its RLS (null: the
+   * person may not read it). `state` and `suppressed` are effective (R2-130): the stored row, or SUPPRESSED when the suppression registry reaches it.
+   */
+  prospectAs(person: Person, prospectId: string): Promise<{ readonly state: string; readonly suppressed: boolean; readonly version: number; readonly ownerSellerId: string | null } | null>;
   /** The routes of the other lanes a race actor or a precondition needs (through their real handlers). */
   readonly routes: {
     revokeGrant(g: GrantP, key?: string): Promise<Reply>;
@@ -685,6 +690,19 @@ export async function senderState(w: SendWorld, senderId: string): Promise<strin
 }
 export async function sendersAt(w: SendWorld, address: string): Promise<number> {
   return (await w.oracle.query<{ n: number }>("SELECT count(*)::int AS n FROM kauro.sender_identities WHERE lower(address) = lower($1)", [address])).rows[0]!.n;
+}
+/** The prospect row as stored (superuser oracle): what no reader shows, the proof that an effective exclusion moved nothing stored. */
+export async function storedProspect(w: SendWorld, p: ProspectP): Promise<{ readonly state: string; readonly suppressed: boolean; readonly version: number }> {
+  return (await w.oracle.query<{ state: string; suppressed: boolean; version: number }>("SELECT state, suppressed, version::int AS version FROM kauro.prospects WHERE prospect_id = $1", [p.prospectId])).rows[0]!;
+}
+/** The suppression registry rows of a contact key (the authority of an opt-out): reason and principal. */
+export async function contactSuppressions(w: SendWorld, contactKey: string): Promise<Array<{ readonly reason: string; readonly recordedByService: string | null; readonly recordedByUserId: string | null }>> {
+  return (
+    await w.oracle.query<{ reason: string; recordedByService: string | null; recordedByUserId: string | null }>(
+      `SELECT reason, recorded_by_service AS "recordedByService", recorded_by_user_id::text AS "recordedByUserId" FROM kauro.prospect_suppressions WHERE key_kind = 'CONTACT' AND suppression_key = $1`,
+      [contactKey],
+    )
+  ).rows;
 }
 export async function prospectState(w: SendWorld, p: ProspectP): Promise<string> {
   return (await w.oracle.query<{ state: string }>("SELECT state FROM kauro.prospects WHERE prospect_id = $1", [p.prospectId])).rows[0]!.state;
